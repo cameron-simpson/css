@@ -308,6 +308,11 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             yield self.book_by_dbid(book.id, db_book=book)
             seen_dbids.add(book.id)
 
+  def identifier_names(self):
+    ''' Return an iterable of the identifiers in use in the library.
+    '''
+    return set(chain(*(cbook.identifiers.keys() for cbook in self)))
+
   def by_identifier(self, type_, value):
     ''' Generator yielding `CalibreBook`
         matching the provided `(type,val)` identifier.
