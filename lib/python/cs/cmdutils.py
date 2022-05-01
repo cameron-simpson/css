@@ -662,6 +662,9 @@ class BaseCommand:
 
   def apply_opts(self, opts):
     ''' Apply command line options.
+
+        Subclasses can override this
+        but it is usually easier to override `apply_opt(opt,val)`.
     '''
     for opt, val in opts:
       with Pfx(opt if val is None else "%s %r" % (opt, val)):
