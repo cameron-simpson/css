@@ -235,18 +235,18 @@ class BaseCommand:
 
           MyCommand(argv).run()
 
-      or via the convenience method:
-
-          MyCommand.run_argv(argv)
-
       Modules which implement a command line mode generally look like this:
 
           ... imports etc ...
+          def main(argv=None):
+              """ The command line mode.
+              """
+              return MyCommand(argv).run()
           ... other code ...
           class MyCommand(BaseCommand):
           ... other code ...
           if __name__ == '__main__':
-              sys.exit(MyCommand.run_argv(sys.argv))
+              sys.exit(main(sys.argv))
 
       Instances have a `self.options` attribute on which optional
       modes are set,
@@ -888,12 +888,6 @@ class BaseCommand:
         if attrfor is not None:
           setattr(attrfor, opt_name, value)
     return keyfor
-
-  @classmethod
-  def run_argv(cls, argv, **kw):
-    ''' Create an instance for `argv` and call its `.run()` method.
-    '''
-    return cls(argv).run(**kw)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
