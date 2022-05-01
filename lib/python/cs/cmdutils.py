@@ -867,7 +867,8 @@ class BaseCommand:
           opt_spec = cls._OptSpec.from_specs(*specs)
           opt_spec_map[opt] = opt_spec
         opt_name_map[opt] = opt_name
-    opts, argv = pfx_call(getopt, argv, shortopts, longopts)
+    opts, post_argv = getopt(argv, shortopts, longopts)
+    argv[:] = post_argv
     for opt, val in opts:
       with Pfx(opt):
         opt_name = opt_name_map[opt]
