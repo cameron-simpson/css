@@ -198,6 +198,65 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
                 "no AZW3, AZW or MOBI format from which to construct a CBZ"
             )
 
+      def pull(
+          self,
+          obook,
+          *,
+          doit=True,
+          formats=None,
+          runstate=None,
+          force=False,
+          quiet=False,
+          verbose=False,
+      ):
+        ''' Pull formats from another `CalibreBook`.
+
+            Parameters:
+            * `obook`: the other book
+            * `doit`: optional flag, default `True`;
+              import formats if true, report actions otherwise
+            * `formats`: optional list of Calibre format keys to pull if present
+            * `runstate`: optional `RunState` for early termination
+            * `force`: optional flag, default `False`;
+              if true import formats even if already present
+            * `quiet`: optional flag, default `False`;
+              if true only print warnings
+            * `verbose`: optional flag, default `False`;
+              if true print all actions and inactions
+        '''
+        if formats is None:
+          formats = sorted(obook.formats.keys())
+        with Pfx("%s <= %s", self, obook):
+          for fmtk in formats:
+            if runstate and runstate.cancelled:
+              break
+            ofmtpath = obook.formatpath(fmtk)
+            if ofmtpath is None:
+              continue
+            with Pfx(fmtk):
+              fmtpath = self.formatpath(fmtk)
+              if fmtpath is not None and not force:
+                if filecmp.cmp(fmtpath, ofmtpath):
+                  verbose and print(
+                      self, fmtk, "identical to", shortpath(ofmtpath)
+                  )
+                else:
+                  quiet or warning(
+                      "already present with different content\n"
+                      "  present: %s\n"
+                      "  other:   %s",
+                      shortpath(fmtpath),
+                      shortpath(ofmtpath),
+                  )
+                continue
+              # pylint: disable=expression-not-assigned
+              quiet or (
+                  print(
+                      self, '+', fmtk, '<=', shortpath(obook.formatpath(fmtk))
+                  ) if verbose else print(self, '+', "%s:%s" % (fmtk, obook))
+              )
+              self.add_format(ofmtpath, doit=doit, force=force, quiet=quiet)
+
     self.CalibreBook = CalibreBook
 
   def __str__(self):
