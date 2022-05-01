@@ -73,6 +73,11 @@ from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 DEFAULT_JOB_MAX = 16
 
+def main(argv=None):
+  ''' The `cloudbackup` command line mode.
+  '''
+  return CloudBackupCommand(argv).run()
+
 class CloudBackupCommand(BaseCommand):
   ''' A main programme instance.
   '''
@@ -2000,4 +2005,4 @@ class FileBackupState(UUIDedDict):
     return AttrableMapping(backups[0])
 
 if __name__ == '__main__':
-  sys.exit(CloudBackupCommand.run_argv(sys.argv))
+  sys.exit(main(sys.argv))
