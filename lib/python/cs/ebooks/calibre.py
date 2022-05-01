@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import filecmp
 from functools import lru_cache, total_ordering
-from getopt import GetoptError
+from getopt import GetoptError, getopt
 from itertools import chain
 import json
 import os
@@ -807,7 +807,10 @@ class CalibreCommand(BaseCommand):
   def cmd_pull(self, argv):
     ''' Usage: {cmd} [-n] other-library [identifier-name [identifier-values...]]
           Import formats from another Calibre library.
-          -n  No action: recite planned actions.
+          -f    Force. Overwrite existing formats with formats from other-library.
+          -n    No action: recite planned actions.
+          -q    Quiet. Only issue warnings and errors.
+          -v    Verbose. Print more information.
           other-library: the path to another Calibre library tree
           identifier-name: the key on which to link matching books;
             the default is {DEFAULT_LINK_IDENTIFIER}
@@ -821,11 +824,23 @@ class CalibreCommand(BaseCommand):
     calibre = options.calibre
     runstate = options.runstate
     doit = True
+    force = False
     quiet = False
     verbose = False
-    if argv and argv[0] == '-n':
-      argv.pop(0)
-      doit = False
+    opts, argv = getopt(argv, 'fnqv')
+    for opt, _ in opts:
+      if opt == '-f':
+        force = False
+      elif opt == '-n':
+        doit = False
+      elif opt == '-q':
+        quiet = True
+        verbose = False
+      elif opt == '-v':
+        quiet = False
+        verbose = True
+      else:
+        raise RuntimeError("unhandled option: %r" % (opt,))
     other_library = self.popargv(argv, "other-library", CalibreTree)
     with Pfx(other_library.shortpath):
       if other_library is calibre:
@@ -839,9 +854,8 @@ class CalibreCommand(BaseCommand):
           warning("ignoring extra arguments after identifier-name=?: %r", argv)
         print("Default identifier:", self.DEFAULT_LINK_IDENTIFIER)
         print("Available idenitifiers in %s:" % (other_library,))
-        for idv in sorted(set(chain(*(obook.identifiers.keys()
-                                      for obook in other_library)))):
-          print(" ", idv)
+        for identifier_name in sorted(other_library.identifier_names()):
+          print(" ", identifier_name)
         return 0
       obooks_map = {
           idv: obook
@@ -851,6 +865,13 @@ class CalibreCommand(BaseCommand):
           )
           if idv is not None
       }
+      if not obooks_map:
+        raise GetoptError(
+            "no books have the identifier %r; identifiers in use are: %s" % (
+                identifier_name,
+                ', '.join(sorted(other_library.identifier_names()))
+            )
+        )
       if argv:
         identifier_values = argv
       else:
@@ -866,7 +887,6 @@ class CalibreCommand(BaseCommand):
         for identifier_value in progressbar(identifier_values,
                                             "pull " + other_library.shortpath):
           if runstate.cancelled:
-            xit = 1
             break
           with Pfx.scope("%s=%s", identifier_name, identifier_value):
             try:
@@ -877,14 +897,30 @@ class CalibreCommand(BaseCommand):
               continue
             with proxy.extend_prefix(
                 "%s=%s: %s" % (identifier_name, identifier_value, obook)):
-              Pfx.push("foreign book %s", obook)
+              if not obook.formats:
+                verbose and print("no formats to pull")
+                continue
               cbooks = list(
                   calibre.by_identifier(identifier_name, identifier_value)
               )
               if not cbooks:
-                cbook = None
+                # new book
+                fmtk = list(obook.formats.keys())[0]
+                ofmtpath = obook.formatpath(fmtk)
+                # pylint: disable=expression-not-assigned
+                quiet or (
+                    print(
+                        "new book from %s:%s <= %s" %
+                        (fmtk, obook, shortpath(ofmtpath))
+                    ) if verbose else
+                    print("new book from %s:%s" % (fmtk, obook))
+                )
+                dbid = calibre.add(
+                    ofmtpath, doit=doit, quiet=quiet, verbose=verbose
+                )
+                cbook = calibre[dbid]
               elif len(cbooks) > 1:
-                warning(
+                verbose or warning(
                     "  \n".join(
                         [
                             "multiple \"local\" books with this identifier:",
@@ -892,42 +928,18 @@ class CalibreCommand(BaseCommand):
                         ]
                     )
                 )
-                cbook = None
+                continue
               else:
                 cbook, = cbooks
-              oformats = obook.formats
-              for fmtk in sorted(oformats.keys()):
-                if runstate.cancelled:
-                  xit = 1
-                  break
-                with Pfx(fmtk):
-                  ##pfxprint(" ", fmtk, fmtsubpath)
-                  ofmtpath = obook.formatpath(fmtk)
-                  if cbook is None:
-                    # pylint: disable=expression-not-assigned
-                    quiet or (
-                        print(
-                            "new book from %s:%s <= %s" %
-                            (fmtk, obook, shortpath(ofmtpath))
-                        ) if verbose else
-                        print("new book from %s:%s" % (fmtk, obook))
-                    )
-                    dbid = calibre.add(ofmtpath, doit=doit, quiet=quiet)
-                    cbook = calibre[dbid]
-                  elif fmtk in cbook.formats:
-                    fmtpath = cbook.formatpath(fmtk)
-                    if not filecmp.cmp(fmtpath, ofmtpath):
-                      warning("already present with different content")
-                  else:
-                    # pylint: disable=expression-not-assigned
-                    quiet or (
-                        print(
-                            cbook, '+', fmtk, '<=',
-                            shortpath(obook.formatpath(fmtk))
-                        ) if verbose else
-                        print(cbook, '+', "%s:%s" % (fmtk, obook))
-                    )
-                    cbook.add_format(fmtpath, doit=doit, quiet=quiet)
+              cbook.pull(
+                  obook,
+                  runstate=runstate,
+                  force=force,
+                  quiet=quiet,
+                  verbose=verbose
+              )
+      if runstate.cancelled:
+        xit = 1
       return xit
 
 if __name__ == '__main__':
