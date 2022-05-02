@@ -246,6 +246,11 @@ class BaseCommandOptions(SimpleNamespace):
     '''
     self.dry_run = not new_doit
 
+  def popopts(self, argv, **opt_specs):
+    ''' Convenience method to appply `BaseCommand.popopts` to the options.
+    '''
+    return BaseCommand.popopts(argv, self, **opt_specs)
+
 class BaseCommand:
   ''' A base class for handling nestable command lines.
 
@@ -878,7 +883,6 @@ class BaseCommand:
           shortopts += opt_name
           if needs_arg:
             shortopts += ':'
-          opt = '-' + opt_name
         elif len(opt_name) > 1:
           opt_dashed = opt_name.replace('_', '-')
           opt = '--' + opt_dashed
