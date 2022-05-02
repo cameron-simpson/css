@@ -39,17 +39,21 @@ DISTINFO = {
 }
 
 # TODO: merge into cs.psutils
-def run(argv, quiet=False, **subp_options):
+def run(argv, doit=True, quiet=False, **subp_options):
   ''' Run a command via `subprocess.run`.
-      Return the `CompletedProcess` result.
+      Return the `CompletedProcess` result or `None` if `doit` is false.
 
       Parameters:
       * `argv`: the command line to run
+      * `doit`: optional flag, default `True`;
+        if false do not run the command and return `None`
       * `quiet`: default `False`; if true, do not print the command or its output
       * `subp_options`: optional mapping of keyword arguments
         to pass to `subprocess.run`
   '''
   quiet or print(shlex.join(argv))
+  if not doit:
+    return None
   with Upd().above():
     cp = pfx_call(subprocess_run, argv, **subp_options)
     if cp.stdout and not quiet:
