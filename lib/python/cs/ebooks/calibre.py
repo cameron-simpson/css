@@ -340,6 +340,15 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.db.shell()
 
+  def preload(self):
+    ''' Scan all the books, preload their data.
+    '''
+    with UpdProxy(text=f"preload {self}"):
+      db = self.db
+      with db.session() as session:
+        for db_book in self.db.books.lookup(session=session):
+          self.book_by_dbid(db_book.id, db_book=db_book)
+
   @typechecked
   def __getitem__(self, dbid: int):
     return self.book_by_dbid(dbid)
@@ -852,6 +861,7 @@ class CalibreCommand(BaseCommand):
       assert not argv
     else:
       cbooks = calibre
+      calibre.preload()
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
@@ -978,6 +988,7 @@ class CalibreCommand(BaseCommand):
             )
         ]
       xit = 0
+      calibre.preload()
       with UpdProxy(prefix="pull " + other_library.shortpath + ": ") as proxy:
         for identifier_value in progressbar(identifier_values,
                                             "pull " + other_library.shortpath):
