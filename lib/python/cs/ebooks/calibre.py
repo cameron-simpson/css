@@ -333,6 +333,15 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   def __getitem__(self, dbid: int):
     return self.book_by_dbid(dbid)
 
+  def __contains__(self, dbid: int):
+    db = self.db
+    try:
+      with db.session() as session:
+        db.books.by_id(dbid, session=session)
+    except IndexError:
+      return False
+    return True
+
   @lru_cache(maxsize=None)
   @typechecked
   @require(lambda dbid: dbid > 0)
@@ -810,19 +819,30 @@ class CalibreCommand(BaseCommand):
     return xit
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l]
+    ''' Usage: {cmd} [-l] [dbids...]
           List the contents of the Calibre library.
     '''
     options = self.options
     options.longmode = False
     options.popopts(argv, l='longmode')
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    calibre = options.calibre
-    runstate = options.runstate
     longmode = options.longmode
+    calibre = options.calibre
     xit = 0
-    for cbook in calibre:
+    cbooks = []
+    if argv:
+      while argv:
+        dbid = self.popargv(argv, "dbid", int)
+        if dbid not in calibre:
+          warning("unknown dbid %d", dbid)
+          xit = 1
+          continue
+        cbook = calibre[dbid]
+        cbooks.append(cbook)
+      assert not argv
+    else:
+      cbooks = calibre
+    runstate = options.runstate
+    for cbook in cbooks:
       if runstate.cancelled:
         xit = 1
         break
