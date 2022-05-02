@@ -454,7 +454,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
   @pfx_method
-  def add(self, bookpath, doit=True, quiet=False):
+  def add(self, bookpath, doit=True, quiet=False, **subp_options):
     ''' Add a book file via the `calibredb add` command.
         Return the database id or `None` if `doit` is false or the command fails.
     '''
@@ -462,9 +462,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         'add',
         '--duplicates',
         bookpath,
-        subp_options=dict(stdin=DEVNULL, capture_output=True, text=True),
         doit=doit,
         quiet=quiet,
+        stdin=DEVNULL,
+        capture_output=True,
+        text=True,
+        **subp_options,
     )
     if cp is None:
       return None
