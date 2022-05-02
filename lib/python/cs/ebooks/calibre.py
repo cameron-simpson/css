@@ -441,9 +441,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     calargv = [calcmd, *calargv]
     return run(calargv, doit=doit, quiet=quiet, **subp_options)
 
-  def calibredb(self, dbcmd, *argv, subp_options=None, doit=True, quiet=False):
+  def calibredb(self, dbcmd, *argv, doit=True, quiet=False, **subp_options):
     ''' Run `dbcmd` via the `calibredb` command.
-        Return a `CompletedProcess`.
+        Return a `CompletedProcess` or `None` if `doit` is false.
     '''
     subp_argv = [
         'calibredb',
