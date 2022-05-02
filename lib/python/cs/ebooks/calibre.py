@@ -172,6 +172,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             Parameters:
             * `bookpath`: filesystem path to the source MOBI file
             * `dbid`: the Calibre database id
+            * `doit`: default `True`; do not run the command if false
             * `force`: replace an existing format if already present, default `False`
         '''
         self.tree.calibredb(
@@ -406,7 +407,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.by_identifier('mobi-asin', asin.upper())
 
-  def _run(self, calcmd, *calargv, quiet=False, subp_options=None):
+  def _run(self, calcmd, *calargv, doit=True, quiet=False, subp_options=None):
     ''' Run a Calibre utility command.
         Return the `CompletedProcess` result.
 
@@ -415,6 +416,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           if the command name is not an absolute path
           it is expected to come from `self.CALIBRE_BINDIR_DEFAULT`
         * `calargv`: the arguments for the command
+        * `doit`: default `True`; do not run the command of false
         * `quiet`: default `False`; if true, do not print the command or its output
         * `subp_options`: optional mapping of keyword arguments
           to pass to `subprocess.run`
@@ -427,7 +429,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     if not isabspath(calcmd):
       calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
     calargv = [calcmd, *calargv]
-    return run(calargv, quiet=quiet, **subp_options)
+    return run(calargv, doit=doit, quiet=quiet, **subp_options)
 
   def calibredb(self, dbcmd, *argv, subp_options=None, doit=True, quiet=False):
     ''' Run `dbcmd` via the `calibredb` command.
@@ -439,15 +441,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         '--library-path=' + self.fspath,
         *argv,
     ]
-    if not doit:
-      print(shlex.join(subp_argv))
-      return None
-    return self._run(*subp_argv, subp_options=subp_options, quiet=quiet)
+    return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
   @pfx_method
   def add(self, bookpath, doit=True, quiet=False):
     ''' Add a book file via the `calibredb add` command.
-        Return the database id.
+        Return the database id or `None` if `doit` is false or the command fails.
     '''
     cp = self.calibredb(
         'add',
