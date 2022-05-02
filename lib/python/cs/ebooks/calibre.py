@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#
+# pylint: disable=too-many-lines
 
 ''' Support for Calibre libraries.
 '''
@@ -7,7 +9,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import filecmp
 from functools import lru_cache, total_ordering
-from getopt import GetoptError, getopt
+from getopt import GetoptError
 from itertools import chain
 import json
 import os
@@ -64,6 +66,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
 
+  # pylint: disable=too-many-statements
   def __init__(self, calibrepath):
     super().__init__(calibrepath)
 
@@ -438,6 +441,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
 
+# pylint: disable=too-many-instance-attributes
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
   '''
