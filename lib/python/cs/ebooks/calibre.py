@@ -165,26 +165,36 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           force: bool = False,
           doit=True,
           quiet=False,
+          **subp_options,
       ):
-        ''' Add a book file to the existing book entry with database id `dbid`
+        ''' Add a book file to the existing book formats
             via the `calibredb add_format` command.
+            Return `True` if the `doit` is false or the command succeeds,
+            `False` otherwise.
 
             Parameters:
             * `bookpath`: filesystem path to the source MOBI file
-            * `dbid`: the Calibre database id
             * `doit`: default `True`; do not run the command if false
             * `force`: replace an existing format if already present, default `False`
+            * `quiet`: default `False`; only print warning if true
         '''
-        self.tree.calibredb(
+        cp = self.tree.calibredb(
             'add_format',
             *(() if force else ('--dont-replace',)),
             str(self.id),
             bookpath,
-            subp_options=dict(stdin=DEVNULL),
             doit=doit,
             quiet=quiet,
+            stdin=DEVNULL,
+            **subp_options,
         )
+        if cp is None:
+          return True
+        if cp.return_code != 0:
+          warning("command fails, return code %d", cp.return_code)
+          return False
         self.refresh_from_db()
+        return True
 
       @property
       def mobipath(self):
