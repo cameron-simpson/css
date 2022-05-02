@@ -809,6 +809,30 @@ class CalibreCommand(BaseCommand):
           Upd().out('')
           yield
 
+  def popbooks(self, argv, once=False):
+    ''' Convert a list of book specifiers (currently dbids) to books.
+        Return `(cbooks,ok)` where `cbooks` is a list of books
+        and `ok` is true if all specifiers resolved.
+
+        If `once` is true (default `False`) process only the first argument.
+    '''
+    options = self.options
+    calibre = options.calibre
+    ok = True
+    cbooks = []
+    while argv:
+      dbid = self.poparg(argv, "dbid", int)
+      if dbid not in calibre:
+        warning("unknown dbid %d", dbid)
+        ok = False
+      else:
+        cbook = calibre[dbid]
+        cbooks.append(cbook)
+      if once:
+        break
+    assert not argv
+    return cbooks, ok
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database prompt.
@@ -836,20 +860,18 @@ class CalibreCommand(BaseCommand):
     calibre = options.calibre
     runstate = options.runstate
     xit = 0
-    for dbid_s in argv:
-      if runstate.cancelled:
-        xit = 1
-        break
-      with Pfx(dbid_s):
-        try:
-          dbid = int(dbid_s)
-        except ValueError as e:
-          warning("invalid dbid: %s", e)
-          xit = 1
+    while argv and not runstate.cancelled:
+      with Pfx(argv[0]):
+        cbooks, ok = self.popbooks(argv, once=True)
+        if not ok:
+          xit = 2
           continue
-        cbook = calibre[dbid]
-        with Pfx("%s: make_cbz", cbook.title):
-          cbook.make_cbz()
+        for cbook in cbooks:
+          if runstate.cancelled:
+            break
+          pfx_call(cbook.make_cbz)
+    if runstate.cancelled:
+      xit = 1
     return xit
 
   def cmd_ls(self, argv):
@@ -864,22 +886,15 @@ class CalibreCommand(BaseCommand):
     xit = 0
     cbooks = []
     if argv:
-      while argv:
-        dbid = self.popargv(argv, "dbid", int)
-        if dbid not in calibre:
-          warning("unknown dbid %d", dbid)
-          xit = 1
-          continue
-        cbook = calibre[dbid]
-        cbooks.append(cbook)
-      assert not argv
+      cbooks, ok = self.popbooks(argv)
+      if not ok:
+        raise GetoptError("invalid book specifiers")
     else:
       cbooks = calibre
       calibre.preload()
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
-        xit = 1
         break
       with Pfx("%d:%s", cbook.id, cbook.title):
         print(f"{cbook.title} ({cbook.dbid})")
@@ -896,6 +911,8 @@ class CalibreCommand(BaseCommand):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
               print("   ", fmt, transcribe_bytes_geek(size), subpath)
+    if runstate.cancelled:
+      xit = 1
     return xit
 
   # pylint: disable=too-many-branches
