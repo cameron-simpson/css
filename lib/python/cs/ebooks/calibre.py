@@ -44,6 +44,7 @@ from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import cutprefix
 from cs.logutils import warning
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
@@ -72,7 +73,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
     # define the proxy classes
 
-    class CalibreBook(RelationProxy(self.db.books, [
+    class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
         'author_sort',
         'authors',
         'flags',
@@ -92,10 +93,20 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       ''' A reference to a book in a Calibre library.
       '''
 
+      @classmethod
+      def _singleton_key(cls, tree: CalibreTree, dbid: int, db_book=None):
+        ''' The singleton key is `(tree,dbid)`.
+        '''
+        return id(tree), dbid
+
       @typechecked
       def __init__(self, tree: CalibreTree, dbid: int, db_book=None):
-        super().__init__(dbid, db_row=db_book)
-        self.tree = tree
+        if 'tree' in self.__dict__:
+          if db_book is not None:
+            self.refresh_from_db(db_row=db_book)
+        else:
+          super().__init__(dbid, db_row=db_book)
+          self.tree = tree
 
       def __str__(self):
         return f"{self.dbid}: {self.title}"
