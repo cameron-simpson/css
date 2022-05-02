@@ -813,15 +813,14 @@ class CalibreCommand(BaseCommand):
     ''' Usage: {cmd} [-l]
           List the contents of the Calibre library.
     '''
-    long = False
-    if argv and argv[0] == '-l':
-      long = True
-      argv.pop(0)
+    options = self.options
+    options.longmode = False
+    options.popopts(argv, l='longmode')
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    options = self.options
     calibre = options.calibre
     runstate = options.runstate
+    longmode = options.longmode
     xit = 0
     for cbook in calibre:
       if runstate.cancelled:
@@ -829,7 +828,7 @@ class CalibreCommand(BaseCommand):
         break
       with Pfx("%d:%s", cbook.id, cbook.title):
         print(f"{cbook.title} ({cbook.dbid})")
-        if long:
+        if longmode:
           print(" ", cbook.path)
           identifiers = cbook.identifiers
           if identifiers:
