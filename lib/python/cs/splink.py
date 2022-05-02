@@ -671,11 +671,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     if argv and argv[0] == '--show':
       show_image = True
       argv.pop(0)
-    imgpath = self.popargv(
+    imgpath = self.poparg(
         argv, "tspath", str, lambda path: not existspath(path),
         "already exists"
     )
-    days = self.popargv(argv, int, "days to display", lambda days: days > 0)
+    days = self.poparg(argv, int, "days to display", lambda days: days > 0)
     if not argv:
       argv = '*'
     options = self.options

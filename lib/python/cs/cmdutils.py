@@ -695,7 +695,7 @@ class BaseCommand:
     @classmethod
     def from_specs(cls, *specs):
       ''' Construct an `_OptSpec` from a list of positional parameters
-          as for `popargv()`.
+          as for `poparg()`.
       '''
       parse = None
       help_text = None
@@ -747,7 +747,7 @@ class BaseCommand:
       return value
 
   @classmethod
-  def popargv(cls, argv: List[str], *a):
+  def poparg(cls, argv: List[str], *a):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
         Raises `getopt.GetoptError` on a missing or invalid argument.
@@ -774,8 +774,8 @@ class BaseCommand:
 
         Typical use inside a `main` or `cmd_*` method might look like:
 
-            self.options.word = self.popargv(argv, int, "a count value")
-            self.options.word = self.popargv(
+            self.options.word = self.poparg(argv, int, "a count value")
+            self.options.word = self.poparg(
                 argv, int, "a count value",
                lambda count: count > 0, "count should be positive")
 
@@ -785,19 +785,19 @@ class BaseCommand:
         Demonstration:
 
             >>> argv = ['word', '3', 'nine', '4']
-            >>> BaseCommand.popargv(argv, "word to process")
+            >>> BaseCommand.poparg(argv, "word to process")
             'word'
-            >>> BaseCommand.popargv(argv, int, "count value")
+            >>> BaseCommand.poparg(argv, int, "count value")
             3
-            >>> BaseCommand.popargv(argv, float, "length")
+            >>> BaseCommand.poparg(argv, float, "length")
             Traceback (most recent call last):
               ...
             getopt.GetoptError: length 'nine': float('nine'): could not convert string to float: 'nine'
-            >>> BaseCommand.popargv(argv, float, "width", lambda width: width > 5)
+            >>> BaseCommand.poparg(argv, float, "width", lambda width: width > 5)
             Traceback (most recent call last):
               ...
             getopt.GetoptError: width '4': invalid value
-            >>> BaseCommand.popargv(argv, float, "length")
+            >>> BaseCommand.poparg(argv, float, "length")
             Traceback (most recent call last):
               ...
             getopt.GetoptError: length: missing argument
