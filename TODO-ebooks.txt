@@ -1,3 +1,4 @@
+CalibreCommand.popbooks: add /title-or-author-or-tag-or-desc and title:title-or-/regexp etc modes
 doit and verbose parameters for cs.psutils.run
 general selection function to slot in for dbids
 calibre tags: tag editor or something
