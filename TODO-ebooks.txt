@@ -1,3 +1,4 @@
+doit and verbose parameters for cs.psutils.run
 general selection function to slot in for dbids
 calibre tags: tag editor or something
 calibre convert: bulk format infill, EPUB if no CBZ
