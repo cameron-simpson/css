@@ -1022,6 +1022,9 @@ class CalibreCommand(BaseCommand):
                     print("new book from %s:%s" % (fmtk, obook))
                 )
                 dbid = calibre.add(ofmtpath, doit=doit, quiet=quiet)
+                if not doit:
+                  # we didn't make a new book, so move to the next one
+                  continue
                 cbook = calibre[dbid]
               elif len(cbooks) > 1:
                 verbose or warning(
