@@ -44,6 +44,7 @@ from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import cutprefix
 from cs.logutils import warning
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
@@ -53,7 +54,7 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 from . import run
 
@@ -72,7 +73,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
     # define the proxy classes
 
-    class CalibreBook(RelationProxy(self.db.books, [
+    class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
         'author_sort',
         'authors',
         'flags',
@@ -92,10 +93,20 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       ''' A reference to a book in a Calibre library.
       '''
 
+      @classmethod
+      def _singleton_key(cls, tree: CalibreTree, dbid: int, db_book=None):
+        ''' The singleton key is `(tree,dbid)`.
+        '''
+        return id(tree), dbid
+
       @typechecked
       def __init__(self, tree: CalibreTree, dbid: int, db_book=None):
-        super().__init__(dbid, db_row=db_book)
-        self.tree = tree
+        if 'tree' in self.__dict__:
+          if db_book is not None:
+            self.refresh_from_db(db_row=db_book)
+        else:
+          super().__init__(dbid, db_row=db_book)
+          self.tree = tree
 
       def __str__(self):
         return f"{self.dbid}: {self.title}"
@@ -120,6 +131,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @classmethod
       def refresh_from_db_row(cls, db_row, fields, *, session):
+        ''' Refresh the cached values from the database.
+        '''
         super().refresh_from_db_row(db_row, fields, session=session)
         fields['authors'] = db_row.authors
         fields['formats'] = {
@@ -292,7 +305,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
                   self, fmtk, "identical to", shortpath(ofmtpath)
               )
             else:
-              quiet or warning(
+              verbose and warning(
                   "already present with different content\n"
                   "  present: %s\n"
                   "  other:   %s",
@@ -328,6 +341,15 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Interactive db shell.
     '''
     return self.db.shell()
+
+  def preload(self):
+    ''' Scan all the books, preload their data.
+    '''
+    with UpdProxy(text=f"preload {self}"):
+      db = self.db
+      with db.session() as session:
+        for db_book in self.db.books.lookup(session=session):
+          self.book_by_dbid(db_book.id, db_book=db_book)
 
   @typechecked
   def __getitem__(self, dbid: int):
@@ -771,8 +793,8 @@ class CalibreCommand(BaseCommand):
             options,
             kindle=kt,
             calibre=cal,
-            verbose=True,
         ):
+          Upd().out('')
           yield
 
   def cmd_dbshell(self, argv):
@@ -841,6 +863,7 @@ class CalibreCommand(BaseCommand):
       assert not argv
     else:
       cbooks = calibre
+      calibre.preload()
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
@@ -902,7 +925,7 @@ class CalibreCommand(BaseCommand):
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
   def cmd_pull(self, argv):
-    ''' Usage: {cmd} [-n] other-library [identifier-name [identifier-values...]]
+    ''' Usage: {cmd} [-fnqv] other-library [identifier-name [identifier-values...]]
           Import formats from another Calibre library.
           -f    Force. Overwrite existing formats with formats from other-library.
           -n    No action: recite planned actions.
@@ -917,6 +940,7 @@ class CalibreCommand(BaseCommand):
             If no identifiers are provided, all books which have
             the specified identifier will be pulled.
     '''
+    Upd().out("pull " + shlex.join(argv))
     options = self.options
     calibre = options.calibre
     runstate = options.runstate
@@ -941,14 +965,15 @@ class CalibreCommand(BaseCommand):
         for identifier_name in sorted(other_library.identifier_names()):
           print(" ", identifier_name)
         return 0
-      obooks_map = {
-          idv: obook
-          for idv, obook in (
-              (obook.identifiers.get(identifier_name), obook)
-              for obook in other_library
-          )
-          if idv is not None
-      }
+      with UpdProxy(text=f"scan identifiers from {other_library}..."):
+        obooks_map = {
+            idv: obook
+            for idv, obook in (
+                (obook.identifiers.get(identifier_name), obook)
+                for obook in other_library
+            )
+            if idv is not None
+        }
       if not obooks_map:
         raise GetoptError(
             "no books have the identifier %r; identifiers in use are: %s" % (
@@ -967,6 +992,7 @@ class CalibreCommand(BaseCommand):
             )
         ]
       xit = 0
+      calibre.preload()
       with UpdProxy(prefix="pull " + other_library.shortpath + ": ") as proxy:
         for identifier_value in progressbar(identifier_values,
                                             "pull " + other_library.shortpath):
@@ -1000,7 +1026,11 @@ class CalibreCommand(BaseCommand):
                     print("new book from %s:%s" % (fmtk, obook))
                 )
                 dbid = calibre.add(ofmtpath, doit=doit, quiet=quiet)
+                if not doit:
+                  # we didn't make a new book, so move to the next one
+                  continue
                 cbook = calibre[dbid]
+                quiet or print('new', cbook, '<=', obook)
               elif len(cbooks) > 1:
                 verbose or warning(
                     "  \n".join(
@@ -1016,6 +1046,7 @@ class CalibreCommand(BaseCommand):
               cbook.pull(
                   obook,
                   runstate=runstate,
+                  doit=doit,
                   force=force,
                   quiet=quiet,
                   verbose=verbose
