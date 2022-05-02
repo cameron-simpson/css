@@ -578,7 +578,7 @@ class KindleCommand(BaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_export(self, argv):
-    ''' Usage: {cmd} [-n] [ASINs...]
+    ''' Usage: {cmd} [-fnqv] [ASINs...]
           Export AZW files to Calibre library.
           -f    Force: replace the AZW3 format if already present.
           -n    No action, recite planned actions.
@@ -591,21 +591,11 @@ class KindleCommand(BaseCommand):
     kindle = options.kindle
     calibre = options.calibre
     runstate = options.runstate
-    doit = True
-    force = False
-    verbose = False
-    opts, argv = getopt(argv, 'fnv')
-    for opt, _ in opts:
-      if opt == '-f':
-        force = False
-      elif opt == '-n':
-        doit = False
-      elif opt == '-q':
-        verbose = False
-      elif opt == '-v':
-        verbose = True
-      else:
-        raise RuntimeError("unhandled option: %r" % (opt,))
+    self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
+    doit = options.doit
+    force = options.force
+    quiet = options.quiet
+    verbose = options.verbose
     if not argv:
       argv = sorted(kindle.asins())
     xit = 0
@@ -618,8 +608,9 @@ class KindleCommand(BaseCommand):
           cbook, added = kbook.export_to_calibre(
               calibre,
               doit=doit,
+              force=force,
               replace_format=force,
-              quiet=not verbose,
+              quiet=quiet,
               verbose=verbose,
           )
         except ValueError as e:
