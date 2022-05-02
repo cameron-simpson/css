@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#
+# pylint: disable=too-many-lines
 
 ''' Support for Calibre libraries.
 '''
@@ -7,7 +9,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import filecmp
 from functools import lru_cache, total_ordering
-from getopt import GetoptError, getopt
+from getopt import GetoptError
 from itertools import chain
 import json
 import os
@@ -64,6 +66,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
 
+  # pylint: disable=too-many-statements
   def __init__(self, calibrepath):
     super().__init__(calibrepath)
 
@@ -81,6 +84,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         'pubdate',
         'series_index',
         'sort',
+        'tags',
         'timestamp',
         'title',
         'uuid',
@@ -127,6 +131,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             identifier.type: identifier.val
             for identifier in db_row.identifiers
         }
+        fields['tags'] = [tag.name for tag in db_row.tags]
 
       def formatpath(self, fmtk):
         ''' Return the filesystem path of the format file for `fmtk`
@@ -328,6 +333,15 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   def __getitem__(self, dbid: int):
     return self.book_by_dbid(dbid)
 
+  def __contains__(self, dbid: int):
+    db = self.db
+    try:
+      with db.session() as session:
+        db.books.by_id(dbid, session=session)
+    except IndexError:
+      return False
+    return True
+
   @lru_cache(maxsize=None)
   @typechecked
   @require(lambda dbid: dbid > 0)
@@ -436,6 +450,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
 
+# pylint: disable=too-many-instance-attributes
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
   '''
@@ -647,8 +662,28 @@ class CalibreMetadataDB(ORM):
       key = Column(String, nullable=False, unique=True)
       value = Column("val", String, nullable=False)
 
+    @total_ordering
+    class Tags(Base, _CalibreTable):
+      ''' A tag.
+      '''
+      __tablename__ = 'tags'
+      name = Column(String, nullable=False, unique=True)
+
+      def __hash__(self):
+        return self.id
+
+      def __eq__(self, other):
+        return self.id == other.id
+
+      def __lt__(self, other):
+        return self.name.lower() < other.name.lower()
+
     class BooksAuthorsLink(Base, _linktable('book', 'author')):
       ''' Link table between `Books` and `Authors`.
+      '''
+
+    class BooksTagsLink(Base, _linktable('book', 'tag')):
+      ''' Link table between `Books` and `Tags`.
       '''
 
     ##class BooksLanguagesLink(Base, _linktable('book', 'lang_code')):
@@ -661,11 +696,16 @@ class CalibreMetadataDB(ORM):
     Books.authors = association_proxy('author_links', 'author')
     Books.identifiers = relationship(Identifiers)
     Books.formats = relationship(Data, backref="book")
+    Books.tag_links = relationship(BooksTagsLink)
+    Books.tags = association_proxy('tag_links', 'tag')
 
     ##Books.language_links = relationship(BooksLanguagesLink)
     ##Books.languages = association_proxy('languages_links', 'languages')
 
     Identifiers.book = relationship(Books, back_populates="identifiers")
+
+    Tags.book_links = relationship(BooksTagsLink)
+    Tags.books = association_proxy('book_links', 'book')
 
     # references to table definitions
     self.authors = Authors
@@ -678,6 +718,8 @@ class CalibreMetadataDB(ORM):
     Languages.orm = self
     self.preferences = Preferences
     Preferences.orm = self
+    self.tags = Tags
+    Tags.orm = self
 
 class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
@@ -777,30 +819,43 @@ class CalibreCommand(BaseCommand):
     return xit
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l]
+    ''' Usage: {cmd} [-l] [dbids...]
           List the contents of the Calibre library.
     '''
-    long = False
-    if argv and argv[0] == '-l':
-      long = True
-      argv.pop(0)
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
+    options.longmode = False
+    options.popopts(argv, l='longmode')
+    longmode = options.longmode
     calibre = options.calibre
-    runstate = options.runstate
     xit = 0
-    for cbook in calibre:
+    cbooks = []
+    if argv:
+      while argv:
+        dbid = self.popargv(argv, "dbid", int)
+        if dbid not in calibre:
+          warning("unknown dbid %d", dbid)
+          xit = 1
+          continue
+        cbook = calibre[dbid]
+        cbooks.append(cbook)
+      assert not argv
+    else:
+      cbooks = calibre
+    runstate = options.runstate
+    for cbook in cbooks:
       if runstate.cancelled:
         xit = 1
         break
       with Pfx("%d:%s", cbook.id, cbook.title):
         print(f"{cbook.title} ({cbook.dbid})")
-        if long:
+        if longmode:
           print(" ", cbook.path)
           identifiers = cbook.identifiers
           if identifiers:
             print("   ", TagSet(identifiers))
+          tags = cbook.tags
+          if tags:
+            print("   ", ", ".join(sorted(tags)))
           for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
               fspath = calibre.pathto(subpath)
@@ -865,10 +920,6 @@ class CalibreCommand(BaseCommand):
     options = self.options
     calibre = options.calibre
     runstate = options.runstate
-    options.doit = True
-    options.force = False
-    options.quiet = False
-    options.verbose = False
     self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
     other_library = self.popargv(argv, "other-library", CalibreTree)
     doit = options.doit
