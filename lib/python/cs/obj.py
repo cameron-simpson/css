@@ -338,7 +338,7 @@ class SingletonMixin:
       even for an already initialised
       and probably subsequently modified object.
 
-      One approach might be to access some attribute,
+      My suggested approach is to access some attribute,
       and preemptively return if it already exists.
       Example:
 
