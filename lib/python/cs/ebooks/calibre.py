@@ -95,6 +95,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       ''' A reference to a book in a Calibre library.
       '''
 
+      # pylint: disable=unused-argument
       @classmethod
       def _singleton_key(cls, tree: CalibreTree, dbid: int, db_book=None):
         ''' The singleton key is `(tree,dbid)`.
@@ -972,7 +973,6 @@ class CalibreCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing dbids")
     options = self.options
-    calibre = options.calibre
     runstate = options.runstate
     xit = 0
     while argv and not runstate.cancelled:
@@ -989,6 +989,7 @@ class CalibreCommand(BaseCommand):
       xit = 1
     return xit
 
+  # pylint: disable=too-many-locals
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l] [dbids...]
           List the contents of the Calibre library.
