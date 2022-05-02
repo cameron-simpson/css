@@ -59,10 +59,7 @@ except NameError:
 
 if sys.hexversion >= 0x03000000:
 
-  def ustr(s, e='utf-8', errors='strict'):
-    ''' Upgrade string to unicode: no-op for python 3.
-    '''
-    return s
+  ustr = str
 
   def iteritems(o):
     return o.items()
