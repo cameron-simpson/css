@@ -54,7 +54,7 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 from . import run
 
@@ -131,6 +131,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @classmethod
       def refresh_from_db_row(cls, db_row, fields, *, session):
+        ''' Refresh the cached values from the database.
+        '''
         super().refresh_from_db_row(db_row, fields, session=session)
         fields['authors'] = db_row.authors
         fields['formats'] = {
@@ -303,7 +305,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
                   self, fmtk, "identical to", shortpath(ofmtpath)
               )
             else:
-              quiet or warning(
+              verbose and warning(
                   "already present with different content\n"
                   "  present: %s\n"
                   "  other:   %s",
@@ -791,8 +793,8 @@ class CalibreCommand(BaseCommand):
             options,
             kindle=kt,
             calibre=cal,
-            verbose=True,
         ):
+          Upd().out('')
           yield
 
   def cmd_dbshell(self, argv):
@@ -923,7 +925,7 @@ class CalibreCommand(BaseCommand):
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
   def cmd_pull(self, argv):
-    ''' Usage: {cmd} [-n] other-library [identifier-name [identifier-values...]]
+    ''' Usage: {cmd} [-fnqv] other-library [identifier-name [identifier-values...]]
           Import formats from another Calibre library.
           -f    Force. Overwrite existing formats with formats from other-library.
           -n    No action: recite planned actions.
@@ -938,6 +940,7 @@ class CalibreCommand(BaseCommand):
             If no identifiers are provided, all books which have
             the specified identifier will be pulled.
     '''
+    Upd().out("pull " + shlex.join(argv))
     options = self.options
     calibre = options.calibre
     runstate = options.runstate
@@ -962,14 +965,15 @@ class CalibreCommand(BaseCommand):
         for identifier_name in sorted(other_library.identifier_names()):
           print(" ", identifier_name)
         return 0
-      obooks_map = {
-          idv: obook
-          for idv, obook in (
-              (obook.identifiers.get(identifier_name), obook)
-              for obook in other_library
-          )
-          if idv is not None
-      }
+      with UpdProxy(text=f"scan identifiers from {other_library}..."):
+        obooks_map = {
+            idv: obook
+            for idv, obook in (
+                (obook.identifiers.get(identifier_name), obook)
+                for obook in other_library
+            )
+            if idv is not None
+        }
       if not obooks_map:
         raise GetoptError(
             "no books have the identifier %r; identifiers in use are: %s" % (
@@ -1026,6 +1030,7 @@ class CalibreCommand(BaseCommand):
                   # we didn't make a new book, so move to the next one
                   continue
                 cbook = calibre[dbid]
+                quiet or print('new', cbook, '<=', obook)
               elif len(cbooks) > 1:
                 verbose or warning(
                     "  \n".join(
@@ -1041,6 +1046,7 @@ class CalibreCommand(BaseCommand):
               cbook.pull(
                   obook,
                   runstate=runstate,
+                  doit=doit,
                   force=force,
                   quiet=quiet,
                   verbose=verbose
