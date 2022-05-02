@@ -15,7 +15,9 @@ import json
 import os
 from os.path import (
     basename,
+    exists as existspath,
     isabs as isabspath,
+    isfile as isfilepath,
     join as joinpath,
     splitext,
 )
@@ -195,6 +197,33 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           return False
         self.refresh_from_db()
         return True
+
+      def convert(
+          self,
+          srcfmtk,
+          dstfmtk,
+          *conv_opts,
+          doit=True,
+          force=False,
+          quiet=False,
+      ):
+        ''' Convert the existing format `srcfmtk` into `dstfmtk`.
+        '''
+        calibre = self.tree
+        srcpath = self.formatpath(srcfmtk)
+        srcbase = basename(srcpath)
+        dstbase = splitext(srcbase)[0] + '.' + dstfmtk.lower()
+        if srcbase == dstbase:
+          raise ValueError(
+              "source format basename %r == destination format basename %r, skipping"
+              % (srcbase, dstbase)
+          )
+        with TemporaryDirectory(prefix='.convert-') as dirpath:
+          dstpath = joinpath(dirpath, dstbase)
+          calibre.ebook_convert(
+              srcpath, dstpath, *conv_opts, check=True, doit=doit, quiet=quiet
+          )
+          self.add_format(dstpath, force=force, doit=doit, quiet=quiet)
 
       @property
       def mobipath(self):
@@ -450,6 +479,30 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         dbcmd,
         '--library-path=' + self.fspath,
         *argv,
+    ]
+    return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
+
+  def ebook_convert(
+      self,
+      srcpath,
+      dstpath,
+      *conv_opts,
+      doit=True,
+      quiet=False,
+      **subp_options
+  ):
+    ''' Run `dbcmd` via the `calibredb` command.
+        Return a `CompletedProcess` or `None` if `doit` is false.
+    '''
+    if not isfilepath(srcpath):
+      raise ValueError("source path is not a file: %r" % (srcpath,))
+    if existspath(dstpath):
+      raise ValueError("destination path already exists: %r" % (dstpath,))
+    subp_argv = [
+        'ebook-convert',
+        srcpath,
+        dstpath,
+        *conv_opts,
     ]
     return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
@@ -775,6 +828,11 @@ class CalibreCommand(BaseCommand):
       'DEFAULT_LINK_IDENTIFIER': DEFAULT_LINK_IDENTIFIER,
   }
 
+  # mapping of target format key to source format and extra options
+  CONVERT_MAP = {
+      'EPUB': (['MOBI', 'AZW', 'AZW3'], ()),
+  }
+
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
@@ -832,6 +890,63 @@ class CalibreCommand(BaseCommand):
         break
     assert not argv
     return cbooks, ok
+
+  # pylint: disable=too-many-branches,too-many-locals
+  def cmd_convert(self, argv):
+    ''' Usage: {cmd} [-fnqv] formatkey dbids...
+          Convert books to the format `formatkey`.
+          -f    Force: convert even if the format is already present.
+          -n    No action: recite planned actions.
+          -q    Quiet: only emit warnings.
+          -v    Verbose: report all actions and decisions.
+    '''
+    options = self.options
+    self.popopts(argv, options, f='force', n='doit', q='quiet', v='verbose')
+    dstfmtk = self.poparg(argv).upper()
+    srcfmtks, conv_opts = self.CONVERT_MAP.get(dstfmtk, ([], ()))
+    if not srcfmtks:
+      raise GetoptError(
+          "no source formats can produce formatkey %r" % (dstfmtk,)
+      )
+    if not argv:
+      raise GetoptError("missing dbids")
+    cbooks, ok = self.popbooks(argv)
+    if not ok:
+      raise GetoptError("invalid book specifiers")
+    xit = 0
+    doit = options.doit
+    force = options.force
+    quiet = options.quiet
+    verbose = options.verbose
+    runstate = options.runstate
+    for cbook in cbooks:
+      if runstate.cancelled:
+        break
+      with Pfx(cbook):
+        if dstfmtk in cbook.formats:
+          if force:
+            verbose and warning("replacing format %r")
+          else:
+            verbose and print(f"{cbook}: format {dstfmtk!r} already present")
+            continue
+        for srcfmtk in srcfmtks:
+          if srcfmtk in cbook.formats:
+            break
+        else:
+          srcfmtk = None
+        if srcfmtk is None:
+          warning(
+              "no suitable source formats (%r); I looked for %r",
+              sorted(cbook.formats.keys()), srcfmtks
+          )
+          xit = 1
+          continue
+
+      cbook.convert(srcfmtk, dstfmtk, *conv_opts, doit=doit, quiet=quiet)
+
+    if runstate.cancelled:
+      xit = 1
+    return xit
 
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
