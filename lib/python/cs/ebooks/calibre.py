@@ -896,7 +896,7 @@ class CalibreCommand(BaseCommand):
     for cbook in cbooks:
       if runstate.cancelled:
         break
-      with Pfx("%d:%s", cbook.id, cbook.title):
+      with Pfx(cbook):
         print(f"{cbook.title} ({cbook.dbid})")
         if longmode:
           print(" ", cbook.path)

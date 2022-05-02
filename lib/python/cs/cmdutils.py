@@ -702,7 +702,7 @@ class BaseCommand:
       validate = None
       unvalidated_message = None
       for spec in specs:
-        with Pfx("%s", r(spec)):
+        with Pfx("%r", spec):
           if help_text is None and isinstance(spec, str):
             help_text = spec
           elif parse is None and callable(spec):

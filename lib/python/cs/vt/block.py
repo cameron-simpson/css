@@ -725,7 +725,7 @@ class HashCodeBlock(_Block):
     '''
     ok = True
     hashcode = self.hashcode
-    with Pfx("%s", hashcode):
+    with Pfx(hashcode):
       with defaults.S as S:
         try:
           data = S[hashcode]

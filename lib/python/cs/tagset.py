@@ -3543,7 +3543,7 @@ class TagsOntologyCommand(BaseCommand):
           etags = ont.metadata(type_name, entity_name)
           print("entity tags =", etags)
           for arg in argv:
-            with Pfx("%s", arg):
+            with Pfx(arg):
               tag = Tag.from_str(arg)
               etags.add(tag)
           return 0
