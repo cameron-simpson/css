@@ -1057,7 +1057,7 @@ class CalibreCommand(BaseCommand):
             with Pfx(fmt):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
-              print("   ", fmt, transcribe_bytes_geek(size), subpath)
+              print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
     if runstate.cancelled:
       xit = 1
     return xit
