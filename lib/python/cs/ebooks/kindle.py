@@ -213,18 +213,6 @@ class KindleBook(HasFSPath):
     except FileNotFoundError:
       return []
 
-  @property
-  def path(self):
-    ''' The filesystem path of this book subdirectory.
-    '''
-    return joinpath(self.tree.pathto(self.subdir_name))
-
-  def pathto(self, subpath):
-    ''' Return the filesystem path of `subpath`
-        located within the book subdirectory.
-    '''
-    return joinpath(self.path, subpath)
-
   def extpath(self, ext):
     ''' Return the filesystem path to the booknamed file
         within the book subdirectory.
@@ -235,7 +223,7 @@ class KindleBook(HasFSPath):
   def tags(self):
     ''' The `FSTags` for this book subdirectory.
     '''
-    return self.tree.fstags[self.path]
+    return self.tree.fstags[self.fspath]
 
   def asset_names(self):
     ''' Return the names of files within the subdirectory
@@ -247,7 +235,7 @@ class KindleBook(HasFSPath):
   def subpath(self, name):
     ''' The filesystem path of `name` within this subdirectory.
     '''
-    return joinpath(self.path, name)
+    return joinpath(self.fspath, name)
 
   def phl_xml(self):
     ''' Decode the `.phl` XML file if present and return an XML `ElementTree`.
