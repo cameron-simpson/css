@@ -51,7 +51,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
-    ORM, BasicTableMixin, HasIdMixin, RelationProxy
+    ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
 )
 from cs.tagset import TagSet
 from cs.threads import locked
@@ -137,17 +137,48 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         ''' Refresh the cached values from the database.
         '''
         super().refresh_from_db_row(db_row, fields, session=session)
-        fields['authors'] = db_row.authors
-        fields['formats'] = {
+        for field_name in 'authors', 'formats', 'idenitifiers', 'tags':
+          try:
+            del fields[field_name]
+          except KeyError:
+            pass
+
+      @property
+      @proxy_on_demand_field
+      def authors(self, db_row, *, session):
+        ''' The book Authors.
+        '''
+        return db_row.authors
+
+      @property
+      @proxy_on_demand_field
+      def formats(self, db_row, *, session):
+        ''' A mapping of Calibre format keys to format paths
+            computed on demand.
+        '''
+        return {
             fmt.format:
             joinpath(db_row.path, f'{fmt.name}.{fmt.format.lower()}')
             for fmt in db_row.formats
         }
-        fields['identifiers'] = {
+
+      @property
+      @proxy_on_demand_field
+      def identifiers(self, db_row, *, session):
+        ''' A mapping of Calibre identifier keys to identifier values
+            computed on demand.
+        '''
+        return {
             identifier.type: identifier.val
             for identifier in db_row.identifiers
         }
-        fields['tags'] = [tag.name for tag in db_row.tags]
+
+      @property
+      @proxy_on_demand_field
+      def tags(self, db_row, *, session):
+        ''' A list of Calibre tags computed on demand.
+        '''
+        return [tag.name for tag in db_row.tags]
 
       def formatpath(self, fmtk):
         ''' Return the filesystem path of the format file for `fmtk`
