@@ -801,5 +801,15 @@ def RelationProxy(
               "%s: no cached field .%s" % (type(self).__name__, attr)
           ) from e
 
+    @contextmanager
+    def db_row_and_session(self):
+      ''' Context manager yielding `(db_row,session)` for deriving data from the row.
+
+          This is expected to be used from on demand proxy properties.
+      '''
+      with using_session(orm=relation.orm) as session:
+        db_row = relation.lookup1(**{id_column: self.id, 'session': session})
+        yield db_row, session
+
   RelProxy.__name__ = relation.__name__ + '_' + RelProxy.__name__
   return RelProxy
