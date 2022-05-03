@@ -801,5 +801,50 @@ def RelationProxy(
               "%s: no cached field .%s" % (type(self).__name__, attr)
           ) from e
 
+    @contextmanager
+    def db_row_and_session(self):
+      ''' Context manager yielding `(db_row,session)` for deriving data from the row.
+
+          This is expected to be used from on demand proxy properties.
+      '''
+      with using_session(orm=relation.orm) as session:
+        db_row = relation.lookup1(**{id_column: self.id, 'session': session})
+        yield db_row, session
+
   RelProxy.__name__ = relation.__name__ + '_' + RelProxy.__name__
   return RelProxy
+
+@decorator
+def proxy_on_demand_field(field_func, field_name=None):
+  ''' A decorator to provide a field value on demand
+      via a function `field_func(self,db_row,session=session)`.
+
+      Example:
+
+          @property
+          @proxy_on_demand_field
+          def formats(self,db_row,*,session):
+              """ A mapping of Calibre format keys to format paths
+                  computed on demand.
+              """
+              return {
+                  fmt.format:
+                  joinpath(db_row.path, f'{fmt.name}.{fmt.format.lower()}')
+                  for fmt in db_row.formats
+              }
+  '''
+  if field_name is None:
+    field_name = field_func.__name__
+
+  def field_func_wrapper(self):
+    fields = self._RelProxy__fields
+    try:
+      field_value = fields[field_name]
+    except KeyError:
+      with self.db_row_and_session() as (db_row, session):
+        field_value = fields[field_name] = field_func(
+            self, db_row, session=session
+        )
+    return field_value
+
+  return field_func_wrapper

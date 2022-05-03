@@ -15,7 +15,9 @@ import json
 import os
 from os.path import (
     basename,
+    exists as existspath,
     isabs as isabspath,
+    isfile as isfilepath,
     join as joinpath,
     splitext,
 )
@@ -49,7 +51,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
-    ORM, BasicTableMixin, HasIdMixin, RelationProxy
+    ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
 )
 from cs.tagset import TagSet
 from cs.threads import locked
@@ -93,6 +95,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       ''' A reference to a book in a Calibre library.
       '''
 
+      # pylint: disable=unused-argument
       @classmethod
       def _singleton_key(cls, tree: CalibreTree, dbid: int, db_book=None):
         ''' The singleton key is `(tree,dbid)`.
@@ -134,17 +137,48 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         ''' Refresh the cached values from the database.
         '''
         super().refresh_from_db_row(db_row, fields, session=session)
-        fields['authors'] = db_row.authors
-        fields['formats'] = {
+        for field_name in 'authors', 'formats', 'idenitifiers', 'tags':
+          try:
+            del fields[field_name]
+          except KeyError:
+            pass
+
+      @property
+      @proxy_on_demand_field
+      def authors(self, db_row, *, session):
+        ''' The book Authors.
+        '''
+        return db_row.authors
+
+      @property
+      @proxy_on_demand_field
+      def formats(self, db_row, *, session):
+        ''' A mapping of Calibre format keys to format paths
+            computed on demand.
+        '''
+        return {
             fmt.format:
             joinpath(db_row.path, f'{fmt.name}.{fmt.format.lower()}')
             for fmt in db_row.formats
         }
-        fields['identifiers'] = {
+
+      @property
+      @proxy_on_demand_field
+      def identifiers(self, db_row, *, session):
+        ''' A mapping of Calibre identifier keys to identifier values
+            computed on demand.
+        '''
+        return {
             identifier.type: identifier.val
             for identifier in db_row.identifiers
         }
-        fields['tags'] = [tag.name for tag in db_row.tags]
+
+      @property
+      @proxy_on_demand_field
+      def tags(self, db_row, *, session):
+        ''' A list of Calibre tags computed on demand.
+        '''
+        return [tag.name for tag in db_row.tags]
 
       def formatpath(self, fmtk):
         ''' Return the filesystem path of the format file for `fmtk`
@@ -165,25 +199,63 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           force: bool = False,
           doit=True,
           quiet=False,
+          **subp_options,
       ):
-        ''' Add a book file to the existing book entry with database id `dbid`
+        ''' Add a book file to the existing book formats
             via the `calibredb add_format` command.
+            Return `True` if the `doit` is false or the command succeeds,
+            `False` otherwise.
 
             Parameters:
             * `bookpath`: filesystem path to the source MOBI file
-            * `dbid`: the Calibre database id
+            * `doit`: default `True`; do not run the command if false
             * `force`: replace an existing format if already present, default `False`
+            * `quiet`: default `False`; only print warning if true
         '''
-        self.tree.calibredb(
+        cp = self.tree.calibredb(
             'add_format',
             *(() if force else ('--dont-replace',)),
             str(self.id),
             bookpath,
-            subp_options=dict(stdin=DEVNULL),
             doit=doit,
             quiet=quiet,
+            stdin=DEVNULL,
+            **subp_options,
         )
+        if cp is None:
+          return True
+        if cp.return_code != 0:
+          warning("command fails, return code %d", cp.return_code)
+          return False
         self.refresh_from_db()
+        return True
+
+      def convert(
+          self,
+          srcfmtk,
+          dstfmtk,
+          *conv_opts,
+          doit=True,
+          force=False,
+          quiet=False,
+      ):
+        ''' Convert the existing format `srcfmtk` into `dstfmtk`.
+        '''
+        calibre = self.tree
+        srcpath = self.formatpath(srcfmtk)
+        srcbase = basename(srcpath)
+        dstbase = splitext(srcbase)[0] + '.' + dstfmtk.lower()
+        if srcbase == dstbase:
+          raise ValueError(
+              "source format basename %r == destination format basename %r, skipping"
+              % (srcbase, dstbase)
+          )
+        with TemporaryDirectory(prefix='.convert-') as dirpath:
+          dstpath = joinpath(dirpath, dstbase)
+          calibre.ebook_convert(
+              srcpath, dstpath, *conv_opts, check=True, doit=doit, quiet=quiet
+          )
+          self.add_format(dstpath, force=force, doit=doit, quiet=quiet)
 
       @property
       def mobipath(self):
@@ -406,7 +478,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.by_identifier('mobi-asin', asin.upper())
 
-  def _run(self, calcmd, *calargv, quiet=False, subp_options=None):
+  def _run(self, calcmd, *calargv, doit=True, quiet=False, subp_options=None):
     ''' Run a Calibre utility command.
         Return the `CompletedProcess` result.
 
@@ -415,6 +487,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           if the command name is not an absolute path
           it is expected to come from `self.CALIBRE_BINDIR_DEFAULT`
         * `calargv`: the arguments for the command
+        * `doit`: default `True`; do not run the command of false
         * `quiet`: default `False`; if true, do not print the command or its output
         * `subp_options`: optional mapping of keyword arguments
           to pass to `subprocess.run`
@@ -427,11 +500,11 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     if not isabspath(calcmd):
       calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
     calargv = [calcmd, *calargv]
-    return run(calargv, quiet=quiet, **subp_options)
+    return run(calargv, doit=doit, quiet=quiet, **subp_options)
 
-  def calibredb(self, dbcmd, *argv, subp_options=None, doit=True, quiet=False):
+  def calibredb(self, dbcmd, *argv, doit=True, quiet=False, **subp_options):
     ''' Run `dbcmd` via the `calibredb` command.
-        Return a `CompletedProcess`.
+        Return a `CompletedProcess` or `None` if `doit` is false.
     '''
     subp_argv = [
         'calibredb',
@@ -439,23 +512,47 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         '--library-path=' + self.fspath,
         *argv,
     ]
-    if not doit:
-      print(shlex.join(subp_argv))
-      return None
-    return self._run(*subp_argv, subp_options=subp_options, quiet=quiet)
+    return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
+
+  def ebook_convert(
+      self,
+      srcpath,
+      dstpath,
+      *conv_opts,
+      doit=True,
+      quiet=False,
+      **subp_options
+  ):
+    ''' Run `dbcmd` via the `calibredb` command.
+        Return a `CompletedProcess` or `None` if `doit` is false.
+    '''
+    if not isfilepath(srcpath):
+      raise ValueError("source path is not a file: %r" % (srcpath,))
+    if existspath(dstpath):
+      raise ValueError("destination path already exists: %r" % (dstpath,))
+    subp_argv = [
+        'ebook-convert',
+        srcpath,
+        dstpath,
+        *conv_opts,
+    ]
+    return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
   @pfx_method
-  def add(self, bookpath, doit=True, quiet=False):
+  def add(self, bookpath, doit=True, quiet=False, **subp_options):
     ''' Add a book file via the `calibredb add` command.
-        Return the database id.
+        Return the database id or `None` if `doit` is false or the command fails.
     '''
     cp = self.calibredb(
         'add',
         '--duplicates',
         bookpath,
-        subp_options=dict(stdin=DEVNULL, capture_output=True, text=True),
         doit=doit,
         quiet=quiet,
+        stdin=DEVNULL,
+        capture_output=True,
+        text=True,
+        **subp_options,
     )
     if cp is None:
       return None
@@ -763,6 +860,11 @@ class CalibreCommand(BaseCommand):
       'DEFAULT_LINK_IDENTIFIER': DEFAULT_LINK_IDENTIFIER,
   }
 
+  # mapping of target format key to source format and extra options
+  CONVERT_MAP = {
+      'EPUB': (['MOBI', 'AZW', 'AZW3'], ()),
+  }
+
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
@@ -797,6 +899,87 @@ class CalibreCommand(BaseCommand):
           Upd().out('')
           yield
 
+  def popbooks(self, argv, once=False):
+    ''' Convert a list of book specifiers (currently dbids) to books.
+        Return `(cbooks,ok)` where `cbooks` is a list of books
+        and `ok` is true if all specifiers resolved.
+
+        If `once` is true (default `False`) process only the first argument.
+    '''
+    options = self.options
+    calibre = options.calibre
+    ok = True
+    cbooks = []
+    while argv:
+      dbid = self.poparg(argv, "dbid", int)
+      if dbid not in calibre:
+        warning("unknown dbid %d", dbid)
+        ok = False
+      else:
+        cbook = calibre[dbid]
+        cbooks.append(cbook)
+      if once:
+        break
+    assert not argv
+    return cbooks, ok
+
+  # pylint: disable=too-many-branches,too-many-locals
+  def cmd_convert(self, argv):
+    ''' Usage: {cmd} [-fnqv] formatkey dbids...
+          Convert books to the format `formatkey`.
+          -f    Force: convert even if the format is already present.
+          -n    No action: recite planned actions.
+          -q    Quiet: only emit warnings.
+          -v    Verbose: report all actions and decisions.
+    '''
+    options = self.options
+    self.popopts(argv, options, f='force', n='doit', q='quiet', v='verbose')
+    dstfmtk = self.poparg(argv).upper()
+    srcfmtks, conv_opts = self.CONVERT_MAP.get(dstfmtk, ([], ()))
+    if not srcfmtks:
+      raise GetoptError(
+          "no source formats can produce formatkey %r" % (dstfmtk,)
+      )
+    if not argv:
+      raise GetoptError("missing dbids")
+    cbooks, ok = self.popbooks(argv)
+    if not ok:
+      raise GetoptError("invalid book specifiers")
+    xit = 0
+    doit = options.doit
+    force = options.force
+    quiet = options.quiet
+    verbose = options.verbose
+    runstate = options.runstate
+    for cbook in cbooks:
+      if runstate.cancelled:
+        break
+      with Pfx(cbook):
+        if dstfmtk in cbook.formats:
+          if force:
+            verbose and warning("replacing format %r")
+          else:
+            verbose and print(f"{cbook}: format {dstfmtk!r} already present")
+            continue
+        for srcfmtk in srcfmtks:
+          if srcfmtk in cbook.formats:
+            break
+        else:
+          srcfmtk = None
+        if srcfmtk is None:
+          warning(
+              "no suitable source formats (%r); I looked for %r",
+              sorted(cbook.formats.keys()), srcfmtks
+          )
+          xit = 1
+          continue
+
+      cbook.convert(srcfmtk, dstfmtk, *conv_opts, doit=doit, quiet=quiet)
+
+    if runstate.cancelled:
+      xit = 1
+    return xit
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database prompt.
@@ -821,25 +1004,23 @@ class CalibreCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing dbids")
     options = self.options
-    calibre = options.calibre
     runstate = options.runstate
     xit = 0
-    for dbid_s in argv:
-      if runstate.cancelled:
-        xit = 1
-        break
-      with Pfx(dbid_s):
-        try:
-          dbid = int(dbid_s)
-        except ValueError as e:
-          warning("invalid dbid: %s", e)
-          xit = 1
+    while argv and not runstate.cancelled:
+      with Pfx(argv[0]):
+        cbooks, ok = self.popbooks(argv, once=True)
+        if not ok:
+          xit = 2
           continue
-        cbook = calibre[dbid]
-        with Pfx("%s: make_cbz", cbook.title):
-          cbook.make_cbz()
+        for cbook in cbooks:
+          if runstate.cancelled:
+            break
+          pfx_call(cbook.make_cbz)
+    if runstate.cancelled:
+      xit = 1
     return xit
 
+  # pylint: disable=too-many-locals
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l] [dbids...]
           List the contents of the Calibre library.
@@ -852,24 +1033,17 @@ class CalibreCommand(BaseCommand):
     xit = 0
     cbooks = []
     if argv:
-      while argv:
-        dbid = self.popargv(argv, "dbid", int)
-        if dbid not in calibre:
-          warning("unknown dbid %d", dbid)
-          xit = 1
-          continue
-        cbook = calibre[dbid]
-        cbooks.append(cbook)
-      assert not argv
+      cbooks, ok = self.popbooks(argv)
+      if not ok:
+        raise GetoptError("invalid book specifiers")
     else:
       cbooks = calibre
       calibre.preload()
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
-        xit = 1
         break
-      with Pfx("%d:%s", cbook.id, cbook.title):
+      with Pfx(cbook):
         print(f"{cbook.title} ({cbook.dbid})")
         if longmode:
           print(" ", cbook.path)
@@ -883,7 +1057,9 @@ class CalibreCommand(BaseCommand):
             with Pfx(fmt):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
-              print("   ", fmt, transcribe_bytes_geek(size), subpath)
+              print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
+    if runstate.cancelled:
+      xit = 1
     return xit
 
   # pylint: disable=too-many-branches
@@ -945,7 +1121,7 @@ class CalibreCommand(BaseCommand):
     calibre = options.calibre
     runstate = options.runstate
     self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
-    other_library = self.popargv(argv, "other-library", CalibreTree)
+    other_library = self.poparg(argv, "other-library", CalibreTree)
     doit = options.doit
     force = options.force
     quiet = options.quiet

@@ -315,7 +315,7 @@ class KindleBook(HasFSPath):
             "multiple calibre books, dbids %r: choosing %s",
             [cb.dbid for cb in cbooks], cbook
         )
-      with Pfx("%s", cbook):
+      with Pfx(cbook):
         # look for exact content match
         for fmtk in 'AZW3', 'AZW', 'MOBI':
           fmtpath = cbook.formatpath(fmtk)

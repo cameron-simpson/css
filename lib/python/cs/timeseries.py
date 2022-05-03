@@ -174,7 +174,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           a TimeSeriesPartitioned directory of such files,
           or a TimeSeriesDataDir containing partitions for multiple keys.
     '''
-    ts = self.popargv(argv, "tspath", timeseries_from_path)
+    ts = self.poparg(argv, "tspath", timeseries_from_path)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     print(ts)
@@ -206,12 +206,12 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     if argv and argv[0] == '--show':
       show_image = True
       argv.pop(0)
-    ts = self.popargv(argv, "tspath", timeseries_from_path)
-    imgpath = self.popargv(
+    ts = self.poparg(argv, "tspath", timeseries_from_path)
+    imgpath = self.poparg(
         argv, "impath.png", str, lambda path: not existspath(path),
         "already exists"
     )
-    days = self.popargv(argv, int, "days to display", lambda days: days > 0)
+    days = self.poparg(argv, int, "days to display", lambda days: days > 0)
     now = time.time()
     start = now - days * 24 * 3600
     if isinstance(ts, TimeSeries):
