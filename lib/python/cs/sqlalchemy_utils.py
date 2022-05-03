@@ -822,7 +822,7 @@ def proxy_on_demand_field(field_func, field_name=None):
       Example:
 
           @property
-          @on_demand_field
+          @proxy_on_demand_field
           def formats(self,db_row,*,session):
               """ A mapping of Calibre format keys to format paths
                   computed on demand.
