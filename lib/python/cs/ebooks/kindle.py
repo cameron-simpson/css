@@ -295,7 +295,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     db = self.db
     books = db.books
-    with db.db_session() as session:
+    with db.session() as session:
       return set(asin for asin, in session.query(books.asin))
 
   def by_asin(self, asin):
@@ -382,7 +382,7 @@ class KindleBookAssetDB(ORM):
 
   # lifted from SQLTags
   @contextmanager
-  def db_session(self, *, new=False):
+  def session(self, *, new=False):
     ''' Context manager to obtain a db session if required
         (or if `new` is true).
     '''
@@ -530,7 +530,7 @@ class KindleBookAssetDB(ORM):
       )
 
     # just suck the version out
-    with self.db_session() as session:
+    with self.session() as session:
       self.version_info = VersionInfo.lookup1(session=session).version
 
     # references to table definitions
