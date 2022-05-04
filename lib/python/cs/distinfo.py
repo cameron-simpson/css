@@ -800,8 +800,6 @@ class Modules(defaultdict):
     with Pfx(requirement_spec):
       mrq = ModuleRequirement.from_requirement(requirement_spec, modules=self)
       requirement = mrq.resolve()
-      if requirement != requirement_spec:
-        warning("RESOLVE %r => %r", requirement_spec, requirement)
       return requirement
 
 # pylint: disable=too-many-public-methods
@@ -1283,7 +1281,7 @@ class Module:
     )
     version = dinfo.pop('version', None)
     if version:
-      pyproject['version'] = version
+      projspec['version'] = version
     if 'extra_requires' in dinfo:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
     dinfo_entry_points = dinfo.pop('entry_points', {})
