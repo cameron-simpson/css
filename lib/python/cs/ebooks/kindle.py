@@ -47,6 +47,11 @@ from cs.sqlalchemy_utils import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
+def main(argv=None):
+  ''' Kindle command line mode.
+  '''
+  return KindleCommand(argv).run()
+
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
 
@@ -628,4 +633,4 @@ class KindleCommand(BaseCommand):
       print(subdir_name, " ".join(map(str, sorted(kbook.tags))))
 
 if __name__ == '__main__':
-  sys.exit(KindleCommand(sys.argv).run())
+  sys.exit(main(sys.argv))
