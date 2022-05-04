@@ -591,7 +591,7 @@ class KindleCommand(BaseCommand):
     options = self.options
     with KindleTree(options.kindle_path) as kt:
       with CalibreTree(options.calibre_path) as cal:
-        with stackattrs(options, kindle=kt, calibre=cal, verbose=True):
+        with stackattrs(options, kindle=kt, calibre=cal):
           yield
 
   def cmd_dbshell(self, argv):
