@@ -664,6 +664,12 @@ class KindleCommand(BaseCommand):
     print(kindle.fspath)
     for subdir_name, kbook in kindle.items():
       print(subdir_name, " ".join(map(str, sorted(kbook.tags))))
+      if kbook.type != 'kindle.ebook':
+        print("  type =", kbook.type)
+      if kbook.revision is not None:
+        print("  revision =", kbook.revision)
+      if kbook.sampling:
+        print("  sampling =", kbook.sampling)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
