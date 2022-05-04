@@ -369,7 +369,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         else:
           fmtpath = self.formatpath(fmtk)
           if fmtpath is None and fmtk.startswith('AZW'):
-            fmtpath = self.formatpath('AZW3') or self.formatpath('AZW')
+            fmtpath = (
+                self.formatpath('AZW3') or self.formatpath('AZW')
+                or self.formatpath('MOBI')
+            )
           if fmtpath is not None and not force:
             if filecmp.cmp(fmtpath, ofmtpath):
               verbose and print(
