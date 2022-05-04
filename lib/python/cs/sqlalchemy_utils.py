@@ -792,7 +792,7 @@ def RelationProxy(
       if attr.startswith('_'):
         warning("__getattr__(%r)", attr)
       with Pfx("%s.%s", type(self).__name__, attr):
-        if attr in ('id', '_RelProxy__fields'):
+        if attr in ('id', '__fields'):
           raise RuntimeError
         try:
           return self[attr]
