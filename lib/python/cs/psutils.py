@@ -136,7 +136,7 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
   try:
     sig, handler = next(it)
   except StopIteration:
-    yield _stacked
+    pass
   else:
     with signal_handler(sig, handler,
                         call_previous=call_previous) as old_handler:
@@ -144,6 +144,8 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
       with signal_handlers(sig_hnds, call_previous=call_previous,
                            _stacked=_stacked) as stacked:
         yield stacked
+    return
+  yield _stacked
 
 def write_pidfile(path, pid=None):
   ''' Write a process id to a pid file.
