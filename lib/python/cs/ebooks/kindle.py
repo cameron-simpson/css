@@ -37,6 +37,7 @@ from cs.fs import FSPathBasedSingleton, HasFSPath
 from cs.fstags import FSTags
 from cs.lex import cutsuffix
 from cs.logutils import warning
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
@@ -44,6 +45,8 @@ from cs.sqlalchemy_utils import (
     ORM,
     BasicTableMixin,
     HasIdMixin,
+    RelationProxy,
+    proxy_on_demand_field,
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
@@ -69,6 +72,183 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       return
     super().__init__(fspath=fspath)
     self._bookrefs = {}
+
+    # define the proxy classes
+    class KindleBook(SingletonMixin, RelationProxy(self.db.books, [
+        'asin',
+        'type',
+        'revision',
+        'sampling',
+    ], id_column='asin'), HasFSPath):
+      ''' A reference to a Kindle library book subdirectory.
+      '''
+
+      # pylint: disable=unused-argument
+      @classmethod
+      def _singleton_key(cls, tree: KindleTree, subdir_name):
+        ''' The singleton key is `(tree,subdir_name
+        '''
+        return id(tree), subdir_name
+
+      # pylint: super-init-not-called
+      @typechecked
+      @require(lambda subdir_name: os.sep not in subdir_name)
+      def __init__(self, tree: KindleTree, subdir_name: str):
+        ''' Initialise this book subdirectory reference.
+
+            Parameters:
+            * `tree`: the `Kindletree` containing the subdirectory
+            * `subdir_name`: the subdirectory name
+        '''
+        if 'tree' in self.__dict__:
+          if db_book is not None:
+            self.refresh_from_db(db_row=db_book)
+        else:
+          self.tree = tree
+          self.subdir_name = subdir_name
+          super().__init__(self.asin)
+
+      def __str__(self):
+        return "%s[%s]:%s" % (self.tree, self.subdir_name, self.tags)
+
+      def __repr__(self):
+        return "%s(%r,%r)" % (type(self).__name__, self.tree, self.subdir_name)
+
+      @property
+      def fspath(self):
+        ''' The filesystem path of this book subdirectory.
+        '''
+        return self.tree.pathto(self.subdir_name)
+
+      @property
+      def asin(self):
+        ''' The ASIN of this book subdirectory, normalised to upper case.
+        '''
+        for suffix in '_EBOK', '_EBSP':
+          prefix = cutsuffix(self.subdir_name, suffix)
+          if prefix is not self.subdir_name:
+            return prefix.upper()
+        raise ValueError(
+            "subdir_name %r does not end with _EBOK or _BSP" %
+            (self.subdir_name,)
+        )
+
+      def listdir(self):
+        ''' Return a list of the names inside the subdirectory,
+              or an empty list if the subdirectory is not present.
+          '''
+        try:
+          return os.listdir(self.fspath)
+        except FileNotFoundError:
+          return []
+
+      def extpath(self, ext):
+        ''' Return the filesystem path to the booknamed file
+            within the book subdirectory.
+        '''
+        return self.pathto(self.subdir_name + '.' + ext)
+
+      @property
+      def tags(self):
+        ''' The `FSTags` for this book subdirectory.
+        '''
+        return self.tree.fstags[self.fspath]
+
+      def asset_names(self):
+        ''' Return the names of files within the subdirectory
+            whose names start with `self.subdir_name+'.'`.
+        '''
+        prefix_ = self.subdir_name
+        return [name for name in self.listdir() if name.startswith(prefix_)]
+
+      def subpath(self, name):
+        ''' The filesystem path of `name` within this subdirectory.
+        '''
+        return joinpath(self.fspath, name)
+
+      def phl_xml(self):
+        ''' Decode the `.phl` XML file if present and return an XML `ElementTree`.
+            Return `None` if the file is not present.
+
+            This file seems to contain popular highlights in the
+            `popular/content/annotation` tags.
+          '''
+        phl_path = self.subpath(self.subdir_name + '.phl')
+        try:
+          with pfx_call(open, phl_path, 'rb') as f:
+            xml_bs = f.read()
+        except FileNotFoundError:
+          return None
+        with Pfx(phl_path):
+          return pfx_call(etree.fromstring, xml_bs)
+
+      # pylint: disable=too-many-branches
+      def export_to_calibre(
+          self,
+          calibre,
+          *,
+          doit=True,
+          replace_format=False,
+          force=False,
+          quiet=False,
+          verbose=False,
+      ):
+        ''' Export this Kindle book to a Calibre instance,
+            return `(cbook,added)`
+            being the `CalibreBook` and whether the Kinble book was added
+            (books are not added if the format is already present).
+
+            Parameters:
+            * `calibre`: the `CalibreTree`
+            * `doit`: optional flag, default `True`;
+              if false just recite planned actions
+            * `force`: optional flag, default `False`;
+              if true pull the AZW file even if an AZW format already exists
+            * `replace_format`: if true, export even if the `AZW3`
+              format is already present
+            * `quiet`: default `False`, do not print nonwarnings
+            * `verbose`: default `False`, print all actions or nonactions
+        '''
+        azwpath = self.extpath('azw')
+        if not isfilepath(azwpath):
+          raise ValueError("no AZW file: %r" % (azwpath,))
+        added = False
+        cbooks = list(calibre.by_asin(self.asin))
+        if not cbooks:
+          # new book
+          quiet or print("new book <=", shortpath(azwpath))
+          dbid = calibre.add(azwpath, doit=doit, quiet=quiet)
+          if dbid is None:
+            added = not doit
+            cbook = None
+          else:
+            added = True
+            cbook = calibre[dbid]
+            quiet or print(" ", cbook)
+        else:
+          # book already present in calibre
+          cbook = cbooks[0]
+          if len(cbooks) > 1:
+            warning(
+                "multiple calibre books, dbids %r: choosing %s",
+                [cb.dbid for cb in cbooks], cbook
+            )
+          with Pfx(cbook):
+            # look for exact content match
+            for fmtk in 'AZW3', 'AZW', 'MOBI':
+              fmtpath = cbook.formatpath(fmtk)
+              if fmtpath and filecmp.cmp(fmtpath, azwpath):
+                quiet or print(
+                    cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
+                )
+                return cbook, False
+            # remaining logic is in CalibreBook.pull_format
+            cbook.pull_format(
+                azwpath, doit=doit, force=force, quiet=quiet, verbose=verbose
+            )
+        return cbook, added
+
+    self.KindleBook = KindleBook
 
   def __str__(self):
     return "%s:%s" % (type(self).__name__, shortpath(self.fspath))
@@ -149,7 +329,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     try:
       book = self._bookrefs[subdir_name]
     except KeyError:
-      book = self._bookrefs[subdir_name] = KindleBook(self, subdir_name)
+      book = self._bookrefs[subdir_name] = self.KindleBook(self, subdir_name)
     return book
 
   def __iter__(self):
@@ -167,161 +347,6 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     for k in self:
       yield k, self[k]
-
-class KindleBook(HasFSPath):
-  ''' A reference to a Kindle library book subdirectory.
-  '''
-
-  # pylint: super-init-not-called
-  @typechecked
-  @require(lambda subdir_name: os.sep not in subdir_name)
-  def __init__(self, tree: KindleTree, subdir_name: str):
-    ''' Initialise this book subdirectory reference.
-
-        Parameters:
-        * `tree`: the `Kindletree` containing the subdirectory
-        * `subdir_name`: the subdirectory name
-    '''
-    self.tree = tree
-    self.subdir_name = subdir_name
-
-  def __str__(self):
-    return "%s[%s]:%s" % (self.tree, self.subdir_name, self.tags)
-
-  def __repr__(self):
-    return "%s(%r,%r)" % (type(self).__name__, self.tree, self.subdir_name)
-
-  @property
-  def fspath(self):
-    ''' The filesystem path of this book subdirectory.
-    '''
-    return self.tree.pathto(self.subdir_name)
-
-  @property
-  def asin(self):
-    ''' The ASIN of this book subdirectory, normalised to upper case.
-    '''
-    for suffix in '_EBOK', '_EBSP':
-      prefix = cutsuffix(self.subdir_name, suffix)
-      if prefix is not self.subdir_name:
-        return prefix.upper()
-    raise ValueError(
-        "subdir_name %r does not end with _EBOK or _BSP" % (self.subdir_name,)
-    )
-
-  def listdir(self):
-    ''' Return a list of the names inside the subdirectory,
-          or an empty list if the subdirectory is not present.
-      '''
-    try:
-      return os.listdir(self.fspath)
-    except FileNotFoundError:
-      return []
-
-  def extpath(self, ext):
-    ''' Return the filesystem path to the booknamed file
-        within the book subdirectory.
-    '''
-    return self.pathto(self.subdir_name + '.' + ext)
-
-  @property
-  def tags(self):
-    ''' The `FSTags` for this book subdirectory.
-    '''
-    return self.tree.fstags[self.fspath]
-
-  def asset_names(self):
-    ''' Return the names of files within the subdirectory
-        whose names start with `self.subdir_name+'.'`.
-    '''
-    prefix_ = self.subdir_name
-    return [name for name in self.listdir() if name.startswith(prefix_)]
-
-  def subpath(self, name):
-    ''' The filesystem path of `name` within this subdirectory.
-    '''
-    return joinpath(self.fspath, name)
-
-  def phl_xml(self):
-    ''' Decode the `.phl` XML file if present and return an XML `ElementTree`.
-        Return `None` if the file is not present.
-
-        This file seems to contain popular highlights in the
-        `popular/content/annotation` tags.
-      '''
-    phl_path = self.subpath(self.subdir_name + '.phl')
-    try:
-      with pfx_call(open, phl_path, 'rb') as f:
-        xml_bs = f.read()
-    except FileNotFoundError:
-      return None
-    with Pfx(phl_path):
-      return pfx_call(etree.fromstring, xml_bs)
-
-  # pylint: disable=too-many-branches
-  def export_to_calibre(
-      self,
-      calibre,
-      *,
-      doit=True,
-      replace_format=False,
-      force=False,
-      quiet=False,
-      verbose=False,
-  ):
-    ''' Export this Kindle book to a Calibre instance,
-        return `(cbook,added)`
-        being the `CalibreBook` and whether the Kinble book was added
-        (books are not added if the format is already present).
-
-        Parameters:
-        * `calibre`: the `CalibreTree`
-        * `doit`: optional flag, default `True`;
-          if false just recite planned actions
-        * `force`: optional flag, default `False`;
-          if true pull the AZW file even if an AZW format already exists
-        * `replace_format`: if true, export even if the `AZW3` format is already present
-        * `quiet`: default `False`, do not print nonwarnings
-        * `verbose`: default `False`, print all actions or nonactions
-    '''
-    azwpath = self.extpath('azw')
-    if not isfilepath(azwpath):
-      raise ValueError("no AZW file: %r" % (azwpath,))
-    added = False
-    cbooks = list(calibre.by_asin(self.asin))
-    if not cbooks:
-      # new book
-      quiet or print("new book <=", shortpath(azwpath))
-      dbid = calibre.add(azwpath, doit=doit, quiet=quiet)
-      if dbid is None:
-        added = not doit
-        cbook = None
-      else:
-        added = True
-        cbook = calibre[dbid]
-        quiet or print(" ", cbook)
-    else:
-      # book already present in calibre
-      cbook = cbooks[0]
-      if len(cbooks) > 1:
-        warning(
-            "multiple calibre books, dbids %r: choosing %s",
-            [cb.dbid for cb in cbooks], cbook
-        )
-      with Pfx(cbook):
-        # look for exact content match
-        for fmtk in 'AZW3', 'AZW', 'MOBI':
-          fmtpath = cbook.formatpath(fmtk)
-          if fmtpath and filecmp.cmp(fmtpath, azwpath):
-            quiet or print(
-                cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
-            )
-            return cbook, False
-        # remaining logic is in CalibreBook.pull_format
-        cbook.pull_format(
-            azwpath, doit=doit, force=force, quiet=quiet, verbose=verbose
-        )
-    return cbook, added
 
 # pylint: disable=too-many-instance-attributes
 class KindleBookAssetDB(ORM):
@@ -510,13 +535,21 @@ class KindleBookAssetDB(ORM):
 
     # references to table definitions
     self.download_state_map = DownloadState
+    DownloadState.orm = self
     self.books = Book
+    Book.orm = self
     self.book_download_info = BookDownloadInfo
+    BookDownloadInfo.orm = self
     self.requirement_level_map = RequirementLevel
+    RequirementLevel.orm = self
     self.assets = Asset
+    Asset.orm = self
     self.endpoint_type_map = EndpointType
+    EndpointType.orm = self
     self.delivery_type_map = DeliveryType
+    DeliveryType.orm = self
     self.asset_download_info = AssetDownloadInfo
+    AssetDownloadInfo.orm = self
 
 class KindleCommand(BaseCommand):
   ''' Command line for interacting with a Kindle filesystem tree.
