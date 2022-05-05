@@ -79,7 +79,7 @@ from cs.py.func import prop
 from cs.py.modules import import_module_name
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
-from cs.threads import locked, locked_property
+from cs.threads import locked
 
 DISTINFO = {
     'description':
@@ -336,7 +336,9 @@ class MailFiler(NS):
     '''
     return self.subcfg('monitor')
 
-  @locked_property
+  @property
+  @locked
+  @cachedmethod
   def maildb_path(self):
     ''' Compute maildb path on the fly.
     '''
@@ -352,7 +354,9 @@ class MailFiler(NS):
     self._maildb_path = path
     self._maildb = None
 
-  @locked_property
+  @property
+  @locked
+  @cachedmethod
   def maildb(self):
     ''' The email address database.
     '''
@@ -381,7 +385,9 @@ class MailFiler(NS):
     self._msgiddb_path = path
     self._msgiddb = None
 
-  @locked_property
+  @property
+  @locked
+  @cachedmethod
   def msgiddb(self):
     ''' The Message-ID database.
     '''
@@ -2190,7 +2196,8 @@ class WatchedMaildir(NS):
         states.append((path, S.mtime, S.size, S.dev, S.ino))
     return states
 
-  @prop
+  @property
+  @locked
   @cachedmethod(sig_func=lambda md: md._rules_state())
   def rules(self):
     ''' The `Rules` object for this `WatchedMaildir`.
