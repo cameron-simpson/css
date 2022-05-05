@@ -1,3 +1,4 @@
+gui - filename field with rename
 show autotag suggests and "apply" button?
 display of tagger.* config?
 exclude tagger.* from tag view
