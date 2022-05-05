@@ -74,7 +74,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     super().__init__(calibrepath)
 
     # define the proxy classes
-
     class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
         'author_sort',
         'authors',
@@ -224,8 +223,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         )
         if cp is None:
           return True
-        if cp.return_code != 0:
-          warning("command fails, return code %d", cp.return_code)
+        if cp.returncode != 0:
+          warning("command fails, return code %d", cp.returncode)
           return False
         self.refresh_from_db()
         return True
@@ -343,7 +342,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           quiet=False,
           verbose=False,
       ):
-        ''' Pull formats from another `CalibreBook`.
+        ''' Pull a format file, typically from another `CalibreBook`.
 
             Parameters:
             * `ofmtpath`: the filesystem path of the format to pull
@@ -370,7 +369,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         else:
           fmtpath = self.formatpath(fmtk)
           if fmtpath is None and fmtk.startswith('AZW'):
-            fmtpath = self.formatpath('AZW3') or self.formatpath('AZW')
+            fmtpath = (
+                self.formatpath('AZW3') or self.formatpath('AZW')
+                or self.formatpath('MOBI')
+            )
           if fmtpath is not None and not force:
             if filecmp.cmp(fmtpath, ofmtpath):
               verbose and print(
@@ -478,7 +480,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.by_identifier('mobi-asin', asin.upper())
 
-  def _run(self, calcmd, *calargv, doit=True, quiet=False, subp_options=None):
+  def _run(self, calcmd, *calargv, doit=True, quiet=False, **subp_options):
     ''' Run a Calibre utility command.
         Return the `CompletedProcess` result.
 
@@ -492,8 +494,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         * `subp_options`: optional mapping of keyword arguments
           to pass to `subprocess.run`
     '''
-    if subp_options is None:
-      subp_options = {}
     subp_options.setdefault('capture_output', True)
     subp_options.setdefault('check', False)
     subp_options.setdefault('text', True)

@@ -470,8 +470,9 @@ class BasicTableMixin:
       id_column = cls.DEFAULT_ID_COLUMN
     row = cls.lookup1(session=session, **{id_column: index})
     if row is None:
-      raise IndexError("%s: no row with id=%s" % (
+      raise IndexError("%s: no row with %s=%s" % (
           cls,
+          id_column,
           index,
       ))
     return row
@@ -742,7 +743,7 @@ def RelationProxy(
     '''
 
     @typechecked
-    def __init__(self, id: Any, *, id_column='id', db_row=None):  # pylint: disable=redefined-builtin
+    def __init__(self, id: Any, *, db_row=None):  # pylint: disable=redefined-builtin
       self.id = id
       self.id_column = id_column
       self.__fields = {}
@@ -778,7 +779,9 @@ def RelationProxy(
         except KeyError:
           pass
       with using_session(orm=relation.orm) as session:
-        db_row = relation.by_id(self.id, session=session)
+        db_row = relation.by_id(
+            self.id, session=session, id_column=self.id_column
+        )
         self.refresh_from_db(db_row)
       return self.__fields[field]
 
@@ -789,7 +792,7 @@ def RelationProxy(
       if attr.startswith('_'):
         warning("__getattr__(%r)", attr)
       with Pfx("%s.%s", type(self).__name__, attr):
-        if attr in ('id', '_RelProxy__fields'):
+        if attr in ('id', '__fields'):
           raise RuntimeError
         try:
           return self[attr]
