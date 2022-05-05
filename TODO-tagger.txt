@@ -1,3 +1,4 @@
+gui - tag input accepting "tag=blah" and "-tag"
 gui - filename field with rename
 show autotag suggests and "apply" button?
 display of tagger.* config?
