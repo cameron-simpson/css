@@ -77,7 +77,6 @@ from cs.obj import singleton
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.py.modules import import_module_name
-from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked, locked_property
@@ -85,10 +84,9 @@ from cs.threads import locked, locked_property
 DISTINFO = {
     'description':
     "email message filing system which monitors multiple inbound Maildir folders",
-    'keywords': ["python2", "python3"],
+    'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         "Topic :: Communications :: Email :: Filters",
     ],
@@ -107,7 +105,6 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.func',
         'cs.py.modules',
-        'cs.py3',
         'cs.rfc2047',
         'cs.seq',
         'cs.threads',
@@ -723,7 +720,7 @@ class MessageFiler(NS):
       self.message_path = message_path
       info(
           (
-              u("%s %s: %s") % (
+              "%s %s: %s" % (
                   time.strftime("%Y-%m-%d %H:%M:%S"),
                   self.format_message(M, "{short_from}->{short_recipients}"),
                   unrfc2047(M.get('subject', '_no_subject'))
@@ -1085,9 +1082,7 @@ class MessageFiler(NS):
     hmap['short_recipients'] = ",".join(
         self.maildb.header_shortlist(M, ('to', 'cc', 'bcc'))
     )
-    for h, hval in list(hmap.items()):
-      hmap[h] = ustr(hval)
-    msg = u(fmt).format(**hmap)
+    msg = fmt.format(**hmap)
     return msg
 
   def alert(self, alert_level, alert_message=None):
@@ -1212,7 +1207,7 @@ re_INGROUPorDOMorADDR = re.compile(re_INGROUPorDOMorADDR_s, re.I)
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
   '''
-  if isinstance(fp, StringTypes):
+  if isinstance(fp, str):
     with open(fp) as rfp:
       yield from parserules(rfp)
     return

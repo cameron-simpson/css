@@ -1,4 +1,3 @@
-cs.app.mailfiler: remove cs.py3 stuff entirely
 mailfiler needed 2 ctrl-c to exit
 support renaming headers in a cascade, example for googlegroups dkim, shuffle From to x-from-ggroups, shuffle x-original-from to from
 make default header set tunable, eg include sender: in to/cc/bcc, would halve my ruleset
