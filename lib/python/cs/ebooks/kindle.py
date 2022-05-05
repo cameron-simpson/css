@@ -5,7 +5,7 @@
 
 from contextlib import contextmanager
 import filecmp
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import os
 from os.path import (
     isdir as isdirpath,
@@ -46,7 +46,6 @@ from cs.sqlalchemy_utils import (
     BasicTableMixin,
     HasIdMixin,
     RelationProxy,
-    proxy_on_demand_field,
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
@@ -62,7 +61,10 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       This is mostly to aid keeping track of state using `cs.fstags`.
   '''
 
-  FSPATH_DEFAULT = '~/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle/My Kindle Content'
+  FSPATH_DEFAULT = (
+      '~/Library/Containers/com.amazon.Kindle/Data/Library/'
+      'Application Support/Kindle/My Kindle Content'
+  )
   FSPATH_ENVVAR = 'KINDLE_LIBRARY'
 
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
@@ -90,7 +92,6 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
         '''
         return id(tree), subdir_name
 
-      # pylint: super-init-not-called
       @typechecked
       @require(lambda subdir_name: os.sep not in subdir_name)
       def __init__(self, tree: KindleTree, subdir_name: str):
@@ -100,10 +101,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
             * `tree`: the `Kindletree` containing the subdirectory
             * `subdir_name`: the subdirectory name
         '''
-        if 'tree' in self.__dict__:
-          if db_book is not None:
-            self.refresh_from_db(db_row=db_book)
-        else:
+        if 'tree' not in self.__dict__:
           self.tree = tree
           self.subdir_name = subdir_name
           super().__init__(self.asin)
@@ -216,6 +214,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
         cbooks = list(calibre.by_asin(self.asin))
         if not cbooks:
           # new book
+          # pylint: disable=expression-not-assigned
           quiet or print("new book <=", shortpath(azwpath))
           dbid = calibre.add(azwpath, doit=doit, quiet=quiet)
           if dbid is None:
@@ -238,6 +237,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
             for fmtk in 'AZW3', 'AZW', 'MOBI':
               fmtpath = cbook.formatpath(fmtk)
               if fmtpath and filecmp.cmp(fmtpath, azwpath):
+                # pylint: disable=expression-not-assigned
                 quiet or print(
                     cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
                 )
@@ -391,6 +391,7 @@ class KindleBookAssetDB(ORM):
     with get_session() as session2:
       yield session2
 
+  # pylint: disable=too-many-statements
   def declare_schema(self):
     r''' Define the database schema / ORM mapping.
 
@@ -630,7 +631,7 @@ class KindleCommand(BaseCommand):
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
         try:
-          cbook, added = kbook.export_to_calibre(
+          kbook.export_to_calibre(
               calibre,
               doit=doit,
               force=force,
