@@ -97,14 +97,20 @@ DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 # High level action tracking, above INFO and below WARNING.
 TRACK = logging.INFO + 5
 
+# Quiet messaging, below TRACK and above the rest.
+QUIET = TRACK - 1
+
 # Special status line tracking, above INFO and below TRACK and WARNING
-STATUS = TRACK - 1
+STATUS = QUIET - 1
 
 # Special verbose value, below INFO but above DEBUG.
 VERBOSE = logging.INFO - 1
 
 # check the hierarchy
-assert logging.DEBUG < VERBOSE < logging.INFO < STATUS < TRACK < logging.WARNING
+assert (
+    logging.DEBUG < VERBOSE < logging.INFO < STATUS < QUIET < TRACK <
+    logging.WARNING
+)
 
 loginfo = None
 D_mode = False
@@ -474,10 +480,11 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   if env_debug is None:
     if environ is None:
       environ = os.environ
-    env_debug = os.environ.get('DEBUG', '')
-  level = TRACK
+    env_debug = environ.get('DEBUG', '')
   if verbose is None:
-    if not sys.stderr.isatty():
+    if sys.stderr.isatty():
+      level = TRACK
+    else:
       level = logging.WARNING
   elif verbose:
     level = logging.VERBOSE
@@ -644,6 +651,12 @@ def track(msg, *args, **kwargs):
   ''' Emit a log at `TRACK` level with the current `Pfx` prefix.
   '''
   log(TRACK, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def quiet(msg, *args, **kwargs):
+  ''' Emit a log at `QUIET` level with the current `Pfx` prefix.
+  '''
+  log(QUIET, msg, *args, **kwargs)
 
 @logging_wrapper(stacklevel_increment=1)
 def verbose(msg, *args, **kwargs):

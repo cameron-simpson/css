@@ -48,7 +48,8 @@ if sys.hexversion >= 0x03000000:
         Warning: _ignores_ the `encoding` and `errors` parameters
         because `fp` should already be decoded.
     '''
-    return csv.reader(fp, **kw)
+    for row in csv.reader(fp, **kw):
+      yield row
 
   def csv_writerow(csvw, row, encoding='utf-8'):
     ''' Write the supplied row as strings encoded with the supplied `encoding`,
@@ -122,13 +123,13 @@ def csv_import(
 
       Examples:
 
-            >>> cls, rows = csv_import(['a, b', '1,2', '3,4'], class_name='Example_AB')
-            >>> cls     #doctest: +ELLIPSIS
+            >>> rowtype, rows = csv_import(['a, b', '1,2', '3,4'], class_name='Example_AB')
+            >>> rowtype     #doctest: +ELLIPSIS
             <function named_row_tuple.<locals>.factory at ...>
             >>> list(rows)
             [Example_AB(a='1', b='2'), Example_AB(a='3', b='4')]
 
-            >>> cls, rows = csv_import(['1,2', '3,4'], class_name='Example_DEFG', column_names=['D E', 'F G '])
+            >>> rowtype, rows = csv_import(['1,2', '3,4'], class_name='Example_DEFG', column_names=['D E', 'F G '])
             >>> list(rows)
             [Example_DEFG(d_e='1', f_g='2'), Example_DEFG(d_e='3', f_g='4')]
   '''

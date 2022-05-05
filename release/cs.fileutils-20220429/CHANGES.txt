@@ -1,0 +1,2 @@
+lib/python/cs/fileutils.py: cs.fileutils,cs.fs: move longpath and shortpath to cs.fs, leave legacy names behind
+lib/python/cs/fileutils.py: cs.fileutils: update DISTINFO

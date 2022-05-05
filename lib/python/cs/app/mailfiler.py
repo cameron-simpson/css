@@ -49,6 +49,7 @@ from threading import Lock, RLock
 import time
 from time import sleep
 from types import SimpleNamespace as NS
+
 from cs.app.maildb import MailDB
 from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
@@ -128,10 +129,10 @@ DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
 SELF_FOLDER = '.'
 
-def main(argv=None, stdin=None):
+def main(argv=None):
   ''' Mailfiler main programme.
   '''
-  return MailFilerCommand(argv, stdin=stdin, log_level=logging.INFO).run()
+  return MailFilerCommand(argv).run()
 
 class MailFilerCommand(BaseCommand):
   ''' MailFiler commandline implementation.
@@ -151,7 +152,7 @@ class MailFilerCommand(BaseCommand):
     ''' Set up default options.
     '''
     options = self.options
-    options.stdin = getattr(options, 'stdin', None) or sys.stdin
+    options.stdin = sys.stdin
     options.config_path = None
     options.maildb_path = None
     options.msgiddb_path = None
@@ -438,7 +439,7 @@ class MailFiler(NS):
         nmsgs = 0
         for folder in these_folders:
           wmdir = self.maildir_watcher(folder)
-          with Pfx("%s", wmdir.shortname):
+          with Pfx(wmdir.shortname):
             try:
               nmsgs += self.sweep(
                   wmdir, justone=justone, no_remove=no_remove, upd=upd
@@ -502,7 +503,7 @@ class MailFiler(NS):
           if upd:
             status(key)
           if key in wmdir.lurking:
-            info("skip lurking key %r", key)
+            track("skip lurking key %r", key)
             skipped += 1
             continue
           if key in wmdir.filed:
@@ -517,10 +518,10 @@ class MailFiler(NS):
               wmdir.lurk(key)
               continue
             if key in wmdir.filed:
-              info("message remains in this folder")
+              track("message remains in this folder")
               continue
             if no_remove:
-              info("no_remove: message not removed, lurking key %s", key)
+              track("no_remove: message not removed, lurking key %s", key)
               wmdir.lurk(key)
             else:
               debug("remove message key %s", key)
@@ -529,7 +530,7 @@ class MailFiler(NS):
             if justone:
               break
       if nmsgs or all_keys_time.elapsed >= 0.2:
-        info(
+        track(
             "filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped,
             all_keys_time.elapsed
         )
@@ -637,7 +638,7 @@ def save_to_folderpath(folderpath, M, message_path, flags):
     else:
       savekey = mdir.save_filepath(message_path, flags=maildir_flags)
     savepath = mdir.keypath(savekey)
-    info("    OK %s" % (shortpath(savepath)))
+    track("    OK %s" % (shortpath(savepath)))
     if message_path is None:
       # update saved message for hard linking
       message_path = savepath
@@ -665,7 +666,7 @@ def save_to_folderpath(folderpath, M, message_path, flags):
       text = M.as_string(True).replace('\nFrom ', '\n>From ')
     with open(folderpath, "a") as mboxfp:
       mboxfp.write(text)
-    info("    OK >> %s" % (shortpath(folderpath)))
+    track("    OK >> %s" % (shortpath(folderpath)))
   return message_path
 
 class MessageFiler(NS):
@@ -716,7 +717,7 @@ class MessageFiler(NS):
                                envsub(DEFAULT_MAIN_LOG))):
       self.message = M
       self.message_path = message_path
-      info(
+      track(
           (
               u("%s %s: %s") % (
                   time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -727,9 +728,9 @@ class MessageFiler(NS):
       )
       msg_id = M.get('message-id', '<?>').replace('\n', ' ')
       if message_path:
-        info("  " + shortpath(self.message_path) + " " + msg_id)
+        track("  " + shortpath(self.message_path) + " " + msg_id)
       else:
-        info("  " + msg_id)
+        track("  " + msg_id)
       # match the rules, gathering labels and save destinations
       try:
         rules.match(self)
@@ -810,7 +811,7 @@ class MessageFiler(NS):
       ##  M.add_header('X-Matched-Mailfiler-Rule', str(R))
       for R in self.matched_rules:
         if any(map(lambda T: not isinstance(T, Target_Assign), R.targets)):
-          info("    MATCH %s", R)
+          track("    MATCH %s", R)
 
       return self.save_message()
 
@@ -1028,7 +1029,7 @@ class MessageFiler(NS):
           mfp.seek(0)
           return self.save_to_pipe(argv, mfp=mfp)
     retcode = subprocess.call(argv, env=environ, stdin=mfp)
-    info("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
+    track("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
   def sendmail(self, address, mfp=None, sender=None):
@@ -1778,7 +1779,7 @@ class Target_Function(NS):
             if s2 is not None:
               new_header_values.append(s2)
         if new_header_values and header_values != new_header_values:
-          info(
+          track(
               "%s: %r ==> %r", header_name.title(), header_values,
               new_header_values
           )
@@ -2116,7 +2117,7 @@ class WatchedMaildir(NS):
     self.lurking = set()
     self.filed = set()
     self.flush()
-    info("%s: %d rules", self.shortname, len(self.rules))
+    track("%s: %d rules", self.shortname, len(self.rules))
 
   def __str__(self):
     return "<WatchedMaildir %s, %s rules, %d lurking>" \
@@ -2169,13 +2170,13 @@ class WatchedMaildir(NS):
   def lurk(self, key):
     ''' Add `key` to the luking list.
     '''
-    info("lurk %s", key)
+    track("lurk %s", key)
     self.lurking.add(key)
 
   def unlurk(self, key):
     ''' Remove `key` from the lurking list.
     '''
-    info("unlurk %s", key)
+    track("unlurk %s", key)
     self.lurking.remove(key)
 
   def _rules_state(self):

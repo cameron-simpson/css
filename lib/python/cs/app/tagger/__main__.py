@@ -191,9 +191,8 @@ class TaggerCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing pathnames")
-    from .gui_tk import TaggerGUI  # pylint: disable=import-outside-toplevel
-    with TaggerGUI(self.options.tagger, argv) as gui:
-      gui.run()
+    from .gui_tk import main as gui_main  # pylint: disable=import-outside-toplevel
+    return gui_main([self.cmd, *argv])
 
   def cmd_ont(self, argv):
     ''' Usage: {cmd} type_name

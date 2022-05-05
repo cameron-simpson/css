@@ -66,9 +66,14 @@ DISTINFO = {
         'cs.threads',
     ],
     'entry_points': {
-        'console_scripts': ['pop3 = cs.pop3:POP3Command.run_argv'],
+        'console_scripts': ['pop3 = cs.pop3:main'],
     },
 }
+
+def main(argv=None):
+  ''' The `pop3` command line mode.
+  '''
+  return POP3Command(argv).run()
 
 class POP3(MultiOpenMixin):
   ''' Simple POP3 class with support for streaming use.
@@ -112,7 +117,7 @@ class POP3(MultiOpenMixin):
       self.flush()
       logmsg("join QUIT")
       quitR.join()
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
       exception("client quit: %s", e)
       logmsg = warning
     if self._result_queue:
@@ -521,7 +526,7 @@ class POP3Command(BaseCommand):
       and obtain the remaining detail via the `netrc` entry.
   '''
 
-  # pylint: disable=too-many-locals
+  # pylint: disable=no-self-use,too-many-locals
   def cmd_dl(self, argv):
     ''' Collect messages from a POP3 server and deliver to a Maildir.
 
@@ -554,4 +559,4 @@ class POP3Command(BaseCommand):
           deleRs.wait()
 
 if __name__ == '__main__':
-  sys.exit(POP3Command.run_argv(sys.argv))
+  sys.exit(main(sys.argv))

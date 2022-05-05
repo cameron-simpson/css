@@ -1,3 +1,4 @@
+cs.distinfo: use the trove-classifiers package for sanity checking?
 default url to point into the sr.ht repo
 wheels
 try using flit instead of twine, obsolete setup.py -- but still provide it?

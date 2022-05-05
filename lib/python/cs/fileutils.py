@@ -51,7 +51,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20211208-post'
+__version__ = '20220429-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -65,6 +65,7 @@ DISTINFO = {
         'cs.deco',
         'cs.env',
         'cs.filestate',
+        'cs.fs>=longpath,shortpath',
         'cs.gimmicks>=TimeoutError',
         'cs.lex>=20200914',
         'cs.logutils',
