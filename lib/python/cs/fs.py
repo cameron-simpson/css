@@ -31,7 +31,7 @@ from cs.env import envsub
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
-__version__ = '20220327-post'
+__version__ = '20220429-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -40,11 +40,19 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.pfx'],
+    'install_requires': [
+        'cs.deco',
+        'cs.env',
+        'cs.obj',
+        'cs.pfx',
+        'icontract',
+        'typeguard',
+    ],
 }
 
 pfx_listdir = partial(pfx_call, os.listdir)
 pfx_mkdir = partial(pfx_call, os.mkdir)
+pfx_makedirs = partial(pfx_call, os.makedirs)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
@@ -156,6 +164,12 @@ class HasFSPath:
 
   def __init__(self, fspath):
     self.fspath = fspath
+
+  @property
+  def shortpath(self):
+    ''' The short version of `self.fspath`.
+    '''
+    return shortpath(self.fspath)
 
   @require(lambda subpath: not isabspath(subpath))
   def pathto(self, subpath):

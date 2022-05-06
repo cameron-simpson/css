@@ -34,6 +34,33 @@ from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
 from cs.threads import locked
 
+__version__ = None
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'entry_points': {
+        'console_scripts': ['tagger = cs.app.tagger.__main__:main'],
+        'gui_scripts': ['tagger-gui = cs.app.tagger.gui_tk:main'],
+    },
+    'install_requires': [
+        'cs.deco',
+        'cs.fs',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.onttags',
+        'cs.pfx',
+        'cs.queues',
+        'cs.seq',
+        'cs.tagset',
+        'cs.threads',
+    ],
+}
+
 pfx_link = partial(pfx_call, os.link)
 pfx_mkdir = partial(pfx_call, os.mkdir)
 pfx_remove = partial(pfx_call, os.remove)
@@ -376,20 +403,24 @@ class Tagger(FSPathBasedSingleton):
   def subdir_tag_map(self):
     ''' Return a mapping of `tag_name`->`tag_value`->[dirpath,...]
         covering the entire subdirectory tree.
+
+        Returns an empty mapping if `self.fspath` does not exist
+        or is not a directory.
     '''
     # scan the whole directory before recursing
     tag_map = defaultdict(lambda: defaultdict(set))
-    for entry in [entry for entry in os.scandir(self.fspath)
-                  if entry.is_dir() and not entry.name.startswith('.')]:
-      subtagger = self.tagger_for(entry.path)
-      # make entries for each tag on the immediate subdir
-      for tag in subtagger.tagged.as_tags():
-        if isinstance(tag.value, (int, str)):
-          tag_map[tag.name][tag.value].add(entry.path)
-      # infill with all the entries from the subdir's own tag map
-      for tag_name, submap in subtagger.subdir_tag_map().items():
-        for tag_value, paths in submap.items():
-          tag_map[tag_name][tag_value].update(paths)
+    if isdirpath(self.fspath):
+      for entry in [entry for entry in os.scandir(self.fspath)
+                    if entry.is_dir() and not entry.name.startswith('.')]:
+        subtagger = self.tagger_for(entry.path)
+        # make entries for each tag on the immediate subdir
+        for tag in subtagger.tagged.as_tags():
+          if isinstance(tag.value, (int, str)):
+            tag_map[tag.name][tag.value].add(entry.path)
+        # infill with all the entries from the subdir's own tag map
+        for tag_name, submap in subtagger.subdir_tag_map().items():
+          for tag_value, paths in submap.items():
+            tag_map[tag_name][tag_value].update(paths)
     return tag_map
 
   @locked

@@ -109,7 +109,7 @@ class TaggerCommand(BaseCommand):
                 continue
               if entry.is_dir(follow_symlinks=False
                               ) or entry.is_file(follow_symlinks=False):
-                q.prepend(joinpath(path, entry.name))
+                q.prepend((joinpath(path, entry.name),))
           else:
             warning("recursion disabled, skipping")
         else:
@@ -122,8 +122,8 @@ class TaggerCommand(BaseCommand):
   def cmd_autotag(self, argv):
     ''' Usage: {cmd} [-fn] paths...
           Apply the inference rules to each path.
-          -n  No action. ZRecite inferred tags.
-          -f  Force. Overwirte existing tags.
+          -f  Force. Overwrite existing tags.
+          -n  No action. Recite inferred tags.
     '''
     infer_mode = 'infill'
     opts, argv = getopt(argv, 'fn')
@@ -191,9 +191,8 @@ class TaggerCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing pathnames")
-    from .gui_tk import TaggerGUI  # pylint: disable=import-outside-toplevel
-    with TaggerGUI(self.options.tagger, argv) as gui:
-      gui.run()
+    from .gui_tk import main as gui_main  # pylint: disable=import-outside-toplevel
+    return gui_main([self.cmd, *argv])
 
   def cmd_ont(self, argv):
     ''' Usage: {cmd} type_name

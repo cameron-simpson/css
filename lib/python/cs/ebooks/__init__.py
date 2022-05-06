@@ -2,22 +2,17 @@
 
 ''' Utilities and command line for working with EBooks.
     Basic support for talking to Apple Books, Calibre, Kindle, Mobi.
+
+    These form the basis of my personal Kindle and Calibre workflow.
 '''
 
-import os
-from os.path import (
-    expanduser,
-    isabs as isabspath,
-    join as joinpath,
-    realpath,
-)
-from threading import Lock
-from typing import Optional
+from builtins import print as builtin_print
+import shlex
+from subprocess import run as subprocess_run
 
-from icontract import require
-from typeguard import typechecked
-
-from cs.obj import SingletonMixin
+from cs.logutils import warning
+from cs.pfx import pfx_call
+from cs.upd import Upd, print
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -44,3 +39,34 @@ DISTINFO = {
         'mobi',
     ],
 }
+
+# TODO: merge into cs.psutils
+def run(argv, doit=True, quiet=False, **subp_options):
+  ''' Run a command via `subprocess.run`.
+      Return the `CompletedProcess` result or `None` if `doit` is false.
+
+      Parameters:
+      * `argv`: the command line to run
+      * `doit`: optional flag, default `True`;
+        if false do not run the command and return `None`
+      * `quiet`: default `False`; if true, do not print the command or its output
+      * `subp_options`: optional mapping of keyword arguments
+        to pass to `subprocess.run`
+  '''
+  quiet or print(shlex.join(argv))
+  if not doit:
+    return None
+  with Upd().above():
+    cp = pfx_call(subprocess_run, argv, **subp_options)
+    if cp.stdout and not quiet:
+      builtin_print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
+    if cp.stderr:
+      builtin_print(" stderr:")
+      builtin_print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
+  if cp.returncode != 0:
+    warning(
+        "run fails, exit code %s from %s",
+        cp.returncode,
+        shlex.join(cp.args),
+    )
+  return cp

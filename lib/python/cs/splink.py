@@ -21,7 +21,6 @@ from os.path import (
     splitext,
 )
 import shlex
-from signal import SIGINT, SIGTERM
 import sys
 import time
 
@@ -469,14 +468,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     '''
     options = self.options
     fstags = options.fstags
-    runstate = options.runstate
     with fstags:
       spd = SPLinkData(options.spdpath)
       with stackattrs(options, spd=spd):
         with spd:
-          with runstate.catch_signal(SIGINT, verbose=True):
-            with runstate.catch_signal(SIGTERM, verbose=True):
-              yield
+          yield
 
   def cmd_fetch(self, argv):
     ''' Usage: {cmd} [-x] [rsync-source] [rsync-options...]
@@ -675,11 +671,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     if argv and argv[0] == '--show':
       show_image = True
       argv.pop(0)
-    imgpath = self.popargv(
+    imgpath = self.poparg(
         argv, "tspath", str, lambda path: not existspath(path),
         "already exists"
     )
-    days = self.popargv(argv, int, "days to display", lambda days: days > 0)
+    days = self.poparg(argv, int, "days to display", lambda days: days > 0)
     if not argv:
       argv = '*'
     options = self.options
