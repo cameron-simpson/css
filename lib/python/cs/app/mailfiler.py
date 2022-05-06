@@ -181,7 +181,7 @@ class MailFilerCommand(BaseCommand):
     self.popopts(
         argv,
         _1='justone',
-        d=('delay', int, lambda delay: delay > 0),
+        d_=('delay', int, lambda delay: delay > 0),
         n='justone'
     )
     if badopts:
