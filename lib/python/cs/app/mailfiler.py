@@ -156,7 +156,7 @@ class MailFilerCommand(BaseCommand):
     options.maildir = None
     options.rules_pattern = DEFAULT_RULES_PATTERN
 
-  def apply_opt(self, opt,val):
+  def apply_opt(self, opt, val):
     ''' Apply a command line option.
     '''
     if opt == '-R':
@@ -763,7 +763,9 @@ class MessageFiler(NS):
         if not default_targets:
           error("no matching targets and no $DEFAULT")
           return False
-        info("    no destinations, falling back to $DEFAULT=%r", default_targets)
+        info(
+            "    no destinations, falling back to $DEFAULT=%r", default_targets
+        )
         try:
           Ts, offset = get_targets(default_targets, 0)
           offset = skipwhite(default_targets, offset)
