@@ -156,15 +156,13 @@ class MailFilerCommand(BaseCommand):
     options.maildir = None
     options.rules_pattern = DEFAULT_RULES_PATTERN
 
-  def apply_opts(self, opts):
-    ''' Apply command line options.
+  def apply_opt(self, opt,val):
+    ''' Apply a command line option.
     '''
-    options = self.options
-    for opt, val in opts:
-      if opt == '-R':
-        options.rules_pattern = val
-      else:
-        raise RuntimeError("unhandled option: %s=%s" % (opt, val))
+    if opt == '-R':
+      self.options.rules_pattern = val
+    else:
+      raise RuntimeError("unhandled option: %s %r" % (opt, val))
 
   def cmd_monitor(self, argv):
     ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]
