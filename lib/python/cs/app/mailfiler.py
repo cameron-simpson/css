@@ -173,40 +173,27 @@ class MailFilerCommand(BaseCommand):
               Default is to make only one run over the Maildirs.
           -n  No remove. Keep filed messages in the origin Maildir.
     '''
-    justone = False
-    delay = None
-    no_remove = False
-    opts, argv = getopt(argv, '1d:n')
+    options = self.options
+    options.justone = False
+    options.delay = None
+    options.no_remove = False
     badopts = False
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-1':
-          justone = True
-        elif opt == '-d':
-          try:
-            delay = int(val)
-          except ValueError as e:
-            warning("%s: %s", e, val)
-            badopts = True
-          else:
-            if delay <= 0:
-              warning("delay must be positive, got: %d", delay)
-              badopts = True
-        elif opt == '-n':
-          no_remove = True
-        else:
-          warning("unimplemented option")
-          badopts = True
-    mdirpaths = argv
+    self.popopts(
+        argv,
+        _1='justone',
+        d=('delay', int, lambda delay: delay > 0),
+        n='justone'
+    )
     if badopts:
       raise GetoptError("invalid arguments")
+    mdirpaths = argv
     if not mdirpaths:
       mdirpaths = None
     return self.mailfiler().monitor(
         mdirpaths,
-        delay=delay,
-        justone=justone,
-        no_remove=no_remove,
+        delay=options.delay,
+        justone=options.justone,
+        no_remove=options.no_remove,
         upd=self.loginfo.upd
     )
 
