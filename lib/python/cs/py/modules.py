@@ -11,9 +11,10 @@ from inspect import getmodule
 import os.path
 import sys
 from cs.context import stackattrs
+from cs.gimmicks import warning
 from cs.pfx import Pfx
 
-__version__ = '20200521-post'
+__version__ = '20210123-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -22,7 +23,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.context', 'cs.pfx'],
+    'install_requires': ['cs.context', 'cs.gimmicks', 'cs.pfx'],
 }
 
 def import_module_name(module_name, name, path=None, lock=None):
@@ -44,6 +45,7 @@ def import_module_name(module_name, name, path=None, lock=None):
   try:
     M = importlib.import_module(module_name)
   except ImportError as e:
+    # pylint: disable=raise-missing-from
     raise ImportError("no module named %r: %s: %s" % (module_name, type(e), e))
   finally:
     if path:
@@ -54,6 +56,7 @@ def import_module_name(module_name, name, path=None, lock=None):
     try:
       return getattr(M, name)
     except AttributeError as e:
+      # pylint: disable=raise-missing-from
       raise ImportError(
           "%s: no entry named %r: %s: %s" % (module_name, name, type(e), e)
       )
@@ -101,7 +104,8 @@ def module_attributes(M):
   '''
   for attr in dir(M):
     value = getattr(M, attr, None)
-    if getmodule(value) is not M:
+    valueM = getmodule(value)
+    if valueM is not None and valueM is not M:
       continue
     yield attr, value
 
@@ -111,6 +115,7 @@ def module_names(M):
   '''
   return [attr for attr, value in module_attributes(M)]
 
+# pylint: disable=too-many-branches
 def direct_imports(src_filename, module_name=None):
   ''' Crudely parse `src_filename` for `import` statements.
       Return the set of directly imported module names.
@@ -123,7 +128,7 @@ def direct_imports(src_filename, module_name=None):
   '''
   subnames = set()
   with Pfx(src_filename):
-    with open(src_filename) as codefp:
+    with open(src_filename, encoding='utf-8') as codefp:
       for lineno, line in enumerate(codefp, 1):
         with Pfx(lineno):
           if line.startswith('import ') or line.startswith('from '):
@@ -160,3 +165,62 @@ def direct_imports(src_filename, module_name=None):
                 subimport = '.'.join(preparts)
             subnames.add(subimport)
   return subnames
+
+def import_extra(extra_package_name, distinfo):
+  ''' Try to import the package named `extra_package_name`
+      using `importlib.import_module` and return the imported package.
+
+      If an `ImportError` is raised,
+      riffle through the extras mapping in `distinfo['extras_requires']`
+      for the package name, and emit an informative warning
+      about the extras which require this package
+      and whose use a `pip install` time would bring the package in.
+      The original `ImportError` is then reraised.
+
+      If no extra is found this is presumed to be an error by the caller
+      and a `RuntimeError` is raised.
+      This function is for internal use as:
+
+          pkg = import_extra('some_package', DISTINFO)
+
+      which passes in the source module's `DISTINFO` mapping,
+      which I use as the basis for my package distributions.
+
+      A fuller example from my `cs.timeseries` module's
+      `plot` command line mode:
+
+          def cmd_plot(self, argv):
+            """ Usage: {cmd} datadir days fields...
+            """
+            try:
+              import_extra('plotly', DISTINFO)
+            except ImportError as e:
+              raise GetoptError(
+                  "the plotly package is not installed: %s" % (e,)
+              ) from e
+
+      which produces this output:
+
+          timeseries.py: plot: import_extra('plotly'): package not available; the following extras pull it in: ['plotting']
+          timeseries.py: the plotly package is not installed: timeseries.py: plot: import_extra('plotly'): No module named 'plotly'
+  '''
+  with Pfx("import_extra(%r)", extra_package_name):
+    try:
+      return importlib.import_module(extra_package_name)
+    except ImportError:
+      from_extras = [
+          extra_name
+          for extra_name, extra_packages in distinfo['extras_requires'].items()
+          if extra_package_name in extra_packages
+      ]
+      if from_extras:
+        warning(
+            "package not available; the following extras pull it in: %r" %
+            (sorted(from_extras),)
+        )
+        raise
+      # pylint: disable=raise-missing-from
+      raise RuntimeError(
+          "import_extra called with a package not listed in DISTINFO[extras_requires]=%r"
+          % (DISTINFO['extras_requires'],)
+      )

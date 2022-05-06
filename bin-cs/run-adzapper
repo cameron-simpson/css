@@ -1,153 +1,25 @@
 #!/bin/sh -u
 #
 # Dispatch an adzapper squid.
-#	- Cameron Simpson <cs@cskk.id.au> 01jul2004
+# - Cameron Simpson <cs@cskk.id.au> 01jul2004
 #
 
 set -ue
 
-: ${VARRUN:=$HOME/var/run}
-: ${VARLOG:=$HOME/var/log}
-: ${TMPDIR:=/tmp}
-: ${ZAP_CACHESIZE:=1024}
-: ${ZAP_LOGFILE:=$VARLOG/adzapper/redirect.log}
-export ZAP_LOGFILE
-
-dflt_listen=localhost:3128
-
 cmd=`basename "$0"`
-oargs=$*
-usage="Usage: $cmd [-L listen]... [squid-options...]
-  -L listen             http_port specification; default: $dflt_listen
-  proxy-peerage         Proxy peerage configuration file for proxy-peerage command.
-  squid-options         Passed to squid on invocation."
+usage="Usage: $cmd"
 
 trace=set-x
-dfltrc=
-for rcpath in /usr/local/etc/squid.conf /opt/local/etc/squid/squid.conf /etc/squid/squid.conf
-do
-  [ -s "$rcpath" ] && { dfltrc=$rcpath; break; }
-done
-[ -n "$dfltrc" ] || { echo "$cmd: no default squid.conf?" >&2; exit 1; }
-
-tmppfx=$TMPDIR/$cmd.$$
-directives=$tmppfx.tags
-
-tidy(){
-  rm -f -- "$tmppfx".*
-}
-trap tidy 0 1 3 15
-
-listen=
-zapdir=$LOGDIR/adzapper
-piddir=$VARRUN
-pidf=$piddir/adzapper-squid.pid
-rc=$HOME/var/adzapper/squid.conf
-cachedir=$HOME/var/adzapper/cache
-peerage=$HOME/.peerage
+rc=$HOME/rc-local/adzapper.conf
 
 badopts=
 
-# reuse previous arguments if none supplied, otherwise update default arguments
-if [ $# = 0 ]
-then  set -- $(lastvalue adzapper)
-      echo "$cmd: using lastvalue adzapper: $*" >&2
-else  lastvalue adzapper "$*"
-fi
-
-if [ -s "$pidf" ]
-then
-  $trace killpidfile -w "$pidf"
-  rm -f "$pidf"
-else
-  echo "$cmd: warning: no pid file: $pidf" >&2
-fi
-
-## old proxy-mode standalone redirector
-##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
-
-while [ $# -gt 0 ]
-do
-  case $1 in
-    -L) listen="$listen $2"; shift ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-        badopts=1
-        ;;
-    *)  break ;;
-  esac
-  shift
-done
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$listen" ] || listen=$dflt_listen
-
-( echo "# Generated on `date`."
-  echo "# $0 $oargs"
-  echo
-
-  # unzapped
-  for l in $listen
-  do
-    echo "http_port $l"
-  done
-  # zapped
-  echo "http_port 127.0.0.1:8080"
-  # always direct
-  echo "http_port 127.0.0.1:3127"
-
-  # preserve old ACLs
-  echo
-  grep '^acl ' <"$dfltrc"
-  echo 'acl QUERY urlpath_regex cgi-bin \?'
-  echo 'acl GMAP urlpath_regex google.com/[a-z]*\? google.com.au/[a-z]*\?'
-
-  cat <<-X
-
-url_rewrite_program $HOME/bin/squid_redirect
-url_rewrite_children 2
-
-# other directives
-visible_hostname $HOST.$MAILDOMAIN
-pid_filename $pidf
-access_log $zapdir/access.log
-cache_log $zapdir/cache.log
-cache_store_log /dev/null
-coredump_dir $zapdir
-cache_dir ufs $cachedir $ZAP_CACHESIZE 16 256
-acl nobannerport myport 8080
-acl alwaysdirect myport 3127
-redirector_access allow nobannerport
-collapsed_forwarding on
-## obsolete ## refresh_stale_hit 10 seconds
-cache allow GMAP
-##cache deny QUERY
-cache allow all
-##broken_vary_encoding allow apache
-http_access allow all
-shutdown_lifetime 2 seconds
-icp_access allow all
-nonhierarchical_direct off
-prefer_direct off
-always_direct allow alwaysdirect
-never_direct deny alwaysdirect
-## obsolete ## maximum_single_addr_tries 4
-retry_on_error on
-
-X
-
-  proxy-peerage squid <"$peerage"
-) \
-| patch-config -I -i "$dfltrc" \
-| grep '^[^#]' \
-| sed -e 's/^ *hierarchy_stoplist/##&/' \
-      -e 's/^ *strip_query_terms/##&/' \
-| $trace rewriteif -d "$rc"
-
-for dir in $zapdir $cachedir $piddir
-do  [ -d "$dir" ] || $trace mkdir -p "$dir"
-done
-
-tidy
-exec $trace squid -N -f "$rc" ${1+"$@"}
+set -x
+( cd $HOME/rc-local
+  myke adzapper.conf
+)
+exec squid -N -f "$rc"

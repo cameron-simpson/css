@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+#
+# POP3 utility tool.
+# - Cameron Simpson <cs@cskk.id.au> 06apr2021
+#
+
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.pop3 import main
+sys.exit(main(sys.argv))

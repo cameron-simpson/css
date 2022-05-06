@@ -15,7 +15,7 @@ import unittest
 from .threads import bg, PriorityLock, PriorityLockSubLock, WorkerThreadPool
 
 class TestWorkerThreadPool(unittest.TestCase):
-  ''' Unit tests for WorkerThreadPool.
+  ''' Unit tests for `WorkerThreadPool`.
   '''
 
   def setUp(self):
@@ -66,7 +66,7 @@ class TestWorkerThreadPool(unittest.TestCase):
       self.pool.dispatch(f, deliver=deliver)
 
 class TestPriorityLock(unittest.TestCase):
-  ''' Unit tests for PriorityLock.
+  ''' Unit tests for `PriorityLock`.
   '''
 
   def setUp(self):

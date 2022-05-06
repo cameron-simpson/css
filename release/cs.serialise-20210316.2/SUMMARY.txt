@@ -1,0 +1,1 @@
+Further obsolescence: drop tests, mark as Development Status :: 7.

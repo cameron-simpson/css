@@ -7,7 +7,7 @@ set -ue
 
 piddir=${VARRUN:-$HOME/var/run}
 
-cmd=$0
+cmd=$( basename "$0" )
 usage="Usage:
     $cmd                                  List the connected portfwds.
     $cmd {-d|disable} [portfwd-names...]  Disable portfwds.
@@ -25,7 +25,7 @@ usage="Usage:
     $cmd start                            Scrub, then kick off \"portfwd -A\"."
 
 portfwd_connected(){
-  connected | sed -n 's/^PORTFWD_\(.*\)_CONNECTED/\1/p' | tr '[A-Z_]' '[a-z-]'
+  connected ${1+"$@"} | sed -n 's/^PORTFWD_\(.*\)_CONNECTED/\1/p' | tr '[A-Z_]' '[a-z-]'
 }
 
 portfwd_running(){
@@ -40,8 +40,26 @@ fq(){
   flag -q | { grep -i "${1-.}" || :; }
 }
 
+# flag based listing of current portfwds
+# Usage: connected [portfwds...]
 connected(){
-	fq '_CONNECTED$'
+  if [ $# = 0 ]
+  then
+    fq '_CONNECTED$'
+  else
+    fq '_CONNECTED$' \
+    | { tr '\012' ' '; echo; } \
+    | \
+    { read -r conns
+      for match
+      do  case " $conns " in
+            *" $match "*)
+              echo "$match"
+              ;;
+          esac
+      done
+    }
+  fi
 }
 
 [ $# = 0 ] && { portfwd_connected; exit $?; }
@@ -49,31 +67,12 @@ connected(){
 arg1=$1; shift
 case $arg1 in
   -d|disable)
-        remaining(){
-          if [ $# = 0 ]
-          then
-            portfwd_connected
-          else
-            portfwd_connected \
-            | { tr '\012' ' '; echo; } \
-            | \
-            { read -r conns
-              for match
-              do  case " $conns " in
-                    *" $match "*)
-                      echo "$match"
-                      ;;
-                  esac
-              done
-            }
-          fi
-        }
-        conns=$( remaining ${1+"$@"} )
         set-x portfwd -d ${1+"$@"}
+        conns=$( portfwd_connected ${1+"$@"} )
         while [ -n "$conns" ]
         do  necho $conns ...
             while sleep 1
-                  nconns=$( remaining ${1+"$@"} )
+                  nconns=$( portfwd_connected ${1+"$@"} )
                   [ "x$nconns" = "x$conns" ]
             do  necho .
             done

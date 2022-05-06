@@ -1,0 +1,4 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: SUBCOMMAND_ARGV_DEFAULT: support a single str value, turn into list
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_help: fix obsolete parameter list
+lib/python/cs/cmdutils.py: merge default ==> tagsets
+lib/python/cs/cmdutils.py: cs.cmdutils: fix docstring grammar

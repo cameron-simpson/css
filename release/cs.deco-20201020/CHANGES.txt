@@ -1,0 +1,9 @@
+lib/python/cs/deco.py: Release information for cs.deco-20200725.
+lib/python/cs/deco.py: cs.deco: @cachedmethod: bugfix cache logic
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: tweak wrapper docstring
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: small change to the dcostring of the wrapper function
+lib/python/cs/deco.py: cs.deco: contextual(): docstring tweak
+lib/python/cs/deco.py: cs.deco: @strable: support generator functions
+lib/python/cs/deco.py: cs.deco: @strable: support generator functions
+lib/python/cs/deco.py: cs.deco: @strable: bugfix the is-generator, not-string case (was unhandled)
+lib/python/cs/deco.py: cs.deco: clean a little lint

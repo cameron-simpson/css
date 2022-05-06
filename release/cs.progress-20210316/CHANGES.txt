@@ -1,0 +1,7 @@
+lib/python/cs/progress.py: cs.progress: Progress.iterbar: rename "i" to "item" for clarity
+lib/python/cs/progress.py: cs.progress: Progress.iterbar: only update the status line once per iteration, either before or after the yield according to incfirst
+lib/python/cs/progress.py: cs.progress: Progress.iterbar: as with the previous update change, set last_pos just before the status line update
+lib/python/cs/progress.py: cs.progress: Progress.iterbar: rename last_pos to last_update_pos for clarity and consistency with upcoming change
+lib/python/cs/progress.py: cs.progress: Progress.iterbar: fix the meaning of update_frequency to count iterations, add update_min_size to count progress advance, DRY up the status line update code
+lib/python/cs/progress.py: cs.progress: update docstrings, fix example, clean lint, improve open() idiom in selftest() function
+lib/python/cs/progress.py: merge vt ==> default: cs.vt: fix datadir_tests, provide status line around some worker threads; cs.upd: bugfix and new features; cs.progress: bugfix

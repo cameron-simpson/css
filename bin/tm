@@ -11,9 +11,23 @@ set -ue
 : ${TMUX:=''}
 : ${DEBUG:=''}
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
-: ${TMPDIR:=/tmp}
-: ${TMUX_TMPDIR:=$TMPDIR/tmux-`id -u`}
-export TMUX_TMPDIR
+: ${TMPDIR:=''}
+: ${TMUX_TMPDIR:=''}
+
+setup_env='
+    [ -n "$TMPDIR" -a -d "$TMPDIR" ] || \
+    if [ -d "$HOME/tmp" ]
+    then  TMPDIR=$HOME/tmp
+    else  TMPDIR=/tmp
+    fi
+    [ -n "$TMUX_TMPDIR" -a -d "$TMUX_TMPDIR" ] || \
+    if [ -d "$HOME/var/tmux" ]
+    then  TMUX_TMPDIR=$HOME/var/tmux
+    else  TMUX_TMPDIR=$TMPDIR/tmux-`id -u`
+    fi
+    export TMPDIR TMUX_TMPDIR'
+
+eval "$setup_env"
 
 trace=
 setx=:
@@ -77,8 +91,9 @@ usage="Usage: $cmd [options...] [op [args...]]
       These sessions are started from the \$HOME directory.
     up
       Short for \"tmux select-pane -U\".
-    use-session session-name [tmux-new-session-options...]
+    use-session session-name [-d] [tmux-new-session-options...]
       Join the session named \"session-name\", creating it if necessary.
+      -d  Detached: do not attach to the session.
       If the session does not exist:
         a) run the supplied command if specified, otherwise \$SHELL.
         b) pass each keyline with a trailing carriage return.
@@ -153,6 +168,7 @@ case "$op" in
   [1-9_A-Z]*)
     session_name=$op
     op=use-session
+    detached=
     ;;
   up | down | left |right )
     if [ $# -gt 0 ]
@@ -254,6 +270,19 @@ case "$op" in
   start)
     ;;
   use-session)
+    detached=
+    while [ $# -gt 0 ]
+    do
+      case "$1" in
+        -d) detached=1 ;;
+        --) shift; break ;;
+        -?*)echo "unsupported $op option: $1" >&2
+            badopts=1
+            ;;
+        *)  break ;;
+      esac
+      shift
+    done
     if [ $# = 0 ]
     then
       echo "$cmd: $op: missing session-name" >&2
@@ -302,19 +331,11 @@ rcmd(){
     *)      _rcmd_ssh=ssh ;;
   esac
   $trace $_rcmd_ssh -t "$_rcmd_rhost" "
-    $setx"'
-    PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH
-    : ${TMPDIR:=/tmp}
-    export PATH TMPDIR
-    if [ -z "$TMUX_TMPDIR" ]
-    then
-      if [ -d "$HOME/var/tmux/." ]
-      then  TMUX_TMPDIR=$HOME/var/tmux
-      else  TMUX_TMPDIR:=$TMPDIR/tmux-`id -u`
-      fi
-    fi
-    export TMUX_TMPDIR
-    '"$*"
+    $setx
+    $setup_env
+    PATH=\$HOME/bin-local:\$HOME/bin:\$PATH:/usr/local/bin:/opt/local/bin
+    export PATH
+    $*"
 }
 
 # print "LABEL shcmd" to standard output
@@ -454,7 +475,6 @@ case "$op" in
       echo "$cmd: $op: no tmrc: $tmrc" >&2
       exit 1
     fi
-    set -x
     tmrc \
     | \
     {
@@ -472,11 +492,9 @@ case "$op" in
           esac
         fi
         matched=1
+        [ -n "$shcmd" ] || shcmd='exec $SHELL'
         do_tmux has-session -t "$session_name" 2>/dev/null \
-        || (
-          set -x
-          do_tmux new-session -d -s "$session_name" "set -x; $shcmd"
-        ) \
+        || do_tmux new-session -d -s "$session_name" "set -x; $shcmd" \
         || xit=1
       done
       [ $matched ] || {
@@ -507,10 +525,12 @@ case "$op" in
       }
       do_tmux new-session -d -s "$session_name" "$@"
     }
-    if [ -n "$TMUX" ]
-    then do_tmux switch-client -t "$session_name"
-    else do_tmux attach-session -t "$session_name"
-    fi
+    [ $detached ] || {
+      if [ -n "$TMUX" ]
+      then do_tmux switch-client -t "$session_name"
+      else do_tmux attach-session -t "$session_name"
+      fi
+    }
     ;;
   use-session-remote)
     # connect to remote session, tmux by choice, screen if no tmux

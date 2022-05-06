@@ -10,10 +10,15 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 : ${EDITOR:=vi}
+
 : ${VCS_FORMAT_TSLOG_GIT:='%ci %ae %s'}
 : ${VCS_FORMAT_TSLOG_HG:='{date|isodate} {author|email} {desc|firstline}\n'}
+
 : ${VCS_FORMAT_GLOG_GIT:='%<(25)%ae %s%n%ci %h<-%p%d%n'}
 : ${VCS_FORMAT_GLOG_HG:='{author|email} {desc|firstline}\n{date|isodate} {rev}:{node|short}<-{ifeq(p2node|short,"000000000000",p1node|short,join(parents))}{ifeq(branch,"default",""," [{branch}]")}{ifeq(activebookmark,"","","@{activebookmark}")}{ifeq(count(tags),0,""," ({join(tags)})")}\n\n'}
+
+: ${VCS_CLONE2_CP:='.envrc'}
+: ${VCS_CLONE2_SYM:=''}
 
 cmd=$(basename "$0")
 usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
@@ -26,6 +31,11 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
   Commands:
     branch      Report current branch name.
     branches    Report all branch names.
+    clone2      Wrapper for \"$cmd sibling\" which copies some additional state:
+                  Files or directories named in \$VCS_CLONE2_CP are copied.
+                  Files or directories named in \$VCS_CLONE2_SYM are symlinked.
+                Relative paths in these variables are resolved
+                relative to the VCS top.
     diff        Run the VCS diff command.
     dl, download Download remote changes.
                 Does not update or merge the local checkout.
@@ -34,8 +44,12 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
                 Fetch all or specified remote branches.
     info        Report VCS type, top and branch.
     modified    Report the names of modified files.
+    record      Record partial changes: \"hg record\" or \"git add -p\".
     remote      Report remote paths.
     report      (Default.) Report brief summary.
+    sibling clonedir
+                Clone the current repo to clonedir but keep the
+                upstream the same as ours.
     status      Report tree status.
     tags        Report tag names.
     top         Report top of tree.
@@ -47,9 +61,9 @@ wd=.
 vcs_top=
 vcs_type=
 trace=command
+[ -t 2 ] && trace=set-x
 hg_q=
 git_q=
-[ -t 2 ] && trace=set-x
 
 badopts=
 
@@ -123,7 +137,7 @@ case "$op" in
       echo "$cmd: $op: extra arguments after dir: $*" &2
       badopts=1
     else
-      vcs_branch=$("$0" -V "$vcs_type" branch)
+      vcs_branch=$( "$0" -V "$vcs_type" branch )
       printf 'top %s\ntype %s\nbranch %s\n' "$vcs_top" "$vcs_type" "$vcs_branch"
       case "$vcs_type" in
         hg)
@@ -148,6 +162,77 @@ case "$op" in
       # report all branches
       branches,git) git branch ;;
       branches,hg)  hg branches ${1+"$@"} ;;
+      clone2,*)     exec 3>&1 1>&2
+                    clonedir=$1; shift
+                    [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
+                    case "$clonedir" in
+                      */*)  clone_branch= ;;
+                      [a-z1-9]*-*)
+                            clone_branch=$clonedir
+                            br=$( "$0" branch )
+                            wd=$( pwd )
+                            base=$( basename "$wd" )
+                            case "$base" in
+                              *-"$br")  pfx=$( expr "x$base" : 'x\(.*\)-'"$br" )
+                                        case "$clone_branch" in
+                                          [1-9][0-9]*-*)    clonedir=../$clone_branch ;;
+                                          *)                clonedir=../$pfx-$clone_branch ;;
+                                        esac
+                                        ;;
+                              *)        clonedir=$wd-$br
+                                        ;;
+                            esac
+                            ;;
+                      *)    clone_branch= ;;
+                    esac
+                    "$0" sibling "$clonedir"
+                    for mode in cp sym
+                    do
+                      case "$mode" in
+                        cp) pathvar=VCS_CLONE2_CP  paths=$VCS_CLONE2_CP ;;
+                        sym)pathvar=VCS_CLONE2_SYM paths=$VCS_CLONE2_SYM ;;
+                        *)  echo "$cmd $op: mode=$mode: unimplemeneted mode, skipping" >&2
+                            continue
+                            ;;
+                      esac
+                      for srcpath in $paths
+                      do
+                        context="$cmd $op: \$$pathvar: $srcpath"
+                        case "$srcpath" in
+                          /*) echo "$context: ignore absolute path" >&2
+                              continue
+                              ;;
+                        esac
+                        subdir=$( dirname "$srcpath" )
+                        srcpath=$vcs_top/$srcpath
+                        [ -e "$srcpath" ] || {
+                          echo "$context: does not exist, skipping" >&2
+                          continue
+                        }
+                        [ -d "$clonedir/$subdir/" ] \
+                        || $trace mkdir -p "$clonedir/$subdir" \
+                        || {
+                          echo "$context: cannot make subdir, skipping" >&2
+                          continue
+                        }
+                        case "$mode" in
+                          cp) $trace cp -a "$srcpath" "$clonedir/$subdir/" ;;
+                          sym)$trace ln -s "$srcpath" "$clonedir/$subdir/" ;;
+                          *)  echo "$context: mode=$mode: unimplemented mode, skipping" >&2 ;;
+                        esac
+                      done
+                    done
+                    [ -z "$clone_branch" ] || {
+                      case "$vcs_type" in
+                        hg)   ask "create branch $clone_branch" \
+                              && incd "$clonedir" hg bookmark "$clone_branch"
+                              ;;
+                        git)  incd "$clonedir" git co -b "$clone_branch"
+                              ;;
+                      esac
+                    }
+                    incd "$clonedir" pwd >&3
+                    ;;
       # current diff
       diff,git)     git diff ${1+"$@"} ;;
       diff,hg)      hg diff ${1+"$@"} ;;
@@ -181,7 +266,7 @@ case "$op" in
                     ;;
       # graph log
       glog,git)     git log \
-                      --graph "--format=tformat:$VCS_FORMAT_GLOG_GIT" \
+                      --graph "--format=tformat:$VCS_FORMAT_GLOG_GIT" --date-order \
                       ${1+"$@"}
                     ;;
       glog,hg)      hg log -G --template "$VCS_FORMAT_GLOG_HG" \
@@ -193,6 +278,12 @@ case "$op" in
                     )
                     ;;
       modified,hg)  hg status -n -am ${1+"$@"} ;;
+      # record partial changes
+      record,hg)    hg record ${1+"$@"} ;;
+      record,git)   git add -p ${1+"$@"} && git diff --staged \
+                    && msg=$( readline "commit message? " ) && [ -n "$msg" ] \
+                    && git commit -m "$msg"
+                    ;;
       # report remote repo paths
       remote,git)   git remote ${1+"$@"} ${1-"-v"} ;;
       remote,hg)    hg config paths ${1+"$@"} ;;
@@ -202,6 +293,20 @@ case "$op" in
                     ;;
       report,hg)    hg summary
                     hg status -C ${1+"$@"} | grep '^[^?]'
+                    ;;
+      sibling,hg)   clonedir=$1; shift
+                    [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
+                    hg clone "$vcs_top" "$clonedir"
+                    upstream=$( hg path default )
+                    bsed \
+                      "/^ *\\[ *paths *\\]/,/^ *\\[/s^default *=.*default = $upstream" \
+                      "$clonedir/.hg/hgrc"
+                    ;;
+      sibling,git)  clonedir=$1; shift
+                    [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
+                    git clone "$vcs_top" "$clonedir"
+                    upstream=$( git remote get-url origin )
+                    incd "$clonedir" git remote set-url origin "$upstream"
                     ;;
       status,hg | st,hg)
                     hg status -C ${1+"$@"}

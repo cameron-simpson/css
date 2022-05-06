@@ -1,0 +1,6 @@
+lib/python/cs/result.py: Release information for cs.result-20200521.
+lib/python/cs/result_tests.py: cs.result_tests: drop D(), unused
+lib/python/cs/result_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/result.py: cs.result: clean some lint
+lib/python/cs/result.py: cs.result: autoformat
+lib/python/cs/result.py: cs.result: Result: now .extra attribute for associated data and a new optional "extra" parameter in the initialiser

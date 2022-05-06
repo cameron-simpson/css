@@ -1,0 +1,1 @@
+Bump for cs.cmdutils minor bugfix, also fix a few docstring typos.

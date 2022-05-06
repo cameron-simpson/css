@@ -1,0 +1,250 @@
+#!/bin/sh
+#
+# Mount a filesystem, print the mountpoint.
+# - Cameron Simpson <cs@cskk.id.au> 22jul2020
+#
+
+set -ue
+
+: "${MNT_BASE:=$HOME/mnt}"
+
+rcfile=$HOME/.mntrc
+umount=
+mount_point=
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$(basename "$0")
+usage="Usage:
+  $cmd [-f rcfile] ALL
+  $cmd [-f rcfile] mount-path [/mount/point]
+  $cmd [-u] {mount-path|/mount/point}...
+    -f rcfile   Specify config file. Default: $rcfile
+    -u          Unmount the mount-path.
+    mount-path
+        ALL
+          Scan the file $rcfile
+        ssh://host/path or host:path
+          Note that the remote path commences _after_ the slash
+          separating the host from the path, so an absolute path will
+          have 2 slashes after the host.
+        /mount/point
+          Infer an ssh://host/path from the real path of /mount/point
+          and mount that."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -f) rcfile=$1; shift ;;
+    -u) umount=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+[ $# -gt 0 ] && [ "x$1" = x-u ] && { umount=1; shift; }
+
+[ $# = 0 ] && {
+  echo "$cmd: missing mount-path" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+parse_mount_path(){
+  ( set -ue
+    # shellcheck disable=SC2030,SC2031
+    cmd="$cmd: parse_mount_path"
+    [ $# = 1 ] || {
+      echo "$cmd: expected exactly one argument" >&2
+      exit 2
+    }
+    mount_path=$1
+    case "$mount_path" in
+      *://*)    type=$( expr "x$mount_path" : 'x\([^:/]*\)://[^/]*/.*' )
+                host=$( expr "x$mount_path" : 'x[^:/]*://\([^/]*\)/.*' )
+                path=$( expr "x$mount_path" : 'x[^:/]*://[^/]*/\(.*\)' )
+                ;;
+      ?*:?*)    type=ssh
+                host=$( expr "x$mount_path" : 'x\([^:/][^:/]*\):.*' )
+                path=$( expr "x$mount_path" : 'x[^:/][^:/]*:\(.*\)' )
+                ;;
+      *)        echo "$cmd: unsupported mount_path:: $mount_path" >&2
+                exit 2
+                ;;
+    esac
+    echo "$type"
+    echo "$host"
+    echo "$path"
+  )
+}
+
+mount_point2mount_path(){
+  ( set -ue
+    # shellcheck disable=SC2030,SC2031
+    cmd="$cmd: mount_point2mount_path"
+    [ $# = 1 ] || {
+      echo "$cmd: expected exactly one argument" >&2
+      exit 2
+    }
+    mount_point=$1
+    cd "$mount_point"
+    mount_point=$( /bin/pwd -P )
+    case "$mount_point" in
+      "$MNT_BASE"/*/*)
+        # shellcheck disable=SC2046
+        set -- $(
+          echo "$mount_point" \
+          | sed "s|^$MNT_BASE/\([^/]*\)/\([^/]*\).*|\1 \2|; s|__|/|g"
+        )
+        mount_path=ssh://$1/$2
+        echo "$cmd: $mount_path -> $mount_path" >&2
+        ;;
+      *)echo "$cmd: $mount_path: cannot translate into an ssh://host/path" >&2
+        exit 1
+        ;;
+    esac
+    printf '%s\n' "$mount_path"
+  )
+}
+
+mount_path2mount_point(){
+  ( set -ue
+    # shellcheck disable=SC2030,SC2031
+    cmd="$cmd: mount_point2mount_path"
+    [ $# = 1 ] || {
+      echo "$cmd: expected exactly one argument" >&2
+      exit 2
+    }
+    mount_path=$1
+    # shellcheck disable=SC2046
+    set -- $( parse_mount_path "$mount_path" )
+    [ $# = 3 ]
+    type=$1 host=$2 path=$3
+    # shellcheck disable=SC2030
+    pathbase=$( printf '%s\n' "$path" | sed 's|//$||; s|//*|__|g; s/\./_/g' )
+    printf '%s\n' "$MNT_BASE/$host/$pathbase"
+  )
+}
+
+do_mount(){
+  ( set -ue
+    # shellcheck disable=SC2030,SC2031
+    cmd="$cmd: do_mount"
+    [ $# = 2 ] || {
+      echo "$cmd: expected exactly 2 arguments" >&2
+      exit 2
+    }
+    mount_path=$1
+    mount_point=$2
+    # shellcheck disable=SC2046
+    set -- $( parse_mount_path "$mount_path" ) || exit 1
+    type=$1 host=$2 path=$3
+    pathbase=$( printf '%s\n' "$path" | sed 's|//$||; s|//*|__|g; s/\./_/g' )
+    set -ue
+    case "$type" in
+      ssh | sshfs )
+        $trace tm use-session -d "MNT_${host}_${pathbase}" \
+          set-x sshfs -f -o reconnect -o ssh_command='datethen 2 set-x ssh' \
+            -- "$host:$path/" "$mount_point"
+        ;;
+      *)echo "$cmd: $mount_point: unsupported type: $type" >&2
+        exit 1
+        ;;
+    esac
+  )
+}
+
+if [ $umount ]
+then
+  xit=0
+  for mnt_arg
+  do
+    case "$mnt_arg" in
+      /*)   ( set -x; umount "$mnt_arg" ) || xit=1 ;;
+      *)    mount_point=$( mount | awk -v "device=$mnt_arg" '$1==device {print $3;exit}' )
+            [ -n "$mount_point" ] || {
+              # shellcheck disable=SC2031
+              echo "$cmd -u: no mount found for path: $mnt_arg" >&2
+              xit=1
+              continue
+            }
+            ( set -x; umount "$mount_point" ) || xit=1
+            ;;
+    esac
+  done
+  exit $xit
+fi
+
+mnt_arg=$1; shift
+# shellcheck disable=SC2031
+cmd="$cmd $mnt_arg"
+
+xit=0
+
+if [ "x$mnt_arg" = xALL ]
+then
+  [ $# = 0 ] || {
+    echo "$cmd: extra arguments: $*" >&2
+    echo "$usage" >&2
+    exit 2
+  }
+  # shellcheck disable=SC2094
+  while read -r path mnt <&3
+  do
+    case "$path" in
+      '' | \#* ) ;;
+      *)  ( set -x
+            # shellcheck disable=SC2086
+            "$0" -f "$rcfile" "$path" $mnt
+          ) 3<&- \
+          || xit=1
+          ;;
+    esac
+  done 3<"$rcfile"
+  exit $xit
+fi
+
+case "$mnt_arg" in
+  /*)
+    [ $# = 0 ] || {
+      echo "$cmd: extra arguments after mount point: $*" >&2
+      echo "$usage" >&2
+      exit 2
+    }
+    mount_point=$mnt_arg
+    mount_path=$( mount_point2mount_path "$mount_point" ) || {
+      echo "$cmd: cannot infer mount-path from $mount_point" >&2
+      exit 1
+    }
+    ;;
+  *)mount_path=$mnt_arg
+    if [ $# = 0 ]
+    then
+      mount_point=$( mount_path2mount_point "$mount_path" ) || {
+        echo "$cmd: cannot infer /mount/point from $mount_path" >&2
+        exit 1
+      }
+    else
+      mount_point=$1; shift
+      case "$mount_point" in
+        /*) ;;
+        *)  echo "$cmd: /mount/point should be an absolute path" >&2
+            exit 2
+            ;;
+      esac
+      [ $# = 0 ] || {
+        echo "$cmd: extra arguments after mount point: $*" >&2
+        exit 2
+      }
+    fi
+    ;;
+esac
+
+[ -d "$mount_point" ] || set-x mkdir "$mount_point" || exit 1
+do_mount "$mount_path" "$mount_point" || xit=1
+
+exit $xit

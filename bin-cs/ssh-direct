@@ -1,0 +1,6 @@
+#!/bin/sh
+# Ssh directly, ingnoring any default control path.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+set -x
+exec ssh -o controlpath=none ${1+"$@"}

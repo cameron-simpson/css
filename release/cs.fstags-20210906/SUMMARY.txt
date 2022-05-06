@@ -1,0 +1,4 @@
+TaggedPath: new auto_infer method overriding the inherited TagSet.auto_infer which consults the cascade_rules from the .fstagsrc.
+fstags ls: new -l option to print a multiline tag listing.
+fstags cptags: copy the tags from one path to another.
+Assorted other changes.

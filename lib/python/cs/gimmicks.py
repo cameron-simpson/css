@@ -6,9 +6,79 @@ Gimmicks and hacks to make some of my other modules more robust and
 less demanding of others.
 '''
 
+# pylint: disable=wrong-import-position
+
+try:
+  from contextlib import nullcontext  # pylint: disable=unused-import
+except ImportError:
+  from contextlib import contextmanager
+
+  @contextmanager
+  def nullcontext():
+    ''' A simple `nullcontext` for older Pythons
+    '''
+    yield None
+
+import os
+import subprocess
+try:
+  DEVNULL = subprocess.DEVNULL
+except AttributeError:
+  DEVNULL = open(os.devnull, 'wb')  # pylint: disable=consider-using-with
+
 import sys
 
-__version__ = '20200418.1'
+try:
+  from types import SimpleNamespace  # pylint: disable=unused-import
+except ImportError:
+
+  # pylint: disable=too-few-public-methods
+  class SimpleNamespace(object):
+    ''' A tiny workalike for types.SimpleNamespace.
+    '''
+
+    def __init__(self, **kw):
+      for k, v in kw.items():
+        setattr(self, k, v)
+
+    def __str__(self):
+      return "%s(%s)" % (
+          type(self).__name__, ','.join(
+              ["%s=%s" % (k, v) for k, v in sorted(self.__dict__.items())]
+          )
+      )
+
+try:
+  # pylint: disable=redefined-builtin,self-assigning-variable
+  TimeoutError = TimeoutError
+except NameError:
+  try:
+    import builtins
+  except ImportError:
+    TimeoutError = None  # pylint: disable=redefined-builtin
+  else:
+    try:
+      TimeoutError = builtins.TimeoutError
+    except AttributeError:
+      TimeoutError = None
+
+  if TimeoutError is None:
+
+    class TimeoutError(Exception):
+      ''' A TimeoutError.
+      '''
+
+      def __init__(self, message, timeout=None):
+        if timeout is None:
+          msg = "%s: timeout exceeded" % (message,)
+        else:
+          msg = "%s: timeout exceeded (%ss)" % (
+              message,
+              timeout,
+          )
+        Exception.__init__(self, msg)
+
+__version__ = '20220429-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,6 +98,7 @@ def _logging_stub(func_name, *a, **kw):
   try:
     logging_function = _logging_functions[func_name]
   except KeyError:
+    # pylint: disable=import-outside-toplevel
     try:
       import cs.logutils as logging_module
     except ImportError:

@@ -18,6 +18,8 @@ def check(o):
   return o._selfcheck()
 
 class Test_LRU_Cache(unittest.TestCase):
+  ''' Test `cs.cache.LRU_Cache`.
+  '''
 
   def test_setup(self):
     self.assertRaises(ValueError, LRU_Cache, maxsize=0)

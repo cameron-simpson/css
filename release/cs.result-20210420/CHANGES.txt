@@ -1,0 +1,3 @@
+lib/python/cs/result.py: cs.result: docstring fix
+lib/python/cs/result.py: cs.result: clean some lint
+lib/python/cs/result.py: cs.result: update DISTINFO

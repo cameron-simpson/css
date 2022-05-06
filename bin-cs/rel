@@ -10,21 +10,17 @@ cmd=$0
 usage="Usage: $cmd [module op]"
 
 module=
-
-if [ $# = 0 ]
+if [ $# -gt 0 ]
 then
-  set -- ls
-else
   case "$1" in
     cs.*)
       module=$1; shift
       ;;
   esac
-  if [ $# = 0 ]
-  then
-    set -- check
-  fi
-  [ -z "$module" ] || set -- "$@" "$module"
+  [ -z "$module" ] || {
+    [ $# -gt 0 ] || set -- check
+    set -- "$@" "$module"
+  }
 fi
 
 set -x

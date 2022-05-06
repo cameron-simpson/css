@@ -1,0 +1,1 @@
+_BaseSubCommand.__init__: hook in the class USAGE_KEYWORDS for methods.

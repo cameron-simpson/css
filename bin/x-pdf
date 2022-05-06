@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# Extract PDF into image files.
+# - Cameron Simpson <cs@cskk.id.au> 24nov2021
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd filename.pdf"
+
+trace=
+[ -t 2 ] && trace=set-x
+
+format=png48
+format_ext=png
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --)     shift; break ;;
+    -?*)    echo "$cmd: unrecognised option: $1" >&2
+            badopts=1
+            ;;
+    *)      break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  filename=-
+  outtplt="stdin-page%d.$format_ext"
+else
+  filename=$1; shift
+  case "$filename" in
+    *.pdf)  basename=$( basename "$filename" )
+            base=$( expr "x$basename" : '.\(.*\).pdf' )
+            outtplt="$base/$base-%03d.$format_ext"
+            $trace mkdir "$base"
+            ;;
+    *)      echo "$cmd: expected filename ending in .pdf, got: $filename" >&2
+            badopts=1
+            ;;
+  esac
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+gs -dNOPAUSE -dBATCH "-sDEVICE=$format" "-sOutputFile=$outtplt" "$filename"

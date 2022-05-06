@@ -1,0 +1,1 @@
+New module cs.fs to contain more filesystem focussed functions than cs.fileutils, which is feeling a bit bloated.

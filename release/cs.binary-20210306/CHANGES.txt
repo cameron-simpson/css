@@ -1,0 +1,149 @@
+lib/python/cs/binary_tests.py: cs.binary_tests: improve some messages, clean a little lint
+lib/python/cs/binary.py: cs.binary: small docstring improvement intended to clarify subclassing requirements
+lib/python/cs/binary.py: cs.binary: drop commented out line, leaving equivalent more verbose but more debugging lines
+lib/python/cs/binary.py: cs.binary: PacketField: provide default value_from_buffer method using from_buffer method - the subclasser may implement either one of these
+lib/python/cs/binary.py: cs.binary: BSData: provide value as `.data` with compatibility `.value` property; add `.data_offset` attribute indicating the offset of the data portion of the packet
+lib/python/cs/binary.py: cs.binary: BSUInt: new `.data_offset_for(bs:bytes)` static method computing the `.data_offset` it would have (`len(BSUInt.transcribe_value(len(bs)))`)
+lib/python/cs/binary.py: cs.binary: docstring tweaks
+lib/python/cs/binary.py: cs.binary: docstring tweaks
+lib/python/cs/binary.py: cs.binary: new PacketField.parse_buffer_with_offsets yielding `(offset,PacketField)` from `bfr`; refactor parse_buffer and parse_buffer_values to use it
+lib/python/cs/binary.py: cs.binary: BytesesField: update docstring to describe the additional offset, end_offset and length attributes
+lib/python/cs/binary.py: cs.binary: PacketField.parse_buffer_with_offsets: now yields `(offset,instance,post_offset)`; related adjustments; docstring for `BSData.value`
+lib/python/cs/binary.py: merge default ==> vt
+lib/python/cs/binary.py: cs.*: fix spelling of "parameter"
+lib/python/cs/binary.py: merge default ==> vt
+lib/python/cs/binary.py: cs.binary: structtuple: add an example to the docstring
+lib/python/cs/binary.py: cs.binary: module docstring improvements
+lib/python/cs/binary.py: cs.binary: new PacketField.parse_file class method to yield instances from a binary file
+lib/python/cs/binary.py: cs.binary: PacketField.parse_file: bugfix use of PacketField.parse_buffer
+lib/python/cs/binary.py: cs.binary: add example code for a structtuple
+lib/python/cs/binary.py: cs.binary: new PacketField.value_as_bytes class method for turning a value into its transcription as a single bytes object
+lib/python/cs/binary.py: merge testing ==> default: assorted fixes
+lib/python/cs/binary.py: cs.binary: PacketField.from_buffer: pass **kw to cls.value_from_buffer and _not_ also to cls(value)
+lib/python/cs/binary.py: cs.binary: UTF16NULField: because this is a compound field, with a value and an encoding, implement from_buffer instead of value_from_buffer
+lib/python/cs/binary.py: cs.binary: multi_struct_field: MultiStructField: add _asdict() method and make __str__ even if no subvalue_names
+lib/python/cs/binary.py: merge default ==> beyonwiz
+lib/python/cs/binary.py: cs.binary: docstring improvements
+lib/python/cs/binary.py: cs.binary: docstring grammar fixes
+lib/python/cs/binary.py: cs.binary: start on new *Binary* classes to supplant Packet and PacketField
+lib/python/cs/binary.py: cs.binary: port BSUint to SingleValueBinary
+lib/python/cs/binary.py: cs.binary: rename struct_field to single_struct and subclass SingleValueBinary
+lib/python/cs/binary.py: cs.binary: convert BSData to subclass SingleValueBinary
+lib/python/cs/binary.py: cs.binary: port BSString to subclass SingleValueBinary
+lib/python/cs/binary.py: cs.binary: rename multi_single_struct back to multi_struct_field, accident from earlier batch edit
+lib/python/cs/binary.py: cs.binary: rename multi_single_struct back to multi_struct_field, accident from earlier batch edit
+lib/python/cs/binary.py: Backed out changeset e441baa904f0
+lib/python/cs/binary.py: cs.binary: BinaryMixin: move from_bytes down below the scan method
+lib/python/cs/binary.py: cs.binary: BinaryMixin: new factory method .from_file
+lib/python/cs/binary.py: cs.binary: rename single_struct to SingleStructBinary
+lib/python/cs/binary.py: cs.binary: Packet.add_from_buffer: port for SingleValueBinary subclass
+lib/python/cs/binary.py: cs.binary: port BytesField to subclass SingleValueBinary
+lib/python/cs/binary.py: cs.binary: rename SingleValueBinary to BinarySingleValue, will fit the coming naming pattern
+lib/python/cs/binary.py: cs.binary: fix for BinaryMixin.from_file
+lib/python/cs/binary.py: cs.binary: rename SingleStructBinary to BinarySingleStruct to match coming naming pattern
+lib/python/cs/binary.py: cs.binary: get warning() from cs.gimmicks, update Python version check
+lib/python/cs/binary.py: cs.binary: new BinaryMultiStruct factory to make AbstractBinary namedtuples for multivalue structs
+lib/python/cs/binary.py: cs.binary: autoformat, clean lint, update docstring, rename .value_from_buffer to .parse_value to match .parse
+lib/python/cs/binary.py: cs.binary: bugfix Python version check
+lib/python/cs/binary.py: cs.binary: BinaryMixin: new parse_bytes and parse_file methods, paralleling from_bytes and from_file without the "everything-consumed requirement
+lib/python/cs/binary.py: cs.binary: spelling fix
+lib/python/cs/binary_tests.py: cs.binary_tests: add support for autotesting AbstractBinary subclasses
+lib/python/cs/binary.py: cs.binary: define BinarySingleValue.__eq__
+lib/python/cs/binary.py: cs.binary: bugfix return value of BSData.parse_value; adjust a bunch of .value_from_buffer calls to .parse_value
+lib/python/cs/binary.py: cs.binary: BinarySingleStruct: switch the class_name and struct_format around to match BinaryMultiStruct
+lib/python/cs/binary.py: cs.binary: turn BinarySingleStruct into a convenience wrapper for BinaryMultiStruct
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: accept str for field_names, add some sanity checks
+lib/python/cs/binary.py: cs.binary: fixed_bytes_field: rename value_from_buffer to parse_value; tweak some docstrings
+lib/python/cs/binary.py: cs.binary: multi_struct_field: fix a rogue batch edit
+lib/python/cs/binary.py: cs.binary: Packet.add_field: AbstractBinary support
+lib/python/cs/binary.py: cs.binary: new BaseBinaryMultiValue class and BinaryMultiValue factory to preparing complex binary structures not based on struct formats
+lib/python/cs/binary.py: cs.binary: BinarySingleStruct: update the doctest
+lib/python/cs/binary.py: cs.binary: BSSFloat: port to BinarySingleValue
+lib/python/cs/binary.py: cs.binary: docstring updates
+lib/python/cs/binary.py: cs.binary: BinaryMultiValue: add support for (struct_format,struct_field_names) to the field_map
+lib/python/cs/binary.py: cs.binary: module docstring: introductory text about the new Binary* classes and factories and the deprecation of the Packet* classes
+lib/python/cs/binary.py: cs.binary: grammar fix for docstring
+lib/python/cs/binary.py: cs.binary: BinaryMixin: drop parse_file and from_file - the buffer might consume more of the file than needed, and there's no way to put it back and the buffer is discarded; better to get a buffer from the file explicitly, then work permanently from the buffer
+lib/python/cs/binary.py: cs.binary: require Python 3.6+, we rely on dict insertion order
+lib/python/cs/binary.py: cs.binary: module docstring: describe the Binary* classes, strip out the stuff for the deprecated classes
+lib/python/cs/binary.py: cs.binary: flatten: use modern "yield from"
+lib/python/cs/binary.py: cs.binary: BinaryMixin: implement self_check()
+lib/python/cs/binary.py: cs.binary: BinaryMixin.__len__: refactor to use map()
+lib/python/cs/binary.py: cs.binary: adjust calls to new names
+lib/python/cs/binary.py: cs.binary: BinaryMixin: parse_bytes,from_bytes: drop special handling of offset and length, expect the buffer to be set up already
+lib/python/cs/binary.py: cs.binary: BinarySingleValue: add __int__ and __float__
+lib/python/cs/binary.py: cs.binary: new BinaryByteses class holding a list of bytes instances, new BinaryListValues class holding a list of arbitrary values with a common parse/transcribe spec (usually another Binary* subclass)
+lib/python/cs/binary.py: cs.binary: tweak docstrings, mark Packet and PacketField as deprecated, tweak comment, drop debug
+lib/python/cs/binary.py: cs.binary: BinarySingleStruct: new optional field_name parameter, default 'value'
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue: drop FIELD_ORDER, rely on dict insertion order
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue: improved str/repr cropping long reprs and omitting _* (tuneable)
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue.s: use the crop_length parameter
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue: new parse_field method(field_name,bfr,parse) method
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue.parse_field: rename "parse" parameter to "pt", consistent with elsewhere
+lib/python/cs/binary.py: cs.binary: the pt_spec() function, returning a (parse,transcribe) pair from a specification
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue.transcribe: accept optional exclude_names parameter, through frankly it seems better to just override the transcribe method entirely
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue: new transcribe_field(field_name,field_value) method
+lib/python/cs/binary.py: cs.binary: BinaryMultiValue: update doctest
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue.parse: fix pt parameter to parse_field
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue.transcribe_field: fix derivation of transcribe function when field_value has a transcribe method
+lib/python/cs/binary.py: cs.binary: BinaryMultiValue doctest: adjust for modern output, include int(bmv.n2) demo
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: add __int__ and __float__ when there is only one field
+lib/python/cs/binary.py: cs.binary: BinaryMultiValue: use pt_spec to parse the field_map
+lib/python/cs/binary.py: cs.binary: add BinaryFixedBytes, a factory for BinarySingleStructs with a single fixed length binary chunk; often is it more expedient to just use self.data = bfr.take(length) in implementations
+lib/python/cs/binary.py: cs.binary: add BinaryUTF8NUL and BinaryUTF16NUL for NUL terminated strings
+lib/python/cs/binary.py: cs.binary: marker comment to delineate the deprecated classes
+lib/python/cs/binary_tests.py: cs.binary_tests: only run the self_check on objects with a self_check method
+lib/python/cs/binary_tests.py: cs.binary: plumb kwargs through
+lib/python/cs/binary.py: cs.binary: remove tracing
+lib/python/cs/binary.py: cs.binary: move pt_spec() up the top under flatten()
+lib/python/cs/binary.py: cs.binary: move all the other deprecated Packet/PacketField derived classes to below the deprecation marker
+lib/python/cs/binary.py: cs.binary: improve the deprecation paragraph in the module docstring
+lib/python/cs/binary.py: cs.binary: clean lint
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue.s,__str__,__repr__: crop the text using cropped() and cropped_repr()
+lib/python/cs/binary.py: cs.binary: BinaryMixin.self_check: improve warning messages
+lib/python/cs/binary.py: cs.binary: flatten: support receiving a transcribeable object, further simplifying .transcribe implementations
+lib/python/cs/binary.py: cs.binary: docstring tweaks, debugging and message text tweaks
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue.transcribe_field: support self.FIELD_TRANSCRIBERS[field_name]=None indicating no transcription for field_name
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue.transcribe_field: improve context and exception message
+lib/python/cs/binary.py: merge default ==> vt
+lib/python/cs/binary.py: cs.binary: BinaryListValues.parse: emit a warning if fewer than min_count values found instead of raising an exception, was preventing parse of noncompliant data structures
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue.transcribe: include Pfx context around per-field transcription
+lib/python/cs/binary.py: cs.binary: docstring updates
+lib/python/cs/binary.py: cs.binary: clean lint
+lib/python/cs/binary.py: cs.binary: fix docstring typo
+lib/python/cs/binary.py: cs.binary: BSUInt: add static method parse_bytes(data,offset=0) to perform a bare parse from a bytes object, pulled from cs.serialise
+lib/python/cs/binary.py: cs.binary: update doctests, drop special BaseBinaryMultiValue.__repr_
+lib/python/cs/binary.py: cs.binary: BSUInt: update docstring
+lib/python/cs/binary.py: cs.binary: modify pt_spec() to return an AbstractBinary subclass instead of just a (parse,transcribe) function pair
+lib/python/cs/binary.py: cs.binary: fixup for previous pt_spec commit
+lib/python/cs/binary.py: cs.binary: new SimpleBinary class which subclasses SimpleNamespace, wanting but parse and transcribe
+lib/python/cs/binary.py: cs.binary: BinarySingleValue: new parse_value_from_bytes method to extract a value from a bytes-like object
+lib/python/cs/binary.py: cs.binary: BaseBinaryMultiValue: subclass SimpleBinary, drop FIELD_PARSERS and FIELD_TRANSCRIBERS in favour of FIELD_CLASSES courtesy of the new pt_spec() implementation
+lib/python/cs/binary.py: cs.binary: some docstring updates
+lib/python/cs/binary.py: cs.binary: BinaryMultiValue: updates following from changes to pt_spec() and BaseBinaryMultiValue
+lib/python/cs/binary.py: cs.binary: BinaryMixin.scan_with_offsets: bugfix post_offset value
+lib/python/cs/binary.py: cs.binary: BinaryMixin.scan: bugfix 3-tuple to tuple[1] mapping
+lib/python/cs/binary.py: cs.binary: BinarySingleValue: new scan_values(bfr) method yielding the .value
+lib/python/cs/binary.py: cs.binary: remove debug
+lib/python/cs/binary.py: cs.binary: pt_spec: aplly the name parameter to generated classes if supplied
+lib/python/cs/binary.py: cs.binary: pt_spec: docstrings, lint
+lib/python/cs/binary.py: cs.binary: tweak docstrings, add some comments, drop obsolete import, clean a little lint
+lib/python/cs/binary.py: cs.binary: new _BinaryMultiValue_Field, a namedtuple with a specification of a field for BinaryMultiValue
+lib/python/cs/binary.py: cs.binary: BinaryMultiValue class factory: treat specs with .prase_value and .transcribe_value specially, putting the value itself as the attribute instead of an AbstractBinary instance
+lib/python/cs/binary.py: cs.binary: BinaryMixin.self_check: include better context in messages
+lib/python/cs/binary_tests.py: cs.binary_tests: improve messages
+lib/python/cs/binary.py: cs.binary: BinaryMixin: crop a long repr
+lib/python/cs/binary.py: cs.binary: BinaryMixin.scan_with_offsets: acception optional `count` maximum scan count
+lib/python/cs/binary.py: cs.binary: pt_spec: tiny refactor, separate attribute names with __ in generated class name
+lib/python/cs/binary.py: cs.binary: BinaryUTF8NUL.parse_value: logic fix for missing_nul and nul_pos
+lib/python/cs/binary.py: cs.binary: BinaryMixin.self_check: exclude _* attrubutes from the check, tidy up the pfx context
+lib/python/cs/binary.py: cs.binary: BinaryMixin.scan_with_offsets: accept optional min_count and max_count parameters
+lib/python/cs/binary.py: cs.binary: BinaryMixin.self_check: drop check for unspecified attributes - these are pretty common
+lib/python/cs/binary.py: cs.binary: module docstring updates
+lib/python/cs/binary_tests.py: cs.binary_tests: update docstring
+lib/python/cs/binary.py: cs.binary: docstring and doctest updates
+lib/python/cs/binary.py: cs.binary: BinaryMixin: move transcription based __len__ to transcribed_length, leave it aliases as __len__ - this lets subclasses override __len__
+lib/python/cs/binary.py: cs.binary: SimpleBinary: new __str__ supporting provision of attr_names and a choice function
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: provide a .value property for single field structs, aids using these directly in multifield things
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: include a .field_names attribute with the field names
+lib/python/cs/binary.py: cs.binary: BinaryUTF8NUL: back off warning about missing NUL to debug, it is annoyingly common

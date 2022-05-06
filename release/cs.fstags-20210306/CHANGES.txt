@@ -1,0 +1,96 @@
+lib/python/cs/fstags.py: cs.fstags: docstring updates
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_autotag: use short path in context
+lib/python/cs/fstags.py: cs.fstags: FSTags.edit_dirpath: an existing path prevents a rename, but not an existing tagset - these we merge
+lib/python/cs/fstags.py: cs.fstags: clean a little lint
+lib/python/cs/fstags.py: cs.fstags,tagset: move RegexpTagRule from cs.fstags to cs.tagset
+lib/python/cs/fstags.py: cs.fstags: FSTags.find: use the new TagChoice.match method to test criteria
+lib/python/cs/fstags.py: cs.fstags,cs.sqltags: parse_tag_choices is now called parse_tagset_criteria
+lib/python/cs/fstags.py: cs.fstags: clean some lint
+lib/python/cs/fstags.py: cs.fstags: RegexpTagRule.rpaths: wrap in @pfx, enables Pfx-with-generator
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand: drop redundant constants
+lib/python/cs/fstags.py: merge fstags ==> sqltags
+lib/python/cs/fstags.py: cs.fstags: TagFile: drop encode_name and decode_name, use Tag.transcribe_value and Tag.parse_value instead
+lib/python/cs/fstags.py: cs.fstags: FSTags.edit_dirpath: now use TaggedEntity.edit_entities for the bulk edit, add support for renaming something into another directory (which you could actually do before, but by accident - it was just broken)
+lib/python/cs/fstags.py: cs.fstags: clean lint, update DISTINFO, trace FSTags.edit_dirpath
+lib/python/cs/fstags.py: cs.fstags: docstring tweak
+lib/python/cs/fstags.py: cs.fstags: TagFile.parse_name: comment out warning for normal parse action
+lib/python/cs/fstags.py: merge default ==> fstags
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_autotag: use the provided Upd directly
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_tag: fix parse of TagChoice from command line; cs.sqltags: matching optimisation
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand: provide the run_context method to ensure FSTags.sync gets calls automatically
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_ont: hook into the new cs.tagset.TagsOntologyCommand for the implementation
+lib/python/cs/fstags.py: cs.fstags: lint, some variable renames, context for FSTags.sync
+lib/python/cs/fstags.py: cs.fstags: FSTags.edit_dirpath: tweak comments
+lib/python/cs/fstags.py: cs.fstags: TagFile: add optional prefix= parameter to .keys, .values and .items - supports choosing subsets, initially in ontologies
+lib/python/cs/fstags.py: cs.fstags: fix various cs.upd.Upd uses
+lib/python/cs/fstags.py: cs.fstags: TagFile.load_tagsets: record lines with parse failures and just issue warning, save commented out
+lib/python/cs/fstags.py: cs.tagset,fstags,sqltags: replace TagChoice with a general purpose TagBasedTest supporting various operators
+lib/python/cs/fstags.py: cs.tagset,fstags,sqltags: common TagsCommandMixin.parse_tag_choices
+lib/python/cs/fstags.py: cs.fstags: clean lint
+lib/python/cs/fstags.py: merge sqltags ==> fstags: pull recent parsing changes
+lib/python/cs/fstags.py: cs.fstags: use cs.threads.State for the global state
+lib/python/cs/fstags.py: cs.fstags: update code for new TagsCommandMixin.TagsCommandMixin signature
+lib/python/cs/fstags.py: cs.fstags: FSTags.test: use new TagBasedTest.match_tagged_entity
+lib/python/cs/fstags.py: cs.fstags: FSTags.test: honour use_direct_tags, lost in previous small refactor
+lib/python/cs/fstags.py: cs.fstags,cs.tagset: adjust TagSet initialisations' _ontology parameter
+lib/python/cs/fstags.py: cs.fstags: modernise use of state stacking
+lib/python/cs/fstags.py: cs.fstags: TagFile.update: bugfix double prefixing
+lib/python/cs/fstags.py: cs.fstags: TagFile: now a TaggedEntities subclass, switch __enter__/__exit__ to startup/shutdown
+lib/python/cs/fstags.py: cs.fstags: rename TAGSFILE to TAGSFILE_BASENAME
+lib/python/cs/fstags.py: cs.fstags: rename self.tagsfile to self.tagsfile_basename
+lib/python/cs/fstags.py: cs.fstags: drop TagFile parent/find_parent support, I'll revisit inherited ontologies later
+lib/python/cs/fstags.py: cs.*: rename TaggedEntity to TagSet towards their merge
+lib/python/cs/fstags.py: cs.fstags: some docstring tweaks
+lib/python/cs/fstags.py: cs.fstags,sqltags,tagset: rename TaggedEntities to TagSets a part of the merge
+lib/python/cs/fstags.py: cs.fstags: move the TaggedPath class up above its first use as TagFile.TagSetClass
+lib/python/cs/fstags.py: cs.fstags: FSTags: new tagfile_for(filepath) to obtain the TagFile for filepath
+lib/python/cs/fstags.py: cs.fstags: new is_valid_basename test function used to constraint TagFile name values
+lib/python/cs/fstags.py: cs.fstags: FSTags._tagfile: pass in fstags=self to TagFile(), add and check type annotations
+lib/python/cs/fstags.py: cs.fstags: clean some lint
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_tagfile: associate the TagFile with options.fstags
+lib/python/cs/fstags.py: cs.fstags: FSTags.dir_tagfile: add and check type annotations
+lib/python/cs/fstags.py: cs.fstags: FSTags.tagfile_for: fix call to self.dir_tagfile()
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.__init__: pass _id and _ontology through to TagSet.__init__
+lib/python/cs/fstags.py: cs.fstags: TaggedPath: drop __contains__, now tests the direct tags instead of the merged tags courtesy of the superclass
+lib/python/cs/fstags.py: cs.fstags: TagFile._singleton_key: accomodate any keyword arguments
+lib/python/cs/fstags.py: cs.fstags: pull the "pure store of TagSets" stuff out of TagFile as BaseTagFile (maybe more to cs.tagsets later)
+lib/python/cs/fstags.py: cs.fstags: TagFile now subclasses BaseTagFile, added filename based checks, new default_factory
+lib/python/cs/fstags.py: cs.fstags: BaseTagFile: minor fixes
+lib/python/cs/fstags.py: cs.fstags: drop TagFileEntry, refactor FSTags.path_tagfiles as a generator, drop precomputed TaggedPath.__tagfile_stack
+lib/python/cs/fstags.py: cs.fstags: use @tag_or_tag_value on a couple of TaggedPath methods
+lib/python/cs/fstags.py: cs.fstags: TaggedPath: correct .direct_tagfile attributes to .tagfile
+lib/python/cs/fstags.py: cs.fstags: BaseTagFile.get: get default is an optional positional argument
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand: new -o ontology option to supply an ontology file for the FSTags
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_ont: drop -o/--ontology, superceded by global -o option
+lib/python/cs/fstags.py: cs.fstags: rename FSTags.ontology to ontology_for, provide new .ontology property based on .ontologyfile as override
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.__init__: _ontology now defaults to fstags.ontology_for(filepath), avoids returning naive TaggedPaths
+lib/python/cs/fstags.py: cs.fstags: TagFile.__init__: use a different sentinel for "omitted ontology", allowing explicit ontology=None (used when constructing the TagFile for an ontology)
+lib/python/cs/fstags.py: cs.fstags: BaseTagFile.default_factory: plumb the ontology for the contained TagSets from self.ontology
+lib/python/cs/fstags.py: cs.fstags: rename TagFile to FSTagsTagFile, prep for shifting BaseTagFile to cs.tagset.TagFile
+lib/python/cs/fstags.py: cs.fstags,tagset: move BaseTagFile from cs.fstags to TagFile in cs.tagset
+lib/python/cs/fstags.py: cs.fstags: clean some lint
+lib/python/cs/fstags.py: cs.fstags: drop obsolete uses of TaggedPath.direct_tags from this and related modules
+lib/python/cs/fstags.py: cs.fstags: fix stupid error
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.__init__: refactor instance attributes setup to include .fstags correctly
+lib/python/cs/fstags.py: cs.fstags: FSTagsTagFile.TagSetClass factory: bugfix save of new TaggedPath, drop .tagfilepath attribute, never used and can always be obtained via the .tagfile property
+lib/python/cs/fstags.py: cs.fstags: HasFSTagsMixin,TaggedPath,FSTagsTagFile: adjust for the new __setattr__ stuff
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_export: a TaggedPath is already a TagSet, but still needs work here
+lib/python/cs/fstags.py: cs.fstags: FSTags.test: update call to as_TagSet
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.__init__: set the ._all_tags attribute for the all_tags property preventing it leaking into the tags
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand: drop add_tagged_entity, obsolete
+lib/python/cs/fstags.py: cs.fstags: FSTags.__getitem__: prepare new TaggedPaths via self._tagged_paths and the appropriate TagFile
+lib/python/cs/fstags.py: cs.fstags: FSTags.edit_dirpath: the tagged_path is a TagSet, no need for distinct tags
+lib/python/cs/fstags.py: cs.fstags: FSTags.edit_dirpath: we now get (old_name,new_name,TaggedPath) back from edit_many, obviating the te_id_map
+lib/python/cs/fstags.py: cs.fstags: FSTags.edit_dirpath: update call to TagSet.edit_many, clean up the access and tagging of the new name's TaggedPath
+lib/python/cs/fstags.py: cs.fstags: TaggedPath: .name property returning basename(self.filepath), .set and .discard methods rejecting use of the 'name' tag
+lib/python/cs/fstags.py: cs.fstags: TaggedPath: drop old .add and .discard methods
+lib/python/cs/fstags.py: cs.fstags: new TaggedPath.as_tags() supporting an optional all_tags=False parameter
+lib/python/cs/fstags.py: cs.fstags: FSTagsTagFile.TagSetClass: simple shim for TaggedPath
+lib/python/cs/fstags.py: cs.fstags: autoformat, beef up TaggedPath.__repr__
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.discard: compatibility with TagSet.discard
+lib/python/cs/fstags.py: cs.fstags: autoformat, clean some lint
+lib/python/cs/fstags.py: cs.fstags: port to new cs.cmdutils API
+lib/python/cs/fstags.py: cs.fstags: more API changed related fixes
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand: replace apply_opts with apply_opt, simpler
+lib/python/cs/fstags.py: cs.fstags: update DISTINFO
+lib/python/cs/fstags.py: cs.fstags: update DISTINFO again

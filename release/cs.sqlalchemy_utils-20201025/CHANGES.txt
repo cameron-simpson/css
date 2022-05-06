@@ -1,0 +1,23 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM.session: accept arbitrary parameters and forward them to the ORM.Session factory, supporting factories with special modes
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: import sqlalchemy.sql.functions as func, rename local variables to avoid conflict
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: new BasicTableMixin and HasIdMixin classes with useful methods and a typical `id` Column respectively
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: push_log_level: logical fix - use try/finally for log level restoration
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: new shared per-thread _state object with prevailing ORM and session, callable as a context manager with stackattrs behaviour
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: new with_orm() context manager to set the prevailing ORM in the shared state
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: with_session: make use of the prevailing shared stateif no orm or session provided
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: @auto_session: document the new use of the shared state
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM: new @orm_method method decorator for use by ORM subclasses to push the ORM as the prevailing ORM
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: autoformat
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: new using_session(orm=None,session=None) context manager to prepare a session for some code
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: with_session: use using_session() for the main logic
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: @auto_session: replace with_session() call with using_session(), and return different wrappers for generators and normal functions
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: @ORM.auto_session: replace with_session with function vs generator wrapper using using_session()
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: @ORM.orm_method: replace with_session() based wrapper with function vs generator wrapper using using_session()
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: @orm_auto_session: replace with_session() based wrapper with function vs generator wrapper using using_session()
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: clean some lint, add a docstring
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: using_session: using the global session does not commence an savepoint
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM.session: push the orm and new session to the global context
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: use @contextdecorator for the @log_level decorator
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: _state: use cs/threads.State
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM: no need to call MultiOpenMixin.__init__
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: clean lint, autoformat

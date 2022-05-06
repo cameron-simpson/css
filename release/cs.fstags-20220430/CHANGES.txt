@@ -1,0 +1,4 @@
+lib/python/cs/fstags.py: cs.*: replace variations on filepath with .fspath and HasFSPath for consistency
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.__init__: bugfix initialisation of .fspath
+lib/python/cs/fstags.py: cs.fstags: bugfix FSTags.test()
+lib/python/cs/fstags.py: cs.fstags: update DISTINFO

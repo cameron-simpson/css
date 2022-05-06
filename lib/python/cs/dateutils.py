@@ -2,10 +2,17 @@
 #
 
 ''' A few conveniences to do with dates and times.
+
+    There are some other PyPI modules providing richer date handling
+    than the stdlib `datetime` module.
+    This module mostly contains conveniences used in my other code;
+    you're welcome to it, but it does not pretend to be large or complete.
 '''
 
-from datetime import datetime, tzinfo, timedelta
-from time import localtime, strftime
+from datetime import date, datetime, tzinfo, timedelta
+from time import localtime, mktime, strftime
+
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["date", "time", "datetime", "python", "python3"],
@@ -49,7 +56,7 @@ class tzinfoHHMM(tzinfo):
     return self._tzname
 
 try:
-  from datetime import timezone
+  from datetime import timezone  # pylint: disable=ungrouped-imports
 except ImportError:
   UTC = tzinfoHHMM('+0000')
 else:
@@ -88,6 +95,11 @@ def unixtime2datetime(unixtime, tz=None):
   if tz is None:
     tz = UTC
   return datetime.fromtimestamp(unixtime, tz=tz)
+
+def localdate2unixtime(d):
+  ''' Convert a localtime `date` into a UNIX timestamp.
+  '''
+  return mktime(date(d.year, d.month, d.day).timetuple())
 
 class UNIXTimeMixin:
   ''' A mixin for classes with a `.unixtime` attribute,

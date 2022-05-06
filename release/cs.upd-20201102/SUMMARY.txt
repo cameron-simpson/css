@@ -1,0 +1,2 @@
+Upd.nl: simple approach when there are no status lines.
+Upd: new cursor_visible and cursor_invisible methods to show and hide the cursor.

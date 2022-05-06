@@ -1,0 +1,5 @@
+lib/python/cs/fstags.py: csfstags: FSTags.edit_dirpath: new all_names parameter to include dot-names; FSTagsCommand.cmd_edit: new -a option to turn on the all_names parameter
+lib/python/cs/fstags.py: cs.fstags: FSTags.find: tag_tests should be a sequence, check that it is a tuple or list - it is reused, so an iterator would be consumed
+lib/python/cs/fstags.py: cs.cmdutils: BaseCommand: new __init_subclass__ method to append the subclass usage_text() to the class docstring; update related modules to match
+lib/python/cs/fstags.py: update module DISTINFOs for recent cs.cmdutils BaseCommand change
+lib/python/cs/fstags.py: cs.fstags: clean a little lint

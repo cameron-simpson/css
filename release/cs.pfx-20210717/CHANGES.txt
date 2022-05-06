@@ -1,0 +1,3 @@
+lib/python/cs/pfx.py: cs.pfx: @pfx_method: better name for the wrapper function
+lib/python/cs/pfx.py: cs.pfx: @pfx_method: new optional decorator argument "with_args" to include some or all arguments in the Pfx context
+lib/python/cs/pfx.py: cs.pfx: docstring tweak

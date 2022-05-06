@@ -5,23 +5,20 @@
 
 r'''
 Convenience facilities for objects.
-
-Presents:
-* flavour, for deciding whether an object resembles a mapping or sequence.
-* Some O_* functions for working with objects
-* Proxy, a very simple minded object proxy intended to aid debugging.
 '''
 
 from __future__ import print_function
+from collections import defaultdict
 from copy import copy as copy0
 import sys
 import traceback
 from types import SimpleNamespace
 from threading import Lock
 from weakref import WeakValueDictionary
+from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
-__version__ = '20200716-post'
+__version__ = '20210717-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -30,7 +27,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -54,6 +51,7 @@ def flavour(obj):
     return T_SEQ
   return T_SCALAR
 
+# pylint: disable=too-few-public-methods
 class O(SimpleNamespace):
   ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`.
   '''
@@ -62,7 +60,7 @@ class O(SimpleNamespace):
 
   def __init__(self, **kw):
     frame = traceback.extract_stack(None, 2)[0]
-    caller=(frame[0], frame[1])
+    caller = (frame[0], frame[1])
     if caller not in self.callers:
       self.callers.add(caller)
       print(
@@ -144,7 +142,7 @@ def O_str(o, no_recurse=False, seen=None):
   if obj_type in (tuple, int, float, bool, list):
     return str(o)
   if obj_type is dict:
-    o2 = dict([(k, str(v)) for k, v in o.items()])
+    o2 = {k: str(v) for k, v in o.items()}
     return str(o2)
   if obj_type is set:
     return 'set(%s)' % (','.join(sorted([str(item) for item in o])))
@@ -187,23 +185,34 @@ def copy(obj, *a, **kw):
     setattr(obj2, attr, value)
   return obj2
 
-def obj_as_dict(o, attr_prefix=None, attr_match=None):
-  ''' Return a dictionary with keys mapping to `o` attributes.
+def as_dict(o, selector=None):
+  ''' Return a dictionary with keys mapping to the values of the attributes of `o`.
+
+      Parameters:
+      * `o`: the object to map
+      * `selector`: the optional selection criterion
+
+      If `selector` is omitted or `None`, select "public" attributes,
+      those not commencing with an underscore.
+
+      If `selector` is a `str`, select attributes starting with `selector`.
+
+      Otherwise presume `selector` is callable
+      and select attributes `attr` where `selector(attr)` is true.
   '''
-  if attr_match is None:
-    if attr_prefix is None:
-      match = lambda attr: attr and not attr.startswith('_')
-    else:
-      match = lambda attr: attr.startswith(attr_prefix)
-  elif attr_prefix is None:
-    match = attr_match
+  if selector is None:
+    match = lambda attr: attr and not attr.startswith('_')
+  elif isinstance(selector, str):
+    match = lambda attr: attr.startswith(selector)
   else:
-    raise ValueError("cannot specify both attr_prefix and attr_match")
-  obj_attrs = {}
-  for attr in dir(o):
-    if match(attr):
-      obj_attrs[attr] = getattr(o, attr)
-  return obj_attrs
+    match = selector
+  return {attr: getattr(o, attr) for attr in dir(o) if match(attr)}
+
+@OBSOLETE("use cs.obj.as_dict")
+def obj_as_dict(o, **kw):
+  ''' OBSOLETE convesion of an object to a `dict`. Please us `cs.obj.as_dict`.
+  '''
+  raise RuntimeError("please use cs.obj.as_dict")
 
 class Proxy(object):
   ''' An extremely simple proxy object
@@ -314,22 +323,22 @@ def singleton(registry, key, factory, fargs, fkwargs):
     is_new = True
   return is_new, instance
 
+# pylint: disable=too-few-public-methods
 class SingletonMixin:
   ''' A mixin turning a subclass into a singleton factory.
 
-      *Note*: this should be the *first* superclass of the subclass
-      in order to intercept `__new__`.
+      *Note*: this mixin overrides `object.__new__`
+      and may not play well with other classes which override `__new__`.
 
       *Warning*: because of the mechanics of `__new__`,
       the instance's `__init__` method will always be called
       after `__new__`,
       even when a preexisting object is returned.
-
       Therefore that method should be sensible
       even for an already initialised
       and probably subsequently modified object.
 
-      One approach might be to access some attribute,
+      My suggested approach is to access some attribute,
       and preemptively return if it already exists.
       Example:
 
@@ -346,7 +355,7 @@ class SingletonMixin:
 
       Implementation requirements:
       a subclass should:
-      * provide a class method `_singleton_key(cls,*args,**kwargs)`
+      * provide a method `_singleton_key(*args,**kwargs)`
         returning a key for use in the single registry,
         computed from the positional and keyword arguments
         supplied on instance creation
@@ -381,12 +390,9 @@ class SingletonMixin:
   # does not yet have a registry.
   __global_lock = Lock()
 
-  def __new__(cls, *a, **kw):
-    ''' Prepare a new instance of `cls` if required.
-        Return the instance.
-
-        This creates the class registry if missing,
-        and then
+  @classmethod
+  def _singleton_get_registry(cls):
+    ''' Obtain the class singleton registry, creating it on first use.
     '''
     try:
       registry = cls._singleton_registry
@@ -395,22 +401,98 @@ class SingletonMixin:
         try:
           registry = cls._singleton_registry
         except AttributeError:
-          # create the registry and give it its own mutex
+          # create the registry and give it its own mutex and multiindex
           registry = cls._singleton_registry = WeakValueDictionary()
           registry._singleton_lock = Lock()
+          registry._singleton_also_keys = defaultdict(WeakValueDictionary)
+    return registry
 
+  def __new__(cls, *a, **kw):
+    ''' Prepare a new instance of `cls` if required.
+        Return the instance.
+
+        This creates the class registry if missing,
+        prepares a key from `cls._singleton_key`,
+        then returns the entry from the registry is present,
+        or creates a new entry if not.
+        Note: if the key is `None` a new entry is always created
+        and not recorded in the registry.
+    '''
+    super_new = super().__new__
+
+    # pylint: disable=unused-argument
     def factory(*fargs, **fkwargs):
-      ''' Prepare a new object.
-
-          Call `object.__new__(cls)` and then `o._singleton_init(*a,**kw)`
-          on the new object.
+      ''' Prepare a new object; does not yet call `__init__`.
+          This accepts arguments to support use via the `singleton()` function.
       '''
-      return object.__new__(cls)
+      return super_new(cls)
 
     okey = cls._singleton_key(*a, **kw)
-    with registry._singleton_lock:
-      isnew, instance = singleton(registry, okey, factory, a, kw)
+    if okey is None:
+      # if the returned key is None we always make a new instance
+      # and do not register in the registry
+      instance = factory()
+    else:
+      # normal behaviour:
+      # reuse an existing instance or make a new one
+      registry = cls._singleton_get_registry()
+      with registry._singleton_lock:
+        is_new, instance = singleton(registry, okey, factory, (), {})
+        if is_new:
+          instance._SingletonMixin_key = okey
+        else:
+          assert instance._SingletonMixin_key == okey
     return instance
+
+  # default hash and equality methods
+  def __hash__(self):
+    return hash(self._SingletonMixin_key)
+
+  def __eq__(self, other):
+    return self is other
+
+  @classmethod
+  def singleton_also_by(cls, also_key, key):
+    ''' Obtain a singleton by a secondary key.
+        Return the instance or `None`.
+
+        Parameters:
+        * `also_key`: the name of the secondary key index
+        * `key`: the key for the index
+    '''
+    registry = cls._singleton_get_registry()
+    with registry._singleton_lock:
+      return registry._singleton_also_keys[also_key].get(key)
+
+  # pylint: disable=no-self-use
+  def _singleton_also_indexmap(self):
+    ''' Return a mapping of secondary key names and their matching key values.
+    '''
+    return {}
+
+  def _singleton_also_index(self):
+    ''' Return a mapping of secondary key names and their matching key values.
+    '''
+    registry = self._singleton_get_registry()
+    with registry._singleton_lock:
+      for also_key, key in self._singleton_also_indexmap().items():
+        registry._singleton_also_keys[also_key][key] = self
+
+  @classmethod
+  def _singleton_instances(cls):
+    ''' Return a list of the current class instances.
+    '''
+    try:
+      registry = cls._singleton_registry
+    except AttributeError:
+      return []
+    else:
+      return list(
+          filter(
+              lambda obj: obj is not None,
+              map(lambda ref: ref(), registry.valuerefs())
+          )
+      )
 
 if __name__ == '__main__':
   import cs.obj_tests

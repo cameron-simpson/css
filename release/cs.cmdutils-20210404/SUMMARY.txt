@@ -1,0 +1,1 @@
+BaseCommand subclasses: automatically add the main usage message to the subclass docstring.

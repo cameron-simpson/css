@@ -68,9 +68,11 @@ class ITunesCommand(BaseCommand):
         for path in rpaths(top_path):
           with Pfx(path):
             tagged_path = TaggedPath(path, fstags)
-            tags = tagged_path.all_tags
-            direct_tags = tagged_path.direct_tags
-            key = (tags.title, tags.get('season'), tags.get('episode'))
+            all_tags = tagged_path.all_tags
+            key = (
+                all_tags.title, all_tags.get('season'),
+                all_tags.get('episode')
+            )
             tracks = tracks_by_series_season_episode.get(key, ())
             if tracks:
               if len(tracks) > 1:
@@ -82,15 +84,13 @@ class ITunesCommand(BaseCommand):
                     ('genre', 'genre'),
                     ('release_date', 'release_date'),
                 ):
-                  tag_value = tags.get(tag_name)
+                  tag_value = all_tags.get(tag_name)
                   if not tag_value:
                     tr_value = getattr(track, track_attr, None)
                     if tr_value is not None:
                       new_tag = Tag(tag_name, tr_value)
                       info("+ %s", new_tag)
-                      direct_tags.add(new_tag)
-
-ITunesCommand.add_usage_to_docstring()
+                      tagged_path.add(new_tag)
 
 class ITunesISODateTime(datetime):
   ''' A `datetime` subclass using the iTunes exported XML date format.

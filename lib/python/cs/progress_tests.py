@@ -10,6 +10,10 @@ import unittest
 from .progress import Progress, DEFAULT_THROUGHPUT_WINDOW
 
 class TestProgress(unittest.TestCase):
+  ''' Test `cs.progress.Progress`.
+
+      TODO: generalise for `OverProgress`.
+  '''
 
   def test00basic(self):
     P = Progress(

@@ -6,16 +6,17 @@ Some relevant links:
 * PyPI.org:
   [several modules](https://pypi.org/user/cameron.simpson/)
   are published here for reuse.
-* SourceHut repository:
+* SourceHut Mercurial repository:
   [overview](https://hg.sr.ht/~cameron-simpson/css),
   [commit log](https://hg.sr.ht/~cameron-simpson/css/log),
   [browse code](https://hg.sr.ht/~cameron-simpson/css/browse).
 * Documentation:
   [some overview documentation](http://www.cskk.ezoshosting.com/cs/css/),
   [some manual entries](http://www.cskk.ezoshosting.com/cs/man/)
-* OBSOLETE: Bitbucket.org source repository - (Atlassian have abandoned their Mercurial users):
+* Bitbucket.org source git repository - (Atlassian have abandoned their Mercurial users):
   [overview](https://bitbucket.org/cameron_simpson/css/),
   [commit log](https://bitbucket.org/cameron_simpson/css/commits/all)
+* GitHub source git repository - [overview](https://github.com/cameron-simpson/css)
 
 An autoindex of the command scripts is in the file 1INDEX.txt.
 
@@ -27,8 +28,7 @@ can just be installed with:
     pip install cs.module_name
 
 Installing the whole source tree can be done as follows:
-* Obtain the tree, wither by cloning this repository or fetching the
-  [(possibly stale) tarball](http://www.cskk.ezoshosting.com/cs/css/css.tar.gz)
+* Obtain the tree, for example by cloning this repository
   into a suitable directory such as `/opt/css`, which I will assume for
   the sake of example below.
 * Configure your environment to use the scripts:
@@ -41,7 +41,7 @@ Installing the whole source tree can be done as follows:
   It is expected that this should be one of the last things in your setup,
   so that is merely adds to your environment instead of preempting things.
   If your install point is not `/opt/css`,
-  set the environment variable``$OPTCSS` to the install point
+  set the environment variable `$OPTCSS` to the install point
   before sourcing the `$OPTCSS/env.sh`.
 
 The configuration script mostly does the following:

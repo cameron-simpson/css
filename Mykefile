@@ -1,9 +1,14 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-repos = sr.ht bitbucket
+hg_repos        = sr.ht-css home borg
+git_repos       = bitbucket-css github-css
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
+www_github      = https://github.com/cameron-simpson/css
 title           = Cameron Simpson's Scripts
+
+# used for pushing live code direct
+RSYNC_TARGET_PYTHON_ENVVAR = RSYNC_TARGET_PYTHON
 
 target  = bin
 
@@ -59,10 +64,12 @@ scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
-py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
-py3files        = $(py2files :|/python/|/python3/|)
+pymdmans= $("lib/python/cs/*.[1-9].md" G?) \
+          $("lib/python/cs/*/*.[1-9].md" G?) \
+          $("lib/python/cs/*/*/*.[1-9].md" G?)
+md2man  = md2man-roff
 
-rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
+rsync   = rsync -iJOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
@@ -76,10 +83,11 @@ _help:
         @echo '_publish           - deploy current release to /opt/css, ezos and tip to bitbucket'
         @echo '_pending           - report unreleased changelog and [M]odified files'
         @echo '_release           - mark tip as new release'
+        @echo '_remote            - rsync the Python tree to $$$(RSYNC_TARGET_PYTHON_ENVVAR)'
         @echo '_freshmeat         - announce current release to freshmeat'
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
-        @echo '_venv              - make the Python virtual envionment based off $(base_python)'
+        @echo '_venv              - make the Python virtual environment based off $(base_python)'
 
 _setup:
     :make _tags _venv
@@ -110,9 +118,9 @@ _testhost:
           do \
             target=$$testhost:$$basedir \
             pfx "$$target/bin" set-x \\
-              rsync -iOtrl "bin/" "$$target/bin/" & \
+              $(rsync) -a "bin/" "$$target/bin/" & \
             pfx "$$target/lib/python/cs" set-x \\
-              rsync -iOtrl '--include=*/' '--include=*.py' '--exclude=*' \\
+              $(rsync) -a '--include=*/' '--include=*.py' '--exclude=*' \\
                 lib/python/cs/ "$$target/lib/python/cs/" & \
           done \
         done \
@@ -136,45 +144,47 @@ _test3:
         find lib/python -type f -name '*.py[co]' -exec rm {} \;
         set -x; ./bin-cs/selftest -v --state state3 --pycmd python3 --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
 
-_macrotest:
-        echo $(py2files)
-        echo $(py3files)
-_2to3:
-        :make $(py3files)
+deploy_dir(targetdir, base, includes) = \
+        ( \
+          set -ue \
+          echo 'update $(targetdir)/$(base) ...' \
+          [ -d $(targetdir)/$(base) ] || ( \
+            set -x; mkdir -p $(targetdir)/$(base) \
+          ) \
+          pfx $(targetdir)/$(base) \\
+              $(rsync) -a --delete $(base)/. $(targetdir)/$(base)/. \
+        )
 
-$(py3files): lib/python/$(@ :|lib/python3/||)
-        echo "$@ <- $?"
+deploy(targetdir) = \
+        ( \
+          set -ue \
+          tmpdir=$$TMPDIR/css-deploy-$$$$ \
+          mkdir "$$tmpdir" \
+          ( set -ue \
+            hg archive -t files -r tip "$$tmpdir" \
+            hg-apply-manifest-dates -r "tip" "$$tmpdir" \
+            cd "$$tmpdir" \
+            $(deploy_dir($(targetdir), bin, synonyms)) \
+            $(deploy_dir($(targetdir), bin-cs, synonyms)) \
+            $(deploy_dir($(targetdir), bin-darwin, synonyms)) \
+            $(deploy_dir($(targetdir), lib/js/cs, "")) \
+            $(deploy_dir($(targetdir), lib/perl/cs, "")) \
+            $(deploy_dir($(targetdir), lib/python/cs, "")) \
+          ) \
+          xit=$$? \
+          rm -rf "$$tmpdir" \
+          exit $$xit \
+        )
+
+_optcss:
+        @$(deploy(/opt/css))
 
 _home:
-        @echo 'update $(HOME)/bin ...' \
-        skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
-        binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
-        pfx bin hg-shelved \\
-            $(rsync) -a --delete \\
-                --include=/CHANGELOG.txt \\
-                $$binskip \\
-                --include=synonyms/ \\
-                --exclude=squid_redirect \\
-                --exclude=/\*/ \\
-                bin/. $(HOME)/bin/.
-        :make _bin_$((bin_suffixes))
-        @echo 'update $(HOME)/lib ...' \
-        libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
-        pfx lib hg-shelved \\
-            $(rsync) -a --delete \\
-                --include=/js \\
-                --include=/js/cs \\
-                --exclude=/js/* \\
-                --include=/perl \\
-                --include=/perl/cs \\
-                --exclude=/perl/* \\
-                --include=/python \\
-                --include=/python/cs \\
-                --exclude=/python/* \\
-                $$libskip \\
-                --exclude=/* \\
-                --exclude=testdata* \\
-                lib/. $(HOME)/lib/.
+        @$(deploy($(HOME)))
+
+_remote:
+        set -uex; rsync -ia --include=*/ --include=*.py --exclude=* cs/ "$$$(RSYNC_TARGET_PYTHON_ENVVAR)/"
+
 
 bin_suffixes = cs darwin
 
@@ -204,20 +214,26 @@ _deploy:
         OPTCSS=$(PREFIX) updcss
 
 _publish _pub:
-        :make _publish_hg
+        :make _publish_hg _publish_git
         #:make _publish_ezos
 
 _publish_ezos:
         :make _deploy
         syncezos
 
+_publish_git:
+        for repo in $(git_repos) \
+        do  pfx "$$repo" hg-gitup -a -f -x "$$repo" \
+        done
+        @echo 'changes visible at $(www_bitbucket)'
+        @echo 'code visible at $(www_github)'
+
 _publish_hg:
-        for repo in $(repos) \
+        for repo in $(hg_repos) \
         do  pfx "$$repo" hg push --new-branch -r tip "$$repo" & \
         done \
         wait
         @echo 'changes visible at $(www_sr_ht)'
-        @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release
 _release:

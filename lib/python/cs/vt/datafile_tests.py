@@ -16,7 +16,7 @@ except ImportError:
 from cs.binary_tests import _TestPacketFields
 from cs.buffer import CornuCopyBuffer
 ##from cs.debug import thread_dump
-from .randutils import rand0, make_randblock
+from cs.randutils import rand0, make_randblock
 from . import datafile
 from .datafile import DataRecord, DataFilePushable
 # from .hash_tests import _TestHashCodeUtils
@@ -27,11 +27,15 @@ MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
 
 class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
+  ''' Test the `PacketField`s.
+  '''
 
   def setUp(self):
     self.module = datafile
 
 class TestDataFile(unittest.TestCase):
+  ''' Tests for `DataFile`.
+  '''
 
   def setUp(self):
     random.seed()
@@ -70,7 +74,7 @@ class TestDataFile(unittest.TestCase):
         with self.subTest(shuffled_offsets_n=n, offset=offset):
           f.seek(offset)
           bfr = CornuCopyBuffer.from_file(f)
-          dr = DataRecord.from_buffer(bfr)
+          dr = DataRecord.parse(bfr)
           data = dr.data
           self.assertTrue(data == blocks[offset])
 

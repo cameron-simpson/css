@@ -7,9 +7,10 @@
 r'''
 Dynamic message prefixes providing execution context.
 
-The primary facility here is Pfx,
+The primary facility here is `Pfx`,
 a context manager which maintains a per thread stack of context prefixes.
 There are also decorators for functions.
+This stack is used to prefix logging messages and exception text with context.
 
 Usage is like this:
 
@@ -19,10 +20,10 @@ Usage is like this:
     setup_logging()
     ...
     def parser(filename):
-      with Pfx("parse(%r)", filename):
+      with Pfx(filename):
         with open(filename) as f:
           for lineno, line in enumerate(f, 1):
-            with Pfx("%d", lineno) as P:
+            with Pfx(lineno) as P:
               if line_is_invalid(line):
                 raise ValueError("problem!")
               info("line = %r", line)
@@ -43,16 +44,18 @@ but used with a little discretion produces far more debuggable results.
 
 from __future__ import print_function
 from contextlib import contextmanager
+from functools import partial
 from inspect import isgeneratorfunction
 import logging
 import sys
 import threading
-from cs.deco import decorator, logging_wrapper
-from cs.py.func import funcname
+import traceback
+from cs.deco import decorator, contextdecorator, fmtdoc, logging_wrapper
+from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20200517-post'
+__version__ = '20220429-post'
 
 DISTINFO = {
     'description':
@@ -65,13 +68,29 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
-        'cs.py.func',
+        'cs.py.func>=func_a_kw_fmt',
         'cs.py3',
         'cs.x',
     ],
 }
 
+DEFAULT_SEPARATOR = ': '
+
 cmd = None
+
+@fmtdoc
+def unpfx(s, sep=None):
+  ''' Strip the leading prefix from the string `s`
+      using the prefix delimiter `sep`
+      (default from `DEFAULT_SEPARATOR`: `{DEFAULT_SEPARATOR!r}`).
+
+      This is a simple hack to support reporting error messages
+      which have had a preifx applied,
+      and fails accordingly if the base message itself contains the separator.
+  '''
+  if sep is None:
+    sep = DEFAULT_SEPARATOR
+  return s.rsplit(sep, 1)[-1].strip()
 
 def pfx_iter(tag, iterable):
   ''' Wrapper for iterables to prefix exceptions with `tag`.
@@ -85,6 +104,19 @@ def pfx_iter(tag, iterable):
       except StopIteration:
         break
     yield i
+
+def pfx_call(func, *a, **kw):
+  ''' Call `func(*a,**kw)` within an enclosing `Pfx` context manager
+      reciting the function name and arguments.
+
+      Example:
+
+          >>> import os
+          >>> pfx_call(os.rename, "oldname", "newname")
+  '''
+  pfxf, pfxav = func_a_kw_fmt(func, *a, **kw)
+  with Pfx(pfxf, *pfxav):
+    return func(*a, **kw)
 
 class _PfxThreadState(threading.local):
   ''' A Thread local class to track `Pfx` stack state.
@@ -102,7 +134,7 @@ class _PfxThreadState(threading.local):
   def cur(self):
     ''' The current/topmost `Pfx` instance.
     '''
-    global cmd
+    global cmd  # pylint: disable=global-statement
     stack = self.stack
     if not stack:
       if not cmd:
@@ -117,7 +149,7 @@ class _PfxThreadState(threading.local):
   def prefix(self):
     ''' Return the prevailing message prefix.
     '''
-    global cmd
+    global cmd  # pylint: disable=global-statement
     # Because P.umark can call str() on the mark, which in turn may
     # call arbitrary code which in turn may issue log messages, which
     # in turn may call this, we prevent such recursion.
@@ -137,7 +169,7 @@ class _PfxThreadState(threading.local):
     if cmd is not None:
       marks.append(cmd)
     marks = reversed(marks)
-    return unicode(': ').join(marks)
+    return unicode(DEFAULT_SEPARATOR).join(marks)
 
   def append(self, P):
     ''' Push a new Pfx instance onto the stack.
@@ -149,58 +181,11 @@ class _PfxThreadState(threading.local):
     '''
     return self.stack.pop()
 
-def gen(func):
-  ''' Decorator for generators to manage the Pfx stack.
-
-      Before running the generator the current stack height is
-      noted.  After yield, the stack above that height is trimmed
-      and saved, and the value yielded.  On recommencement the saved
-      stack is reapplied to the current stack (which may have
-      changed) and the generator continued.
-  '''
-
-  def wrapper(*a, **kw):
-    if not isgeneratorfunction(func):
-      raise ValueError(
-          "@gen: generatior function required, received %s" % (func,)
-      )
-    # commence the generator
-    g = func(*a, **kw)
-    # note the current Thread's Pfx stack
-    stack = Pfx._state.stack
-    height = len(stack)
-    while True:
-      try:
-        value = next(g)
-      except StopIteration:
-        # clean up and reraise
-        stack[height:] = []
-        return
-      except:
-        # clean up and reraise
-        stack[height:] = []
-        raise
-      # shelve the in-generator Pfx stack and yield
-      saved = stack[height:]
-      stack[height:] = []
-      yield value
-      # note the current Thread's Pfx stack
-      stack = Pfx._state.stack
-      height = len(stack)
-      # reapply the in-generator Pfx stack
-      stack.extend(saved)
-      del saved
-
-  wrapper.__name__ = "@Pfx.gen(%s)" % (func.__name__,)
-  fdoc = func.__doc__
-  wrapper.__doc__ = wrapper.__name__ + ":\n" + fdoc if fdoc else ''
-  return wrapper
-
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
 
-  # instantiate the thread-local state object
+  # instantiate the thread-local class state object
   _state = _PfxThreadState()
 
   def __init__(self, mark, *args, **kwargs):
@@ -213,6 +198,10 @@ class Pfx(object):
           true, this message forms the base of the message prefixes;
           earlier prefixes will be suppressed.
         * `loggers`: which loggers should receive log messages.
+        * `print`: if true, print the `mark` on entry to the `with` suite.
+          This may be a `bool`, implying `print()` if `True`,
+          a callable which works like `print()`,
+          or a file-like object which implies using `print(...,file=print)`.
 
         *Note*:
         the `mark` and `args` are only combined if the `Pfx` instance gets used,
@@ -233,12 +222,21 @@ class Pfx(object):
     '''
     absolute = kwargs.pop('absolute', False)
     loggers = kwargs.pop('loggers', None)
+    print_func = kwargs.pop('print', False)
+    if print_func:
+      if isinstance(print_func, bool):
+        # bool:True => print()
+        print_func = print
+      elif not callable(print_func) and hasattr(print_func, 'write'):
+        # presume a file
+        print_func = partial(print, file=print_func)
     if kwargs:
       raise TypeError("unsupported keyword arguments: %r" % (kwargs,))
 
     self.mark = mark
     self.mark_args = args
     self.absolute = absolute
+    self.print_func = print_func
     self._umark = None
     self._loggers = None
     if loggers is not None:
@@ -248,13 +246,32 @@ class Pfx(object):
 
   def __enter__(self):
     # push this Pfx onto the per-Thread stack
-    _state = self._state
-    _state.append(self)
-    _state.raise_needs_prefix = True
-    if _state.trace:
-      _state.trace(_state.prefix)
+    self._push(self)
+    print_func = self.print_func
+    if print_func:
+      mark = self.mark
+      mark_args = self.mark_args
+      if mark_args:
+        mark = mark % mark_args
+      print_func(mark)
 
-  def __exit__(self, exc_type, exc_value, traceback):
+  @classmethod
+  def _push(cls, P):
+    ''' Push this `Pfx` instance onto the current `Thread`'s stack.
+    '''
+    state = cls._state
+    state.append(P)
+    state.raise_needs_prefix = True
+    if state.trace:
+      state.trace(state.prefix)
+
+  @classmethod
+  def push(cls, msg, *a):
+    ''' A new `Pfx(msg,*a)` onto the `Thread` stack.
+    '''
+    cls._push(cls(msg, *a))
+
+  def __exit__(self, exc_type, exc_value, _):
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
@@ -262,12 +279,17 @@ class Pfx(object):
         _state.raise_needs_prefix = False
         # now hack the exception attributes
         if not self.prefixify_exception(exc_value):
-          print(
+          True or print(
               "warning: %s: %s:%s: message not prefixed" %
               (self._state.prefix, type(exc_value).__name__, exc_value),
               file=sys.stderr
           )
-    _state.pop()
+    try:
+      _state.pop()
+    except IndexError as e:
+      print(
+          "warning: %s.__exit__: _state.pop(): %s" % (type(self).__name__, e)
+      )
     if _state.trace:
       _state.trace(_state.prefix)
     return False
@@ -280,13 +302,7 @@ class Pfx(object):
     '''
     u = self._umark
     if u is None:
-      mark = ustr(self.mark)
-      if not isinstance(mark, unicode):
-        if isinstance(mark, str):
-          mark = unicode(mark, errors='replace')
-        else:
-          mark = unicode(mark)
-      u = mark
+      u = ustr(self.mark)
       if self.mark_args:
         try:
           u = u % self.mark_args
@@ -305,16 +321,18 @@ class Pfx(object):
   @classmethod
   def prefixify(cls, text):
     ''' Return `text` with the current prefix prepended.
-        Returns `text` unchanged if it is not a string.
+        Return `text` unchanged if it is not a string.
     '''
     current_prefix = cls._state.prefix
     if not isinstance(text, StringTypes):
       ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
       ##  current_prefix, text.__class__, text, sys.exc_info())
       return text
-    return current_prefix \
-        + ': ' \
-        + ustr(text, errors='replace').replace('\n', '\n  ' + current_prefix + ': ')
+    return (
+        current_prefix + DEFAULT_SEPARATOR +
+        ustr(text, errors='replace'
+             ).replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
+    )
 
   @classmethod
   def prefixify_exception(cls, e):
@@ -323,12 +341,37 @@ class Pfx(object):
     '''
     current_prefix = cls._state.prefix
     did_prefix = False
-    for attr in 'args', 'message', 'msg', 'reason':
+    for attr in 'args', 'message', 'msg', 'reason', 'strerror':
       try:
         value = getattr(e, attr)
       except AttributeError:
         continue
-      if isinstance(value, StringTypes):
+      if value is None:
+        continue
+      # special case various known exception type attributes
+      if attr == 'args' and isinstance(e, OSError):
+        try:
+          value0, value1 = value
+        except ValueError as args_e:
+          X(
+              "prefixify_exception OSError.args: %s(%s) %s: args=%r: %s",
+              type(e).__name__,
+              ','.join(
+                  cls.__name__
+                  for cls in type(e).__mro__
+                  if cls is not type(e) and cls is not object
+              ),
+              e,
+              value,
+              args_e,
+          )
+          continue
+        else:
+          value = (value0, cls.prefixify(value1))
+      elif attr == 'args' and isinstance(e, LookupError):
+        # args[0] is the key, do not fiddle with it
+        continue
+      elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
         # set did_prefix if we modify this in place
@@ -340,7 +383,8 @@ class Pfx(object):
           print(
               "warning: %s: %s.%s: " % (current_prefix, e, attr),
               cls.prefixify(
-                  "do not know how to prefixify: %s:%r" % (type(value), value)
+                  "do not know how to prefixify .%s=<%s>:%r" %
+                  (attr, type(value).__name__, value)
               ),
               file=sys.stderr
           )
@@ -399,13 +443,44 @@ class Pfx(object):
   enter = __enter__
   exit = __exit__
 
+  @classmethod
+  def scope(cls, msg=None, *a):
+    ''' Context manager to save the current `Thread`'s stack state
+        and to restore it on exit.
+
+        This is to aid long suites which progressively add `Pfx` context
+        as the suite progresses, example:
+
+            for item in items:
+                with Pfx.scope("item %s", item):
+                    db_row = db.get(item)
+                    Pfx.push("db_row = %r", db_row)
+                    matches = db.lookup(db_row.category)
+                    if not matches:
+                        continue
+                    Pfx.push("%d matches", len(matches):
+                    ... etc etc ...
+    '''
+
+    @contextmanager
+    def scope_cmgr():
+      old_stack = list(cls._state.stack)
+      try:
+        if msg is not None:
+          cls.push(msg, *a)
+        yield
+      finally:
+        cls._state.stack[:] = old_stack
+
+    return scope_cmgr()
+
   # Logger methods
   @logging_wrapper
-  def exception(self, msg, *args):
+  def exception(self, msg, *args, **kwargs):
     ''' Log an exception message to this Pfx's loggers.
     '''
     for L in self.loggers:
-      L.exception(msg, *args)
+      L.exception(msg, *args, **kwargs)
 
   @logging_wrapper
   def log(self, level, msg, *args, **kwargs):
@@ -415,7 +490,7 @@ class Pfx(object):
     for L in self.loggers:
       try:
         L.log(level, msg, *args, **kwargs)
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         print(
             "%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s" %
             (self._state.prefix, L, msg, args, kwargs, e),
@@ -457,6 +532,16 @@ def prefix():
   '''
   return Pfx._state.prefix
 
+def pfxprint(*a, print_func=None, **kw):
+  ''' Call `print()` with the current prefix.
+
+      The optional keyword parameter `print_func`
+      provides an alternative function to the builtin `print()`.
+  '''
+  if print_func is None:
+    print_func = print
+  print_func(prefix() + ':', *a, **kw)
+
 @contextmanager
 def PrePfx(tag, *args):
   ''' Push a temporary value for Pfx._state._ur_prefix to enloundenify messages.
@@ -472,11 +557,10 @@ def PrePfx(tag, *args):
     state._ur_prefix = old_ur_prefix
 
 class PfxCallInfo(Pfx):
-  ''' Subclass of Pfx to insert current function an caller into messages.
+  ''' Subclass of Pfx to insert current function and caller into messages.
   '''
 
   def __init__(self):
-    import traceback
     grandcaller, caller, _ = traceback.extract_stack(None, 3)
     Pfx.__init__(
         self, "at %s:%d %s(), called from %s:%d %s()", caller[0], caller[1],
@@ -499,10 +583,9 @@ def PfxThread(target=None, **kw):
 @decorator
 def pfx(func, message=None, message_args=()):
   ''' General purpose @pfx for generators, methods etc.
-      Pfx needs a .overPfx attribute to hook up chained Pfx stacks.
 
       Parameters:
-      * `func`: the function to decorate
+      * `func`: the function or generator function to decorate
       * `message`: optional prefix to use instead of the function name
       * `message_args`: optional arguments to embed in the preifx using `%`
 
@@ -514,91 +597,111 @@ def pfx(func, message=None, message_args=()):
   '''
   fname = funcname(func)
   if message is None:
-    message = fname
+    if message_args:
+      raise ValueError("no message, but message_args=%r" % (message_args,))
 
   if isgeneratorfunction(func):
 
-    def wrapper(*a, **kw):
-      ''' Before running the generator the current stack height is
-          noted.  After yield, the stack above that height is trimmed
-          and saved, and the value yielded.  On recommencement the saved
-          stack is reapplied to the current stack (which may have
-          changed) and the generator continued.
+    # persistent in-generator stack to be reused across calls to
+    # the context manager
+    saved_stack = []
+    if message is None:
+      message = funcname
+
+    @contextdecorator
+    def cmgrdeco(func, a, kw):
+      ''' Context manager to note the entry `Pfx` stack height, append saved
+          `Pfx` stack from earlier run, then after the iteration step save the
+          top of the `Pfx` stack for next time.
       '''
-      # commence the generator
-      g = func(*a, **kw)
-      # prepare an initial generator Pfx stack
-      saved = []
-      while True:
-        # note the current Thread's Pfx stack
-        stack = Pfx._state.stack
-        height = len(stack)
-        stack.extend(saved)
-        try:
-          with Pfx(message, *message_args):
-            value = next(g)
-        except StopIteration:
-          # clean up and return
-          stack[height:] = []
-          return
-          # other exceptions raise cleanly out of the generator
-        # save generator Pfx stack, reset caller Pfx stack, yield
-        saved = stack[height:]
-        stack[height:] = []
-        yield value
+      pfx_stack = Pfx._state.stack
+      height = len(pfx_stack)
+      pfx_stack.extend(saved_stack)
+      with Pfx(message, *message_args):
+        yield
+      saved_stack[:] = pfx_stack[height:]
+      pfx_stack[height:] = []
+
+    wrapper = cmgrdeco(func)
+
   else:
 
-    def wrapper(*a, **kw):
-      ''' Run function inside `Pfx` context manager.
-      '''
-      with Pfx(message, *message_args):
-        return func(*a, **kw)
+    if message is None:
+
+      def wrapper(*a, **kw):
+        ''' Run function inside `Pfx` context manager.
+        '''
+        return pfx_call(func, *a, **kw)
+
+    else:
+
+      def wrapper(*a, **kw):
+        ''' Run function inside `Pfx` context manager.
+        '''
+        with Pfx(message, *message_args):
+          return func(*a, **kw)
 
   wrapper.__name__ = "@pfx(%s)" % (fname,)
   wrapper.__doc__ = func.__doc__
   return wrapper
 
 @decorator
-def pfx_method(method, use_str=False):
+def pfx_method(method, use_str=False, with_args=False):
   ''' Decorator to provide a `Pfx` context for an instance method prefixing
-      *classname.methodname*
-      (or `str(self).`*methodname* if `use_str` is true).
+      *classname.methodname*.
 
-      Example usage:
+      If `use_str` is true (default `False`)
+      use `str(self)` instead of `classname`.
+
+      If `with_args` is true (default `False`)
+      include the specified arguments in the `Pfx` context.
+      If `with_args` is `True`, this includes all the arguments.
+      Otherwise `with_args` should be a sequence of argument references:
+      an `int` specifies one of the positional arguments
+      and a string specifies one of the keyword arguments.
+
+      Examples:
 
           class O:
+              # just use "O.foo"
               @pfx_method
               def foo(self, .....):
+                  ....
+              # use the value of self instead of the class name
+              @pfx_method(use_str=True)
+              def foo2(self, .....):
+                  ....
+              # include all the arguments
+              @pfx_method(with_args=True)
+              def foo3(self, a, b, c, *, x=1, y):
+                  ....
+              # include the "b", "c" and "x" arguments
+              @pfx_method(with_args=[1,2,'x'])
+              def foo3(self, a, b, c, *, x=1, y):
                   ....
   '''
 
   fname = method.__name__
 
-  def wrapper(self, *a, **kw):
+  def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
-    with Pfx("%s.%s", self if use_str else type(self).__name__, fname):
+    classref = self if use_str else type(self).__name__
+    pfxfmt, pfxargs = func_a_kw_fmt(method, *a, **kw)
+    with Pfx("%s." + pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)
 
-  wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = fname
-  return wrapper
+  pfx_method_wrapper.__doc__ = method.__doc__
+  pfx_method_wrapper.__name__ = fname
+  return pfx_method_wrapper
 
 def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`
       which prefixes the message with the current Pfx prefix.
   '''
-  f = kwargs.pop('file', None)
-  if f is None:
-    f = sys.stderr
-  elif f is not None:
-    if isinstance(f, StringTypes):
-      with open(f, "a") as f2:
-        return XP(msg, *args, file=f2)
-  f.write(prefix())
-  f.write(': ')
-  f.flush()
-  return X(msg, *args, file=f)
+  if args:
+    return X("%s: " + msg, prefix(), *args, **kwargs)
+  return X(prefix() + DEFAULT_SEPARATOR + msg, **kwargs)
 
 def XX(prepfx, msg, *args, **kwargs):
   ''' Trite wrapper for `XP()` to transiently insert a leading prefix string.
