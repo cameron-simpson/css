@@ -195,6 +195,7 @@ class MailFilerCommand(BaseCommand):
         delay=options.delay,
         justone=options.justone,
         no_remove=options.no_remove,
+        runstate=options.runstate,
         upd=self.loginfo.upd
     )
 
@@ -408,7 +409,14 @@ class MailFiler(NS):
     return wmdir
 
   def monitor(
-      self, folders, *, delay=None, justone=False, no_remove=False, upd=None
+      self,
+      folders,
+      *,
+      delay=None,
+      justone=False,
+      no_remove=False,
+      runstate=None,
+      upd=None,
   ):
     ''' Monitor the specified `folders`, a list of folder spcifications.
         If `delay` is not None, poll the folders repeatedly with a
@@ -420,41 +428,38 @@ class MailFiler(NS):
     debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
     idle = 0
-    try:
-      while True:
-        these_folders = folders
-        if not these_folders:
-          these_folders = op_cfg.get('folders', '').split()
-        nmsgs = 0
-        for folder in these_folders:
-          wmdir = self.maildir_watcher(folder)
-          with Pfx(wmdir.shortname):
-            try:
-              nmsgs += self.sweep(
-                  wmdir, justone=justone, no_remove=no_remove, upd=upd
-              )
-            except KeyboardInterrupt:
-              raise
-            except Exception as e:
-              exception("exception during sweep: %s", e)
-        if nmsgs > 0:
-          idle = 0
-        if delay is None:
-          break
-        if upd is not None:
-          if idle > 0:
-            status("sleep %ds; idle %ds", delay, idle)
-          else:
-            status("sleep %ds", delay)
-        sleep(delay)
-        idle += delay
-    except KeyboardInterrupt:
-      watchers = self._maildir_watchers
-      with self._lock:
-        for wmdir in watchers.values():
-          wmdir.close()
-      return 1
-    return 0
+    while not runstate or not runstate.cancelled:
+      these_folders = folders
+      if not these_folders:
+        these_folders = op_cfg.get('folders', '').split()
+      nmsgs = 0
+      for folder in these_folders:
+        wmdir = self.maildir_watcher(folder)
+        with Pfx(wmdir.shortname):
+          try:
+            nmsgs += self.sweep(
+                wmdir, justone=justone, no_remove=no_remove, upd=upd
+            )
+          except KeyboardInterrupt:
+            raise
+          except Exception as e:
+            exception("exception during sweep: %s", e)
+      if nmsgs > 0:
+        idle = 0
+      if delay is None:
+        break
+      if upd is not None:
+        if idle > 0:
+          status("sleep %ds; idle %ds", delay, idle)
+        else:
+          status("sleep %ds", delay)
+      sleep(delay)
+      idle += delay
+    watchers = self._maildir_watchers
+    with self._lock:
+      for wmdir in watchers.values():
+        wmdir.close()
+    return 1 if runstate and runstate.cancelled else 0
 
   @property
   def logdir(self):
