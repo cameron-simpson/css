@@ -830,6 +830,9 @@ class BaseCommand:
 
         The expected options are specified by the keyword parameters
         in `opt_specs`:
+        * options not starting with a letter may be preceeded by an underscore
+          to allow use in the parameter list, for example `_1='once'`
+          for a `-1` option setting the `once` option name
         * a single letter name specifies a short option
           and a multiletter name specifies a long option
         * options requiring an argument have a trailing underscore
@@ -844,14 +847,16 @@ class BaseCommand:
             ...   all=False,
             ...   jobs=1,
             ...   number=0,
+            ...   once=False,
             ...   path=None,
             ...   trace_exec=True,
             ...   verbose=False,
             ...   dry_run=False)
-            >>> argv = ['-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
+            >>> argv = ['-1', '-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
             >>> opt_dict = BaseCommand.popopts(
             ...   argv,
             ...   options,
+            ...   _1='once',
             ...   a='all',
             ...   j_=('jobs',int),
             ...   n='dry_run',
@@ -863,9 +868,9 @@ class BaseCommand:
             ...   verbose=None,
             ... )
             >>> opt_dict
-            {'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
+            {'once': True, 'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
             >>> options
-            namespace(all=False, jobs=4, number=0, path='/foo', trace_exec=True, verbose=True, dry_run=False)
+            namespace(all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=True, verbose=True, dry_run=False)
     '''
     keyfor = {}
     shortopts = ''
@@ -875,6 +880,8 @@ class BaseCommand:
     for opt_name, opt_spec in opt_specs.items():
       with Pfx("opt_spec[%r]=%r", opt_name, opt_spec):
         needs_arg = False
+        if opt_name.startswith('_'):
+          opt_name=opt_name[1:]
         if opt_name.endswith('_'):
           needs_arg = True
           opt_name = opt_name[:-1]
