@@ -311,6 +311,17 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
   def cmd_import(self, argv):
     ''' Usage: {cmd} csvpath datecol[:conv] [import_columns]
           Import data into the time series.
+          csvpath   The CSV file to import.
+          datecol[:conv]
+                    Specify the timestamp column and optional
+                    conversion function.
+                    "datecol" can be either the column header name
+                    or a numeric column index counting from 0.
+                    If "conv" is omitted, the column should contain
+                    a UNIX seconds timestamp.  Otherwise "conv"
+                    should be either an identifier naming one of
+                    the known conversion functions or an "arrow.get"
+                    compatible time format string.
     '''
     options = self.options
     runstate = options.runstate
