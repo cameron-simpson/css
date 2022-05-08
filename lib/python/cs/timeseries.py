@@ -248,8 +248,47 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
   ''' Command line interface to `TimeSeries` data files.
   '''
 
+  USAGE_FORMAT = r'''Usage: {cmd} [-s ts-step] tspath subcommand...
+    -s ts-step  Specify the UNIX time step for the time series,
+                used if the time series is new and checked otherwise.
+    tspath      The path to the time series data directory.'''
+  GETOPT_SPEC = 's:'
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
+
+  def apply_defaults(self):
+    self.options.ts_step = None  # the time series step
+
+  def apply_opt(self, opt, val):
+    if opt == '-s':
+      try:
+        ts_step = pfx_call(float, val)
+      except ValueError as e:
+        raise GetoptError("not a floating point value: %s" % (e,)) from e
+      if ts_step <= 0:
+        raise GetoptError("ts-step must be >0, got %s" % (ts_step,))
+      self.options.ts_step = ts_step
+    else:
+      raise RuntimeError("unhandled option")
+
+  def apply_preargv(self, argv):
+    ''' Parse a leading time series filesystem path from `argv`,
+        set `self.options.ts` to the time series,
+        return modified `argv`.
+    '''
+    argv = list(argv)
+    options = self.options
+    options.ts = self.poparg(
+        argv,
+        'tspath',
+        partial(timeseries_from_path, step=options.ts_step),
+    )
+    if options.ts.step != options.ts_step:
+      warning(
+          "tspath step=%s but -s ts-step specified %s", options.ts.step,
+          options.ts_step
+      )
+    return argv
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
     ''' Usage: {cmd} [testnames...]
