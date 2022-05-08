@@ -22,7 +22,7 @@
       time series, for example one subdirectory for grid voltage
       and another for grid power
 
-    Together these provide a hierary for finite sized files storing
+    Together these provide a hierarchy for finite sized files storing
     unbounded time series data for multiple parameters.
     The core purpose is to provide time series data storage; there
     are assorted convenience methods to export arbitrary subsets
@@ -33,6 +33,7 @@
 
 from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
+from collections import defaultdict
 from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
@@ -58,16 +59,18 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
+from cs.context import stackattrs
+from cs.csvutils import csv_import
 from cs.deco import cachedmethod, decorator
-from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, needdir, shortpath
+from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning, error
 from cs.pfx import pfx, pfx_call, Pfx
+from cs.progress import progressbar
 from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin
-
-from cs.x import X
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -248,7 +251,187 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
   ''' Command line interface to `TimeSeries` data files.
   '''
 
-  SUBCOMMAND_ARGV_DEFAULT = 'test'
+  USAGE_FORMAT = r'''Usage: {cmd} [-s ts-step] tspath subcommand...
+    -s ts-step  Specify the UNIX time step for the time series,
+                used if the time series is new and checked otherwise.
+    tspath      The path to the time series data directory.'''
+  GETOPT_SPEC = 's:'
+  SUBCOMMAND_ARGV_DEFAULT = 'info'
+
+  # conversion functions for a date column
+  DATE_CONV_MAP = {
+      'int': int,
+      'float': float,
+      'date': lambda d: pfx_call(arrow.get, d, tzinfo='local').timestamp(),
+      'iso8601': lambda d: pfx_call(arrow.get, d, tzinfo='local').timestamp(),
+  }
+
+  def apply_defaults(self):
+    self.options.ts_step = None  # the time series step
+
+  def apply_opt(self, opt, val):
+    if opt == '-s':
+      try:
+        ts_step = pfx_call(float, val)
+      except ValueError as e:
+        raise GetoptError("not a floating point value: %s" % (e,)) from e
+      if ts_step <= 0:
+        raise GetoptError("ts-step must be >0, got %s" % (ts_step,))
+      self.options.ts_step = ts_step
+    else:
+      raise RuntimeError("unhandled option")
+
+  def apply_preargv(self, argv):
+    ''' Parse a leading time series filesystem path from `argv`,
+        set `self.options.ts` to the time series,
+        return modified `argv`.
+    '''
+    argv = list(argv)
+    options = self.options
+    options.ts = self.poparg(
+        argv,
+        'tspath',
+        partial(timeseries_from_path, step=options.ts_step),
+    )
+    if options.ts.step != options.ts_step:
+      warning(
+          "tspath step=%s but -s ts-step specified %s", options.ts.step,
+          options.ts_step
+      )
+    return argv
+
+  @contextmanager
+  def run_context(self):
+    with super().run_context():
+      with Upd() as upd:
+        with stackattrs(self.options, upd=upd):
+          yield
+
+  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+  def cmd_import(self, argv):
+    ''' Usage: {cmd} csvpath datecol[:conv] [import_columns...]
+          Import data into the time series.
+          csvpath   The CSV file to import.
+          datecol[:conv]
+                    Specify the timestamp column and optional
+                    conversion function.
+                    "datecol" can be either the column header name
+                    or a numeric column index counting from 0.
+                    If "conv" is omitted, the column should contain
+                    a UNIX seconds timestamp.  Otherwise "conv"
+                    should be either an identifier naming one of
+                    the known conversion functions or an "arrow.get"
+                    compatible time format string.
+          import_columns
+                    An optional list of column names or their derived
+                    attribute names. The default is to import every
+                    numeric column except for the datecol.
+    '''
+    options = self.options
+    runstate = options.runstate
+    upd = options.upd
+    ts = options.ts
+    badopts = False
+    csvpath = self.poparg(
+        argv,
+        'csvpath',
+        str,
+        lambda csvp: csvp.lower().endswith('.csv') and isfilepath(csvp),
+        'not an existing .csv file',
+    )
+    datecolspec = self.poparg(argv, 'datecol[:conv]', str)
+    with Pfx("datecol[:conv] %r", datecolspec):
+      try:
+        datecol, dateconv = datecolspec.split(':', 1)
+      except ValueError:
+        datecol, dateconv = datecolspec, float
+      else:
+        with Pfx("conv %r", dateconv):
+          try:
+            dateconv = self.DATE_CONV_MAP[dateconv]
+          except KeyError:
+            if is_identifier(dateconv):
+              warning(
+                  "unknown conversion function; I know: %s",
+                  ", ".join(sorted(self.DATE_CONV_MAP.keys()))
+              )
+              badopts = True
+            else:
+              dateconv_format = dateconv
+              dateconv = lambda datestr: arrow.get(
+                  datestr, dateconv_format, tzinfo='local'
+              ).timestamp()
+      # see if the column is numeric
+      try:
+        datecol = int(datecol)
+      except ValueError:
+        pass
+    if badopts:
+      raise GetoptError("invalid arguments")
+    with Pfx("import %s", shortpath(csvpath)):
+      unixtimes = []
+      data = defaultdict(list)
+      rowcls, rows = csv_import(csvpath, snake_case=True)
+      attrlist = rowcls.name_attributes_
+      if argv:
+        attrindices = list(range(len(rowcls.name_attributes_)))
+      else:
+        attrindices = [rowcls.index_of_[attr] for attr in argv]
+      if isinstance(datecol, int):
+        if datecol >= len(rowcls.names_):
+          raise GetoptError(
+              "date column index %d exceeds the width of the CSV data" %
+              (datecol,)
+          )
+        else:
+          dateindex = datecol
+      else:
+        try:
+          dateindex = rowcls.index_of_[datecol]
+        except KeyError:
+          warning(
+              "date column %r is not present in the row class, which knows:\n  %s"
+              % (datecol, "\n  ".join(sorted(rowcls.index_of_.keys())))
+          )
+          raise GetoptError("date column %r is not recognised" % (datecol,))
+      # load the data, store the numeric values
+      for i in attrindices:
+        if i != dateindex:
+          ts.makeitem(attrlist[i])
+      for row in progressbar(
+          rows,
+          "parse " + shortpath(csvpath),
+          update_frequency=1024,
+          report_print=True,
+          runstate=runstate,
+      ):
+        when = pfx_call(dateconv, row[datecol])
+        unixtimes.append(when)
+        for i, value in enumerate(row):
+          if i == dateindex:
+            continue
+          attr = attrlist[i]
+          try:
+            value = int(value)
+          except ValueError:
+            try:
+              value = float(value)
+            except ValueError:
+              value = None
+          data[attrlist[i]].append(value)
+      # store the data into the time series
+      for attr, values in progressbar(
+          sorted(data.items()),
+          "set subseries",
+          report_print=True,
+          runstate=runstate,
+      ):
+        upd.out("%s: %d values..." % (attr, len(values)))
+        with Pfx("%s: store %d values", attr, len(values)):
+          ts[attr].setitems(unixtimes, values, skipNone=True)
+      if runstate.cancelled:
+        return 1
+      return 0
 
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
@@ -340,7 +523,7 @@ def timeseries_from_path(tspath: str, start=None, step=None, typecode=None):
       return TimeSeriesPartitioned(
           tspath, typecode, start=start, step=step, policy='annual'
       )
-    return TimeSeriesDataDir(tspath, policy=TimespanPolicyAnnual)
+    return TimeSeriesDataDir(tspath, policy=TimespanPolicyAnnual, step=step)
   raise ValueError("cannot deduce time series type from tspath %r" % (tspath,))
 
 @decorator
@@ -380,6 +563,7 @@ def plotrange(func, needs_start=False, needs_stop=False):
 
   return plotrange_wrapper
 
+# pylint: disable=too-many-locals
 def plot_events(
     figure,
     events,
@@ -636,7 +820,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     if start is None:
       start = self.start
     if stop is None:
-      stop = self.stop
+      stop = self.stop  # pylint: disable=no-member
     return np.array([self[start:stop]], self.np_type)
 
   @pfx
@@ -646,9 +830,9 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     '''
     pandas = import_extra('pandas', DISTINFO)
     if start is None:
-      start = self.start
+      start = self.start  # pylint: disable=no-member
     if stop is None:
-      stop = self.stop
+      stop = self.stop  # pylint: disable=no-member
     times, data = self.data2(start, stop)
     indices = (datetime64(t, 's') for t in times)
     return pandas.Series(data, indices)
@@ -1373,9 +1557,9 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
     '''
     pandas = import_extra('pandas', DISTINFO)
     if start is None:
-      start = self.start
+      start = self.start  # pylint: disable=no-member
     if stop is None:
-      stop = self.stop
+      stop = self.stop  # pylint: disable=no-member
     if keys is None:
       keys = self.keys()
     elif not isinstance(keys, (tuple, list)):
@@ -1493,6 +1677,8 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
         getattr(self, 'step', 'STEP_UNDEFINED'),
         getattr(self, 'policy', 'POLICY_UNDEFINED'),
     )
+
+  __repr__ = __str__
 
   def _infill_keys_from_subdirs(self):
     ''' Fill in any missing keys from subdirectories.
@@ -1790,7 +1976,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         partition_start, partition_stop = self.timespan_for(when)
       yield when, ts
 
-  def setitems(self, whens, values):
+  def setitems(self, whens, values, *, skipNone=False):
     ''' Store `values` against the UNIX times `whens`.
 
         This is most efficient if `whens` are ordered.
@@ -1799,6 +1985,8 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     partition_start = None
     partition_stop = None
     for when, value in zip(whens, values):
+      if value is None and skipNone:
+        continue
       if partition_start is not None and not partition_start <= when < partition_stop:
         # different range, invalidate the current bounds
         partition_start = None
