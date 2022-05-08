@@ -1790,7 +1790,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         partition_start, partition_stop = self.timespan_for(when)
       yield when, ts
 
-  def setitems(self, whens, values):
+  def setitems(self, whens, values, *, skipNone=False):
     ''' Store `values` against the UNIX times `whens`.
 
         This is most efficient if `whens` are ordered.
@@ -1799,6 +1799,8 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     partition_start = None
     partition_stop = None
     for when, value in zip(whens, values):
+      if value is None and skipNone:
+        continue
       if partition_start is not None and not partition_start <= when < partition_stop:
         # different range, invalidate the current bounds
         partition_start = None
