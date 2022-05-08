@@ -340,7 +340,7 @@ def timeseries_from_path(tspath: str, start=None, step=None, typecode=None):
       return TimeSeriesPartitioned(
           tspath, typecode, start=start, step=step, policy='annual'
       )
-    return TimeSeriesDataDir(tspath, policy=TimespanPolicyAnnual)
+    return TimeSeriesDataDir(tspath, policy=TimespanPolicyAnnual, step=step)
   raise ValueError("cannot deduce time series type from tspath %r" % (tspath,))
 
 @decorator
