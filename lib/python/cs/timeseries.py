@@ -248,7 +248,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
   ''' Command line interface to `TimeSeries` data files.
   '''
 
-  SUBCOMMAND_ARGV_DEFAULT = 'test'
+  SUBCOMMAND_ARGV_DEFAULT = 'info'
 
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
