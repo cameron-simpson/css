@@ -715,7 +715,8 @@ class BaseCommand:
           else:
             raise TypeError(
                 "unexpected argument, expected help_text or parse,"
-                " then optional validate and optional invalid message"
+                " then optional validate and optional invalid message,"
+                " received %s" % (r(spec),)
             )
       if help_text is None:
         help_text = (
@@ -881,7 +882,7 @@ class BaseCommand:
       with Pfx("opt_spec[%r]=%r", opt_name, opt_spec):
         needs_arg = False
         if opt_name.startswith('_'):
-          opt_name=opt_name[1:]
+          opt_name = opt_name[1:]
         if opt_name.endswith('_'):
           needs_arg = True
           opt_name = opt_name[:-1]
