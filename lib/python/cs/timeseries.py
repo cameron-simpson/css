@@ -1494,6 +1494,8 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
         getattr(self, 'policy', 'POLICY_UNDEFINED'),
     )
 
+  __repr__ = __str__
+
   def _infill_keys_from_subdirs(self):
     ''' Fill in any missing keys from subdirectories.
     '''
