@@ -72,8 +72,6 @@ from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-from cs.x import X
-
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
