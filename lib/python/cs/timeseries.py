@@ -255,6 +255,13 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
   GETOPT_SPEC = 's:'
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
+  # conversion functions for a date column
+  DATE_CONV_MAP = {
+      'int': int,
+      'float': float,
+      'date': lambda d: pfx_call(arrow.get, d, tzinfo='local').timestamp(),
+      'iso8601': lambda d: pfx_call(arrow.get, d, tzinfo='local').timestamp(),
+  }
 
   def apply_defaults(self):
     self.options.ts_step = None  # the time series step
@@ -296,6 +303,104 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       with Upd() as upd:
         with stackattrs(self.options, upd=upd):
           yield
+
+  def cmd_import(self, argv):
+    ''' Usage: {cmd} csvpath datecol[:conv] [import_columns]
+          Import data into the time series.
+    '''
+    options = self.options
+    runstate = options.runstate
+    upd = options.upd
+    ts = options.ts
+    ts_step = options.ts_step
+    badopts = False
+    csvpath = self.poparg(
+        argv,
+        'csvpath',
+        str,
+        lambda csvp: csvp.lower().endswith('.csv') and isfilepath(csvp),
+        'not an existing .csv file',
+    )
+    datecolspec = self.poparg(argv, 'datecol[:conv]', str)
+    with Pfx("datecol[:conv] %r", datecolspec):
+      try:
+        datecol, dateconv = datecolspec.split(':', 1)
+      except ValueError:
+        datecol, dateconv = datecolspec, float
+      else:
+        with Pfx("conv %r", dateconv):
+          try:
+            dateconv = self.DATE_CONV_MAP[dateconv]
+          except KeyError:
+            if is_identifier(dateconv):
+              warning(
+                  "unknown conversion function; I know: %s",
+                  ", ".join(sorted(self.DATE_CONV_MAP.keys()))
+              )
+              badopts = True
+            else:
+              dateconv_format = dateconv
+              dateconv = lambda datestr: arrow.get(
+                  datestr, dateconv_format, tzinfo='local'
+              ).timestamp()
+      # see if the column is numeric
+      try:
+        datecol = int(datecol)
+      except ValueError:
+        pass
+    if badopts:
+      raise GetoptError("invalid arguments")
+    with Pfx("import %s", shortpath(csvpath)):
+      unixtimes = []
+      data = defaultdict(list)
+      rowcls, rows = csv_import(csvpath, snake_case=True)
+      if isinstance(datecol, int):
+        if datecol >= len(rowcls.names_):
+          raise GetoptError(
+              "date column index %d exceeds the width of the CSV data" %
+              (datecol,)
+          )
+      elif datecol not in rowcls.name_of_:
+        raise GetoptError(
+            "date column %r is not present in the row class, which has: %s" %
+            (datecol, ", ".join(sorted(rowcls.name_of_.keys())))
+        )
+      # load the data, store the numeric values
+      attrs = rowcls.name_attributes_
+      for attr in attrs:
+        ts.makeitem(attr)
+      for row in progressbar(
+          rows,
+          "parse " + shortpath(csvpath),
+          update_frequency=1024,
+          report_print=True,
+          runstate=runstate,
+      ):
+        when = pfx_call(dateconv, row[datecol])
+        unixtimes.append(when)
+        for i, value in enumerate(row):
+          try:
+            value = int(value)
+          except ValueError:
+            try:
+              value = float(value)
+            except ValueError:
+              value = None
+          data[attrs[i]].append(value)
+      # store the data into the time series
+      for attr, values in progressbar(
+          sorted(data.items()),
+          "set subseries",
+          report_print=True,
+          runstate=runstate,
+      ):
+        upd.out("%s: %d values..." % (attr, len(values)))
+        with Pfx("%s: store %d values", attr, len(values)):
+          ts[attr].setitems(unixtimes, values, skipNone=True)
+      if runstate.cancelled:
+        return 1
+      return 0
+
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
     ''' Usage: {cmd} [testnames...]
