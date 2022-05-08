@@ -309,7 +309,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_import(self, argv):
-    ''' Usage: {cmd} csvpath datecol[:conv] [import_columns]
+    ''' Usage: {cmd} csvpath datecol[:conv] [import_columns...]
           Import data into the time series.
           csvpath   The CSV file to import.
           datecol[:conv]
@@ -322,6 +322,10 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
                     should be either an identifier naming one of
                     the known conversion functions or an "arrow.get"
                     compatible time format string.
+          import_columns
+                    An optional list of column names or their derived
+                    attribute names. The default is to import every
+                    numeric column except for the datecol.
     '''
     options = self.options
     runstate = options.runstate
@@ -368,21 +372,32 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       unixtimes = []
       data = defaultdict(list)
       rowcls, rows = csv_import(csvpath, snake_case=True)
+      attrlist = rowcls.name_attributes_
+      if argv:
+        attrindices = list(range(len(rowcls.name_attributes_)))
+      else:
+        attrindices = [rowcls.index_of_[attr] for attr in argv]
       if isinstance(datecol, int):
         if datecol >= len(rowcls.names_):
           raise GetoptError(
               "date column index %d exceeds the width of the CSV data" %
               (datecol,)
           )
-      elif datecol not in rowcls.name_of_:
-        raise GetoptError(
-            "date column %r is not present in the row class, which has: %s" %
-            (datecol, ", ".join(sorted(rowcls.name_of_.keys())))
-        )
+        else:
+          dateindex = datecol
+      else:
+        try:
+          dateindex = rowcls.index_of_[datecol]
+        except KeyError:
+          warning(
+              "date column %r is not present in the row class, which knows:\n  %s"
+              % (datecol, "\n  ".join(sorted(rowcls.index_of_.keys())))
+          )
+          raise GetoptError("date column %r is not recognised" % (datecol,))
       # load the data, store the numeric values
-      attrs = rowcls.name_attributes_
-      for attr in attrs:
-        ts.makeitem(attr)
+      for i in attrindices:
+        if i != dateindex:
+          ts.makeitem(attrlist[i])
       for row in progressbar(
           rows,
           "parse " + shortpath(csvpath),
@@ -393,6 +408,9 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         when = pfx_call(dateconv, row[datecol])
         unixtimes.append(when)
         for i, value in enumerate(row):
+          if i == dateindex:
+            continue
+          attr = attrlist[i]
           try:
             value = int(value)
           except ValueError:
@@ -400,7 +418,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
               value = float(value)
             except ValueError:
               value = None
-          data[attrs[i]].append(value)
+          data[attrlist[i]].append(value)
       # store the data into the time series
       for attr, values in progressbar(
           sorted(data.items()),
