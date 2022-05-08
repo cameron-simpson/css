@@ -22,7 +22,7 @@
       time series, for example one subdirectory for grid voltage
       and another for grid power
 
-    Together these provide a hierary for finite sized files storing
+    Together these provide a hierarchy for finite sized files storing
     unbounded time series data for multiple parameters.
     The core purpose is to provide time series data storage; there
     are assorted convenience methods to export arbitrary subsets
@@ -33,6 +33,7 @@
 
 from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
+from collections import defaultdict
 from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
@@ -58,14 +59,18 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
+from cs.context import stackattrs
+from cs.csvutils import csv_import
 from cs.deco import cachedmethod, decorator
-from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, needdir, shortpath
+from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning, error
 from cs.pfx import pfx, pfx_call, Pfx
+from cs.progress import progressbar
 from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from cs.x import X
 
@@ -304,6 +309,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         with stackattrs(self.options, upd=upd):
           yield
 
+  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_import(self, argv):
     ''' Usage: {cmd} csvpath datecol[:conv] [import_columns]
           Import data into the time series.
@@ -312,7 +318,6 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
     runstate = options.runstate
     upd = options.upd
     ts = options.ts
-    ts_step = options.ts_step
     badopts = False
     csvpath = self.poparg(
         argv,
@@ -531,6 +536,7 @@ def plotrange(func, needs_start=False, needs_stop=False):
 
   return plotrange_wrapper
 
+# pylint: disable=too-many-locals
 def plot_events(
     figure,
     events,
@@ -787,7 +793,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     if start is None:
       start = self.start
     if stop is None:
-      stop = self.stop
+      stop = self.stop  # pylint: disable=no-member
     return np.array([self[start:stop]], self.np_type)
 
   @pfx
@@ -797,9 +803,9 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     '''
     pandas = import_extra('pandas', DISTINFO)
     if start is None:
-      start = self.start
+      start = self.start  # pylint: disable=no-member
     if stop is None:
-      stop = self.stop
+      stop = self.stop  # pylint: disable=no-member
     times, data = self.data2(start, stop)
     indices = (datetime64(t, 's') for t in times)
     return pandas.Series(data, indices)
@@ -1524,9 +1530,9 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
     '''
     pandas = import_extra('pandas', DISTINFO)
     if start is None:
-      start = self.start
+      start = self.start  # pylint: disable=no-member
     if stop is None:
-      stop = self.stop
+      stop = self.stop  # pylint: disable=no-member
     if keys is None:
       keys = self.keys()
     elif not isinstance(keys, (tuple, list)):
