@@ -289,6 +289,13 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
           options.ts_step
       )
     return argv
+
+  @contextmanager
+  def run_context(self):
+    with super().run_context():
+      with Upd() as upd:
+        with stackattrs(self.options, upd=upd):
+          yield
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
     ''' Usage: {cmd} [testnames...]
