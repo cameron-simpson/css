@@ -799,6 +799,12 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     '''
     return zip(self.range(start, stop), self[start:stop])
 
+  def data2(self, start, stop):
+    ''' Like `data(start,stop)` but returning 2 lists: one of time and one of data.
+    '''
+    data = self.data(start, stop)
+    return [d[0] for d in data], [d[1] for d in data]
+
   @property
   def np_type(self):
     ''' The `numpy` type corresponding to `self.typecode`.
@@ -836,12 +842,6 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     times, data = self.data2(start, stop)
     indices = (datetime64(t, 's') for t in times)
     return pandas.Series(data, indices)
-
-  def data2(self, start, stop):
-    ''' Like `data(start,stop)` but returning 2 lists: one of time and one of data.
-    '''
-    data = self.data(start, stop)
-    return [d[0] for d in data], [d[1] for d in data]
 
   @plotrange
   def plot(self, start, stop, *, figure, name=None, **scatter_kw):
