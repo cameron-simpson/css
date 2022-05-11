@@ -851,14 +851,13 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     ''' Return a `pandas.Series` containing the data from `start` to `stop`,
         default from `self.start` and `self.stop` respectively.
     '''
-    pandas = import_extra('pandas', DISTINFO)
+    pd = import_extra('pandas', DISTINFO)
     if start is None:
       start = self.start  # pylint: disable=no-member
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
     times, data = self.data2(start, stop)
-    indices = (datetime64(t, 's') for t in times)
-    return pandas.Series(data, indices)
+    return pd.Series(data, _dt64(times))
 
   @plotrange
   def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
