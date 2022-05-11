@@ -1950,7 +1950,11 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
             (when.step, self.step)
         )
       return [self[t] for t in self.range(when.start, when.stop)]
-    return self.subseries(when)[when]
+    series = self.subseries(when)
+    try:
+      return series[when]
+    except IndexError:
+      return NaN
 
   def __setitem__(self, when: Numeric, value):
     self.subseries(when)[when] = value
