@@ -218,6 +218,8 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     imgpath = self.poparg(
         argv, "impath.png", str, lambda path: not existspath(path),
         "already exists"
+    options = self.options
+    runstate = options.runstate
     )
     days = self.poparg(argv, int, "days to display", lambda days: days > 0)
     now = time.time()
@@ -247,6 +249,8 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     with Pfx("write %r", imgpath):
       if existspath(imgpath):
         error("already exists")
+    if runstate.cancelled:
+      return 1
       else:
         figure.write_image(imgpath, format="png", width=2048, height=1024)
     if show_image:
@@ -1552,6 +1556,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
       start=None,
       stop=None,
       keys: Optional[List[str]] = None,
+      *,
+      runstate=None,
   ):
     ''' Return a `numpy.DataFrame` containing the specified data.
 
@@ -1589,6 +1595,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
       start,
       stop,
       keys=None,
+      runstate=None,
       *,
       figure,
       key_colors=None,
