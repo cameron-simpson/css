@@ -201,35 +201,52 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
       raise RuntimeError("unhandled time series type: %s" % (s(ts),))
 
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [--show] tspath impath.png days [{{glob|fields}}...]
-          Plot the most recent days of data from the time series at tspath
-          to impath.png. Open the image if --show is provided.
-          tspath may refer to a single .csts TimeSeriesFile,
-          a TimeSeriesPartitioned directory of such files,
-          or a TimeSeriesDataDir containing partitions for multiple keys.
-          If glob is supplied, constrain the keys of a TimeSeriesDataDir
-          by the glob.
+    ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] days [{{glob|fields}}...]
+          Plot the most recent days of data from the time series at tspath.
+          Options:
+          -f            Force. -o will overwrite an existing image file.
+          -imgpath.png  File system path to which to save the plot.
+          --show        Show the image in the GUI.
+          --stacked     Stack the plot lines/areas.
+          glob|fields   If glob is supplied, constrain the keys of
+                        a TimeSeriesDataDir by the glob.
     '''
-    show_image = False
-    if argv and argv[0] == '--show':
-      show_image = True
-      argv.pop(0)
-    ts = self.poparg(argv, "tspath", timeseries_from_path)
-    imgpath = self.poparg(
-        argv, "impath.png", str, lambda path: not existspath(path),
-        "already exists"
     options = self.options
     runstate = options.runstate
+    options.show_image = False
+    options.imgpath = None
+    options.stacked = False
+    options.multi = False
+    self.popopts(
+        argv,
+        options,
+        f='force',
+        multi=None,
+        o_='imgpath',
+        show='show_image',
+        stacked=None,
     )
+    force = options.force
+    imgpath = options.imgpath
+    if imgpath and not force and existspath(imgpath):
+      raise GetoptError("imgpath exists: %r" % (imgpath,))
     days = self.poparg(argv, int, "days to display", lambda days: days > 0)
+    xit = 0
     now = time.time()
     start = now - days * 24 * 3600
+    ts = options.ts
+    plot_dx = 14
+    plot_dy = 8
+    plot_kw = {}
     if isinstance(ts, TimeSeries):
       if argv:
         raise GetoptError(
             "fields:%r should not be suppplied for a %s" % (argv, s(ts))
         )
-      figure = ts.plot(start, now)  # pylint: disable=missing-kwoa
+      ax = ts.plot(
+          start, now, runstate=runstate, figsize=(plot_dx, plot_dy), **plot_kw
+      )  # pylint: disable=missing-kwoa
+      figure = ax.figure
     elif isinstance(ts, TimeSeriesDataDir):
       if argv:
         keys = ts.keys(argv)
@@ -241,20 +258,49 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         keys = ts.keys()
         if not keys:
           raise GetoptError("no keys in %s" % (ts,))
-      figure = ts.plot(
-          start, now, keys
+      plot_dy = max(plot_dy, len(keys) // 2)
+      plot_kw.update(
+          stacked=options.stacked,
+          subplots=options.multi,
+          sharex=options.multi,
+      )
+      ax = ts.plot(
+          start,
+          now,
+          keys,
+          runstate=runstate,
+          figsize=(plot_dx, plot_dy),
+          **plot_kw,
       )  # pylint: too-many-function-args.disable=missing-kwoa
+      if ax is None:
+        return 1
+      figure = (ax[0] if options.multi else ax).figure
     else:
       raise RuntimeError("unhandled type %s" % (s(ts),))
-    with Pfx("write %r", imgpath):
-      if existspath(imgpath):
-        error("already exists")
     if runstate.cancelled:
       return 1
+    with TemporaryDirectory(dir=(dirname(imgpath) if imgpath else '.')
+                            ) as tmppath:
+      if imgpath:
+        imgfilename = basename(imgpath)
       else:
-        figure.write_image(imgpath, format="png", width=2048, height=1024)
-    if show_image:
-      os.system(shlex.join(['open', imgpath]))
+        imgfilename = 'plot.png'
+      tmpimgpath = joinpath(tmppath, imgfilename)
+      pfx_call(figure.savefig, tmpimgpath)
+      if imgpath:
+        if not force and existspath(imgpath):
+          error("output path already exists: %r", imgpath)
+          xit = 1
+        else:
+          pfx_call(os.link, tmpimgpath, imgpath)
+      else:
+        if not options.show_image:
+          with open(tmpimgpath, 'rb') as imgf:
+            with open('/dev/tty', 'wb') as tty:
+              run(['img2sixel'], stdin=imgf, stdout=tty)
+    if options.show_image:
+      figure.show()
+    return xit
 
 class TimeSeriesCommand(TimeSeriesBaseCommand):
   ''' Command line interface to `TimeSeries` data files.
