@@ -1578,7 +1578,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
         * `stop`: end time of the data
         * `keys`: optional iterable of keys, default from `self.keys()`
     '''
-    pandas = import_extra('pandas', DISTINFO)
+    pd = import_extra('pandas', DISTINFO)
     if start is None:
       start = self.start  # pylint: disable=no-member
     if stop is None:
@@ -1587,14 +1587,21 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
       keys = self.keys()
     elif not isinstance(keys, (tuple, list)):
       keys = tuple(keys)
-    indices = [datetime64(t, 's') for t in self.range(start, stop)]
+    indices = _dt64(self.range(start, stop))
     data_dict = {}
-    for key in keys:
-      with Pfx(key):
-        if key not in self:
-          raise KeyError("no such key")
-        data_dict = self[key].as_np_array(start, stop)
-    return pandas.DataFrame(
+    with UpdProxy(prefix="gather fields: ") as proxy:
+      for key in progressbar(keys, "gather fields"):
+        if runstate and runstate.cancelled:
+          raise CancellationError
+        proxy.text = key
+        with Pfx(key):
+          if key not in self:
+            raise KeyError("no such key")
+          data_dict[key] = self[key].as_np_array(start, stop)
+    if runstate and runstate.cancelled:
+      raise CancellationError
+    return pfx_call(
+        pd.DataFrame,
         data=data_dict,
         index=indices,
         columns=keys,
