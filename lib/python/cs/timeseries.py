@@ -108,6 +108,8 @@ DISTINFO = {
 
 Numeric = Union[int, float]
 
+NaN = float('NaN')
+
 def main(argv=None):
   ''' Run the command line tool for `TimeSeries` data.
   '''
