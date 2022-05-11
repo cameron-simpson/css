@@ -1971,6 +1971,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
 
   def __getitem__(self, when: Union[Numeric, slice]):
     if isinstance(when, slice):
+      # TODO: fast version
       if when.step is not None and when.step != self.step:
         raise IndexError(
             "slice.step:%r should be None or ==self.step:%r" %
