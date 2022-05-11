@@ -370,7 +370,8 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
     with super().run_context():
       with Upd() as upd:
         with stackattrs(self.options, upd=upd):
-          yield
+          with self.options.ts:
+            yield
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_import(self, argv):
