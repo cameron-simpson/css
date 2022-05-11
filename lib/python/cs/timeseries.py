@@ -984,7 +984,7 @@ class TimeSeriesFile(TimeSeries):
         )
     if fill is None:
       if typecode == 'd':
-        fill = float('nan')
+        fill = NaN
       elif typecode == 'q':
         fill = 0
       else:
