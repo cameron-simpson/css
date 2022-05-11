@@ -150,6 +150,9 @@ NATIVE_BIGENDIANNESS = {
     for typecode in SUPPORTED_TYPECODES
 }
 
+def _dt64(times):
+  return np.array(list(map(int, times))).astype('datetime64[s]')
+
 class TimeSeriesBaseCommand(BaseCommand, ABC):
   ''' Abstract base class for command line interfaces to `TimeSeries` data files.
   '''
