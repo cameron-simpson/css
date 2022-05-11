@@ -40,13 +40,17 @@ from functools import partial
 from getopt import GetoptError
 import os
 from os.path import (
+    basename,
+    dirname,
     exists as existspath,
     isdir as isdirpath,
     isfile as isfilepath,
+    join as joinpath,
 )
-import shlex
 from struct import pack, Struct  # pylint: disable=no-name-in-module
+from subprocess import run
 import sys
+from tempfile import TemporaryDirectory
 import time
 from typing import Callable, List, Optional, Tuple, Union
 
@@ -66,11 +70,12 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning, error
-from cs.pfx import pfx, pfx_call, Pfx
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.result import CancellationError
+from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1632,7 +1637,6 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
         * `label`: optional label for the graph
         Other keyword parameters are passed to `Axes.plot`
     '''
-    pd = import_extra('pandas', DISTINFO)
     if keys is None:
       keys = sorted(self.keys())
     df = self.as_pd_dataframe(start, stop, keys, runstate=runstate)
@@ -1655,6 +1659,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
   ''' A directory containing a collection of `TimeSeriesPartitioned` data files.
   '''
 
+  @pfx_method
   @typechecked
   def __init__(
       self,
@@ -1673,7 +1678,10 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     config = self.config
     if step is None:
       if config.step is None:
-        raise ValueError("missing step parameter and no step in config")
+        raise ValueError(
+            "missing step parameter and no step in config: config=%s" %
+            (s(config),)
+        )
       step = config.step
     elif self.step is None:
       self.step = step
