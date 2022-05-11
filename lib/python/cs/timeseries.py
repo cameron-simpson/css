@@ -5,11 +5,11 @@
 ''' Efficient portable machine native columnar storage of time series data
     for double float and signed 64-bit integers.
 
-    On a personal basis, I use this as efficient storage of time
-    series data from my solar inverter, which reports in a slightly
-    clunky time limited CSV format; I import those CSVs into
-    time series data directories which contain the overall accrued
-    data.
+    The core purpose is to provide time series data storage; there
+    are assorted convenience methods to export arbitrary subsets
+    of the data for use by other libraries in common forms, such
+    as dataframes or series, numpy arrays and simple lists.
+    There are also some simple plot methods for plotting graphs.
 
     Three levels of storage are defined here:
     - `TimeSeriesFile`: a single file containing a binary list of
@@ -24,11 +24,12 @@
 
     Together these provide a hierarchy for finite sized files storing
     unbounded time series data for multiple parameters.
-    The core purpose is to provide time series data storage; there
-    are assorted convenience methods to export arbitrary subsets
-    of the data for use by other libraries in common forms, such
-    as dataframes or series, numpy arrays and simple lists.
-    There are also some simple plot methods for making graphs using `plotly`.
+
+    On a personal basis, I use this as efficient storage of time
+    series data from my solar inverter, which reports in a slightly
+    clunky time limited CSV format; I import those CSVs into
+    time series data directories which contain the overall accrued
+    data; see my `cs.splink` module which is built on this module.
 '''
 
 from abc import ABC, abstractmethod
