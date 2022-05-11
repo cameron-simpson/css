@@ -545,12 +545,10 @@ def plotrange(func, needs_start=False, needs_stop=False):
 
       If `start` is `None` its value is set to `self.start`.
       If `stop` is `None` its value is set to `self.stop`.
-      If `figure` is `None` its value is set to a new
-      `plotly.graph_objects.Figure` instance.
 
       The decorated method is then called as:
 
-          func(self, start, stop, *a, figure=figure, **kw)
+          func(self, start, stop, *a, **kw)
 
       where `*a` and `**kw` are the additional positional and keyword
       parameters respectively, if any.
@@ -559,46 +557,32 @@ def plotrange(func, needs_start=False, needs_stop=False):
   # pylint: disable=keyword-arg-before-vararg
   @require(lambda start: not needs_start or start is not None)
   @require(lambda stop: not needs_stop or stop is not None)
-  def plotrange_wrapper(self, start=None, stop=None, *a, figure=None, **kw):
-    plotly = import_extra('plotly', DISTINFO)
-    go = plotly.graph_objects
+  def plotrange_wrapper(self, start=None, stop=None, *a, **kw):
+    import_extra('pandas', DISTINFO)
+    import_extra('matplotlib', DISTINFO)
     if start is None:
       start = self.start
     if stop is None:
       stop = self.stop
-    if figure is None:
-      figure = go.Figure()
-    return func(self, start, stop, *a, figure=figure, **kw)
+    return func(self, start, stop, *a, **kw)
 
   return plotrange_wrapper
 
 # pylint: disable=too-many-locals
 def plot_events(
-    figure,
-    events,
-    value_func,
-    *,
-    start=None,
-    stop=None,
-    key_colours=None,
-    name=None,
-    rescale=False,
-    **scatter_kw
+    ax, events, value_func, *, start=None, stop=None, **scatter_kw
 ):
   ''' Plot `events`, an iterable of objects with `.unixtime` attributes
-      such as an `SQLTagSet`, on an existing `figure`.
+      such as an `SQLTagSet`, on an existing set of axes `ax`.
 
       Parameters:
-      * `figure`: a plotly `Figure`
+      * `ax`: axes on which to plot
       * `events`: an iterable of objects with `.unixtime` attributes
       * `value_func`: a callable to compute the y-axis value from an event
       * `start`: optional start UNIX time, used to crop the events plotted
       * `stop`: optional stop UNIX time, used to crop the events plotted
-      * `name`: the name for the plot entries
-      Other keyword parameters are passed to the `Scatter` object user to do the plot.
+      Other keyword parameters are passed to `Axes.scatter`.
   '''
-  plotly = import_extra('plotly', DISTINFO)
-  go = plotly.graph_objects
   xaxis = []
   yaxis = []
   for event in (ev for ev in events
@@ -614,33 +598,7 @@ def plot_events(
       continue
     xaxis.append(x)
     yaxis.append(value_func(event))
-  # rescale Y value to land on the graph
-  if yaxis:
-    if rescale:
-      try:
-        low, high = rescale
-      except ValueError:
-        low = 0
-        high = rescale
-      min_y = min(yaxis)
-      max_y = max(yaxis)
-      dy = max_y - min_y
-      rescale_dy = high - low
-      if dy > 0:
-        yaxis = [low + (y - min_y) / dy * rescale_dy for y in yaxis]
-      else:
-        yaxis = [high] * len(yaxis)
-  figure.add_trace(
-      go.Scatter(
-          name=name,
-          mode='markers',
-          x=xaxis,
-          y=yaxis,
-          marker=dict(size=6,
-                      color='yellow'),  # colours.get(group_name, 'yellow')),
-          **scatter_kw
-      )
-  )
+  ax.scatter(xaxis, yaxis, **scatter_kw)
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
@@ -853,23 +811,28 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     return pandas.Series(data, indices)
 
   @plotrange
-  def plot(self, start, stop, *, figure, name=None, **scatter_kw):
-    ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
-        creating it if necessary.
-        Return `figure`.
+  def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
+    ''' Convenience shim for `DataFrame.plot` to plot data from
+        `start` to `stop`.  Return the plot `Axes`.
+
+        Parameters:
+        * `start`,`stop`: the time range
+        * `ax`: optional `Axes`; new `Axes` will be made if not specified
+        * `label`: optional label for the graph
+        Other keyword parameters are passed to `Axes.plot`
+        or `DataFrame.plot` for new axes.
     '''
-    plotly = import_extra('plotly', DISTINFO)
-    go = plotly.graph_objects
-    if name is None:
-      name = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
+    pd = import_extra('pandas', DISTINFO)
+    if label is None:
+      label = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
     xdata, yaxis = self.data2(start, stop)
-    xaxis = np.array(xdata).astype('datetime64[s]')
+    xaxis = _dt64(xdata)
     assert len(xaxis) == len(yaxis), (
         "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
         (len(xaxis), len(yaxis), start, stop)
     )
-    figure.add_trace(go.Scatter(name=name, x=xaxis, y=yaxis, **scatter_kw))
-    return figure
+    df = pd.DataFrame(dict(x=xaxis, y=yaxis))
+    return df.plot('x', 'y', label=label, **plot_kw)
 
 # pylint: disable=too-many-instance-attributes
 class TimeSeriesFile(TimeSeries):
@@ -1597,43 +1560,39 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
       keys=None,
       runstate=None,
       *,
-      figure,
-      key_colors=None,
-      name=None,
-      **scatter_kw
+      ax=None,
+      label=None,
+      **plot_kw
   ):
-    ''' Plot traces on `figure:plotly.graph_objects.Figure`,
-        creating it if necessary, for each key in `keys`.
-        Return `figure`.
+    ''' Convenience shim for `DataFrame.plot` to plot data from
+        `start` to `stop` for each key in `keys`.
+        Return the plot `Axes`.
 
         Parameters:
         * `start`: optional start, default `self.start`
         * `stop`: optional stop, default `self.stop`
         * `keys`: optional list of keys, default all keys
-        * `figure`: optional figure, created if not specified
-        * `key_colors`: option mapping of key to `marker_color`
-        Other keyword parameters are passed to `Scatter`.
+        * `ax`: optional `Axes`; new `Axes` will be made if not specified
+        * `label`: optional label for the graph
+        Other keyword parameters are passed to `Axes.plot`
     '''
+    pd = import_extra('pandas', DISTINFO)
     if keys is None:
       keys = sorted(self.keys())
+    df = self.as_pd_dataframe(start, stop, keys, runstate=runstate)
     for key in keys:
       with Pfx(key):
         ts = self[key]
         kname = ts.tags.get('csv.header', key)
-        if name:
-          kname = name + ': ' + kname
-        key_scatter_kw = dict(scatter_kw)
-        if key_colors:
-          try:
-            colour = key_colors[key]
-          except KeyError:
-            pass
-          else:
-            key_scatter_kw.update(marker_color=colour)
-        figure = ts.plot(
-            start, stop, figure=figure, name=kname, **key_scatter_kw
-        )
-    return figure
+        if label:
+          kname = label + ': ' + kname
+        if kname != key:
+          print("RENAME", key, kname)
+          df.rename(columns={key: kname}, inplace=True)
+    print(df)
+    if runstate and runstate.cancelled:
+      raise CancellationError
+    return df.plot(**plot_kw)
 
 class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
                         TimeStepsMixin):
@@ -2022,16 +1981,20 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     return xydata
 
   @plotrange
-  def plot(self, start, stop, *, figure, name=None, **scatter_kw):
-    ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
-        creating it if necessary.
-        Return `figure`.
+  def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
+    ''' Convenience shim for `DataFrame.plot` to plot data from
+        `start` to `stop`.  Return the plot `Axes`.
+
+        Parameters:
+        * `start`,`stop`: the time range
+        * `ax`: optional `Axes`; new `Axes` will be made if not specified
+        * `label`: optional label for the graph
+        Other keyword parameters are passed to `Axes.plot`
+        or `DataFrame.plot` for new axes.
     '''
-    if name is None:
-      name = self.tags.get(
-          'csv.header'
-      ) or "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
-    return super().plot(start, stop, figure=figure, name=name, **scatter_kw)
+    if label is None:
+      label = self.tags.get('csv.header')
+    return super().plot(start, stop, label=label, runstate=runstate, **plot_kw)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
