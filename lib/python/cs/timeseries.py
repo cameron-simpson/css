@@ -181,30 +181,12 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     '''
     raise NotImplementedError
 
+  @abstractmethod
   def cmd_info(self, argv):
-    ''' Usage: {cmd} tspath
-          Report infomation about the time series stored at tspath.
-          tspath may refer to a single .csts TimeSeriesFile,
-          a TimeSeriesPartitioned directory of such files,
-          or a TimeSeriesDataDir containing partitions for multiple keys.
+    ''' Usage: {cmd}
+          Report information.
     '''
-    ts = self.poparg(argv, "tspath", timeseries_from_path)
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    print(ts)
-    if isinstance(ts, TimeSeries):
-      print("  start =", ts.start, arrow.get(ts.start))
-      print("  step =", ts.step)
-      print("  typecode =", ts.typecode)
-    elif isinstance(ts, TimeSeriesPartitioned):
-      for tsfilename in sorted(ts.tsfilenames()):
-        tsf = TimeSeriesFile(ts.pathto(tsfilename))
-        print(" ", tsf)
-    elif isinstance(ts, TimeSeriesDataDir):
-      for key in sorted(ts.keys()):
-        print(" ", key, ts[key])
-    else:
-      raise RuntimeError("unhandled time series type: %s" % (s(ts),))
+    raise NotImplemenetedError
 
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] days [{{glob|fields}}...]
@@ -498,6 +480,28 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       if runstate.cancelled:
         return 1
       return 0
+
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Report infomation about the time series stored at tspath.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    ts = self.options.ts
+    print(ts)
+    if isinstance(ts, TimeSeries):
+      print("  start =", ts.start, arrow.get(ts.start))
+      print("  step =", ts.step)
+      print("  typecode =", ts.typecode)
+    elif isinstance(ts, TimeSeriesPartitioned):
+      for tsfilename in sorted(ts.tsfilenames()):
+        tsf = TimeSeriesFile(ts.pathto(tsfilename))
+        print(" ", tsf)
+    elif isinstance(ts, TimeSeriesDataDir):
+      for key in sorted(ts.keys()):
+        print(" ", key, ts[key])
+    else:
+      raise RuntimeError("unhandled time series type: %s" % (s(ts),))
 
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
