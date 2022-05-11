@@ -309,7 +309,11 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
   USAGE_FORMAT = r'''Usage: {cmd} [-s ts-step] tspath subcommand...
     -s ts-step  Specify the UNIX time step for the time series,
                 used if the time series is new and checked otherwise.
-    tspath      The path to the time series data directory.'''
+    tspath      The filesystem path to the time series;
+                this may refer to a single .csts TimeSeriesFile, a
+                TimeSeriesPartitioned directory of such files, or
+                a TimeSeriesDataDir containing partitions for
+                multiple keys.'''
   GETOPT_SPEC = 's:'
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
