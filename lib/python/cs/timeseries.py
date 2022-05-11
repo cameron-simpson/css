@@ -844,7 +844,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
       start = self.start
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
-    return np.array([self[start:stop]], self.np_type)
+    return np.array(self[start:stop], self.np_type)
 
   @pfx
   def as_pd_series(self, start=None, stop=None):
