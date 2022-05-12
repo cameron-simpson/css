@@ -502,7 +502,12 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     if expunge:
       rsargv.append('--delete-source')
     rsargv.extend(argv)
-    rsargv.extend(['--', rsync_source + '/', spd.downloadspath + '/'])
+    rsargv.extend(
+        [
+            '--', fetch_source + '/' + spd.PERFORMANCEDATA_GLOB,
+            spd.downloadspath + '/'
+        ]
+    )
     if not doit:
       print(shlex.join(argv))
       return 0
