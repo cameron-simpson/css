@@ -445,7 +445,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   def apply_defaults(self):
     ''' Set the default `spdpath`.
     '''
-    self.options.doit = True
+    self.options.fetch_source = os.environ.get(
+        self.DEFAULT_FETCH_SOURCE_ENVVAR
+    )
     self.options.fstags = FSTags()
     self.options.spdpath = os.environ.get(
         self.DEFAULT_SPDPATH_ENVVAR, self.DEFAULT_SPDPATH
@@ -477,35 +479,24 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           yield
 
   def cmd_fetch(self, argv):
-    ''' Usage: {cmd} [-x] [rsync-source] [rsync-options...]
+    ''' Usage: {cmd} [-F rsync-source] [-nx] [-- [rsync-options...]]
           Rsync everything from rsync-source into the downloads area.
+          -F    Fetch rsync source, default from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
           -n    Passed to rsync. Just more convenient than putting it at the end.
           -x    Delete source files.
-          If rsync-source is not provided it will be obtained from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
     '''
     options = self.options
+    options.expunge = False
+    self.popopts(argv, options, F='fetch_source', n='dry_run', x='expunge')
     doit = options.doit
+    expunge = options.expunge
+    fetch_source = options.fetch_source
+    if not fetch_source:
+      raise GetoptError(
+          f"no fetch source: no ${self.DEFAULT_FETCH_SOURCE_ENVVAR} and no -F option"
+      )
     spd = options.spd
-    expunge = False
     rsopts = ['-ia']
-    opts, argv = getopt(argv, 'nx')
-    for opt, _ in opts:
-      with Pfx(opt):
-        if opt == '-n':
-          rsopts.insert(0, opt)
-        elif opt == '-x':
-          expunge = True
-        else:
-          raise RuntimeError("unhandled option")
-    if argv and not argv[0].startswith('-'):
-      rsync_source = argv.pop(0)
-    else:
-      try:
-        rsync_source = os.environ[self.DEFAULT_FETCH_SOURCE_ENVVAR]
-      except KeyError as e:
-        raise GetoptError(
-            "no rsync-source provided and no ${self.DEFAULT_FETCH_SOURCE_ENVVAR}"
-        ) from e
     rsargv = ['set-x', 'rsync']
     rsargv.extend(rsopts)
     if expunge:
