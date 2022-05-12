@@ -671,6 +671,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                         ",".join(spd.TIMESERIES_DATASETS),
                     )
                 )
+    if xit == 0 and runstate.cancelled:
+      xit = 1
     return xit
 
   # pylint: disable=too-many-locals
