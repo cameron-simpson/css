@@ -429,6 +429,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                 or {DEFAULT_SPDPATH!r}
     -n          No action; recite planned actions.'''
 
+  SUBCOMMAND_ARGV_DEFAULT = 'info'
+
   DEFAULT_SPDPATH = '.'
   DEFAULT_SPDPATH_ENVVAR = 'SPLINK_DATADIR'
   DEFAULT_FETCH_SOURCE_ENVVAR = 'SPLINK_FETCH_SOURCE'
@@ -513,6 +515,22 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       return 0
     print('+', shlex.join(argv))
     return run(rsargv)
+
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Report information about this SP-Link data collection.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    spd = options.spd
+    perfsubdirpaths = sorted(spd.download_subdirs())
+    print(
+        len(perfsubdirpaths), "downloads in", spd.DOWNLOADS + '/',
+        "fetched from", options.fetch_source + '/'
+    )
+    for perfdir in perfsubdirpaths:
+      print(" ", basename(perfdir))
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
   def cmd_import(self, argv):
