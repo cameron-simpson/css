@@ -344,14 +344,13 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     '''
     return self.pathto(self.DOWNLOADS)
 
-  def download_subdirs(self, include_imports=False):
+  def download_subdirs(self):
     ''' Return an iterable of the paths of the top level `PerformanceData_*`
         subdirectories in the downloads subdirectory.
-        If `include_imports`, include subdirectories.
     '''
     return [
         joinpath(self.downloadspath, perfdirname) for perfdirname in
-        fnmatchdir(self.downloadspath, 'PerformanceData_????-??-??_??-??-??')
+        fnmatchdir(self.downloadspath, self.PERFORMANCEDATA_GLOB)
     ]
 
   @classmethod
