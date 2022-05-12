@@ -1,0 +1,686 @@
+#!/usr/bin/env python3
+#
+
+''' Utility script for dealing with SP-Link data.
+    - Cameron Simpson <cs@cskk.id.au> 25apr2018
+'''
+
+from __future__ import print_function
+from collections import namedtuple
+from datetime import datetime, timedelta
+from getopt import GetoptError
+import os
+from os import getcwd
+from os.path import (
+    basename,
+    splitext,
+    join as joinpath,
+    exists as pathexists,
+    expandvars,
+)
+import re
+from subprocess import run, Popen, PIPE
+import sys
+from time import sleep
+from types import SimpleNamespace
+from cs.cmdutils import BaseCommand
+from cs.csvutils import csv_import
+from cs.deco import fmtdoc
+from cs.env import envsub
+from cs.logutils import error, warning
+from cs.pfx import Pfx
+from cs.psutils import groupargv
+from cs.py.func import prop
+from cs.x import X
+import matplotlib.pyplot as plt
+
+ENV_BASEDIR = 'SP_LINK_BASEDIR'
+ENV_BASEDIR_DEFAULT = '$HOME/var/sp-link'
+
+# TODO: needs to come from a config in the site dir
+BATTERY_CAPACITY_KWH = 10.0
+
+DEFAULT_GRAPH_DAYS = 28
+
+DEFAULT_DATASET_NAME = 'DetailedData'
+
+RRD_VALID_DS_NAME = re.compile('^[a-zA-Z0-9_]{1,19}$')
+
+# SP polls default to every 15 minutes, set heartbeat to 20 minutes in case of skew
+RRD_HEARTBEAT = 1200
+
+RRD_STEP = 10  # 10s slot size
+RRD_SLOTS = 3153600  # a year in 10s slots
+
+def main(argv=None):
+  ''' Command line mode.
+  '''
+  return SPLinkCommand().run(argv)
+
+class SPConfig(SimpleNamespace):
+  ''' An embodiment of the sp-link command's options.
+  '''
+
+  def __init__(self, basedir=None, sitedir=None, site=None, **kw):
+    if basedir is None:
+      basedir = os.environ.get(ENV_BASEDIR, expandvars(ENV_BASEDIR_DEFAULT))
+    if sitedir is None:
+      if site is None:
+        site = basename(getcwd())
+      sitedir = joinpath(basedir, site)
+    elif site is None:
+      site = basename(sitedir)
+    super().__init__(basedir=basedir, sitedir=sitedir, site=site, **kw)
+    X("SPCONFIG: %r", self)
+
+  @prop
+  @fmtdoc
+  def basepath(self):
+    ''' Base directory for RRD file data, containing per-site subdirectories.
+        Default: `${ENV_BASEDIR}` or `{ENV_BASEDIR_DEFAULT!r}`
+    '''
+    base = self.basedir
+    if base is None:
+      base = os.environ.get(ENV_BASEDIR)
+      if base is None:
+        base = envsub(ENV_BASEDIR_DEFAULT)
+    return base
+
+  def sitepath(self, site):
+    ''' Directory to hold the per-site files such as RRD files.
+    '''
+    sitedir = self.sitedir
+    if sitedir is None:
+      sitedir = joinpath(self.basepath, site)
+    return sitedir
+
+  @staticmethod
+  def parse_csvfilename(filename):
+    ''' Extract site and dataset name from a CSV filename.
+        Return `(sitename,datasetname,dumptime)`.
+    '''
+    filebase = basename(filename)
+    root, ext = splitext(filebase)
+    if ext.lower() != '.csv':
+      raise ValueError("not a CSV file: %r" % (filename,))
+    mkey = None
+    for _mkey in MAPPINGS:
+      _mkey_ = '_' + _mkey + '_'
+      try:
+        site, dumptime = root.split(_mkey_, 1)
+      except ValueError:
+        continue
+      mkey = _mkey
+      break
+    if not mkey:
+      raise ValueError("unrecognised CSV base: %r" % (filebase,))
+    return site, mkey, dumptime
+
+class SPLinkCommand(BaseCommand):
+  ''' sp-link command line implementation
+  '''
+
+  OPTIONS_CLASS = SPConfig
+
+  GETOPT_SPEC = 'D:d:s:'
+
+  USAGE_FORMAT = r'''Usage: {cmd} [-D basedir] [-d sitedir] op [op-args...]
+    -D basedir
+      Base directory for RRD file data, containing per-site subdirectories.
+      Default: $''' + ENV_BASEDIR + ''' or ''' + ENV_BASEDIR_DEFAULT + '''
+    -d sitedir
+      Directory for RRD file data.
+      Default: {{basedir}}/{{site}}
+    -s site
+      Default site name. Default the basename of the current directory.'''
+
+  @staticmethod
+  def apply_opts(opts, options):
+    ''' Apply command line options.
+    '''
+    for opt, val in opts:
+      if opt == '-D':
+        options.basedir = val
+      elif opt == '-d':
+        options.sitedir = val
+      elif opt == '-s':
+        options.site = val
+      else:
+        raise RuntimeError("unhandled option: %s=%s" % (opt, val))
+
+  @staticmethod
+  def cmd_graph(argv, cfg):
+    ''' Run the "graph" command, generating graphs of RRD files
+        associated with CSV data.
+
+        Usage: {cmd} [days] csvfiles...
+          Graph the data from the named csvfiles.
+    '''
+    xit = 0
+    days = None
+    if argv:
+      try:
+        days = int(argv[0])
+      except ValueError:
+        pass
+      else:
+        if days > 0:
+          argv.pop(0)
+        else:
+          days = None
+    if not argv:
+      raise GetoptError("missing csvfiles")
+    for csvfile in argv:
+      with Pfx(csvfile):
+        try:
+          dataset = DataSet.from_csvfile(csvfile, cfg)
+        except ValueError as e:
+          warning("unhandled file: %s" % (e,))
+          continue
+        dataset.gen_graphs(days=days)
+    return xit
+
+  @staticmethod
+  def cmd_import(argv, cfg):
+    ''' Usage: import csvfiles...
+          Import data from CSV files into RRD files.
+    '''
+    xit = 0
+    if not argv:
+      raise GetoptError("missing csvfiles")
+    for csvfile in argv:
+      with Pfx(csvfile):
+        try:
+          dataset = DataSet.from_csvfile(csvfile, cfg)
+        except ValueError as e:
+          warning("unhandled file: %s" % (e,))
+          continue
+        rrdfile = dataset.rrdfile
+        if not pathexists(rrdfile):
+          dataset.rrd_create()
+        dataset.rrd_update()
+    return xit
+
+  @staticmethod
+  def cmd_parse(argv, cfg):
+    ''' Usage: {cmd} csvfiles...
+          Parse the supplied CSV files.
+    '''
+    if not argv:
+      raise GetoptError("missing csvfiles")
+    for csvfile in argv:
+      with Pfx(csvfile):
+        try:
+          dataset = DataSet.from_csvfile(csvfile, cfg)
+        except ValueError as e:
+          warning("unhandled file: %s" % (e,))
+          continue
+        data = dataset.data
+        hdrs = dataset.data_hdrs
+        print("%s: %d rows of %d columns" % (csvfile, len(data), len(hdrs)))
+        for ndx, hdr in enumerate(hdrs):
+          print(' ', ndx, hdr)
+        print(list(dataset.rrd_field_defns()))
+
+  @staticmethod
+  def cmd_plot(argv, cfg):
+    ''' Usage: {cmd} {{-|csvfile}} plot-cli-arguments
+         Plot data from csvfile using the plot-cli "plot" command.
+    '''
+    csvfilename = argv.pop(0)
+    rowcls, rows = csv_import(sys.stdin if csvfilename == '-' else csvfilename)
+    P = Popen(
+        ['plot', '--header', '--index-col', '0'], stdin=PIPE, encoding='utf-8'
+    )
+    f = P.stdin
+    print('unixtime', *rowcls.names_, sep=',', file=f)
+    for row in rows:
+      print(sp_unixtime(row[0]), *row, sep=',', file=f)
+    f.close()
+    exitcode = P.wait()
+    return exitcode
+
+  @staticmethod
+  def cmd_plt(argv, cfg):
+    ''' Usage: {cmd} {{-|csvfile}} [y-columns...]
+         Plot data from csvfile using matplotlib.
+    '''
+
+    def convert_value(value):
+      ''' Convert quoted strings (they all are) to an `int` or `float`.
+        '''
+      try:
+        value = int(value)
+      except ValueError:
+        try:
+          value = float(value)
+        except ValueError:
+          pass
+      return value
+
+    csvfilename = argv.pop(0)
+    rowcls, rows = csv_import(sys.stdin if csvfilename == '-' else csvfilename)
+    # no args? list the available columns
+    if not argv:
+      for header in rowcls.names_:
+        print(header)
+      return 0
+    # iterable of rows with strings promoted to int or float
+    rows = map(lambda row: rowcls(*map(convert_value, row)), rows)
+    # comsume so that we can pull out columns for plotting
+    rows = list(rows)
+    x_values = list(
+        map(lambda row: datetime.fromtimestamp(sp_unixtime(row[0])), rows)
+    )
+    fig, axs = plt.subplots(1,len(argv))
+    if len(argv) == 1:
+      axs=axs,
+    for column, ax in zip(argv,axs):
+      if column.startswith('/'):
+        ptn = column[1:].rstrip('/')
+        X("ptn=%r", ptn)
+        ptn_re = re.compile(ptn, re.I)
+        for header in rowcls.names_:
+          if ptn_re.search(header):
+            print(header)
+            ax.plot(
+                x_values,
+                list(map(lambda row: row[header], rows)),
+                label=header,
+            )
+        ax.set_title(column)
+        ax.set_xlabel("Date/Time")
+        ax.legend()
+    plt.show()
+    ##fig.show()
+
+UNIX_EPOCH = datetime(1970, 1, 1)
+SP_EPOCH = datetime(2001, 1, 1).astimezone()
+
+# scale factor for per-slot rates to get per-hour rates
+# base rate is kwh/s, this converts to kw
+RRD_Y_SCALE = 3600
+
+##RRD_STEP = 900
+##RRD_SLOTS = 35040
+
+KEY_TIMESTAMP_SECONDS = 'Date/Time Stamp [Seconds From The Year 2001]'
+
+# RRD ds-name information:
+# csv_hdr: the key from the CSV file, and index in the 'csv2rrd' map
+# ds_name: the RRD ds-name
+# ds_type: the RRD ds-name type
+RRD_DSName = namedtuple('RRD_DSName', 'csv_hdr ds_name ds_type')
+
+MAPPINGS = {
+    'DetailedData': {
+        'csv2rrd': {
+            'Date/Time Stamp [Seconds From The Year 2001]':
+            None,
+            'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]':
+            None,
+            'Inverter AC Power (Average) [kW]':
+            'inverterACPwrKW:GAUGE',
+            'DC Input Accumulated (Sample) [kWh]':
+            'dcInputCumKWH:DCOUNTER',
+            'DC Output Accumulated (Sample) [kWh]':
+            'dcOutputCumKWH:DCOUNTER',
+            'Battery In Accumulated (Sample) [kWh]':
+            'batteryInCumKWH:DCOUNTER',
+            'Battery Out Accumulated (Sample) [kWh]':
+            'batteryOutCumKWH:DCOUNTER',
+            'DC Voltage (Average) [V DC]':
+            'dcVoltsAvgVDC:GAUGE',
+            'DC Voltage (Min) [V DC]':
+            'dcVoltsMinVDC:GAUGE',
+            'DC Voltage (Max) [V DC]':
+            'dcVoltsMaxVDC:GAUGE',
+            'DC Mid Voltage (Average) [V DC]':
+            'dcMidVoltsAvgVDC:GAUGE',
+            'DC Mid Voltage (Sync Sample at Min DC V) [V DC]':
+            'dcMidVoltsMinVDC:GAUGE',
+            'DC Mid Voltage (Sync Sample at Max DC V) [V DC]':
+            'dcMidVoltsMaxVDC:GAUGE',
+            'Inverter DC Current (Average) [A]':
+            'invDCCurrentAvgA:GAUGE',
+            'Shunt1 Current (Average) [A]':
+            'shunt1CurrentA:GAUGE',
+            'Shunt 2 Current (Average) [A]':
+            'shunt2CurrentA:GAUGE',
+            'Load AC Power (Average) [kW]':
+            'acLoadPwrAvgKW:GAUGE',
+            'Load AC Power (Max) [kW]':
+            'acLoadPwrMaxKW:GAUGE',
+            'AC Input Power (Average) [kW]':
+            'acInputPwrAvgKW:GAUGE',
+            'AC Load Voltage (Average) [V AC]':
+            'acLoadVoltsAvgVDC:GAUGE',
+            'AC Load Frequency (Average) [Hz]':
+            'acLoadFreqAvgHz:GAUGE',
+            'Transformer Temperature (Max) [Degrees C]':
+            'transformerTempMaxC:GAUGE',
+            'Heatsink Temperature (Max) [Degrees C]':
+            'heatsinkTempMaxC:GAUGE',
+            'Battery Temperature (Max) [Degrees C]':
+            'batteryTempMaxC:GAUGE',
+            'Internal Temperature (Max) [Degrees C]':
+            'internalTempMaxC:GAUGE',
+            'Power Module Temperature (Max) [Degrees C]':
+            'powerModTempMaxC:GAUGE',
+            'State of Charge (Sample) [%]':
+            'batterySOCPcnt:GAUGE',
+            'AC Input kWh Accumulated (Sample) [kWh]':
+            'acInputCumKWH:DCOUNTER',
+            'AC Load kWh Accumulated (Sample) [kWh]':
+            'acLoadCumKWH:DCOUNTER',
+            'Shunt 1 kWh Accumulated (Sample) [kWh]':
+            'shunt1SampCumKWH:DCOUNTER',
+            'Shunt 2 kWh Accumulated (Sample) [kWh]':
+            'shunt2SampCumKWH:DCOUNTER',
+            'Analogue In 1 DC Voltage (Average) [V DC]':
+            'alogIn1VoltsAvgVDC:GAUGE',
+            'Analogue In 2 DC Voltage (Average) [V DC]':
+            'alogIn2VoltsAvgVDC:GAUGE',
+            'AC Export kWh Accumulated (Sample) [kWh]':
+            'acExportCumKWH:DCOUNTER',
+            'Total AC Coupled Power (Average) [kW]':
+            'totACCoupledPwrKW:GAUGE',
+            'Total AC Coupled Energy (Sample) [kWh]':
+            'totACCoupledEgyKWH:DCOUNTER',
+        },
+        'graphs': {
+            'battery_charge': [
+                'DEF:batterySOCPcnt:batterySOCPcnt:MAX',
+                'LINE:batterySOCPcnt#000080:Battery SOC %'
+            ],
+            'ac': [
+                'LINE1:acInputPwrAvgKW#ff0000:AC Input Power Avg KW',
+                'LINE1:acInputCumKWH#ff8080:AC Input kWh Accumulated (Sample) [kWh]',
+                'LINE1:acExportCumKWH#00ff00:AC Export kWh Accumulated (Sample) [kWh]',
+                'LINE1:totACCoupledPwrKW#0000ff:Total AC Coupled Power (Average) [kW]',
+                'LINE1:totACCoupledEgyKWH#00ff00:Total AC Coupled Energy (Sample) [kWh]',
+                'LINE1:acLoadPwrAvgKW#00000:Load AC Power (Average) [kW]',
+            ],
+            'power': [
+                f'CDEF:acloadkw=acLoadCumKWH,{RRD_Y_SCALE},*',
+                f'CDEF:acloadkw_=acloadkw,300,TRENDNAN',
+                f'CDEF:acloadmaxkw=acLoadCumKWH,{RRD_Y_SCALE},*',
+                f'CDEF:pvkw=dcInputCumKWH,{RRD_Y_SCALE},*,0,6,LIMIT',
+                f'CDEF:batChargeKW=batteryInCumKWH,{RRD_Y_SCALE},*',
+                f'CDEF:batDischargeKW=batteryOutCumKWH,{RRD_Y_SCALE},*',
+                f'CDEF:batDischargeKW_=batDischargeKW,300,TRENDNAN',
+                f'CDEF:gridExpKW=acExportCumKWH,{RRD_Y_SCALE},*',
+                # the load should be met by the sum of:
+                # pvload=min(load, pvinput)
+                # batout=battery out
+                # acimport=load-pvload-batout
+                'CDEF:acloadafterbat=acloadkw_,batDischargeKW_,-,0,MAX',
+                'CDEF:acloadfrombat=acloadkw_,acloadafterbat,-',
+                'CDEF:batExport=batDischargeKW_,acloadfrombat,-',
+                'CDEF:acloadafterpv=acloadafterbat,pvkw,-,0,MAX',
+                'CDEF:acloadfrompv=acloadafterbat,acloadafterpv,-,0,MAX',
+                'CDEF:acloadfromgrid=acloadafterpv',
+                'CDEF:pvloadkw=acloadkw_,pvkw,MIN',
+                'CDEF:gridImportKW=acloadkw_,pvloadkw,-,batDischargeKW,-',
+                'AREA:acloadfrompv#0000ff:Load From PV KW',
+                'AREA:acloadfrombat#ff8080:Load From Battery KW:STACK',
+                'AREA:acloadfromgrid#ff0000:Grid Import KW (load - pv - battery):STACK',
+                'AREA:batChargeKW#8080ff:Battery Charge from PV? KW (from batteryInCumKWH):STACK',
+                'AREA:batExport#ffff00:Battery Export? Battery not consumed by load:STACK',
+                'AREA:gridExpKW#00ff00:Grid Export KW (from acExportCumKWH):STACK',
+                'LINE1:acloadkw_#000000:Load AC Power KW Smoothed',
+                ##'LINE1:acloadmaxkw#00ff00:Load AC Power KW',
+                ##'LINE1:pvkw#c0c080:PV Input KW (from dcInputCumKWH)',
+                'CDEF:batterySOC6KW=batterySOCPcnt,6,*,100,/',
+                'LINE1:batterySOC6KW#404080:Battery SOC',
+            ],
+        },
+    },
+}
+
+def sp_unixtime(sp_ts):
+  ''' Take an SP LINK timestamp and produce a UNIX timestamp.
+  '''
+  dt = SP_EPOCH + timedelta(seconds=sp_ts)
+  return dt.timestamp()
+
+# pylint: disable=too-many-instance-attributes
+class DataSet:
+  ''' Data and methods for a CSV file.
+  '''
+
+  def __init__(self, site, mapping_name, cfg):
+    X("DataSet(mapping_name=%r, cfg=%r)...", mapping_name, cfg)
+    self.site = site
+    self.mapping_name = mapping_name
+    self.cfg = cfg
+    self.data = []
+    self._mapping = MAPPINGS[self.mapping_name]
+    self.csv2rrd = self._mapping['csv2rrd']
+    self.data_hdrs = self.csv2rrd.keys()
+    self.graphs = self._mapping['graphs']
+
+  @classmethod
+  def from_csvfile(cls, csvfile, cfg):
+    ''' Construct a DataSet from a CSV file, and load the CSV data. Return the DataSet.
+    '''
+    csvfile_site, mapping_name, _ = cfg.parse_csvfilename(csvfile)
+    DS = cls(csvfile_site, mapping_name, cfg)
+    DS.import_csv(csvfile)
+    return DS
+
+  def import_csv(self, csvfile):
+    ''' Read the CSV data file, sotre headers and time-sorted data.
+    '''
+    with Pfx(csvfile):
+      _, mapping_name, _ = self.cfg.parse_csvfilename(csvfile)
+      if mapping_name != self.mapping_name:
+        raise ValueError(
+            "CSV mapping name %r does not match %s mapping name %r" %
+            (mapping_name, type(self).__name__, self.mapping_name)
+        )
+
+      def preprocess(context, row):
+        ''' Convert the CSV values, which are all strings, to numeric values.
+        '''
+        if context.index > 0:
+          for i, v in enumerate(row):
+            try:
+              v = int(v)
+            except ValueError:
+              try:
+                v = float(v)
+              except ValueError:
+                v = v.strip()
+                if v == '':
+                  v = 0.0
+            row[i] = v
+        return row
+
+      with open(csvfile) as csvfp:
+        row_class, row_data = csv_import(
+            csvfp,
+            computed={
+                'unixtime':
+                lambda self: sp_unixtime(self[KEY_TIMESTAMP_SECONDS])
+            },
+            preprocess=preprocess
+        )
+        X("row_class=%s", row_class)
+        self.data.extend(row_data)
+    self.data.sort(key=lambda row: row['unixtime'])
+
+  def pathto(self, filebase):
+    ''' Return the pathname of a file given its basename.
+    '''
+    return joinpath(self.cfg.sitepath(self.site), filebase)
+
+  @prop
+  def rrdfile(self):
+    ''' Pathname for the RRD file containing this dataset.
+    '''
+    return self.pathto(f'{self.site}_{self.mapping_name}.rrd')
+
+  @staticmethod
+  def run_argv(pre_argv, argv):
+    ''' Run a command which may be too long for the OS argument limit
+        by breaking it into several commands if necessary.
+    '''
+    if argv:
+      for argv_group in groupargv(pre_argv, argv):
+        print(*argv_group, flush=True)
+        run(argv_group, check=True)
+    else:
+      print(*pre_argv, flush=True)
+      run(pre_argv, check=True)
+
+  def rrd_specs(self):
+    ''' Yield the broken out parts of the RRD field specifications.
+    '''
+    for row_key, rrd_spec in sorted(self.csv2rrd.items()):
+      with Pfx("%r: %r", row_key, rrd_spec):
+        if rrd_spec is None:
+          continue
+        rrd_field, rrd_type = rrd_spec.split(':')
+        if not RRD_VALID_DS_NAME.match(rrd_field):
+          raise ValueError("invalid ds-name: %r" % (rrd_field,))
+        if rrd_type not in ('GAUGE', 'DCOUNTER'):
+          raise ValueError("invalid ds-name type: %r" % (rrd_type,))
+      yield RRD_DSName(row_key, rrd_field, rrd_type)
+
+  def rrd_field_defns(self):
+    ''' Yield the RRD filed definitions for this DataSet.
+    '''
+    for rrd_spec in self.rrd_specs():
+      yield f"DS:{rrd_spec.ds_name}:{rrd_spec.ds_type}:{RRD_HEARTBEAT}:0:U"
+    yield f"RRA:MAX:0.01:1:{RRD_SLOTS}"
+
+  def rrd_create(self):
+    ''' Create the RRD file for this DataSet.
+    '''
+    start_time = self.data[0]['unixtime']
+    self.run_argv(
+        [
+            'rrdtool',
+            'create',
+            self.rrdfile,
+            '--step',
+            str(RRD_STEP),
+            '--start',
+            str(int(start_time - RRD_STEP * (RRD_SLOTS + 1))),
+        ], list(self.rrd_field_defns())
+    )
+
+  def rrd_update(self):
+    ''' Update the RRD file with values from this DataSet.
+    '''
+    pre_argv = [
+        'rrdtool', 'update', self.rrdfile, '--template',
+        ':'.join(rrd_spec.ds_name for rrd_spec in self.rrd_specs()),
+        '--skip-past-updates', '--'
+    ]
+    data_argv = []
+    row_time_prev = None
+    for row in self.data:
+      row_time = row['unixtime']
+      if row_time_prev is not None and row_time <= row_time_prev:
+        error(
+            "SKIP out of order rows: row_time=%s, row_time_prev=%s", row_time,
+            row_time_prev
+        )
+        continue
+      row_time_prev = row_time
+      values = [row_time]
+      for rrd_spec in self.rrd_specs():
+        values.append(row[rrd_spec.csv_hdr])
+      data_argv.append(':'.join(str(value) for value in values))
+    self.run_argv(pre_argv, data_argv)
+
+  def rrdgraph_ds_defs(self):
+    ''' Yield DEFs for each ds-name in the RRD file, used to prime rrdgraph incantations.
+    '''
+    for rrd_spec in self.rrd_specs():
+      yield f'DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX'
+
+  # pylint: disable=too-many-arguments
+  def rrdgraph(
+      self,
+      graph_name,
+      graph_argv,
+      start='end-1000000',
+      end=None,
+      width=2048,
+      height=512
+  ):
+    ''' Draw a graph, return the graph image filename.
+    '''
+    graphfile = self.pathto(
+        f"{self.site}_{self.mapping_name}_{graph_name}.png"
+    )
+    with Pfx(graphfile):
+      rrd_argv = [
+          'rrdtool', 'graph', graphfile, f'--width={width}',
+          f'--height={height}'
+      ]
+      if start is not None:
+        rrd_argv.append(f'--start={start}')
+      if end is not None:
+        rrd_argv.append(f'--end={end}')
+      rrd_argv.extend(self.rrdgraph_ds_defs())
+      rrd_argv.extend(graph_argv)
+      self.run_argv(rrd_argv, [])
+    return graphfile
+
+  def gen_graphs(self, days=None):
+    ''' Generate the various graphs defined for this DataSet.
+    '''
+    if days is None:
+      days = DEFAULT_GRAPH_DAYS
+    time_period = days * 24 * 3600
+    ##start = int(self.data[0]['unixtime'])
+    ##end = int(self.data[-1]['unixtime'])
+    end_spec = 'now'
+    start_spec = 'end-%ds' % (time_period,)
+    for graph_name, graph_spec in self.graphs.items():
+      graph_argv = []
+      for spec in graph_spec:
+        with Pfx(spec):
+          fields = spec.split(':')
+          spec_type = fields[0]
+          if spec_type == 'DEF':
+            # append the RRD file to the vname
+            fields[1] = f"{fields[1]}={self.rrdfile}"
+          elif spec_type == 'LINE':
+            fields[0] = fields[0] + '1'
+          spec = ':'.join(fields)
+          graph_argv.append(spec)
+      self.rrdgraph(graph_name, graph_argv, start=start_spec, end=end_spec)
+    graph_argv = []
+    for rrd_spec in self.rrd_specs():
+      if 'kwh' in rrd_spec.csv_hdr.lower():
+        graph_argv.append(
+            f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}'
+        )
+    self.rrdgraph('kwh', graph_argv, start=start_spec, end=end_spec)
+    graph_argv = []
+    for rrd_spec in self.rrd_specs():
+      if 'kw' in rrd_spec.csv_hdr.lower(
+      ) and 'kwh' not in rrd_spec.csv_hdr.lower():
+        graph_argv.append(
+            f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}'
+        )
+    self.rrdgraph('kw', graph_argv, start=start_spec, end=end_spec)
+    if True:
+      # debugging graphs for various parameters
+      for rrd_spec in self.rrd_specs():
+        self.rrdgraph(
+            f'ds_{rrd_spec.ds_name}', [
+                f"DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX",
+                f"LINE1:{rrd_spec.ds_name}#000000:Field {rrd_spec.ds_name} - {rrd_spec.csv_hdr}",
+            ],
+            start=start_spec,
+            end=end_spec
+        )
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

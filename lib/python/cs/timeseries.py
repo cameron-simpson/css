@@ -5,11 +5,11 @@
 ''' Efficient portable machine native columnar storage of time series data
     for double float and signed 64-bit integers.
 
-    On a personal basis, I use this as efficient storage of time
-    series data from my solar inverter, which reports in a slightly
-    clunky time limited CSV format; I import those CSVs into
-    time series data directories which contain the overall accrued
-    data.
+    The core purpose is to provide time series data storage; there
+    are assorted convenience methods to export arbitrary subsets
+    of the data for use by other libraries in common forms, such
+    as dataframes or series, numpy arrays and simple lists.
+    There are also some simple plot methods for plotting graphs.
 
     Three levels of storage are defined here:
     - `TimeSeriesFile`: a single file containing a binary list of
@@ -24,11 +24,12 @@
 
     Together these provide a hierarchy for finite sized files storing
     unbounded time series data for multiple parameters.
-    The core purpose is to provide time series data storage; there
-    are assorted convenience methods to export arbitrary subsets
-    of the data for use by other libraries in common forms, such
-    as dataframes or series, numpy arrays and simple lists.
-    There are also some simple plot methods for making graphs using `plotly`.
+
+    On a personal basis, I use this as efficient storage of time
+    series data from my solar inverter, which reports in a slightly
+    clunky time limited CSV format; I import those CSVs into
+    time series data directories which contain the overall accrued
+    data; see my `cs.splink` module which is built on this module.
 '''
 
 from abc import ABC, abstractmethod
@@ -40,13 +41,17 @@ from functools import partial
 from getopt import GetoptError
 import os
 from os.path import (
+    basename,
+    dirname,
     exists as existspath,
     isdir as isdirpath,
     isfile as isfilepath,
+    join as joinpath,
 )
-import shlex
 from struct import pack, Struct  # pylint: disable=no-name-in-module
+from subprocess import run
 import sys
+from tempfile import TemporaryDirectory
 import time
 from typing import Callable, List, Optional, Tuple, Union
 
@@ -66,11 +71,12 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning, error
-from cs.pfx import pfx, pfx_call, Pfx
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.result import CancellationError
+from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -102,11 +108,13 @@ DISTINFO = {
     'extras_requires': {
         'numpy': ['numpy'],
         'pandas': ['pandas'],
-        'plotting': ['kaleido', 'plotly'],
+        'plotting': ['matplotlib'],
     },
 }
 
 Numeric = Union[int, float]
+
+NaN = float('NaN')
 
 def main(argv=None):
   ''' Run the command line tool for `TimeSeries` data.
@@ -148,6 +156,9 @@ NATIVE_BIGENDIANNESS = {
     for typecode in SUPPORTED_TYPECODES
 }
 
+def _dt64(times):
+  return np.array(list(map(int, times))).astype('datetime64[s]')
+
 class TimeSeriesBaseCommand(BaseCommand, ABC):
   ''' Abstract base class for command line interfaces to `TimeSeries` data files.
   '''
@@ -170,59 +181,60 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     '''
     raise NotImplementedError
 
+  @abstractmethod
   def cmd_info(self, argv):
-    ''' Usage: {cmd} tspath
-          Report infomation about the time series stored at tspath.
-          tspath may refer to a single .csts TimeSeriesFile,
-          a TimeSeriesPartitioned directory of such files,
-          or a TimeSeriesDataDir containing partitions for multiple keys.
+    ''' Usage: {cmd}
+          Report information.
     '''
-    ts = self.poparg(argv, "tspath", timeseries_from_path)
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    print(ts)
-    if isinstance(ts, TimeSeries):
-      print("  start =", ts.start, arrow.get(ts.start))
-      print("  step =", ts.step)
-      print("  typecode =", ts.typecode)
-    elif isinstance(ts, TimeSeriesPartitioned):
-      for tsfilename in sorted(ts.tsfilenames()):
-        tsf = TimeSeriesFile(ts.pathto(tsfilename))
-        print(" ", tsf)
-    elif isinstance(ts, TimeSeriesDataDir):
-      for key in sorted(ts.keys()):
-        print(" ", key, ts[key])
-    else:
-      raise RuntimeError("unhandled time series type: %s" % (s(ts),))
+    raise NotImplemenetedError
 
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [--show] tspath impath.png days [{{glob|fields}}...]
-          Plot the most recent days of data from the time series at tspath
-          to impath.png. Open the image if --show is provided.
-          tspath may refer to a single .csts TimeSeriesFile,
-          a TimeSeriesPartitioned directory of such files,
-          or a TimeSeriesDataDir containing partitions for multiple keys.
-          If glob is supplied, constrain the keys of a TimeSeriesDataDir
-          by the glob.
+    ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] days [{{glob|fields}}...]
+          Plot the most recent days of data from the time series at tspath.
+          Options:
+          -f            Force. -o will overwrite an existing image file.
+          -imgpath.png  File system path to which to save the plot.
+          --show        Show the image in the GUI.
+          --stacked     Stack the plot lines/areas.
+          glob|fields   If glob is supplied, constrain the keys of
+                        a TimeSeriesDataDir by the glob.
     '''
-    show_image = False
-    if argv and argv[0] == '--show':
-      show_image = True
-      argv.pop(0)
-    ts = self.poparg(argv, "tspath", timeseries_from_path)
-    imgpath = self.poparg(
-        argv, "impath.png", str, lambda path: not existspath(path),
-        "already exists"
+    options = self.options
+    runstate = options.runstate
+    options.show_image = False
+    options.imgpath = None
+    options.stacked = False
+    options.multi = False
+    self.popopts(
+        argv,
+        options,
+        f='force',
+        multi=None,
+        o_='imgpath',
+        show='show_image',
+        stacked=None,
     )
+    force = options.force
+    imgpath = options.imgpath
+    if imgpath and not force and existspath(imgpath):
+      raise GetoptError("imgpath exists: %r" % (imgpath,))
     days = self.poparg(argv, int, "days to display", lambda days: days > 0)
+    xit = 0
     now = time.time()
     start = now - days * 24 * 3600
+    ts = options.ts
+    plot_dx = 14
+    plot_dy = 8
+    plot_kw = {}
     if isinstance(ts, TimeSeries):
       if argv:
         raise GetoptError(
             "fields:%r should not be suppplied for a %s" % (argv, s(ts))
         )
-      figure = ts.plot(start, now)  # pylint: disable=missing-kwoa
+      ax = ts.plot(
+          start, now, runstate=runstate, figsize=(plot_dx, plot_dy), **plot_kw
+      )  # pylint: disable=missing-kwoa
+      figure = ax.figure
     elif isinstance(ts, TimeSeriesDataDir):
       if argv:
         keys = ts.keys(argv)
@@ -234,18 +246,49 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         keys = ts.keys()
         if not keys:
           raise GetoptError("no keys in %s" % (ts,))
-      figure = ts.plot(
-          start, now, keys
+      plot_dy = max(plot_dy, len(keys) // 2)
+      plot_kw.update(
+          stacked=options.stacked,
+          subplots=options.multi,
+          sharex=options.multi,
+      )
+      ax = ts.plot(
+          start,
+          now,
+          keys,
+          runstate=runstate,
+          figsize=(plot_dx, plot_dy),
+          **plot_kw,
       )  # pylint: too-many-function-args.disable=missing-kwoa
+      if ax is None:
+        return 1
+      figure = (ax[0] if options.multi else ax).figure
     else:
       raise RuntimeError("unhandled type %s" % (s(ts),))
-    with Pfx("write %r", imgpath):
-      if existspath(imgpath):
-        error("already exists")
+    if runstate.cancelled:
+      return 1
+    with TemporaryDirectory(dir=(dirname(imgpath) if imgpath else '.')
+                            ) as tmppath:
+      if imgpath:
+        imgfilename = basename(imgpath)
       else:
-        figure.write_image(imgpath, format="png", width=2048, height=1024)
-    if show_image:
-      os.system(shlex.join(['open', imgpath]))
+        imgfilename = 'plot.png'
+      tmpimgpath = joinpath(tmppath, imgfilename)
+      pfx_call(figure.savefig, tmpimgpath)
+      if imgpath:
+        if not force and existspath(imgpath):
+          error("output path already exists: %r", imgpath)
+          xit = 1
+        else:
+          pfx_call(os.link, tmpimgpath, imgpath)
+      else:
+        if not options.show_image:
+          with open(tmpimgpath, 'rb') as imgf:
+            with open('/dev/tty', 'wb') as tty:
+              run(['img2sixel'], stdin=imgf, stdout=tty)
+    if options.show_image:
+      figure.show()
+    return xit
 
 class TimeSeriesCommand(TimeSeriesBaseCommand):
   ''' Command line interface to `TimeSeries` data files.
@@ -254,7 +297,11 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
   USAGE_FORMAT = r'''Usage: {cmd} [-s ts-step] tspath subcommand...
     -s ts-step  Specify the UNIX time step for the time series,
                 used if the time series is new and checked otherwise.
-    tspath      The path to the time series data directory.'''
+    tspath      The filesystem path to the time series;
+                this may refer to a single .csts TimeSeriesFile, a
+                TimeSeriesPartitioned directory of such files, or
+                a TimeSeriesDataDir containing partitions for
+                multiple keys.'''
   GETOPT_SPEC = 's:'
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
@@ -293,7 +340,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         'tspath',
         partial(timeseries_from_path, step=options.ts_step),
     )
-    if options.ts.step != options.ts_step:
+    if options.ts_step is not None and options.ts.step != options.ts_step:
       warning(
           "tspath step=%s but -s ts-step specified %s", options.ts.step,
           options.ts_step
@@ -305,7 +352,8 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
     with super().run_context():
       with Upd() as upd:
         with stackattrs(self.options, upd=upd):
-          yield
+          with self.options.ts:
+            yield
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_import(self, argv):
@@ -433,6 +481,28 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         return 1
       return 0
 
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Report infomation about the time series stored at tspath.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    ts = self.options.ts
+    print(ts)
+    if isinstance(ts, TimeSeries):
+      print("  start =", ts.start, arrow.get(ts.start))
+      print("  step =", ts.step)
+      print("  typecode =", ts.typecode)
+    elif isinstance(ts, TimeSeriesPartitioned):
+      for tsfilename in sorted(ts.tsfilenames()):
+        tsf = TimeSeriesFile(ts.pathto(tsfilename))
+        print(" ", tsf)
+    elif isinstance(ts, TimeSeriesDataDir):
+      for key in sorted(ts.keys()):
+        print(" ", key, ts[key])
+    else:
+      raise RuntimeError("unhandled time series type: %s" % (s(ts),))
+
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
     ''' Usage: {cmd} [testnames...]
@@ -536,12 +606,10 @@ def plotrange(func, needs_start=False, needs_stop=False):
 
       If `start` is `None` its value is set to `self.start`.
       If `stop` is `None` its value is set to `self.stop`.
-      If `figure` is `None` its value is set to a new
-      `plotly.graph_objects.Figure` instance.
 
       The decorated method is then called as:
 
-          func(self, start, stop, *a, figure=figure, **kw)
+          func(self, start, stop, *a, **kw)
 
       where `*a` and `**kw` are the additional positional and keyword
       parameters respectively, if any.
@@ -550,46 +618,32 @@ def plotrange(func, needs_start=False, needs_stop=False):
   # pylint: disable=keyword-arg-before-vararg
   @require(lambda start: not needs_start or start is not None)
   @require(lambda stop: not needs_stop or stop is not None)
-  def plotrange_wrapper(self, start=None, stop=None, *a, figure=None, **kw):
-    plotly = import_extra('plotly', DISTINFO)
-    go = plotly.graph_objects
+  def plotrange_wrapper(self, start=None, stop=None, *a, **kw):
+    import_extra('pandas', DISTINFO)
+    import_extra('matplotlib', DISTINFO)
     if start is None:
       start = self.start
     if stop is None:
       stop = self.stop
-    if figure is None:
-      figure = go.Figure()
-    return func(self, start, stop, *a, figure=figure, **kw)
+    return func(self, start, stop, *a, **kw)
 
   return plotrange_wrapper
 
 # pylint: disable=too-many-locals
 def plot_events(
-    figure,
-    events,
-    value_func,
-    *,
-    start=None,
-    stop=None,
-    key_colours=None,
-    name=None,
-    rescale=False,
-    **scatter_kw
+    ax, events, value_func, *, start=None, stop=None, **scatter_kw
 ):
   ''' Plot `events`, an iterable of objects with `.unixtime` attributes
-      such as an `SQLTagSet`, on an existing `figure`.
+      such as an `SQLTagSet`, on an existing set of axes `ax`.
 
       Parameters:
-      * `figure`: a plotly `Figure`
+      * `ax`: axes on which to plot
       * `events`: an iterable of objects with `.unixtime` attributes
       * `value_func`: a callable to compute the y-axis value from an event
       * `start`: optional start UNIX time, used to crop the events plotted
       * `stop`: optional stop UNIX time, used to crop the events plotted
-      * `name`: the name for the plot entries
-      Other keyword parameters are passed to the `Scatter` object user to do the plot.
+      Other keyword parameters are passed to `Axes.scatter`.
   '''
-  plotly = import_extra('plotly', DISTINFO)
-  go = plotly.graph_objects
   xaxis = []
   yaxis = []
   for event in (ev for ev in events
@@ -605,33 +659,7 @@ def plot_events(
       continue
     xaxis.append(x)
     yaxis.append(value_func(event))
-  # rescale Y value to land on the graph
-  if yaxis:
-    if rescale:
-      try:
-        low, high = rescale
-      except ValueError:
-        low = 0
-        high = rescale
-      min_y = min(yaxis)
-      max_y = max(yaxis)
-      dy = max_y - min_y
-      rescale_dy = high - low
-      if dy > 0:
-        yaxis = [low + (y - min_y) / dy * rescale_dy for y in yaxis]
-      else:
-        yaxis = [high] * len(yaxis)
-  figure.add_trace(
-      go.Scatter(
-          name=name,
-          mode='markers',
-          x=xaxis,
-          y=yaxis,
-          marker=dict(size=6,
-                      color='yellow'),  # colours.get(group_name, 'yellow')),
-          **scatter_kw
-      )
-  )
+  ax.scatter(xaxis, yaxis, **scatter_kw)
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
@@ -799,6 +827,12 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     '''
     return zip(self.range(start, stop), self[start:stop])
 
+  def data2(self, start, stop):
+    ''' Like `data(start,stop)` but returning 2 lists: one of time and one of data.
+    '''
+    data = self.data(start, stop)
+    return [d[0] for d in data], [d[1] for d in data]
+
   @property
   def np_type(self):
     ''' The `numpy` type corresponding to `self.typecode`.
@@ -821,46 +855,44 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
       start = self.start
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
-    return np.array([self[start:stop]], self.np_type)
+    return np.array(self[start:stop], self.np_type)
 
   @pfx
   def as_pd_series(self, start=None, stop=None):
     ''' Return a `pandas.Series` containing the data from `start` to `stop`,
         default from `self.start` and `self.stop` respectively.
     '''
-    pandas = import_extra('pandas', DISTINFO)
+    pd = import_extra('pandas', DISTINFO)
     if start is None:
       start = self.start  # pylint: disable=no-member
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
     times, data = self.data2(start, stop)
-    indices = (datetime64(t, 's') for t in times)
-    return pandas.Series(data, indices)
-
-  def data2(self, start, stop):
-    ''' Like `data(start,stop)` but returning 2 lists: one of time and one of data.
-    '''
-    data = self.data(start, stop)
-    return [d[0] for d in data], [d[1] for d in data]
+    return pd.Series(data, _dt64(times))
 
   @plotrange
-  def plot(self, start, stop, *, figure, name=None, **scatter_kw):
-    ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
-        creating it if necessary.
-        Return `figure`.
+  def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
+    ''' Convenience shim for `DataFrame.plot` to plot data from
+        `start` to `stop`.  Return the plot `Axes`.
+
+        Parameters:
+        * `start`,`stop`: the time range
+        * `ax`: optional `Axes`; new `Axes` will be made if not specified
+        * `label`: optional label for the graph
+        Other keyword parameters are passed to `Axes.plot`
+        or `DataFrame.plot` for new axes.
     '''
-    plotly = import_extra('plotly', DISTINFO)
-    go = plotly.graph_objects
-    if name is None:
-      name = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
+    pd = import_extra('pandas', DISTINFO)
+    if label is None:
+      label = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
     xdata, yaxis = self.data2(start, stop)
-    xaxis = np.array(xdata).astype('datetime64[s]')
+    xaxis = _dt64(xdata)
     assert len(xaxis) == len(yaxis), (
         "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
         (len(xaxis), len(yaxis), start, stop)
     )
-    figure.add_trace(go.Scatter(name=name, x=xaxis, y=yaxis, **scatter_kw))
-    return figure
+    df = pd.DataFrame(dict(x=xaxis, y=yaxis))
+    return df.plot('x', 'y', label=label, **plot_kw)
 
 # pylint: disable=too-many-instance-attributes
 class TimeSeriesFile(TimeSeries):
@@ -963,7 +995,7 @@ class TimeSeriesFile(TimeSeries):
         )
     if fill is None:
       if typecode == 'd':
-        fill = float('nan')
+        fill = NaN
       elif typecode == 'q':
         fill = 0
       else:
@@ -1547,6 +1579,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
       start=None,
       stop=None,
       keys: Optional[List[str]] = None,
+      *,
+      runstate=None,
   ):
     ''' Return a `numpy.DataFrame` containing the specified data.
 
@@ -1555,7 +1589,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
         * `stop`: end time of the data
         * `keys`: optional iterable of keys, default from `self.keys()`
     '''
-    pandas = import_extra('pandas', DISTINFO)
+    pd = import_extra('pandas', DISTINFO)
     if start is None:
       start = self.start  # pylint: disable=no-member
     if stop is None:
@@ -1564,14 +1598,21 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
       keys = self.keys()
     elif not isinstance(keys, (tuple, list)):
       keys = tuple(keys)
-    indices = [datetime64(t, 's') for t in self.range(start, stop)]
+    indices = _dt64(self.range(start, stop))
     data_dict = {}
-    for key in keys:
-      with Pfx(key):
-        if key not in self:
-          raise KeyError("no such key")
-        data_dict = self[key].as_np_array(start, stop)
-    return pandas.DataFrame(
+    with UpdProxy(prefix="gather fields: ") as proxy:
+      for key in progressbar(keys, "gather fields"):
+        if runstate and runstate.cancelled:
+          raise CancellationError
+        proxy.text = key
+        with Pfx(key):
+          if key not in self:
+            raise KeyError("no such key")
+          data_dict[key] = self[key].as_np_array(start, stop)
+    if runstate and runstate.cancelled:
+      raise CancellationError
+    return pfx_call(
+        pd.DataFrame,
         data=data_dict,
         index=indices,
         columns=keys,
@@ -1584,50 +1625,47 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
       start,
       stop,
       keys=None,
+      runstate=None,
       *,
-      figure,
-      key_colors=None,
-      name=None,
-      **scatter_kw
+      ax=None,
+      label=None,
+      **plot_kw
   ):
-    ''' Plot traces on `figure:plotly.graph_objects.Figure`,
-        creating it if necessary, for each key in `keys`.
-        Return `figure`.
+    ''' Convenience shim for `DataFrame.plot` to plot data from
+        `start` to `stop` for each key in `keys`.
+        Return the plot `Axes`.
 
         Parameters:
         * `start`: optional start, default `self.start`
         * `stop`: optional stop, default `self.stop`
         * `keys`: optional list of keys, default all keys
-        * `figure`: optional figure, created if not specified
-        * `key_colors`: option mapping of key to `marker_color`
-        Other keyword parameters are passed to `Scatter`.
+        * `ax`: optional `Axes`; new `Axes` will be made if not specified
+        * `label`: optional label for the graph
+        Other keyword parameters are passed to `Axes.plot`
     '''
     if keys is None:
       keys = sorted(self.keys())
+    df = self.as_pd_dataframe(start, stop, keys, runstate=runstate)
     for key in keys:
       with Pfx(key):
         ts = self[key]
         kname = ts.tags.get('csv.header', key)
-        if name:
-          kname = name + ': ' + kname
-        key_scatter_kw = dict(scatter_kw)
-        if key_colors:
-          try:
-            colour = key_colors[key]
-          except KeyError:
-            pass
-          else:
-            key_scatter_kw.update(marker_color=colour)
-        figure = ts.plot(
-            start, stop, figure=figure, name=kname, **key_scatter_kw
-        )
-    return figure
+        if label:
+          kname = label + ': ' + kname
+        if kname != key:
+          print("RENAME", key, kname)
+          df.rename(columns={key: kname}, inplace=True)
+    print(df)
+    if runstate and runstate.cancelled:
+      raise CancellationError
+    return df.plot(**plot_kw)
 
 class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
                         TimeStepsMixin):
   ''' A directory containing a collection of `TimeSeriesPartitioned` data files.
   '''
 
+  @pfx_method
   @typechecked
   def __init__(
       self,
@@ -1646,7 +1684,10 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     config = self.config
     if step is None:
       if config.step is None:
-        raise ValueError("missing step parameter and no step in config")
+        raise ValueError(
+            "missing step parameter and no step in config: config=%s" %
+            (s(config),)
+        )
       step = config.step
     elif self.step is None:
       self.step = step
@@ -1944,13 +1985,18 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
 
   def __getitem__(self, when: Union[Numeric, slice]):
     if isinstance(when, slice):
+      # TODO: fast version
       if when.step is not None and when.step != self.step:
         raise IndexError(
             "slice.step:%r should be None or ==self.step:%r" %
             (when.step, self.step)
         )
       return [self[t] for t in self.range(when.start, when.stop)]
-    return self.subseries(when)[when]
+    series = self.subseries(when)
+    try:
+      return series[when]
+    except IndexError:
+      return NaN
 
   def __setitem__(self, when: Numeric, value):
     self.subseries(when)[when] = value
@@ -2006,16 +2052,20 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     return xydata
 
   @plotrange
-  def plot(self, start, stop, *, figure, name=None, **scatter_kw):
-    ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
-        creating it if necessary.
-        Return `figure`.
+  def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
+    ''' Convenience shim for `DataFrame.plot` to plot data from
+        `start` to `stop`.  Return the plot `Axes`.
+
+        Parameters:
+        * `start`,`stop`: the time range
+        * `ax`: optional `Axes`; new `Axes` will be made if not specified
+        * `label`: optional label for the graph
+        Other keyword parameters are passed to `Axes.plot`
+        or `DataFrame.plot` for new axes.
     '''
-    if name is None:
-      name = self.tags.get(
-          'csv.header'
-      ) or "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
-    return super().plot(start, stop, figure=figure, name=name, **scatter_kw)
+    if label is None:
+      label = self.tags.get('csv.header')
+    return super().plot(start, stop, label=label, runstate=runstate, **plot_kw)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

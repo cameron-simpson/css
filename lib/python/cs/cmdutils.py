@@ -744,7 +744,7 @@ class BaseCommand:
             if not pfx_call(self.validate, value):
               raise ValueError(self.unvalidated_message)
         except ValueError as e:
-          raise GetoptError(": ".join(e.args))  # pylint: disable=raise-missing-from
+          raise GetoptError(str(e))  # pylint: disable=raise-missing-from
       return value
 
   @classmethod
