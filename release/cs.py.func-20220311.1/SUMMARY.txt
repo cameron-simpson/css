@@ -1,0 +1,1 @@
+New callif(doit[,modes],func,*a,**kw) to call or print a function, used in -n/--dry-run stuff sometimes.

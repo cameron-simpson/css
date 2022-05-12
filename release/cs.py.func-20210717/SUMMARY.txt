@@ -1,0 +1,2 @@
+Move @trace from debug to py.func, defer log call imports to avoid loops.
+Drop cs.pfx requirement, import opportunisticly with fallback.

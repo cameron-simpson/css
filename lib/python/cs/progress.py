@@ -16,6 +16,7 @@ import functools
 import sys
 from threading import RLock
 import time
+from typing import Optional
 from cs.deco import decorator
 from cs.logutils import debug, exception
 from cs.py.func import funcname
@@ -30,7 +31,9 @@ from cs.units import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20210316-post'
+from typeguard import typechecked
+
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -38,8 +41,15 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.deco', 'cs.logutils', 'cs.py.func', 'cs.seq', 'cs.units', 'cs.upd'],
+    'install_requires': [
+        'cs.deco',
+        'cs.logutils',
+        'cs.py.func',
+        'cs.seq',
+        'cs.units',
+        'cs.upd',
+        'typeguard',
+    ],
 }
 
 # default to 5s of position buffer for computing recent thoroughput
@@ -304,12 +314,12 @@ class BaseProgress(object):
       remaining = self.remaining_time
       if remaining:
         remaining = int(remaining)
-      if remaining is None:
-        rightv.append('ETA ??')
-      else:
+      if remaining is not None:
         rightv.append('ETA ' + transcribe_time(remaining))
     if self.total is not None and self.total > 0:
       leftv.append(self.text_pos_of_total())
+    else:
+      leftv.append(self.format_counter(self.position))
     left = ' '.join(leftv)
     right = ' '.join(rightv)
     if self.total is None:
@@ -355,6 +365,7 @@ class BaseProgress(object):
   def bar(
       self,
       label=None,
+      *,
       upd=None,
       proxy=None,
       statusfunc=None,
@@ -377,7 +388,7 @@ class BaseProgress(object):
           which uses `sys.stderr` for display.
         * `statusfunc`: an optional function to compute the progress bar text
           accepting `(self,label,width)`.
-        * `width`: an optional width expressioning how wide the progress bar
+        * `width`: an optional width expressing how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
         * `window`: optional timeframe to define "recent" in seconds;
@@ -454,8 +465,9 @@ class BaseProgress(object):
       width=None,
       window=None,
       update_frequency=1,
-      update_min_size=0,
+      update_min_size=None,
       report_print=None,
+      runstate=None,
   ):
     ''' An iterable progress bar: a generator yielding values
         from the iterable `it` while updating a progress bar.
@@ -493,13 +505,14 @@ class BaseProgress(object):
         * `update_frequency`: optional update frequency, default `1`;
           only update the progress bar after this many iterations,
           useful if the iteration rate is quite high
-        * `update_min_size`: optional update step size, default `0`;
+        * `update_min_size`: optional update step size;
           only update the progress bar after an advance of this many units,
           useful if the iteration size increment is quite small
         * `report_print`: optional `print` compatible function
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
           in order to interoperate with `Upd`.
+        * `runstate`: optional `RunState` whose `.cancelled` property can be consulted
 
         Example use:
 
@@ -541,7 +554,8 @@ class BaseProgress(object):
       nonlocal self, proxy, statusfunc, label, width
       nonlocal iteration, last_update_iteration, last_update_pos
       if (force or iteration - last_update_iteration >= update_frequency
-          or self.position - last_update_pos >= update_min_size):
+          or (update_min_size is not None
+              and self.position - last_update_pos >= update_min_size)):
         last_update_iteration = iteration
         last_update_pos = self.position
         proxy(statusfunc(self, label, width or proxy.width))
@@ -556,6 +570,8 @@ class BaseProgress(object):
       if not incfirst:
         self += length
         update_status()
+      if runstate is not None and runstate.cancelled:
+        break
     if delete_proxy:
       proxy.delete()
     else:
@@ -564,7 +580,10 @@ class BaseProgress(object):
       if isinstance(report_print, bool):
         report_print = print
       report_print(
-          label + ':', self.format_counter(self.position - start_pos), 'in',
+          label + (
+              ': (cancelled)'
+              if runstate is not None and runstate.cancelled else ':'
+          ), self.format_counter(self.position - start_pos), 'in',
           transcribe(
               self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
           )
@@ -613,14 +632,16 @@ class Progress(BaseProgress):
   '''
 
   # pylint: disable=too-many-arguments
+  @typechecked
   def __init__(
       self,
-      position=None,
-      name=None,
-      start=None,
-      start_time=None,
-      throughput_window=None,
-      total=None,
+      name: Optional[str] = None,
+      *,
+      position: Optional[int] = None,
+      start: Optional[int] = None,
+      start_time: Optional[float] = None,
+      throughput_window: Optional[int] = None,
+      total: Optional[int] = None,
       units_scale=None,
   ):
     ''' Initialise the Progesss object.
@@ -1093,12 +1114,17 @@ def selftest(argv):
   lines += lines
   for _ in progressbar(lines, "lines"):
     time.sleep(0.005)
-  for _ in progressbar(lines, "blines",units_scale=BINARY_BYTES_SCALE, itemlenfunc=len):
+  for _ in progressbar(lines, "blines", units_scale=BINARY_BYTES_SCALE,
+                       itemlenfunc=len):
     time.sleep(0.005)
   for _ in progressbar(lines, "lines step 100", update_frequency=100,
                        report_print=True):
     time.sleep(0.005)
-  P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
+  P = Progress(
+      name=__file__,
+      ##total=len(lines),
+      units_scale=DECIMAL_SCALE,
+  )
   with open(__file__) as f:
     for _ in P.iterbar(f):
       time.sleep(0.005)

@@ -10,22 +10,26 @@ import logging
 import os
 from os.path import abspath
 from threading import current_thread, Lock
+from typing import Any, Optional, Union, List, Tuple
+
+from icontract import require
 from sqlalchemy import Column, Integer, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker as sqla_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
-from icontract import require
+from typeguard import typechecked
+
 from cs.deco import decorator, contextdecorator
 from cs.fileutils import makelockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-__version__ = '20210420-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'description':
@@ -235,10 +239,6 @@ class ORM(MultiOpenMixin, ABC):
       and provides various Session related convenience methods.
       It is also a `MultiOpenMixin` subclass
       supporting nested open/close sequences and use as a context manager.
-
-      Subclasses must define the following:
-      * `.startup` and `.shutdown` methods to support the `MultiOpenMixin`,
-        even if these just `pass`
   '''
 
   @pfx_method
@@ -256,16 +256,19 @@ class ORM(MultiOpenMixin, ABC):
         Instead we use the `serial_sessions` option to obtain a
         mutex before allocating a session.
     '''
-    db_fspath = cutprefix(db_url, 'sqlite://')
+    db_fspath = cutprefix(db_url, 'sqlite:///')
     if db_fspath is db_url:
-      # no leading "sqlite://"
+      # unchanged - no leading "sqlite:///"
       if db_url.startswith(('/', './', '../')) or '://' not in db_url:
         # turn filesystenm pathnames into SQLite db URLs
         db_fspath = abspath(db_url)
         db_url = 'sqlite:///' + db_url
       else:
-        # sqlite://memory or something - no filesystem object
+        # no fs path
         db_fspath = None
+    else:
+      # starts with sqlite:///, we have the db_fspath
+      pass
     self.db_url = db_url
     self.db_fspath = db_fspath
     is_sqlite = db_url.startswith('sqlite://')
@@ -331,18 +334,22 @@ class ORM(MultiOpenMixin, ABC):
     '''
     raise NotImplementedError("declare_schema")
 
-  def startup(self):
-    ''' Startup: define the tables if not present.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Default startup/shutdown context manager.
+
+        This base method operates a lockfile to manage concurrent access
+        by other programmes (which would also need to honour this file).
+        If you actually expect this to be common
+        you should try to keep the `ORM` "open" as briefly as possible.
+        The lock file is only operated if `self.db_fspath`,
+        current set only for filesystem SQLite database URLs.
     '''
     if self.db_fspath:
       self._lockfilepath = makelockfile(self.db_fspath, poll_interval=0.2)
-
-  def shutdown(self):
-    ''' Stub shutdown.
-    '''
+    yield
     if self._lockfilepath is not None:
-      with Pfx("remove(%r)", self._lockfilepath):
-        os.remove(self._lockfilepath)
+      pfx_call(os.remove, self._lockfilepath)
       self._lockfilepath = None
 
   @property
@@ -441,9 +448,11 @@ class BasicTableMixin:
   ''' Useful methods for most tables.
   '''
 
+  DEFAULT_ID_COLUMN = 'id'
+
   @classmethod
   def lookup(cls, *, session, **criteria):
-    ''' Return iterable of row entities matching `criteria`.
+    ''' Return an iterable `Query` of row entities matching `criteria`.
     '''
     return session.query(cls).filter_by(**criteria)
 
@@ -454,14 +463,21 @@ class BasicTableMixin:
     return session.query(cls).filter_by(**criteria).one_or_none()
 
   @classmethod
-  def __getitem__(cls, index):
-    row = cls.lookup1(id=index, session=state.session)
+  def by_id(cls, index, *, id_column=None, session):
+    ''' Index the table by its `id_column` column, default `'id'`.
+    '''
+    if id_column is None:
+      id_column = cls.DEFAULT_ID_COLUMN
+    row = cls.lookup1(session=session, **{id_column: index})
     if row is None:
-      raise IndexError("%s: no row with id=%s" % (
+      raise IndexError("%s: no row with %s=%s" % (
           cls,
+          id_column,
           index,
       ))
     return row
+
+  __getitem__ = by_id
 
 # pylint: disable=too-few-public-methods
 class HasIdMixin:
@@ -667,3 +683,171 @@ def json_column(
   setattr(cls, attr, getter)
   setattr(cls, attr, getter.setter(set_col))
   return cls
+
+def RelationProxy(
+    relation,
+    columns: Union[str, Tuple[str], List[str]],
+    *,
+    id_column: Optional[str] = None
+):
+  ''' Construct a proxy for a row from a relation.
+
+      Parameters:
+      * `relation`: an ORM relation for which this will be a proxy
+      * `columns`: a list of the column names to cache,
+        or a space separated string of the column names
+      * `id_column`: options primary key column name,
+        default from `BasicTableMixin.DEFAULT_ID_COLUMN`: `'id'`
+
+      This is something of a workaround for applications which dip
+      briefly into the database to obtain information instead of
+      doing single long running transactions or sessions.
+      Instead of keeping the row instance around, which might want
+      to load related data on demand after its source session is
+      expired, we keep a proxy for the row with cached values
+      and refetch the row at need if further information is requried.
+
+      Typical use is to construct this proxy class as part
+      of the `__init__` of a larger class which accesses the database
+      as part of its working, example based on `cs.ebooks.calibre.CalibreTree`:
+
+          def __init__(self, calibrepath):
+            super().__init__(calibrepath)
+            # define the proxy classes
+            class CalibreBook(RelationProxy(self.db.books, [
+                'author',
+                'title',
+            ])):
+              """ A reference to a book in a Calibre library.
+              """
+              @typechecked
+              def __init__(self, tree: CalibreTree, dbid: int, db_book=None):
+                self.tree = tree
+                self.dbid = dbid
+              ... various other CalibreBook methods ...
+            self.CalibreBook = CalibreBook
+
+          def __getitem__(self, dbid):
+            return self.CalibreBook(self, dbid, db_book=db_book)
+
+
+  '''
+  if isinstance(columns, str):
+    columns = [column for column in columns.split() if column]
+  if id_column is None:
+    id_column = BasicTableMixin.DEFAULT_ID_COLUMN
+
+  class RelProxy:
+    ''' The relation proxy base class,
+        defined in the factory because it uses the relation via a closure.
+    '''
+
+    @typechecked
+    def __init__(self, id: Any, *, db_row=None):  # pylint: disable=redefined-builtin
+      self.id = id
+      self.id_column = id_column
+      self.__fields = {}
+      if db_row is not None:
+        self.refresh_from_db(db_row)
+
+    def refresh_from_db(self, db_row=None):
+      ''' Update the cached values from the database.
+      '''
+      with using_session(orm=relation.orm) as session:
+        if db_row is None:
+          db_row = relation.lookup1(**{id_column: self.id, 'session': session})
+        self.refresh_from_db_row(db_row, self.__fields, session=session)
+
+    # pylint: disable=unused-argument
+    @classmethod
+    def refresh_from_db_row(cls, db_row, fields, *, session):
+      ''' Class method to update a field cache from a database row `db_row`.
+
+          This method should be overridden by subclasses to add
+          addition cached values.
+      '''
+      for column in columns:
+        fields[column] = getattr(db_row, column)
+
+    def __getitem__(self, field, force=False):
+      ''' Fetch a field from the cache.
+          If not present, refresh the cache and retry.
+      '''
+      if not force:
+        try:
+          return self.__fields[field]
+        except KeyError:
+          pass
+      with using_session(orm=relation.orm) as session:
+        db_row = relation.by_id(
+            self.id, session=session, id_column=self.id_column
+        )
+        self.refresh_from_db(db_row)
+      return self.__fields[field]
+
+    def __getattr__(self, attr):
+      ''' Attribute access fetches from the cache via `__getitem__`
+          or falls back to attribute access on the database row.
+      '''
+      if attr.startswith('_'):
+        warning("__getattr__(%r)", attr)
+      with Pfx("%s.%s", type(self).__name__, attr):
+        if attr in ('id', '__fields'):
+          raise RuntimeError
+        try:
+          return self[attr]
+        except KeyError as e:
+          with using_session(orm=relation.orm) as session:
+            db_row = relation.by_id(self.id, session=session)
+            self.__fields[attr] = getattr(db_row, attr)
+          raise AttributeError(
+              "%s: no cached field .%s" % (type(self).__name__, attr)
+          ) from e
+
+    @contextmanager
+    def db_row_and_session(self):
+      ''' Context manager yielding `(db_row,session)` for deriving data from the row.
+
+          This is expected to be used from on demand proxy properties.
+      '''
+      with using_session(orm=relation.orm) as session:
+        db_row = relation.lookup1(**{id_column: self.id, 'session': session})
+        yield db_row, session
+
+  RelProxy.__name__ = relation.__name__ + '_' + RelProxy.__name__
+  return RelProxy
+
+@decorator
+def proxy_on_demand_field(field_func, field_name=None):
+  ''' A decorator to provide a field value on demand
+      via a function `field_func(self,db_row,session=session)`.
+
+      Example:
+
+          @property
+          @proxy_on_demand_field
+          def formats(self,db_row,*,session):
+              """ A mapping of Calibre format keys to format paths
+                  computed on demand.
+              """
+              return {
+                  fmt.format:
+                  joinpath(db_row.path, f'{fmt.name}.{fmt.format.lower()}')
+                  for fmt in db_row.formats
+              }
+  '''
+  if field_name is None:
+    field_name = field_func.__name__
+
+  def field_func_wrapper(self):
+    fields = self._RelProxy__fields
+    try:
+      field_value = fields[field_name]
+    except KeyError:
+      with self.db_row_and_session() as (db_row, session):
+        field_value = fields[field_name] = field_func(
+            self, db_row, session=session
+        )
+    return field_value
+
+  return field_func_wrapper

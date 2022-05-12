@@ -25,6 +25,7 @@ from pprint import pformat
 import subprocess
 import sys
 from tempfile import NamedTemporaryFile
+import time
 from uuid import UUID
 import discid
 import musicbrainzngs
@@ -32,7 +33,6 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
-from cs.lex import cutprefix
 from cs.logutils import error, warning, info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
@@ -86,6 +86,8 @@ class CDRipCommand(BaseCommand):
       'MBDB_PATH_ENVVAR': MBDB_PATH_ENVVAR,
       'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
   }
+
+  SUBCOMMAND_ARGV_DEFAULT = 'rip'
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
@@ -151,9 +153,9 @@ class CDRipCommand(BaseCommand):
       print("changed", repr(te.name or te.id))
 
   def cmd_meta(self, argv):
-    ''' Usage: {cmd} metaname...
-          Print the metadata about metaname, where metaname name the form
-          type_name.uuid being an ontology type such as "artist"
+    ''' Usage: {cmd} entity...
+          Print the metadata about entity, where entity has the form
+          *type_name*`.`*uuid* such as "artist"
           and a Musicbrainz UUID for that type.
     '''
     options = self.options
@@ -162,9 +164,8 @@ class CDRipCommand(BaseCommand):
       raise GetoptError("missing metanames")
     for metaname in argv:
       with Pfx("metaname %r", metaname):
-        ontkey = 'meta.' + metaname
-        metadata = mbdb.ontology[ontkey]
-        print(' ', metadata)
+        metadata = mbdb.ontology[metaname]
+        print(' ', metaname, metadata)
 
   # pylint: disable=too-many-locals
   def cmd_rip(self, argv):
@@ -219,11 +220,10 @@ class CDRipCommand(BaseCommand):
     with Pfx("discid %s", disc_id):
       disc = MB.discs[disc_id]
       print(disc.title)
-      print(", ".join(disc.artist_names()))
+      print(", ".join(disc.artist_names))
       for tracknum, recording in enumerate(disc.recordings(), 1):
         print(
-            tracknum, recording.title, '--',
-            ", ".join(recording.artist_names())
+            tracknum, recording.title, '--', ", ".join(recording.artist_names)
         )
     return 0
 
@@ -266,7 +266,9 @@ def rip(
         track=tracknum
     )
     track_artists = ", ".join(recording.artist_names)
-    track_base = f"{tracknum:02} - {recording.title} -- {track_artists}"
+    track_base = f"{tracknum:02} - {recording.title} -- {track_artists}".replace(
+        os.sep, '-'
+    )
     wav_filename = joinpath(subdir, track_base + '.wav')
     mp3_filename = joinpath(subdir, track_base + '.mp3')
     if existspath(mp3_filename):
@@ -316,18 +318,25 @@ def rip(
       else:
         with Pfx("+ %r", argv, print=True):
           subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+      fstags[mp3_filename].conversion_command = argv
     if no_action:
       print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
     else:
       fstags[mp3_filename].update(track_fstags)
-      fstags[mp3_filename].conversion_command = argv
   if not no_action:
+    subprocess.run(['ls', '-la', subdir])
     os.system("eject")
 
 # pylint: disable=too-many-ancestors
 class _MBTagSet(SQLTagSet):
   ''' An `SQLTagSet` subclass for MB entities.
   '''
+
+  MB_QUERY_PREFIX = 'musicbrainzng.api.query.'
+  MB_QUERY_TIME_TAG_NAME = MB_QUERY_PREFIX + 'time'
+
+  def __repr__(self):
+    return "%s:%s:%r" % (type(self).__name__, self.name, self.as_dict())
 
   @property
   def mbdb(self):
@@ -336,23 +345,30 @@ class _MBTagSet(SQLTagSet):
     return self.sqltags.mbdb
 
   @property
+  def mbtype(self):
+    ''' The MusicBrainz type (usually a UUID or discid).
+        Returns `None` for noncompound names.
+    '''
+    try:
+      type_name, _ = self.name.split('.', 1)
+    except ValueError:
+      return None
+    return type_name
+
+  @property
   def mbkey(self):
     ''' The MusicBrainz key (usually a UUID or discid).
     '''
-    return self.name.split('.', 2)[2]
+    _, mbid = self.name.split('.', 1)
+    return mbid
 
   @property
-  def type_name(self):
-    ''' The ontology type. Eg `'artist'` if `name==`meta.artist.foo`.
-        This is `None` if `self.name` is not a `meta.`*type_name*`.` name.
+  def mbtime(self):
+    ''' The timestamp of the most recent .refresh() API call, or `None`.
     '''
-    try:
-      ontish, onttype, _ = self.name.split('.', 2)
-    except ValueError:
+    if self.MB_QUERY_TIME_TAG_NAME not in self:
       return None
-    if ontish != 'meta':
-      return None
-    return onttype
+    return self[self.MB_QUERY_TIME_TAG_NAME]
 
   @property
   def ontology(self):
@@ -366,16 +382,13 @@ class _MBTagSet(SQLTagSet):
 
         This method has a fair bit of entity type specific knowledge.
     '''
-    if not force:
-      onttype = self.type_name
-      if onttype in ('artist',):
-        if getattr(self, onttype + '_name', None):
-          return
-      elif onttype in ('disc', 'recording'):
-        if self.title:
-          return
+    onttype = self.mbtype
+    if onttype is None:
+      ##warning("%s: no MBTYPE, not refreshing", self)
+      return
+    if not force and self.MB_QUERY_TIME_TAG_NAME in self:
+      return
     mbkey = self.mbkey
-    onttype = self.type_name
     get_type = onttype
     id_name = 'id'
     record_key = None
@@ -390,8 +403,11 @@ class _MBTagSet(SQLTagSet):
     elif onttype == 'recording':
       includes = ['artists', 'tags']
     A = self.mbdb.query(get_type, mbkey, includes, id_name, record_key)
+    self[self.MB_QUERY_TIME_TAG_NAME] = time.time()
     # record the full response data for forensics
-    self[f'musicbrainzngs.{get_type}_by_{id_name}__{"_".join(includes)}'] = A
+    self[self.MB_QUERY_PREFIX + 'get_type'] = get_type
+    self[self.MB_QUERY_PREFIX + 'includes'] = includes
+    self[self.MB_QUERY_PREFIX + 'result'] = A
     # modify A for discs
     if onttype == 'disc':
       # drill down to the release and medium containing the disc id
@@ -472,8 +488,8 @@ class _MBTagSet(SQLTagSet):
           # list of unique tag strings
           tag_value = list(set(map(lambda tag_dict: tag_dict['name'], v)))
         else:
-          warning("SKIP unhandled A record %r", k)
-          print(pformat(v))
+          ##warning("SKIP unhandled A record %r", k)
+          ##print(pformat(v))
           continue
         self[tag_name] = tag_value
 
@@ -493,28 +509,14 @@ class MBSQLTags(SQLTags):
   ''' Musicbrainz `SQLTags` with special `TagSetClass`.
   '''
 
-  # map 'foo' frm 'meta.foo.bah' to a particular TagSet subclass
-  TAGSET_CLASSES = {
+  TAGSETCLASS_DEFAULT = _MBTagSet
+
+  # map 'foo' from 'foo.bah' to a particular TagSet subclass
+  TAGSETCLASS_PREFIX_MAPPING = {
       'artist': MBArtist,
       'disc': MBDisc,
       'recording': MBRecording,
   }
-
-  def TagSetClass(self, *, name, **kw):
-    ''' Instead of a fixed class we use a factory to construct a
-        type specific instance.
-    '''
-    cls = None
-    meta1 = cutprefix(name, 'meta.')
-    if meta1 is not name:
-      type_name, _ = meta1.split('.', 1)
-      cls = self.TAGSET_CLASSES[type_name]
-    if cls is None:
-      cls = super().TagSetClass
-    te = cls(name=name, **kw)
-    return te
-
-  TagSetClass.singleton_also_by = _MBTagSet.singleton_also_by
 
   @fmtdoc
   def __init__(self, mbdb_path=None):
@@ -533,6 +535,21 @@ class MBSQLTags(SQLTags):
     super().__init__(db_url=mbdb_path)
     self.mbdb_path = mbdb_path
 
+  def default_factory(self, index):
+    ''' The default factory runs the `SQLTags` default factory and then does an MB refresh.
+    '''
+    te = super().default_factory(index)
+    te.refresh()
+    return te
+
+  def get(self, key, default=None):
+    ''' Run the default `.get()` and the do an MB refresh.
+    '''
+    te = super().get(key, default=default)
+    if te is not default:
+      te.refresh()
+    return te
+
 class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
   '''
@@ -542,12 +559,12 @@ class MBDB(MultiOpenMixin):
     sqltags.mbdb = self
     with sqltags:
       ont = self.ontology = TagsOntology(sqltags)
-      self.artists = sqltags.subdomain('meta.artist')
-      ont['type.artists'].update(type='list', member_type='artist')
-      self.discs = sqltags.subdomain('meta.disc')
-      ont['type.discs'].update(type='list', member_type='disc')
-      self.recordings = sqltags.subdomain('meta.recording')
-      ont['type.recordings'].update(type='list', member_type='recording')
+      self.artists = sqltags.subdomain('artist')
+      ont['artists'].update(type='list', member_type='artist')
+      self.discs = sqltags.subdomain('disc')
+      ont['discs'].update(type='list', member_type='disc')
+      self.recordings = sqltags.subdomain('recording')
+      ont['recordings'].update(type='list', member_type='recording')
 
   @contextmanager
   def startup_shutdown(self):

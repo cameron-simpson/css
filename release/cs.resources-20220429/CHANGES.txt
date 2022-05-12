@@ -1,0 +1,6 @@
+lib/python/cs/resources.py: cs.resources: docstring grammer fix
+lib/python/cs/resources.py: cs.resources: RunState: new catch_signal(sig,verbose=False) context manager method to cancel the RunState on receipt of a signal
+lib/python/cs/resources.py: cs.resources: catch_signal: accept an int or an iterable if ints as the `sig` parameter
+lib/python/cs/resources.py: cs.resources: RunState: new optional list if signals to catch-and-cancel, subclass ContextManagerMixin to streamline enter/exit
+lib/python/cs/resources.py: cs.resources: update imports, clean a little lint
+lib/python/cs/resources.py: cs.resources: RunState.__enter_exit__: do not call the previous signal handler

@@ -1,11 +1,14 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-hg_repos        = sr.ht-css
+hg_repos        = sr.ht-css home borg
 git_repos       = bitbucket-css github-css
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
 www_github      = https://github.com/cameron-simpson/css
 title           = Cameron Simpson's Scripts
+
+# used for pushing live code direct
+RSYNC_TARGET_PYTHON_ENVVAR = RSYNC_TARGET_PYTHON
 
 target  = bin
 
@@ -61,10 +64,12 @@ scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
-py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
-py3files        = $(py2files :|/python/|/python3/|)
+pymdmans= $("lib/python/cs/*.[1-9].md" G?) \
+          $("lib/python/cs/*/*.[1-9].md" G?) \
+          $("lib/python/cs/*/*/*.[1-9].md" G?)
+md2man  = md2man-roff
 
-rsync = rsync -iJOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
+rsync   = rsync -iJOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
@@ -78,6 +83,7 @@ _help:
         @echo '_publish           - deploy current release to /opt/css, ezos and tip to bitbucket'
         @echo '_pending           - report unreleased changelog and [M]odified files'
         @echo '_release           - mark tip as new release'
+        @echo '_remote            - rsync the Python tree to $$$(RSYNC_TARGET_PYTHON_ENVVAR)'
         @echo '_freshmeat         - announce current release to freshmeat'
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
@@ -138,15 +144,6 @@ _test3:
         find lib/python -type f -name '*.py[co]' -exec rm {} \;
         set -x; ./bin-cs/selftest -v --state state3 --pycmd python3 --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
 
-_macrotest:
-        echo $(py2files)
-        echo $(py3files)
-_2to3:
-        :make $(py3files)
-
-$(py3files): lib/python/$(@ :|lib/python3/||)
-        echo "$@ <- $?"
-
 deploy_dir(targetdir, base, includes) = \
         ( \
           set -ue \
@@ -184,6 +181,10 @@ _optcss:
 
 _home:
         @$(deploy($(HOME)))
+
+_remote:
+        set -uex; rsync -ia --include=*/ --include=*.py --exclude=* cs/ "$$$(RSYNC_TARGET_PYTHON_ENVVAR)/"
+
 
 bin_suffixes = cs darwin
 

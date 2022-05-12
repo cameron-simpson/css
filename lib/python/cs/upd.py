@@ -85,7 +85,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20210507-post'
+__version__ = '20220504-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -140,6 +140,18 @@ def print(*a, **kw):
   kw['flush'] = True
   with upd.above(need_newline=not end.endswith('\n')):
     builtin_print(*a, **kw)
+
+def pfxprint(*a, **kw):
+  ''' Wrapper for `cs.pfx.pfxprint` to pass `print_func=cs.upd.print`.
+
+      Programmes integrating `cs.upd` with use of the `cs.pfx.pfxprint`
+      function should use this at import time:
+
+          from cs.upd import pfxprint
+  '''
+  # pylint: disable=import-outside-toplevel
+  from cs.pfx import pfxprint as base_pfxprint
+  return base_pfxprint(*a, print_func=print, **kw)
 
 def nl(msg, *a, **kw):
   ''' Write `msg` to `file` (default `sys.stdout`),
@@ -212,6 +224,7 @@ class Upd(SingletonMixin):
     if isatty:
       if curses is not None:
         try:
+          # pylint: disable=no-member
           curses.setupterm(fd=backend_fd)
         except TypeError:
           pass
@@ -224,6 +237,7 @@ class Upd(SingletonMixin):
               'il1',  # insert one line
               'el',  # clear to end of line
           ):
+            # pylint: disable=no-member
             s = curses.tigetstr(ti_name)
             if s is not None:
               s = s.decode('ascii')
@@ -382,7 +396,7 @@ class Upd(SingletonMixin):
 
   def proxy(self, index):
     ''' Return the `UpdProxy` for `index`.
-        Returns `None` if `index` if out of range.
+        Returns `None` if `index` is out of range.
         The index `0` is never out of range;
         it will be autocreated if there are no slots yet.
     '''
@@ -681,7 +695,7 @@ class Upd(SingletonMixin):
 
   @contextmanager
   def above(self, need_newline=False):
-    ''' Move to the top line of the display, clear it, yield, redraw below.
+    ''' Context manager to move to the top line of the display, clear it, yield, redraw below.
 
         This context manager is for use when interleaving _another_
         stream with the `Upd` display;
@@ -705,19 +719,23 @@ class Upd(SingletonMixin):
     '''
     if self._disabled or self._backend is None or not self._slot_text:
       yield
-    else:
-      # go to the top slot, overwrite it and then rewrite the slots below
-      with self._lock:
-        backend = self._backend
-        slots = self._slot_text
-        txts = []
-        top_slot = len(slots) - 1
-        txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
-        txts.extend(self._redraw_line_v(''))
-        backend.write(''.join(txts))
-        backend.flush()
-        self._current_slot = top_slot
+      return
+    # go to the top slot, overwrite it and then rewrite the slots below
+    with self._lock:
+      backend = self._backend
+      slots = self._slot_text
+      txts = []
+      top_slot = len(slots) - 1
+      txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
+      txts.extend(self._redraw_line_v(''))
+      backend.write(''.join(txts))
+      backend.flush()
+      self._current_slot = top_slot
+      try:
+        self.disable()
         yield
+      finally:
+        self.enable()
         txts = []
         if need_newline:
           clr_eol = self.ti_str('el')
@@ -884,10 +902,8 @@ class Upd(SingletonMixin):
       if len(slots) == 0 and index == 0:
         return None
       if index < 0 or index >= len(slots):
-        raise ValueError(
-            "index should be in the range 0..%d inclusive: got %s" %
-            (len(self), index)
-        )
+        warning("Upd.delete(index=%d): index out of range, ignored")
+        return
       if len(slots) == 1:
         # silently do not delete
         ##raise ValueError("cannot delete the last slot")
@@ -968,7 +984,7 @@ class UpdProxy(object):
       '_text': 'The text following the prefix for this slot, default "".',
   }
 
-  def __init__(self, index=1, upd=None, text=None):
+  def __init__(self, index=1, upd=None, text=None, prefix=None):
     ''' Initialise a new `UpdProxy` status line.
 
         Parameters:
@@ -983,7 +999,7 @@ class UpdProxy(object):
     if upd is None:
       upd = Upd()
     upd.insert(index, proxy=self)
-    self._prefix = ''
+    self._prefix = prefix or ''
     self._text = ''
     if text:
       self(text)
@@ -1077,10 +1093,11 @@ class UpdProxy(object):
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
     '''
-    with self.upd._lock:  # pylint: disable=protected-access
-      index = self.index
-      if index is not None:
-        self.upd.delete(index)
+    if self.upd is not None:
+      with self.upd._lock:  # pylint: disable=protected-access
+        index = self.index
+        if index is not None:
+          self.upd.delete(index)
 
   __del__ = delete
 
@@ -1119,6 +1136,15 @@ def upd_proxy(func, prefix=None, insert_at=1):
       * `func`: the function to decorate
       * `prefix`: initial proxy prefix, default `func.__name__`
       * `insert_at`: the position for the new proxy, default `1`
+
+      Typical example:
+
+          from cs.upd import upd_proxy, state as upd_state
+          ...
+          @upd_proxy
+          def func*(self, ...):
+              proxy = upd_state.proxy
+              proxy.prefix = str(self) + " taskname"
   '''
   if prefix is None:
     prefix = func.__name__

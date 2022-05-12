@@ -19,6 +19,7 @@ import threading
 import time
 import traceback
 from types import SimpleNamespace as NS
+
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
@@ -28,7 +29,7 @@ from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.x import X
 
-__version__ = '20200318'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -43,7 +44,6 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.stack',
         'cs.py3',
-        'cs.result',
         'cs.seq',
         'cs.x',
     ],

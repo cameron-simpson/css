@@ -742,7 +742,7 @@ class Box(SimpleBinary):
       if length is Ellipsis:
         end_offset = Ellipsis
         bfr_tail = bfr
-        warning("Box.parse_buffer: Box %s has no length", header)
+        warning("Box.parse: Box %s has no length", header)
       else:
         end_offset = self.offset + length
         bfr_tail = bfr.bounded(end_offset)
@@ -833,7 +833,7 @@ class Box(SimpleBinary):
     super().self_check()
     # sanity check the supplied box_type
     # against the box types this class supports
-    with Pfx("%s", self):
+    with Pfx(self):
       box_type = self.header.type
       try:
         BOX_TYPE = self.BOX_TYPE

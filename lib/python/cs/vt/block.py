@@ -87,6 +87,18 @@ class _Block(Transcriber, ABC):
     self.blockmap = None
     self._lock = RLock()
 
+  def __bytes__(self):
+    ''' `bytes(_Block)` returns allo the data together as a single `bytes` instance.
+
+        Try not to do this for indirect blocks, it gets expensive.
+    '''
+    return b''.join(self)
+
+  def __iter__(self):
+    ''' Iterating over a `_Block` yields chunks from `self.datafrom()`.
+    '''
+    return self.datafrom()
+
   # pylint: disable=too-many-branches,too-many-locals,too-many-return-statements
   def __eq__(self, oblock):
     ''' Compare this Block with another Block for data equality.
@@ -214,6 +226,13 @@ class _Block(Transcriber, ABC):
     if len(chunks) == 1:
       return chunks[0]
     return b''.join(chunks)
+
+  @property
+  def data(self):
+    ''' This provides very easy access to `get_spanned_data()`.
+        It is overridden on `IndirectBlock` because of the likely expense.
+    '''
+    return self.get_spanned_data()
 
   def matches_data(self, odata):
     ''' Check supplied bytes `odata` against this Block's hashcode.
@@ -565,11 +584,11 @@ class HashCodeBlock(_Block):
   transcribe_prefix = 'B'
 
   def __init__(self, hashcode=None, data=None, added=False, span=None, **kw):
-    ''' Initialise a BT_HASHCODE Block or IndirectBlock.
+    ''' Initialise a `BT_HASHCODE` Block.
 
         A HashCodeBlock always stores its hashcode directly.
         If `data` is supplied, store it and compute or check the hashcode.
-        If `span` is not None, store it. Otherwise compute it on
+        If `span` is not `None`, store it. Otherwise compute it on
           demand from the data, fetching that if necessary.
 
         NB: The data are not kept in memory; fetched on demand.
@@ -599,6 +618,12 @@ class HashCodeBlock(_Block):
     self._span = None
     _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
+
+  @property
+  def data(self):
+    ''' The data stored in this Block.
+    '''
+    return self.get_direct_data()
 
   def get_direct_data(self):
     ''' Return the direct data of this Block, fetching it if necessary.
@@ -700,7 +725,7 @@ class HashCodeBlock(_Block):
     '''
     ok = True
     hashcode = self.hashcode
-    with Pfx("%s", hashcode):
+    with Pfx(hashcode):
       with defaults.S as S:
         try:
           data = S[hashcode]
@@ -760,6 +785,16 @@ class IndirectBlock(_Block):
       span = sum(subB.span for subB in self.subblocks)
     self.span = span
     self.hashcode = superblock.hashcode
+
+  @property
+  def data(self):
+    ''' Prevent use of `.data` on IndirectBlock` instances.
+        Use `get_spanned_data()` if you really need a flat `bytes` instance.
+    '''
+    raise RuntimeError(
+        "no .data on %s, likely to be expensive; it truly required, call get_spanned_data()"
+        % (type(self),)
+    )
 
   @classmethod
   def from_hashcode(cls, hashcode, span):
@@ -957,12 +992,18 @@ class LiteralBlock(_Block):
 
   def __init__(self, data, **kw):
     _Block.__init__(self, BlockType.BT_LITERAL, span=len(data), **kw)
-    self.data = data
+    self._data = data
+
+  @property
+  def data(self):
+    ''' The data.
+    '''
+    return self._data
 
   def transcribe_inner(self, T, fp):
     ''' Transcribe the block data in texthexified form.
     '''
-    fp.write(hexify(self.data))
+    fp.write(hexify(self._data))
 
   @classmethod
   # pylint: disable=too-many-arguments
@@ -978,7 +1019,7 @@ class LiteralBlock(_Block):
   def get_direct_data(self):
     ''' Return the direct data of this Block>
     '''
-    return self.data
+    return self._data
 
   @require(
       lambda self, start, end: 0 <= start and
@@ -989,14 +1030,14 @@ class LiteralBlock(_Block):
     '''
     if end is None:
       end = self.span
-    yield self.data[start:end]
+    yield self._data[start:end]
 
   @io_fail
   def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this LiteralBlock.
     '''
     ok = True
-    data = self.data
+    data = self._data
     if len(self) != len(data):
       error("len(self)=%d, len(data)=%d", len(self), len(data))
       ok = False

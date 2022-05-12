@@ -3,7 +3,8 @@
 # Playon facilities. - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Playon facilities.
+''' PlayOn facilities, primarily access to the download API.
+    Includes a nice command line tool.
 '''
 
 from collections import defaultdict
@@ -23,15 +24,18 @@ import sys
 from threading import RLock, Semaphore
 import time
 from urllib.parse import unquote as unpercent
+
 import requests
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
+from cs.fileutils import atomic_filename
 from cs.lex import has_format_attributes, format_attribute
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.result import bg as bg_result, report as report_results
@@ -40,18 +44,55 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
+__version__ = '20220311-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 5 - Production/Stable",
+        "Environment :: Console",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Topic :: Utilities",
+    ],
+    'entry_points': {
+        'console_scripts': ['playon = cs.app.playon:main'],
+    },
+    'install_requires': [
+        'cs.cmdutils',
+        'cs.context',
+        'cs.deco',
+        'cs.fileutils>=atomic_filename',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx>=pfx_call',
+        'cs.progress',
+        'cs.resources',
+        'cs.result',
+        'cs.sqltags',
+        'cs.threads',
+        'cs.units',
+        'cs.upd',
+        'requests',
+        'typeguard',
+    ],
+}
+
 DBURL_ENVVAR = 'PLAYON_TAGS_DBURL'
 DBURL_DEFAULT = '~/var/playon.sqlite'
 
+FILENAME_FORMAT_ENVVAR = 'PLAYON_FILENAME_FORMAT'
 DEFAULT_FILENAME_FORMAT = (
-    '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}'
+    '{playon.Series}--{playon.Name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
 # download parallelism
 DEFAULT_DL_PARALLELISM = 2
 
 def main(argv=None):
-  ''' Playon command line mode.
+  ''' Playon command line mode;
+      see the `PlayOnCommand` class below.
   '''
   return PlayOnCommand(argv).run()
 
@@ -60,7 +101,10 @@ class PlayOnCommand(BaseCommand):
   '''
 
   # default "ls" output format
-  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
+  LS_FORMAT = (
+      '{playon.ID} {playon.HumanSize} {resolution}'
+      ' {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
+  )
 
   # default "queue" output format
   QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
@@ -68,6 +112,7 @@ class PlayOnCommand(BaseCommand):
   USAGE_KEYWORDS = {
       'DEFAULT_DL_PARALLELISM': DEFAULT_DL_PARALLELISM,
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
+      'FILENAME_FORMAT_ENVVAR': FILENAME_FORMAT_ENVVAR,
       'LS_FORMAT': LS_FORMAT,
       'DBURL_ENVVAR': DBURL_ENVVAR,
       'DBURL_DEFAULT': DBURL_DEFAULT,
@@ -80,7 +125,7 @@ class PlayOnCommand(BaseCommand):
       PLAYON_USER               PlayOn login name, default from $EMAIL.
       PLAYON_PASSWORD           PlayOn password.
                                 This is obtained from .netrc if omitted.
-      PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
+      {FILENAME_FORMAT_ENVVAR}  Format string for downloaded filenames.
                                 Default: {DEFAULT_FILENAME_FORMAT}
       {DBURL_ENVVAR:17}         Location of state tags database.
                                 Default: {DBURL_DEFAULT}
@@ -114,7 +159,7 @@ class PlayOnCommand(BaseCommand):
       with stackattrs(options, api=api, sqltags=sqltags):
         with api:
           # preload all the recordings from the db
-          all_recordings = list(sqltags.recordings())
+          list(sqltags.recordings())
           # if there are unexpired stale entries or no unexpired entries,
           # refresh them
           self._refresh_sqltags_data(api, sqltags)
@@ -130,6 +175,7 @@ class PlayOnCommand(BaseCommand):
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
 
+  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_dl(self, argv):
     ''' Usage: {cmd} [-j jobs] [-n] [recordings...]
           Download the specified recordings, default "pending".
@@ -203,7 +249,7 @@ class PlayOnCommand(BaseCommand):
             if no_download:
               recording.ls()
             else:
-              sem.acquire()
+              sem.acquire()  # pylint: disable=consider-using-with
               Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
 
     if Rs:
@@ -222,9 +268,16 @@ class PlayOnCommand(BaseCommand):
         or if all records are expired.
     '''
     recordings = set(sqltags.recordings())
-    if (any(map(lambda recording: not recording.is_expired() and recording.
-                is_stale(max_age=max_age), recordings))
-        or all(map(lambda recording: recording.is_expired(), recordings))):
+    need_refresh = (
+        # any current recordings whose state is stale
+        any(
+            not recording.is_expired() and recording.is_stale(max_age=max_age)
+            for recording in recordings
+        ) or
+        # no recording is current
+        not all(recording.is_expired() for recording in recordings)
+    )
+    if need_refresh:
       print("refresh queue and recordings...")
       Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
       for T in Ts:
@@ -341,13 +394,27 @@ class _RequestsNoAuth(requests.auth.AuthBase):
   def __call__(self, r):
     return r
 
+# pylint: disable=too-many-ancestors
 @has_format_attributes
-class PlayOnSQLTagSet(SQLTagSet):
-  ''' An `SQLTagSet` with some special methods.
+class Recording(SQLTagSet):
+  ''' An `SQLTagSet` with knowledge about PlayOn recordings.
   '''
 
   # recording data stale after 10 minutes
   STALE_AGE = 600
+
+  RECORDING_QUALITY = {
+      1: '720p',
+      2: '1080p',
+  }
+
+  @format_attribute
+  def resolution(self):
+    ''' The recording resolution derived from the quality
+        via the `Recording.RECORDING_QUALITY` mapping.
+    '''
+    quality = self.get('playon.Quality')
+    return self.RECORDING_QUALITY.get(quality, quality)
 
   @format_attribute
   def recording_id(self):
@@ -358,11 +425,11 @@ class PlayOnSQLTagSet(SQLTagSet):
   @format_attribute
   def nice_name(self):
     ''' A nice name for the recording: the PlayOn series and name,
-        omitting the series if None.
+        omitting the series if `None`.
     '''
     playon_tags = self.subtags('playon')
     citation = playon_tags.Name
-    if playon_tags.Series:
+    if playon_tags.Series and playon_tags.Series != 'none':
       citation = playon_tags.Series + " - " + citation
     return citation
 
@@ -403,21 +470,26 @@ class PlayOnSQLTagSet(SQLTagSet):
   @format_attribute
   def is_expired(self):
     ''' Test whether this recording is expired,
-        should imply no longer available for download.
+        which implies that it is no longer available for download.
     '''
     expires = self.get('playon.Expires')
     if not expires:
-      return False
+      return True
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
   @format_attribute
   def is_stale(self, max_age=None):
     ''' Test whether this entry is stale
-        i.e. the time since `self.last_updated` exceeds `max_age` seconds,
-        default from `self.STALE_AGE`.
+        i.e. the time since `self.last_updated` exceeds `max_age` seconds
+        (default from `self.STALE_AGE`).
+        Note that expired recordings are never stale
+        because they can no longer be queried from the API.
     '''
     if max_age is None:
       max_age = self.STALE_AGE
+    if self.is_expired():
+      # expired recording will never become unstale
+      return False
     if max_age <= 0:
       return True
     last_updated = self.last_updated
@@ -437,13 +509,17 @@ class PlayOnSQLTagSet(SQLTagSet):
       for tag in sorted(self):
         print_func(" ", tag)
 
+# pylint: disable=too-many-ancestors
 class PlayOnSQLTags(SQLTags):
   ''' `SQLTags` subclass with PlayOn related methods.
   '''
 
   STATEDBPATH = '~/var/playon.sqlite'
 
-  TagSetClass = PlayOnSQLTagSet
+  # map 'foo' from 'foo.bah' to a particular TagSet subclass
+  TAGSETCLASS_PREFIX_MAPPING = {
+      'recording': Recording,
+  }
 
   def __init__(self, dbpath=None):
     if dbpath is None:
@@ -479,6 +555,7 @@ class PlayOnSQLTags(SQLTags):
 
   __iter__ = recordings
 
+  # pylint: disable=too-many-branches
   @pfx_method
   def recording_ids_from_str(self, arg):
     ''' Convert a string to a list of recording ids.
@@ -660,7 +737,8 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.sqltags[download_id]
 
-  def suburl_request(self, base_url, method, suburl):
+  @staticmethod
+  def suburl_request(base_url, method, suburl):
     ''' Return a curried `requests` method
         to fetch `API_BASE/suburl`.
     '''
@@ -715,6 +793,8 @@ class PlayOnAPI(MultiOpenMixin):
     return self.suburl_data('account')
 
   def cdsurl_data(self, suburl, _method='GET', headers=None, **kw):
+    ''' Wrapper for `suburl_data` using `CDS_BASE` as the base URL.
+    '''
     return self.suburl_data(
         suburl,
         _base_url=self.CDS_BASE,
@@ -789,6 +869,7 @@ class PlayOnAPI(MultiOpenMixin):
       for entry in entries:
         entry_id = entry['ID']
         with Pfx(entry_id):
+          # pylint: disable=use-dict-literal
           for field, conv in sorted(dict(
               ##Created=self.from_playon_date,
               ##Expires=self.from_playon_date,
@@ -817,6 +898,8 @@ class PlayOnAPI(MultiOpenMixin):
 
   @pfx_method
   def services(self):
+    ''' Fetch the list of services.
+    '''
     entries = self.cdsurl_data('content')
     return self._services_from_entries(entries)
 
@@ -865,27 +948,27 @@ class PlayOnAPI(MultiOpenMixin):
           dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with Pfx("open(%r,'wb')", filename):
-        with open(filename, 'wb') as f:
-          for chunk in progressbar(
-              dl_rsp.iter_content(chunk_size=131072),
-              label=filename,
-              total=dl_length,
-              units_scale=BINARY_BYTES_SCALE,
-              itemlenfunc=len,
-              report_print=True,
-          ):
-            offset = 0
-            length = len(chunk)
-            while offset < length:
-              with Pfx("write %d bytes", length - offset):
-                written = f.write(chunk[offset:])
-                if written < 1:
-                  warning("fewer than 1 bytes written: %s", written)
-                else:
-                  offset += written
-                  assert offset <= length
-            assert offset == length
+      with pfx_call(atomic_filename, filename, mode='wb',
+                    placeholder=True) as f:
+        for chunk in progressbar(
+            dl_rsp.iter_content(chunk_size=131072),
+            label=filename,
+            total=dl_length,
+            units_scale=BINARY_BYTES_SCALE,
+            itemlenfunc=len,
+            report_print=True,
+        ):
+          offset = 0
+          length = len(chunk)
+          while offset < length:
+            with Pfx("write %d bytes", length - offset):
+              written = f.write(chunk[offset:])
+              if written < 1:
+                warning("fewer than 1 bytes written: %s", written)
+              else:
+                offset += written
+                assert offset <= length
+          assert offset == length
     fullpath = realpath(filename)
     recording = self[download_id]
     if dl_rsp is not None:

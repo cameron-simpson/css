@@ -5,30 +5,34 @@
 
 set -ue
 
+: ${DK_APP_USER:='appuser'}
 : ${DK_COMPOSE_YML:='docker-compose.yml'}
 : ${DK_CP_PREFIX:='.'}
 : ${DK_ENVVARS:=''}
 : ${DK_EXEC_PREFIX:=''}
-: ${DK_PRIMARY_SERVICE=''}
+: ${DK_PRIMARY_SERVICE='gunicorn'}
 : ${DK_PSQL_SERVICE=''}
 : ${DK_PSQL_DBNAME=''}
 : ${DK_PSQL_SETUP_USERNAME=''}
 
 docker_compose_opts=
+docker_exec_opts=-i
+[ -t 0 -a -t 1 ] && docker_exec_opts="$docker_exec_opts -t"
 
 cmd=$0
 usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
   -f docker-compose.yml
     Specify docker-compose YAML file.
     Default from \$DK_COMPOSE_YML: $DK_COMPOSE_YML
+  -i Passed to \"docker exec\", for commands which use that.
   -n name
     Specify primary service name.
     This is also the target service for \"exec\".
+  @name
+    Shorthand for \"-n name\".
 
   Most ops are passed to docker or docker-compose, but the following
   are specially handled:
-    @name
-      Shorthand for \"-n name exec\".
     cp [name:]path [name:]path
       Passed to \"docker cp\".
       \"name\" is the short container name.
@@ -42,7 +46,7 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       there is a standard environment setup script within the
       container.
     loaddb
-      Load a postgresql dump from standard input into \$DK_PSQL_DBNAME 
+      Load a postgresql dump from standard input into \$DK_PSQL_DBNAME
       ($DK_PSQL_DBNAME) in service \$DK_PSQL_SERVICE ($DK_PSQL_SERVICE).
     logs
       Passed to docker-compose -f \$DK_PRIMARY_SERVICE.
@@ -53,6 +57,13 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
     rsync rsync-args...
       Rsync into or out of the container where the container name
       comes from the \"host\" part of an rsync remote path.
+    ssh [ssh-args...]
+      Ssh into the container.
+    ssh-add-pubkey pubkey-files...
+      Add the pubkey-files to the .ssh/authorized_keys file for
+      \$DK_APP_USER ($DK_APP_USER).
+    sshd
+      Invoke an inet-mode sshd inside the container.
     try [name [command...]]
       Shorthand for \"docker-compose run --rm name command...\".
       The default name comes from \$DK_PRIMARY_SERVICE ($DK_PRIMARY_SERVICE).
@@ -61,6 +72,9 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       Run down, volume rm var, pull, build, up setup.
 
   Environment:
+    DK_APP_USER
+      The nonroot username inside the container.
+      Presently used by the \"ssh\" op.
     DK_COMPOSE_YML
       The docker-compose filename, default docker-compose.yml.
       If not present in the current directory it will be sought in an ancestor.
@@ -73,7 +87,6 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       in-container environment setup script.
     DK_PRIMARY_SERVICE
       The default short name for the target container for \"dk exec\"."
-    
 
 badopts=
 
@@ -86,6 +99,7 @@ do
         exit 0
         ;;
     -n) DK_PRIMARY_SERVICE=$2; shift ;;
+    @?*)DK_PRIMARY_SERVICE=$( expr "$1" : '@\(.*\)' ) ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -107,9 +121,7 @@ done
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing op" >&2
-  set | grep '^DK_' | sort
-  op=help
+  op=exec
 else
   op=$1
   shift
@@ -167,7 +179,8 @@ resolve_container_path(){
 
 DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
-base=$( basename "$ymlbasedir" )
+: ${DK_BASE_PREFIX:=${COMPOSE_PROJECT_NAME:-$( basename "$ymlbasedir" )}}
+base=$DK_BASE_PREFIX
 primary_container=$( resolve_shortname "$DK_PRIMARY_SERVICE" )
 
 case "$op" in
@@ -187,8 +200,6 @@ case "$op" in
       exec docker "$op" "$src" "$dst"
       ;;
   exec)
-      docker_exec_opts=-i
-      [ -t 0 -a -t 1 ] && docker_exec_opts="$docker_exec_opts -t"
       [ $# -gt 0 ] || set bash
       if [ -n "$DK_ENVVARS" ]
       then
@@ -237,7 +248,7 @@ case "$op" in
       ;;
   logs)
       set -x
-      [ $# -gt 0 ] || set -- -f "$DK_PRIMARY_SERVICE"
+      [ $# -gt 0 ] || set -- -f -t --tail=50 "$DK_PRIMARY_SERVICE"
       ;;
   rsh)
       rhost=$1; shift
@@ -247,6 +258,45 @@ case "$op" in
   rsync)
       set -x
       exec rsync -e "set-x env DK_EXEC_PREFIX= $0 rsh" ${1+"$@"} ;;
+  ssh)
+      # ssh into the container via an inet-mode sshd
+      set -x
+      exec ssh -o "proxycommand=set-x '$0' -n '$primary_container' sshd" \
+            "$DK_APP_USER@localhost" ${1+"$@"}
+      ;;
+  ssh-add-pubkey)
+      ok=1
+      for pubkeyfile
+      do
+        [ -s "$pubkeyfile" ] || {
+          echo "$cmd: expected nonempty file: $pubkeyfile" >&2
+          ok=
+        }
+      done
+      [ $ok ] || exit 2
+      set -x
+      DK_EXEC_PREFIX=; export DK_EXEC_PREFIX
+      "$0" -n "$primary_container" exec mkdir -p /run/sshd
+      "$0" -n "$primary_container" exec su "$DK_APP_USER" -c 'umask 022; cd; mkdir -p .ssh; >>.ssh/authorized_keys'
+      for pubkeyfile
+      do
+        "$0" -n "$primary_container" exec su "$DK_APP_USER" -c 'cd; cat >>.ssh/authorized_keys' <"$pubkeyfile"
+      done
+      exit $?
+      ;;
+  sshd)
+      # invoke an inet-mode sshd inside the container
+      set -x
+      DK_EXEC_PREFIX=; export DK_EXEC_PREFIX
+      "$0" -n "$primary_container" exec mkdir -p /run/sshd
+      "$0" -n "$primary_container" exec su "$DK_APP_USER" -c 'umask 022; cd; mkdir -p .ssh; >>.ssh/authorized_keys'
+      exec "$0" -n "$primary_container" \
+            exec /usr/sbin/sshd \
+                  -edi \
+                  -o AuthenticationMethods=publickey \
+                  -o PubkeyAcceptedKeyTypes=+ssh-dss \
+                  ${1+"$@"}
+      ;;
   try)
       if [ $# = 0 ]
       then
@@ -265,7 +315,7 @@ case "$op" in
   update)
       set -ex
       "$0" down
-      docker volume rm "${base}_var"
+      docker volume rm "${base}_var" || :
       "$0" pull
       "$0" build
       "$0" up setup
