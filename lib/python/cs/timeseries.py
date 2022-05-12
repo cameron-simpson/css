@@ -340,7 +340,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         'tspath',
         partial(timeseries_from_path, step=options.ts_step),
     )
-    if options.ts.step != options.ts_step:
+    if options.ts_step is not None and options.ts.step != options.ts_step:
       warning(
           "tspath step=%s but -s ts-step specified %s", options.ts.step,
           options.ts_step
