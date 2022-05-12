@@ -576,7 +576,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     for path in argv:
       if runstate.cancelled:
         break
-      with Pfx(path):
+      with Pfx(shortpath(path)):
         if not existspath(path):
           error("does not exist")
           xit = 1
@@ -590,7 +590,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                   if dirname and not dirname.startswith('.')
               )
           )
-          for filename in filenames:
+          for filename in sorted(filenames):
             if runstate.cancelled:
               break
             if not filename or filename.startswith('.'):
@@ -632,13 +632,17 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                       if when_tags:
                         # subsequent events overlap previous imports,
                         # make sure we only import new events
-                        proxy.text = "load preexisting events in this timeframe"
+                        start = when_tags[0][0]
+                        start_date = arrow.get(start, tzinfo='local').date()
+                        stop = when_tags[-1][0]
+                        stop_date = arrow.get(stop, tzinfo='local').date()
+                        proxy.text = f"load preexisting events from {start_date}:{stop_date}"
                         existing = set(
                             (
                                 (ev.unixtime, ev.event_description)
                                 for ev in db.find(
-                                    f'unixtime>={when_tags[0][0]}',
-                                    f'unixtime<={when_tags[-1][0]}',
+                                    f'unixtime>={start}',
+                                    f'unixtime<={stop}',
                                 )
                             )
                         )
