@@ -86,7 +86,8 @@ def ts2001_unixtime(tzname=None):
   return unixtime
 
 class SPLinkCSVDir(HasFSPath):
-  ''' A class for working with SP-Link data downloads.
+  ''' A class for working with SP-Link data downloads,
+      referring to a particular `PerformanceData*` download directory.
   '''
   DEFAULT_LOG_FREQUENCY = 900
 
@@ -198,6 +199,8 @@ class SPLinkCSVDir(HasFSPath):
 class SPLinkDataDir(TimeSeriesDataDir):
   ''' A `TimeSeriesDataDir` to hold log data from an SP-Link CSV data download.
       This holds the data from a particular CSV log such as `'DetailedData'`.
+      The `SPLinkData` class manages a couple of these and a downloads
+      subdirectory and an events `SQLTags`.
   '''
 
   DEFAULT_POLICY_CLASS = TimespanPolicyAnnual
