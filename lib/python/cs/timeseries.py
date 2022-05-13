@@ -714,7 +714,7 @@ class TimeStepsMixin:
 
   def offset_bounds(self, start, stop) -> (int, int):
     ''' Return the bounds of `(start,stop)` as offsets
-        (multiples of `self.step`).
+        (`self.start` plus multiples of `self.step`).
     '''
     offset_steps = self.offset(start)
     end_offset_steps = self.offset(stop)
