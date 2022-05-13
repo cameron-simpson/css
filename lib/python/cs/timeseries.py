@@ -39,6 +39,7 @@ from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
+from math import nan
 import os
 from os.path import (
     basename,
@@ -113,8 +114,6 @@ DISTINFO = {
 }
 
 Numeric = Union[int, float]
-
-NaN = float('NaN')
 
 def main(argv=None):
   ''' Run the command line tool for `TimeSeries` data.
@@ -995,7 +994,7 @@ class TimeSeriesFile(TimeSeries):
         )
     if fill is None:
       if typecode == 'd':
-        fill = NaN
+        fill = nan
       elif typecode == 'q':
         fill = 0
       else:
@@ -1996,7 +1995,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     try:
       return series[when]
     except IndexError:
-      return NaN
+      return nan
 
   def __setitem__(self, when: Numeric, value):
     self.subseries(when)[when] = value
