@@ -716,11 +716,11 @@ class TimeStepsMixin:
     ''' Return the bounds of `(start,stop)` as offsets
         (`self.start` plus multiples of `self.step`).
     '''
-    offset_steps = self.offset(start)
+    start_offset_steps = self.offset(start)
     end_offset_steps = self.offset(stop)
-    if end_offset_steps == offset_steps and stop > start:
+    if end_offset_steps == start_offset_steps and stop > start:
       end_offset_steps += 1
-    return offset_steps, end_offset_steps
+    return start_offset_steps, end_offset_steps
 
   def offset_range(self, start, stop):
     ''' Return an iterable of the offsets from `start` to `stop`
@@ -739,8 +739,8 @@ class TimeStepsMixin:
       )
     if stop < start:
       raise IndexError("start:%s must be <= stop:%s" % (start, stop))
-    offset_steps, end_offset_steps = self.offset_bounds(start, stop)
-    return range(offset_steps, end_offset_steps)
+    start_offset_steps, end_offset_steps = self.offset_bounds(start, stop)
+    return range(start_offset_steps, end_offset_steps)
 
   def round_down(self, when):
     ''' Return `when` rounded down to the start of its time slot.
@@ -1262,6 +1262,34 @@ class TimeSeriesFile(TimeSeries):
     '''
     return len(self.array)
 
+  def slice(self, start, stop, pad=False, prepad=False):
+    ''' Return a slice of the underlying array
+        for the times `start:stop`.
+
+        If `stop` implies values beyong the end of the array
+        and `pad` is true, pad the resulting list with `self.fill`
+        to the expected length.
+
+        If `start` corresponds to an offset before the start of the array
+        raise an `IndexError` unless `prepad` is true,
+        in which case the list of values will be prepended
+        with enough of `self.fill` to reach the array start.
+        If `prepad` is true, pad the resulting list at the beginning
+    '''
+    ary = self.array
+    astart, astop = self.offset_bounds(start, stop)
+    if astart < 0:
+      raise IndexError(
+          "%s slice index %s starts at an offset before this array (start offet = %s)"
+          % (type(self).__name__, when, astart)
+      )
+    values = ary[start:astop]
+    if astop > len(ary):
+      # pad with nan
+      values.extend([self.fill] * (astop - len(ary)))
+    return values
+
+  @pfx
   @typechecked
   def __getitem__(self, when: Union[Numeric, slice]):
     ''' Return the datum for the UNIX time `when`.
@@ -1269,20 +1297,24 @@ class TimeSeriesFile(TimeSeries):
         If `when` is a slice, return a list of the data
         for the times in the range `start:stop`
         as given by `self.range(start,stop)`.
+        This will raise an `IndexError` if `start` corresponds to
+        an offset before the beginning of the array.
     '''
-    ary = self.array
     if isinstance(when, slice):
       start, stop, step = when.start, when.stop, when.step
       if step is not None:
         raise ValueError(
             "%s index slices may not specify a step" % (type(self).__name__,)
         )
-      astart, astop = self.offset_bounds(start, stop)
-      return ary[astart:astop]
+      return self.slice(start, step)
+    ary = self.array
     # avoid confusion with negative indices
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
-    return ary[self.array_index(when)]
+    try:
+      return ary[self.array_index(when)]
+    except IndexError:
+      return nan
 
   def __setitem__(self, when, value):
     ''' Set the datum for the UNIX time `when`.
