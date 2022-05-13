@@ -1,3 +1,4 @@
+Pfx: accept a mode to defer computing the format string, eg for pfx_call et al, to make them nearly free
 @locked_property: replace with @cachedmethod throughout
 @cachedmethod: needs a __lock attribute, then review use throughout
 cs.upd: Upd activation always makes the status line, Upd.insert can never create slot 0
