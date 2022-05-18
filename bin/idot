@@ -17,7 +17,7 @@ usage="Usage: $cmd {-fg foreground|-bg background|dot-option|layout}...
   passed through unchanged."
 
 layout=${DOT_LAYOUT="twopi"}
-type=png
+lang=png
 
 case "$COLORFGBG" in
   *?\;?*)
@@ -39,7 +39,7 @@ for arg
 do
   [ $first ] && set --
   [ $skip ] && { skip=; continue; }
-  [ $argfor ] && { eval "$argfor=$arg"; argfor=; continue; }
+  [ $argfor ] && { eval "$argfor=\$arg"; argfor=; continue; }
   case $arg in
     # layouts
     circo|dot|fdp|neato|nop|nop1|nop2|osage|patchwork|sfdp|twopi)
@@ -50,11 +50,11 @@ do
     |jp2|jpe|jpeg|jpg|json|json0|mp|pct|pdf|pic|pict|plain|plain-ext \
     |png|pov|ps|ps2|psd|sgi|svg|svgz|tga|tif|tiff|tk|vdx|vml|vmlz|vrml \
     |wbmp|webp|xdot|xdot1.2|xdot1.4|xdot_json \
-    )       type=$arg ;;
+    )       lang=$arg ;;
     -fg)    argfor=fg ;;
     -bg)    argfor=bg ;;
-    -T)     argfor=type ;;
-    -T?*)   type=$( expr "x$1" : 'x-T\(.*\)' ) ;;
+    -T)     argfor=lang ;;
+    -T?*)   lang=$( expr "x$1" : 'x-T\(.*\)' ) ;;
     -[A-Za-z]?*)
             set -- ${1+"$@"} "$arg"
             ;;
@@ -67,19 +67,19 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-case "$type" in
-  svg|vrml|dot|dot_json|xdot)
+case "$lang" in
+  svg|vrml|dot|dot_json|pic|xdot)
     conv(){ cat; }
     ;;
   *)conv(){
-      gm convert "$type:-" -trim -bordercolor "$bg" -border 20 - \
+      gm convert "$lang:-" -trim -bordercolor "$bg" -border 20 - \
       | img2sixel
     }
     ;;
 esac
 
 set -x
-dot "-T$type" \
+dot "-T$lang" \
     "-Glayout=$layout" "-Gsplines=true" \
       "-Gbgcolor=$bg" \
     "-Ncolor=$fg" "-Nfontcolor=$fg" \
