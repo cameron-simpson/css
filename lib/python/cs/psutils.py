@@ -11,6 +11,7 @@ import errno
 import io
 import logging
 import os
+import shlex
 from signal import SIGTERM, SIGKILL, signal
 import subprocess
 import sys
@@ -358,3 +359,32 @@ if __name__ == '__main__':
             )
         )
     )
+
+def print_argv(*argv, indent="", subindent="  ", file=None, fold=False):
+  ''' Print an indented possibly folded command line.
+  '''
+  if file is None:
+    file = sys.stdout
+  was_opt = False
+  for i, arg in enumerate(argv):
+    if i == 0:
+      file.write(indent)
+      was_opt = False
+    elif len(arg) >= 2 and arg.startswith('-'):
+      if fold:
+        # options get a new line
+        file.write(" \\\n" + indent + subindent)
+      else:
+        file.write(" ")
+      was_opt = True
+    else:
+      if was_opt:
+        file.write(" ")
+      elif fold:
+        # nonoptions get a new line
+        file.write(" \\\n" + indent + subindent)
+      else:
+        file.write(" ")
+      was_opt = False
+    file.write(shlex.quote(arg))
+  file.write("\n")
