@@ -22,15 +22,15 @@ import json
 import re
 from threading import RLock
 from uuid import UUID, uuid4
+
 from cs.deco import strable
-from cs.lex import isUC_, parseUC_sAttr, cutprefix, r
+from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
-from cs.py3 import StringTypes
-from cs.seq import the
+from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20211208-post'
+__version__ = '20220318-post'
 
 DISTINFO = {
     'description':
@@ -38,7 +38,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -46,15 +45,23 @@ DISTINFO = {
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
-        'cs.py3',
         'cs.seq',
-        'cs.sharedfile',
+        'cs.sharedfile>=20211208',
     ],
 }
 
 # pylint: disable=too-many-statements
-def named_row_tuple(*column_names, **kw):
-  ''' Return a namedtuple subclass factory derived from `column_names`.
+def named_row_tuple(
+    *column_names,
+    class_name=None,
+    computed=None,
+    column_map=None,
+    snake_case=False,
+    mixin=None,
+):
+  ''' Return a `namedtuple` subclass factory derived from `column_names`.
+      The primary use case is using the header row of a spreadsheet
+      to key the data from the subsequent rows.
 
       Parameters:
       * `column_names`: an iterable of `str`, such as the heading columns
@@ -93,22 +100,38 @@ def named_row_tuple(*column_names, **kw):
           >>> row
           Example(column_1='val1', column_3='val3', column_4=4, column_5=5)
   '''
-  class_name = kw.pop('class_name', None)
-  computed = kw.pop('computed', None)
-  mixin = kw.pop('mixin', None)
-  if kw:
-    raise ValueError("unexpected keyword arguments: %r" % (kw,))
   if class_name is None:
     class_name = 'NamedRow'
   column_names = list(column_names)
   if computed is None:
     computed = {}
+  if column_map is None:
+    if snake_case:
+      column_map = lambda raw_column_name: snakecase(
+          re.sub(r'\W+', '_', raw_column_name).strip('_')
+      )
+    else:
+      column_map = lambda raw_column_name: re.sub(
+          r'\W+', '_', raw_column_name
+      ).strip('_').lower()
+  elif not callable(column_map):
+    attr_seq = Seq(start=1)
+    mapping = column_map
+
+    def column_map(raw_column_name):
+      ''' Function to map raw column names to the values in the
+          supplied mapping.
+      '''
+      attr_name = mapping.get(raw_column_name, None)
+      if attr_name is None:
+        attr_name = '_' + str(attr_seq())
+      return attr_name
+
   if mixin is None:
     mixin = object
   # compute candidate tuple attributes from the column names
   name_attributes = [
-      None if name is None else re.sub(r'\W+', '_', name).strip('_').lower()
-      for name in column_names
+      None if name is None else column_map(name) for name in column_names
   ]
   # final tuple attributes are the nonempty name_attributes_
   attributes = [attr for attr in name_attributes if attr]
@@ -126,11 +149,11 @@ def named_row_tuple(*column_names, **kw):
 
         The class has the following attributes:
         * `attributes_`: the attribute names of each tuple in order
-        * `computed_`: a mapping of str to functions of `self`; these
+        * `computed_`: a mapping of `str` to functions of `self`; these
           values are also available via `__getitem__`
         * `names_`: the originating name strings
         * `name_attributes_`: the computed attribute names corresponding to the
-          `names`; there may be empty strings in this list
+          `names_`; there may be empty strings in this list
         * `attr_of_`: a mapping of column name to attribute name
         * `name_of_`: a mapping of attribute name to column name
         * `index_of_`: a mapping of column names and attributes their tuple indices
@@ -216,12 +239,13 @@ def named_column_tuples(
     column_names=None,
     computed=None,
     preprocess=None,
-    mixin=None
+    mixin=None,
+    snake_case=False,
 ):
   ''' Process an iterable of data rows, usually with the first row being
       column names.
-      Return a generated namedtuple factory and an iterable
-      of instances of the namedtuples for each row.
+      Return a generated `namedtuple` factory (the row class)
+      and an iterable of instances of the namedtuples for each row.
 
       Parameters:
       * `rows`: an iterable of rows, each an iterable of data values.
@@ -233,22 +257,23 @@ def named_column_tuples(
       * `preprocess`: optional callable to modify CSV rows before
         they are converted into the namedtuple.  It receives a context
         object an the data row.
-        It should return the row (possibly modified), or None to drop the
+        It should return the row (possibly modified), or `None` to drop the
         row.
-      * `mixin`: an optional mixin class for the generated namedtuple subclass
+      * `mixin`: an optional mixin class for the generated `namedtuple` subclass
         to provide extra methods or properties
 
       The context object passed to `preprocess` has the following attributes:
-      * `.cls`: attribute with the generated namedtuple subclass;
+      * `.cls`: the generated namedtuple subclass;
         this is useful for obtaining things like the column names
         or column indices;
         this is `None` when preprocessing the header row, if any
-      * `.index`: attribute with the row's enumeration, which counts from 0
-      * `.previous`: the previously accepted row's namedtuple,
-        or `None` if there is no previous row
+      * `.index`: attribute with the row's enumeration, which counts from `0`
+      * `.previous`: the previously accepted row's `namedtuple`,
+        or `None` if there is no previous row;
+        this is useful for differencing
 
-      Rows may be flat iterables in the same order as the column
-      names or mappings keyed on the column names.
+      Rows may be flat iterables in the same order as the column names
+      or mappings keyed on the column names.
 
       If the column names contain empty strings they are dropped
       and the corresponding data row entries are also dropped. This
@@ -267,7 +292,7 @@ def named_column_tuples(
           ...   (1, 11, "one"),
           ...   (2, 22, "two"),
           ... ]
-          >>> cls, rows = named_column_tuples(data1)
+          >>> rowtype, rows = named_column_tuples(data1)
           >>> print(list(rows))
           [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
 
@@ -278,7 +303,7 @@ def named_column_tuples(
           ...   (1, 11, "one"),
           ...   (2, 22, "two"),
           ... ]
-          >>> cls, rows = named_column_tuples(data1)
+          >>> rowtype, rows = named_column_tuples(data1)
           >>> print(list(rows))
           [NamedRow(index=1, value_found=11, descriptive_text='one'), NamedRow(index=2, value_found=22, descriptive_text='two')]
 
@@ -289,7 +314,7 @@ def named_column_tuples(
           ...   (1, 11, "one"),
           ...   {'a': 2, 'c': "two", 'b': 22},
           ... ]
-          >>> cls, rows = named_column_tuples(data1)
+          >>> rowtype, rows = named_column_tuples(data1)
           >>> print(list(rows))
           [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
 
@@ -301,7 +326,7 @@ def named_column_tuples(
           ...   {'a': 2, 'c': "two", 'b': 22},
           ...   [3, 11, "three", '', 'dropped'],
           ... ]
-          >>> cls, rows = named_column_tuples(data1, 'CSV_Row')
+          >>> rowtype, rows = named_column_tuples(data1, 'CSV_Row')
           >>> print(list(rows))
           [CSV_Row(a=1, b=11, c='one'), CSV_Row(a=2, b=22, c='two'), CSV_Row(a=3, b=11, c='three')]
 
@@ -318,7 +343,7 @@ def named_column_tuples(
           ...   (1, 11, "one"),
           ...   {'a': 2, 'c': "two", 'b': 22},
           ... ]
-          >>> cls, rows = named_column_tuples(data1, mixin=Mixin)
+          >>> rowtype, rows = named_column_tuples(data1, mixin=Mixin)
           >>> rows = list(rows)
           >>> rows[0].test1()
           'test1'
@@ -332,10 +357,11 @@ def named_column_tuples(
       column_names=column_names,
       computed=computed,
       preprocess=preprocess,
-      mixin=mixin
+      mixin=mixin,
+      snake_case=snake_case,
   )
-  cls = next(gen)
-  return cls, gen
+  rowtype = next(gen)
+  return rowtype, gen
 
 # pylint: disable=too-many-arguments
 def _named_column_tuples(
@@ -344,31 +370,40 @@ def _named_column_tuples(
     column_names=None,
     computed=None,
     preprocess=None,
-    mixin=None
+    mixin=None,
+    snake_case=False,
 ):
   if column_names is None:
-    cls = None
+    rowtype = None
   else:
-    cls = named_row_tuple(
-        *column_names, class_name=class_name, computed=computed, mixin=mixin
+    rowtype = named_row_tuple(
+        *column_names,
+        class_name=class_name,
+        computed=computed,
+        mixin=mixin,
+        snake_case=snake_case,
     )
-    yield cls
-    tuple_attributes = cls.attributes_
-    name_attributes = cls.name_attributes_
+    yield rowtype
+    tuple_attributes = rowtype.attributes_
+    name_attributes = rowtype.name_attributes_
   previous = None
   for index, row in enumerate(rows):
     if preprocess:
-      row = preprocess(_nct_Context(cls, index, previous), row)
+      row = preprocess(_nct_Context(rowtype, index, previous), row)
       if row is None:
         continue
-    if cls is None:
+    if rowtype is None:
       column_names = row
-      cls = named_row_tuple(
-          *column_names, class_name=class_name, computed=computed, mixin=mixin
+      rowtype = named_row_tuple(
+          *column_names,
+          class_name=class_name,
+          computed=computed,
+          mixin=mixin,
+          snake_case=snake_case,
       )
-      yield cls
-      tuple_attributes = cls.attributes_
-      name_attributes = cls.name_attributes_
+      yield rowtype
+      tuple_attributes = rowtype.attributes_
+      name_attributes = rowtype.name_attributes_
       continue
     if callable(getattr(row, 'get', None)):
       # flatten a mapping into a list ordered by column_names
@@ -376,7 +411,7 @@ def _named_column_tuples(
     if tuple_attributes is not name_attributes:
       # drop items from columns with empty names
       row = [item for item, attr in zip(row, name_attributes) if attr]
-    named_row = cls(*row)
+    named_row = rowtype(*row)
     yield named_row
     previous = named_row
 
@@ -425,6 +460,11 @@ class SeqMapUC_Attrs(object):
     self.__M = M
     self.keepEmpty = keepEmpty
 
+  def __repr__(self):
+    return "%s(%r, keepEmpty=%s)" % (
+        type(self).__name__, self.__M, self.keepEmpty
+    )
+
   def __str__(self):
     kv = []
     for k, value in self.__M.items():
@@ -447,10 +487,12 @@ class SeqMapUC_Attrs(object):
     if k is None:
       return self.__dict__[k]
     if plural:
-      if k not in self.__M:
-        return ()
-      return self.__M[k]
-    return the(self.__M[k])
+      return self.__M.get(k, ())
+    try:
+      value, = self.__M[k]
+    except (ValueError, KeyError):
+      raise AttributeError("%s.%s" % (type(self).__name__, k))
+    return value
 
   def __setattr__(self, attr, value):
     k, plural = parseUC_sAttr(attr)
@@ -458,7 +500,7 @@ class SeqMapUC_Attrs(object):
       self.__dict__[attr] = value
       return
     if plural:
-      if isinstance(type, StringTypes):
+      if isinstance(type, str):
         raise ValueError(
             "invalid string %r assigned to plural attribute %r" %
             (value, attr)
@@ -650,7 +692,7 @@ class MappingChain(object):
 
   def __getitem__(self, key):
     ''' Return the first value for `key` found in the mappings.
-        Raise KeyError if the key in not found in any mapping.
+        Raise `KeyError` if the key in not found in any mapping.
     '''
     for mapping in self.get_mappings():
       try:
@@ -948,7 +990,7 @@ class AttrableMappingMixin(object):
     ''' Unknown attributes are obtained from the mapping entries.
 
         Note that this first consults `self.__dict__`.
-        For many classes that is redundants, but subclasses of
+        For many classes that is redundant, but subclasses of
         `dict` at least seem not to consult that with attribute
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
@@ -993,7 +1035,7 @@ class JSONableMappingMixin:
 
   @classmethod
   def from_json(cls, js):
-    ''' Prepare an dict from JSON text.
+    ''' Prepare a `dict` from JSON text.
 
       If the class has `json_object_hook` or `json_object_pairs_hook`
       attributes these are used as the `object_hook` and
@@ -1010,7 +1052,7 @@ class JSONableMappingMixin:
     return d
 
   def as_json(self):
-    ''' The dict transcribed as JSON.
+    ''' Return the `dict` transcribed as JSON.
 
         If the instance's class has `json_default` or `json_separators` these
         are used for the `default` and `separators` parameters of the `json.dumps()`
@@ -1283,7 +1325,6 @@ class RemappedMappingProxy:
     self._mapped_subkeys = {}
 
   def _self_check(self):
-    X("SELF CHECK")
     assert len(self._mapped_keys) == len(self._mapped_subkeys)
     assert set(self._mapped_keys.values()) == set(self._mapped_subkeys.keys())
     assert set(self._mapped_keys.keys()) == set(self._mapped_subkeys.values())

@@ -7,7 +7,7 @@ set -ue
 
 piddir=${VARRUN:-$HOME/var/run}
 
-cmd=$0
+cmd=$( basename "$0" )
 usage="Usage:
     $cmd                                  List the connected portfwds.
     $cmd {-d|disable} [portfwd-names...]  Disable portfwds.

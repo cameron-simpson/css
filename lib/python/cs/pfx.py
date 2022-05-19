@@ -55,7 +55,7 @@ from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20211031-post'
+__version__ = '20220429-post'
 
 DISTINFO = {
     'description':
@@ -185,7 +185,7 @@ class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
 
-  # instantiate the thread-local state object
+  # instantiate the thread-local class state object
   _state = _PfxThreadState()
 
   def __init__(self, mark, *args, **kwargs):
@@ -246,6 +246,7 @@ class Pfx(object):
 
   def __enter__(self):
     # push this Pfx onto the per-Thread stack
+    self._push(self)
     print_func = self.print_func
     if print_func:
       mark = self.mark
@@ -253,11 +254,22 @@ class Pfx(object):
       if mark_args:
         mark = mark % mark_args
       print_func(mark)
-    _state = self._state
-    _state.append(self)
-    _state.raise_needs_prefix = True
-    if _state.trace:
-      _state.trace(_state.prefix)
+
+  @classmethod
+  def _push(cls, P):
+    ''' Push this `Pfx` instance onto the current `Thread`'s stack.
+    '''
+    state = cls._state
+    state.append(P)
+    state.raise_needs_prefix = True
+    if state.trace:
+      state.trace(state.prefix)
+
+  @classmethod
+  def push(cls, msg, *a):
+    ''' A new `Pfx(msg,*a)` onto the `Thread` stack.
+    '''
+    cls._push(cls(msg, *a))
 
   def __exit__(self, exc_type, exc_value, _):
     _state = self._state
@@ -290,13 +302,7 @@ class Pfx(object):
     '''
     u = self._umark
     if u is None:
-      mark = ustr(self.mark)
-      if not isinstance(mark, unicode):
-        if isinstance(mark, str):
-          mark = unicode(mark, errors='replace')
-        else:
-          mark = unicode(mark)
-      u = mark
+      u = ustr(self.mark)
       if self.mark_args:
         try:
           u = u % self.mark_args
@@ -437,6 +443,37 @@ class Pfx(object):
   enter = __enter__
   exit = __exit__
 
+  @classmethod
+  def scope(cls, msg=None, *a):
+    ''' Context manager to save the current `Thread`'s stack state
+        and to restore it on exit.
+
+        This is to aid long suites which progressively add `Pfx` context
+        as the suite progresses, example:
+
+            for item in items:
+                with Pfx.scope("item %s", item):
+                    db_row = db.get(item)
+                    Pfx.push("db_row = %r", db_row)
+                    matches = db.lookup(db_row.category)
+                    if not matches:
+                        continue
+                    Pfx.push("%d matches", len(matches):
+                    ... etc etc ...
+    '''
+
+    @contextmanager
+    def scope_cmgr():
+      old_stack = list(cls._state.stack)
+      try:
+        if msg is not None:
+          cls.push(msg, *a)
+        yield
+      finally:
+        cls._state.stack[:] = old_stack
+
+    return scope_cmgr()
+
   # Logger methods
   @logging_wrapper
   def exception(self, msg, *args, **kwargs):
@@ -495,10 +532,15 @@ def prefix():
   '''
   return Pfx._state.prefix
 
-def pfxprint(*a, **kw):
+def pfxprint(*a, print_func=None, **kw):
   ''' Call `print()` with the current prefix.
+
+      The optional keyword parameter `print_func`
+      provides an alternative function to the builtin `print()`.
   '''
-  print(prefix() + ':', *a, **kw)
+  if print_func is None:
+    print_func = print
+  print_func(prefix() + ':', *a, **kw)
 
 @contextmanager
 def PrePfx(tag, *args):

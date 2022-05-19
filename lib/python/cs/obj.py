@@ -338,7 +338,7 @@ class SingletonMixin:
       even for an already initialised
       and probably subsequently modified object.
 
-      One approach might be to access some attribute,
+      My suggested approach is to access some attribute,
       and preemptively return if it already exists.
       Example:
 
@@ -372,8 +372,8 @@ class SingletonMixin:
 
           class Pool(SingletonMixin):
 
-              @staticmethod
-              def _singleton_key(foo, bah=3):
+              @classmethod
+              def _singleton_key(cls, foo, bah=3):
                   return foo, bah
 
               def __init__(self, foo, bah=3):
@@ -437,8 +437,19 @@ class SingletonMixin:
       # reuse an existing instance or make a new one
       registry = cls._singleton_get_registry()
       with registry._singleton_lock:
-        _, instance = singleton(registry, okey, factory, (), {})
+        is_new, instance = singleton(registry, okey, factory, (), {})
+        if is_new:
+          instance._SingletonMixin_key = okey
+        else:
+          assert instance._SingletonMixin_key == okey
     return instance
+
+  # default hash and equality methods
+  def __hash__(self):
+    return hash(self._SingletonMixin_key)
+
+  def __eq__(self, other):
+    return self is other
 
   @classmethod
   def singleton_also_by(cls, also_key, key):

@@ -38,8 +38,8 @@ else
   case "$filename" in
     *.pdf)  basename=$( basename "$filename" )
             base=$( expr "x$basename" : '.\(.*\).pdf' )
-            outtplt="$base/$base-%d.$format_ext"
-            $trace mkdir "$outtplt"
+            outtplt="$base/$base-%03d.$format_ext"
+            $trace mkdir "$base"
             ;;
     *)      echo "$cmd: expected filename ending in .pdf, got: $filename" >&2
             badopts=1

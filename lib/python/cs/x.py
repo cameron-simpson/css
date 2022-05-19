@@ -18,7 +18,7 @@ It is presented here in its own module for reuse:
 It normally writes directly to `sys.stderr` but accepts an optional
 keyword argument `file` to specify a different filelike object.
 
-The following globals are further tune its behaviour,
+The following globals further tune its behaviour,
 absent the `file=` parameter:
 * `X_logger`: if not `None` then log a warning to that logger
 * `X_via_tty`: if true then a pathname to which to append messages
