@@ -1205,6 +1205,9 @@ class CalibreCommand(BaseCommand):
                 if not doit:
                   # we didn't make a new book, so move to the next one
                   continue
+                if dbid is None:
+                  error("calibre add failed")
+                  xit = 1
                 cbook = calibre[dbid]
                 quiet or print('new', cbook, '<=', obook)
               elif len(cbooks) > 1:
