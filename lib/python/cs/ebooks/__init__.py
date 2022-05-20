@@ -2,6 +2,8 @@
 
 ''' Utilities and command line for working with EBooks.
     Basic support for talking to Apple Books, Calibre, Kindle, Mobi.
+
+    These form the basis of my personal Kindle and Calibre workflow.
 '''
 
 from builtins import print as builtin_print

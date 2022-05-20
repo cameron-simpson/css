@@ -75,20 +75,18 @@ from cs.obj import singleton
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.py.modules import import_module_name
-from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
-from cs.threads import locked, locked_property
+from cs.threads import locked
 
 __version__ = '20200719-post'
 
 DISTINFO = {
     'description':
     "email message filing system which monitors multiple inbound Maildir folders",
-    'keywords': ["python2", "python3"],
+    'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         "Topic :: Communications :: Email :: Filters",
     ],
@@ -108,7 +106,6 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.func',
         'cs.py.modules',
-        'cs.py3',
         'cs.rfc2047',
         'cs.seq',
         'cs.threads',
@@ -159,15 +156,13 @@ class MailFilerCommand(BaseCommand):
     options.maildir = None
     options.rules_pattern = DEFAULT_RULES_PATTERN
 
-  def apply_opts(self, opts):
-    ''' Apply command line options.
+  def apply_opt(self, opt, val):
+    ''' Apply a command line option.
     '''
-    options = self.options
-    for opt, val in opts:
-      if opt == '-R':
-        options.rules_pattern = val
-      else:
-        raise RuntimeError("unhandled option: %s=%s" % (opt, val))
+    if opt == '-R':
+      self.options.rules_pattern = val
+    else:
+      raise RuntimeError("unhandled option: %s %r" % (opt, val))
 
   def cmd_monitor(self, argv):
     ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]
@@ -178,40 +173,29 @@ class MailFilerCommand(BaseCommand):
               Default is to make only one run over the Maildirs.
           -n  No remove. Keep filed messages in the origin Maildir.
     '''
-    justone = False
-    delay = None
-    no_remove = False
-    opts, argv = getopt(argv, '1d:n')
+    options = self.options
+    options.justone = False
+    options.delay = None
+    options.no_remove = False
     badopts = False
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-1':
-          justone = True
-        elif opt == '-d':
-          try:
-            delay = int(val)
-          except ValueError as e:
-            warning("%s: %s", e, val)
-            badopts = True
-          else:
-            if delay <= 0:
-              warning("delay must be positive, got: %d", delay)
-              badopts = True
-        elif opt == '-n':
-          no_remove = True
-        else:
-          warning("unimplemented option")
-          badopts = True
-    mdirpaths = argv
+    self.popopts(
+        argv,
+        options,
+        _1='justone',
+        d_=('delay', int, lambda delay: delay > 0),
+        n='justone'
+    )
     if badopts:
       raise GetoptError("invalid arguments")
+    mdirpaths = argv
     if not mdirpaths:
       mdirpaths = None
     return self.mailfiler().monitor(
         mdirpaths,
-        delay=delay,
-        justone=justone,
-        no_remove=no_remove,
+        delay=options.delay,
+        justone=options.justone,
+        no_remove=options.no_remove,
+        runstate=options.runstate,
         upd=self.loginfo.upd
     )
 
@@ -329,7 +313,9 @@ class MailFiler(NS):
     '''
     return self.subcfg('monitor')
 
-  @locked_property
+  @property
+  @locked
+  @cachedmethod
   def maildb_path(self):
     ''' Compute maildb path on the fly.
     '''
@@ -345,7 +331,9 @@ class MailFiler(NS):
     self._maildb_path = path
     self._maildb = None
 
-  @locked_property
+  @property
+  @locked
+  @cachedmethod
   def maildb(self):
     ''' The email address database.
     '''
@@ -374,7 +362,9 @@ class MailFiler(NS):
     self._msgiddb_path = path
     self._msgiddb = None
 
-  @locked_property
+  @property
+  @locked
+  @cachedmethod
   def msgiddb(self):
     ''' The Message-ID database.
     '''
@@ -419,7 +409,14 @@ class MailFiler(NS):
     return wmdir
 
   def monitor(
-      self, folders, *, delay=None, justone=False, no_remove=False, upd=None
+      self,
+      folders,
+      *,
+      delay=None,
+      justone=False,
+      no_remove=False,
+      runstate=None,
+      upd=None,
   ):
     ''' Monitor the specified `folders`, a list of folder spcifications.
         If `delay` is not None, poll the folders repeatedly with a
@@ -431,41 +428,44 @@ class MailFiler(NS):
     debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
     idle = 0
-    try:
-      while True:
-        these_folders = folders
-        if not these_folders:
-          these_folders = op_cfg.get('folders', '').split()
-        nmsgs = 0
-        for folder in these_folders:
-          wmdir = self.maildir_watcher(folder)
-          with Pfx(wmdir.shortname):
-            try:
-              nmsgs += self.sweep(
-                  wmdir, justone=justone, no_remove=no_remove, upd=upd
-              )
-            except KeyboardInterrupt:
-              raise
-            except Exception as e:
-              exception("exception during sweep: %s", e)
-        if nmsgs > 0:
-          idle = 0
-        if delay is None:
+    while not runstate or not runstate.cancelled:
+      these_folders = folders
+      if not these_folders:
+        these_folders = op_cfg.get('folders', '').split()
+      nmsgs = 0
+      for folder in these_folders:
+        if runstate and runstate.cancelled:
           break
-        if upd is not None:
-          if idle > 0:
-            status("sleep %ds; idle %ds", delay, idle)
-          else:
-            status("sleep %ds", delay)
-        sleep(delay)
-        idle += delay
-    except KeyboardInterrupt:
-      watchers = self._maildir_watchers
-      with self._lock:
-        for wmdir in watchers.values():
-          wmdir.close()
-      return 1
-    return 0
+        wmdir = self.maildir_watcher(folder)
+        with Pfx(wmdir.shortname):
+          try:
+            nmsgs += self.sweep(
+                wmdir,
+                justone=justone,
+                no_remove=no_remove,
+                upd=upd,
+                runstate=runstate,
+            )
+          except KeyboardInterrupt:
+            raise
+          except Exception as e:
+            exception("exception during sweep: %s", e)
+      if nmsgs > 0:
+        idle = 0
+      if delay is None:
+        break
+      if upd is not None:
+        if idle > 0:
+          status("sleep %ds; idle %ds", delay, idle)
+        else:
+          status("sleep %ds", delay)
+      sleep(delay)
+      idle += delay
+    watchers = self._maildir_watchers
+    with self._lock:
+      for wmdir in watchers.values():
+        wmdir.close()
+    return 1 if runstate and runstate.cancelled else 0
 
   @property
   def logdir(self):
@@ -483,7 +483,14 @@ class MailFiler(NS):
     )
 
   def sweep(
-      self, wmdir, *, justone=False, no_remove=False, logfile=None, upd=None
+      self,
+      wmdir,
+      *,
+      justone=False,
+      no_remove=False,
+      logfile=None,
+      upd=None,
+      runstate=None,
   ):
     ''' Scan a WatchedMaildir for messages to filter.
         Return the number of messages processed.
@@ -500,6 +507,8 @@ class MailFiler(NS):
       skipped = 0
       with LogTime("all keys") as all_keys_time:
         for key in list(wmdir.keys(flush=True)):
+          if runstate and runstate.cancelled:
+            break
           if upd:
             status(key)
           if key in wmdir.lurking:
@@ -719,7 +728,7 @@ class MessageFiler(NS):
       self.message_path = message_path
       track(
           (
-              u("%s %s: %s") % (
+              "%s %s: %s" % (
                   time.strftime("%Y-%m-%d %H:%M:%S"),
                   self.format_message(M, "{short_from}->{short_recipients}"),
                   unrfc2047(M.get('subject', '_no_subject'))
@@ -762,6 +771,9 @@ class MessageFiler(NS):
         if not default_targets:
           error("no matching targets and no $DEFAULT")
           return False
+        info(
+            "    no destinations, falling back to $DEFAULT=%r", default_targets
+        )
         try:
           Ts, offset = get_targets(default_targets, 0)
           offset = skipwhite(default_targets, offset)
@@ -1080,9 +1092,7 @@ class MessageFiler(NS):
     hmap['short_recipients'] = ",".join(
         self.maildb.header_shortlist(M, ('to', 'cc', 'bcc'))
     )
-    for h, hval in list(hmap.items()):
-      hmap[h] = ustr(hval)
-    msg = u(fmt).format(**hmap)
+    msg = fmt.format(**hmap)
     return msg
 
   def alert(self, alert_level, alert_message=None):
@@ -1207,7 +1217,7 @@ re_INGROUPorDOMorADDR = re.compile(re_INGROUPorDOMorADDR_s, re.I)
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
   '''
-  if isinstance(fp, StringTypes):
+  if isinstance(fp, str):
     with open(fp) as rfp:
       yield from parserules(rfp)
     return
@@ -2111,6 +2121,7 @@ class WatchedMaildir(NS):
     if rules_path is None:
       # default to looking for .mailfiler inside the Maildir
       rules_path = os.path.join(self.mdir.path, '.mailfiler')
+    self._lock = Lock()
     self._rules = None
     self._rules_paths = [rules_path]
     self._rules_lock = Lock()
@@ -2190,7 +2201,8 @@ class WatchedMaildir(NS):
         states.append((path, S.mtime, S.size, S.dev, S.ino))
     return states
 
-  @prop
+  @property
+  @locked
   @cachedmethod(sig_func=lambda md: md._rules_state())
   def rules(self):
     ''' The `Rules` object for this `WatchedMaildir`.

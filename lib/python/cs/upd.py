@@ -85,7 +85,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20220429-post'
+__version__ = '20220504-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -902,10 +902,8 @@ class Upd(SingletonMixin):
       if len(slots) == 0 and index == 0:
         return None
       if index < 0 or index >= len(slots):
-        raise ValueError(
-            "index should be in the range 0..%d inclusive: got %s" %
-            (len(self), index)
-        )
+        warning("Upd.delete(index=%d): index out of range, ignored")
+        return
       if len(slots) == 1:
         # silently do not delete
         ##raise ValueError("cannot delete the last slot")

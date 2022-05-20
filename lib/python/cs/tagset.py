@@ -1488,18 +1488,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         try:
           i = int(nonwhite)
         except ValueError:
-          pass
+          try:
+            f = float(nonwhite)
+          except ValueError:
+            pass
+          else:
+            if str(f) == nonwhite:
+              value = f
         else:
           if str(i) == nonwhite:
             value = i
-          else:
-            try:
-              f = float(nonwhite)
-            except ValueError:
-              pass
-            else:
-              if str(f) == nonwhite:
-                value = f
       if value is None:
         # not a special value, preserve as a string
         value = nonwhite
