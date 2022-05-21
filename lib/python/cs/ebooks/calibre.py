@@ -1281,5 +1281,22 @@ class CalibreCommand(BaseCommand):
         xit = 1
       return xit
 
+  def cmd_shell(self, argv):
+    ''' Usage: {cmd}
+          Run an interactive Python prompt with some predefined named:
+          calibre: the CalibreTree
+          options: self.options
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    interact(
+        banner=f'{self.cmd}: {options.calibre}',
+        local=dict(
+            calibre=options.calibre,
+            options=options,
+        )
+    )
+
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
