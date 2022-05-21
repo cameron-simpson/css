@@ -25,6 +25,7 @@ import shlex
 from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
+from typing import Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -70,7 +71,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
 
   # pylint: disable=too-many-statements
-  def __init__(self, calibrepath):
+  @typechecked
+  def __init__(self, calibrepath: Optional[str]):
     super().__init__(calibrepath)
 
     # define the proxy classes
