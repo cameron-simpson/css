@@ -65,6 +65,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
 
+  # used by FSPathBasedSingleton for the default library path
   FSPATH_DEFAULT = '~/CALIBRE'
   FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
 
@@ -846,13 +847,19 @@ class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
   '''
 
-  GETOPT_SPEC = 'C:K:'
+  GETOPT_SPEC = 'C:K:O:'
 
   USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]
   -C calibre_library
     Specify calibre library location.
   -K kindle_library
-    Specify kindle library location.'''
+    Specify kindle library location.
+  -O other_calibre_library
+    Specify alternate calibre library location, the default library
+    for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.'''
+
+  # envar $CALIBRE_LIBRARY_OTHER as push/pull etc "other library"
+  OTHER_LIBRARY_PATH_ENVVAR = CalibreTree.FSPATH_ENVVAR + '_OTHER'
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
@@ -860,6 +867,7 @@ class CalibreCommand(BaseCommand):
 
   USAGE_KEYWORDS = {
       'DEFAULT_LINK_IDENTIFIER': DEFAULT_LINK_IDENTIFIER,
+      'OTHER_LIBRARY_PATH_ENVVAR': OTHER_LIBRARY_PATH_ENVVAR,
   }
 
   # mapping of target format key to source format and extra options
@@ -867,12 +875,50 @@ class CalibreCommand(BaseCommand):
       'EPUB': (['MOBI', 'AZW', 'AZW3'], ()),
   }
 
+  class OPTIONS_CLASS(BaseCommand.OPTIONS_CLASS):
+
+    def __init__(
+        self,
+        kindle_path=None,
+        calibre_path=None,
+        calibre_path_other=None,
+        **kw
+    ):
+      super().__init__(
+          kindle_path=kindle_path,
+          calibre_path=calibre_path,
+          calibre_path_other=calibre_path_other,
+          **kw
+      )
+
+    @property
+    def calibre(self):
+      ''' The `CalibreTree` from `self.calibre_path`.
+      '''
+      return CalibreTree(self.calibre_path)
+
+    @property
+    def calibre_other(self):
+      ''' The alternate `CalibreTree` from `self.calibre_path_other`.
+      '''
+      if self.calibre_path_other is None:
+        raise AttributeError(".calibre_other: no .calibre_path_other")
+      return CalibreTree(self.calibre_path_other)
+
+    @property
+    def kindle(self):
+      ''' The `KindleTree` from `self.kindle_path`.
+      '''
+      if self.kindle_path is None:
+        raise AttributeError(".kindle: no .kindle_path")
+      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
+      return KindleTree(self.kindle_path)
+
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
     options = self.options
-    options.kindle_path = None
-    options.calibre_path = None
+    options.calibre_path_other = os.environ.get(self.OTHER_LIBRARY_PATH_ENVVAR)
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -882,6 +928,8 @@ class CalibreCommand(BaseCommand):
       options.calibre_path = val
     elif opt == '-K':
       options.kindle_path = val
+    elif opt == '-O':
+      options.calibre_path_other = val
     else:
       super().apply_opt(opt, val)
 
@@ -889,17 +937,11 @@ class CalibreCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
     options = self.options
-    with KindleTree(options.kindle_path) as kt:
-      with CalibreTree(options.calibre_path) as cal:
-        with stackattrs(
-            options,
-            kindle=kt,
-            calibre=cal,
-        ):
-          Upd().out('')
-          yield
+    print("options =", options)
+    with self.options.calibre:
+      Upd().out('')
+      yield
 
   def popbooks(self, argv, once=False):
     ''' Convert a list of book specifiers (currently dbids) to books.
@@ -997,7 +1039,10 @@ class CalibreCommand(BaseCommand):
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     print("calibre", self.options.calibre.shortpath)
-    print("kindle", self.options.kindle.shortpath)
+    if self.options.calibre_path_other:
+      print("calibre_other", shortpath(self.options.calibre_path_other))
+    if self.options.kindle_path:
+      print("kindle", shortpath(self.options.kindle_path))
 
   def cmd_make_cbz(self, argv):
     ''' Usage: {cmd} dbids...
