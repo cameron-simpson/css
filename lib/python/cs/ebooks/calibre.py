@@ -5,6 +5,7 @@
 ''' Support for Calibre libraries.
 '''
 
+from code import interact
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import filecmp
@@ -46,7 +47,7 @@ from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import cutprefix
-from cs.logutils import warning
+from cs.logutils import warning, error
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
