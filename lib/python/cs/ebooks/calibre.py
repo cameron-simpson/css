@@ -1045,29 +1045,6 @@ class CalibreCommand(BaseCommand):
     if self.options.kindle_path:
       print("kindle", shortpath(self.options.kindle_path))
 
-  def cmd_make_cbz(self, argv):
-    ''' Usage: {cmd} dbids...
-          Add the CBZ format to the designated Calibre books.
-    '''
-    if not argv:
-      raise GetoptError("missing dbids")
-    options = self.options
-    runstate = options.runstate
-    xit = 0
-    while argv and not runstate.cancelled:
-      with Pfx(argv[0]):
-        cbooks, ok = self.popbooks(argv, once=True)
-        if not ok:
-          xit = 2
-          continue
-        for cbook in cbooks:
-          if runstate.cancelled:
-            break
-          pfx_call(cbook.make_cbz)
-    if runstate.cancelled:
-      xit = 1
-    return xit
-
   # pylint: disable=too-many-locals
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l] [dbids...]
@@ -1106,6 +1083,30 @@ class CalibreCommand(BaseCommand):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
               print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
+    if runstate.cancelled:
+      xit = 1
+    return xit
+
+  def cmd_make_cbz(self, argv):
+    ''' Usage: {cmd} dbids...
+          Add the CBZ format to the designated Calibre books.
+    '''
+    if not argv:
+      raise GetoptError("missing dbids")
+    options = self.options
+    runstate = options.runstate
+    xit = 0
+    while argv and not runstate.cancelled:
+      with Pfx(argv[0]):
+        try:
+          cbooks = self.popbooks(argv, once=True)
+        except ValueError as e:
+          xit = 2
+          continue
+        for cbook in cbooks:
+          if runstate.cancelled:
+            break
+          pfx_call(cbook.make_cbz)
     if runstate.cancelled:
       xit = 1
     return xit
