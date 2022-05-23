@@ -37,7 +37,11 @@ DISTINFO = {
 }
 
 class Seq(object):
-  ''' A thread safe wrapper for itertools.count().
+  ''' A numeric sequence implemented as a thread safe wrapper for
+      `itertools.count()`.
+
+      A `Seq` is iterable and both iterating and calling it return
+      the next number in the sequence.
   '''
 
   __slots__ = ('counter', '_lock')
@@ -56,6 +60,7 @@ class Seq(object):
       return next(self.counter)
 
   next = __next__
+  __call__ = __next__
 
 __seq = Seq()
 
