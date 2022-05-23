@@ -53,7 +53,7 @@ cs.numeric pypi.release=20190309
 cs.obj pypi.release="20210717" ok_revision=db5ae904372904f9c3a3d99ef9d43879d914de64 features={"20210717":["SingletonMixin_key_is_none"]}
 cs.onttags
 cs.packetstream pypi.release="20211208" ok_revision="906f6148d57dfa082d18e6f4b27b8081ee317ba8"
-cs.pfx pypi.release="20220429" ok_revision="8f39407364e66dd6494793eeec5ea9c07d74168a" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
+cs.pfx pypi.release="20220429" ok_revision="507a93d1c05c880e4608a64a581f2d15d02267b8" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
 cs.pipeline pypi.release="20191007.1" ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
 cs.pop3 ok_revision=eeaff20598722dc1f84a9f472987f4270b01714b pypi.release="20220312"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
