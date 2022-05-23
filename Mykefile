@@ -7,6 +7,9 @@ www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
 www_github      = https://github.com/cameron-simpson/css
 title           = Cameron Simpson's Scripts
 
+# used for pushing live code direct
+RSYNC_TARGET_PYTHON_ENVVAR = RSYNC_TARGET_PYTHON
+
 target  = bin
 
 dev = env-dev -d $. -x
@@ -80,6 +83,7 @@ _help:
         @echo '_publish           - deploy current release to /opt/css, ezos and tip to bitbucket'
         @echo '_pending           - report unreleased changelog and [M]odified files'
         @echo '_release           - mark tip as new release'
+        @echo '_remote            - rsync the Python tree to $$$(RSYNC_TARGET_PYTHON_ENVVAR)'
         @echo '_freshmeat         - announce current release to freshmeat'
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
@@ -177,6 +181,10 @@ _optcss:
 
 _home:
         @$(deploy($(HOME)))
+
+_remote:
+        set -uex; rsync -ia --include=*/ --include=*.py --exclude=* cs/ "$$$(RSYNC_TARGET_PYTHON_ENVVAR)/"
+
 
 bin_suffixes = cs darwin
 

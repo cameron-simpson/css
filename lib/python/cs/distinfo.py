@@ -800,8 +800,6 @@ class Modules(defaultdict):
     with Pfx(requirement_spec):
       mrq = ModuleRequirement.from_requirement(requirement_spec, modules=self)
       requirement = mrq.resolve()
-      if requirement != requirement_spec:
-        warning("RESOLVE %r => %r", requirement_spec, requirement)
       return requirement
 
 # pylint: disable=too-many-public-methods
@@ -1016,7 +1014,7 @@ class Module:
     ''' Sync the package `Tag`s `TagFile`, return the pathname of the tag file.
     '''
     self.options.pkg_tagsets.save()
-    return self.options.pkg_tagsets.filepath
+    return self.options.pkg_tagsets.fspath
 
   @tag_or_tag_value
   def set_tag(self, tag_name, value, *, msg):
@@ -1160,7 +1158,7 @@ class Module:
     if pypi_package_name is None:
       pypi_package_name = self.name
     if pypi_package_version is None:
-      pypi_package_version = self.latest.version
+      pypi_package_version = self.latest.version if self.latest else None
 
     # prepare core distinfo
     dinfo = dict(DISTINFO_DEFAULTS)
@@ -1271,7 +1269,6 @@ class Module:
       dinfo = dict(dinfo)
     projspec = dict(
         name=dinfo.pop('name'),
-        version=dinfo.pop('version'),
         description=dinfo.pop('description'),
         authors=[
             dict(name=dinfo.pop('author'), email=dinfo.pop('author_email'))
@@ -1282,13 +1279,25 @@ class Module:
         urls={'URL': dinfo.pop('url')},
         classifiers=dinfo.pop('classifiers'),
     )
+    version = dinfo.pop('version', None)
+    if version:
+      projspec['version'] = version
     if 'extra_requires' in dinfo:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
+    dinfo_entry_points = dinfo.pop('entry_points', {})
+    if dinfo_entry_points:
+      entry_points = {}
+      console_scripts = dinfo_entry_points.pop('console_scripts', [])
+      if console_scripts:
+        projspec['scripts'] = console_scripts
+      gui_scripts = dinfo_entry_points.pop('gui_scripts', [])
+      if gui_scripts:
+        projspec['gui-scripts'] = gui_scripts
     pyproject = {
         "project": projspec,
         "build-system": {
             "requires": [
-                "setuptools >= 40.9.0",
+                "setuptools >= 61.0",
                 'trove-classifiers',
                 "wheel",
             ],
@@ -1641,7 +1650,8 @@ class Module:
           old_import_names = set(distinfo_requires_names) - set(import_names)
           problems.append(
               (
-                  "DISTINFO[install_requires=%r] != direct_imports=%r\n"
+                  "DISTINFO[install_requires]=%r"
+                  "  != direct_imports=%r\n"
                   "  new imports %r\n"
                   "  removed imports %r"
               ) % (
