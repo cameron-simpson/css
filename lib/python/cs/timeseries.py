@@ -34,7 +34,7 @@
 
 from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
@@ -185,8 +185,9 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     ''' Usage: {cmd}
           Report information.
     '''
-    raise NotImplemenetedError
+    raise NotImplementedError
 
+  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] days [{{glob|fields}}...]
           Plot the most recent days of data from the time series at tspath.
@@ -284,6 +285,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         if not options.show_image:
           with open(tmpimgpath, 'rb') as imgf:
             with open('/dev/tty', 'wb') as tty:
+              # pylint: disable=subprocess-run-check
               run(['img2sixel'], stdin=imgf, stdout=tty)
     if options.show_image:
       figure.show()
@@ -440,6 +442,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
               "date column %r is not present in the row class, which knows:\n  %s"
               % (datecol, "\n  ".join(sorted(rowcls.index_of_.keys())))
           )
+          # pylint: disable=raise-missing-from
           raise GetoptError("date column %r is not recognised" % (datecol,))
       # load the data, store the numeric values
       for i in attrindices:
@@ -1355,6 +1358,7 @@ class TimespanPolicy(DBC):
       enclosing a timestamp.
   '''
 
+  # definition to happy linters
   name = None  # subclasses get this when they are registered
   FACTORIES = {}
   DEFAULT_NAME = 'monthly'
@@ -1696,6 +1700,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
   ''' A directory containing a collection of `TimeSeriesPartitioned` data files.
   '''
 
+  # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
   @typechecked
   def __init__(
