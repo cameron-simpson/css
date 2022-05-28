@@ -130,6 +130,32 @@ SUPPORTED_TYPECODES = {
     'd': float,
 }
 assert all(typecode in typecodes for typecode in SUPPORTED_TYPECODES)
+TYPECODE_FOR = {type_: code for code, type_ in SUPPORTED_TYPECODES.items()}
+assert len(SUPPORTED_TYPECODES) == len(TYPECODE_FOR)
+
+def typecode_of(type_) -> str:
+  ''' Return the `array` typecode for the type `type_`.
+      This supports the types in `SUPPORTED_TYPECODES`: `int` and `float`.
+  '''
+  try:
+    return TYPECODE_FOR[type_]
+  except KeyError as e:
+    raise TypeError(
+        "unsupported type %s, SUPPORTED_TYPED=%r" %
+        (type_, SUPPORTED_TYPECODES)
+    ) from e
+
+def type_of(typecode: str) -> type:
+  ''' Return the type associated with `array` `typecode`.
+      This supports the types in `SUPPORTED_TYPECODES`: `int` and `float`.
+  '''
+  try:
+    return SUPPORTED_TYPECODES[typecode]
+  except KeyError as e:
+    raise ValueError(
+        "unsupported typecode %r, SUPPORTED_TYPED=%r" %
+        (typecode, SUPPORTED_TYPECODES)
+    ) from e
 
 @typechecked
 @require(lambda typecode: typecode in SUPPORTED_TYPECODES)
