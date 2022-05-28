@@ -2505,6 +2505,15 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     return self.fnmatch('*' + TimeSeriesFile.DOTEXT)
 
+  @pfx_method
+  def partition_name_from_filename(self, tsfilename: str) -> str:
+    ''' Return the time span name from a `TimeSeriesFile` filename.
+    '''
+    name, ext = splitext(tsfilename)
+    if ext != TimeSeriesFile.DOTEXT:
+      warning("expected extension %r, got %r", TimeSeriesFile.DOTEXT, ext)
+    return name
+
   def partition(self, start, stop):
     ''' Return an iterable of `(when,subseries)` for each time `when`
         from `start` to `stop`.
