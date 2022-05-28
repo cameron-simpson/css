@@ -953,7 +953,7 @@ class _BoundedBufferIterator(object):
     if limit <= 0:
       if limit < 0:
         raise RuntimeError("limit:%d < 0" % (limit,))
-      raise StopIteration
+      raise StopIteration("limit reached")
     # post: limit > 0
     buf = next(bfr)
     # post: bfr.buf now empty, can be modified
