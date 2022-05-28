@@ -818,7 +818,7 @@ class Upd(SingletonMixin):
           )
       if proxy is None:
         # create the proxy, which inserts it
-        return UpdProxy(index, self)
+        return UpdProxy(index, self, prefix=txt)
 
       # associate the proxy with self
       assert proxy.upd is None
