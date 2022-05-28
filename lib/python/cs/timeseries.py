@@ -1519,7 +1519,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         raise ValueError(
             "%s index slices may not specify a step" % (type(self).__name__,)
         )
-      return self.slice(start, step)
+      return self.slice(start, stop)
     ary = self.array
     # avoid confusion with negative indices
     if when < 0:
