@@ -696,7 +696,7 @@ class TimeStepsMixin:
 
         Eample in a `TimeSeries`:
 
-           >>> ts = TimeSeriesFile('tsfile.csts', 'd', start=19.1, step=1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', epoch=(19.1, 1.2))
            >>> ts.offset(19.1)
            0
            >>> ts.offset(20)
@@ -728,7 +728,7 @@ class TimeStepsMixin:
 
         Eample in a `TimeSeries`:
 
-           >>> ts = TimeSeriesFile('tsfile.csts', 'd', start=19.1, step=1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', epoch=(19.1, 1.2))
            >>> list(ts.offset_range(20,30))
            [0, 1, 2, 3, 4, 5, 6, 7, 8]
     '''
@@ -759,7 +759,7 @@ class TimeStepsMixin:
 
         Eample in a `TimeSeries`:
 
-           >>> ts = TimeSeriesFile('tsfile.csts', 'd', start=19.1, step=1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', epoch=(19.1, 1.2))
            >>> list(ts.range(20,30))
            [19.1, 20.3, 21.5, 22.700000000000003, 23.900000000000002, 25.1, 26.3, 27.5, 28.700000000000003]
 
@@ -867,10 +867,15 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
 
         An `int` or `float` argument will be used as the `step` in
         an `Epoch` starting at `0`.
+
+        A 2-tuple of `(start,step)` will be used to construct a new `Epoch` directly.
     '''
     if not isinstance(arg, Epoch):
       if isinstance(arg, (int, float)):
         arg = cls(0, arg)
+      elif isinstance(arg, tuple):
+        start, step = arg
+        arg = cls(start, step)
       else:
         raise TypeError(
             "%s.promote: do not know how to promote %s" %
@@ -1433,7 +1438,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
         Eample:
 
-           >>> ts = TimeSeriesFile('tsfile.csts', 'd', 19.1, 1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', epoch=(19.1, 1.2))
            >>> ts.array_index_bounds(20,30)
            (0, 9)
     '''
@@ -1449,7 +1454,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
         Eample:
 
-           >>> ts = TimeSeriesFile('tsfile.csts', 'd', 19.1, 1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', epoch=(19.1, 1.2))
            >>> list(ts.array_indices(20,30))
            [0, 1, 2, 3, 4, 5, 6, 7, 8]
     '''
