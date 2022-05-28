@@ -1038,9 +1038,8 @@ class BaseCommand:
       print(usage.rstrip(), file=sys.stderr)
     return True
 
-  @staticmethod
   @contextmanager
-  def run_context():
+  def run_context(self):
     ''' Stub context manager which surrounds `main` or `cmd_`*subcmd*.
     '''
     # redundant try/finally to remind subclassers of correct structure
