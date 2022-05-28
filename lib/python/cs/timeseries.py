@@ -2463,14 +2463,15 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     try:
       ts = self._ts_by_partition[span.name]
     except KeyError:
+      tsepoch = Epoch(span.start, span.step)
       filepath = self.pathto(span.name + TimeSeriesFile.DOTEXT)
       ts = self._ts_by_partition[span.name] = TimeSeriesFile(
           filepath,
           self.typecode,
-          epoch=self.epoch,
+          epoch=tsepoch,
       )
+      ts.epoch = tsepoch
       ts.span = span  # pylint: disable=attribute-defined-outside-init
-      ts.epoch = span.epoch
       ts.tags['partition'] = span.name
       ts.tags['start'] = span.start
       ts.tags['stop'] = span.stop
