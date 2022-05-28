@@ -1550,6 +1550,55 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       self.modified = True
       assert len(ary) == ary_index + 1
 
+class TimePartition(namedtuple('TimePartition', 'epoch name offset0 steps'),
+                    TimeStepsMixin):
+  ''' A `namedtuple` for a slice of time with the following attributes:
+      * `epoch`: the reference `Epoch`
+      * `name`: the name for this slice
+      * `offset0`: the epoch offset of the start time (`self.start`)
+      * `steps`: the number of time slots in this partition
+
+      These are used by `TimespanPolicy` instances to express the partitions
+      into which they divide time.
+  '''
+
+  @property
+  def start(self):
+    ''' The start UNIX time derived from `self.epoch` and `self.offset0`.
+    '''
+    return self.epoch.when(self.offset0)
+
+  @property
+  def stop(self):
+    ''' The start UNIX time derived from `self.epoch` and `self.offset0` and `self.steps`.
+    '''
+    return self.epoch.when(self.offset0 + self.steps)
+
+  @property
+  def step(self):
+    ''' The epoch step size.
+    '''
+    return self.epoch.step
+
+  def __contains__(self, when: Numeric) -> bool:
+    ''' Test whether the UNIX timestamp `when` lies in this partition.
+    '''
+    return self.start <= when < self.stop
+
+  def __iter__(self):
+    ''' A generator yielding times from this partition from
+        `self.start` to `self.stop` by `self.step`.
+    '''
+    offset = self.offset0
+    epoch = self.epoch
+    for offset in self.offsets():
+      yield epoch.when(offset)
+
+  def offsets(self):
+    ''' Return an iterable of the epoch offsets from `self.start` to `self.stop`.
+    '''
+    return range(self.offset0, self.offset0 + self.steps)
+
 class TimespanPolicy(DBC, HasEpochMixin):
   ''' A class implementing a policy allocating times to named time spans.
 
