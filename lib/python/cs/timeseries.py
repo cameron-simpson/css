@@ -1119,28 +1119,228 @@ class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
 
 # pylint: disable=too-many-instance-attributes
 class TimeSeriesFile(TimeSeries, HasFSPath):
+  ''' A file containing a single time series for a single data field.
 
-  @classmethod
-  @pfx
-  def stat(cls, fspath):
-    ''' Read the data file header, return `(typecode,bigendian)`
-        as from the `parse_header(heasder_bs)` method.
-        Returns `None` if the file does not exist.
-        Raises `ValueError` for an invalid header.
+      This provides easy access to a time series data file.
+      The instance can be indexed by UNIX time stamp for time based access
+      or its `.array` property can be accessed for the raw data.
+
+      Read only users can just instantiate an instance.
+      Read/write users should use the instance as a context manager,
+      which will automatically rewrite the file with the array data
+      on exit.
+
+      Note that the save-on-close is done with `TimeSeries.flush()`
+      which ony saves if `self.modified`.
+      Use of the `__setitem__` or `pad_to` methods set this flag automatically.
+      Direct access via the `.array` will not set it,
+      so users working that way for performance should update the flag themselves.
+
+      The data file itself has a header indicating the file data big endianness,
+      the datum type and the time type (both `array.array` type codes).
+      Following these are the start and step sizes in the time type format.
+      This is automatically honoured on load and save.
+  '''
+
+  DOTEXT = '.csts'
+
+  # pylint: disable=too-many-branches,too-many-statements
+  @typechecked
+  def __init__(
+      self,
+      fspath: str,
+      typecode: Optional[str] = None,
+      *,
+      epoch: Optional[Epoch] = None,
+      fill=None,
+      fstags=None,
+  ):
+    ''' Prepare a new time series stored in the file at `fspath`
+        containing machine data for the time series values.
+
+        Parameters:
+        * `fspath`: the filename of the data file
+        * `typecode` optional expected `array.typecode` value of the data;
+          if specified and the data file exists, they must match;
+          if not specified then the data file must exist
+          and the `typecode` will be obtained from its header
+        * `start`: the UNIX epoch time for the first datum
+        * `step`: the increment between data times
+        * `time_typecode`: the type of the start and step times;
+          inferred from the type of the start time value if unspecified
+        * `fill`: optional default fill values for `pad_to`;
+          if unspecified, fill with `0` for `'q'`
+          and `float('nan') for `'d'`
+
+        If `start` or `step` are omitted the file's fstags will be
+        consulted for their values.
+        This class does not set these tags (that would presume write
+        access to the parent directory or its `.fstags` file)
+        when a `TimeSeriesFile` is made by a `TimeSeriesPartitioned` instance
+        it sets these flags.
     '''
-    # read the data file header
+    HasFSPath.__init__(self, fspath)
+    if fstags is None:
+      fstags = FSTags()
+    self.fstags = fstags
     try:
-      with pfx_open(fspath, 'rb') as tsf:
-        header_bs = tsf.read(cls.HEADER_LENGTH)
-      if len(header_bs) != cls.HEADER_LENGTH:
-        raise ValueError(
-            "file header is the wrong length, expected %d, got %d" %
-            (cls.HEADER_LENGTH, len(header_bs))
-        )
+      header = TimeSeriesFileHeader.from_file(self.fspath)
     except FileNotFoundError:
-      # file does not exist
-      return None
-    return cls.parse_header(header_bs)
+      header = None
+    # compare the file against the supplied arguments
+    if header is None:
+      # no existing file
+      if typecode is None:
+        raise ValueError(
+            "no typecode supplied and no data file %r" % (fspath,)
+        )
+      if epoch is None:
+        raise ValueError("no epoch supplied and no data file %r" % (fspath,))
+      header = TimeSeriesFileHeader(
+          bigendian=NATIVE_BIGENDIANNESS[typecode],
+          typecode=typecode,
+          epoch=epoch,
+      )
+    else:
+      if typecode is not None and typecode != header.typecode:
+        raise ValueError(
+            "typecode=%r but data file %s has typecode %r" %
+            (typecode, fspath, header.typecode)
+        )
+      if epoch is not None and epoch != header.epoch:
+        raise ValueError(
+            "epoch=%s but data file %s has epoch %s" %
+            (epoch, fspath, header.epoch)
+        )
+    self.header = header
+    TimeSeries.__init__(self, header.epoch, typecode)
+    if fill is None:
+      if typecode == 'd':
+        fill = nan
+      elif typecode == 'q':
+        fill = 0
+      else:
+        raise RuntimeError(
+            "no default fill value for typecode=%r" % (typecode,)
+        )
+    self.fill = fill
+    self.fill_bs = header.datum_type.transcribe_value(self.fill)
+    self._itemsize = array(typecode).itemsize
+    assert self._itemsize == self.header.datum_type.length
+    self.modified = False
+    self._array = None
+
+  def __str__(self):
+    return "%s(%s,%r,%d:%d,%r)" % (
+        type(self).__name__, shortpath(self.fspath), self.typecode, self.start,
+        self.step, self.fill
+    )
+
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `TimeSeriesFile`, handy for use with `pprint()`.
+    '''
+    if d is None:
+      d = {}
+    d.update(fspath=self.fspath, slots=len(self.array))
+    TimeSeries.info_dict(self, d)
+    return d
+
+  @contextmanager
+  def startup_shutdown(self):
+    yield self
+    self.flush()
+
+  @property
+  def end(self):
+    ''' The end time of this array,
+        computed as `self.start+len(self.array)*self.step`.
+    '''
+    return self.start + len(self.array) * self.step
+
+  def file_offset(self, offset):
+    ''' Return the file position for the data with position `offset`.
+    '''
+    return self.HEADER_LENGTH + self.header.datum_type.length * offset
+
+  def peek(self, when: Numeric, f=None):
+    ''' Read a single data value for the UNIX time `when`
+        from the file `f`.
+        The default file is obtained by opening `self.fspath` for read.
+    '''
+    if when < self.start:
+      raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
+    return self.peek_offset(self.offset(when), f=f)
+
+  def peek_offset(self, offset, f=None):
+    ''' Read a single data value from the binary file `f` at _data_
+        offset `offset` i.e. the array index.
+        Return the value.
+        The default file is obtained by opening `self.fspath` for read.
+    '''
+    if f is None:
+      with open(self.fspath, 'rb') as f2:
+        return self.peek_offset(offset, f2)
+    read_len = self.header.datum_type.length
+    bs = f.pread(f.fileno(), self.file_offset(offset), read_len)
+    if len(bs) == 0:
+      return self.fill
+    if len(bs) < read_len:
+      raise ValueError(
+          "%s.peek(f=%s,%d): expected %d bytes, got %d bytes: %r" %
+          (self, f, offset, read_len, len(bs), bs)
+      )
+    return self.header.parse_value(bs)
+
+  def poke(self, when: Numeric, value: Numeric, f=None):
+    ''' Write a single data value for the UNIX time `when` to the file `f`.
+        The default file is obtained by opening `self.fspath` for update.
+    '''
+    if when < self.start:
+      raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
+    self.poke_offset(self.offset(when), value, f=f)
+
+  def poke_offset(self, offset: int, value: Numeric, f=None):
+    ''' Write a single data value to the binary file `f` at _data_
+        offset `offset` i.e. the array offset.
+        The default file is obtained by opening `self.fspath` for update.
+    '''
+    if offset < 0:
+      raise ValueError("offset:%d must be >= 0" % (offset,))
+    if f is None:
+      with open(self.fspath, 'w+b') as f2:
+        self.poke_offset(offset, value, f=f2)
+      return
+    seek_offset = self.file_offset(offset)
+    dtype = self.header.datum_type
+    S = os.fstat(f.fileno())
+    if S.st_size > seek_offset:
+      # pad intervening data with self.fill
+      pad_length = S.st_size - seek_offset
+      assert pad_length % dtype.length == 0
+      pad_count = pad_length // dtype.length
+      pad_bs = self.fill_bs * pad_count
+      nwritten = os.pwrite(f.fileno(), S.st_size, pad_bs)
+      if nwritten != len(pad_bs):
+        raise IOError(
+            "tried to write %d bytes, wrote %d bytes" %
+            (len(pad_bs), nwritten)
+        )
+    datum_bs = dtype.transscribe_value(value)
+    assert len(datum_bs) == dtype.length
+    nwritten = os.pwrite(f.fileno(), seek_offset, datum_bs)
+    if nwritten != len(datum_bs):
+      raise IOError(
+          "tried to write %d bytes, wrote %d bytes" %
+          (len(datum_bs), nwritten)
+      )
+
+  @property
+  @cachedmethod
+  def tags(self):
+    ''' The `TagSet` associated with this `TimeSeriesFile` instance.
+    '''
+    return self.fstags[self.fspath]
 
   @property
   @cachedmethod
@@ -1149,11 +1349,51 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         This loads the array data from `self.fspath` on first use.
     '''
     try:
-      ary = self.load_from(self.fspath, self.typecode)
+      hdr, ary = self.load_from(self.fspath)
     except FileNotFoundError:
       # no file, empty array
       ary = array(self.typecode)
+    else:
+      # sanity check the header
+      if hdr.typecode != self.typecode:
+        raise ValueError(
+            "file typecode %r does not match self.typecode:%r" %
+            (hdr.typecode, self.typecode)
+        )
+      if hdr.time_typecode != self.time_typecode:
+        raise ValueError(
+            "file time typecode %r does not match self.time_typecode:%r" %
+            (hdr.time_typecode, self.time_typecode)
+        )
+      if hdr.step != self.step:
+        raise ValueError(
+            "file step %r does not match self.step:%r" % (hdr.step, self.step)
+        )
     return ary
+
+  @staticmethod
+  def load_from(fspath):
+    ''' Load the data from `fspath`, return the header and an
+        `array.array(typecode)` containing the file data.
+        Raises `FileNotFoundError` if the file does not exist.
+    '''
+    with pfx_open(fspath, 'rb') as tsf:
+      bfr = CornuCopyBuffer.from_file(tsf)
+      header = TimeSeriesFileHeader.parse(bfr)
+      ary = array(header.typecode)
+      itemsize = header.datum_type.length
+      flen = os.fstat(tsf.fileno()).st_size
+      datalen = flen - bfr.offset
+      if datalen % ary.itemsize != 0:
+        warning(
+            "data length:%d is not a multiple of item size:%d", datalen,
+            itemsize
+        )
+        with mmap(tsf.fileno(), flen, MAP_PRIVATE, PROT_READ) as mm:
+          ary.frombytes(memoryview(mm)[bfr.offset:flen])
+    if header.bigendian != NATIVE_BIGENDIANNESS[header.typecode]:
+      ary.byteswap()
+    return header, ary
 
   def flush(self, keep_array=False):
     ''' Save the data file if `self.modified`.
@@ -1170,45 +1410,11 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     assert self._array is not None, "array not yet loaded, nothing to save"
     if fspath is None:
       fspath = self.fspath
-    self.save_to(self.array, fspath, self.file_bigendian)
+    self.save_to(fspath)
 
-  @classmethod
-  @ensure(
-      lambda typecode, result: typecode is None or result.typecode == typecode
-  )
-  def load_from(cls, fspath, typecode=None):
-    ''' Load the data from `fspath`, return an `array.array(typecode)`
-        containing the file data.
-    '''
-    ary = array(typecode)
-    with pfx_open(fspath, 'rb') as tsf:
-      header_bs = tsf.read(cls.HEADER_LENGTH)
-      assert len(header_bs) == cls.HEADER_LENGTH
-      h_typecode, h_bigendian = cls.parse_header(header_bs)
-      if typecode is not None and h_typecode != typecode:
-        raise ValueError(
-            "expected typecode %r, file contains typecode %r" %
-            (typecode, h_typecode)
-        )
-      flen = os.fstat(tsf.fileno()).st_size
-      datalen = flen - len(header_bs)
-      if flen % ary.itemsize != 0:
-        warning(
-            "data length:%d is not a multiple of item size:%d", datalen,
-            ary.itemsize
-        )
-      datum_count = datalen // ary.itemsize
-      ary.fromfile(tsf, datum_count)
-      if h_bigendian != NATIVE_BIGENDIANNESS[h_typecode]:
-        ary.byteswap()
-    return ary
-
-  @classmethod
   @typechecked
-  def save_to(cls, ary, fspath: str, bigendian=Optional[bool]):
-    ''' Save the array `ary` to `fspath`.
-        If `bigendian` is specified, write the data in that endianness.
-        The default is to use the native endianness.
+  def save_to(self, fspath: str):
+    ''' Save the time series to `fspath`.
 
         *Warning*:
         if the file endianness is not the native endianness,
@@ -1216,17 +1422,22 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         during the file write operation.
         Concurrent users should avoid using the array during this function.
     '''
+    ary = self.array
+    header = self.header
     native_bigendian = NATIVE_BIGENDIANNESS[ary.typecode]
-    if bigendian is None:
-      bigendian = native_bigendian
-    header_bs = cls.make_header(ary.typecode, bigendian)
     with pfx_open(fspath, 'wb') as tsf:
-      tsf.write(header_bs)
-      if bigendian != native_bigendian:
+      for bs in header.transcribe_flat():
+        tsf.write(bs)
+      if header.bigendian != native_bigendian:
         with array_byteswapped(ary):
           ary.tofile(tsf)
       else:
         ary.tofile(tsf)
+    fstags = self.fstags[fspath]
+    fstags['start'] = self.epoch.start
+    fstags['step'] = self.epoch.step
+    fstags['datatype'] = SUPPORTED_TYPECODES[self.typecode].__name__
+    fstags['timetype'] = type(self.epoch.start).__name__
 
   @ensure(lambda result: result >= 0)
   def array_index(self, when) -> int:
@@ -1272,7 +1483,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       raise IndexError("index:%d must be >=0" % (index,))
     return self.when(index)
 
-  def __len__(self):
+  def array_length(self):
     ''' The length of the time series data,
         from `len(self.array)`.
     '''
@@ -1292,7 +1503,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         with enough of `self.fill` to reach the array start.
         If `prepad` is true, pad the resulting list at the beginning
     '''
-    ary = self.array
     astart, astop = self.offset_bounds(start, stop)
     if astart < 0:
       raise IndexError(
