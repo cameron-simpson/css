@@ -71,13 +71,16 @@ from builtins import print as builtin_print
 from contextlib import contextmanager
 import os
 import sys
-from threading import RLock
+from threading import RLock, Thread
+import time
+
 from cs.context import stackattrs, StackableState
 from cs.deco import decorator
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
 from cs.tty import ttysize
+from cs.units import transcribe, TIME_SCALE
 
 try:
   import curses
@@ -959,6 +962,56 @@ class Upd(SingletonMixin):
         self._backend.write(''.join(txts))
         self._backend.flush()
       return proxy
+
+  @contextmanager
+  def run_task(
+      self,
+      label: str,
+      report_print=False,
+      runstate=None,
+      tick_delay=None,
+      tick_chars='|/=\\'
+  ):
+    ''' Context manager to display an `UpdProxy` for the duration of some task.
+    '''
+    if tick_delay is not None:
+      if tick_delay <= 0:
+        raise ValueError(
+            "run_task(%r,...,tick_delay=%s): tick_delay should be >0" %
+            (label, tick_delay)
+        )
+
+      def _ticker(proxy, runstate):
+        i = 0
+        while not runstate.cancelled:
+          proxy.suffix = ' ' + tick_chars[i % len(tick_chars)]
+          i += 1
+          time.sleep(tick_delay)
+
+    _runstate = None
+    with self.insert(1, label + ' ') as proxy:
+      if tick_delay is not None:
+        from cs.resources import RunState  # pylint: disable=import-outside-toplevel
+        _runstate = runstate or RunState()
+        Thread(target=_ticker, args=(proxy, _runstate), daemon=True).start()
+      proxy.text = '...'
+      start_time = time.time()
+      yield proxy
+      end_time = time.time()
+      if _runstate and _runstate is not runstate:
+        # shut down the ticker
+        _runstate.cancel()
+    elapsed_time = end_time - start_time
+    if report_print:
+      if isinstance(report_print, bool):
+        report_print = print
+      report_print(
+          label + (
+              ': (cancelled)'
+              if runstate is not None and runstate.cancelled else ':'
+          ), 'in',
+          transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
+      )
 
 class UpdProxy(object):
   ''' A proxy for a status line of a multiline `Upd`.
