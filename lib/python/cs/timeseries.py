@@ -897,6 +897,16 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     self.epoch = epoch
     self.typecode = typecode
 
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `TimeSeries`, handy for use with `pprint()`.
+    '''
+    if d is None:
+      d = {}
+    d.update(typecode=self.typecode)
+    HasEpochMixin.info_dict(self, d)
+    return d
+
   @abstractmethod
   def __getitem__(self, index):
     ''' Return a datum or list of data.
@@ -1969,6 +1979,16 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
         getattr(self, 'policy', 'POLICY_UNDEFINED'),
     )
 
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `TimeSeriesMapping`, handy for use with `pprint()`.
+    '''
+    if d is None:
+      d = {}
+    keys = sorted(self.keys())
+    d.update(keys=keys, subseries={key: self[key].info_dict() for key in keys})
+    return d
+
   @contextmanager
   def startup_shutdown(self):
     ''' Context manager for `MultiOpenMixin`.
@@ -2168,6 +2188,17 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     )
 
   __repr__ = __str__
+
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `TimeSeriesDataDir`, handy for use with `pprint()`.
+    '''
+    if d is None:
+      d = {}
+    d.update(fspath=self.fspath)
+    d.update(config=HasConfigIni.info_dict(self))
+    TimeSeriesMapping.info_dict(self, d)
+    return d
 
   def _infill_keys_from_subdirs(self):
     ''' Fill in any missing keys from subdirectories.
@@ -2374,6 +2405,26 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         getattr(self, 'step', 'NO_STEP_YET'),
         getattr(self, 'policy', 'NO_POLICY_YET'),
     )
+
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `TimeSeriesPartitioned`, handy for use with `pprint()`.
+    '''
+    if d is None:
+      d = {}
+    filenames = sorted(self.tsfilenames())
+    d.update(
+        typecode=self.typecode,
+        time_typecode=self.time_typecode,
+        epoch_start=self.epoch.start,
+        epoch_step=self.epoch.step,
+        filenames=filenames,
+        partitions={
+            span_name: self.subseries(span_name).info_dict()
+            for span_name in map(self.partition_name_from_filename, filenames)
+        },
+    )
+    return d
 
   @contextmanager
   def startup_shutdown(self):
