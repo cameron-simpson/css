@@ -352,6 +352,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
 
   def apply_defaults(self):
     self.options.ts_step = None  # the time series step
+    self.options.ts = None
 
   def apply_opt(self, opt, val):
     if opt == '-s':
@@ -372,16 +373,19 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
     '''
     argv = list(argv)
     options = self.options
-    options.ts = self.poparg(
-        argv,
-        'tspath',
-        partial(timeseries_from_path, epoch=options.ts_step),
-    )
-    if options.ts_step is not None and options.ts.step != options.ts_step:
-      warning(
-          "tspath step=%s but -s ts-step specified %s", options.ts.step,
-          options.ts_step
+    if argv and argv[0] in ('test',):
+      pass
+    else:
+      options.ts = self.poparg(
+          argv,
+          'tspath',
+          partial(timeseries_from_path, epoch=options.ts_step),
       )
+      if options.ts_step is not None and options.ts.step != options.ts_step:
+        warning(
+            "tspath step=%s but -s ts-step specified %s", options.ts.step,
+            options.ts_step
+        )
     return argv
 
   @contextmanager
@@ -389,8 +393,11 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
     with super().run_context():
       with Upd() as upd:
         with stackattrs(self.options, upd=upd):
-          with self.options.ts:
+          if self.options.ts is None:
             yield
+          else:
+            with self.options.ts:
+              yield
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_import(self, argv):
@@ -533,12 +540,10 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
     ''' Usage: {cmd} [testnames...]
           Run some tests of functionality.
     '''
-    if not argv:
-      argv = ['pandas']
 
-    def test_pandas():
+    def test_pandas(tmpdirpath):
       t0 = 1649552238
-      fspath = f'foo--from-{t0}.dat'
+      fspath = joinpath(tmpdirpath, f'foo--from-{t0}.dat')
       ts = TimeSeriesFile(fspath, 'd', epoch=60)
       ts.pad_to(time.time() + 300)
       print("len(ts.array) =", len(ts.array))
@@ -546,8 +551,8 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       print(type(pds), pds.memory_usage())
       print(pds)
 
-    def test_partitioned_spans():
-      policy = TimespanPolicyDaily()
+    def test_partitioned_spans(tmpdirpath):
+      policy = TimespanPolicyDaily
       start = time.time()
       end = time.time() + 7 * 24 * 3600
       print("start =", Arrow.fromtimestamp(start))
@@ -560,18 +565,19 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
             Arrow.fromtimestamp(partition_stop),
         )
 
-    def test_datadir():
-      with TimeSeriesDataDir('tsdatadir', policy='daily', step=300) as datadir:
+    def test_datadir(tmpdirpath):
+      with TimeSeriesDataDir(joinpath(tmpdirpath, 'tsdatadir'),
+                             policy='daily') as datadir:
         ts = datadir['key1']
         ts[time.time()] = 9.0
 
-    def test_timespan_policy():
+    def test_timespan_policy(tmpdirpath):
       policy = TimespanPolicyMonthly()
-      policy.timespan_for(time.time())
+      policy.partition_for(time.time())
 
-    def test_timeseries():
+    def test_timeseries(tmpdirpath):
       t0 = 1649464235
-      fspath = 'foo.dat'
+      fspath = joinpath(tmpdirpath, 'foo.dat')
       ts = TimeSeriesFile(fspath, 'd', start=t0, step=1)
       ary = ts.array
       print(ary)
@@ -586,6 +592,9 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         'timeseries': test_timeseries,
         'timespan_policy': test_timespan_policy,
     }
+
+    if not argv:
+      argv = ['pandas']
     ok = True
     for testname in argv:
       with Pfx(testname):
@@ -599,7 +608,11 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       )
     for testname in argv:
       with Pfx(testname):
-        testfunc_map[testname]()
+        with TemporaryDirectory(
+            dir='.',
+            prefix=f'{self.cmd}--test--{testname}--',
+        ) as tmpdirpath:
+          testfunc_map[testname](tmpdirpath)
 
 @decorator
 def plotrange(func, needs_start=False, needs_stop=False):
