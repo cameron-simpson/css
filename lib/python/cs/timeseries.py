@@ -704,14 +704,7 @@ class TimeStepsMixin:
            >>> ts.offset(22)
            2
     '''
-    offset = when - self.start
-    offset_steps = offset // self.step
-    when0 = self.start + offset_steps * self.step
-    if when0 < self.start:
-      offset_steps += 1
-    offset_steps_i = int(offset_steps)
-    assert offset_steps == offset_steps_i
-    return offset_steps_i
+    return int((when - self.start) // self.step)
 
   def when(self, offset):
     ''' Return `self.start+offset*self.step`.
