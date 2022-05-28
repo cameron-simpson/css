@@ -39,7 +39,8 @@ from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
-from math import nan
+from math import nan  # pylint: disable=no-name-in-module
+from mmap import mmap, MAP_PRIVATE, PROT_READ  # pylint: disable=no-name-in-module,c-extension-no-member
 import os
 from os.path import (
     basename,
@@ -48,13 +49,20 @@ from os.path import (
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
+    splitext,
 )
-from struct import pack, Struct  # pylint: disable=no-name-in-module
+from pprint import pprint
+from struct import pack  # pylint: disable=no-name-in-module
 from subprocess import run
 import sys
 from tempfile import TemporaryDirectory
 import time
-from typing import Callable, List, Optional, Tuple, Union
+from typing import (
+    Callable,
+    List,
+    Optional,
+    Union,
+)
 
 import arrow
 from arrow import Arrow
@@ -63,6 +71,8 @@ import numpy as np
 from numpy import datetime64
 from typeguard import typechecked
 
+from cs.binary import BinarySingleStruct, SimpleBinary
+from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
 from cs.context import stackattrs
@@ -458,8 +468,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
               "date column index %d exceeds the width of the CSV data" %
               (datecol,)
           )
-        else:
-          dateindex = datecol
+        dateindex = datecol
       else:
         try:
           dateindex = rowcls.index_of_[datecol]
@@ -1003,8 +1012,8 @@ class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
   # step time
   HEADER_LENGTH = 24
 
-  # pylint: disable=too-many-branches
   @typechecked
+  @require(lambda typecode: typecode in 'dq')
   def __init__(
       self,
       *,
