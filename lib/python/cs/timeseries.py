@@ -804,6 +804,60 @@ class TimeStepsMixin:
         for offset_step in self.offset_range(start, stop)
     )
 
+class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
+  ''' The basis of time references with a starting UNIX time, the
+      `epoch` and the `step` defining the width of a time slot.
+  '''
+
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `Epoch`, handy for use with `pprint()`.
+    '''
+    if d is None:
+      d = {}
+    d.update(
+        typecode=self.typecode,
+        start=self.start,
+        start_dt=str(arrow.get(self.start)),
+        step=self.step
+    )
+    return d
+
+  @property
+  def typecode(self):
+    ''' The `array` typecode for the times from this `Epoch`.
+        This returns `typecode_of(type(self.start))`.
+    '''
+    return typecode_of(type(self.start))
+
+  @classmethod
+  def promote(cls, epochy):
+    ''' Promote `epochy` to an `Epoch` (except for `None`).
+
+        `None` remains `None`.
+
+        An `Epoch` remains unchanged.
+
+        An `int` or `float` argument will be used as the `step` in
+        an `Epoch` starting at `0`.
+
+        A 2-tuple of `(start,step)` will be used to construct a new `Epoch` directly.
+    '''
+    if epochy is not None and not isinstance(epochy, Epoch):
+      if isinstance(epochy, (int, float)):
+        epochy = cls(0, epochy)
+      elif isinstance(epochy, tuple):
+        start, step = epochy
+        epochy = cls(start, step)
+      else:
+        raise TypeError(
+            "%s.promote: do not know how to promote %s" %
+            (cls.__name__, r(epochy))
+        )
+    return epochy
+
+OptionalEpochy = Optional[Union[Epoch, Tuple[Numeric, Numeric], Numeric]]
+
 class HasEpochMixin(TimeStepsMixin):
   ''' A `TimeStepsMixin` with `.start` and `.step` derive from `self.epoch`.
   '''
@@ -834,54 +888,6 @@ class HasEpochMixin(TimeStepsMixin):
     ''' The `array` typecode for times from `self.epoch`.
     '''
     return self.epoch.typecode
-
-class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
-  ''' The basis of time references with a starting UNIX time, the
-      `epoch` and the `step` defining the width of a time slot.
-  '''
-
-  def info_dict(self, d=None):
-    ''' Return an informational `dict` containing salient information
-        about this `Epoch`, handy for use with `pprint()`.
-    '''
-    if d is None:
-      d = {}
-    d.update(
-        typecode=self.typecode,
-        start=self.start,
-        start_dt=str(arrow.get(self.start)),
-        step=self.step
-    )
-    return d
-
-  @property
-  def typecode(self):
-    ''' The `array` typecode for the times from this `Epoch`.
-        This returns `typecode_of(type(self.start))`.
-    '''
-    return typecode_of(type(self.start))
-
-  @classmethod
-  def promote(cls, arg):
-    ''' Promote `arg` to an `Epoch`.
-
-        An `int` or `float` argument will be used as the `step` in
-        an `Epoch` starting at `0`.
-
-        A 2-tuple of `(start,step)` will be used to construct a new `Epoch` directly.
-    '''
-    if not isinstance(arg, Epoch):
-      if isinstance(arg, (int, float)):
-        arg = cls(0, arg)
-      elif isinstance(arg, tuple):
-        start, step = arg
-        arg = cls(start, step)
-      else:
-        raise TypeError(
-            "%s.promote: do not know how to promote %s" %
-            (cls.__name__, r(arg))
-        )
-    return arg
 
 class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
   ''' Common base class of any time series.
