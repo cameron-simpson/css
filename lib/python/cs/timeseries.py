@@ -834,7 +834,6 @@ class TimeStepsMixin:
         for offset_step in self.offset_range(start, stop)
     )
 
-class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
 class HasEpochMixin(TimeStepsMixin):
   ''' A `TimeStepsMixin` with `.start` and `.step` derive from `self.epoch`.
   '''
@@ -909,6 +908,7 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
         )
     return arg
 
+class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
   ''' Common base class of any time series.
   '''
 
