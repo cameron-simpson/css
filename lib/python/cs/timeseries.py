@@ -604,26 +604,6 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       with Pfx(testname):
         testfunc_map[testname]()
 
-def timeseries_from_path(tspath: str, start=None, step=None, typecode=None):
-  ''' Turn a time series filesystem path into a time series:
-      * a file: a `TimeSeries`
-      * a directory holding `.csts` files: a `TimeSeriesPartitioned`
-      * a directory: a `TimeSeriesDataDir`
-  '''
-  if isfilepath(tspath):
-    if not tspath.endswith(TimeSeriesFile.DOTEXT):
-      raise GetoptError(
-          "%s does not end in %s" % (shortpath(tspath), TimeSeriesFile.DOTEXT)
-      )
-    return TimeSeriesFile(tspath, None, start=start, step=step)
-  if isdirpath(tspath):
-    if fnmatchdir(tspath, '*' + TimeSeriesFile.DOTEXT):
-      return TimeSeriesPartitioned(
-          tspath, typecode, start=start, step=step, policy='annual'
-      )
-    return TimeSeriesDataDir(tspath, policy=TimespanPolicyAnnual, step=step)
-  raise ValueError("cannot deduce time series type from tspath %r" % (tspath,))
-
 @decorator
 def plotrange(func, needs_start=False, needs_stop=False):
   ''' A decorator for plotting methods with optional `start` and `stop`
@@ -2426,6 +2406,28 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     if label is None:
       label = self.tags.get('csv.header')
     return super().plot(start, stop, label=label, runstate=runstate, **plot_kw)
+
+@typechecked
+def timeseries_from_path(
+    tspath: str, epoch: Union[Epoch, Numeric], typecode=None
+):
+  ''' Turn a time series filesystem path into a time series:
+      * a file: a `TimeSeriesFile`
+      * a directory holding `.csts` files: a `TimeSeriesPartitioned`
+      * a directory: a `TimeSeriesDataDir`
+  '''
+  epoch = Epoch.promote(epoch)
+  if isfilepath(tspath):
+    if not tspath.endswith(TimeSeriesFile.DOTEXT):
+      raise ValueError(
+          "%s does not end in %s" % (shortpath(tspath), TimeSeriesFile.DOTEXT)
+      )
+    return TimeSeriesFile(tspath, typecode, start=epoch.start, step=epoch.step)
+  if isdirpath(tspath):
+    if fnmatchdir(tspath, '*' + TimeSeriesFile.DOTEXT):
+      return TimeSeriesPartitioned(tspath, typecode, policy='annual')
+    return TimeSeriesDataDir(tspath, policy='annual')
+  raise ValueError("cannot deduce time series type from tspath %r" % (tspath,))
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
