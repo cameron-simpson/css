@@ -996,192 +996,73 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
     df = pd.DataFrame(dict(x=xaxis, y=yaxis))
     return df.plot('x', 'y', label=label, **plot_kw)
 
-# pylint: disable=too-many-instance-attributes
-class TimeSeriesFile(TimeSeries):
-  ''' A file containing a single time series for a single data field.
+class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
+  ''' The binary data structure of the `TimeSeriesFile` file header.
 
-      This provides easy access to a time series data file.
-      The instance can be indexed by UNIX time stamp for time based access
-      or its `.array` property can be accessed for the raw data.
+      This is 24 bytes long and consists of:
+      * the 4 byte magic number, `b'csts'`
+      * the file bigendian marker, a `struct` byte order indicator
+        with a value of `b'>'` for big endian data
+        or `b'<'` for little endian data
+      * the datum typecode, `b'd'` for double float
+        or `b'q'` for signed 64 bit integer
+      * the time typecode, `b'd'` for double float
+        or `b'q'` for signed 64 bit integer
+      * a pad byte, value `b'_'`
+      * the start UNIX time, a double float or signed 64 bit integer
+        according to the time typecode and bigendian flag
+      * the step size, a double float or signed 64 bit integer
+        according to the time typecode and bigendian flag
 
-      Read only users can just instantiate an instance.
-      Read/write users should use the instance as a context manager,
-      which will automatically rewrite the file with the array data
-      on exit.
-
-      Note that the save-on-close is done with `TimeSeries.flush()`
-      which ony saves if `self.modified`.
-      Use of the `__setitem__` or `pad_to` methods set this flag automatically.
-      Direct access via the `.array` will not set it,
-      so users working that way for performance should update the flag themselves.
-
-      The data file itself has a header indicating the file data big endianness
-      and datum type (an `array.array` type code).
-      This is automatically honoured on load and save.
-      Note that the header _does not_ indicate the `start`,`step` time range of the data.
+      In addition to the header values tnd methods this also presents:
+      * `datum_type`: a `BinarySingleStruct` for the binary form of a data value
+      * `time_type`:  a `BinarySingleStruct` for the binary form of a time value
   '''
 
-  DOTEXT = '.csts'
   MAGIC = b'csts'
-  HEADER_LENGTH = 8
+  # MAGIC + endian + data type + time type + pad ('_')
+  # start time
+  # step time
+  HEADER_LENGTH = 24
 
   # pylint: disable=too-many-branches
   @typechecked
   def __init__(
       self,
-      fspath: str,
-      typecode: Optional[str] = None,
       *,
-      start: Union[int, float] = None,
-      step: Union[int, float] = None,
-      fill=None,
-      fstags=None,
+      bigendian: bool,
+      typecode: str,
+      epoch: Epoch,
   ):
-    ''' Prepare a new time series stored in the file at `fspath`
-        containing machine data for the time series values.
-
-        Parameters:
-        * `fspath`: the filename of the data file
-        * `typecode` optional expected `array.typecode` value of the data;
-          if specified and the data file exists, they must match;
-          if not specified then the data file must exist
-          and the `typecode` will be obtained from its header
-        * `start`: the UNIX epoch time for the first datum
-        * `step`: the increment between data times
-        * `fill`: optional default fill values for `pad_to`;
-          if unspecified, fill with `0` for `'q'`
-          and `float('nan') for `'d'`
-
-        If `start` or `step` are omitted the file's fstags will be
-        consulted for their values.
-        This class does not set these tags (that would presume write
-        access to the parent directory or its `.fstags` file)
-        when a `TimeSeriesFile` is made by a `TimeSeriesPartitioned` instance
-        it sets these flags.
-    '''
-    if fstags is None:
-      fstags = FSTags()
-    self.fstags = fstags
-    if start is None:
-      start = self.tags.start
-      if start is None:
-        raise ValueError("no start and no 'start' FSTags tag")
-    if step is None:
-      step = self.tags.step
-      if step is None:
-        raise ValueError("no step and no 'step' FSTags tag")
-    if typecode is not None and typecode not in SUPPORTED_TYPECODES:
-      raise ValueError(
-          "expected typecode to be one of %r, got %r" %
-          (tuple(SUPPORTED_TYPECODES.keys()), typecode)
-      )
-    if step <= 0:
-      raise ValueError("step should be >0, got %s" % (step,))
-    self.fspath = fspath
-    # compare the file against the supplied arguments
-    hdr_stat = self.stat(fspath)
-    if hdr_stat is None:
-      if typecode is None:
-        raise ValueError(
-            "no typecode supplied and no data file %r" % (fspath,)
-        )
-      file_bigendian = NATIVE_BIGENDIANNESS[typecode]
-    else:
-      file_typecode, file_bigendian = hdr_stat
-      if typecode is None:
-        typecode = file_typecode
-      elif typecode != file_typecode:
-        raise ValueError(
-            "typecode=%r but data file %s has typecode %r" %
-            (typecode, fspath, file_typecode)
-        )
-    if fill is None:
-      if typecode == 'd':
-        fill = nan
-      elif typecode == 'q':
-        fill = 0
-      else:
-        raise RuntimeError(
-            "no default fill value for typecode=%r" % (typecode,)
-        )
-    super().__init__(start, step, typecode)
-    self.file_bigendian = file_bigendian
-    self.fill = fill
-    self._itemsize = array(typecode).itemsize
-    assert self._itemsize == 8
-    struct_fmt = self.make_struct_format(typecode, self.file_bigendian)
-    self._struct = Struct(struct_fmt)
-    assert self._struct.size == self._itemsize
-    self.modified = False
-    self._array = None
-
-  def __str__(self):
-    return "%s(%s,%r,%d:%d,%r)" % (
-        type(self).__name__, shortpath(self.fspath), self.typecode, self.start,
-        self.step, self.fill
+    super().__init__(
+        bigendian=bigendian,
+        typecode=typecode,
+        epoch=epoch,
+    )
+    self.datum_type = BinarySingleStruct(
+        'Datum', self.struct_endian_marker + self.typecode
+    )
+    self.time_type = BinarySingleStruct(
+        'TimeValue', self.struct_endian_marker + self.time_typecode
     )
 
-  @contextmanager
-  def startup_shutdown(self):
-    yield self
-    self.flush()
-
   @property
-  def end(self):
-    ''' The end time of this array,
-        computed as `self.start+len(self.array)*self.step`.
+  def struct_endian_marker(self):
+    ''' The endianness indicatoe for a `struct` format string.
     '''
-    return self.start + len(self.array) * self.step
-
-  @property
-  @cachedmethod
-  def tags(self):
-    ''' The `TagSet` associated with this `TimeSeriesFile` instance.
-    '''
-    return self.fstags[self.fspath]
-
-  @staticmethod
-  def make_struct_format(typecode, bigendian):
-    ''' Make a `struct` format string for the data in a file.
-    '''
-    return ('>' if bigendian else '<') + typecode
-
-  @property
-  def header(self):
-    ''' The header magic bytes.
-    '''
-    return self.make_header(self.typecode, self.file_bigendian)
+    return '>' if self.bigendian else '<'
 
   @classmethod
-  def make_header(cls, typecode, bigendian):
-    ''' Construct a header `bytes` object for `typecode` and `bigendian`.
+  def parse(cls, bfr):
+    ''' Parse the header record, return a `TimeSeriesFileHeader`.
     '''
-    header_bs = (
-        cls.MAGIC +
-        cls.make_struct_format(typecode, bigendian).encode('ascii') + b'__'
-    )
-    assert len(header_bs) == cls.HEADER_LENGTH
-    return header_bs
-
-  @classmethod
-  @pfx
-  @typechecked
-  @ensure(lambda result: result[0] in SUPPORTED_TYPECODES)
-  def parse_header(cls, header_bs: bytes) -> Tuple[str, bool]:
-    ''' Parse the file header record.
-        Return `(typecode,bigendian)`.
-    '''
-    if len(header_bs) != cls.HEADER_LENGTH:
+    offset0 = bfr.offset
+    magic = bfr.take(4)
+    if magic != cls.MAGIC:
       raise ValueError(
-          "expected %d bytes, got %d bytes" %
-          (cls.HEADER_LENGTH, len(header_bs))
+          "invalid magic number, expected %r, got %r" % (cls.MAGIC, magic)
       )
-    if not header_bs.startswith(cls.MAGIC):
-      raise ValueError(
-          "bad leading magic, expected %r, got %r" %
-          (cls.MAGIC, header_bs[:len(cls.MAGIC)])
-      )
-    struct_endian_b, typecode_b, _1, _2 = header_bs[len(cls.MAGIC):]
+    struct_endian_b, typecode_b, time_typecode_b, pad = bfr.take(4)
     struct_endian_marker = chr(struct_endian_b)
     if struct_endian_marker == '>':
       bigendian = True
@@ -1200,12 +1081,44 @@ class TimeSeriesFile(TimeSeries):
               typecode,
           )
       )
-    if bytes((_1, _2)) != b'__':
-      warning(
-          "ignoring unexpected header trailer, expected %r, got %r" %
-          (b'__', _1 + _2)
+    time_typecode = chr(time_typecode_b)
+    if time_typecode not in SUPPORTED_TYPECODES:
+      raise ValueError(
+          "unsupported time_typecode, expected one of %r, got %r" % (
+              SUPPORTED_TYPECODES,
+              time_typecode,
+          )
       )
-    return typecode, bigendian
+    if pad != ord('_'):
+      warning(
+          "ignoring unexpected header pad, expected %r, got %r" % (b'_', pad)
+      )
+    time_type = BinarySingleStruct(
+        'TimeValue', struct_endian_marker + time_typecode
+    )
+    start = time_type.parse_value(bfr)
+    step = time_type.parse_value(bfr)
+    assert bfr.offset - offset0 == cls.HEADER_LENGTH
+    epoch = Epoch(start, step)
+    return cls(
+        bigendian=bigendian,
+        typecode=typecode,
+        epoch=epoch,
+    )
+
+  def transcribe(self):
+    ''' Transcribe the header record.
+    '''
+    yield self.MAGIC
+    yield b'>' if self.bigendian else b'<'
+    yield self.typecode
+    yield self.time_typecode
+    yield b'_'
+    yield self.time_type.transcribe_value(self.start)
+    yield self.time_type.transcribe_value(self.step)
+
+# pylint: disable=too-many-instance-attributes
+class TimeSeriesFile(TimeSeries, HasFSPath):
 
   @classmethod
   @pfx
