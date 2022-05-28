@@ -982,9 +982,10 @@ class UpdProxy(object):
       'index': 'The index of this slot within the parent Upd.',
       '_prefix': 'The fixed leading prefix for this slot, default "".',
       '_text': 'The text following the prefix for this slot, default "".',
+      '_suffix': 'The fixed trailing suffix or this slot, default "".',
   }
 
-  def __init__(self, index=1, upd=None, text=None, prefix=None):
+  def __init__(self, index=1, upd=None, text=None, prefix=None, suffix=None):
     ''' Initialise a new `UpdProxy` status line.
 
         Parameters:
@@ -1001,6 +1002,7 @@ class UpdProxy(object):
     upd.insert(index, proxy=self)
     self._prefix = prefix or ''
     self._text = ''
+    self._suffix = suffix or ''
     if text:
       self(text)
 
@@ -1024,11 +1026,25 @@ class UpdProxy(object):
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.delete()
 
+  def _update(self):
+    upd = self.upd
+    if upd is not None:
+      with upd._lock:  # pylint: disable=protected-access
+        index = self.index
+        if index is not None:
+          txt = upd.normalise(self.prefix + self._text + self._suffix)
+          overflow = len(txt) - upd.columns + 1
+          if overflow > 0:
+            txt = '<' + txt[overflow + 1:]
+          self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+
   def reset(self):
     ''' Clear the proxy: set both the prefix and text to `''`.
     '''
     self._prefix = ''
-    self.text = ''
+    self._text = ''
+    self._suffix = ''
+    self._update()
 
   @property
   def prefix(self):
@@ -1042,7 +1058,7 @@ class UpdProxy(object):
     '''
     old_prefix, self._prefix = self._prefix, new_prefix
     if new_prefix != old_prefix:
-      self.text = self._text
+      self._update()
 
   @contextmanager
   def extend_prefix(self, more_prefix):
@@ -1066,16 +1082,21 @@ class UpdProxy(object):
         width then the leftmost text is cropped to fit.
     '''
     self._text = txt
-    upd = self.upd
-    if upd is not None:
-      with upd._lock:  # pylint: disable=protected-access
-        index = self.index
-        if index is not None:
-          txt = upd.normalise(self.prefix + txt)
-          overflow = len(txt) - upd.columns + 1
-          if overflow > 0:
-            txt = '<' + txt[overflow + 1:]
-          self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+    self._update()
+
+  @property
+  def suffix(self):
+    ''' The current suffix string.
+    '''
+    return self._suffix
+
+  @suffix.setter
+  def suffix(self, new_suffix):
+    ''' Change the suffix, redraw the status line.
+    '''
+    old_suffix, self._suffix = self._suffix, new_suffix
+    if new_suffix != old_suffix:
+      self._update()
 
   @property
   def width(self):
