@@ -577,12 +577,12 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       policy.partition_for(time.time())
 
     def test_timeseries(tmpdirpath):
-      t0 = 1649464235
+      now = time.time()
       fspath = joinpath(tmpdirpath, 'foo.dat')
-      ts = TimeSeriesFile(fspath, 'd', start=t0, step=1)
+      ts = TimeSeriesFile(fspath, 'd', epoch=(now, 1))
       ary = ts.array
       print(ary)
-      ts.pad_to(time.time() + 300)
+      ts.pad_to(now + 300)
       print(ary)
       ts.save()
 
