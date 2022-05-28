@@ -1605,17 +1605,19 @@ class TimespanPolicy(DBC, HasEpochMixin):
       The `TimeSeriesPartitioned` uses these policies
       to partition data among multiple `TimeSeries` data files.
 
-      Probably the most important methods are `partition_for(when)`
+      Probably the most important methods are `partition_name(when)`
       which returns a label for a timestamp (eg `"2022-01"` for a monthly policy)
-      and `timespan_for` which returns the per partition start and end times
+      and `partition_for` which returns the per partition start and end times
       enclosing a timestamp.
   '''
 
   # definition to happy linters
   name = None  # subclasses get this when they are registered
-  FACTORIES = {}
+
+  # a not unreasonable default policy name
   DEFAULT_NAME = 'monthly'
-  DEFAULT_PARTITION_FORMAT = ''  # set by subclasses to an Arrow format string
+
+  FACTORIES = {}
 
   @typechecked
   def __init__(self, epoch: Epoch):
@@ -1636,12 +1638,15 @@ class TimespanPolicy(DBC, HasEpochMixin):
     ''' Factory method to return a new `TimespanPolicy` instance
         from the policy name,
         which indexes `TimespanPolicy.FACTORIES`.
-        The default `policy_name`
-        is from `TimespanPolicy.DEFAULT_NAME` (`'monthly'`).
     '''
-    if policy_name is None:
-      policy_name = cls.DEFAULT_NAME
-    return cls.FACTORIES[policy_name](*a, **kw)
+    if cls is not TimespanPolicy:
+      raise TypeError(
+          "TimespanPolicy.from_name is not meaningful from a subclass (%s)" %
+          (cls.__name__,)
+      )
+    policy = cls.FACTORIES[policy_name](epoch=epoch, **policy_kw)
+    assert epoch is None or policy.epoch == epoch
+    return policy
 
   @classmethod
   @pfx_method
@@ -1783,101 +1788,155 @@ class TimespanPolicy(DBC, HasEpochMixin):
       if span is None:
         span = self.span_for_time(when)
       yield when, span
+
+class ArrowBasedTimespanPolicy(TimespanPolicy):
+  ''' A `TimespanPolicy` based on an Arrow format string.
+
+      See the `raw_edges` method for the specifics of how these are defined.
+  '''
+
+  # this must be an Arrow format string used as the basis of the
+  # partition names and edge computations
+  PARTITION_FORMAT = None
+
+  # this must be a dict holding parameters for Arrow.shift()
+  # this definition is mostly to happy linters
+  ARROW_SHIFT_PARAMS = None
+
+  @typechecked
+  def __init__(self, epoch: Epoch, *, tzinfo: Optional[str] = None):
+    super().__init__(epoch)
+    if tzinfo is None:
+      tzinfo = get_default_timezone_name()
+    self.tzinfo = tzinfo
+
+  def __str__(self):
+    return "%s:%s" % (super().__str__(), self.tzinfo)
+
   def Arrow(self, when):
     ''' Return an `arrow.Arrow` instance for the UNIX time `when`
         in the policy timezone.
     '''
-    return arrow.Arrow.fromtimestamp(when, tzinfo=self.timezone)
+    return arrow.Arrow.fromtimestamp(when, tzinfo=self.tzinfo)
 
-  @abstractmethod
-  @ensure(lambda when, result: result[0] <= when < result[1])
-  def timespan_for(self, when: Numeric) -> Tuple[Numeric, Numeric]:
-    ''' A `TimespanPolicy` bracketing the UNIX time `when`.
+  # pylint: disable=no-self-use
+  def partition_format_cononical(self, txt):
+    ''' Modify the formatted text derived from `self.PARTITION_FORMAT`.
+
+        The driving example is the 'weekly' policy, which uses
+        Arrow's 'W' ISO week format but trims the sub-week day
+        suffix.  This is sufficient if Arrow can parse the trimmed
+        result, which it can for 'W'. If not, a subclass might need
+        to override this method.
     '''
-    raise NotImplementedError
-
-  def partition_for(self, when):
-    ''' Return the default partition for the UNIX time `when`,
-        which is derived from the `arrow.Arrow`
-        format string `self.DEFAULT_PARTITION_FORMAT`.
-    '''
-    return self.Arrow(when).format(self.DEFAULT_PARTITION_FORMAT)
-
-  @require(lambda start, stop: start < stop)
-  def partitioned_spans(self, start, stop):
-    ''' Generator yielding a sequence of `(partition,partition_start,partition_stop)`
-        covering the range `start:stop`.
-    '''
-    when = start
-    while when < stop:
-      partition = self.partition_for(when)
-      _, partition_stop = self.timespan_for(when)
-      yield partition, when, min(partition_stop, stop)
-      when = partition_stop
-
-  def partition_timespan(self, partition: str) -> Tuple[Numeric, Numeric]:
-    ''' Return the start and end times for the supplied `partition`.
-    '''
-    return self.timespan_for(
-        arrow.get(
-            partition, self.DEFAULT_PARTITION_FORMAT, tzinfo=self.timezone
-        ).timestamp()
-    )
-
-class TimespanPolicyDaily(TimespanPolicy):
-  ''' A `TimespanPolicy` bracketing times at day boundaries.
-  '''
-
-  DEFAULT_PARTITION_FORMAT = 'YYYY-MM-DD'
-
-  def timespan_for(self, when):
-    ''' Return the start and end UNIX times
-        (inclusive and exclusive respectively)
-        bracketing the UNIX time `when`.
-    '''
-    a = self.Arrow(when)
-    start = Arrow(a.year, a.month, a.day, tzinfo=self.timezone)
-    end = start.shift(days=1)
-    return start.timestamp(), end.timestamp()
-
-TimespanPolicy.register_factory(TimespanPolicyDaily, 'daily')
-
-class TimespanPolicyMonthly(TimespanPolicy):
-  ''' A `TimespanPolicy` bracketing times at month boundaries.
-  '''
-
-  DEFAULT_PARTITION_FORMAT = 'YYYY-MM'
-
-  def timespan_for(self, when):
-    ''' Return the start and end UNIX times
-        (inclusive and exclusive respectively)
-        bracketing the UNIX time `when`.
-    '''
-    a = self.Arrow(when)
-    start = Arrow(a.year, a.month, 1, tzinfo=self.timezone)
-    end = start.shift(months=1)
-    return start.timestamp(), end.timestamp()
-
-TimespanPolicy.register_factory(TimespanPolicyMonthly, 'monthly')
-
-class TimespanPolicyAnnual(TimespanPolicy):
-  ''' A `TimespanPolicy` bracketing times at month boundaries.
-  '''
-
-  DEFAULT_PARTITION_FORMAT = 'YYYY'
+    return txt
 
   @typechecked
-  def timespan_for(self, when: Numeric):
-    ''' Return the start and end UNIX times
+  def _arrow_name(self, a: Arrow):
+    ''' Compute the partition name from an `Arrow` instance.
+    '''
+    name = a.format(self.PARTITION_FORMAT)
+    post_fn = self.partition_format_cononical
+    if post_fn is not None:
+      name = post_fn(name)
+    return name
+
+  def name_for_time(self, when):
+    ''' Return a time span name for the UNIX time `when`.
+    '''
+    return self._arrow_name(self.Arrow(when))
+
+  @pfx_method
+  def span_for_name(self, span_name: str):
+    ''' Return a `TimePartition` derived from the `span_name`.
+    '''
+    a = arrow.get(span_name, self.PARTITION_FORMAT, tzinfo=self.tzinfo)
+    return self.span_for_time(a.timestamp())
+
+  @typechecked
+  @ensure(lambda when, result: result[0] <= when < result[1])
+  def raw_edges(self, when: Numeric):
+    ''' Return the _raw_ start and end UNIX times
         (inclusive and exclusive respectively)
         bracketing the UNIX time `when`.
+
+        This implementation performs the following steps:
+        * get an `Arrow` instance in the policy timezone from the
+          UNIX time `when`
+        * format that instance using `self.PARTITION_FORMAT`,
+          modified by `self.partition_format_cononical`
+        * parse that string into a new `Arrow` instance which is
+          the raw start time
+        * compute the raw end time as `calendar_start.shift(**self.ARROW_SHIFT_PARAMS)`
+        * return the UNIX timestamps for the raw start and end times
     '''
     a = self.Arrow(when)
-    start = Arrow(a.year, 1, 1, tzinfo=self.timezone)
-    end = start.shift(years=1)
-    return start.timestamp(), end.timestamp()
+    name = self._arrow_name(a)
+    calendar_start = pfx_call(arrow.get, name, tzinfo=self.tzinfo)
+    calendar_end = calendar_start.shift(**self.ARROW_SHIFT_PARAMS)
+    raw_start = calendar_start.timestamp()
+    raw_end = calendar_end.timestamp()
+    assert raw_start < raw_end
+    return raw_start, raw_end
 
-TimespanPolicy.register_factory(TimespanPolicyAnnual, 'annual')
+  @classmethod
+  def make(cls, name, partition_format, shift):
+    ''' Create and register a simple `ArrowBasedTimespanPolicy`.
+        Return the new policy.
+
+        Parameters:
+        * `name`: the name for the policy; this can also be a sequence of names
+        * `partition_format`: the Arrow format string for naming time partitions
+        * `shift`: a mapping of parameter values for `Arrow.shift()`
+          defining the time step from one partition to the next
+    '''
+    if isinstance(name, str):
+      names = (name,)
+    else:
+      names = name
+    if isinstance(partition_format, str):
+      post_format = None
+    else:
+      # Arrow time format, function to process the result
+      partition_format, post_format = partition_format
+
+    class _Policy(cls):
+
+      PARTITION_FORMAT = partition_format
+      ARROW_SHIFT_PARAMS = shift
+
+      if post_format is not None:
+
+        def partition_format_cononical(self, txt):
+          return post_format(txt)
+
+        partition_format_cononical.__doc__ = cls.partition_format_cononical.__doc__
+
+    _Policy.__name__ = f'{names[0].title()}{cls.__name__}'
+    _Policy.__doc__ = (
+        f'A {names[0]} time policy.\n'
+        f'PARTITION_FORMAT = {partition_format!r}\n'
+        f'ARROW_SHIFT_PARAMS = {shift!r}'
+    )
+    for policy_name in names:
+      TimespanPolicy.register_factory(_Policy, policy_name)
+    return _Policy
+
+# prepare some standard convenient policies
+TimespanPolicyDaily = ArrowBasedTimespanPolicy.make(
+    'daily', 'YYYY-MM-DD', dict(days=1)
+)
+TimespanPolicyWeekly = ArrowBasedTimespanPolicy.make(
+    'weekly',
+    ('W', lambda wtxt: '-'.join(wtxt.split('-')[:2])),
+    dict(weeks=1),
+)
+TimespanPolicyMonthly = ArrowBasedTimespanPolicy.make(
+    'monthly', 'YYYY-MM', dict(months=1)
+)
+TimespanPolicyAnnual = TimespanPolicyYearly = ArrowBasedTimespanPolicy.make(
+    ('annual', 'yearly'), 'YYYY', dict(years=1)
+)
 
 class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
   ''' A group of named `TimeSeries` instances, indexed by a key.
