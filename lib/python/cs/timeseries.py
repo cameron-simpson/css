@@ -912,9 +912,9 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
   ''' Common base class of any time series.
   '''
 
-  def __init__(self, start, step, typecode):
-    self.start = start
-    self.step = step
+  @typechecked
+  def __init__(self, epoch: Epoch, typecode: str):
+    self.epoch = epoch
     self.typecode = typecode
 
   @abstractmethod
@@ -1570,9 +1570,10 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       self.modified = True
       assert len(ary) == ary_index + 1
 
-class TimespanPolicy(DBC):
-  ''' A class implementing a policy about where to store data,
-      used by `TimeSeriesPartitioned` instances
+class TimespanPolicy(DBC, HasEpochMixin):
+  ''' A class implementing a policy allocating times to named time spans.
+
+      The `TimeSeriesPartitioned` uses these policies
       to partition data among multiple `TimeSeries` data files.
 
       Probably the most important methods are `partition_for(when)`
@@ -1588,28 +1589,21 @@ class TimespanPolicy(DBC):
   DEFAULT_PARTITION_FORMAT = ''  # set by subclasses to an Arrow format string
 
   @typechecked
-  def __init__(self, *, timezone: Optional[str] = None):
+  def __init__(self, epoch: Epoch):
     ''' Initialise the policy.
-
-        Parameters:
-        * `timezone`: optional timezone name used to compute `datetime`s;
-          the default is inferred from the default time zone
-          using the `get_default_timezone_name` function
     '''
     self.name = type(self).name
-    if timezone is None:
-      timezone = get_default_timezone_name()
-    self.timezone = timezone
+    self.epoch = epoch
 
   def __str__(self):
-    return "%s:%r:%r:%r" % (
-        type(self).__name__, self.name, self.DEFAULT_PARTITION_FORMAT,
-        self.timezone
-    )
+    return "%s:%r:%s" % (type(self).__name__, self.name, self.epoch)
 
   # pylint: disable=keyword-arg-before-vararg
   @classmethod
-  def from_name(cls, policy_name=None, *a, **kw):
+  @typechecked
+  def from_name(
+      cls, policy_name: str, epoch: Optional[Epoch] = None, **policy_kw
+  ):
     ''' Factory method to return a new `TimespanPolicy` instance
         from the policy name,
         which indexes `TimespanPolicy.FACTORIES`.
@@ -1621,24 +1615,34 @@ class TimespanPolicy(DBC):
     return cls.FACTORIES[policy_name](*a, **kw)
 
   @classmethod
-  def from_any(cls, policy):
+  @pfx_method
+  @typechecked
+  def promote(cls, policy, epoch: Optional[Epoch] = None):
     ''' Factory to promote `policy` to a `TimespanPolicy` instance.
 
         The supplied `policy` may be:
-        * `None`: return an instance of the default named policy
         * `str`: return an instance of the named policy
         * `TimespanPolicy` subclass: return an instance of the subclass
         * `TimespanPolicy` instance: return the instance
     '''
-    if policy is None:
-      policy = TimespanPolicy.from_name()
-    elif isinstance(policy, str):
-      policy = TimespanPolicy.from_name(policy)
-    elif isinstance(policy, type) and issubclass(policy, TimespanPolicy):
-      policy = policy()
-    else:
-      assert isinstance(policy, TimespanPolicy
-                        ), "policy=%s:%r" % (type(policy), policy)
+    if cls is not TimespanPolicy:
+      raise TypeError(
+          "TimespanPolicy.from_name is not meaningful from a subclass (%s)" %
+          (cls.__name__,)
+      )
+    if not isinstance(policy, TimespanPolicy):
+      if epoch is None:
+        raise ValueError("epoch may not be None if promotion is required")
+      if isinstance(policy, str):
+        policy = TimespanPolicy.from_name(policy, epoch=epoch)
+      elif isinstance(policy, type) and issubclass(policy, TimespanPolicy):
+        policy = policy(epoch=epoch)
+      else:
+        raise TypeError(
+            "%s.promote: do not know how to promote %s" %
+            (cls.__name__, policy)
+        )
+    assert epoch is None or policy.epoch == epoch
     return policy
 
   @classmethod
@@ -1653,6 +1657,103 @@ class TimespanPolicy(DBC):
     cls.FACTORIES[name] = factory
     factory.name = name
 
+  @abstractmethod
+  @typechecked
+  @ensure(lambda when, result: result[0] <= when < result[1])
+  def raw_edges(self, when: Numeric):
+    ''' Return the _raw_ start and end UNIX times
+        (inclusive and exclusive respectively)
+        bracketing the UNIX time `when`.
+        This is the core method that a policy must implement.
+
+        These are the direct times implied by the policy.
+        For example, with a policy for a calendar month
+        this would return the start second of that month
+        and the start second of the following month.
+
+        These times are used as the basis for the time slots allocated
+        to a particular partition by the `partition_for(when)` method.
+    '''
+    raise NotImplementedError
+
+  def span_for_time(self, when):
+    ''' Return a `TimePartition` enclosing `when`, a UNIX timestamp.
+
+        The boundaries of the partition are derived from the "raw"
+        start and end times returned by the `raw_edges(when)` method,
+        but fall on time slot boundaries defined by `self.epoch`.
+
+        Because the raw start/end times will usually fall within a
+        time slot instead of exactly on an edge a decision must be
+        made as to which partition a boundary slot falls.
+
+        This implementation chooses that the time slot spanning the
+        "raw" start second of the partition belongs to that partition.
+        As a consequence, the last "raw" seconds of the partition
+        will belong to the next partition
+        as their time slot overlaps the "raw" start of the next partition.
+    '''
+    epoch = self.epoch
+    raw_start, raw_end = self.raw_edges(when)
+    start = epoch.round_down(raw_start)
+    end = epoch.round_down(raw_end)
+    assert start <= when < end
+    name = self.name_for_time(raw_start)
+    start_offset = epoch.offset(start)
+    end_offset = epoch.offset(end)
+    return TimePartition(
+        epoch=epoch,
+        name=name,
+        offset0=start_offset,
+        steps=end_offset - start_offset
+    )
+
+  @abstractmethod
+  def span_for_name(self, span_name):
+    ''' Return a `TimePartition` derived from the `span_name`.
+    '''
+    raise NotImplementedError
+
+  @abstractmethod
+  def name_for_time(self, when):
+    ''' Return a time span name for the UNIX time `when`.
+    '''
+    raise NotImplementedError
+
+  @require(lambda start, stop: start < stop)
+  def partitioned_spans(self, start, stop):
+    ''' Generator yielding a sequence of `TimePartition`s covering
+        the range `start:stop` such that `start` falls within the first
+        partition.
+
+        Note that these partitions fall in the policy partitions,
+        but are bracketed by `[round_down(start):stop]`.
+        As such they will have the correct policy partition names
+        but the boundaries of the first and last spans
+        start at `round_down(start)` and end at `stop` respectively.
+        This makes the returned spans useful for time ranges from a subseries.
+    '''
+    when = self.round_down(start)
+    while when < stop:
+      span = self.span_for_time(when)
+      yield TimePartition(
+          span.name, max(span.start, when), min(span.stop, stop)
+      )
+      when = span.stop
+
+  def spans_for_times(self, whens):
+    ''' Generator yielding `(when,TimePartition)` for each UNIX
+        time in the iterabe `whens`.
+        This is most efficient if times for a particular span are adjacent,
+        trivially so if the times are ordered.
+    '''
+    span = None
+    for when in whens:
+      if span is not None and when in span:
+        span = None
+      if span is None:
+        span = self.span_for_time(when)
+      yield when, span
   def Arrow(self, when):
     ''' Return an `arrow.Arrow` instance for the UNIX time `when`
         in the policy timezone.
