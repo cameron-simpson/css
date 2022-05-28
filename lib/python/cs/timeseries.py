@@ -835,6 +835,80 @@ class TimeStepsMixin:
     )
 
 class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
+class HasEpochMixin(TimeStepsMixin):
+  ''' A `TimeStepsMixin` with `.start` and `.step` derive from `self.epoch`.
+  '''
+
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `HasEpochMixin`, handy for use with `pprint()`.
+    '''
+    if d is None:
+      d = {}
+    d.update(epoch=self.epoch.info_dict())
+    return d
+
+  @property
+  def start(self):
+    ''' The start UNIX time from `self.epoch.start`.
+    '''
+    return self.epoch.start
+
+  @property
+  def step(self):
+    ''' The time slot width from `self.epoch.step`.
+    '''
+    return self.epoch.step
+
+  @property
+  def time_typecode(self):
+    ''' The `array` typecode for times from `self.epoch`.
+    '''
+    return self.epoch.typecode
+
+class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
+  ''' The basis of time references with a starting UNIX time, the
+      `epoch` and the `step` defining the width of a time slot.
+  '''
+
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `Epoch`, handy for use with `pprint()`.
+    '''
+    if d is None:
+      d = {}
+    d.update(
+        typecode=self.typecode,
+        start=self.start,
+        start_dt=str(arrow.get(self.start)),
+        step=self.step
+    )
+    return d
+
+  @property
+  def typecode(self):
+    ''' The `array` typecode for the times from this `Epoch`.
+        This returns `typecode_of(type(self.start))`.
+    '''
+    return typecode_of(type(self.start))
+
+  @classmethod
+  def promote(cls, arg):
+    ''' Promote `arg` to an `Epoch`.
+
+        An `int` or `float` argument will be used as the `step` in
+        an `Epoch` starting at `0`.
+    '''
+    if not isinstance(arg, Epoch):
+      if isinstance(arg, (int, float)):
+        arg = cls(0, arg)
+      else:
+        raise TypeError(
+            "%s.promote: do not know how to promote %s" %
+            (cls.__name__, r(arg))
+        )
+    return arg
+
   ''' Common base class of any time series.
   '''
 
