@@ -694,7 +694,7 @@ class TimeStepsMixin:
   def offset(self, when: Numeric) -> int:
     ''' Return the step offset for the UNIX time `when` from `self.start`.
 
-        Eample in a `TimeSeries`:
+        Example in a `TimeSeries`:
 
            >>> ts = TimeSeriesFile('tsfile.csts', 'd', epoch=(19.1, 1.2))
            >>> ts.offset(19.1)
@@ -726,7 +726,7 @@ class TimeStepsMixin:
         in units of `self.step`
         i.e. `offset(start) == 0`.
 
-        Eample in a `TimeSeries`:
+        Example in a `TimeSeries`:
 
            >>> ts = TimeSeriesFile('tsfile.csts', 'd', epoch=(19.1, 1.2))
            >>> list(ts.offset_range(20,30))
@@ -1436,7 +1436,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ''' Return a `(array_start,array_stop)` pair for the array indices
         between the UNIX times `start` and `stop`.
 
-        Eample:
+        Example:
 
            >>> ts = TimeSeriesFile('tsfile.csts', 'd', epoch=(19.1, 1.2))
            >>> ts.array_index_bounds(20,30)
@@ -1452,7 +1452,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ''' Return an iterable of the array indices for the UNIX times
         from `start` to `stop` from this `TimeSeries`.
 
-        Eample:
+        Example:
 
            >>> ts = TimeSeriesFile('tsfile.csts', 'd', epoch=(19.1, 1.2))
            >>> list(ts.array_indices(20,30))
@@ -1478,7 +1478,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ''' Return a slice of the underlying array
         for the times `start:stop`.
 
-        If `stop` implies values beyong the end of the array
+        If `stop` implies values beyond the end of the array
         and `pad` is true, pad the resulting list with `self.fill`
         to the expected length.
 
@@ -2124,7 +2124,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
 
 class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
                         TimeStepsMixin):
-  ''' A directory containing a collection of `TimeSeriesPartitioned` data files.
+  ''' A directory containing a collection of `TimeSeriesPartitioned` subdirectories.
   '''
 
   # pylint: disable=too-many-branches,too-many-statements
