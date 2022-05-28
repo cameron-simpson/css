@@ -2510,15 +2510,14 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         from `start` to `stop`.
     '''
     ts = None
-    partition_start = None
-    partition_stop = None
+    span = None
     for when in self.range(start, stop):
-      if partition_start is not None and not partition_start <= when < partition_stop:
+      if span is not None and when not in span:
         # different range, invalidate the current bounds
-        partition_start = None
-      if partition_start is None:
+        span = None
+      if span is None:
         ts = self.subseries(when)
-        partition_start, partition_stop = self.timespan_for(when)
+        span = ts.span
       yield when, ts
 
   def setitems(self, whens, values, *, skipNone=False):
