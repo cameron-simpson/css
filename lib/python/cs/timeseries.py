@@ -2461,23 +2461,26 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         which may be a partition name or a UNIX time.
     '''
     if isinstance(spec, str):
-      partition = spec
+      # partition name
+      span = self.policy.span_for_name(spec)
     else:
       # numeric UNIX time
-      partition = self.partition_for(spec)
+      span = self.policy.span_for_time(spec)
+    assert span.step == self.step
     try:
-      ts = self._ts_by_partition[partition]
+      ts = self._ts_by_partition[span.name]
     except KeyError:
-      partition_start, partition_stop = self.policy.partition_timespan(
-          partition
+      filepath = self.pathto(span.name + TimeSeriesFile.DOTEXT)
+      ts = self._ts_by_partition[span.name] = TimeSeriesFile(
+          filepath,
+          self.typecode,
+          epoch=self.epoch,
       )
-      filepath = self.pathto(partition + TimeSeriesFile.DOTEXT)
-      ts = self._ts_by_partition[partition] = TimeSeriesFile(
-          filepath, self.typecode, start=partition_start, step=self.step
-      )
-      ts.tags['partition'] = partition
-      ts.tags['start'] = partition_start
-      ts.tags['stop'] = partition_stop
+      ts.span = span  # pylint: disable=attribute-defined-outside-init
+      ts.epoch = span.epoch
+      ts.tags['partition'] = span.name
+      ts.tags['start'] = span.start
+      ts.tags['stop'] = span.stop
       ts.tags['step'] = self.step
       ts.open()
     return ts
