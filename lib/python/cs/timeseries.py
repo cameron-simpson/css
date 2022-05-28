@@ -937,7 +937,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
   def data2(self, start, stop):
     ''' Like `data(start,stop)` but returning 2 lists: one of time and one of data.
     '''
-    data = self.data(start, stop)
+    data = list(self.data(start, stop))
     return [d[0] for d in data], [d[1] for d in data]
 
   @property
