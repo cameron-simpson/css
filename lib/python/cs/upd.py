@@ -906,7 +906,7 @@ class Upd(SingletonMixin):
         return None
       if index < 0 or index >= len(slots):
         warning("Upd.delete(index=%d): index out of range, ignored")
-        return
+        return None
       if len(slots) == 1:
         # silently do not delete
         ##raise ValueError("cannot delete the last slot")
