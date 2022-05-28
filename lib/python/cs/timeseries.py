@@ -375,7 +375,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
     options.ts = self.poparg(
         argv,
         'tspath',
-        partial(timeseries_from_path, step=options.ts_step),
+        partial(timeseries_from_path, epoch=options.ts_step),
     )
     if options.ts_step is not None and options.ts.step != options.ts_step:
       warning(
@@ -1945,7 +1945,7 @@ TimespanPolicyAnnual = TimespanPolicyYearly = ArrowBasedTimespanPolicy.make(
     ('annual', 'yearly'), 'YYYY', dict(years=1)
 )
 
-class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
+class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
   ''' A group of named `TimeSeries` instances, indexed by a key.
 
       This is the basis for `TimeSeriesDataDir`.
@@ -1955,24 +1955,24 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
   def __init__(
       self,
       *,
-      step: Numeric,
+      epoch: Epoch,
       policy=None,  # :TimespanPolicy
       timezone: Optional[str] = None,
   ):
     super().__init__()
     if timezone is None:
       timezone = get_default_timezone_name()
+    self.epoch = epoch
     if policy is None:
       policy_name = TimespanPolicy.DEFAULT_NAME
       policy = TimespanPolicy.from_name(policy_name, timezone=timezone)
-    self.step = step
     self.policy = policy
     self._rules = {}
 
   def __str__(self):
     return "%s(%s,%s)" % (
         type(self).__name__,
-        getattr(self, 'step', 'STEP_UNDEFINED'),
+        getattr(self, 'epoch', 'STEP_UNDEFINED'),
         getattr(self, 'policy', 'POLICY_UNDEFINED'),
     )
 
@@ -2136,7 +2136,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       self,
       fspath,
       *,
-      step: Optional[Numeric] = None,
+      epoch: Optional[Union[Epoch, Numeric]] = None,
       policy=None,  # :TimespanPolicy
       timezone: Optional[str] = None,
       fstags: Optional[FSTags] = None,
@@ -2160,20 +2160,25 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       raise ValueError("step:%r != config.step:%r" % (step, self.step))
     self.start = 0
     timezone = timezone or self.timezone
+    if isinstance(epoch, Epoch):
+      assert start == epoch.start
+      assert step == epoch.step
+    else:
+      epoch = Epoch(start, step)
+    self.epoch = epoch
+    tzinfo = tzinfo or self.tzinfo
     if policy is None:
       policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
-      policy = TimespanPolicy.from_name(policy_name)
+      policy = TimespanPolicy.from_name(policy_name, epoch=epoch)
     else:
-      policy = TimespanPolicy.from_any(policy)
+      policy = TimespanPolicy.promote(policy, epoch=epoch)
       policy_name = policy.name
     # fill in holes in the config
     if not config.auto.policy.name:
       self.policy_name = policy_name
     if not config.auto.policy.timezone:
       self.timezone = timezone
-    TimeSeriesMapping.__init__(
-        self, step=step, policy=policy, timezone=timezone
-    )
+    TimeSeriesMapping.__init__(self, epoch=epoch, policy=policy, tzinfo=tzinfo)
     self._infill_keys_from_subdirs()
 
   def __str__(self):
@@ -2229,7 +2234,6 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     ts = TimeSeriesPartitioned(
         keypath,
         self.key_typecode(key),
-        step=self.step,
         policy=self.policy,
         fstags=self.fstags,
     )
@@ -2327,15 +2331,13 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   '''
 
   @typechecked
-  @require(lambda step: step > 0)
   def __init__(
       self,
       dirpath: str,
       typecode: str,
       *,
+      epoch: Optional[Union[Epoch, Numeric]] = None,
       policy,  # :TimespanPolicy,
-      start: Optional[Numeric] = None,
-      step: Optional[Numeric] = None,
       fstags: Optional[FSTags] = None,
   ):
     ''' Initialise the `TimeSeriesPartitioned` instance.
@@ -2344,21 +2346,21 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         * `dirpath`: the directory filesystem path,
           known as `.fspath` within the instance
         * `typecode`: the `array` type code for the data
+        * `epoch`: the time series `Epoch`
         * `policy`: the partitioning `TimespanPolicy`
-        * `start`: the reference epoch, default `0`
-        * `step`: keyword parameter specifying the width of a time slot
 
         The instance requires a reference epoch
         because the `policy` start times will almost always
-        not fall on exact multiples of `step`.
+        not fall on exact multiples of `epoch.step`.
         The reference allows for reliable placement of times
-        which fall within `step` of a partition boundary.
-        For example, if `start==0` and `step==6` and a partition
-        boundary came at `19` (eg due to some calendar based policy)
-        then a time of `20` would fall in the partion left of the
-        boundary because it belongs to the time slot commencing at `18`.
+        which fall within `epoch.step` of a partition boundary.
+        For example, if `epoch.start==0` and `epoch.step==6` and a
+        partition boundary came at `19` due to some calendar based
+        policy then a time of `20` would fall in the partion left
+        of the boundary because it belongs to the time slot commencing
+        at `18`.
 
-        If `start` or `step` or `typecode` are omitted the file's
+        If `epoch` or `typecode` are omitted the file's
         fstags will be consulted for their values.
         The `start` parameter will further fall back to `0`.
         This class does not set these tags (that would presume write
@@ -2366,18 +2368,11 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         when a `TimeSeriesPartitioned` is made by a `TimeSeriesDataDir`
         instance it sets these flags.
     '''
+    assert isinstance(policy, TimespanPolicy)
     HasFSPath.__init__(self, dirpath)
     if fstags is None:
       fstags = FSTags()
     self.fstags = fstags
-    if start is None:
-      start = self.tags.start
-      if start is None:
-        start = 0
-    if step is None:
-      step = self.tags.step
-      if step is None:
-        raise ValueError("no step and no FSTags 'step' tag")
     if typecode is None:
       typecode = self.tags.typecode
       if typecode is None:
@@ -2387,11 +2382,10 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
           "typecode=%s not in SUPPORTED_TYPECODES:%r" %
           (s(typecode), sorted(SUPPORTED_TYPECODES.keys()))
       )
-    TimeSeries.__init__(self, start, step, typecode)
-    policy = TimespanPolicy.from_any(policy)
+    policy = TimespanPolicy.promote(policy, epoch=epoch)
+    assert isinstance(policy, ArrowBasedTimespanPolicy)
+    TimeSeries.__init__(self, policy.epoch, typecode)
     self.policy = policy
-    self.start = start
-    self.step = step
     self._ts_by_partition = {}
 
   def __str__(self):
@@ -2399,7 +2393,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         type(self).__name__,
         shortpath(self.fspath),
         getattr(self, 'typecode', 'NO_TYPECODE_YET'),
-        getattr(self, 'step', 'NO_STEP_YET'),
+        getattr(self, 'epoch', 'NO_EPOCH_YET'),
         getattr(self, 'policy', 'NO_POLICY_YET'),
     )
 
