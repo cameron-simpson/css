@@ -2406,6 +2406,8 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         getattr(self, 'policy', 'NO_POLICY_YET'),
     )
 
+  __repr__ = __str__
+
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
         about this `TimeSeriesPartitioned`, handy for use with `pprint()`.
