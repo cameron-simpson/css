@@ -2540,14 +2540,20 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         partition_start, partition_stop = self.timespan_for(when)
       ts[when] = value
 
+  def partitioned_spans(self, start, step):
+    ''' Generator yielding a sequence of `TimePartition`s covering
+        the range `start:stop` such that `start` falls within the first
+        partition via `self.policy`.
+    '''
+    return self.policy.partitioned_spans(start, step)
+
   def data(self, start, stop):
     ''' Return a list of `(when,datum)` tuples for the slot times from `start` to `stop`.
     '''
     xydata = []
-    for partition, partition_start, partition_stop in self.policy.partitioned_spans(
-        start, stop):
-      ts = self.subseries(partition)
-      xydata.extend(ts.data(partition_start, partition_stop))
+    for span in self.partitioned_spans(start, stop):
+      ts = self.subseries(span.name)
+      xydata.extend(ts.data(span.start, span.stop))
     return xydata
 
   @plotrange
