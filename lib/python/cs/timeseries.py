@@ -517,19 +517,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     ts = self.options.ts
     print(ts)
-    if isinstance(ts, TimeSeries):
-      print("  start =", ts.start, arrow.get(ts.start))
-      print("  step =", ts.step)
-      print("  typecode =", ts.typecode)
-    elif isinstance(ts, TimeSeriesPartitioned):
-      for tsfilename in sorted(ts.tsfilenames()):
-        tsf = TimeSeriesFile(ts.pathto(tsfilename))
-        print(" ", tsf)
-    elif isinstance(ts, TimeSeriesDataDir):
-      for key in sorted(ts.keys()):
-        print(" ", key, ts[key])
-    else:
-      raise RuntimeError("unhandled time series type: %s" % (s(ts),))
+    pprint(ts.info_dict())
 
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
