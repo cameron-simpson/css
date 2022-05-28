@@ -539,9 +539,9 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
     def test_pandas():
       t0 = 1649552238
       fspath = f'foo--from-{t0}.dat'
-      ts = TimeSeriesFile(fspath, 'd', start=t0, step=1)
+      ts = TimeSeriesFile(fspath, 'd', epoch=60)
       ts.pad_to(time.time() + 300)
-      print("len(ts) =", len(ts))
+      print("len(ts.array) =", len(ts.array))
       pds = ts.as_pd_series()
       print(type(pds), pds.memory_usage())
       print(pds)
