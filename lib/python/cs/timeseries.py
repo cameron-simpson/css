@@ -1142,7 +1142,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       fspath: str,
       typecode: Optional[str] = None,
       *,
-      epoch: Optional[Epoch] = None,
+      epoch: OptionalEpochy = None,
       fill=None,
       fstags=None,
   ):
@@ -1170,6 +1170,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         when a `TimeSeriesFile` is made by a `TimeSeriesPartitioned` instance
         it sets these flags.
     '''
+    epoch = Epoch.promote(epoch)
     HasFSPath.__init__(self, fspath)
     if fstags is None:
       fstags = FSTags()
@@ -1644,7 +1645,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
   @classmethod
   @typechecked
   def from_name(
-      cls, policy_name: str, epoch: Optional[Epoch] = None, **policy_kw
+      cls, policy_name: str, epoch: OptionalEpochy = None, **policy_kw
   ):
     ''' Factory method to return a new `TimespanPolicy` instance
         from the policy name,
@@ -1655,6 +1656,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
           "TimespanPolicy.from_name is not meaningful from a subclass (%s)" %
           (cls.__name__,)
       )
+    epoch = Epoch.promote(epoch)
     policy = cls.FACTORIES[policy_name](epoch=epoch, **policy_kw)
     assert epoch is None or policy.epoch == epoch
     return policy
@@ -1662,7 +1664,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
   @classmethod
   @pfx_method
   @typechecked
-  def promote(cls, policy, epoch: Optional[Epoch] = None):
+  def promote(cls, policy, epoch: OptionalEpochy = None):
     ''' Factory to promote `policy` to a `TimespanPolicy` instance.
 
         The supplied `policy` may be:
@@ -1675,6 +1677,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
           "TimespanPolicy.from_name is not meaningful from a subclass (%s)" %
           (cls.__name__,)
       )
+    epoch = Epoch.promote(epoch)
     if not isinstance(policy, TimespanPolicy):
       if epoch is None:
         raise ValueError("epoch may not be None if promotion is required")
@@ -2140,11 +2143,13 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       self,
       fspath,
       *,
-      epoch: Optional[Union[Epoch, Numeric]] = None,
+      epoch: OptionalEpochy = None,
       policy=None,  # :TimespanPolicy
       timezone: Optional[str] = None,
       fstags: Optional[FSTags] = None,
   ):
+    epoch = Epoch.promote(epoch)
+    self.epoch = epoch
     HasFSPath.__init__(self, fspath)
     if fstags is None:
       fstags = FSTags()
@@ -2340,7 +2345,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       dirpath: str,
       typecode: str,
       *,
-      epoch: Optional[Union[Epoch, Numeric]] = None,
+      epoch: OptionalEpochy = None,
       policy,  # :TimespanPolicy,
       fstags: Optional[FSTags] = None,
   ):
@@ -2372,6 +2377,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         when a `TimeSeriesPartitioned` is made by a `TimeSeriesDataDir`
         instance it sets these flags.
     '''
+    epoch = Epoch.promote(epoch)
     assert isinstance(policy, TimespanPolicy)
     HasFSPath.__init__(self, dirpath)
     if fstags is None:
