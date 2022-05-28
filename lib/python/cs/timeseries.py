@@ -2527,17 +2527,14 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         This is most efficient if `whens` are ordered.
     '''
     ts = None
-    partition_start = None
-    partition_stop = None
+    span = None
     for when, value in zip(whens, values):
       if value is None and skipNone:
         continue
-      if partition_start is not None and not partition_start <= when < partition_stop:
-        # different range, invalidate the current bounds
-        partition_start = None
-      if partition_start is None:
+      if span is None or when not in span:
+        # new partition required, sets ts as well
         ts = self.subseries(when)
-        partition_start, partition_stop = self.timespan_for(when)
+        span = ts.span
       ts[when] = value
 
   def partitioned_spans(self, start, step):
