@@ -1257,11 +1257,11 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     self.flush()
 
   @property
-  def end(self):
+  def stop(self):
     ''' The end time of this array,
         computed as `self.start+len(self.array)*self.step`.
     '''
-    return self.start + len(self.array) * self.step
+    return self.when(len(self.array))
 
   def file_offset(self, offset):
     ''' Return the file position for the data with position `offset`.
