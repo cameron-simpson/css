@@ -1162,15 +1162,32 @@ class CalibreCommand(BaseCommand):
       if runstate.cancelled:
         break
       with Pfx(cbook):
-        print(f"{cbook.title} ({cbook.dbid})")
+        top_row = []
+        series_name = cbook.series_name
+        if series_name:
+          top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
+        top_row.append(cbook.title)
+        author_names = cbook.author_names
+        if author_names:
+          top_row.extend(
+              ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
+          )
+        top_row.append(f"({cbook.dbid})")
+        print(*top_row)
         if longmode:
+          series_name = cbook.series_name
+          if series_name is not None:
+            series_num = int(cbook.series_index)
+            if series_num != cbook.series_index:
+              series_num = cbook.series_index
+            print(" ", series_name, series_num)
           print(" ", cbook.path)
-          identifiers = cbook.identifiers
-          if identifiers:
-            print("   ", TagSet(identifiers))
           tags = cbook.tags
           if tags:
             print("   ", ", ".join(sorted(tags)))
+          identifiers = cbook.identifiers
+          if identifiers:
+            print("   ", TagSet(identifiers))
           for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
               fspath = calibre.pathto(subpath)
