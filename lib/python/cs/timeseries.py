@@ -1637,10 +1637,9 @@ class TimespanPolicy(DBC, HasEpochMixin):
       The `TimeSeriesPartitioned` uses these policies
       to partition data among multiple `TimeSeries` data files.
 
-      Probably the most important methods are `partition_name(when)`
-      which returns a label for a timestamp (eg `"2022-01"` for a monthly policy)
-      and `partition_for` which returns the per partition start and end times
-      enclosing a timestamp.
+      Probably the most important methods are:
+      * `span_for_time`: return a `TimePartition` from a UNIX time
+      * `span_for_name`: return a `TimePartition` a partition name
   '''
 
   # definition to happy linters
@@ -1741,7 +1740,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
         and the start second of the following month.
 
         These times are used as the basis for the time slots allocated
-        to a particular partition by the `partition_for(when)` method.
+        to a particular partition by the `span_for_time(when)` method.
     '''
     raise NotImplementedError
 
@@ -2455,17 +2454,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     ''' The `TagSet` associated with this `TimeSeriesPartitioned` instance.
     '''
     return self.fstags[self.fspath]
-
-  @typechecked
-  def partition_for(self, when: Numeric) -> str:
-    ''' Return the partition for the UNIX time `when`.
-    '''
-    return self.policy.partition_for(self.round_down(when))
-
-  def timespan_for(self, when):
-    ''' Return the start and end UNIX times for the partition storing `when`.
-    '''
-    return self.policy.timespan_for(self.round_down(when))
 
   @typechecked
   def subseries(self, spec: Union[str, Numeric]):
