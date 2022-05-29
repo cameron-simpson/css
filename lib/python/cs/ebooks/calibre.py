@@ -662,9 +662,11 @@ class CalibreMetadataDB(ORM):
         '''
         __tablename__ = tablename
 
-        __tablename__ = f'{left_name}s_{right_name}s_link'
+      def vsetattr(o, a, v):
+        ##X("setattr(%r,%r,%r)", o, a, v)
+        setattr(o, a, v)
 
-      setattr(
+      vsetattr(
           linktable, f'{left_name}_id',
           declared_attr(
               lambda self: Column(
@@ -674,7 +676,7 @@ class CalibreMetadataDB(ORM):
               )
           )
       )
-      setattr(
+      vsetattr(
           linktable, left_name,
           declared_attr(
               lambda self: relationship(
@@ -683,7 +685,7 @@ class CalibreMetadataDB(ORM):
               )
           )
       )
-      setattr(
+      vsetattr(
           linktable, f'{right_name}_id',
           declared_attr(
               lambda self: Column(
@@ -693,7 +695,7 @@ class CalibreMetadataDB(ORM):
               )
           )
       )
-      setattr(
+      vsetattr(
           linktable, right_name,
           declared_attr(
               lambda self: relationship(
@@ -702,8 +704,8 @@ class CalibreMetadataDB(ORM):
               )
           )
       )
-      for colname, colspec in addtional_columns.items():
-        setattr(
+      for colname, colspec in additional_columns.items():
+        vsetattr(
             linktable,
             colname,
             declared_attr(lambda self, colspec=colspec: colspec),
