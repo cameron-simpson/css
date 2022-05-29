@@ -2551,12 +2551,12 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         span = ts.span
       ts[when] = value
 
-  def partitioned_spans(self, start, step):
+  def partitioned_spans(self, start, stop):
     ''' Generator yielding a sequence of `TimePartition`s covering
         the range `start:stop` such that `start` falls within the first
         partition via `self.policy`.
     '''
-    return self.policy.partitioned_spans(start, step)
+    return self.policy.partitioned_spans(start, stop)
 
   def data(self, start, stop):
     ''' Return a list of `(when,datum)` tuples for the slot times from `start` to `stop`.
