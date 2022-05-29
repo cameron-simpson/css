@@ -41,6 +41,12 @@ DISTINFO = {
     ],
 }
 
+def intif(f: float):
+  ''' Return `int(f)` if that equals `f`, otherwise `f`.
+  '''
+  i = int(f)
+  return i if i == f else f
+
 # TODO: merge into cs.psutils
 def run(argv, doit=True, quiet=False, **subp_options):
   ''' Run a command via `subprocess.run`.
