@@ -640,7 +640,9 @@ class CalibreMetadataDB(ORM):
       ''' Base class for Calibre tables.
       '''
 
-    def _linktable(left_name, right_name, **addtional_columns):
+    def _linktable(
+        left_name, right_name, tablename=None, **additional_columns
+    ):
       ''' Prepare and return a Calibre link table base class.
 
           Parameters:
@@ -648,13 +650,17 @@ class CalibreMetadataDB(ORM):
             example `'book'`
           * `right_name`: the right hand entity, lowercase, singular,
             example `'author'`
-          * `addtional_columns`: other keyword parameters
+          * `additional_columns`: other keyword parameters
             define further `Column`s and relationships
       '''
+      if tablename is None:
+        tablename = f'{left_name}s_{right_name}s_link'
+
 
       class linktable(_CalibreTable):
         ''' Prepare a `_CalibreTable` subclass representing a Calibre link table.
         '''
+        __tablename__ = tablename
 
         __tablename__ = f'{left_name}s_{right_name}s_link'
 
