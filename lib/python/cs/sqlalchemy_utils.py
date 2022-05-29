@@ -29,6 +29,8 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
+from cs.x import X
+
 __version__ = '20220311-post'
 
 DISTINFO = {
@@ -688,7 +690,8 @@ def RelationProxy(
     relation,
     columns: Union[str, Tuple[str], List[str]],
     *,
-    id_column: Optional[str] = None
+    id_column: Optional[str] = None,
+    orm=None,
 ):
   ''' Construct a proxy for a row from a relation.
 
@@ -698,6 +701,7 @@ def RelationProxy(
         or a space separated string of the column names
       * `id_column`: options primary key column name,
         default from `BasicTableMixin.DEFAULT_ID_COLUMN`: `'id'`
+      * `orm`: the ORM, default from `relation.orm`
 
       This is something of a workaround for applications which dip
       briefly into the database to obtain information instead of
@@ -705,11 +709,12 @@ def RelationProxy(
       Instead of keeping the row instance around, which might want
       to load related data on demand after its source session is
       expired, we keep a proxy for the row with cached values
-      and refetch the row at need if further information is requried.
+      and refetch the row at need if further information is required.
 
       Typical use is to construct this proxy class as part
       of the `__init__` of a larger class which accesses the database
-      as part of its working, example based on `cs.ebooks.calibre.CalibreTree`:
+      as part of its operation.
+      The example below is based on `cs.ebooks.calibre.CalibreTree`:
 
           def __init__(self, calibrepath):
             super().__init__(calibrepath)
@@ -736,6 +741,8 @@ def RelationProxy(
     columns = [column for column in columns.split() if column]
   if id_column is None:
     id_column = BasicTableMixin.DEFAULT_ID_COLUMN
+  if orm is None:
+    orm = relation.orm
 
   class RelProxy:
     ''' The relation proxy base class,
@@ -746,6 +753,8 @@ def RelationProxy(
     def __init__(self, id: Any, *, db_row=None):  # pylint: disable=redefined-builtin
       self.id = id
       self.id_column = id_column
+      self.relation = relation
+      self.orm = orm
       self.__fields = {}
       if db_row is not None:
         self.refresh_from_db(db_row)
@@ -753,7 +762,7 @@ def RelationProxy(
     def refresh_from_db(self, db_row=None):
       ''' Update the cached values from the database.
       '''
-      with using_session(orm=relation.orm) as session:
+      with using_session(orm=orm) as session:
         if db_row is None:
           db_row = relation.lookup1(**{id_column: self.id, 'session': session})
         self.refresh_from_db_row(db_row, self.__fields, session=session)
@@ -778,7 +787,7 @@ def RelationProxy(
           return self.__fields[field]
         except KeyError:
           pass
-      with using_session(orm=relation.orm) as session:
+      with using_session(orm=orm) as session:
         db_row = relation.by_id(
             self.id, session=session, id_column=self.id_column
         )
@@ -797,7 +806,7 @@ def RelationProxy(
         try:
           return self[attr]
         except KeyError as e:
-          with using_session(orm=relation.orm) as session:
+          with using_session(orm=orm) as session:
             db_row = relation.by_id(self.id, session=session)
             self.__fields[attr] = getattr(db_row, attr)
           raise AttributeError(
@@ -810,7 +819,7 @@ def RelationProxy(
 
           This is expected to be used from on demand proxy properties.
       '''
-      with using_session(orm=relation.orm) as session:
+      with using_session(orm=orm) as session:
         db_row = relation.lookup1(**{id_column: self.id, 'session': session})
         yield db_row, session
 
