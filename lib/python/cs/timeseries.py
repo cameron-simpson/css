@@ -553,18 +553,23 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       print(pds)
 
     def test_partitioned_spans(tmpdirpath):
-      policy = TimespanPolicyDaily
-      start = time.time()
-      end = time.time() + 7 * 24 * 3600
+      # a daily partition with 1 minute time slots
+      policy = TimespanPolicyDaily(epoch=60)
+      now = time.time()
+      start = now
+      stop = now + 7 * 24 * 3600
       print("start =", Arrow.fromtimestamp(start))
-      print("end =", Arrow.fromtimestamp(end))
-      for partition, partition_start, partition_stop in policy.partitioned_spans(
-          start, end):
+      print("stop =", Arrow.fromtimestamp(stop))
+      prev_stop = None
+      for span in policy.partitioned_spans(start, stop):
         print(
-            partition,
-            Arrow.fromtimestamp(partition_start),
-            Arrow.fromtimestamp(partition_stop),
+            span,
+            Arrow.fromtimestamp(span.start),
+            Arrow.fromtimestamp(span.stop),
         )
+        if prev_stop is not None:
+          assert prev_stop == span.start
+        prev_stop = span.stop
 
     def test_datadir(tmpdirpath):
       with TimeSeriesDataDir(joinpath(tmpdirpath, 'tsdatadir'),
