@@ -834,8 +834,8 @@ class CalibreMetadataDB(ORM):
 
     Books.author_links = relationship(BooksAuthorsLink)
     Books.authors = association_proxy('author_links', 'author')
-    Books.identifiers = relationship(Identifiers)
     Books.formats = relationship(Data, backref="book")
+    Books.identifiers = relationship(Identifiers)
     Books.tag_links = relationship(BooksTagsLink)
     Books.tags = association_proxy('tag_links', 'tag')
 
