@@ -2153,7 +2153,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     return df.plot(**plot_kw)
 
 class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
-                        TimeStepsMixin):
+                        HasEpochMixin):
   ''' A directory containing a collection of `TimeSeriesPartitioned` subdirectories.
   '''
 
@@ -2304,19 +2304,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     self.config['policy.name'] = new_policy_name
 
   @property
-  def step(self):
-    ''' The `step` config value, the size of a time slot.
     '''
-    return self.config.step
-
-  @step.setter
-  def step(self, new_step: Numeric):
-    ''' Set the `step` config value, the size of a time slot.
-    '''
-    if new_step <= 0:
-      raise ValueError("step must be >0, got %r" % (new_step,))
-    self.config['step'] = new_step
-
   @property
   def timezone(self):
     ''' The `policy.timezone` config value, a timezone name.
