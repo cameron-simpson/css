@@ -600,7 +600,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
     }
 
     if not argv:
-      argv = ['pandas']
+      argv = sorted(testfunc_map.keys())
     ok = True
     for testname in argv:
       with Pfx(testname):
