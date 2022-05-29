@@ -2585,7 +2585,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
 
 @typechecked
 def timeseries_from_path(
-    tspath: str, epoch: Union[Epoch, Numeric], typecode=None
+    tspath: str, epoch: OptionalEpochy = None, typecode=None
 ):
   ''' Turn a time series filesystem path into a time series:
       * a file: a `TimeSeriesFile`
@@ -2598,7 +2598,7 @@ def timeseries_from_path(
       raise ValueError(
           "%s does not end in %s" % (shortpath(tspath), TimeSeriesFile.DOTEXT)
       )
-    return TimeSeriesFile(tspath, typecode, start=epoch.start, step=epoch.step)
+    return TimeSeriesFile(tspath, typecode, epoch=epoch)
   if isdirpath(tspath):
     if fnmatchdir(tspath, '*' + TimeSeriesFile.DOTEXT):
       return TimeSeriesPartitioned(tspath, typecode, policy='annual')
