@@ -995,29 +995,69 @@ class CalibreCommand(BaseCommand):
       Upd().out('')
       yield
 
-  def popbooks(self, argv, once=False):
-    ''' Convert a list of book specifiers (currently dbids) to books.
-        Return `(cbooks,ok)` where `cbooks` is a list of books
-        and `ok` is true if all specifiers resolved.
+  @staticmethod
+  def books_from_spec(calibre, spec):
+    # raw dbid
+    try:
+      dbid = int(spec)
+    except ValueError:
+      # /regexp
+      if spec.startswith('/'):
+        re_s = spec[1:]
+        if not re_s:
+          raise ValueError("empty regexp")
+        r = re.compile(re_s, re.I)
+        match_fn = lambda book: (
+            r.search(book.title) or any(map(r.search, book.author_names)) or r.
+            search(book.series_name or "")
+        )
+      else:
+        # [identifier=]id-value,...
+        try:
+          identifiers_s, id_values_s = spec.split('=', 1)
+        except ValueError:
+          # id-value,...
+          identifiers = None
+          values_s = spec
+        else:
+          identifiers = identifiers_s.split(',')
+        values = list(map(str.lower, values_s.split(',')))
+        match_fn = lambda book: any(
+            (
+                (identifiers is None or idk in identifiers) and idv.lower() in
+                values
+            ) for idk, idv in book.identifiers.items()
+        )
+      for book in calibre:
+        if match_fn(book):
+          yield book
+    else:
+      yield calibre[dbid]
 
-        If `once` is true (default `False`) process only the first argument.
+  def popbooks(self, argv, once=False, sortkey=None):
+    ''' Consume `argv` as book specifications and return a list of matching books.
+
+        If `once` is true (default `False`) consume only the first argument.
+        If `sortkey` is not `None`, sort the returned books by this function.
     '''
     options = self.options
     calibre = options.calibre
-    ok = True
     cbooks = []
     while argv:
-      dbid = self.poparg(argv, "dbid", int)
-      if dbid not in calibre:
-        warning("unknown dbid %d", dbid)
-        ok = False
-      else:
-        cbook = calibre[dbid]
-        cbooks.append(cbook)
-      if once:
-        break
+      spec = self.poparg(argv, "book_spec")
+      cbooks.extend(self.books_from_spec(calibre, spec))
+    if sortkey is not None and sortkey is not False:
+      if sortkey is True:
+        sortkey = lambda cbook: (
+            (cbook.series_name.lower(), cbook.series_index)
+            if cbook.series_name else ("", 0),
+            cbook.title.lower(),
+            tuple(map(str.lower, cbook.author_names)),
+            cbook.dbid,
+        )
+      cbooks = sorted(cbooks, key=sortkey)
     assert not argv
-    return cbooks, ok
+    return cbooks
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_convert(self, argv):
@@ -1038,9 +1078,10 @@ class CalibreCommand(BaseCommand):
       )
     if not argv:
       raise GetoptError("missing dbids")
-    cbooks, ok = self.popbooks(argv)
-    if not ok:
-      raise GetoptError("invalid book specifiers")
+    try:
+      cbooks = self.popbooks(argv)
+    except ValueError as e:
+      raise GetoptError("invalid book specifiers: %s") from e
     xit = 0
     doit = options.doit
     force = options.force
@@ -1109,9 +1150,10 @@ class CalibreCommand(BaseCommand):
     xit = 0
     cbooks = []
     if argv:
-      cbooks, ok = self.popbooks(argv)
-      if not ok:
-        raise GetoptError("invalid book specifiers")
+      try:
+        cbooks = self.popbooks(argv, sortkey=True)
+      except ValueError as e:
+        raise GetoptError("invalid book specifiers: %s") from e
     else:
       cbooks = calibre
       calibre.preload()
