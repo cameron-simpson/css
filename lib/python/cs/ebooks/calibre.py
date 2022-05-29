@@ -60,7 +60,7 @@ from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-from . import run
+from . import intif, run
 
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
@@ -155,6 +155,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+
+      @property
+      def author_names(self):
+        ''' A list of the author names.
+        '''
+        return [author.name for author in self.authors]
       def formats(self, db_row, *, session):
         ''' A mapping of Calibre format keys to format paths
             computed on demand.
