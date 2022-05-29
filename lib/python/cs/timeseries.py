@@ -1985,15 +1985,17 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       *,
       epoch: Epoch,
       policy=None,  # :TimespanPolicy
-      timezone: Optional[str] = None,
+      tzinfo: Optional[str] = None,
   ):
     super().__init__()
-    if timezone is None:
-      timezone = get_default_timezone_name()
     self.epoch = epoch
+    if tzinfo is None:
+      tzinfo = get_default_timezone_name()
     if policy is None:
       policy_name = TimespanPolicy.DEFAULT_NAME
-      policy = TimespanPolicy.from_name(policy_name, timezone=timezone)
+      policy = TimespanPolicy.from_name(
+          policy_name, epoch=self.epoch, tzinfo=tzinfo
+      )
     self.policy = policy
     self._rules = {}
 
@@ -2166,7 +2168,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       *,
       epoch: OptionalEpochy = None,
       policy=None,  # :TimespanPolicy
-      timezone: Optional[str] = None,
+      tzinfo: Optional[str] = None,
       fstags: Optional[FSTags] = None,
   ):
     epoch = Epoch.promote(epoch)
@@ -2206,8 +2208,8 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     # fill in holes in the config
     if not config.auto.policy.name:
       self.policy_name = policy_name
-    if not config.auto.policy.timezone:
-      self.timezone = timezone
+    if not config.auto.policy.tzinfo:
+      self.tzinfo = tzinfo
     TimeSeriesMapping.__init__(self, epoch=epoch, policy=policy, tzinfo=tzinfo)
     self._infill_keys_from_subdirs()
 
@@ -2287,7 +2289,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   @property
   def policy_name(self):
-    ''' The `policy.timezone` config value, usually a key from
+    ''' The `policy.name` config value, usually a key from
         `TimespanPolicy.FACTORIES`.
     '''
     name = self.config.auto.policy.name
@@ -2298,28 +2300,26 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   @policy_name.setter
   def policy_name(self, new_policy_name: str):
-    ''' Set the `policy.timezone` config value, usually a key from
+    ''' Set the `policy.tzinfo` config value, usually a key from
         `TimespanPolicy.FACTORIES`.
     '''
     self.config['policy.name'] = new_policy_name
 
   @property
+  def tzinfo(self):
+    ''' The `policy.tzinfo` config value, a timezone name.
     '''
-  @property
-  def timezone(self):
-    ''' The `policy.timezone` config value, a timezone name.
-    '''
-    name = self.config.auto.policy.timezone
+    name = self.config.auto.policy.tzinfo
     if not name:
       name = get_default_timezone_name()
-      self.timezone = name
+      self.tzinfo = name
     return name
 
-  @timezone.setter
-  def timezone(self, new_timezone: str):
-    ''' Set the `policy.timezone` config value, a timezone name.
+  @tzinfo.setter
+  def tzinfo(self, new_timezone: str):
+    ''' Set the `policy.tzinfo` config value, a timezone name.
     '''
-    self.config['policy.timezone'] = new_timezone
+    self.config['policy.tzinfo'] = new_timezone
 
   def keys(self, fnglobs: Optional[Union[str, List[str]]] = None):
     ''' Return a list of the known keys, derived from the subdirectories,
