@@ -578,8 +578,8 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         ts[time.time()] = 9.0
 
     def test_timespan_policy(tmpdirpath):
-      policy = TimespanPolicyMonthly()
-      policy.partition_for(time.time())
+      policy = TimespanPolicyMonthly(epoch=60)
+      print(policy.span_for_time(time.time()))
 
     def test_timeseries(tmpdirpath):
       now = time.time()
