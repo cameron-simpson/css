@@ -161,6 +161,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         ''' A list of the author names.
         '''
         return [author.name for author in self.authors]
+
+      @property
+      @proxy_on_demand_field
       def formats(self, db_row, *, session):
         ''' A mapping of Calibre format keys to format paths
             computed on demand.
