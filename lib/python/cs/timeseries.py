@@ -875,7 +875,8 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
         )
     return epochy
 
-OptionalEpochy = Optional[Union[Epoch, Tuple[Numeric, Numeric], Numeric]]
+Epochy = Union[Epoch, Tuple[Numeric, Numeric], Numeric]
+OptionalEpochy = Optional[Epochy]
 
 class HasEpochMixin(TimeStepsMixin):
   ''' A `TimeStepsMixin` with `.start` and `.step` derive from `self.epoch`.
@@ -1651,9 +1652,10 @@ class TimespanPolicy(DBC, HasEpochMixin):
   FACTORIES = {}
 
   @typechecked
-  def __init__(self, epoch: Epoch):
+  def __init__(self, epoch: Epochy):
     ''' Initialise the policy.
     '''
+    epoch = Epoch.promote(epoch)
     self.name = type(self).name
     self.epoch = epoch
 
@@ -1837,7 +1839,7 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
   ARROW_SHIFT_PARAMS = None
 
   @typechecked
-  def __init__(self, epoch: Epoch, *, tzinfo: Optional[str] = None):
+  def __init__(self, epoch: Epochy, *, tzinfo: Optional[str] = None):
     super().__init__(epoch)
     if tzinfo is None:
       tzinfo = get_default_timezone_name()
