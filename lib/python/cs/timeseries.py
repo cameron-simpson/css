@@ -1978,6 +1978,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       This is the basis for `TimeSeriesDataDir`.
   '''
 
+  DEFAULT_POLICY_NAME = 'monthly'
+
   @typechecked
   def __init__(
       self,
@@ -1991,7 +1993,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     if tzinfo is None:
       tzinfo = get_default_timezone_name()
     if policy is None:
-      policy_name = TimespanPolicy.DEFAULT_NAME
+      policy_name = self.DEFAULT_POLICY_NAME
       policy = TimespanPolicy.from_name(
           policy_name, epoch=self.epoch, tzinfo=tzinfo
       )
