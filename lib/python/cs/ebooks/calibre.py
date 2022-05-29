@@ -155,6 +155,23 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      def series_id(self, db_row, *, session):
+        ''' The book Series or `None`.
+        '''
+        if not db_row.series:
+          return None
+        sid, = db_row.series
+        return sid
+
+      @property
+      def series_name(self):
+        sid = self.series_id
+        if sid is None:
+          return None
+        orm = self.orm
+        with orm.session() as session:
+          srow = orm.series.by_id(sid, session=session)
+          return srow.name
 
       @property
       def author_names(self):
@@ -802,6 +819,13 @@ class CalibreMetadataDB(ORM):
       key = Column(String, nullable=False, unique=True)
       value = Column("val", String, nullable=False)
 
+    class Series(Base, _CalibreTable):
+      ''' Calibre preferences.
+      '''
+      __tablename__ = 'series'
+      name = Column(String, nullable=False, unique=True)
+      sort = Column(String, nullable=False)
+
     @total_ordering
     class Tags(Base, _CalibreTable):
       ''' A tag.
@@ -822,6 +846,12 @@ class CalibreMetadataDB(ORM):
       ''' Link table between `Books` and `Authors`.
       '''
 
+    class BookSeriesLink(Base, _CalibreTable):
+      __tablename__ = 'books_series_link'
+      book = Column('book', ForeignKey('books.id'))
+      series = Column('series', ForeignKey('series.id'))
+
+
     class BooksTagsLink(Base, _linktable('book', 'tag')):
       ''' Link table between `Books` and `Tags`.
       '''
@@ -836,6 +866,8 @@ class CalibreMetadataDB(ORM):
     Books.authors = association_proxy('author_links', 'author')
     Books.formats = relationship(Data, backref="book")
     Books.identifiers = relationship(Identifiers)
+    Books.series_links = relationship(BookSeriesLink)
+    Books.series = association_proxy('series_links', 'series')
     Books.tag_links = relationship(BooksTagsLink)
     Books.tags = association_proxy('tag_links', 'tag')
 
@@ -858,6 +890,8 @@ class CalibreMetadataDB(ORM):
     Languages.orm = self
     self.preferences = Preferences
     Preferences.orm = self
+    self.series = Series
+    Series.orm = self
     self.tags = Tags
     Tags.orm = self
 
