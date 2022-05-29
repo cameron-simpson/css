@@ -1260,13 +1260,13 @@ class CalibreCommand(BaseCommand):
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
   def cmd_pull(self, argv):
-    ''' Usage: {cmd} [-fnqv] other-library [identifier-name [identifier-values...]]
+    ''' Usage: {cmd} [-fnqv] [/path/to/other-library] [identifiers...]
           Import formats from another Calibre library.
           -f    Force. Overwrite existing formats with formats from other-library.
           -n    No action: recite planned actions.
           -q    Quiet. Only issue warnings and errors.
           -v    Verbose. Print more information.
-          other-library: the path to another Calibre library tree
+          /path/to/other-library: optional path to another Calibre library tree
           identifier-name: the key on which to link matching books;
             the default is {DEFAULT_LINK_IDENTIFIER}
             If the identifier '?' is specified the available
@@ -1280,118 +1280,124 @@ class CalibreCommand(BaseCommand):
     calibre = options.calibre
     runstate = options.runstate
     self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
-    other_library = self.poparg(argv, "other-library", CalibreTree)
+    if argv and argv[0].startswith('/') and isdirpath(argv[0]):
+      options.calibre_path_other = argv.pop(0)
     doit = options.doit
     force = options.force
     quiet = options.quiet
     verbose = options.verbose
+    other_library = options.calibre_other
     with Pfx(other_library.shortpath):
-      if other_library is calibre:
-        raise GetoptError("cannot import from the same library")
-      if argv:
-        identifier_name = argv.pop(0)
-      else:
-        identifier_name = self.DEFAULT_LINK_IDENTIFIER
-      if identifier_name == '?':
+      with other_library:
+        if other_library is calibre:
+          raise GetoptError("cannot import from the same library")
         if argv:
-          warning("ignoring extra arguments after identifier-name=?: %r", argv)
-        print("Default identifier:", self.DEFAULT_LINK_IDENTIFIER)
-        print("Available idenitifiers in %s:" % (other_library,))
-        for identifier_name in sorted(other_library.identifier_names()):
-          print(" ", identifier_name)
-        return 0
-      with UpdProxy(text=f"scan identifiers from {other_library}..."):
-        obooks_map = {
-            idv: obook
-            for idv, obook in (
-                (obook.identifiers.get(identifier_name), obook)
-                for obook in other_library
+          identifier_name = argv.pop(0)
+        else:
+          identifier_name = self.DEFAULT_LINK_IDENTIFIER
+        if identifier_name == '?':
+          if argv:
+            warning(
+                "ignoring extra arguments after identifier-name=?: %r", argv
             )
-            if idv is not None
-        }
-      if not obooks_map:
-        raise GetoptError(
-            "no books have the identifier %r; identifiers in use are: %s" % (
-                identifier_name,
-                ', '.join(sorted(other_library.identifier_names()))
-            )
-        )
-      if argv:
-        identifier_values = argv
-      else:
-        identifier_values = [
-            idv for idv, obook in sorted(
-                obooks_map.items(),
-                key=lambda id_ob:
-                (id_ob[1].title, id_ob[1].author_sort, id_ob[1].dbid)
-            )
-        ]
-      xit = 0
-      calibre.preload()
-      with UpdProxy(prefix="pull " + other_library.shortpath + ": ") as proxy:
-        for identifier_value in progressbar(identifier_values,
-                                            "pull " + other_library.shortpath):
-          if runstate.cancelled:
-            break
-          with Pfx.scope("%s=%s", identifier_name, identifier_value):
-            try:
-              obook = obooks_map[identifier_value]
-            except KeyError:
-              warning("unknown")
-              xit = 1
-              continue
-            with proxy.extend_prefix(
-                "%s=%s: %s" % (identifier_name, identifier_value, obook)):
-              if not obook.formats:
-                verbose and print("no formats to pull")
-                continue
-              cbooks = list(
-                  calibre.by_identifier(identifier_name, identifier_value)
+          print("Default identifier:", self.DEFAULT_LINK_IDENTIFIER)
+          print("Available idenitifiers in %s:" % (other_library,))
+          for identifier_name in sorted(other_library.identifier_names()):
+            print(" ", identifier_name)
+          return 0
+        with UpdProxy(text=f"scan identifiers from {other_library}..."):
+          obooks_map = {
+              idv: obook
+              for idv, obook in (
+                  (obook.identifiers.get(identifier_name), obook)
+                  for obook in other_library
               )
-              if not cbooks:
-                # new book
-                fmtk = list(obook.formats.keys())[0]
-                ofmtpath = obook.formatpath(fmtk)
-                # pylint: disable=expression-not-assigned
-                quiet or (
-                    print(
-                        "new book from %s:%s <= %s" %
-                        (fmtk, obook, shortpath(ofmtpath))
-                    ) if verbose else
-                    print("new book from %s:%s" % (fmtk, obook))
-                )
-                dbid = calibre.add(ofmtpath, doit=doit, quiet=quiet)
-                if not doit:
-                  # we didn't make a new book, so move to the next one
+              if idv is not None
+          }
+        if not obooks_map:
+          raise GetoptError(
+              "no books have the identifier %r; identifiers in use are: %s" % (
+                  identifier_name,
+                  ', '.join(sorted(other_library.identifier_names()))
+              )
+          )
+        if argv:
+          identifier_values = argv
+        else:
+          identifier_values = [
+              idv for idv, obook in sorted(
+                  obooks_map.items(),
+                  key=lambda id_ob:
+                  (id_ob[1].title, id_ob[1].author_sort, id_ob[1].dbid)
+              )
+          ]
+        xit = 0
+        calibre.preload()
+        with UpdProxy(prefix="pull " + other_library.shortpath + ": "
+                      ) as proxy:
+          for identifier_value in progressbar(identifier_values, "pull " +
+                                              other_library.shortpath):
+            if runstate.cancelled:
+              break
+            with Pfx.scope("%s=%s", identifier_name, identifier_value):
+              try:
+                obook = obooks_map[identifier_value]
+              except KeyError:
+                warning("unknown")
+                xit = 1
+                continue
+              with proxy.extend_prefix(
+                  "%s=%s: %s" % (identifier_name, identifier_value, obook)):
+                if not obook.formats:
+                  verbose and print("no formats to pull")
                   continue
-                if dbid is None:
-                  error("calibre add failed")
-                  xit = 1
-                cbook = calibre[dbid]
-                quiet or print('new', cbook, '<=', obook)
-              elif len(cbooks) > 1:
-                verbose or warning(
-                    "  \n".join(
-                        [
-                            "multiple \"local\" books with this identifier:",
-                            *map(str, cbooks)
-                        ]
-                    )
+                cbooks = list(
+                    calibre.by_identifier(identifier_name, identifier_value)
                 )
-                continue
-              else:
-                cbook, = cbooks
-              cbook.pull(
-                  obook,
-                  runstate=runstate,
-                  doit=doit,
-                  force=force,
-                  quiet=quiet,
-                  verbose=verbose
-              )
-      if runstate.cancelled:
-        xit = 1
-      return xit
+                if not cbooks:
+                  # new book
+                  fmtk = list(obook.formats.keys())[0]
+                  ofmtpath = obook.formatpath(fmtk)
+                  # pylint: disable=expression-not-assigned
+                  quiet or (
+                      print(
+                          "new book from %s:%s <= %s" %
+                          (fmtk, obook, shortpath(ofmtpath))
+                      ) if verbose else
+                      print("new book from %s:%s" % (fmtk, obook))
+                  )
+                  dbid = calibre.add(ofmtpath, doit=doit, quiet=quiet)
+                  if not doit:
+                    # we didn't make a new book, so move to the next one
+                    continue
+                  if dbid is None:
+                    error("calibre add failed")
+                    xit = 1
+                  cbook = calibre[dbid]
+                  quiet or print('new', cbook, '<=', obook)
+                elif len(cbooks) > 1:
+                  verbose or warning(
+                      "  \n".join(
+                          [
+                              "multiple \"local\" books with this identifier:",
+                              *map(str, cbooks)
+                          ]
+                      )
+                  )
+                  continue
+                else:
+                  cbook, = cbooks
+                cbook.pull(
+                    obook,
+                    runstate=runstate,
+                    doit=doit,
+                    force=force,
+                    quiet=quiet,
+                    verbose=verbose
+                )
+        if runstate.cancelled:
+          xit = 1
+        return xit
 
   def cmd_shell(self, argv):
     ''' Usage: {cmd}
