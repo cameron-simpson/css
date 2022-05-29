@@ -980,7 +980,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
     times, data = self.data2(start, stop)
-    return pd.Series(data, _dt64(times))
+    return pd.Series(data, _dt64(times), self.np_type)
 
   @plotrange
   def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
