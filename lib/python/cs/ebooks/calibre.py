@@ -1139,7 +1139,7 @@ class CalibreCommand(BaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l] [dbids...]
+    ''' Usage: {cmd} [-l] [book_specs...]
           List the contents of the Calibre library.
     '''
     options = self.options
@@ -1198,11 +1198,11 @@ class CalibreCommand(BaseCommand):
     return xit
 
   def cmd_make_cbz(self, argv):
-    ''' Usage: {cmd} dbids...
+    ''' Usage: {cmd} book_specs...
           Add the CBZ format to the designated Calibre books.
     '''
     if not argv:
-      raise GetoptError("missing dbids")
+      raise GetoptError("missing book_specs")
     options = self.options
     runstate = options.runstate
     xit = 0
@@ -1211,6 +1211,7 @@ class CalibreCommand(BaseCommand):
         try:
           cbooks = self.popbooks(argv, once=True)
         except ValueError as e:
+          warning("invalid book specifications: %s", e)
           xit = 2
           continue
         for cbook in cbooks:
