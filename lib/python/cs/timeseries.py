@@ -1265,8 +1265,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   @property
   def stop(self):
-    ''' The end time of this array,
-        computed as `self.start+len(self.array)*self.step`.
+    ''' The end time of this array;
+        the UNIX time of the first time slot beyond the end of the array.
     '''
     return self.when(len(self.array))
 
