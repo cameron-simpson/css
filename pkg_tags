@@ -50,7 +50,7 @@ cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b8
 cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783" pypi.release="20211208"
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309
-cs.obj pypi.release="20210717" ok_revision=db5ae904372904f9c3a3d99ef9d43879d914de64 features={"20210717":["SingletonMixin_key_is_none"]}
+cs.obj pypi.release="20210717" ok_revision="1648304052b6ec944d9d428d98aa780d90cdd8b2" features={"20210717":["SingletonMixin_key_is_none"]}
 cs.onttags
 cs.packetstream pypi.release="20211208" ok_revision="906f6148d57dfa082d18e6f4b27b8081ee317ba8"
 cs.pfx pypi.release="20220523" ok_revision="507a93d1c05c880e4608a64a581f2d15d02267b8" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
