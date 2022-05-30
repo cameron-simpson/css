@@ -104,6 +104,7 @@ DISTINFO = {
         'cs.lex',
         'cs.obj>=20210122',
         'cs.tty',
+        'cs.units',
     ],
 }
 
