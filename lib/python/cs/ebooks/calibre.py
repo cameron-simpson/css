@@ -18,10 +18,12 @@ from os.path import (
     basename,
     exists as existspath,
     isabs as isabspath,
+    isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
     splitext,
 )
+import re
 import shlex
 from subprocess import DEVNULL
 import sys
@@ -43,7 +45,6 @@ from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import cutprefix
@@ -148,6 +149,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
       def authors(self, db_row, *, session):
         ''' The book Authors.
         '''
@@ -155,6 +157,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
       def series_id(self, db_row, *, session):
         ''' The book Series or `None`.
         '''
@@ -165,6 +168,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       def series_name(self):
+        ''' The series name or `None`.
+        '''
         sid = self.series_id
         if sid is None:
           return None
@@ -181,6 +186,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
       def formats(self, db_row, *, session):
         ''' A mapping of Calibre format keys to format paths
             computed on demand.
@@ -193,6 +199,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
       def identifiers(self, db_row, *, session):
         ''' A mapping of Calibre identifier keys to identifier values
             computed on demand.
@@ -204,6 +211,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
       def tags(self, db_row, *, session):
         ''' A list of Calibre tags computed on demand.
         '''
@@ -405,10 +413,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             )
           if fmtpath is not None and not force:
             if filecmp.cmp(fmtpath, ofmtpath):
+              # pylint: disable=expression-not-assigned
               verbose and print(
                   self, fmtk, "identical to", shortpath(ofmtpath)
               )
             else:
+              # pylint: disable=expression-not-assigned
               verbose and warning(
                   "already present with different content\n"
                   "  present: %s\n"
@@ -673,7 +683,6 @@ class CalibreMetadataDB(ORM):
       if tablename is None:
         tablename = f'{left_name}s_{right_name}s_link'
 
-
       class linktable(_CalibreTable):
         ''' Prepare a `_CalibreTable` subclass representing a Calibre link table.
         '''
@@ -847,10 +856,11 @@ class CalibreMetadataDB(ORM):
       '''
 
     class BookSeriesLink(Base, _CalibreTable):
+      ''' Link table between `Books` and `Series`.
+      '''
       __tablename__ = 'books_series_link'
       book = Column('book', ForeignKey('books.id'))
       series = Column('series', ForeignKey('series.id'))
-
 
     class BooksTagsLink(Base, _linktable('book', 'tag')):
       ''' Link table between `Books` and `Tags`.
@@ -928,6 +938,8 @@ class CalibreCommand(BaseCommand):
   }
 
   class OPTIONS_CLASS(BaseCommand.OPTIONS_CLASS):
+    ''' Special class for `self.options` with various properties.
+    '''
 
     def __init__(
         self,
@@ -1094,8 +1106,10 @@ class CalibreCommand(BaseCommand):
       with Pfx(cbook):
         if dstfmtk in cbook.formats:
           if force:
+            # pylint: disable=expression-not-assigned
             verbose and warning("replacing format %r")
           else:
+            # pylint: disable=expression-not-assigned
             verbose and print(f"{cbook}: format {dstfmtk!r} already present")
             continue
         for srcfmtk in srcfmtks:
@@ -1143,7 +1157,7 @@ class CalibreCommand(BaseCommand):
           List the contents of the Calibre library.
     '''
     options = self.options
-    options.longmode = False
+    options.longmode = False  # pylint: disable=attribute-defined-outside-init
     options.popopts(argv, l='longmode')
     longmode = options.longmode
     calibre = options.calibre
@@ -1350,6 +1364,7 @@ class CalibreCommand(BaseCommand):
               with proxy.extend_prefix(
                   "%s=%s: %s" % (identifier_name, identifier_value, obook)):
                 if not obook.formats:
+                  # pylint: disable=expression-not-assigned
                   verbose and print("no formats to pull")
                   continue
                 cbooks = list(
@@ -1375,8 +1390,10 @@ class CalibreCommand(BaseCommand):
                     error("calibre add failed")
                     xit = 1
                   cbook = calibre[dbid]
+                  # pylint: disable=expression-not-assigned
                   quiet or print('new', cbook, '<=', obook)
                 elif len(cbooks) > 1:
+                  # pylint: disable=expression-not-assigned
                   verbose or warning(
                       "  \n".join(
                           [
