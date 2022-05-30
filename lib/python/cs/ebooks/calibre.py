@@ -1008,9 +1008,7 @@ class CalibreCommand(BaseCommand):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     options = self.options
-    print("options =", options)
     with self.options.calibre:
-      Upd().out('')
       yield
 
   @staticmethod
@@ -1200,12 +1198,6 @@ class CalibreCommand(BaseCommand):
         top_row.append(f"({cbook.dbid})")
         print(*top_row)
         if longmode:
-          series_name = cbook.series_name
-          if series_name is not None:
-            series_num = int(cbook.series_index)
-            if series_num != cbook.series_index:
-              series_num = cbook.series_index
-            print(" ", series_name, series_num)
           print(" ", cbook.path)
           tags = cbook.tags
           if tags:
