@@ -669,8 +669,13 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
         or *module_name*{`=`,`>=`}*version*
         satisfying the versions and features in `self.requirements`.
     '''
+    pkg = self.modules[self.module_name]
     if self.op is None:
-      return self.module_name
+      pkg_pypi_version = pkg.latest_pypi_version
+      return (
+          f'{self.module_name}>={pkg_pypi_version}'
+          if pkg_pypi_version else self.module_name
+      )
     release_versions = set()
     feature_set = set()
     for requirement in self.requirements:
@@ -682,7 +687,6 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
           # not a bare identifier, presume release version
           release_versions.add(requirement)
     if feature_set:
-      pkg = self.modules[self.module_name]
       release_version = pkg.release_with_features(feature_set)
       if release_version is None:
         raise ValueError(
