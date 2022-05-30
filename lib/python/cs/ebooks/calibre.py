@@ -1052,6 +1052,19 @@ class CalibreCommand(BaseCommand):
     else:
       yield calibre[dbid]
 
+  @staticmethod
+  def cbook_default_sortkey(cbook):
+    ''' The default presentation order for things like "ls":
+        series-name-index,title,authors,dbid.
+    '''
+    return (
+        (cbook.series_name.lower(),
+         cbook.series_index) if cbook.series_name else ("", 0),
+        cbook.title.lower(),
+        tuple(map(str.lower, cbook.author_names)),
+        cbook.dbid,
+    )
+
   def popbooks(self, argv, once=False, sortkey=None):
     ''' Consume `argv` as book specifications and return a list of matching books.
 
@@ -1068,13 +1081,7 @@ class CalibreCommand(BaseCommand):
         break
     if sortkey is not None and sortkey is not False:
       if sortkey is True:
-        sortkey = lambda cbook: (
-            (cbook.series_name.lower(), cbook.series_index)
-            if cbook.series_name else ("", 0),
-            cbook.title.lower(),
-            tuple(map(str.lower, cbook.author_names)),
-            cbook.dbid,
-        )
+        sortkey = self.cbook_default_sortkey
       cbooks = sorted(cbooks, key=sortkey)
     assert not argv
     return cbooks
@@ -1177,8 +1184,8 @@ class CalibreCommand(BaseCommand):
       except ValueError as e:
         raise GetoptError("invalid book specifiers: %s") from e
     else:
-      cbooks = calibre
       calibre.preload()
+      cbooks = sorted(calibre, key=self.cbook_default_sortkey)
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
