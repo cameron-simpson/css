@@ -1014,29 +1014,32 @@ class CalibreCommand(BaseCommand):
       yield
 
   @staticmethod
-  def books_from_spec(calibre, spec):
+  def books_from_spec(calibre, book_spec):
+    ''' Generator yielding `CalibreBook` instances from `book_spec`.
+    '''
     # raw dbid
     try:
-      dbid = int(spec)
+      dbid = int(book_spec)
     except ValueError:
       # /regexp
-      if spec.startswith('/'):
-        re_s = spec[1:]
+      if book_spec.startswith('/'):
+        re_s = book_spec[1:]
         if not re_s:
-          raise ValueError("empty regexp")
-        r = re.compile(re_s, re.I)
+          raise ValueError("empty regexp")  # pylint: disable=raise-missing-from
+        regexp = re.compile(re_s, re.I)
         match_fn = lambda book: (
-            r.search(book.title) or any(map(r.search, book.author_names)) or r.
-            search(book.series_name or "")
+            regexp.search(book.title) or any(
+                map(regexp.search, book.author_names)
+            ) or regexp.search(book.series_name or "")
         )
       else:
         # [identifier=]id-value,...
         try:
-          identifiers_s, id_values_s = spec.split('=', 1)
+          identifiers_s, values_s = book_spec.split('=', 1)
         except ValueError:
           # id-value,...
           identifiers = None
-          values_s = spec
+          values_s = book_spec
         else:
           identifiers = identifiers_s.split(',')
         values = list(map(str.lower, values_s.split(',')))
@@ -1062,8 +1065,10 @@ class CalibreCommand(BaseCommand):
     calibre = options.calibre
     cbooks = []
     while argv:
-      spec = self.poparg(argv, "book_spec")
-      cbooks.extend(self.books_from_spec(calibre, spec))
+      book_spec = self.poparg(argv, "book_spec")
+      cbooks.extend(self.books_from_spec(calibre, book_spec))
+      if once:
+        break
     if sortkey is not None and sortkey is not False:
       if sortkey is True:
         sortkey = lambda cbook: (
