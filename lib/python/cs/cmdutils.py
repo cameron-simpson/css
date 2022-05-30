@@ -979,6 +979,8 @@ class BaseCommand:
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with upd_context:
+        if upd is not None:
+          upd.out(self.cmd + '...')
         with stackattrs(self, cmd=self._subcmd):
           with stackattrs(
               options,
@@ -1040,9 +1042,8 @@ class BaseCommand:
       print(usage.rstrip(), file=sys.stderr)
     return True
 
-  @staticmethod
   @contextmanager
-  def run_context():
+  def run_context(self):
     ''' Stub context manager which surrounds `main` or `cmd_`*subcmd*.
     '''
     # redundant try/finally to remind subclassers of correct structure

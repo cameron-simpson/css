@@ -219,6 +219,14 @@ class HasConfigIni:
     self.__section = section
     self._config = None
 
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `HasCOnfigIni`, handy for use with `pprint()`.
+    '''
+    if d is None: d = {}
+    d.update(config=self.config_ini, section=self.__section)
+    return d
+
   @property
   def configpath(self):
     ''' The path to the `config.ini` file.

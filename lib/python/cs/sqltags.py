@@ -1782,6 +1782,7 @@ class SQLTags(BaseTagSets):
         [SQTCriterion.from_equality(k, v) for k, v in crit_kw.items()]
     )
     post_criteria = []
+    # promote criteria from str to SQTCriterion as needed
     for i, criterion in enumerate(criteria):
       cr0 = criterion
       with Pfx(str(criterion)):
