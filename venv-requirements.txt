@@ -10,6 +10,7 @@ lxml
 mobi
 mypy
 musicbrainzngs
+pillow
 pycodestyle
 pyflakes
 pyicontract-lint

@@ -11,10 +11,15 @@ import errno
 import io
 import logging
 import os
-from signal import SIGTERM, SIGKILL
+import shlex
+from signal import SIGTERM, SIGKILL, signal
 import subprocess
 import sys
 import time
+
+from cs.gimmicks import DEVNULL
+
+__version__ = '20220504-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -23,7 +28,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.gimmicks'],
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions
@@ -50,7 +55,7 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
         send the process `signal.SIGKILL` as a final measure before return.
   '''
   if isinstance(pid, str):
-    return stop(int(open(pid).read().strip()))
+    return stop(int(open(pid, encoding='ascii').read().strip()))
   os.kill(pid, signum)
   if wait is None:
     return True
@@ -76,6 +81,73 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
             raise
       return False
 
+@contextmanager
+def signal_handler(sig, handler, call_previous=False):
+  ''' Context manager to push a new signal handler,
+      yielding the old handler,
+      restoring the old handler on exit.
+      If `call_previous` is true (default `False`)
+      also call the old handler after the new handler on receipt of the signal.
+
+      Parameters:
+      * `sig`: the `int` signal number to catch
+      * `handler`: the handler function to call with `(sig,frame)`
+      * `call_previous`: optional flag (default `False`);
+        if true, also call the old handler (if any) after `handler`
+  '''
+  if call_previous:
+    # replace handler() with a wrapper to call both it and the old handler
+    handler0 = handler
+
+    def handler(sig, frame):  # pylint:disable=function-redefined
+      ''' Call the handler and then the previous handler if requested.
+      '''
+      handler0(sig, frame)
+      if callable(old_handler):
+        old_handler(sig, frame)
+
+  old_handler = signal(sig, handler)
+  try:
+    yield old_handler
+  finally:
+    # restiore the previous handler
+    signal(sig, old_handler)
+
+@contextmanager
+def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
+  ''' Context manager to stack multiple signal handlers,
+      yielding a mapping of `sig`=>`old_handler`.
+
+      Parameters:
+      * `sig_hnds`: a mapping of `sig`=>`new_handler`
+        or an iterable of `(sig,new_handler)` pairs
+      * `call_previous`: optional flag (default `False`), passed
+        to `signal_handler()`
+  '''
+  if _stacked is None:
+    _stacked = {}
+  try:
+    items = sig_hnds.items
+  except AttributeError:
+    # (sig,hnd),... from iterable
+    it = iter(sig_hnds)
+  else:
+    # (sig,hnd),... from mapping
+    it = items()
+  try:
+    sig, handler = next(it)
+  except StopIteration:
+    pass
+  else:
+    with signal_handler(sig, handler,
+                        call_previous=call_previous) as old_handler:
+      _stacked[sig] = old_handler
+      with signal_handlers(sig_hnds, call_previous=call_previous,
+                           _stacked=_stacked) as stacked:
+        yield stacked
+    return
+  yield _stacked
+
 def write_pidfile(path, pid=None):
   ''' Write a process id to a pid file.
 
@@ -85,14 +157,14 @@ def write_pidfile(path, pid=None):
   '''
   if pid is None:
     pid = os.getpid()
-  with open(path, "w") as pidfp:
+  with open(path, 'w', encoding='ascii') as pidfp:
     print(pid, file=pidfp)
 
 def remove_pidfile(path):
   ''' Truncate and remove a pidfile, permissions permitting.
   '''
   try:
-    with open(path, "w"):
+    with open(path, "wb"):  # pylint: disable=unspecified-encoding
       pass
     os.remove(path)
   except OSError as e:
@@ -134,7 +206,7 @@ def run(argv, logger=None, pids=None, **kw):
     if logger:
       pargv = ['+'] + argv
       logger.info("RUN COMMAND: %r", pargv)
-    P = subprocess.Popen(argv, **kw)
+    P = subprocess.Popen(argv, **kw)  # pylint: disable=consider-using-with
     if pids is not None:
       pids.add(P.pid)
     returncode = P.wait()
@@ -177,13 +249,8 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
     print(*pargv, file=tracefp)
   popen_kw = {}
   if not keep_stdin:
-    sp_devnull = getattr(subprocess, 'DEVNULL', None)
-    if sp_devnull is None:
-      devnull = open(os.devnull, 'wb')
-    else:
-      devnull = sp_devnull
-    popen_kw['stdin'] = devnull
-  P = subprocess.Popen(argv, stdout=subprocess.PIPE, **popen_kw)
+    popen_kw['stdin'] = DEVNULL
+  P = subprocess.Popen(argv, stdout=subprocess.PIPE, **popen_kw)  # pylint: disable=consider-using-with
   if binary:
     if kw:
       raise ValueError(
@@ -191,8 +258,6 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
       )
   else:
     P.stdout = io.TextIOWrapper(P.stdout, **kw)
-  if not keep_stdin and sp_devnull is None:
-    devnull.close()
   return P
 
 def pipeto(argv, trace=False, **kw):
@@ -214,7 +279,7 @@ def pipeto(argv, trace=False, **kw):
     tracefp = sys.stderr if trace is True else trace
     pargv = ['+', '|'] + argv
     print(*pargv, file=tracefp)
-  P = subprocess.Popen(argv, stdin=subprocess.PIPE)
+  P = subprocess.Popen(argv, stdin=subprocess.PIPE)  # pylint: disable=consider-using-with
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
 
@@ -294,3 +359,32 @@ if __name__ == '__main__':
             )
         )
     )
+
+def print_argv(*argv, indent="", subindent="  ", file=None, fold=False):
+  ''' Print an indented possibly folded command line.
+  '''
+  if file is None:
+    file = sys.stdout
+  was_opt = False
+  for i, arg in enumerate(argv):
+    if i == 0:
+      file.write(indent)
+      was_opt = False
+    elif len(arg) >= 2 and arg.startswith('-'):
+      if fold:
+        # options get a new line
+        file.write(" \\\n" + indent + subindent)
+      else:
+        file.write(" ")
+      was_opt = True
+    else:
+      if was_opt:
+        file.write(" ")
+      elif fold:
+        # nonoptions get a new line
+        file.write(" \\\n" + indent + subindent)
+      else:
+        file.write(" ")
+      was_opt = False
+    file.write(shlex.quote(arg))
+  file.write("\n")

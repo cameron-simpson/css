@@ -12,12 +12,12 @@ trace=
 # run "pop3 dl"
 while read account spool <&3
 do
-  $trace pop3 dl "$account" "$spool" 3<&-
+  $trace timeout 1800 pop3 dl "$account" "$spool" </dev/null 3<&-
 done 3<$HOME/rc-local/pop3_dl
 
-# run "getmail"
-lastvalue getmail \
-| while read -r getm
-  do
-    $trace getmail -r "$getm" </dev/null
-  done
+### run "getmail"
+##lastvalue getmail \
+##| while read -r getm
+##  do
+##    $trace timeout 1800 getmail -r "$getm" </dev/null
+##  done
