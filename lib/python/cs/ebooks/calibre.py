@@ -478,7 +478,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       return False
     return True
 
-  @lru_cache(maxsize=None)
   @typechecked
   @require(lambda dbid: dbid > 0)
   def book_by_dbid(self, dbid: int, *, db_book=None):
