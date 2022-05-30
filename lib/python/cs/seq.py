@@ -32,7 +32,6 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
-        'cs.queues>=iterable_channel',
     ],
 }
 
