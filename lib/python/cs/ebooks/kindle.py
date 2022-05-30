@@ -570,8 +570,19 @@ class KindleCommand(BaseCommand):
     ''' Set up the default values in `options`.
     '''
     options = self.options
-    options.kindle_path = None
-    options.calibre_path = None
+    try:
+      # pylint: disable=protected-access
+      kindle_path = KindleTree._resolve_fspath(None)
+    except ValueError:
+      kindle_path = None
+    from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
+    try:
+      # pylint: disable=protected-access
+      calibre_path = CalibreTree._resolve_fspath(None)
+    except ValueError:
+      calibre_path = None
+    options.kindle_path = kindle_path
+    options.calibre_path = calibre_path
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
