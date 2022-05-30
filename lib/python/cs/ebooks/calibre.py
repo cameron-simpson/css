@@ -1202,6 +1202,9 @@ class CalibreCommand(BaseCommand):
               ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
           )
         top_row.append(f"({cbook.dbid})")
+        if not longmode:
+          top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
+          top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
         print(*top_row)
         if longmode:
           print(" ", cbook.path)
