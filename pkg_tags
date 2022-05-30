@@ -87,7 +87,7 @@ cs.timeseries
 cs.timeutils pypi.release="20211208" ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.tty pypi.release="20210316" ok_revision="62e7c17f710e13db7893ea64324ef77bca01d6ec"
 cs.units pypi.release="20220311" ok_revision="8dcc9126e735454e3e888690cda70854e9bccfa8"
-cs.upd pypi.release="20220504" ok_revision=f0dfdfd65131f97fa37e8ca24d3df9822d66ba29 features={"20200517":["multiline"],"20210428.4":["fix_stdout_not_tty_setupterm"],"20220429":["pfxprint"]}
+cs.upd pypi.release="20220504" ok_revision=f0dfdfd65131f97fa37e8ca24d3df9822d66ba29 features={"20200517":["multiline"],"20210428.4":["fix_stdout_not_tty_setupterm"],"20220429":["pfxprint"],"20220530":["run_task"]}
 cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
 cs.wol pypi.release=20171228
