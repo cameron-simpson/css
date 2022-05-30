@@ -948,12 +948,24 @@ class CalibreCommand(BaseCommand):
         calibre_path_other=None,
         **kw
     ):
-      super().__init__(
-          kindle_path=kindle_path,
-          calibre_path=calibre_path,
-          calibre_path_other=calibre_path_other,
-          **kw
-      )
+      super().__init__(**kw)
+      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
+      try:
+        # pylint: disable=protected-access
+        kindle_path = KindleTree._resolve_fspath(kindle_path)
+      except ValueError:
+        kindle_path = None
+      try:
+        # pylint: disable=protected-access
+        calibre_path_other = CalibreTree._resolve_fspath(
+            calibre_path_other,
+            envvar=CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR
+        )
+      except ValueError:
+        calibre_path_other = None
+      self.kindle_path = kindle_path
+      self.calibre_path = calibre_path
+      self.calibre_path_other = calibre_path_other
 
     @property
     def calibre(self):
@@ -977,12 +989,6 @@ class CalibreCommand(BaseCommand):
         raise AttributeError(".kindle: no .kindle_path")
       from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
       return KindleTree(self.kindle_path)
-
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    options = self.options
-    options.calibre_path_other = os.environ.get(self.OTHER_LIBRARY_PATH_ENVVAR)
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
