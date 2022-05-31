@@ -439,17 +439,29 @@ class PfxFormatter(Formatter):
         ''' Call the former `formatter.format` method
             and prepend the current `Pfx` prefix to the start.
         '''
+        msg0 = record.msg
+        args0 = record.args
         cur_pfx = Pfx._state.prefix
         if not cur_pfx:
           return old_format(record)
-        if record.args:
-          new_msg = '%s' + str(record.msg)
-          new_args = (cur_pfx + cs.pfx.DEFAULT_SEPARATOR,) + tuple(record.args)
-        else:
-          new_msg = cur_pfx + cs.pfx.DEFAULT_SEPARATOR + str(record.msg)
-          new_args = record.args
-        with stackattrs(record, msg=new_msg, args=new_args):
+        if not isinstance(record.args, tuple):
+          # TODO: dict support
           return old_format(record)
+        else:
+          if record.args:
+            new_msg = '%s' + str(record.msg)
+            new_args = (cur_pfx +
+                        cs.pfx.DEFAULT_SEPARATOR,) + tuple(record.args)
+          else:
+            new_msg = cur_pfx + cs.pfx.DEFAULT_SEPARATOR + str(record.msg)
+            new_args = record.args
+          try:
+            with stackattrs(record, msg=new_msg, args=new_args):
+              return old_format(record)
+          except Exception as e:
+            # unsupported in some way, fall back to the original
+            # and lose the prefix
+            return old_format(record)
 
       formatter.format = new_format
       formatter.PfxFormatter__monkey_patched = True
