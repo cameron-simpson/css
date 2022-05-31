@@ -28,7 +28,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks'],
+    'install_requires': ['cs.gimmicks>=devnull'],
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions
