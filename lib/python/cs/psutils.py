@@ -19,7 +19,7 @@ import time
 
 from cs.gimmicks import DEVNULL
 
-__version__ = '20220504-post'
+__version__ = '20220531'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
