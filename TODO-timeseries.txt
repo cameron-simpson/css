@@ -1,3 +1,4 @@
+TimeSeriesDataDir: put the column mapping into the config.ini ?
 TimeSeriesFile: open modes: basic read/modify/save, open for r or rw, mmap ro or rw
 TimeSeriesFile: start,step after header in same units int/float
 MultiTimeSeries: convenience add_rate(ratekey,accumulation_key) wrapper for add_derived, should backtrack to most recent non-NaN
