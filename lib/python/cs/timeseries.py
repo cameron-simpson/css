@@ -572,9 +572,12 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         prev_stop = span.stop
 
     def test_datadir(tmpdirpath):
-      with TimeSeriesDataDir(joinpath(tmpdirpath, 'tsdatadir'),
-                             policy='daily') as datadir:
-        ts = datadir['key1']
+      with TimeSeriesDataDir(
+          joinpath(tmpdirpath, 'tsdatadir'),
+          policy='daily',
+          epoch=30,
+      ) as datadir:
+        ts = datadir.makets('key1')
         ts[time.time()] = 9.0
 
     def test_timespan_policy(tmpdirpath):
