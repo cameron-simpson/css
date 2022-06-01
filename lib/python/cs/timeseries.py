@@ -828,6 +828,14 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
       `epoch` and the `step` defining the width of a time slot.
   '''
 
+  def __new__(cls, *a, **kw):
+    epoch = super().__new__(cls, *a, **kw)
+    assert isinstance(epoch.start, (int, float))
+    assert isinstance(epoch.step, (int, float))
+    assert type(self.start) is type(self.step)
+    assert epoch.step > 0
+    return epoch
+
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
         about this `Epoch`, handy for use with `pprint()`.
