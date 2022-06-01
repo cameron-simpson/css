@@ -170,9 +170,12 @@ class SPLinkCSVDir(HasFSPath):
     keys = rowtype.attributes_
     key0 = keys[0]
     key_values = {key: [] for key in keys}
+    short_csvpath = relpath(csvpath, self.fspath)
+    if short_csvpath.startswith('../'):
+      short_csvpath = shortpath(csvpath)
     for row in progressbar(
         rows,
-        shortpath(csvpath),
+        short_csvpath,
         update_frequency=128,
         report_print=True,
     ):
