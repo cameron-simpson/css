@@ -2168,6 +2168,12 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
   ''' A directory containing a collection of `TimeSeriesPartitioned` subdirectories.
   '''
 
+  # hard wired to avoid confusion in subclasses,
+  # particularly we do not want to create the data dir with a
+  # subclass and then not find the config reading with the generic
+  # class
+  CONFIG_SECTION_NAME = 'TimeSeriesDataDir'
+
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
   @typechecked
@@ -2185,7 +2191,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     HasFSPath.__init__(self, fspath)
     if fstags is None:
       fstags = FSTags()
-    HasConfigIni.__init__(self, 'TimeSeriesDataDir')
+    HasConfigIni.__init__(self, self.CONFIG_SECTION_NAME)
     self.fstags = fstags
     config = self.config
     if step is None:
