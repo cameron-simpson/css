@@ -36,15 +36,15 @@ The steps to achieve this are as follows:
 At that point the package is present on the package distribution service.
 To use the package, end users must:
 
-- download one of the package artifacts from the package distribution service
+- download one of the package's build artifacts from the package distribution service
 
 - install it in their Python installation, usually in its `site-packages` directory;
   this install step may involve a build/compile step which, if needed, must
   be described by the package metadata
 
-These 2 steps are typically performed by a tool like [pip](https://pip.pypa.io/en/stable/).
+These last 2 steps are typically performed by a tool like [pip](https://pip.pypa.io/en/stable/).
 
-These steps are described in more detail below.
+The steps above are described in more detail below.
 
 ## The Source Tree
 

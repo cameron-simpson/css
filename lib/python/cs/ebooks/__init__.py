@@ -12,6 +12,7 @@ from subprocess import run as subprocess_run
 
 from cs.logutils import warning
 from cs.pfx import pfx_call
+from cs.psutils import print_argv
 from cs.upd import Upd, print
 
 DISTINFO = {
@@ -40,6 +41,12 @@ DISTINFO = {
     ],
 }
 
+def intif(f: float):
+  ''' Return `int(f)` if that equals `f`, otherwise `f`.
+  '''
+  i = int(f)
+  return i if i == f else f
+
 # TODO: merge into cs.psutils
 def run(argv, doit=True, quiet=False, **subp_options):
   ''' Run a command via `subprocess.run`.
@@ -53,10 +60,13 @@ def run(argv, doit=True, quiet=False, **subp_options):
       * `subp_options`: optional mapping of keyword arguments
         to pass to `subprocess.run`
   '''
-  quiet or print(shlex.join(argv))
   if not doit:
+    if not quiet:
+      with Upd().above():
+        print_argv(*argv, fold=True)
     return None
   with Upd().above():
+    quiet or print_argv(*argv)
     cp = pfx_call(subprocess_run, argv, **subp_options)
     if cp.stdout and not quiet:
       builtin_print(" ", cp.stdout.rstrip().replace("\n", "\n  "))

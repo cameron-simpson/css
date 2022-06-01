@@ -11,6 +11,7 @@ import errno
 import io
 import logging
 import os
+import shlex
 from signal import SIGTERM, SIGKILL, signal
 import subprocess
 import sys
@@ -18,7 +19,7 @@ import time
 
 from cs.gimmicks import DEVNULL
 
-__version__ = '20220504-post'
+__version__ = '20220531-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -27,7 +28,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks'],
+    'install_requires': ['cs.gimmicks>=devnull'],
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions
@@ -358,3 +359,32 @@ if __name__ == '__main__':
             )
         )
     )
+
+def print_argv(*argv, indent="", subindent="  ", file=None, fold=False):
+  ''' Print an indented possibly folded command line.
+  '''
+  if file is None:
+    file = sys.stdout
+  was_opt = False
+  for i, arg in enumerate(argv):
+    if i == 0:
+      file.write(indent)
+      was_opt = False
+    elif len(arg) >= 2 and arg.startswith('-'):
+      if fold:
+        # options get a new line
+        file.write(" \\\n" + indent + subindent)
+      else:
+        file.write(" ")
+      was_opt = True
+    else:
+      if was_opt:
+        file.write(" ")
+      elif fold:
+        # nonoptions get a new line
+        file.write(" \\\n" + indent + subindent)
+      else:
+        file.write(" ")
+      was_opt = False
+    file.write(shlex.quote(arg))
+  file.write("\n")

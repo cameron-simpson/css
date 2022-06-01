@@ -91,19 +91,33 @@ class BWizCmd(BaseCommand):
       return 0 if R.convert(dstpath, max_n=TRY_N, timespans=timespans) else 1
 
   def cmd_mconvert(self, args):
-    ''' Usage: {cmd} recording...
+    ''' Usage: {cmd} [{{-n|--dry-run}}] recording...
           Convert multiple named recordings to automatically named .mp4 files
           in the current directory.
           Most metadata are preserved.
+          -n, --dry-run No action; print planned actions.
     '''
+    options = self.options
+    self.popopts(
+        args,
+        options,
+        n='dry_run',
+        dry_run=None,
+    )
+    doit = options.doit
     if not args:
       raise GetoptError("missing recordings")
     xit = 0
+    runstate = options.runstate
     for srcpath in args:
+      if runstate.cancelled:
+        break
       with Pfx(srcpath):
         R = Recording(srcpath)
-        if not R.convert(None, max_n=TRY_N):
+        if not R.convert(None, max_n=TRY_N, doit=doit):
           xit = 1
+    if runstate.cancelled:
+      return 1
     return xit
 
   def cmd_meta(self, args):

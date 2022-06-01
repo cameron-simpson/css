@@ -883,6 +883,8 @@ class BaseCommand:
         needs_arg = False
         if opt_name.startswith('_'):
           opt_name = opt_name[1:]
+          if is_identifier(opt_name):
+            warning("leading underscore on valid identifier option")
         if opt_name.endswith('_'):
           needs_arg = True
           opt_name = opt_name[:-1]
