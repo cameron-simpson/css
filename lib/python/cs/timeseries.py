@@ -2219,6 +2219,8 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
   ):
     epoch = Epoch.promote(epoch)
     self.epoch = epoch
+    if not isdirpath(fspath):
+      pfx_call(needdir, fspath)
     HasFSPath.__init__(self, fspath)
     if fstags is None:
       fstags = FSTags()
