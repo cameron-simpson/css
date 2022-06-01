@@ -194,7 +194,7 @@ class SPLinkCSVDir(HasFSPath):
         key_values[key].append(value)
     for key in keys[2:]:
       with Pfx(key):
-        ts = tsd.makeitem(key)
+        ts = tsd.make_ts(key)
         ts.tags['csv.header'] = rowtype.name_of_[key]
         ts.setitems(key_values[key0], key_values[key])
 

@@ -577,7 +577,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
           policy='daily',
           epoch=30,
       ) as datadir:
-        ts = datadir.makets('key1')
+        ts = datadir.make_ts('key1')
         ts[time.time()] = 9.0
 
     def test_timespan_policy(tmpdirpath):
@@ -2298,7 +2298,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
           continue
         self[key] = self._tsfactory(key)
 
-  def makeitem(self, key):
+  def make_ts(self, key):
     ''' Create a `TimeSeriesPartitioned` for `key`.
     '''
     if key not in self:
