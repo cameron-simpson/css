@@ -1,3 +1,5 @@
+TimeSeriesFile: open modes: basic read/modify/save, open for r or rw, mmap ro or rw
+TimeSeriesFile: start,step after header in same units int/float
 MultiTimeSeries: convenience add_rate(ratekey,accumulation_key) wrapper for add_derived, should backtrack to most recent non-NaN
 MultiTimeSeries: add_derivation_rule(fnglob,infer(key)->(derived_key,derived_func(mts,when)) which calls add_derived
 MultiTimeSeries: add_derived(key,func(mts,when)) to make a derives time series with func as a computation

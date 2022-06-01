@@ -715,7 +715,8 @@ class BaseCommand:
           else:
             raise TypeError(
                 "unexpected argument, expected help_text or parse,"
-                " then optional validate and optional invalid message"
+                " then optional validate and optional invalid message,"
+                " received %s" % (r(spec),)
             )
       if help_text is None:
         help_text = (
@@ -743,7 +744,7 @@ class BaseCommand:
             if not pfx_call(self.validate, value):
               raise ValueError(self.unvalidated_message)
         except ValueError as e:
-          raise GetoptError(": ".join(e.args))  # pylint: disable=raise-missing-from
+          raise GetoptError(str(e))  # pylint: disable=raise-missing-from
       return value
 
   @classmethod
@@ -881,7 +882,9 @@ class BaseCommand:
       with Pfx("opt_spec[%r]=%r", opt_name, opt_spec):
         needs_arg = False
         if opt_name.startswith('_'):
-          opt_name=opt_name[1:]
+          opt_name = opt_name[1:]
+          if is_identifier(opt_name):
+            warning("leading underscore on valid identifier option")
         if opt_name.endswith('_'):
           needs_arg = True
           opt_name = opt_name[:-1]
@@ -976,6 +979,8 @@ class BaseCommand:
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with upd_context:
+        if upd is not None:
+          upd.out(self.cmd + '...')
         with stackattrs(self, cmd=self._subcmd):
           with stackattrs(
               options,
@@ -1037,9 +1042,8 @@ class BaseCommand:
       print(usage.rstrip(), file=sys.stderr)
     return True
 
-  @staticmethod
   @contextmanager
-  def run_context():
+  def run_context(self):
     ''' Stub context manager which surrounds `main` or `cmd_`*subcmd*.
     '''
     # redundant try/finally to remind subclassers of correct structure

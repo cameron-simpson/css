@@ -86,7 +86,8 @@ def ts2001_unixtime(tzname=None):
   return unixtime
 
 class SPLinkCSVDir(HasFSPath):
-  ''' A class for working with SP-Link data downloads.
+  ''' A class for working with SP-Link data downloads,
+      referring to a particular `PerformanceData*` download directory.
   '''
   DEFAULT_LOG_FREQUENCY = 900
 
@@ -198,6 +199,8 @@ class SPLinkCSVDir(HasFSPath):
 class SPLinkDataDir(TimeSeriesDataDir):
   ''' A `TimeSeriesDataDir` to hold log data from an SP-Link CSV data download.
       This holds the data from a particular CSV log such as `'DetailedData'`.
+      The `SPLinkData` class manages a couple of these and a downloads
+      subdirectory and an events `SQLTags`.
   '''
 
   DEFAULT_POLICY_CLASS = TimespanPolicyAnnual
@@ -341,14 +344,13 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     '''
     return self.pathto(self.DOWNLOADS)
 
-  def download_subdirs(self, include_imports=False):
+  def download_subdirs(self):
     ''' Return an iterable of the paths of the top level `PerformanceData_*`
         subdirectories in the downloads subdirectory.
-        If `include_imports`, include subdirectories.
     '''
     return [
         joinpath(self.downloadspath, perfdirname) for perfdirname in
-        fnmatchdir(self.downloadspath, 'PerformanceData_????-??-??_??-??-??')
+        fnmatchdir(self.downloadspath, self.PERFORMANCEDATA_GLOB)
     ]
 
   @classmethod
@@ -427,6 +429,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                 or {DEFAULT_SPDPATH!r}
     -n          No action; recite planned actions.'''
 
+  SUBCOMMAND_ARGV_DEFAULT = 'info'
+
   DEFAULT_SPDPATH = '.'
   DEFAULT_SPDPATH_ENVVAR = 'SPLINK_DATADIR'
   DEFAULT_FETCH_SOURCE_ENVVAR = 'SPLINK_FETCH_SOURCE'
@@ -443,7 +447,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   def apply_defaults(self):
     ''' Set the default `spdpath`.
     '''
-    self.options.doit = True
+    self.options.fetch_source = os.environ.get(
+        self.DEFAULT_FETCH_SOURCE_ENVVAR
+    )
     self.options.fstags = FSTags()
     self.options.spdpath = os.environ.get(
         self.DEFAULT_SPDPATH_ENVVAR, self.DEFAULT_SPDPATH
@@ -475,46 +481,56 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           yield
 
   def cmd_fetch(self, argv):
-    ''' Usage: {cmd} [-x] [rsync-source] [rsync-options...]
+    ''' Usage: {cmd} [-F rsync-source] [-nx] [-- [rsync-options...]]
           Rsync everything from rsync-source into the downloads area.
+          -F    Fetch rsync source, default from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
           -n    Passed to rsync. Just more convenient than putting it at the end.
           -x    Delete source files.
-          If rsync-source is not provided it will be obtained from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
     '''
     options = self.options
+    options.expunge = False
+    self.popopts(argv, options, F='fetch_source', n='dry_run', x='expunge')
     doit = options.doit
+    expunge = options.expunge
+    fetch_source = options.fetch_source
+    if not fetch_source:
+      raise GetoptError(
+          f"no fetch source: no ${self.DEFAULT_FETCH_SOURCE_ENVVAR} and no -F option"
+      )
     spd = options.spd
-    expunge = False
     rsopts = ['-ia']
-    opts, argv = getopt(argv, 'nx')
-    for opt, _ in opts:
-      with Pfx(opt):
-        if opt == '-n':
-          rsopts.insert(0, opt)
-        elif opt == '-x':
-          expunge = True
-        else:
-          raise RuntimeError("unhandled option")
-    if argv and not argv[0].startswith('-'):
-      rsync_source = argv.pop(0)
-    else:
-      try:
-        rsync_source = os.environ[self.DEFAULT_FETCH_SOURCE_ENVVAR]
-      except KeyError as e:
-        raise GetoptError(
-            "no rsync-source provided and no ${self.DEFAULT_FETCH_SOURCE_ENVVAR}"
-        ) from e
     rsargv = ['set-x', 'rsync']
     rsargv.extend(rsopts)
     if expunge:
       rsargv.append('--delete-source')
     rsargv.extend(argv)
-    rsargv.extend(['--', rsync_source + '/', spd.downloadspath + '/'])
+    rsargv.extend(
+        [
+            '--', fetch_source + '/' + spd.PERFORMANCEDATA_GLOB,
+            spd.downloadspath + '/'
+        ]
+    )
     if not doit:
       print(shlex.join(argv))
       return 0
     print('+', shlex.join(argv))
     return run(rsargv)
+
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Report information about this SP-Link data collection.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    spd = options.spd
+    perfsubdirpaths = sorted(spd.download_subdirs())
+    print(
+        len(perfsubdirpaths), "downloads in", spd.DOWNLOADS + '/',
+        "fetched from", options.fetch_source + '/'
+    )
+    for perfdir in perfsubdirpaths:
+      print(" ", basename(perfdir))
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
   def cmd_import(self, argv):
@@ -560,7 +576,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     for path in argv:
       if runstate.cancelled:
         break
-      with Pfx(path):
+      with Pfx(shortpath(path)):
         if not existspath(path):
           error("does not exist")
           xit = 1
@@ -574,7 +590,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                   if dirname and not dirname.startswith('.')
               )
           )
-          for filename in filenames:
+          for filename in sorted(filenames):
             if runstate.cancelled:
               break
             if not filename or filename.startswith('.'):
@@ -616,13 +632,17 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                       if when_tags:
                         # subsequent events overlap previous imports,
                         # make sure we only import new events
-                        proxy.text = "load preexisting events in this timeframe"
+                        start = when_tags[0][0]
+                        start_date = arrow.get(start, tzinfo='local').date()
+                        stop = when_tags[-1][0]
+                        stop_date = arrow.get(stop, tzinfo='local').date()
+                        proxy.text = f"load preexisting events from {start_date}:{stop_date}"
                         existing = set(
                             (
                                 (ev.unixtime, ev.event_description)
                                 for ev in db.find(
-                                    f'unixtime>={when_tags[0][0]}',
-                                    f'unixtime<={when_tags[-1][0]}',
+                                    f'unixtime>={start}',
+                                    f'unixtime<={stop}',
                                 )
                             )
                         )
@@ -655,6 +675,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                         ",".join(spd.TIMESERIES_DATASETS),
                     )
                 )
+    if xit == 0 and runstate.cancelled:
+      xit = 1
     return xit
 
   # pylint: disable=too-many-locals

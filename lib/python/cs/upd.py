@@ -71,13 +71,16 @@ from builtins import print as builtin_print
 from contextlib import contextmanager
 import os
 import sys
-from threading import RLock
+from threading import RLock, Thread
+import time
+
 from cs.context import stackattrs, StackableState
 from cs.deco import decorator
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
 from cs.tty import ttysize
+from cs.units import transcribe, TIME_SCALE
 
 try:
   import curses
@@ -85,7 +88,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20220504-post'
+__version__ = '20220530-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -101,6 +104,7 @@ DISTINFO = {
         'cs.lex',
         'cs.obj>=20210122',
         'cs.tty',
+        'cs.units',
     ],
 }
 
@@ -815,7 +819,7 @@ class Upd(SingletonMixin):
           )
       if proxy is None:
         # create the proxy, which inserts it
-        return UpdProxy(index, self)
+        return UpdProxy(index, self, prefix=txt)
 
       # associate the proxy with self
       assert proxy.upd is None
@@ -902,8 +906,8 @@ class Upd(SingletonMixin):
       if len(slots) == 0 and index == 0:
         return None
       if index < 0 or index >= len(slots):
-        warning("Upd.delete(index=%d): index out of range, ignored")
-        return
+        warning("Upd.delete(index=%d): index out of range, ignored", index)
+        return None
       if len(slots) == 1:
         # silently do not delete
         ##raise ValueError("cannot delete the last slot")
@@ -960,6 +964,56 @@ class Upd(SingletonMixin):
         self._backend.flush()
       return proxy
 
+  @contextmanager
+  def run_task(
+      self,
+      label: str,
+      report_print=False,
+      runstate=None,
+      tick_delay=None,
+      tick_chars='|/=\\'
+  ):
+    ''' Context manager to display an `UpdProxy` for the duration of some task.
+    '''
+    if tick_delay is not None:
+      if tick_delay <= 0:
+        raise ValueError(
+            "run_task(%r,...,tick_delay=%s): tick_delay should be >0" %
+            (label, tick_delay)
+        )
+
+      def _ticker(proxy, runstate):
+        i = 0
+        while not runstate.cancelled:
+          proxy.suffix = ' ' + tick_chars[i % len(tick_chars)]
+          i += 1
+          time.sleep(tick_delay)
+
+    _runstate = None
+    with self.insert(1, label + ' ') as proxy:
+      if tick_delay is not None:
+        from cs.resources import RunState  # pylint: disable=import-outside-toplevel
+        _runstate = runstate or RunState()
+        Thread(target=_ticker, args=(proxy, _runstate), daemon=True).start()
+      proxy.text = '...'
+      start_time = time.time()
+      yield proxy
+      end_time = time.time()
+      if _runstate and _runstate is not runstate:
+        # shut down the ticker
+        _runstate.cancel()
+    elapsed_time = end_time - start_time
+    if report_print:
+      if isinstance(report_print, bool):
+        report_print = print
+      report_print(
+          label + (
+              ': (cancelled)'
+              if runstate is not None and runstate.cancelled else ':'
+          ), 'in',
+          transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
+      )
+
 class UpdProxy(object):
   ''' A proxy for a status line of a multiline `Upd`.
 
@@ -982,9 +1036,10 @@ class UpdProxy(object):
       'index': 'The index of this slot within the parent Upd.',
       '_prefix': 'The fixed leading prefix for this slot, default "".',
       '_text': 'The text following the prefix for this slot, default "".',
+      '_suffix': 'The fixed trailing suffix or this slot, default "".',
   }
 
-  def __init__(self, index=1, upd=None, text=None, prefix=None):
+  def __init__(self, index=1, upd=None, text=None, prefix=None, suffix=None):
     ''' Initialise a new `UpdProxy` status line.
 
         Parameters:
@@ -1001,6 +1056,7 @@ class UpdProxy(object):
     upd.insert(index, proxy=self)
     self._prefix = prefix or ''
     self._text = ''
+    self._suffix = suffix or ''
     if text:
       self(text)
 
@@ -1024,11 +1080,25 @@ class UpdProxy(object):
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.delete()
 
+  def _update(self):
+    upd = self.upd
+    if upd is not None:
+      with upd._lock:  # pylint: disable=protected-access
+        index = self.index
+        if index is not None:
+          txt = upd.normalise(self.prefix + self._text + self._suffix)
+          overflow = len(txt) - upd.columns + 1
+          if overflow > 0:
+            txt = '<' + txt[overflow + 1:]
+          self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+
   def reset(self):
     ''' Clear the proxy: set both the prefix and text to `''`.
     '''
     self._prefix = ''
-    self.text = ''
+    self._text = ''
+    self._suffix = ''
+    self._update()
 
   @property
   def prefix(self):
@@ -1042,7 +1112,7 @@ class UpdProxy(object):
     '''
     old_prefix, self._prefix = self._prefix, new_prefix
     if new_prefix != old_prefix:
-      self.text = self._text
+      self._update()
 
   @contextmanager
   def extend_prefix(self, more_prefix):
@@ -1066,16 +1136,21 @@ class UpdProxy(object):
         width then the leftmost text is cropped to fit.
     '''
     self._text = txt
-    upd = self.upd
-    if upd is not None:
-      with upd._lock:  # pylint: disable=protected-access
-        index = self.index
-        if index is not None:
-          txt = upd.normalise(self.prefix + txt)
-          overflow = len(txt) - upd.columns + 1
-          if overflow > 0:
-            txt = '<' + txt[overflow + 1:]
-          self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+    self._update()
+
+  @property
+  def suffix(self):
+    ''' The current suffix string.
+    '''
+    return self._suffix
+
+  @suffix.setter
+  def suffix(self, new_suffix):
+    ''' Change the suffix, redraw the status line.
+    '''
+    old_suffix, self._suffix = self._suffix, new_suffix
+    if new_suffix != old_suffix:
+      self._update()
 
   @property
   def width(self):
