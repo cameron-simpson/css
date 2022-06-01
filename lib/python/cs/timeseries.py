@@ -872,9 +872,34 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
     '''
     if epochy is not None and not isinstance(epochy, Epoch):
       if isinstance(epochy, (int, float)):
-        epochy = cls(0, epochy)
-      elif isinstance(epochy, tuple):
+        # just the step value, start the epoch at 0
+        epochy = 0, epochy
+      if isinstance(epochy, tuple):
         start, step = epochy
+        if isinstance(start, float) and isinstance(step, int):
+          step0 = step
+          step = float(step)
+          if step != step0:
+            raise ValueError(
+                "promoted step:%r to float to match start, but new value %r is not equal"
+                % (step0, step)
+            )
+        elif isinstance(start, int) and isinstance(step, float):
+          # ints have unbound precision in Python and 63 bits in storage
+          # so if we can work in ints, use ints
+          step_i = int(step)
+          if step_i == step:
+            # demote step to an int to match start
+            step = step_i
+          else:
+            # promote start to float to match step
+            start0 = start
+            start = float(start)
+            if start != start0:
+              raise ValueError(
+                  "promoted start:%r to float to match start, but new value %r is not equal"
+                  % (start0, start)
+              )
         epochy = cls(start, step)
       else:
         raise TypeError(
