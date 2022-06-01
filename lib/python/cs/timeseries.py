@@ -835,7 +835,10 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
     epoch = super().__new__(cls, *a, **kw)
     assert isinstance(epoch.start, (int, float))
     assert isinstance(epoch.step, (int, float))
-    assert type(self.start) is type(self.step)
+    assert type(epoch.start) is type(epoch.step), (
+        "type(epoch.start):%s is not type(epoch.step):%s" %
+        (type(epoch.start).__name__, type(epoch.step).__name__)
+    )
     assert epoch.step > 0
     return epoch
 
