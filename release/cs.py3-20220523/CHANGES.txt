@@ -1,0 +1,3 @@
+lib/python/cs/py3/__init__.py: cs.py3: bump __version__ to 20200517-post to avoid misleading value for future unreleased changes
+lib/python/cs/py3/__init__.py: cs.py3.__init__: define ustr=str for Python3, much more direct
+lib/python/cs/py3/__init__.py: cs.py3.__init__: ustr: pass non-str objects to str()

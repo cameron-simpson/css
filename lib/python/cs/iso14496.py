@@ -833,7 +833,7 @@ class Box(SimpleBinary):
     super().self_check()
     # sanity check the supplied box_type
     # against the box types this class supports
-    with Pfx("%s", self):
+    with Pfx(self):
       box_type = self.header.type
       try:
         BOX_TYPE = self.BOX_TYPE

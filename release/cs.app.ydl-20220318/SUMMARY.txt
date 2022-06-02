@@ -1,0 +1,2 @@
+YDLCommand.main: plumb options.parallel through to the OverYDL constructor.
+Bump required revision for cs.cmdutils.

@@ -493,7 +493,7 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
       thus providing a nice `__str__` and a keyword based `__init__`.
       Implementors must still define `.parse` and `.transcribe`.
 
-      To constraint the arguments passed to `__init__`,
+      To constrain the arguments passed to `__init__`,
       define an `__init__` which accepts specific keyword arguments
       and pass through to `super().__init__()`. Example:
 

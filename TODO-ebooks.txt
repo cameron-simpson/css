@@ -1,2 +1,11 @@
+calibre lint command
+CalibreCommand.popbooks: add /title-or-author-or-tag-or-desc and title:title-or-/regexp etc modes
+doit and verbose parameters for cs.psutils.run
+general selection function to slot in for dbids
+calibre tags: tag editor or something
+calibre convert: bulk format infill, EPUB if no CBZ
+calibre: normalise book formats? should dedrmed AZW* be MOBI? what actually happens in old calibre vs current calibre?
+KindleBook: .calibre_book property giving the Calibre book if there is a calibre.dbid
+"kindle ls": recite calibre info if there is a calibre.dbid
 move -C,-K to cs.ebooks.EBooksCommand and find a way to pass them forward to KindleCommand,CalibreCommand
 "calibre add_cbz dbid" - make cbz from mobi format, -D option to delete the mobi format
