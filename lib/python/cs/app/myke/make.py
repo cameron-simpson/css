@@ -29,8 +29,10 @@ from cs.queues import MultiOpenMixin
 from cs.result import Result, ResultState
 from cs.threads import Lock, locked, locked_property
 
-from .parse import (SPECIAL_MACROS, Macro, MacroExpression, readMakefileLines, ParseError)
 from . import DEFAULT_MAKE_COMMAND
+from .parse import (
+    SPECIAL_MACROS, Macro, MacroExpression, readMakefileLines, ParseError
+)
 
 SHELL = '/bin/sh'
 
@@ -225,19 +227,19 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
     '''
     ok = True
     for target in targets:
-        if isinstance(target, str):
-          T = self[target]
-        else:
-          T = target
-        T.require()
-        if T.get():
-          self.debug_make("MAKE %s: OK", T)
-        else:
-          self.debug_make("MAKE %s: FAILED", T)
-          ok = False
-          if self.fail_fast:
-            self.debug_make("ABORT MAKE")
-            break
+      if isinstance(target, str):
+        T = self[target]
+      else:
+        T = target
+      T.require()
+      if T.get():
+        self.debug_make("MAKE %s: OK", T)
+      else:
+        self.debug_make("MAKE %s: FAILED", T)
+        ok = False
+        if self.fail_fast:
+          self.debug_make("ABORT MAKE")
+          break
     self.debug_make("%r: %s", targets, ok)
     return ok
 
@@ -318,7 +320,8 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
     '''
     from .make import Target, Action
     action_list = None  # not in a target
-    for context, line in readMakefileLines(self, fp, parent_context=parent_context,
+    for context, line in readMakefileLines(self, fp,
+                                           parent_context=parent_context,
                                            missing_ok=missing_ok):
       with Pfx(str(context)):
         if isinstance(line, OSError):
@@ -380,7 +383,8 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
                   )
                 mexpr, offset = MacroExpression.parse(context, line, offset)
                 self.precious.update(
-                    word for word in mexpr(context, self.namespaces).split() if word
+                    word for word in mexpr(context, self.namespaces).split()
+                    if word
                 )
                 continue
               raise ParseError(context, doffset, "unrecognised directive")
@@ -401,7 +405,9 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
                 if offset < len(line) and line[offset] == '@':
                   action_silent = True
                   offset += 1
-                A = Action(context, 'shell', line[offset:], silent=action_silent)
+                A = Action(
+                    context, 'shell', line[offset:], silent=action_silent
+                )
                 self.debug_parse("add action: %s", A)
                 action_list.append(A)
                 continue
