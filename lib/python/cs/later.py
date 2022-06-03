@@ -51,8 +51,6 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import bg as bg_thread, State as ThreadState
 
-from cs.x import X
-
 __version__ = '20201021-post'
 
 DISTINFO = {
