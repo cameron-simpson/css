@@ -17,15 +17,12 @@ def main(argv=None):
   return MykeCommand(argv).run()
 
 class MykeCommand(BaseCommand):
+  ''' Command line mode for `cs.app.myke`.
+  '''
 
   GETOPT_SPEC = 'dD:eEf:ij:kmNnpqrRsS:tuvx'
   USAGE_FORMAT = "Usage: {cmd} [options...] [macro=value...] [targets...]"
-
-  def OPTIONS_CLASS(self):
-    ''' Factory function to prepare the `.options` object,
-        which is a `Maker`.
-    '''
-    return Maker(self.cmd)
+  OPTIONS_CLASS = Maker
 
   def apply_opt(self, opt, val):
     ''' Modify the `Maker` according to a command line option.
@@ -82,6 +79,7 @@ class MykeCommand(BaseCommand):
   @contextmanager
   def run_context(self):
     M = self.options
+    M.makecmd = self.cmd
     ok = M.loadMakefiles(M.makefiles)
     ok = ok and M.loadMakefiles(M.appendfiles)
     # prepend the command line namespace at the front again
