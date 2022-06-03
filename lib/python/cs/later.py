@@ -35,7 +35,6 @@ from functools import partial
 from heapq import heappush, heappop
 import logging
 import sys
-import threading
 from threading import Lock, Thread, Event
 import time
 
@@ -354,9 +353,10 @@ class Later(MultiOpenMixin):
 
   def _try_dispatch(self):
     ''' Try to dispatch the next `LateFunction`.
-
         Does nothing if insufficient capacity or no pending tasks.
+        Return the dispatched `LateFunction` or `None`.
     '''
+    LF = None
     with self._lock:
       if len(self.running) < self.capacity:
         try:
@@ -375,6 +375,7 @@ class Later(MultiOpenMixin):
           LF._dispatch()
       elif self.pending:
         debug("LATER: at capacity, nothing dispatched: %s", self)
+    return LF
 
   def _complete_LF(self, LF):
     ''' Process a completed `LateFunction`: remove from .running,
