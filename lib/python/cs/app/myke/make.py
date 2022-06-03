@@ -29,6 +29,7 @@ from cs.result import Result, ResultState
 from cs.threads import Lock, locked, locked_property
 
 from .parse import (SPECIAL_MACROS, Macro, MacroExpression, readMakefileLines, ParseError)
+from . import DEFAULT_MAKE_COMMAND
 
 SHELL = '/bin/sh'
 
@@ -40,19 +41,21 @@ PRI_PREREQ = 2
 
 MakeDebugFlags = Flags('debug', 'flags', 'make', 'parse')
 
-class Maker(MultiOpenMixin):
+class Maker(BaseCommandOptions, MultiOpenMixin):
   ''' Main class representing a set of dependencies to make.
   '''
 
   DEFAULT_PARALLELISM = 1
 
-  def __init__(self, makecmd, parallel=None, name=None):
+  def __init__(self, makecmd=None, parallel=None, name=None):
     ''' Initialise a Maker.
 
         Parameters:
         * `makecmd`: used to define `$(MAKE)`, typically `sys.argv[0]`.
         * `parallel`: the degree of parallelism of shell actions.
     '''
+    if makecmd is None:
+      makecmd = DEFAULT_MAKE_COMMAND
     if parallel is None:
       parallel = self.DEFAULT_PARALLELISM
     if parallel < 1:
@@ -61,26 +64,29 @@ class Maker(MultiOpenMixin):
       )
     if name is None:
       name = cs.pfx.cmd
-    self.parallel = parallel
-    self.name = name
-    self.debug = MakeDebugFlags()
-    self.debug.debug = False  # logging.DEBUG noise
-    self.debug.flags = False  # watch debug flag settings
-    self.debug.make = False  # watch make decisions
-    self.debug.parse = False  # watch Makefile parsing
-    self.fail_fast = True
-    self.no_action = False
-    self.default_target = None
-    self._makefiles = []
-    self.appendfiles = []
-    self.macros = {}
-    # autocreating mapping interface to Targets
-    self.targets = TargetMap(self)
-    self.rules = {}
-    self.precious = set()
-    self.active = set()
-    self._active_lock = Lock()
-    self._namespaces = [{'MAKE': makecmd.replace('$', '$$')}]
+    debug = MakeDebugFlags()
+    debug.debug = False  # logging.DEBUG noise
+    debug.flags = False  # watch debug flag settings
+    debug.make = False  # watch make decisions
+    debug.parse = False  # watch Makefile parsing
+    super().__init__(
+        name=name,
+        makecmd=makecmd,
+        parallel=parallel,
+        debug=debug,
+        fail_fast=True,
+        no_action=False,
+        default_target=None,
+        _makefiles=[],
+        appendfiles=[],
+        macros={},
+        targets=TargetMap(self),  # autocreating mapping interface to Targets
+        rules={},
+        precious=set(),
+        active=set(),
+        _active_lock=Lock(),
+        _namespaces=[]
+    )
 
   def __str__(self):
     return (
