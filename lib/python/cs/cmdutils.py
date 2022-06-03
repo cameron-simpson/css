@@ -401,7 +401,8 @@ class BaseCommand:
         * `BaseCommand()`: `argv` comes from `sys.argv`
           and the value for `cmd` is derived from `argv[0]`
         * `BaseCommand(argv)`: `argv` is the complete command line
-          and the value for `cmd` is derived from `argv[0]`
+          including the command name and the value for `cmd` is
+          derived from `argv[0]`
         * `BaseCommand(argv, cmd=foo)`: `argv` is the command
           arguments _after_ the command name and `cmd` is set to
           `foo`
