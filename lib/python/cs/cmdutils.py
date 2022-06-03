@@ -396,6 +396,16 @@ class BaseCommand:
         Other keyword arguments are applied to `self.options`
         as attributes.
 
+        The `cmd` and `argv` parameters have some fiddly semantics for convenience.
+        There are 3 basic ways to initialise:
+        * `BaseCommand()`: `argv` comes from `sys.argv`
+          and the value for `cmd` is derived from `argv[0]`
+        * `BaseCommand(argv)`: `argv` is the complete command line
+          and the value for `cmd` is derived from `argv[0]`
+        * `BaseCommand(argv, cmd=foo)`: `argv` is the command
+          arguments _after_ the command argument and `cmd` is set to
+          `foo`
+
         The command line arguments are parsed according to
         the optional `GETOPT_SPEC` class attribute (default `''`).
         If `getopt_spec` is not empty
@@ -420,19 +430,26 @@ class BaseCommand:
     '''
     subcmds = self.subcommands()
     has_subcmds = subcmds and list(subcmds) != ['help']
+    if argv is None:
+      # using sys.argv:
+      # argv0 comes from sys.argv[0], which is discarded
+      argv = list(sys.argv)
+      argv0 = argv.pop(0)
+    else:
+      # argv provided:
+      # if cmd is None, pop argv0 from argv
+      # otherwise set argv0=cmd
+      argv = list(argv)
+      if cmd is None:
+        argv0 = argv.pop(0)
+      else:
+        argv0 = cmd
+    if cmd is None:
+      cmd = basename(argv0)
+    self.cmd = cmd
+    X("self.cmd = %r",self.cmd)
     options = self.options = self.OPTIONS_CLASS()
     options.runstate_signals = (SIGINT, SIGTERM)
-    if argv is None:
-      argv = list(sys.argv)
-      if cmd is not None:
-        # consume the first argument anyway
-        argv.pop(0)
-    else:
-      argv = list(argv)
-    if cmd is None:
-      cmd = basename(argv.pop(0))
-    self.cmd = cmd
-    options = self.options = self.OPTIONS_CLASS()
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
