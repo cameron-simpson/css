@@ -83,7 +83,7 @@ class MultiOpenMixin(ContextManagerMixin):
       If used as a context manager this mixin calls `open()`/`close()` from
       `__enter__()` and `__exit__()`.
 
-      Recommended subclass implementations do as little as possible
+      It is recommended subclass implementations do as little as possible
       during `__init__`, and do almost all setup during startup so
       that the class may perform multiple startup/shutdown iterations.
 
@@ -163,7 +163,23 @@ class MultiOpenMixin(ContextManagerMixin):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Default context manager form of startup/shutdown - just calls them.
+    ''' Default context manager form of startup/shutdown - just
+        call the distinct `.startup()` and `.shutdown()` methods.
+
+        This supports legacy subclasses of `MultiOpenMixin` which
+        have separate `startup()` and `shutdown()` methods.
+        The preferred approach is a single `startup_shutdwn()`
+        context manager overriding this method.
+
+        The usual form looks like this:
+
+            @contextmanager
+            def startup_shutdown(self):
+                ... do some set up ...
+                try:
+                    yield
+                finally:
+                    ... do some tear down ...
     '''
     try:
       startup = self.startup
