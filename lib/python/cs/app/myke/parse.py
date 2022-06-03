@@ -327,12 +327,12 @@ class ModSelectRange(Modifier):
 ## TODO: check against below ## class ModSubstitute(Modifier):
 ## TODO: check against below ##   ''' A modifier which returns `text` with substitutions.
 ## TODO: check against below ##   '''
-## TODO: check against below ## 
+## TODO: check against below ##
 ## TODO: check against below ##   def __init__(self, context, modtext, regexp_mexpr, replacement):
 ## TODO: check against below ##     Modifier.__init__(self, context, modtext)
 ## TODO: check against below ##     self.regexp_mexpr = regexp_mexpr
 ## TODO: check against below ##     self.replacement = replacement
-## TODO: check against below ## 
+## TODO: check against below ##
 ## TODO: check against below ##   @pfx_method
 ## TODO: check against below ##   def modify(self, text, namespaces):
 ## TODO: check against below ##     ''' Apply the substitution.
@@ -468,8 +468,8 @@ def readMakefileLines(
     try:
       with pfx_call(open, filename) as fp:
         yield from readMakefileLines(
-            M, fp, parent_context,
-            missing_ok=missing_ok)
+            M, fp, parent_context, missing_ok=missing_ok
+        )
     except OSError as e:
       if e.errno == errno.ENOENT or e.errno == errno.EPERM:
         yield parent_context, e

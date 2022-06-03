@@ -44,16 +44,16 @@ class MykeCommand(BaseCommand):
         try:
           M.setDebug(flag, val)
         except AttributeError as e:
-          raise GetoptError("bad flag %r: %s"%( flag, e))
+          raise GetoptError("bad flag %r: %s" % (flag, e))
     elif opt == '-f':
       M._makefiles.append(val)
     elif opt == '-j':
       try:
         val = int(val)
       except ValueError as e:
-        raise GetoptError("invalid -j val: %s"%(e,))
+        raise GetoptError("invalid -j val: %s" % (e,))
       if val < 1:
-        raise GetoptError("invalid -j value: %d, must be >= 1"%( val,))
+        raise GetoptError("invalid -j value: %d, must be >= 1" % (val,))
       M.parallel = int(val)
     elif opt == '-k':
       M.fail_fast = False
