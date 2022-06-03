@@ -38,6 +38,8 @@ import sys
 import threading
 from threading import Lock, Thread, Event
 import time
+
+from cs.context import stackattrs
 from cs.deco import OBSOLETE
 from cs.excutils import logexc
 import cs.logutils
@@ -48,7 +50,9 @@ from cs.queues import IterableQueue, TimerQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, report, after
 from cs.seq import seq
-from cs.threads import bg as bg_thread
+from cs.threads import bg as bg_thread, State as ThreadState
+
+from cs.x import X
 
 __version__ = '20201021-post'
 
@@ -74,31 +78,7 @@ DISTINFO = {
 
 DEFAULT_RETRY_DELAY = 0.1
 
-class _ThreadLocal(threading.local):
-  ''' Thread local state to provide implied context within Later context managers.
-  '''
-
-  def __init__(self):
-    threading.local.__init__(self)
-    self.stack = []
-
-  @property
-  def current(self):
-    ''' The current topmost `Later` on the stack.
-    '''
-    return self.stack[-1]
-
-  def push(self, L):
-    ''' Push a `Later` onto the stack.
-    '''
-    self.stack.append(L)
-
-  def pop(self):
-    ''' Pop and return the top `Later` from the stack.
-    '''
-    return self.stack.pop()
-
-default = _ThreadLocal()
+default = ThreadState(current=None)
 
 def defer(func, *a, **kw):
   ''' Queue a function using the current default Later.
@@ -352,25 +332,25 @@ class Later(MultiOpenMixin):
     # inbound requests queue
     self._finished = None
 
-  def startup(self):
-    ''' Initial startup.
-    '''
+  @contextmanager
+  def startup_shutdown(self):
     self._finished = Event()
-
-  @pfx_method
-  def shutdown(self):
-    ''' Shut down the Later instance:
-        - close the request queue
-        - close the TimerQueue if any
-        - close the worker thread pool
-        - dispatch a Thread to wait for completion and fire the
-          _finished Event
-    '''
-    if self._timerQ:
-      self._timerQ.close()
-      self._timerQ.join()
-    # queue actions to detect activity completion
-    bg_thread(self._finished.set)
+    global default  # pylint: disable=global-statement
+    with stackattrs(default, current=self):
+      try:
+        yield
+      finally:
+        # Shut down the Later instance:
+        # - close the request queue
+        # - close the TimerQueue if any
+        # - close the worker thread pool
+        # - dispatch a Thread to wait for completion and fire the
+        #   _finished Event
+        if self._timerQ:
+          self._timerQ.close()
+          self._timerQ.join()
+        # queue actions to detect activity completion
+        bg_thread(self._finished.set)
 
   def _try_dispatch(self):
     ''' Try to dispatch the next `LateFunction`.
@@ -466,21 +446,6 @@ class Later(MultiOpenMixin):
       self.debug("STATUS: pending: %s", LF)
     for LF in list(self.running):
       self.debug("STATUS: running: %s", LF)
-
-  def __enter__(self):
-    global default  # pylint: disable=global-statement
-    debug("%s: __enter__", self)
-    default.push(self)
-    return self
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    ''' Exit handler: release the "complete" lock; the placeholder
-        function is blocking on this, and will return on its release.
-    '''
-    global default  # pylint: disable=global-statement
-    debug("%s: __exit__: exc_type=%s", self, exc_type)
-    default.pop()
-    return False
 
   def logTo(self, filename, logger=None, log_level=None):
     ''' Log to the file specified by `filename` using the specified
