@@ -403,7 +403,7 @@ class BaseCommand:
         * `BaseCommand(argv)`: `argv` is the complete command line
           and the value for `cmd` is derived from `argv[0]`
         * `BaseCommand(argv, cmd=foo)`: `argv` is the command
-          arguments _after_ the command argument and `cmd` is set to
+          arguments _after_ the command name and `cmd` is set to
           `foo`
 
         The command line arguments are parsed according to
@@ -447,7 +447,6 @@ class BaseCommand:
     if cmd is None:
       cmd = basename(argv0)
     self.cmd = cmd
-    X("self.cmd = %r",self.cmd)
     options = self.options = self.OPTIONS_CLASS()
     options.runstate_signals = (SIGINT, SIGTERM)
     log_level = getattr(options, 'log_level', None)
