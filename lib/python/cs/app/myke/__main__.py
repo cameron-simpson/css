@@ -14,6 +14,8 @@ from .make import Maker
 from .parse import Macro
 
 def main(argv=None):
+  ''' Myke command line mode.
+  '''
   return MykeCommand(argv).run()
 
 class MykeCommand(BaseCommand):
@@ -24,6 +26,7 @@ class MykeCommand(BaseCommand):
   USAGE_FORMAT = "Usage: {cmd} [options...] [macro=value...] [targets...]"
   OPTIONS_CLASS = Maker
 
+  # pylint: disable=too-many-branches
   def apply_opt(self, opt, val):
     ''' Modify the `Maker` according to a command line option.
         '''
@@ -44,14 +47,14 @@ class MykeCommand(BaseCommand):
         try:
           M.setDebug(flag, val)
         except AttributeError as e:
-          raise GetoptError("bad flag %r: %s" % (flag, e))
+          raise GetoptError("bad flag %r: %s" % (flag, e)) from e
     elif opt == '-f':
       M._makefiles.append(val)
     elif opt == '-j':
       try:
         val = int(val)
       except ValueError as e:
-        raise GetoptError("invalid -j val: %s" % (e,))
+        raise GetoptError("invalid -j val: %s" % (e,)) from e
       if val < 1:
         raise GetoptError("invalid -j value: %d, must be >= 1" % (val,))
       M.parallel = int(val)
