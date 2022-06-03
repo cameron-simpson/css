@@ -126,7 +126,9 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
   def namespaces(self):
     ''' The namespaces for this Maker: the built namespaces plus the special macros.
     '''
-    return self._namespaces + [SPECIAL_MACROS]
+    return self._namespaces + [
+        dict(MAKE=self.makecmd.replace('$', '$$')), SPECIAL_MACROS
+    ]
 
   def insert_namespace(self, ns):
     ''' Insert a macro namespace in front of the existing namespaces.
