@@ -15,6 +15,7 @@ import sys
 import time
 from types import SimpleNamespace as NS
 
+from cs.cmdutils import BaseCommandOptions
 from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
