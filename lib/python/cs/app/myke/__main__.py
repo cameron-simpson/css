@@ -101,7 +101,7 @@ class MykeCommand(BaseCommand):
       if target is None:
         targets = ()
       else:
-        targets = (M.default_target.name,)
+        targets = (M.default_target,)
     if not targets:
       error("no default target")
       return 1
