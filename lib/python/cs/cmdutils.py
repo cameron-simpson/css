@@ -1006,7 +1006,7 @@ class BaseCommand:
       with upd_context:
         if upd is not None:
           upd.out(self.cmd + '...')
-        with stackattrs(self, cmd=self._subcmd):
+        with stackattrs(self, cmd=self._subcmd if self._subcmd else self.cmd):
           with stackattrs(
               options,
               runstate=runstate,
