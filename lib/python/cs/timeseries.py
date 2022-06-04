@@ -51,7 +51,7 @@ from os.path import (
     join as joinpath,
     splitext,
 )
-from pprint import pprint
+from pprint import pformat
 from struct import pack  # pylint: disable=no-name-in-module
 from subprocess import run
 import sys
@@ -61,6 +61,7 @@ from typing import (
     Callable,
     List,
     Optional,
+    Tuple,
     Union,
 )
 
@@ -570,6 +571,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       print(type(pds), pds.memory_usage())
       print(pds)
 
+    # pylint: disable=unused-argument
     def test_partitioned_spans(tmpdirpath):
       # a daily partition with 1 minute time slots
       policy = TimespanPolicyDaily(epoch=60)
@@ -598,6 +600,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         ts = datadir.make_ts('key1')
         ts[time.time()] = 9.0
 
+    # pylint: disable=unused-argument
     def test_timespan_policy(tmpdirpath):
       policy = TimespanPolicyMonthly(epoch=60)
       print(policy.span_for_time(time.time()))
@@ -1048,7 +1051,15 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     return pd.Series(data, _dt64(times), self.np_type)
 
   @plotrange
-  def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
+  def plot(
+      self,
+      start,
+      stop,
+      *,
+      label=None,
+      runstate=None,  # pylint: disable=unused-argument
+      **plot_kw,
+  ):
     ''' Convenience shim for `DataFrame.plot` to plot data from
         `start` to `stop`.  Return the plot `Axes`.
 
@@ -1192,7 +1203,7 @@ class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
     yield self.time_type.transcribe_value(self.start)
     yield self.time_type.transcribe_value(self.step)
 
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-public-methods
 class TimeSeriesFile(TimeSeries, HasFSPath):
   ''' A file containing a single time series for a single data field.
 
@@ -1341,7 +1352,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ''' Return the file position for the data with position `offset`.
     '''
     return (
-        self.TimeSeriesFileHeader.HEADER_LENGTH +
+        TimeSeriesFileHeader.HEADER_LENGTH +
         self.header.datum_type.length * offset
     )
 
@@ -2235,6 +2246,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       raise CancellationError
     return df.plot(**plot_kw)
 
+# pylint: disable=too-many-ancestors
 class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
                         HasEpochMixin):
   ''' A directory containing a collection of `TimeSeriesPartitioned` subdirectories.
@@ -2604,7 +2616,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         return self.timeseriesfile_from_partition_name(partition_name)
       # a partition name
       return self.timeseriesfile_from_partition_name(index)
-    raise TypeError("invalid type for index %s", r(index))
+    raise TypeError("invalid type for index %s" % r(index))
 
   def __setitem__(self, when: Numeric, value):
     self.subseries(when)[when] = value
