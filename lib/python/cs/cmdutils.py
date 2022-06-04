@@ -447,7 +447,6 @@ class BaseCommand:
     if cmd is None:
       cmd = basename(argv0)
     self.cmd = cmd
-    X("self.cmd = %r",self.cmd)
     options = self.options = self.OPTIONS_CLASS()
     options.runstate_signals = (SIGINT, SIGTERM)
     log_level = getattr(options, 'log_level', None)
