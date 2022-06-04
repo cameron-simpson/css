@@ -301,7 +301,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       with Pfx(path):
         if directories_like_files or not isdirpath(path):
           # edit the Tags, one per line
-          fstags[path].edit(verbose=state.verbose)
+          fstags[path].edit(verbose=state.verbose, comments=["", path, ""])
         # edit the tagsets, on per file on a line
         elif not fstags.edit_dirpath(path, all_names=all_names):
           xit = 1
