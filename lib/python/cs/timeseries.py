@@ -1443,9 +1443,9 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
             (hdr.typecode, self.typecode)
         )
       if hdr.time_typecode != self.time_typecode:
-        raise ValueError(
-            "file time typecode %r does not match self.time_typecode:%r" %
-            (hdr.time_typecode, self.time_typecode)
+        warning(
+            "file time typecode %r does not match self.time_typecode:%r",
+            hdr.time_typecode, self.time_typecode
         )
       if hdr.step != self.step:
         raise ValueError(
