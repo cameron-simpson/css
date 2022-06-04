@@ -1340,7 +1340,10 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
   def file_offset(self, offset):
     ''' Return the file position for the data with position `offset`.
     '''
-    return self.HEADER_LENGTH + self.header.datum_type.length * offset
+    return (
+        self.TimeSeriesFileHeader.HEADER_LENGTH +
+        self.header.datum_type.length * offset
+    )
 
   def peek(self, when: Numeric, f=None):
     ''' Read a single data value for the UNIX time `when`
