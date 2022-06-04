@@ -1471,8 +1471,10 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
             "data length:%d is not a multiple of item size:%d", datalen,
             itemsize
         )
-        with mmap(tsf.fileno(), flen, MAP_PRIVATE, PROT_READ) as mm:
-          ary.frombytes(memoryview(mm)[bfr.offset:flen])
+      with mmap(tsf.fileno(), flen, MAP_PRIVATE, PROT_READ) as mm:
+        mv = memoryview(mm)
+        ary.frombytes(mv[bfr.offset:flen])
+        mv = None
     if header.bigendian != NATIVE_BIGENDIANNESS[header.typecode]:
       ary.byteswap()
     return header, ary
