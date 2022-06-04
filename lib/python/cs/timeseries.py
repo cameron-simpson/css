@@ -1593,7 +1593,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           "%s slice index %s starts at a negative offset" %
           (type(self).__name__, astart)
       )
-    values = ary[start:astop]
+    ary = self.array
+    values = ary[astart:astop]
     if astop > len(ary):
       # pad with nan
       values.extend([self.fill] * (astop - len(ary)))
