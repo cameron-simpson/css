@@ -961,14 +961,23 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     )
     new_lines = edit_lines(lines, editor=editor)
     new_values = {}
+    no_discard = False
     for lineno, line in enumerate(new_lines):
       with Pfx("%d: %r", lineno, line):
         line = line.strip()
         if not line or line.startswith('#'):
           continue
-        tag = Tag.from_str(line)
-        new_values[tag.name] = tag.value
-    self.set_from(new_values, verbose=verbose)
+        try:
+          tag = Tag.from_str(line)
+        except ValueError as e:
+          warning("parse error, discarded: %s", line)
+          no_discard = True
+        else:
+          new_values[tag.name] = tag.value
+    if no_discard:
+      self.update(new_values, verbose=True)
+    else:
+      self.set_from(new_values, verbose=verbose)
 
   @classmethod
   @pfx_method
