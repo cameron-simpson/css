@@ -2627,6 +2627,25 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       ts.tags['step'] = self.step
       ts.open()
     return ts
+
+  @property
+  def start(self):
+    ''' The earliest time in any component `TimeSeriesFile`.
+    '''
+    tsf_map = self.timeseriesfiles()
+    if not tsf_map:
+      return None
+    return min(tsf.start for tsf in tsf_map.values())
+
+  @property
+  def stop(self):
+    ''' The latest time in any component `TimeSeriesFile`.
+    '''
+    tsf_map = self.timeseriesfiles()
+    if not tsf_map:
+      return None
+    return max(tsf.stop for tsf in tsf_map.values())
+
   @staticmethod
   def partition_name_from_filename(tsfilename: str) -> str:
     ''' Return the time span name from a `TimeSeriesFile` filename.
