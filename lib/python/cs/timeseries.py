@@ -1588,6 +1588,12 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         If `prepad` is true, pad the resulting list at the beginning
     '''
     astart, astop = self.offset_bounds(start, stop)
+    return self.offset_slice(astart, astop)
+
+  def offset_slice(self, astart, astop):
+    ''' Return a slice of the underlying array
+        for the array indices `astart:astop`.
+    '''
     if astart < 0:
       raise IndexError(
           "%s slice index %s starts at a negative offset" %
