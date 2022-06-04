@@ -855,14 +855,14 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
     assert isinstance(epoch.step, (int, float))
     assert type(epoch.start) is type(epoch.step), (
         "type(epoch.start):%s is not type(epoch.step):%s" %
-        (type(epoch.start).__name__, type(epoch.step).__name__)
+        (s(epoch.start), s(epoch.step))
     )
     assert epoch.step > 0
     return epoch
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `Epoch`, handy for use with `pprint()`.
+        about this `Epoch`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -941,7 +941,7 @@ class HasEpochMixin(TimeStepsMixin):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `HasEpochMixin`, handy for use with `pprint()`.
+        about this `HasEpochMixin`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -977,7 +977,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeries`, handy for use with `pprint()`.
+        about this `TimeSeries`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -1255,6 +1255,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     try:
       header = TimeSeriesFileHeader.from_file(self.fspath)
     except FileNotFoundError:
+      # a missing file is ok, other exceptions are not
       header = None
     # compare the file against the supplied arguments
     if header is None:
@@ -1278,8 +1279,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         )
       if epoch is not None and epoch != header.epoch:
         raise ValueError(
-            "epoch=%s but data file %s has epoch %s" %
-            (epoch, fspath, header.epoch)
+            "epoch.step=%s but data file %s has epoch.step %s" %
+            (epoch.step, fspath, header.epoch.step)
         )
     self.header = header
     TimeSeries.__init__(self, header.epoch, typecode)
@@ -1307,7 +1308,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeriesFile`, handy for use with `pprint()`.
+        about this `TimeSeriesFile`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -1575,8 +1576,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     astart, astop = self.offset_bounds(start, stop)
     if astart < 0:
       raise IndexError(
-          "%s slice index %s starts at an offset before this array (start offet = %s)"
-          % (type(self).__name__, when, astart)
+          "%s slice index %s starts at a negative offset" %
+          (type(self).__name__, astart)
       )
     values = ary[start:astop]
     if astop > len(ary):
@@ -2066,7 +2067,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeriesMapping`, handy for use with `pprint()`.
+        about this `TimeSeriesMapping`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -2248,8 +2249,12 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     if step is None:
       if config.step is None:
         raise ValueError(
-            "missing step parameter and no step in config: config=%s" %
-            (s(config),)
+            "no epoch provided and start or step missing from config %s[%s]: %r"
+            % (
+                shortpath(self.configpath),
+                self.CONFIG_SECTION_NAME,
+                self.config,
+            )
         )
       step = config.step
     elif self.step is None:
@@ -2291,7 +2296,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeriesDataDir`, handy for use with `pprint()`.
+        about this `TimeSeriesDataDir`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -2486,7 +2491,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeriesPartitioned`, handy for use with `pprint()`.
+        about this `TimeSeriesPartitioned`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
