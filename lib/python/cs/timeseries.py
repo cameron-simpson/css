@@ -2568,24 +2568,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       # numeric UNIX time
       span = self.policy.span_for_time(spec)
     assert span.step == self.step
-    try:
-      ts = self._ts_by_partition[span.name]
-    except KeyError:
-      tsepoch = Epoch(span.start, span.step)
-      filepath = self.pathto(span.name + TimeSeriesFile.DOTEXT)
-      ts = self._ts_by_partition[span.name] = TimeSeriesFile(
-          filepath,
-          self.typecode,
-          epoch=tsepoch,
-      )
-      ts.epoch = tsepoch
-      ts.span = span  # pylint: disable=attribute-defined-outside-init
-      ts.tags['partition'] = span.name
-      ts.tags['start'] = span.start
-      ts.tags['stop'] = span.stop
-      ts.tags['step'] = self.step
-      ts.open()
-    return ts
+    return self.timeseriesfile_from_partition_name(span.name)
 
   def __getitem__(self, when: Union[Numeric, slice]):
     if isinstance(when, slice):
@@ -2610,6 +2593,29 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     return self.fnmatch('*' + TimeSeriesFile.DOTEXT)
 
+
+  def timeseriesfile_from_partition_name(self, partition_name):
+    ''' Return the `TimeSeriesFile` associated with the supplied partition_name.
+    '''
+    partition_span = self.policy.span_for_name(partition_name)
+    try:
+      ts = self._ts_by_partition[partition_span.name]
+    except KeyError:
+      tsepoch = Epoch(partition_span.start, partition_span.step)
+      filepath = self.pathto(partition_span.name + TimeSeriesFile.DOTEXT)
+      ts = self._ts_by_partition[partition_span.name] = TimeSeriesFile(
+          filepath,
+          self.typecode,
+          epoch=tsepoch,
+      )
+      ts.epoch = tsepoch
+      ts.partition_span = partition_span  # pylint: disable=attribute-defined-outside-init
+      ts.tags['partition'] = partition_span.name
+      ts.tags['start'] = partition_span.start
+      ts.tags['stop'] = partition_span.stop
+      ts.tags['step'] = self.step
+      ts.open()
+    return ts
   @staticmethod
   def partition_name_from_filename(tsfilename: str) -> str:
     ''' Return the time span name from a `TimeSeriesFile` filename.
