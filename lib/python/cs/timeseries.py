@@ -2759,9 +2759,21 @@ def timeseries_from_path(
       )
     return TimeSeriesFile(tspath, typecode, epoch=epoch)
   if isdirpath(tspath):
-    if fnmatchdir(tspath, '*' + TimeSeriesFile.DOTEXT):
-      return TimeSeriesPartitioned(tspath, typecode, policy='annual')
-    return TimeSeriesDataDir(tspath, policy='annual')
+    tsfilenames = fnmatchdir(tspath, '*' + TimeSeriesFile.DOTEXT)
+    if tsfilenames:
+      # contains some .csts files
+      tsfilepath = joinpath(tspath, tsfilenames[0])
+      f0_typecode = TimeSeriesFile(tsfilepath).typecode
+      if typecode is not None and typecode != f0_typecode:
+        warning(
+            "supplied typecode %r does not match typecode %r from file %r",
+            typecode, f0_typecode, tsfilepath
+        )
+      typecode = f0_typecode
+      return TimeSeriesPartitioned(
+          tspath, typecode, policy='annual', epoch=epoch
+      )
+    return TimeSeriesDataDir(tspath, policy='annual', epoch=epoch)
   raise ValueError("cannot deduce time series type from tspath %r" % (tspath,))
 
 if __name__ == '__main__':
