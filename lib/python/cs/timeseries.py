@@ -1284,7 +1284,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
             "typecode=%r but data file %s has typecode %r" %
             (typecode, fspath, header.typecode)
         )
-      if epoch is not None and epoch != header.epoch:
+      if epoch is not None and epoch.step != header.epoch.step:
         raise ValueError(
             "epoch.step=%s but data file %s has epoch.step %s" %
             (epoch.step, fspath, header.epoch.step)
