@@ -2268,8 +2268,10 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     HasConfigIni.__init__(self, self.CONFIG_SECTION_NAME)
     self.fstags = fstags
     config = self.config
-    if step is None:
-      if config.step is None:
+    cfg_start = config.start
+    cfg_step = config.step
+    if epoch is None:
+      if cfg_start is None or cfg_step is None:
         raise ValueError(
             "no epoch provided and start or step missing from config %s[%s]: %r"
             % (
@@ -2278,18 +2280,23 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
                 self.config,
             )
         )
-      step = config.step
-    elif self.step is None:
-      self.step = step
-    elif step != self.step:
+
+      epoch = Epoch(cfg_start, cfg_step)
+    start, step = epoch.start, epoch.step
+    if start is None:
+      start = 0 if cfg_start is None else cfg_start
+      config.start = start
+    elif cfg_start is None:
+      config.start = start
+    elif start != cfg_start:
+      raise ValueError("start:%r != config.start:%r" % (start, cfg_start))
+    if step is None:
+      step = 0 if cfg_step is None else cfg_step
+      config.step = step
+    elif cfg_step is None:
+      config.step = step
+    elif step != cfg_step:
       raise ValueError("step:%r != config.step:%r" % (step, self.step))
-    self.start = 0
-    timezone = timezone or self.timezone
-    if isinstance(epoch, Epoch):
-      assert start == epoch.start
-      assert step == epoch.step
-    else:
-      epoch = Epoch(start, step)
     self.epoch = epoch
     tzinfo = tzinfo or self.tzinfo
     if policy is None:
@@ -2480,11 +2487,10 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         instance it sets these flags.
     '''
     epoch = Epoch.promote(epoch)
-    assert isinstance(policy, TimespanPolicy)
+    policy = TimespanPolicy.promote(policy, epoch)
     HasFSPath.__init__(self, dirpath)
     if fstags is None:
       fstags = FSTags()
-    self.fstags = fstags
     if typecode is None:
       typecode = self.tags.typecode
       if typecode is None:
@@ -2498,6 +2504,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     assert isinstance(policy, ArrowBasedTimespanPolicy)
     TimeSeries.__init__(self, policy.epoch, typecode)
     self.policy = policy
+    self.fstags = fstags
     self._ts_by_partition = {}
 
   def __str__(self):
