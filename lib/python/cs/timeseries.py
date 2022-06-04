@@ -2614,9 +2614,12 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def partition_name_from_filename(self, tsfilename: str) -> str:
     ''' Return the time span name from a `TimeSeriesFile` filename.
     '''
-    name, ext = splitext(tsfilename)
+    name, ext = splitext(basename(tsfilename))
     if ext != TimeSeriesFile.DOTEXT:
-      warning("expected extension %r, got %r", TimeSeriesFile.DOTEXT, ext)
+      raise ValueError(
+          "expected extension %r, got %r; tsfilename=%r" %
+          (TimeSeriesFile.DOTEXT, ext, tsfilename)
+      )
     return name
 
   def partition(self, start, stop):
