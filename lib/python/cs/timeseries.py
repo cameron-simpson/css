@@ -1617,8 +1617,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       values.extend([self.fill] * (astop - len(ary)))
     return values
 
-  @pfx
-  @typechecked
   def __getitem__(self, when: Union[Numeric, slice]):
     ''' Return the datum for the UNIX time `when`.
 
