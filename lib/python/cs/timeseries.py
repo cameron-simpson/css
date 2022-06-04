@@ -1880,12 +1880,13 @@ class TimespanPolicy(DBC, HasEpochMixin):
         start at `round_down(start)` and end at `stop` respectively.
         This makes the returned spans useful for time ranges from a subseries.
     '''
-    when = self.round_down(start)
+    epoch = self.epoch
+    when = start
     while when < stop:
       span = self.span_for_time(when)
-      yield TimePartition(
-          span.name, max(span.start, when), min(span.stop, stop)
-      )
+      offset0 = epoch.offset(max(span.start, when))
+      offset1 = epoch.offset(min(span.stop, stop))
+      yield TimePartition(epoch, span.name, offset0, offset1 - offset0)
       when = span.stop
 
   def spans_for_times(self, whens):
