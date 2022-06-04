@@ -948,14 +948,16 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   #############################################################################
   # Edit tags.
 
-  def edit(self, editor=None, verbose=None):
+  def edit(self, editor=None, verbose=None, comments=()):
     ''' Edit this `TagSet`.
     '''
     if editor is None:
       editor = EDITOR
     lines = (
-        ["# Edit TagSet.", "# One tag per line."] +
-        list(map(str, sorted(self)))
+        ["# Edit TagSet.", "# One tag per line."] + [
+            ("# " + comment.replace("\n", "\n# ")).rstrip()
+            for comment in comments
+        ] + list(map(str, sorted(self)))
     )
     new_lines = edit_lines(lines, editor=editor)
     new_values = {}
