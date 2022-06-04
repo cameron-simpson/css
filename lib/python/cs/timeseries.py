@@ -123,7 +123,8 @@ DISTINFO = {
     },
 }
 
-Numeric = Union[int, float]
+numeric_types = int, float
+Numeric = Union[numeric_types]
 
 def main(argv=None):
   ''' Run the command line tool for `TimeSeries` data.
