@@ -1260,7 +1260,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       fstags = FSTags()
     self.fstags = fstags
     try:
-      header = TimeSeriesFileHeader.from_file(self.fspath)
+      header, = TimeSeriesFileHeader.scan_fspath(self.fspath, max_count=1)
     except FileNotFoundError:
       # a missing file is ok, other exceptions are not
       header = None
@@ -1290,7 +1290,9 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
             (epoch.step, fspath, header.epoch.step)
         )
     self.header = header
-    TimeSeries.__init__(self, header.epoch, typecode)
+    epoch = header.epoch
+    typecode = header.typecode
+    TimeSeries.__init__(self, epoch, typecode)
     if fill is None:
       if typecode == 'd':
         fill = nan
