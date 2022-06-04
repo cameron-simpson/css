@@ -2593,6 +2593,17 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     return self.fnmatch('*' + TimeSeriesFile.DOTEXT)
 
+  def timeseriesfiles(self):
+    ''' Return a mapping of partition name to associated `TimeSeriesFile`
+        for the existing time series data files.
+    '''
+    timeseriesfiles = {}
+    for filename in self.tsfilenames():
+      partition_name = self.partition_name_from_filename(filename)
+      tsf = self.timeseriesfile_from_partition_name(partition_name)
+      assert partition_name not in timeseriesfiles
+      timeseriesfiles[partition_name] = tsf
+    return timeseriesfiles
 
   def timeseriesfile_from_partition_name(self, partition_name):
     ''' Return the `TimeSeriesFile` associated with the supplied partition_name.
