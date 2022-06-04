@@ -986,6 +986,13 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     return d
 
   @abstractmethod
+  @contextmanager
+  def startup_shutdown(self):
+    ''' This is required, even if empty.
+    '''
+    raise NotImplementedError
+
+  @abstractmethod
   def __getitem__(self, index):
     ''' Return a datum or list of data.
     '''
