@@ -551,7 +551,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     ts = self.options.ts
     print(ts)
-    pprint(ts.info_dict())
+    print(pformat(ts.info_dict(), compact=True))
 
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
