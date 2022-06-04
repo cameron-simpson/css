@@ -400,6 +400,23 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
             with self.options.ts:
               yield
 
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd}
+          Dump the contents of tspath.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    ts = options.ts
+    if isinstance(ts, TimeSeries):
+      npary = ts.as_pd_series()
+      print(npary)
+    elif isinstance(ts, TimeSeriesMapping):
+      df = ts.as_pd_dataframe()
+      print(df)
+    else:
+      raise GetoptError("unhandled time series: %s" % ts)
+
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_import(self, argv):
     ''' Usage: {cmd} csvpath datecol[:conv] [import_columns...]
