@@ -2570,20 +2570,41 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     assert span.step == self.step
     return self.timeseriesfile_from_partition_name(span.name)
 
-  def __getitem__(self, when: Union[Numeric, slice]):
-    if isinstance(when, slice):
-      # TODO: fast version
-      if when.step is not None and when.step != self.step:
+  def __getitem__(self, index: Union[Numeric, slice, str]):
+    ''' Obtain various things from this `TimeSeriesPartitioned`
+        according to the type of `index`:
+        * `int` or `float`: the value for the UNIX timestamp `index`
+        * `slice`: a list of the values for the UNIX timestamp slice `index`
+        * `*.csts`: the `TimeSeriesFile` named `index` within this
+          `TimeSeriesPartitioned`
+        * partition name: the `TimeSeriesFile` for the policy time partition
+    '''
+    if isinstance(index, numeric_types):
+      # UNIX timestamp
+      span = self.policy.span_for_time(index)
+      tsf = self.timeseriesfile_from_partition_name(span.name)
+      return tsf[index]
+    if isinstance(index, slice):
+      # slice of UNIX timestamps
+      if index.step is not None and index.step != self.step:
         raise IndexError(
             "slice.step:%r should be None or ==self.step:%r" %
-            (when.step, self.step)
+            (index.step, self.step)
         )
-      return [self[t] for t in self.range(when.start, when.stop)]
-    series = self.subseries(when)
-    try:
-      return series[when]
-    except IndexError:
-      return nan
+      values = []
+      for span in self.policy.partitioned_spans(index.start, index.stop):
+        ts = self.timeseriesfile_from_partition_name(span.name)
+        ts_values = ts[span.start:span.stop]
+        values.extend(ts_values)
+      return values
+    if isinstance(index, str):
+      if index.endswith(TimeSeriesFile.DOTEXT):
+        # a .csts filename
+        partition_name = self.partition_name_from_filename(index)
+        return self.timeseriesfile_from_partition_name(partition_name)
+      # a partition name
+      return self.timeseriesfile_from_partition_name(index)
+    raise TypeError("invalid type for index %s", r(index))
 
   def __setitem__(self, when: Numeric, value):
     self.subseries(when)[when] = value
