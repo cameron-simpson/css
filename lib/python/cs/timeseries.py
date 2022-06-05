@@ -2220,7 +2220,6 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
           kname = label + ': ' + kname
         if kname != key:
           df.rename(columns={key: kname}, inplace=True)
-    print(df)
     if runstate and runstate.cancelled:
       raise CancellationError
     return df.plot(**plot_kw)
