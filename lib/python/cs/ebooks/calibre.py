@@ -1243,7 +1243,11 @@ class CalibreCommand(BaseCommand):
         for cbook in cbooks:
           if runstate.cancelled:
             break
-          pfx_call(cbook.make_cbz)
+          try:
+            pfx_call(cbook.make_cbz)
+          except ValueError as e:
+            warning("cannot make CBZ from %s: %s" % (cbook, e))
+            xit = 1
     if runstate.cancelled:
       xit = 1
     return xit
