@@ -264,6 +264,9 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     ts = options.ts
     plot_dx = 14
     plot_dy = 8
+    figure = Figure(figsize=(plot_dx, plot_dy), dpi=100)
+    figure.add_subplot()
+    ax = figure.axes[0]
     plot_kw = {}
     if isinstance(ts, TimeSeries):
       if argv:
@@ -271,9 +274,13 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
             "fields:%r should not be suppplied for a %s" % (argv, s(ts))
         )
       ax = ts.plot(
-          start, now, runstate=runstate, figsize=(plot_dx, plot_dy), **plot_kw
+          start,
+          now,
+          ax=ax,
+          runstate=runstate,
+          figsize=(plot_dx, plot_dy),
+          **plot_kw
       )  # pylint: disable=missing-kwoa
-      figure = ax.figure
     elif isinstance(ts, TimeSeriesDataDir):
       if argv:
         keys = ts.keys(argv)
@@ -285,7 +292,6 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         keys = ts.keys()
         if not keys:
           raise GetoptError("no keys in %s" % (ts,))
-      plot_dy = max(plot_dy, len(keys) // 2)
       plot_kw.update(
           stacked=options.stacked,
           subplots=options.multi,
@@ -296,11 +302,9 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           now,
           keys,
           runstate=runstate,
-          figsize=(plot_dx, plot_dy),
+          ax=ax,
           **plot_kw,
       )  # pylint: too-many-function-args.disable=missing-kwoa
-      if ax is None:
-        return 1
       figure = (ax[0] if options.multi else ax).figure
     else:
       raise RuntimeError("unhandled type %s" % (s(ts),))
