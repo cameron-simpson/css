@@ -560,22 +560,22 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                             imported.
     '''
     options = self.options
-    runstate = options.runstate
-    doit = options.doit
-    force = False
     fstags = options.fstags
+    runstate = options.runstate
     spd = options.spd
-    datasets = self.ALL_DATASETS
+    options.datasets = self.ALL_DATASETS
+    options.once = False
     badopts = False
-    opts, argv = getopt(argv, 'd:n')
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-d':
-          datasets = val.split(',')
-        elif opt == '-f':
-          force = True
-        elif opt == '-n':
-          doit = False
+    options.popopts(
+        argv,
+        d_=('datasets', lambda opt: opt.split(',')),
+        f='force',
+        n='dry_run',
+        dry_run='dry_run',
+    )
+    datasets = options.datasets
+    doit = options.doit
+    force = options.force
     if not datasets:
       warning("empty dataset list")
     for dataset in datasets:
