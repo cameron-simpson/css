@@ -2702,7 +2702,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       if span is None or when not in span:
         # new partition required, sets ts as well
         ts = self.subseries(when)
-        span = ts.span
+        span = ts.partition_span
       ts[when] = value
 
   def partitioned_spans(self, start, stop):
