@@ -5,11 +5,12 @@
     which communicates with their controllers.
 '''
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from datetime import datetime
+from fnmatch import fnmatch
 from functools import partial
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import os
 from os.path import (
     basename,
@@ -18,13 +19,16 @@ from os.path import (
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
+    relpath,
     splitext,
 )
+from pprint import pprint
 import shlex
 import sys
 import time
 
 import arrow
+from matplotlib.figure import Figure
 from typeguard import typechecked
 
 from cs.context import stackattrs
@@ -37,17 +41,19 @@ from cs.logutils import warning, error
 from cs.pfx import pfx, pfx_call, Pfx
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
-    plot_events,
+    Epoch,
     TimeSeriesBaseCommand,
     TimeSeriesDataDir,
-    TimespanPolicyAnnual,
+    TimespanPolicyYearly,
+    plot_events,
+    print_figure,
+    save_figure,
 )
-from cs.upd import print, UpdProxy  # pylint: disable=redefined-builtin
+from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -55,16 +61,16 @@ DISTINFO = {
         "Development Status :: 3 - Alpha",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': [
+        'cs.timeseries',
+        'arrow',
+        'matplotlib',
+        'typeguard',
+    ],
     'entry_points': {
         'console_scripts': [
             'splink = cs.splink:main',
         ],
-    },
-    'extras_requires': {
-        'numpy': ['numpy'],
-        'pandas': ['pandas'],
-        'plotting': ['kaleido', 'plotly'],
     },
 }
 
