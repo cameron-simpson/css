@@ -809,9 +809,8 @@ class Upd(SingletonMixin):
               (len(self), index0)
           )
       elif index > len(self):
-        if index == 1 and len(self) == 0:
-          # crop insert in the initial state
-          index = 0
+        if index == 1 and not slots:
+          self.insert(0)
         else:
           raise ValueError(
               "index should be in the range 0..%d inclusive: got %s" %
