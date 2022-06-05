@@ -305,26 +305,10 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
       raise RuntimeError("unhandled type %s" % (s(ts),))
     if runstate.cancelled:
       return 1
-    with TemporaryDirectory(dir=(dirname(imgpath) if imgpath else '.')
-                            ) as tmppath:
-      if imgpath:
-        imgfilename = basename(imgpath)
-      else:
-        imgfilename = 'plot.png'
-      tmpimgpath = joinpath(tmppath, imgfilename)
-      pfx_call(figure.savefig, tmpimgpath)
-      if imgpath:
-        if not force and existspath(imgpath):
-          error("output path already exists: %r", imgpath)
-          xit = 1
-        else:
-          pfx_call(os.link, tmpimgpath, imgpath)
-      else:
-        if not options.show_image:
-          with open(tmpimgpath, 'rb') as imgf:
-            with open('/dev/tty', 'wb') as tty:
-              # pylint: disable=subprocess-run-check
-              run(['img2sixel'], stdin=imgf, stdout=tty)
+    if imgpath:
+      save_figure(figure, imgpath, force=force)
+    else:
+      print_figure(figure)
     if options.show_image:
       figure.show()
     return xit
@@ -2785,6 +2769,49 @@ def timeseries_from_path(
       )
     return TimeSeriesDataDir(tspath, policy='annual', epoch=epoch)
   raise ValueError("cannot deduce time series type from tspath %r" % (tspath,))
+
+@contextmanager
+def saved_figure(figure_or_ax, dir=None, ext=None):
+  ''' Context manager to save a `Figure` to a file and yield the file path.
+  '''
+  figure = getattr(figure_or_ax, 'figure', figure_or_ax)
+  if dir is None:
+    dir = '.'
+  if ext is None:
+    ext = 'png'
+  with TemporaryDirectory(dir=dir or '.') as tmppath:
+    tmpimgpath = joinpath(tmppath, f'plot.{ext}')
+    pfx_call(figure.savefig, tmpimgpath)
+    yield tmpimgpath
+
+def save_figure(figure_or_ax, imgpath: str, force=False):
+  ''' Save a `Figure` (or something with a `.figure` attribute such
+      as a set of axes) to the file `imgpath`.
+  '''
+  if not force and existspath(imgpath):
+    raise ValueError("image path already exists: %r" % (imgpath,))
+  _, imgext = splitext(basename(imgpath))
+  ext = imgext[1:] if imgext else 'png'
+  with saved_figure(figure_or_ax, dir=dirname(imgpath), ext=ext) as tmpimgpath:
+    if not force and existspath(imgpath):
+      raise ValueError("image path already exists: %r" % (imgpath,))
+    pfx_call(os.link, tmpimgpath, imgpath)
+
+def print_figure(figure_or_ax, format=None, file=None):
+  if file is None:
+    file = sys.stdout
+  if format is None:
+    if file.isatty():
+      format = 'sixel'
+    else:
+      format = 'png'
+  with saved_figure(figure_or_ax) as tmpimgpath:
+    with open(tmpimgpath, 'rb') as imgf:
+      if format == 'sixel':
+        run(['img2sixel'], stdin=imgf, stdout=file.fileno())
+      else:
+        for bs in CornuCopyBuffer.from_file(imgf):
+          file.write(bs)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
