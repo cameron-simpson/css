@@ -95,7 +95,6 @@ class SPLinkCSVDir(HasFSPath):
   ''' A class for working with SP-Link data downloads,
       referring to a particular `PerformanceData*` download directory.
   '''
-  DEFAULT_LOG_FREQUENCY = 900
 
   @property
   @cachedmethod
@@ -213,9 +212,9 @@ class SPLinkDataDir(TimeSeriesDataDir):
   '''
 
   DEFAULT_POLICY_CLASS = TimespanPolicyAnnual
-  DEFAULT_LOG_FREQUENCY = SPLinkCSVDir.DEFAULT_LOG_FREQUENCY
 
-  def __init__(self, dirpath, dataset: str, step=None, policy=None, **kw):
+  @typechecked
+  def __init__(self, dirpath, dataset: str, step: int, policy=None, **kw):
     ''' Initialise the `SPLinkDataDir`.
 
         Parameters:
@@ -229,8 +228,7 @@ class SPLinkDataDir(TimeSeriesDataDir):
         Other keyword arguments are passed to the `TimeSeriesDataDir`
         initialiser.
     '''
-    if step is None:
-      step = self.DEFAULT_LOG_FREQUENCY
+    epoch = Epoch.promote((ts2001_unixtime(), step))
     if policy is None:
       policy = self.DEFAULT_POLICY_CLASS()
     super().__init__(dirpath, step=step, policy=policy, **kw)
