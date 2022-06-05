@@ -692,6 +692,17 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       xit = xit or 1
     return xit
 
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Report infomation about the time series stored at tspath.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    spd = options.spd
+    print(spd)
+    pprint(spd.info_dict())
+
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [--show] imagepath.png days {{[dataset:]{{glob|field}}}}...
