@@ -1004,8 +1004,6 @@ class BaseCommand:
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with upd_context:
-        if upd is not None:
-          upd.out(self.cmd + '...')
         with stackattrs(self, cmd=self._subcmd if self._subcmd else self.cmd):
           with stackattrs(
               options,
