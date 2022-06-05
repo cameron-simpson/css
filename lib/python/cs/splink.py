@@ -587,6 +587,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     if badopts:
       raise GetoptError("bad invocation")
     xit = 0
+    seen_events = defaultdict(set)
     for path in argv:
       if runstate.cancelled:
         break
@@ -618,11 +619,14 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             if dsinfo.dotext != '.CSV':
               continue
             dspath = joinpath(dirpath, filename)
+            short_dspath = relpath(dspath, spd.fspath)
+            if short_dspath.startswith('../'):
+              short_dspath = shortpath(dspath)
             dataset = dsinfo.dataset
             with Pfx(dspath):
               dstags = fstags[dspath]
               if not force and dstags.imported:
-                warning("skip, already imported")
+                print("already imported:", short_dspath)
                 continue
               if dataset in spd.TIMESERIES_DATASETS:
                 ts = getattr(spd, dataset)
@@ -633,51 +637,46 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                   print("import", dspath, "=>", ts)
               elif dataset in spd.EVENTS_DATASETS:
                 db = spd.eventsdb
+                seen = seen_events[dataset]
                 if doit:
-                  with UpdProxy(prefix="import %s: " % (shortpath(dspath),)
+                  with UpdProxy(prefix=f"{short_dspath}: import ... "
                                 ) as proxy:
-                    with db:
-                      short_csvpath = shortpath(dspath)
-                      proxy.text = "load " + short_csvpath
+                    proxy.text = 'load ' + short_dspath
+                    with Upd().run_task(
+                        f'{short_dspath}: load ',
+                        report_print=True,
+                    ):
                       when_tags = sorted(
                           SPLinkCSVDir.csv_tagsets(dspath),
                           key=lambda wt: wt[0]
                       )
+                    with db:
                       if when_tags:
-                        # subsequent events overlap previous imports,
-                        # make sure we only import new events
-                        start = when_tags[0][0]
-                        start_date = arrow.get(start, tzinfo='local').date()
-                        stop = when_tags[-1][0]
-                        stop_date = arrow.get(stop, tzinfo='local').date()
-                        proxy.text = f"load preexisting events from {start_date}:{stop_date}"
-                        existing = set(
-                            (
-                                (ev.unixtime, ev.event_description)
-                                for ev in db.find(
-                                    f'unixtime>={start}',
-                                    f'unixtime<={stop}',
-                                )
-                            )
-                        )
-                        proxy.text = "winnow existing events"
-                        new_when_tags = [
-                            wt for wt in when_tags
-                            if (wt[0],
-                                wt[1]['event_description']) not in existing
-                        ]
-                        if new_when_tags:
-                          proxy.text = "import %d new events" % (
-                              len(new_when_tags,)
-                          )
-                          for when, tags in progressbar(
-                              new_when_tags,
-                              short_csvpath,
-                              update_frequency=8,
+                        if not seen:
+                          proxy.text = 'load events from db ...'
+                          with Upd().run_task(
+                              f'{short_dspath}: load events from {db}',
                               report_print=True,
+                              tick_delay=0.15,
                           ):
+                            seen.update(
+                                (ev.unixtime, ev.event_description)
+                                for ev in db.find()
+                            )
+                          if runstate.cancelled:
+                            break
+                        proxy.text = 'insert new events'
+                        for when, tags in progressbar(
+                            when_tags,
+                            short_dspath,
+                            update_frequency=16,
+                            report_print=True,
+                        ):
+                          key = when, tags['event_description']
+                          if key not in seen:
                             tags['dataset'] = dataset
                             db.default_factory(None, unixtime=when, tags=tags)
+                            seen.add(key)
                   dstags['imported'] = 1
                 else:
                   print("import", dspath, "=>", db)
@@ -689,8 +688,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                         ",".join(spd.TIMESERIES_DATASETS),
                     )
                 )
-    if xit == 0 and runstate.cancelled:
-      xit = 1
+    if runstate.cancelled:
+      xit = xit or 1
     return xit
 
   # pylint: disable=too-many-locals
