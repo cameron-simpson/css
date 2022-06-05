@@ -396,6 +396,17 @@ class BaseCommand:
         Other keyword arguments are applied to `self.options`
         as attributes.
 
+        The `cmd` and `argv` parameters have some fiddly semantics for convenience.
+        There are 3 basic ways to initialise:
+        * `BaseCommand()`: `argv` comes from `sys.argv`
+          and the value for `cmd` is derived from `argv[0]`
+        * `BaseCommand(argv)`: `argv` is the complete command line
+          including the command name and the value for `cmd` is
+          derived from `argv[0]`
+        * `BaseCommand(argv, cmd=foo)`: `argv` is the command
+          arguments _after_ the command name and `cmd` is set to
+          `foo`
+
         The command line arguments are parsed according to
         the optional `GETOPT_SPEC` class attribute (default `''`).
         If `getopt_spec` is not empty
@@ -420,21 +431,28 @@ class BaseCommand:
     '''
     subcmds = self.subcommands()
     has_subcmds = subcmds and list(subcmds) != ['help']
+    if argv is None:
+      # using sys.argv:
+      # argv0 comes from sys.argv[0], which is discarded
+      argv = list(sys.argv)
+      argv0 = argv.pop(0)
+    else:
+      # argv provided:
+      # if cmd is None, pop argv0 from argv
+      # otherwise set argv0=cmd
+      argv = list(argv)
+      if cmd is None:
+        argv0 = argv.pop(0)
+      else:
+        argv0 = cmd
+    if cmd is None:
+      cmd = basename(argv0)
+    self.cmd = cmd
     options = self.options = self.OPTIONS_CLASS()
     options.runstate_signals = (SIGINT, SIGTERM)
-    if argv is None:
-      argv = list(sys.argv)
-      if cmd is not None:
-        # consume the first argument anyway
-        argv.pop(0)
-    else:
-      argv = list(argv)
-    if cmd is None:
-      cmd = basename(argv.pop(0))
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
-    self.cmd = cmd
     self.loginfo = loginfo
     self.apply_defaults()
     # override the default options
@@ -673,9 +691,16 @@ class BaseCommand:
         Subclasses can override this
         but it is usually easier to override `apply_opt(opt,val)`.
     '''
+    badopts = False
     for opt, val in opts:
       with Pfx(opt if val is None else "%s %r" % (opt, val)):
-        self.apply_opt(opt, val)
+        try:
+          self.apply_opt(opt, val)
+        except GetoptError as e:
+          warning("%s", e)
+          badopts = True
+    if badopts:
+      raise GetoptError("bad options")
 
   # pylint: disable=no-self-use
   def apply_preargv(self, argv):
@@ -981,7 +1006,7 @@ class BaseCommand:
       with upd_context:
         if upd is not None:
           upd.out(self.cmd + '...')
-        with stackattrs(self, cmd=self._subcmd):
+        with stackattrs(self, cmd=self._subcmd if self._subcmd else self.cmd):
           with stackattrs(
               options,
               runstate=runstate,

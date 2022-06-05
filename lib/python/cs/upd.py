@@ -88,7 +88,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20220504-post'
+__version__ = '20220530-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -104,6 +104,7 @@ DISTINFO = {
         'cs.lex',
         'cs.obj>=20210122',
         'cs.tty',
+        'cs.units',
     ],
 }
 
@@ -969,8 +970,8 @@ class Upd(SingletonMixin):
       label: str,
       report_print=False,
       runstate=None,
-      tick_delay=None,
-      tick_chars='|/=\\'
+      tick_delay=0.15,
+      tick_chars='|/-\\'
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
     '''

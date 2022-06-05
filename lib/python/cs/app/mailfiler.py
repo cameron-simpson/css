@@ -296,6 +296,11 @@ class MailFiler(NS):
     self._maildir_watchers = {}
     self._rules_pattern = None
 
+  def __str__(self):
+    return "%s(config_path=%s,..,rules_pattern=%r)" % (
+        type(self).__name__, shortpath(self.config_path), self.rules_pattern
+    )
+
   @property
   def cfg(self):
     ''' The [DEFAULT] configuration section.

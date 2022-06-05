@@ -18,7 +18,7 @@ from threading import Lock, Condition, Thread
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20210924-post'
+__version__ = '20220530-post'
 
 DISTINFO = {
     'description':
@@ -32,7 +32,6 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
-        'cs.queues>=iterable_channel',
     ],
 }
 

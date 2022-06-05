@@ -19,7 +19,7 @@ import time
 
 from cs.gimmicks import DEVNULL
 
-__version__ = '20220504-post'
+__version__ = '20220531-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,7 +28,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks'],
+    'install_requires': ['cs.gimmicks>=devnull'],
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions

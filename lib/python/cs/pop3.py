@@ -42,6 +42,7 @@ from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
 from cs.threads import bg as bg_thread
+from cs.upd import print
 
 __version__ = '20220312-post'
 
@@ -64,6 +65,7 @@ DISTINFO = {
         'cs.resources',
         'cs.result>=20210407',
         'cs.threads',
+        'cs.upd',
     ],
     'entry_points': {
         'console_scripts': ['pop3 = cs.pop3:main'],
