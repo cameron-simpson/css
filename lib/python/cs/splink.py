@@ -315,7 +315,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       dirpath,
   ):
     if not isdirpath(dirpath):
-      raise ValueError("not a directory: %r" % (dirpath,))
+      pfx_call(needdir, dirpath)
     super().__init__(dirpath)
     self._to_close = []
 
