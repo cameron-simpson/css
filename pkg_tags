@@ -40,7 +40,7 @@ cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba36087
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.iso14496 pypi.release="20210306" ok_revision="30d3534ee55e6aef369c55e79c0fe63d6bc2e1e6"
 cs.jdson
-cs.later pypi.release=20191007 ok_revision="258f06f68c5714444c510ea19c3f45a0f574d151"
+cs.later pypi.release="20220605" ok_revision="258f06f68c5714444c510ea19c3f45a0f574d151"
 cs.lex pypi.release="20220227" ok_revision=fb121c6afe95e80f0be91dcff41366e19527c28a features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"]}
 cs.logutils pypi.release="20220531" ok_revision=b00bf7d22f3b049e51068327ee8ffc299136d510 features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
