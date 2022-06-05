@@ -449,7 +449,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
             yield tsd, key
 
 class SPLinkCommand(TimeSeriesBaseCommand):
-  ''' Command line to wrk with SP-Link data downloads.
+  ''' Command line to work with SP-Link data downloads.
   '''
 
   GETOPT_SPEC = 'd:n'
@@ -546,29 +546,13 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     print('+', shlex.join(argv))
     return run(rsargv)
 
-  def cmd_info(self, argv):
-    ''' Usage: {cmd}
-          Report information about this SP-Link data collection.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    options = self.options
-    spd = options.spd
-    perfsubdirpaths = sorted(spd.download_subdirs())
-    print(
-        len(perfsubdirpaths), "downloads in", spd.DOWNLOADS + '/',
-        "fetched from", options.fetch_source + '/'
-    )
-    for perfdir in perfsubdirpaths:
-      print(" ", basename(perfdir))
-
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
   def cmd_import(self, argv):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
           -d datasets       Comma separated list of datasets to import.
                             Default datasets: {ALL_DATASETS}
-          -f                Force. Import datasets even is already marked as
+          -f                Force. Import datasets even if already marked as
                             imported.
           -n                No action. Recite planned imports.
           sp-link-download  Specify specific individual downloads to import.
