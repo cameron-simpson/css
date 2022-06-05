@@ -84,6 +84,14 @@ class Mobi:
     with self.extracted() as df:
       dirpath, rfilepath = df
       imagepaths = sorted(glob(joinpath(dirpath, 'mobi8/OEBPS/Images/*.*')))
+      if not imagepaths:
+        imagepaths = sorted(glob(joinpath(dirpath, 'mobi7/Images/*.*')))
+      if not imagepaths:
+        for dirp, dirnames, filenames in os.walk(dirpath):
+          dirnames[:] = sorted(dirnames)
+          for f in sorted(filenames):
+            print(joinpath(dirp, f))
+        raise ValueError("no image paths")
       info("write %s", cbzpath)
       try:
         with pfx_call(ZipFile, cbzpath, 'x', compression=ZIP_STORED) as cbz:
