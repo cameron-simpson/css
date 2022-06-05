@@ -2098,8 +2098,9 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     try:
       yield
     finally:
-      for ts in self.values():
+      for key, ts in list(self.items()):
         ts.close()
+        del self[key]
 
   @staticmethod
   def validate_key(key):
@@ -2131,6 +2132,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     self.validate_key(key)
     if key in self:
       raise ValueError("key already exists: %r" % (key,))
+    ts.open()
     super().__setitem__(key, ts)
 
   # pylint: disable=no-self-use,unused-argument
@@ -2366,7 +2368,6 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     ts.tags['key'] = key
     ts.tags['step'] = ts.step
     ts.tags['typecode'] = ts.typecode
-    ts.open()
     return ts
 
   @contextmanager
