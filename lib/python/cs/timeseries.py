@@ -1064,7 +1064,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
         (len(xaxis), len(yaxis), start, stop)
     )
     df = pd.DataFrame(dict(x=xaxis, y=yaxis))
-    return df.plot('x', 'y', label=label, **plot_kw)
+    return df.plot('x', 'y', title=label, **plot_kw)
 
 class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
   ''' The binary data structure of the `TimeSeriesFile` file header.
