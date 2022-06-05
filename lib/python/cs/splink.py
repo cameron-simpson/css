@@ -431,7 +431,6 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
   def resolve(self, spec):
     ''' Resolve a field spec into an iterable of `(timeseries,key)`.
     '''
-    print("RESOLVE", spec)
     with Pfx(spec):
       try:
         dsname, field_spec = spec.split(':', 1)
