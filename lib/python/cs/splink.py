@@ -705,32 +705,44 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [--show] imagepath.png days {{[dataset:]{{glob|field}}}}...
+    ''' Usage: {cmd} [--show] [-f] [-o imagepath] days {{mode|[dataset:]{{glob|field}}}}...
     '''
-    try:
-      import_extra('plotly', DISTINFO)
-    except ImportError as e:
-      raise GetoptError(
-          "the plotly package is not installed: %s" % (e,)
-      ) from e
-    show_image = False
-    if argv and argv[0] == '--show':
-      show_image = True
-      argv.pop(0)
-    imgpath = self.poparg(
-        argv, "tspath", str, lambda path: not existspath(path),
-        "already exists"
+    options = self.options
+    options.show_image = False
+    options.imgpath = None
+    options.stacked = False
+    options.multi = False
+    self.popopts(
+        argv,
+        options,
+        f='force',
+        multi=None,
+        o_='imgpath',
+        show='show_image',
+        stacked=None,
     )
+    force = options.force
+    imgpath = options.imgpath
+    spd = options.spd
+    show_image = options.show_image
     days = self.poparg(argv, int, "days to display", lambda days: days > 0)
+    mode = None  # 'energy', 'power', 'vac', 'vdc'
+    modes = {
+        'energy': '*_kwh',
+        'power': '*_kw',
+        'vac': '*_v_ac',
+        'vdc': '*_v_dc',
+    }
     if not argv:
       argv = '*'
-    options = self.options
-    spd = options.spd
     tsd_keys = []
     with Pfx("fields"):
       for spec in argv:
         with Pfx(spec):
           print("try spec", spec)
+          if mode is None:
+            mode = modes.get(spec, None)
+          spec = modes.get(spec, spec)
           matches = list(spd.resolve(spec))
           if matches:
             tsd_keys.extend(spd.resolve(spec))
@@ -738,16 +750,41 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             warning("no matches")
     if not tsd_keys:
       raise GetoptError("no fields were resolved")
+    if mode is None:
+      # scan the keys looking for a match to a mode
+      for tsd_key in tsd_keys:
+        _, key = tsd_key
+        for mode_name, mode_glob in modes.items():
+          if pfx_call(fnmatch, key, mode_glob):
+            X("infer mode %r from key %r", mode_name, key)
+            mode = mode_name
+            break
+        if mode is not None:
+          break
     now = time.time()
     start = now - days * 24 * 3600
-    figure = None
+    figure = Figure(figsize=(14, 8), dpi=100)
+    figure.add_subplot()
+    ax = figure.axes[0]
     with UpdProxy(prefix="plot lines: ") as proxy:
+      # the data may come from different datasets
       for tsd, key in tsd_keys:
         name = f'{shortpath(tsd.fspath)}:{key}'
         proxy.text = name
-        figure = tsd.plot(start, now, figure=figure, keys=(key,), name=name)
-    eventsdb = spd.eventsdb
+        ax = tsd.plot(
+            start,
+            now,
+            ax=ax,
+            keys=(key,),
+        )
     with UpdProxy(prefix="plot events: ") as proxy:
+      eventsdb = spd.eventsdb
+      ev_y_field = {
+          'energy': 'load_ac_power_instantaneous_kw',
+          'power': 'load_ac_power_instantaneous_kw',
+          'vac': 'ac_load_voltage_instantaneous_v_ac',
+          'vdc': 'dc_voltage_instantaneous_[v_dc',
+      }.get(mode, 'ac_load_voltage_instantaneous_v_ac')
       for label in [
           'System - AC Source no longer detected',
           'System - AC Source outside operating range',
@@ -762,29 +799,25 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                   f"unixtime>={start}",
                   f"unixtime<{now}",
                   event_description=label,
+                  # TODO: use a constant
                   dataset='EventData',
               )
           )
           print(len(events), "events found for", repr(label))
           proxy.text = "add trace"
           plot_events(
-              figure,
+              ax,
               events,
-              lambda ev: ev.ac_load_voltage_instantaneous_v_ac,
-              name=label,
-              rescale=False,  # True,
+              lambda ev: ev[ev_y_field],
+              label=label,
           )
-    figure.update_layout(dict(
-        title=f"Data from {spd}.",
-        showlegend=True,
-    ))
-    with Pfx("write %r", imgpath):
-      if existspath(imgpath):
-        error("already exists")
-      else:
-        figure.write_image(imgpath, format="png", width=2048, height=1024)
-    if show_image:
-      os.system(shlex.join(['open', imgpath]))
+    ax.set_title(str(spd))
+    if imgpath:
+      save_figure(ax, imgpath, force=force)
+      if show_image:
+        os.system(shlex.join(['open', imgpath]))
+    else:
+      print_figure(ax)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
