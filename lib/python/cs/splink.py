@@ -324,6 +324,24 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     super().__init__(dirpath)
     self._to_close = []
 
+  def __str__(self):
+    return f'{type(self).__name__}({shortpath(self.fspath)})'
+
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `SPLinkData`, handy for use with `pformat()` or `pprint()`.
+    '''
+    if d is None:
+      d = {}
+    d.update(
+        fspath=self.fspath,
+        timeseries={
+            dsname: getattr(self, dsname).info_dict()
+            for dsname in sorted(self.TIMESERIES_DATASETS)
+        },
+    )
+    return d
+
   @contextmanager
   def startup_shutdown(self):
     ''' Close the subsidiary time series on exit.
