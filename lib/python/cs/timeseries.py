@@ -69,6 +69,7 @@ from typing import (
 import arrow
 from arrow import Arrow
 from icontract import ensure, require, DBC
+from matplotlib.figure import Figure
 import numpy as np
 from numpy import datetime64
 from typeguard import typechecked
@@ -110,6 +111,7 @@ DISTINFO = {
         'cs.py.modules',
         'cs.resources',
         'icontract',
+        'matplotlib',
         'numpy',
         'typeguard',
     ],
@@ -119,9 +121,7 @@ DISTINFO = {
         ],
     },
     'extras_requires': {
-        'numpy': ['numpy'],
         'pandas': ['pandas'],
-        'plotting': ['matplotlib'],
     },
 }
 
