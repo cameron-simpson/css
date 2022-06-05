@@ -970,7 +970,7 @@ class Upd(SingletonMixin):
       label: str,
       report_print=False,
       runstate=None,
-      tick_delay=None,
+      tick_delay=0.15,
       tick_chars='|/-\\'
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
