@@ -1,0 +1,2 @@
+named_row_tuple et al: plumb a new optional snake_case parameter to snake case mixed case attribute names.
+Drop Python 2 support and the cs.py3 shims.
