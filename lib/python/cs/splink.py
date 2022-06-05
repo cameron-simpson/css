@@ -230,8 +230,8 @@ class SPLinkDataDir(TimeSeriesDataDir):
     '''
     epoch = Epoch.promote((ts2001_unixtime(), step))
     if policy is None:
-    super().__init__(dirpath, step=step, policy=policy, **kw)
       policy = self.DEFAULT_POLICY_CLASS(epoch=epoch)
+    super().__init__(dirpath, epoch=epoch, policy=policy, **kw)
     self.dataset = dataset
 
   def import_from(self, csv, tzname=None):
