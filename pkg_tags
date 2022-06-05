@@ -16,7 +16,8 @@ cs.app.tagger
 cs.app.ydl pypi.release="20220318" ok_revision=c3034b39089e541de85a33496e6cb57d48b0436f
 cs.asynchron pypi.release=20160828
 cs.binary pypi.release="20210316" ok_revision=e0d01b9045138b3bfb6175e5abfcd96549f4a001
-cs.buffer pypi.release="20210316" ok_revision=d13e4361ea70ade9bb028568e34aca6f1bf291e6
+cs.buffe
+cs.buffer pypi.release="20210316" ok_revision="5400b0ac672f77b4b461bb330fc511bc282fb95a"
 cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.clockutils pypi.release=20190101
 cs.cmdutils pypi.release="20220429" ok_revision="945b22c31d2e89f4e846fea3c83778bec7fa7e20" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"]}
