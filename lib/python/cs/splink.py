@@ -211,7 +211,7 @@ class SPLinkDataDir(TimeSeriesDataDir):
       subdirectory and an events `SQLTags`.
   '''
 
-  DEFAULT_POLICY_CLASS = TimespanPolicyAnnual
+  DEFAULT_POLICY_CLASS = TimespanPolicyYearly
 
   @typechecked
   def __init__(self, dirpath, dataset: str, step: int, policy=None, **kw):
@@ -224,14 +224,14 @@ class SPLinkDataDir(TimeSeriesDataDir):
           default `SPLinkDataDir.DEFAULT_LOG_FREQUENCY`,
           which comes from `SPLinkCSVDir.DEFAULT_LOG_FREQUENCY`
         * `policy`: optional TimespanPolicy` instance;
-          if omitted an `TimespanPolicyAnnual` instance will be made
+          if omitted an `TimespanPolicyYearly` instance will be made
         Other keyword arguments are passed to the `TimeSeriesDataDir`
         initialiser.
     '''
     epoch = Epoch.promote((ts2001_unixtime(), step))
     if policy is None:
-      policy = self.DEFAULT_POLICY_CLASS()
     super().__init__(dirpath, step=step, policy=policy, **kw)
+      policy = self.DEFAULT_POLICY_CLASS(epoch=epoch)
     self.dataset = dataset
 
   def import_from(self, csv, tzname=None):
