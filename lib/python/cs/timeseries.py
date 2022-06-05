@@ -110,6 +110,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.modules',
         'cs.resources',
+        'arrow',
         'icontract',
         'matplotlib',
         'numpy',
