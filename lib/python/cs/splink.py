@@ -444,9 +444,109 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       for dsname in dsnames:
         with Pfx(dsname):
           tsd = getattr(self, dsname)
-          print("try tsd", tsd, "spec", field_spec)
           for key in pfx_call(tsd.keys, field_spec):
             yield tsd, key
+
+  def plot(
+      self,
+      start,
+      stop,
+      *,
+      key_specs,
+      mode=None,
+      figsize=None,
+      dpi=None,
+      event_labels=None
+  ):
+    ''' The core logic of the `SPLinkCommand.cmd_plot` method
+        to plot arbitrary parameters against a time range.
+    '''
+    if figsize is None:
+      figsize = 14, 8
+    if dpi is None:
+      dpi = 100
+    if event_labels is None:
+      event_labels = (
+          'System - AC Source no longer detected',
+          'System - AC Source outside operating range',
+          'Bridge negative correction',
+          'Bridge positive correction',
+          'AC Mode - Synchronised begin',
+      )
+    modes = {
+        'energy': '*_kwh',
+        'power': '*_kw',
+        'vac': '*_v_ac',
+        'vdc': '*_v_dc',
+    }
+    with Pfx("key_specs"):
+      tsd_keys = []
+      for key_spec in key_specs:
+        with Pfx(key_spec):
+          if mode is None and key_spec in modes:
+            mode = key_spec
+          key_spec = modes.get(key_spec, key_spec)
+          matches = list(self.resolve(key_spec))
+          if matches:
+            tsd_keys.extend(self.resolve(key_spec))
+          else:
+            warning("no matches")
+    if not tsd_keys:
+      raise GetoptError("no fields were resolved")
+    if mode is None:
+      # scan the keys looking for a match to a mode
+      for tsd_key in tsd_keys:
+        _, key = tsd_key
+        for mode_name, mode_glob in modes.items():
+          if pfx_call(fnmatch, key, mode_glob):
+            mode = mode_name
+            break
+        if mode is not None:
+          break
+    figure = Figure(figsize=figsize, dpi=dpi)
+    figure.add_subplot()
+    ax = figure.axes[0]
+    with UpdProxy(prefix="plot lines: ") as proxy:
+      # the data may come from different datasets
+      for tsd, key in tsd_keys:
+        name = f'{shortpath(tsd.fspath)}:{key}'
+        proxy.text = name
+        ax = tsd.plot(
+            start,
+            stop,
+            ax=ax,
+            keys=(key,),
+        )
+    with UpdProxy(prefix="plot events: ") as proxy:
+      eventsdb = self.eventsdb
+      ev_y_field = {
+          'energy': 'load_ac_power_instantaneous_kw',
+          'power': 'load_ac_power_instantaneous_kw',
+          'vac': 'ac_load_voltage_instantaneous_v_ac',
+          'vdc': 'dc_voltage_instantaneous_v_dc',
+      }.get(mode, 'ac_load_voltage_instantaneous_v_ac')
+      for label in event_labels:
+        with proxy.extend_prefix(label + ": "):
+          proxy.text = "find events"
+          events = list(
+              eventsdb.find(
+                  f"unixtime>={start}",
+                  f"unixtime<{stop}",
+                  event_description=label,
+                  # TODO: use a constant
+                  dataset='EventData',
+              )
+          )
+          print(len(events), "events found for", repr(label))
+          proxy.text = "add trace"
+          plot_events(
+              ax,
+              events,
+              lambda ev: ev[ev_y_field],
+              label=label,
+          )
+    ax.set_title(str(self))
+    return figure
 
 class SPLinkCommand(TimeSeriesBaseCommand):
   ''' Command line to work with SP-Link data downloads.
@@ -726,98 +826,15 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     spd = options.spd
     show_image = options.show_image
     days = self.poparg(argv, int, "days to display", lambda days: days > 0)
-    mode = None  # 'energy', 'power', 'vac', 'vdc'
-    modes = {
-        'energy': '*_kwh',
-        'power': '*_kw',
-        'vac': '*_v_ac',
-        'vdc': '*_v_dc',
-    }
-    if not argv:
-      argv = '*'
-    tsd_keys = []
-    with Pfx("fields"):
-      for spec in argv:
-        with Pfx(spec):
-          print("try spec", spec)
-          if mode is None:
-            mode = modes.get(spec, None)
-          spec = modes.get(spec, spec)
-          matches = list(spd.resolve(spec))
-          if matches:
-            tsd_keys.extend(spd.resolve(spec))
-          else:
-            warning("no matches")
-    if not tsd_keys:
-      raise GetoptError("no fields were resolved")
-    if mode is None:
-      # scan the keys looking for a match to a mode
-      for tsd_key in tsd_keys:
-        _, key = tsd_key
-        for mode_name, mode_glob in modes.items():
-          if pfx_call(fnmatch, key, mode_glob):
-            X("infer mode %r from key %r", mode_name, key)
-            mode = mode_name
-            break
-        if mode is not None:
-          break
     now = time.time()
     start = now - days * 24 * 3600
-    figure = Figure(figsize=(14, 8), dpi=100)
-    figure.add_subplot()
-    ax = figure.axes[0]
-    with UpdProxy(prefix="plot lines: ") as proxy:
-      # the data may come from different datasets
-      for tsd, key in tsd_keys:
-        name = f'{shortpath(tsd.fspath)}:{key}'
-        proxy.text = name
-        ax = tsd.plot(
-            start,
-            now,
-            ax=ax,
-            keys=(key,),
-        )
-    with UpdProxy(prefix="plot events: ") as proxy:
-      eventsdb = spd.eventsdb
-      ev_y_field = {
-          'energy': 'load_ac_power_instantaneous_kw',
-          'power': 'load_ac_power_instantaneous_kw',
-          'vac': 'ac_load_voltage_instantaneous_v_ac',
-          'vdc': 'dc_voltage_instantaneous_[v_dc',
-      }.get(mode, 'ac_load_voltage_instantaneous_v_ac')
-      for label in [
-          'System - AC Source no longer detected',
-          'System - AC Source outside operating range',
-          'Bridge negative correction',
-          'Bridge positive correction',
-          'AC Mode - Synchronised begin',
-      ]:
-        with proxy.extend_prefix(label + ": "):
-          proxy.text = "find events"
-          events = list(
-              eventsdb.find(
-                  f"unixtime>={start}",
-                  f"unixtime<{now}",
-                  event_description=label,
-                  # TODO: use a constant
-                  dataset='EventData',
-              )
-          )
-          print(len(events), "events found for", repr(label))
-          proxy.text = "add trace"
-          plot_events(
-              ax,
-              events,
-              lambda ev: ev[ev_y_field],
-              label=label,
-          )
-    ax.set_title(str(spd))
+    figure = spd.plot(start, now, key_specs=argv)
     if imgpath:
-      save_figure(ax, imgpath, force=force)
+      save_figure(figure, imgpath, force=force)
       if show_image:
         os.system(shlex.join(['open', imgpath]))
     else:
-      print_figure(ax)
+      print_figure(figure)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
