@@ -1049,10 +1049,9 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
 
         Parameters:
         * `start`,`stop`: the time range
-        * `ax`: optional `Axes`; new `Axes` will be made if not specified
+        * `runstate`: optional `RunState`, ignored in this implementation
         * `label`: optional label for the graph
-        Other keyword parameters are passed to `Axes.plot`
-        or `DataFrame.plot` for new axes.
+        Other keyword parameters are passed to `DataFrame.plot`.
     '''
     pd = import_extra('pandas', DISTINFO)
     if label is None:
@@ -2148,7 +2147,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       self,
       start=None,
       stop=None,
-      keys: Optional[List[str]] = None,
+      keys: Optional[Iterable[str]] = None,
       *,
       runstate=None,
   ):
@@ -2178,7 +2177,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         with Pfx(key):
           if key not in self:
             raise KeyError("no such key")
-          data_dict[key] = self[key].as_np_array(start, stop)
+          data_dict[key] = self[key].as_pd_series(start, stop)
     if runstate and runstate.cancelled:
       raise CancellationError
     return pfx_call(
