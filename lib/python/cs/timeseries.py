@@ -59,6 +59,7 @@ from tempfile import TemporaryDirectory
 import time
 from typing import (
     Callable,
+    Iterable,
     List,
     Optional,
     Tuple,
@@ -2190,15 +2191,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
 
   @plotrange
   def plot(
-      self,
-      start,
-      stop,
-      keys=None,
-      runstate=None,
-      *,
-      ax=None,
-      label=None,
-      **plot_kw
+      self, start, stop, keys=None, *, label=None, runstate=None, **plot_kw
   ):
     ''' Convenience shim for `DataFrame.plot` to plot data from
         `start` to `stop` for each key in `keys`.
@@ -2208,9 +2201,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         * `start`: optional start, default `self.start`
         * `stop`: optional stop, default `self.stop`
         * `keys`: optional list of keys, default all keys
-        * `ax`: optional `Axes`; new `Axes` will be made if not specified
         * `label`: optional label for the graph
-        Other keyword parameters are passed to `Axes.plot`
+        Other keyword parameters are passed to `DataFrame.plot`.
     '''
     if keys is None:
       keys = sorted(self.keys())
@@ -2222,7 +2214,6 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         if label:
           kname = label + ': ' + kname
         if kname != key:
-          print("RENAME", key, kname)
           df.rename(columns={key: kname}, inplace=True)
     print(df)
     if runstate and runstate.cancelled:
