@@ -230,12 +230,12 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] days [{{glob|fields}}...]
           Plot the most recent days of data from the time series at tspath.
           Options:
-          -f            Force. -o will overwrite an existing image file.
-          -imgpath.png  File system path to which to save the plot.
-          --show        Show the image in the GUI.
-          --stacked     Stack the plot lines/areas.
-          glob|fields   If glob is supplied, constrain the keys of
-                        a TimeSeriesDataDir by the glob.
+          -f              Force. -o will overwrite an existing image file.
+          -o imgpath.png  File system path to which to save the plot.
+          --show          Show the image in the GUI.
+          --stacked       Stack the plot lines/areas.
+          glob|fields     If glob is supplied, constrain the keys of
+                          a TimeSeriesDataDir by the glob.
     '''
     options = self.options
     runstate = options.runstate
