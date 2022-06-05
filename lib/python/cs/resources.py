@@ -251,7 +251,7 @@ class MultiOpenMixin(ContextManagerMixin):
     with state._lock:
       opens = state._opens
       if opens < 1:
-        error("%s: UNDERFLOW CLOSE", self)
+        error("%s: UNDERFLOW CLOSE from %s", self, caller())
         error("  final close was from %s", state._final_close_from)
         for frame_key in sorted(state._opened_from.keys()):
           error(

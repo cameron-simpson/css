@@ -51,7 +51,7 @@ from os.path import (
     join as joinpath,
     splitext,
 )
-from pprint import pprint
+from pprint import pformat
 from struct import pack  # pylint: disable=no-name-in-module
 from subprocess import run
 import sys
@@ -59,14 +59,17 @@ from tempfile import TemporaryDirectory
 import time
 from typing import (
     Callable,
+    Iterable,
     List,
     Optional,
+    Tuple,
     Union,
 )
 
 import arrow
 from arrow import Arrow
 from icontract import ensure, require, DBC
+from matplotlib.figure import Figure
 import numpy as np
 from numpy import datetime64
 from typeguard import typechecked
@@ -81,7 +84,7 @@ from cs.deco import cachedmethod, decorator
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
-from cs.logutils import warning, error
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
@@ -107,7 +110,9 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.modules',
         'cs.resources',
+        'arrow',
         'icontract',
+        'matplotlib',
         'numpy',
         'typeguard',
     ],
@@ -117,13 +122,12 @@ DISTINFO = {
         ],
     },
     'extras_requires': {
-        'numpy': ['numpy'],
         'pandas': ['pandas'],
-        'plotting': ['matplotlib'],
     },
 }
 
-Numeric = Union[int, float]
+numeric_types = int, float
+Numeric = Union[numeric_types]
 
 def main(argv=None):
   ''' Run the command line tool for `TimeSeries` data.
@@ -228,12 +232,12 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] days [{{glob|fields}}...]
           Plot the most recent days of data from the time series at tspath.
           Options:
-          -f            Force. -o will overwrite an existing image file.
-          -imgpath.png  File system path to which to save the plot.
-          --show        Show the image in the GUI.
-          --stacked     Stack the plot lines/areas.
-          glob|fields   If glob is supplied, constrain the keys of
-                        a TimeSeriesDataDir by the glob.
+          -f              Force. -o will overwrite an existing image file.
+          -o imgpath.png  File system path to which to save the plot.
+          --show          Show the image in the GUI.
+          --stacked       Stack the plot lines/areas.
+          glob|fields     If glob is supplied, constrain the keys of
+                          a TimeSeriesDataDir by the glob.
     '''
     options = self.options
     runstate = options.runstate
@@ -261,6 +265,9 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     ts = options.ts
     plot_dx = 14
     plot_dy = 8
+    figure = Figure(figsize=(plot_dx, plot_dy), dpi=100)
+    figure.add_subplot()
+    ax = figure.axes[0]
     plot_kw = {}
     if isinstance(ts, TimeSeries):
       if argv:
@@ -268,9 +275,13 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
             "fields:%r should not be suppplied for a %s" % (argv, s(ts))
         )
       ax = ts.plot(
-          start, now, runstate=runstate, figsize=(plot_dx, plot_dy), **plot_kw
+          start,
+          now,
+          ax=ax,
+          runstate=runstate,
+          figsize=(plot_dx, plot_dy),
+          **plot_kw
       )  # pylint: disable=missing-kwoa
-      figure = ax.figure
     elif isinstance(ts, TimeSeriesDataDir):
       if argv:
         keys = ts.keys(argv)
@@ -282,7 +293,6 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         keys = ts.keys()
         if not keys:
           raise GetoptError("no keys in %s" % (ts,))
-      plot_dy = max(plot_dy, len(keys) // 2)
       plot_kw.update(
           stacked=options.stacked,
           subplots=options.multi,
@@ -293,36 +303,18 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           now,
           keys,
           runstate=runstate,
-          figsize=(plot_dx, plot_dy),
+          ax=ax,
           **plot_kw,
       )  # pylint: too-many-function-args.disable=missing-kwoa
-      if ax is None:
-        return 1
       figure = (ax[0] if options.multi else ax).figure
     else:
       raise RuntimeError("unhandled type %s" % (s(ts),))
     if runstate.cancelled:
       return 1
-    with TemporaryDirectory(dir=(dirname(imgpath) if imgpath else '.')
-                            ) as tmppath:
-      if imgpath:
-        imgfilename = basename(imgpath)
-      else:
-        imgfilename = 'plot.png'
-      tmpimgpath = joinpath(tmppath, imgfilename)
-      pfx_call(figure.savefig, tmpimgpath)
-      if imgpath:
-        if not force and existspath(imgpath):
-          error("output path already exists: %r", imgpath)
-          xit = 1
-        else:
-          pfx_call(os.link, tmpimgpath, imgpath)
-      else:
-        if not options.show_image:
-          with open(tmpimgpath, 'rb') as imgf:
-            with open('/dev/tty', 'wb') as tty:
-              # pylint: disable=subprocess-run-check
-              run(['img2sixel'], stdin=imgf, stdout=tty)
+    if imgpath:
+      save_figure(figure, imgpath, force=force)
+    else:
+      print_figure(figure)
     if options.show_image:
       figure.show()
     return xit
@@ -398,6 +390,23 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
           else:
             with self.options.ts:
               yield
+
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd}
+          Dump the contents of tspath.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    ts = options.ts
+    if isinstance(ts, TimeSeries):
+      npary = ts.as_pd_series()
+      print(npary)
+    elif isinstance(ts, TimeSeriesMapping):
+      df = ts.as_pd_dataframe()
+      print(df)
+    else:
+      raise GetoptError("unhandled time series: %s" % ts)
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_import(self, argv):
@@ -533,7 +542,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     ts = self.options.ts
     print(ts)
-    pprint(ts.info_dict())
+    print(pformat(ts.info_dict(), compact=True))
 
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
@@ -552,6 +561,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       print(type(pds), pds.memory_usage())
       print(pds)
 
+    # pylint: disable=unused-argument
     def test_partitioned_spans(tmpdirpath):
       # a daily partition with 1 minute time slots
       policy = TimespanPolicyDaily(epoch=60)
@@ -572,11 +582,15 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         prev_stop = span.stop
 
     def test_datadir(tmpdirpath):
-      with TimeSeriesDataDir(joinpath(tmpdirpath, 'tsdatadir'),
-                             policy='daily') as datadir:
-        ts = datadir['key1']
+      with TimeSeriesDataDir(
+          joinpath(tmpdirpath, 'tsdatadir'),
+          policy='daily',
+          epoch=30,
+      ) as datadir:
+        ts = datadir.make_ts('key1')
         ts[time.time()] = 9.0
 
+    # pylint: disable=unused-argument
     def test_timespan_policy(tmpdirpath):
       policy = TimespanPolicyMonthly(epoch=60)
       print(policy.span_for_time(time.time()))
@@ -828,9 +842,20 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
       `epoch` and the `step` defining the width of a time slot.
   '''
 
+  def __new__(cls, *a, **kw):
+    epoch = super().__new__(cls, *a, **kw)
+    assert isinstance(epoch.start, (int, float))
+    assert isinstance(epoch.step, (int, float))
+    assert type(epoch.start) is type(epoch.step), (
+        "type(epoch.start):%s is not type(epoch.step):%s" %
+        (s(epoch.start), s(epoch.step))
+    )
+    assert epoch.step > 0
+    return epoch
+
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `Epoch`, handy for use with `pprint()`.
+        about this `Epoch`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -864,9 +889,34 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
     '''
     if epochy is not None and not isinstance(epochy, Epoch):
       if isinstance(epochy, (int, float)):
-        epochy = cls(0, epochy)
-      elif isinstance(epochy, tuple):
+        # just the step value, start the epoch at 0
+        epochy = 0, epochy
+      if isinstance(epochy, tuple):
         start, step = epochy
+        if isinstance(start, float) and isinstance(step, int):
+          step0 = step
+          step = float(step)
+          if step != step0:
+            raise ValueError(
+                "promoted step:%r to float to match start, but new value %r is not equal"
+                % (step0, step)
+            )
+        elif isinstance(start, int) and isinstance(step, float):
+          # ints have unbound precision in Python and 63 bits in storage
+          # so if we can work in ints, use ints
+          step_i = int(step)
+          if step_i == step:
+            # demote step to an int to match start
+            step = step_i
+          else:
+            # promote start to float to match step
+            start0 = start
+            start = float(start)
+            if start != start0:
+              raise ValueError(
+                  "promoted start:%r to float to match start, but new value %r is not equal"
+                  % (start0, start)
+              )
         epochy = cls(start, step)
       else:
         raise TypeError(
@@ -884,7 +934,7 @@ class HasEpochMixin(TimeStepsMixin):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `HasEpochMixin`, handy for use with `pprint()`.
+        about this `HasEpochMixin`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -920,13 +970,20 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeries`, handy for use with `pprint()`.
+        about this `TimeSeries`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
     d.update(typecode=self.typecode)
     HasEpochMixin.info_dict(self, d)
     return d
+
+  @abstractmethod
+  @contextmanager
+  def startup_shutdown(self):
+    ''' This is required, even if empty.
+    '''
+    raise NotImplementedError
 
   @abstractmethod
   def __getitem__(self, index):
@@ -984,16 +1041,23 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     return pd.Series(data, _dt64(times), self.np_type)
 
   @plotrange
-  def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
+  def plot(
+      self,
+      start,
+      stop,
+      *,
+      label=None,
+      runstate=None,  # pylint: disable=unused-argument
+      **plot_kw,
+  ):
     ''' Convenience shim for `DataFrame.plot` to plot data from
         `start` to `stop`.  Return the plot `Axes`.
 
         Parameters:
         * `start`,`stop`: the time range
-        * `ax`: optional `Axes`; new `Axes` will be made if not specified
+        * `runstate`: optional `RunState`, ignored in this implementation
         * `label`: optional label for the graph
-        Other keyword parameters are passed to `Axes.plot`
-        or `DataFrame.plot` for new axes.
+        Other keyword parameters are passed to `DataFrame.plot`.
     '''
     pd = import_extra('pandas', DISTINFO)
     if label is None:
@@ -1005,7 +1069,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
         (len(xaxis), len(yaxis), start, stop)
     )
     df = pd.DataFrame(dict(x=xaxis, y=yaxis))
-    return df.plot('x', 'y', label=label, **plot_kw)
+    return df.plot('x', 'y', title=label, **plot_kw)
 
 class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
   ''' The binary data structure of the `TimeSeriesFile` file header.
@@ -1128,7 +1192,7 @@ class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
     yield self.time_type.transcribe_value(self.start)
     yield self.time_type.transcribe_value(self.step)
 
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-public-methods
 class TimeSeriesFile(TimeSeries, HasFSPath):
   ''' A file containing a single time series for a single data field.
 
@@ -1196,8 +1260,9 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       fstags = FSTags()
     self.fstags = fstags
     try:
-      header = TimeSeriesFileHeader.from_file(self.fspath)
+      header, = TimeSeriesFileHeader.scan_fspath(self.fspath, max_count=1)
     except FileNotFoundError:
+      # a missing file is ok, other exceptions are not
       header = None
     # compare the file against the supplied arguments
     if header is None:
@@ -1219,13 +1284,15 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
             "typecode=%r but data file %s has typecode %r" %
             (typecode, fspath, header.typecode)
         )
-      if epoch is not None and epoch != header.epoch:
+      if epoch is not None and epoch.step != header.epoch.step:
         raise ValueError(
-            "epoch=%s but data file %s has epoch %s" %
-            (epoch, fspath, header.epoch)
+            "epoch.step=%s but data file %s has epoch.step %s" %
+            (epoch.step, fspath, header.epoch.step)
         )
     self.header = header
-    TimeSeries.__init__(self, header.epoch, typecode)
+    epoch = header.epoch
+    typecode = header.typecode
+    TimeSeries.__init__(self, epoch, typecode)
     if fill is None:
       if typecode == 'd':
         fill = nan
@@ -1250,7 +1317,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeriesFile`, handy for use with `pprint()`.
+        about this `TimeSeriesFile`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -1273,7 +1340,10 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
   def file_offset(self, offset):
     ''' Return the file position for the data with position `offset`.
     '''
-    return self.HEADER_LENGTH + self.header.datum_type.length * offset
+    return (
+        TimeSeriesFileHeader.HEADER_LENGTH +
+        self.header.datum_type.length * offset
+    )
 
   def peek(self, when: Numeric, f=None):
     ''' Read a single data value for the UNIX time `when`
@@ -1373,9 +1443,9 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
             (hdr.typecode, self.typecode)
         )
       if hdr.time_typecode != self.time_typecode:
-        raise ValueError(
-            "file time typecode %r does not match self.time_typecode:%r" %
-            (hdr.time_typecode, self.time_typecode)
+        warning(
+            "file time typecode %r does not match self.time_typecode:%r",
+            hdr.time_typecode, self.time_typecode
         )
       if hdr.step != self.step:
         raise ValueError(
@@ -1401,8 +1471,10 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
             "data length:%d is not a multiple of item size:%d", datalen,
             itemsize
         )
-        with mmap(tsf.fileno(), flen, MAP_PRIVATE, PROT_READ) as mm:
-          ary.frombytes(memoryview(mm)[bfr.offset:flen])
+      with mmap(tsf.fileno(), flen, MAP_PRIVATE, PROT_READ) as mm:
+        mv = memoryview(mm)
+        ary.frombytes(mv[bfr.offset:flen])
+        mv = None
     if header.bigendian != NATIVE_BIGENDIANNESS[header.typecode]:
       ary.byteswap()
     return header, ary
@@ -1516,19 +1588,24 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         If `prepad` is true, pad the resulting list at the beginning
     '''
     astart, astop = self.offset_bounds(start, stop)
+    return self.offset_slice(astart, astop)
+
+  def offset_slice(self, astart, astop):
+    ''' Return a slice of the underlying array
+        for the array indices `astart:astop`.
+    '''
     if astart < 0:
       raise IndexError(
-          "%s slice index %s starts at an offset before this array (start offet = %s)"
-          % (type(self).__name__, when, astart)
+          "%s slice index %s starts at a negative offset" %
+          (type(self).__name__, astart)
       )
-    values = ary[start:astop]
+    ary = self.array
+    values = ary[astart:astop]
     if astop > len(ary):
       # pad with nan
       values.extend([self.fill] * (astop - len(ary)))
     return values
 
-  @pfx
-  @typechecked
   def __getitem__(self, when: Union[Numeric, slice]):
     ''' Return the datum for the UNIX time `when`.
 
@@ -1801,12 +1878,13 @@ class TimespanPolicy(DBC, HasEpochMixin):
         start at `round_down(start)` and end at `stop` respectively.
         This makes the returned spans useful for time ranges from a subseries.
     '''
-    when = self.round_down(start)
+    epoch = self.epoch
+    when = start
     while when < stop:
       span = self.span_for_time(when)
-      yield TimePartition(
-          span.name, max(span.start, when), min(span.stop, stop)
-      )
+      offset0 = epoch.offset(max(span.start, when))
+      offset1 = epoch.offset(min(span.stop, stop))
+      yield TimePartition(epoch, span.name, offset0, offset1 - offset0)
       when = span.stop
 
   def spans_for_times(self, whens):
@@ -2009,7 +2087,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeriesMapping`, handy for use with `pprint()`.
+        about this `TimeSeriesMapping`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -2025,8 +2103,9 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     try:
       yield
     finally:
-      for ts in self.values():
+      for key, ts in list(self.items()):
         ts.close()
+        del self[key]
 
   @staticmethod
   def validate_key(key):
@@ -2058,6 +2137,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     self.validate_key(key)
     if key in self:
       raise ValueError("key already exists: %r" % (key,))
+    ts.open()
     super().__setitem__(key, ts)
 
   # pylint: disable=no-self-use,unused-argument
@@ -2073,7 +2153,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       self,
       start=None,
       stop=None,
-      keys: Optional[List[str]] = None,
+      keys: Optional[Iterable[str]] = None,
       *,
       runstate=None,
   ):
@@ -2103,7 +2183,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         with Pfx(key):
           if key not in self:
             raise KeyError("no such key")
-          data_dict[key] = self[key].as_np_array(start, stop)
+          data_dict[key] = self[key].as_pd_series(start, stop)
     if runstate and runstate.cancelled:
       raise CancellationError
     return pfx_call(
@@ -2116,15 +2196,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
 
   @plotrange
   def plot(
-      self,
-      start,
-      stop,
-      keys=None,
-      runstate=None,
-      *,
-      ax=None,
-      label=None,
-      **plot_kw
+      self, start, stop, keys=None, *, label=None, runstate=None, **plot_kw
   ):
     ''' Convenience shim for `DataFrame.plot` to plot data from
         `start` to `stop` for each key in `keys`.
@@ -2134,9 +2206,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         * `start`: optional start, default `self.start`
         * `stop`: optional stop, default `self.stop`
         * `keys`: optional list of keys, default all keys
-        * `ax`: optional `Axes`; new `Axes` will be made if not specified
         * `label`: optional label for the graph
-        Other keyword parameters are passed to `Axes.plot`
+        Other keyword parameters are passed to `DataFrame.plot`.
     '''
     if keys is None:
       keys = sorted(self.keys())
@@ -2148,17 +2219,23 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         if label:
           kname = label + ': ' + kname
         if kname != key:
-          print("RENAME", key, kname)
           df.rename(columns={key: kname}, inplace=True)
     print(df)
     if runstate and runstate.cancelled:
       raise CancellationError
     return df.plot(**plot_kw)
 
+# pylint: disable=too-many-ancestors
 class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
                         HasEpochMixin):
   ''' A directory containing a collection of `TimeSeriesPartitioned` subdirectories.
   '''
+
+  # hard wired to avoid confusion in subclasses,
+  # particularly we do not want to create the data dir with a
+  # subclass and then not find the config reading with the generic
+  # class
+  CONFIG_SECTION_NAME = 'TimeSeriesDataDir'
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
@@ -2174,30 +2251,43 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
   ):
     epoch = Epoch.promote(epoch)
     self.epoch = epoch
+    if not isdirpath(fspath):
+      pfx_call(needdir, fspath)
     HasFSPath.__init__(self, fspath)
     if fstags is None:
       fstags = FSTags()
-    HasConfigIni.__init__(self, 'TimeSeriesDataDir')
+    HasConfigIni.__init__(self, self.CONFIG_SECTION_NAME)
     self.fstags = fstags
     config = self.config
-    if step is None:
-      if config.step is None:
+    cfg_start = config.start
+    cfg_step = config.step
+    if epoch is None:
+      if cfg_start is None or cfg_step is None:
         raise ValueError(
-            "missing step parameter and no step in config: config=%s" %
-            (s(config),)
+            "no epoch provided and start or step missing from config %s[%s]: %r"
+            % (
+                shortpath(self.configpath),
+                self.CONFIG_SECTION_NAME,
+                self.config,
+            )
         )
-      step = config.step
-    elif self.step is None:
-      self.step = step
-    elif step != self.step:
+
+      epoch = Epoch(cfg_start, cfg_step)
+    start, step = epoch.start, epoch.step
+    if start is None:
+      start = 0 if cfg_start is None else cfg_start
+      config.start = start
+    elif cfg_start is None:
+      config.start = start
+    elif start != cfg_start:
+      raise ValueError("start:%r != config.start:%r" % (start, cfg_start))
+    if step is None:
+      step = 0 if cfg_step is None else cfg_step
+      config.step = step
+    elif cfg_step is None:
+      config.step = step
+    elif step != cfg_step:
       raise ValueError("step:%r != config.step:%r" % (step, self.step))
-    self.start = 0
-    timezone = timezone or self.timezone
-    if isinstance(epoch, Epoch):
-      assert start == epoch.start
-      assert step == epoch.step
-    else:
-      epoch = Epoch(start, step)
     self.epoch = epoch
     tzinfo = tzinfo or self.tzinfo
     if policy is None:
@@ -2226,7 +2316,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeriesDataDir`, handy for use with `pprint()`.
+        about this `TimeSeriesDataDir`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -2251,7 +2341,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
           continue
         self[key] = self._tsfactory(key)
 
-  def makeitem(self, key):
+  def make_ts(self, key):
     ''' Create a `TimeSeriesPartitioned` for `key`.
     '''
     if key not in self:
@@ -2273,7 +2363,6 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     ts.tags['key'] = key
     ts.tags['step'] = ts.step
     ts.tags['typecode'] = ts.typecode
-    ts.open()
     return ts
 
   @contextmanager
@@ -2388,11 +2477,10 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         instance it sets these flags.
     '''
     epoch = Epoch.promote(epoch)
-    assert isinstance(policy, TimespanPolicy)
+    policy = TimespanPolicy.promote(policy, epoch)
     HasFSPath.__init__(self, dirpath)
     if fstags is None:
       fstags = FSTags()
-    self.fstags = fstags
     if typecode is None:
       typecode = self.tags.typecode
       if typecode is None:
@@ -2406,6 +2494,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     assert isinstance(policy, ArrowBasedTimespanPolicy)
     TimeSeries.__init__(self, policy.epoch, typecode)
     self.policy = policy
+    self.fstags = fstags
     self._ts_by_partition = {}
 
   def __str__(self):
@@ -2421,7 +2510,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
-        about this `TimeSeriesPartitioned`, handy for use with `pprint()`.
+        about this `TimeSeriesPartitioned`, handy for use with `pformat()` or `pprint()`.
     '''
     if d is None:
       d = {}
@@ -2469,39 +2558,43 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       # numeric UNIX time
       span = self.policy.span_for_time(spec)
     assert span.step == self.step
-    try:
-      ts = self._ts_by_partition[span.name]
-    except KeyError:
-      tsepoch = Epoch(span.start, span.step)
-      filepath = self.pathto(span.name + TimeSeriesFile.DOTEXT)
-      ts = self._ts_by_partition[span.name] = TimeSeriesFile(
-          filepath,
-          self.typecode,
-          epoch=tsepoch,
-      )
-      ts.epoch = tsepoch
-      ts.span = span  # pylint: disable=attribute-defined-outside-init
-      ts.tags['partition'] = span.name
-      ts.tags['start'] = span.start
-      ts.tags['stop'] = span.stop
-      ts.tags['step'] = self.step
-      ts.open()
-    return ts
+    return self.timeseriesfile_from_partition_name(span.name)
 
-  def __getitem__(self, when: Union[Numeric, slice]):
-    if isinstance(when, slice):
-      # TODO: fast version
-      if when.step is not None and when.step != self.step:
+  def __getitem__(self, index: Union[Numeric, slice, str]):
+    ''' Obtain various things from this `TimeSeriesPartitioned`
+        according to the type of `index`:
+        * `int` or `float`: the value for the UNIX timestamp `index`
+        * `slice`: a list of the values for the UNIX timestamp slice `index`
+        * `*.csts`: the `TimeSeriesFile` named `index` within this
+          `TimeSeriesPartitioned`
+        * partition name: the `TimeSeriesFile` for the policy time partition
+    '''
+    if isinstance(index, numeric_types):
+      # UNIX timestamp
+      span = self.policy.span_for_time(index)
+      tsf = self.timeseriesfile_from_partition_name(span.name)
+      return tsf[index]
+    if isinstance(index, slice):
+      # slice of UNIX timestamps
+      if index.step is not None and index.step != self.step:
         raise IndexError(
             "slice.step:%r should be None or ==self.step:%r" %
-            (when.step, self.step)
+            (index.step, self.step)
         )
-      return [self[t] for t in self.range(when.start, when.stop)]
-    series = self.subseries(when)
-    try:
-      return series[when]
-    except IndexError:
-      return nan
+      values = []
+      for span in self.policy.partitioned_spans(index.start, index.stop):
+        ts = self.timeseriesfile_from_partition_name(span.name)
+        ts_values = ts[span.start:span.stop]
+        values.extend(ts_values)
+      return values
+    if isinstance(index, str):
+      if index.endswith(TimeSeriesFile.DOTEXT):
+        # a .csts filename
+        partition_name = self.partition_name_from_filename(index)
+        return self.timeseriesfile_from_partition_name(partition_name)
+      # a partition name
+      return self.timeseriesfile_from_partition_name(index)
+    raise TypeError("invalid type for index %s" % r(index))
 
   def __setitem__(self, when: Numeric, value):
     self.subseries(when)[when] = value
@@ -2511,13 +2604,69 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     return self.fnmatch('*' + TimeSeriesFile.DOTEXT)
 
-  @pfx_method
-  def partition_name_from_filename(self, tsfilename: str) -> str:
+  def timeseriesfiles(self):
+    ''' Return a mapping of partition name to associated `TimeSeriesFile`
+        for the existing time series data files.
+    '''
+    timeseriesfiles = {}
+    for filename in self.tsfilenames():
+      partition_name = self.partition_name_from_filename(filename)
+      tsf = self.timeseriesfile_from_partition_name(partition_name)
+      assert partition_name not in timeseriesfiles
+      timeseriesfiles[partition_name] = tsf
+    return timeseriesfiles
+
+  def timeseriesfile_from_partition_name(self, partition_name):
+    ''' Return the `TimeSeriesFile` associated with the supplied partition_name.
+    '''
+    partition_span = self.policy.span_for_name(partition_name)
+    try:
+      ts = self._ts_by_partition[partition_span.name]
+    except KeyError:
+      tsepoch = Epoch(partition_span.start, partition_span.step)
+      filepath = self.pathto(partition_span.name + TimeSeriesFile.DOTEXT)
+      ts = self._ts_by_partition[partition_span.name] = TimeSeriesFile(
+          filepath,
+          self.typecode,
+          epoch=tsepoch,
+      )
+      ts.epoch = tsepoch
+      ts.partition_span = partition_span  # pylint: disable=attribute-defined-outside-init
+      ts.tags['partition'] = partition_span.name
+      ts.tags['start'] = partition_span.start
+      ts.tags['stop'] = partition_span.stop
+      ts.tags['step'] = self.step
+      ts.open()
+    return ts
+
+  @property
+  def start(self):
+    ''' The earliest time in any component `TimeSeriesFile`.
+    '''
+    tsf_map = self.timeseriesfiles()
+    if not tsf_map:
+      return None
+    return min(tsf.start for tsf in tsf_map.values())
+
+  @property
+  def stop(self):
+    ''' The latest time in any component `TimeSeriesFile`.
+    '''
+    tsf_map = self.timeseriesfiles()
+    if not tsf_map:
+      return None
+    return max(tsf.stop for tsf in tsf_map.values())
+
+  @staticmethod
+  def partition_name_from_filename(tsfilename: str) -> str:
     ''' Return the time span name from a `TimeSeriesFile` filename.
     '''
-    name, ext = splitext(tsfilename)
+    name, ext = splitext(basename(tsfilename))
     if ext != TimeSeriesFile.DOTEXT:
-      warning("expected extension %r, got %r", TimeSeriesFile.DOTEXT, ext)
+      raise ValueError(
+          "expected extension %r, got %r; tsfilename=%r" %
+          (TimeSeriesFile.DOTEXT, ext, tsfilename)
+      )
     return name
 
   def partition(self, start, stop):
@@ -2548,7 +2697,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       if span is None or when not in span:
         # new partition required, sets ts as well
         ts = self.subseries(when)
-        span = ts.span
+        span = ts.partition_span
       ts[when] = value
 
   def partitioned_spans(self, start, stop):
@@ -2600,10 +2749,87 @@ def timeseries_from_path(
       )
     return TimeSeriesFile(tspath, typecode, epoch=epoch)
   if isdirpath(tspath):
-    if fnmatchdir(tspath, '*' + TimeSeriesFile.DOTEXT):
-      return TimeSeriesPartitioned(tspath, typecode, policy='annual')
-    return TimeSeriesDataDir(tspath, policy='annual')
+    tsfilenames = fnmatchdir(tspath, '*' + TimeSeriesFile.DOTEXT)
+    if tsfilenames:
+      # contains some .csts files
+      tsfilepath = joinpath(tspath, tsfilenames[0])
+      f0_typecode = TimeSeriesFile(tsfilepath).typecode
+      if typecode is not None and typecode != f0_typecode:
+        warning(
+            "supplied typecode %r does not match typecode %r from file %r",
+            typecode, f0_typecode, tsfilepath
+        )
+      typecode = f0_typecode
+      return TimeSeriesPartitioned(
+          tspath, typecode, policy='annual', epoch=epoch
+      )
+    return TimeSeriesDataDir(tspath, policy='annual', epoch=epoch)
   raise ValueError("cannot deduce time series type from tspath %r" % (tspath,))
+
+# pylint: disable=redefined-builtin
+@contextmanager
+def saved_figure(figure_or_ax, dir=None, ext=None):
+  ''' Context manager to save a `Figure` to a file and yield the file path.
+
+      Parameters:
+      * `figure_or_ax`: a `matplotlib.figure.Figure` or an object
+        with a `.figure` attribute such as a set of `Axes`
+      * `dir`: passed to `tempfile.TemporaryDirectory`
+      * `ext`: optional file extension, default `'png'`
+  '''
+  figure = getattr(figure_or_ax, 'figure', figure_or_ax)
+  if dir is None:
+    dir = '.'
+  if ext is None:
+    ext = 'png'
+  with TemporaryDirectory(dir=dir or '.') as tmppath:
+    tmpimgpath = joinpath(tmppath, f'plot.{ext}')
+    pfx_call(figure.savefig, tmpimgpath)
+    yield tmpimgpath
+
+def save_figure(figure_or_ax, imgpath: str, force=False):
+  ''' Save a `Figure` to the file `imgpath`.
+
+      Parameters:
+      * `figure_or_ax`: a `matplotlib.figure.Figure` or an object
+        with a `.figure` attribute such as a set of `Axes`
+      * `imgpath`: the filesystem path to which to save the image
+      * `force`: optional flag, default `False`: if true the `imgpath`
+        will be written to even if it exists
+  '''
+  if not force and existspath(imgpath):
+    raise ValueError("image path already exists: %r" % (imgpath,))
+  _, imgext = splitext(basename(imgpath))
+  ext = imgext[1:] if imgext else 'png'
+  with saved_figure(figure_or_ax, dir=dirname(imgpath), ext=ext) as tmpimgpath:
+    if not force and existspath(imgpath):
+      raise ValueError("image path already exists: %r" % (imgpath,))
+    pfx_call(os.link, tmpimgpath, imgpath)
+
+def print_figure(figure_or_ax, imgformat=None, file=None):
+  ''' Print `figure_or_ax` to a file.
+
+      Parameters:
+      * `figure_or_ax`: a `matplotlib.figure.Figure` or an object
+        with a `.figure` attribute such as a set of `Axes`
+      * `imgformat`: optional output format; if omitted use `'sixel'`
+        if `file` is a terminal, otherwise `'png'`
+      * `file`: the output file, default `sys.stdout`
+  '''
+  if file is None:
+    file = sys.stdout
+  if imgformat is None:
+    if file.isatty():
+      imgformat = 'sixel'
+    else:
+      imgformat = 'png'
+  with saved_figure(figure_or_ax) as tmpimgpath:
+    with open(tmpimgpath, 'rb') as imgf:
+      if imgformat == 'sixel':
+        run(['img2sixel'], stdin=imgf, stdout=file.fileno(), check=True)
+      else:
+        for bs in CornuCopyBuffer.from_file(imgf):
+          file.write(bs)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
