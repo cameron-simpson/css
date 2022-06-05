@@ -77,12 +77,12 @@ class Mobi:
         Return the path to the created CBZ file.
     '''
     if cbzpath is None:
-      mobibase, mobiext = splitext(basename(self.path))
+      mobibase, _ = splitext(basename(self.path))
       cbzpath = mobibase + '.cbz'
     if existspath(cbzpath):
       raise ValueError("CBZ path %r already exists" % (cbzpath,))
     with self.extracted() as df:
-      dirpath, rfilepath = df
+      dirpath, _ = df
       imagepaths = sorted(glob(joinpath(dirpath, 'mobi8/OEBPS/Images/*.*')))
       if not imagepaths:
         imagepaths = sorted(glob(joinpath(dirpath, 'mobi7/Images/*.*')))
@@ -117,17 +117,15 @@ class MobiCommand(BaseCommand):
           Prints the outdir and the name of the top file.
     '''
     outdirpath = None
-    if not argv:
-      raise GetoptError("missing mobipath")
-    mobipath = argv.pop(0)
+    mobipath = self.poparg(argv, "mobipath")
     if argv:
       outdirpath = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments after cbzpath: %r" % (argv,))
+      raise GetoptError("extra arguments after outdir: %r" % (argv,))
     if not existspath(mobipath):
       raise GetoptError("mobipath does not exist: %r" % (mobipath,))
     if outdirpath is None:
-      outdirpath, mobiext = splitext(basename(mobipath))
+      outdirpath, _ = splitext(basename(mobipath))
     if existspath(outdirpath):
       raise GetoptError("outdir already exists: %s" % (outdirpath,))
     MB = Mobi(mobipath)
@@ -143,10 +141,8 @@ class MobiCommand(BaseCommand):
           The default cbzpath is mobibase.cbz where mobibase is the
           basename of mobipath with its extension removed.
     '''
-    if not argv:
-      raise GetoptError("missing mobipath")
-    mobipath = argv.pop(0)
-    mobibase, mobiext = splitext(basename(mobipath))
+    mobipath = self.poparg(argv, "mobipath")
+    mobibase, _ = splitext(basename(mobipath))
     if argv:
       cbzpath = argv.pop(0)
     else:
