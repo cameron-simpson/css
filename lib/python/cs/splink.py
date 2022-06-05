@@ -163,8 +163,9 @@ class SPLinkCSVDir(HasFSPath):
         self.csvpath(dataset), tsd, tzname=tzname
     )
 
-  @staticmethod
-  def export_csv_to_timeseries(csvpath, tsd: TimeSeriesDataDir, tzname=None):
+  def export_csv_to_timeseries(
+      self, csvpath, tsd: TimeSeriesDataDir, tzname=None
+  ):
     ''' Read the CSV file specified by `cvspath`
         and export its contents into the `tsd:TimeSeriesDataDir.
     '''
@@ -178,30 +179,34 @@ class SPLinkCSVDir(HasFSPath):
     short_csvpath = relpath(csvpath, self.fspath)
     if short_csvpath.startswith('../'):
       short_csvpath = shortpath(csvpath)
-    for row in progressbar(
-        rows,
-        short_csvpath,
-        update_frequency=128,
-        report_print=True,
-    ):
-      for key, value in zip(keys, row):
-        if key == key0:
-          # seconds since 2001-01-01; make UNIX time
-          value = int(value) + ts2001
-        else:
-          try:
-            value = int(value)
-          except ValueError:
+    with tsd:
+      for row in progressbar(
+          rows,
+          short_csvpath,
+          update_frequency=128,
+          report_print=True,
+      ):
+        for key, value in zip(keys, row):
+          if key == key0:
+            # seconds since 2001-01-01; make UNIX time
+            value = int(value) + ts2001
+          else:
             try:
-              value = float(value)
+              value = int(value)
             except ValueError:
-              value = nan
-        key_values[key].append(value)
-    for key in keys[2:]:
-      with Pfx(key):
-        ts = tsd.make_ts(key)
-        ts.tags['csv.header'] = rowtype.name_of_[key]
-        ts.setitems(key_values[key0], key_values[key])
+              try:
+                value = float(value)
+              except ValueError:
+                value = nan
+          key_values[key].append(value)
+      with UpdProxy(prefix=f"{short_csvpath}: write per-column values: "
+                    ) as proxy:
+        for key in keys[2:]:
+          proxy.text = key
+          with Pfx(key):
+            ts = tsd.make_ts(key)
+            ts.tags['csv.header'] = rowtype.name_of_[key]
+            ts.setitems(key_values[key0], key_values[key])
 
 # pylint: disable=too-many-ancestors
 class SPLinkDataDir(TimeSeriesDataDir):
