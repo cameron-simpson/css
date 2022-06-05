@@ -1115,12 +1115,16 @@ class UpdProxy(object):
       self._update()
 
   @contextmanager
-  def extend_prefix(self, more_prefix):
+  def extend_prefix(self, more_prefix, print_elapsed=False):
     ''' Context manager to append text to the prefix.
     '''
     new_prefix = self.prefix + more_prefix
     with stackattrs(self, prefix=new_prefix):
+      start_time = time.time()
       yield new_prefix
+    if print_elapsed:
+      end_time = time.time()
+      print("%s: %ss" % (new_prefix, end_time - start_time))
 
   @property
   def text(self):
