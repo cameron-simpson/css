@@ -9,7 +9,7 @@ from code import interact
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import filecmp
-from functools import lru_cache, total_ordering
+from functools import total_ordering
 from getopt import GetoptError
 from itertools import chain
 import json
@@ -1006,7 +1006,6 @@ class CalibreCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    options = self.options
     with self.options.calibre:
       yield
 
