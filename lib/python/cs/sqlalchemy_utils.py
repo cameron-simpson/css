@@ -29,7 +29,7 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-__version__ = '20220311-post'
+__version__ = '20220606'
 
 DISTINFO = {
     'description':
