@@ -21,7 +21,7 @@ DISTINFO = {
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
-        'cs.numeric',
+        'cs.numeric>=intif',
         'cs.obj',
         'cs.pfx',
         'cs.resources',
