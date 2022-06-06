@@ -1318,7 +1318,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     # mmaped file data
     self._mmap = None
     self._mmap_fd = None
-    self._mmap_data_offset = None
+    self._mmap_offset = None
     self._mmap_datum_struct = None
 
   def __str__(self):
@@ -1357,20 +1357,17 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         self.header.datum_type.length * offset
     )
 
-  def peek(self, when: Numeric, f=None):
-    ''' Read a single data value for the UNIX time `when`
-        from the file `f`.
+  def peek(self, when: Numeric):
+    ''' Read a single data value for the UNIX time `when`.
 
         This method uses the `mmap` interface if the array is not already loaded.
     '''
     if when < self.start:
       raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
-    return self.peek_offset(self.offset(when), f=f)
+    return self.peek_offset(self.offset(when))
 
   def peek_offset(self, offset):
-    ''' Read a single data value from the binary file `f` at _data_
-        offset `offset` i.e. the array index.
-        Return the value.
+    ''' Read a single data value from `offset`.
 
         This method uses the `mmap` interface if the array is not already loaded.
     '''
@@ -1379,20 +1376,19 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       return self._array_peek_offset(offset)
     if self._mmap is None:
       self._mmap_open()
-    return self._mmap_peek(offset)
+    return self._mmap_peek_offset(offset)
 
-  def poke(self, when: Numeric, value: Numeric, f=None):
-    ''' Write a single data value for the UNIX time `when` to the file `f`.
+  def poke(self, when: Numeric, value: Numeric):
+    ''' Write a single data value for the UNIX time `when`.
 
         This method uses the `mmap` interface if the array is not already loaded.
     '''
     if when < self.start:
       raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
-    self.poke_offset(self.offset(when), value, f=f)
+    self.poke_offset(self.offset(when), value)
 
-  def poke_offset(self, offset: int, value: Numeric, f=None):
-    ''' Write a single data value to the binary file `f` at _data_
-        offset `offset` i.e. the array offset.
+  def poke_offset(self, offset: int, value: Numeric):
+    ''' Write a single data value at `offset`.
 
         This method uses the `mmap` interface if the array is not already loaded.
     '''
@@ -1480,7 +1476,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     '''
     assert self._array is None
     assert self._mmap_fd is None
-    assert self._mmap_data_offset is None
+    assert self._mmap_offset is None
     with Pfx("_mmap_open: fspath %r", self.fspath):
       self._mmap_fd = pfx_call(os.open, self.fspath, os.O_RDWR)
       flen = os.fstat(self._mmap_fd).st_size
@@ -1557,8 +1553,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       flen = os.fstat(self._mmap_fd).st_size
       if mm_end_offset <= flen:
         # file has grown to sufficient size
-        self._mm_close()
-        self._mm_open()
+        self._mmap_close()
+        self._mmap_open()
         # retry with the larger mapping
         continue
       # file too short, pad the file and append the value
@@ -1720,7 +1716,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
             "%s index slices may not specify a step" % (type(self).__name__,)
         )
       return self.slice(start, stop)
-    ary = self.array
     # avoid confusion with negative indices
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
