@@ -88,7 +88,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20220530-post'
+__version__ = '20220605-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -809,9 +809,8 @@ class Upd(SingletonMixin):
               (len(self), index0)
           )
       elif index > len(self):
-        if index == 1 and len(self) == 0:
-          # crop insert in the initial state
-          index = 0
+        if index == 1 and not slots:
+          self.insert(0)
         else:
           raise ValueError(
               "index should be in the range 0..%d inclusive: got %s" %
@@ -1115,12 +1114,16 @@ class UpdProxy(object):
       self._update()
 
   @contextmanager
-  def extend_prefix(self, more_prefix):
+  def extend_prefix(self, more_prefix, print_elapsed=False):
     ''' Context manager to append text to the prefix.
     '''
     new_prefix = self.prefix + more_prefix
     with stackattrs(self, prefix=new_prefix):
+      start_time = time.time()
       yield new_prefix
+    if print_elapsed:
+      end_time = time.time()
+      print("%s: %ss" % (new_prefix, end_time - start_time))
 
   @property
   def text(self):

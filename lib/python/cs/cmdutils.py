@@ -35,7 +35,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20220429-post'
+__version__ = '20220605-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1004,8 +1004,6 @@ class BaseCommand:
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with upd_context:
-        if upd is not None:
-          upd.out(self.cmd + '...')
         with stackattrs(self, cmd=self._subcmd if self._subcmd else self.cmd):
           with stackattrs(
               options,

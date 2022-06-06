@@ -9,7 +9,7 @@ from code import interact
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import filecmp
-from functools import lru_cache, total_ordering
+from functools import total_ordering
 from getopt import GetoptError
 from itertools import chain
 import json
@@ -1007,7 +1007,6 @@ class CalibreCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    options = self.options
     with self.options.calibre:
       yield
 
@@ -1053,6 +1052,19 @@ class CalibreCommand(BaseCommand):
     else:
       yield calibre[dbid]
 
+  @staticmethod
+  def cbook_default_sortkey(cbook):
+    ''' The default presentation order for things like "ls":
+        series-name-index,title,authors,dbid.
+    '''
+    return (
+        (cbook.series_name.lower(),
+         cbook.series_index) if cbook.series_name else ("", 0),
+        cbook.title.lower(),
+        tuple(map(str.lower, cbook.author_names)),
+        cbook.dbid,
+    )
+
   def popbooks(self, argv, once=False, sortkey=None):
     ''' Consume `argv` as book specifications and return a list of matching books.
 
@@ -1069,13 +1081,7 @@ class CalibreCommand(BaseCommand):
         break
     if sortkey is not None and sortkey is not False:
       if sortkey is True:
-        sortkey = lambda cbook: (
-            (cbook.series_name.lower(), cbook.series_index)
-            if cbook.series_name else ("", 0),
-            cbook.title.lower(),
-            tuple(map(str.lower, cbook.author_names)),
-            cbook.dbid,
-        )
+        sortkey = self.cbook_default_sortkey
       cbooks = sorted(cbooks, key=sortkey)
     assert not argv
     return cbooks
@@ -1178,8 +1184,8 @@ class CalibreCommand(BaseCommand):
       except ValueError as e:
         raise GetoptError("invalid book specifiers: %s") from e
     else:
-      cbooks = calibre
       calibre.preload()
+      cbooks = sorted(calibre, key=self.cbook_default_sortkey)
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
@@ -1196,6 +1202,9 @@ class CalibreCommand(BaseCommand):
               ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
           )
         top_row.append(f"({cbook.dbid})")
+        if not longmode:
+          top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
+          top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
         print(*top_row)
         if longmode:
           print(" ", cbook.path)
@@ -1234,7 +1243,11 @@ class CalibreCommand(BaseCommand):
         for cbook in cbooks:
           if runstate.cancelled:
             break
-          pfx_call(cbook.make_cbz)
+          try:
+            pfx_call(cbook.make_cbz)
+          except ValueError as e:
+            warning("cannot make CBZ from %s: %s" % (cbook, e))
+            xit = 1
     if runstate.cancelled:
       xit = 1
     return xit
