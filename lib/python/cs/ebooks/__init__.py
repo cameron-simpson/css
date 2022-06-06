@@ -6,6 +6,8 @@
     These form the basis of my personal Kindle and Calibre workflow.
 '''
 
+__version__ = '20220606'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
