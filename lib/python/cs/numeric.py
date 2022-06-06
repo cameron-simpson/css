@@ -7,6 +7,8 @@
 ''' A few ad hoc numeric alogrithms: `factors` and `primes`.
 '''
 
+__version__ = '20220606'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
