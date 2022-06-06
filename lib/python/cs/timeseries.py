@@ -1376,7 +1376,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     '''
     if self._array is not None:
       assert self._mmap is None
-      return self._array_peek(offset)
+      return self._array_peek_offset(offset)
     if self._mmap is None:
       self._mmap_open()
     return self._mmap_peek(offset)
@@ -1401,7 +1401,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     if self._array is not None:
       # array in memory, write to it
       assert self._mmap is None
-      self._array_poke(offset, value)
+      self._array_poke_offset(offset, value)
       return
     # save to the mmap
     if self._mmap is None:
@@ -1451,6 +1451,28 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     self._mmap_close()
     self.modified = False
     return ary
+
+  def _array_peek_offset(self, offset):
+    ''' Fetch the datum from the `array` at `offset`.
+    '''
+    assert offset >= 0
+    assert self._array is not None
+    try:
+      return self.array[offset]
+    except IndexError:
+      return self.fill
+
+  def _array_poke_offset(self, offset, value):
+    ''' Store `value` at `offset` in the `array`.
+        Pads with `self.fill` as needed.
+    '''
+    assert offset >= 0
+    assert self._array is not None
+    ary = self._array
+    if offset >= len(ary):
+      ary.extend([self.fill] * (offset - len(ary) + 1))
+    ary[offset] = value
+    self.modified = True
 
   def _mmap_open(self):
     ''' Open a `mmap` of the data file.
@@ -1702,10 +1724,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     # avoid confusion with negative indices
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
-    try:
-      return ary[self.array_index(when)]
-    except IndexError:
-      return nan
+    return self.peek_offset(self.array_index(when))
 
   def __setitem__(self, when, value):
     ''' Set the datum for the UNIX time `when`.
@@ -1715,8 +1734,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     self.pad_to(when)
     assert isinstance(value,
                       (int, float)), "value is a %s:%r" % (type(value), value)
-    self.array[self.array_index(when)] = value
-    self.modified = True
+    self.poke_offset(self.array_index(when), value)
 
   def pad_to(self, when, fill=None):
     ''' Pad the time series to store values up to the UNIX time `when`.
