@@ -8,7 +8,6 @@
 '''
 
 DISTINFO = {
-    'description': "some numeric functions; currently primes() and factors()",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Development Status :: 6 - Mature",
@@ -44,3 +43,9 @@ def factors(n):
     while n % p == 0:
       yield p
       n //= p
+
+def intif(f: float):
+  ''' Return `int(f)` if that equals `f`, otherwise `f`.
+  '''
+  i = int(f)
+  return i if i == f else f

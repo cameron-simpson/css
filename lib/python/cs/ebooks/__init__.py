@@ -21,6 +21,7 @@ DISTINFO = {
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
+        'cs.numeric',
         'cs.obj',
         'cs.pfx',
         'cs.resources',
@@ -31,9 +32,3 @@ DISTINFO = {
         'mobi',
     ],
 }
-
-def intif(f: float):
-  ''' Return `int(f)` if that equals `f`, otherwise `f`.
-  '''
-  i = int(f)
-  return i if i == f else f
