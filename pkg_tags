@@ -50,7 +50,7 @@ cs.mediainfo
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783" pypi.release="20211208"
 cs.nodedb pypi.release=20160828
-cs.numeric pypi.release=20190309
+cs.numeric pypi.release=20190309 ok_revision="59303dd747cbf52f6fdf1777c1f6979d1085156d"
 cs.obj pypi.release="20220530" ok_revision="1648304052b6ec944d9d428d98aa780d90cdd8b2" features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"]}
 cs.onttags
 cs.packetstream pypi.release="20211208" ok_revision="906f6148d57dfa082d18e6f4b27b8081ee317ba8"
