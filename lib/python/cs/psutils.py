@@ -189,37 +189,50 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
-def run(argv, logger=None, pids=None, **kw):
-  ''' Run a command. Optionally trace invocation.
-      Return result of subprocess.call.
+def run(argv, doit=True, logger=None, quiet=False, **subp_options):
+  ''' Run a command via `subprocess.run`.
+      Return the `CompletedProcess` result or `None` if `doit` is false.
 
       Parameters:
-      * `argv`: the command argument list
-      * `pids`: if supplied and not None,
-        call .add and .remove with the subprocess pid around the execution
-
-      Other keyword arguments are passed to `subprocess.call`.
+      * `argv`: the command line to run
+      * `doit`: optional flag, default `True`;
+        if false do not run the command and return `None`
+      * `logger`: optional logger, default `None`;
+        if `True`, use `logging.getLogger()`;
+        if not `None` or `False` trace using `print_argv`
+      * `quiet`: default `False`; if true, do not print the command or its output
+      * `subp_options`: optional mapping of keyword arguments
+        to pass to `subprocess.run`
   '''
   if logger is True:
     logger = logging.getLogger()
-  try:
-    if logger:
-      pargv = ['+'] + argv
-      logger.info("RUN COMMAND: %r", pargv)
-    P = subprocess.Popen(argv, **kw)  # pylint: disable=consider-using-with
-    if pids is not None:
-      pids.add(P.pid)
-    returncode = P.wait()
-    if pids is not None:
-      pids.remove(P.pid)
-    if returncode != 0:
+  if not doit:
+    if not quiet:
       if logger:
-        logger.error("NONZERO EXIT STATUS: %s: %r", returncode, pargv)
-    return returncode
-  except BaseException as e:
-    if logger:
-      logger.exception("RUNNING COMMAND: %s", e)
-    raise
+        trace("skip: %s", shlex.join(argv))
+      else:
+        with Upd().above():
+          print_argv(*argv, fold=True)
+    return None
+  with Upd().above():
+    if not quiet:
+      if logger:
+        trace("+ %s", shlex.join(argv))
+      else:
+        print_argv(*argv)
+    cp = pfx_call(subprocess_run, argv, **subp_options)
+    if cp.stdout and not quiet:
+      builtin_print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
+    if cp.stderr:
+      builtin_print(" stderr:")
+      builtin_print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
+  if cp.returncode != 0:
+    warning(
+        "run fails, exit code %s from %s",
+        cp.returncode,
+        shlex.join(cp.args),
+    )
+  return cp
 
 def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
   ''' Pipe text from a command.
