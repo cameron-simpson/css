@@ -627,7 +627,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           f"no fetch source: no ${self.DEFAULT_FETCH_SOURCE_ENVVAR} and no -F option"
       )
     spd = options.spd
-    rsopts = ['-ia']
+    rsopts = ['-iaO']
     rsargv = ['set-x', 'rsync']
     rsargv.extend(rsopts)
     if expunge:

@@ -768,7 +768,7 @@ def ask(message, fin=None, fout=None):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output file object of a command.
   '''
-  P = cs.psutils.pipefrom(argv, trace=False, **kw)
+  P = cs.psutils.pipefrom(argv, **kw)
   yield P.stdout
   if P.wait() != 0:
     pipecmd = ' '.join(argv)

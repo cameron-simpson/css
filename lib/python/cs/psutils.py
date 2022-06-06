@@ -5,7 +5,7 @@ r'''
 Assorted process and subprocess management functions.
 '''
 
-from __future__ import print_function
+from builtins import print as builtin_print
 from contextlib import contextmanager
 import errno
 import io
@@ -13,11 +13,14 @@ import logging
 import os
 import shlex
 from signal import SIGTERM, SIGKILL, signal
-import subprocess
+from subprocess import PIPE, Popen, run as subprocess_run
 import sys
 import time
 
 from cs.gimmicks import DEVNULL
+from cs.logutils import trace, warning
+from cs.pfx import pfx_call
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20220531-post'
 
@@ -28,7 +31,12 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks>=devnull'],
+    'install_requires': [
+        'cs.gimmicks>=devnull',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.upd',
+    ],
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions
@@ -189,39 +197,52 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
-def run(argv, logger=None, pids=None, **kw):
-  ''' Run a command. Optionally trace invocation.
-      Return result of subprocess.call.
+def run(argv, doit=True, logger=None, quiet=False, **subp_options):
+  ''' Run a command via `subprocess.run`.
+      Return the `CompletedProcess` result or `None` if `doit` is false.
 
       Parameters:
-      * `argv`: the command argument list
-      * `pids`: if supplied and not None,
-        call .add and .remove with the subprocess pid around the execution
-
-      Other keyword arguments are passed to `subprocess.call`.
+      * `argv`: the command line to run
+      * `doit`: optional flag, default `True`;
+        if false do not run the command and return `None`
+      * `logger`: optional logger, default `None`;
+        if `True`, use `logging.getLogger()`;
+        if not `None` or `False` trace using `print_argv`
+      * `quiet`: default `False`; if true, do not print the command or its output
+      * `subp_options`: optional mapping of keyword arguments
+        to pass to `subprocess.run`
   '''
   if logger is True:
     logger = logging.getLogger()
-  try:
-    if logger:
-      pargv = ['+'] + argv
-      logger.info("RUN COMMAND: %r", pargv)
-    P = subprocess.Popen(argv, **kw)  # pylint: disable=consider-using-with
-    if pids is not None:
-      pids.add(P.pid)
-    returncode = P.wait()
-    if pids is not None:
-      pids.remove(P.pid)
-    if returncode != 0:
+  if not doit:
+    if not quiet:
       if logger:
-        logger.error("NONZERO EXIT STATUS: %s: %r", returncode, pargv)
-    return returncode
-  except BaseException as e:
-    if logger:
-      logger.exception("RUNNING COMMAND: %s", e)
-    raise
+        trace("skip: %s", shlex.join(argv))
+      else:
+        with Upd().above():
+          print_argv(*argv, fold=True)
+    return None
+  with Upd().above():
+    if not quiet:
+      if logger:
+        trace("+ %s", shlex.join(argv))
+      else:
+        print_argv(*argv)
+    cp = pfx_call(subprocess_run, argv, **subp_options)
+    if cp.stdout and not quiet:
+      builtin_print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
+    if cp.stderr:
+      builtin_print(" stderr:")
+      builtin_print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
+  if cp.returncode != 0:
+    warning(
+        "run fails, exit code %s from %s",
+        cp.returncode,
+        shlex.join(cp.args),
+    )
+  return cp
 
-def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
+def pipefrom(argv, quiet=False, binary=False, keep_stdin=False, **kw):
   ''' Pipe text from a command.
       Optionally trace invocation.
       Return the `Popen` object with `.stdout` decoded as text.
@@ -230,7 +251,8 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
       * `argv`: the command argument list
       * `binary`: if true (default false)
         return the raw stdout instead of a text wrapper
-      * `trace`: if true (default `False`),
+      * `quiet`: optional flag, default `False`;
+
         if `trace` is `True`, recite invocation to stderr
         otherwise presume that `trace` is a stream
         to which to recite the invocation.
@@ -243,14 +265,12 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
       Other keyword arguments are passed to the `io.TextIOWrapper`
       which wraps the command's output.
   '''
-  if trace:
-    tracefp = sys.stderr if trace is True else trace
-    pargv = ['+'] + list(argv) + ['|']
-    print(*pargv, file=tracefp)
+  if not quiet:
+    print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   popen_kw = {}
   if not keep_stdin:
     popen_kw['stdin'] = DEVNULL
-  P = subprocess.Popen(argv, stdout=subprocess.PIPE, **popen_kw)  # pylint: disable=consider-using-with
+  P = Popen(argv, stdout=PIPE, **popen_kw)  # pylint: disable=consider-using-with
   if binary:
     if kw:
       raise ValueError(
@@ -260,7 +280,7 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
     P.stdout = io.TextIOWrapper(P.stdout, **kw)
   return P
 
-def pipeto(argv, trace=False, **kw):
+def pipeto(argv, quiet=False, **kw):
   ''' Pipe text to a command.
       Optionally trace invocation.
       Return the Popen object with .stdin encoded as text.
@@ -275,11 +295,9 @@ def pipeto(argv, trace=False, **kw):
       Other keyword arguments are passed to the `io.TextIOWrapper`
       which wraps the command's input.
   '''
-  if trace:
-    tracefp = sys.stderr if trace is True else trace
-    pargv = ['+', '|'] + argv
-    print(*pargv, file=tracefp)
-  P = subprocess.Popen(argv, stdin=subprocess.PIPE)  # pylint: disable=consider-using-with
+  if not quiet:
+    print_argv(*argv, indent="| ", file=sys.stderr)
+  P = Popen(argv, stdin=PIPE)  # pylint: disable=consider-using-with
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
 
@@ -347,20 +365,9 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
     argvs.append(pre_argv + per + post_argv)
   return argvs
 
-if __name__ == '__main__':
-  for test_max_argv in 64, 20, 16, 8:
-    print(
-        test_max_argv,
-        repr(
-            groupargv(
-                ['cp', '-a'], ['a', 'bbbb', 'ddddddddddddd'], ['end'],
-                max_argv=test_max_argv,
-                encode=True
-            )
-        )
-    )
-
-def print_argv(*argv, indent="", subindent="  ", file=None, fold=False):
+def print_argv(
+    *argv, indent="", subindent="  ", end="\n", file=None, fold=False
+):
   ''' Print an indented possibly folded command line.
   '''
   if file is None:
@@ -387,4 +394,17 @@ def print_argv(*argv, indent="", subindent="  ", file=None, fold=False):
         file.write(" ")
       was_opt = False
     file.write(shlex.quote(arg))
-  file.write("\n")
+  file.write(end)
+
+if __name__ == '__main__':
+  for test_max_argv in 64, 20, 16, 8:
+    print(
+        test_max_argv,
+        repr(
+            groupargv(
+                ['cp', '-a'], ['a', 'bbbb', 'ddddddddddddd'], ['end'],
+                max_argv=test_max_argv,
+                encode=True
+            )
+        )
+    )
