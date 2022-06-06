@@ -365,20 +365,9 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
     argvs.append(pre_argv + per + post_argv)
   return argvs
 
-if __name__ == '__main__':
-  for test_max_argv in 64, 20, 16, 8:
-    print(
-        test_max_argv,
-        repr(
-            groupargv(
-                ['cp', '-a'], ['a', 'bbbb', 'ddddddddddddd'], ['end'],
-                max_argv=test_max_argv,
-                encode=True
-            )
-        )
-    )
-
-def print_argv(*argv, indent="", subindent="  ", file=None, fold=False):
+def print_argv(
+    *argv, indent="", subindent="  ", end="\n", file=None, fold=False
+):
   ''' Print an indented possibly folded command line.
   '''
   if file is None:
@@ -405,4 +394,17 @@ def print_argv(*argv, indent="", subindent="  ", file=None, fold=False):
         file.write(" ")
       was_opt = False
     file.write(shlex.quote(arg))
-  file.write("\n")
+  file.write(end)
+
+if __name__ == '__main__':
+  for test_max_argv in 64, 20, 16, 8:
+    print(
+        test_max_argv,
+        repr(
+            groupargv(
+                ['cp', '-a'], ['a', 'bbbb', 'ddddddddddddd'], ['end'],
+                max_argv=test_max_argv,
+                encode=True
+            )
+        )
+    )
