@@ -12,7 +12,7 @@ try:
 except ImportError:
   import xml.etree.ElementTree as etree
 
-__version__ = '20220606'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python3"],
