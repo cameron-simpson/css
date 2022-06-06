@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 #
-# Basic XML conveniences.
-#   - Cameron Simpson <cs@cskk.id.au> 12feb2017
-#
+
+''' A couple of trite XML conveniences:
+    preferred `etree` import and a `pprint` function.
+'''
 
 from __future__ import print_function
 import sys
@@ -10,6 +11,18 @@ try:
   from lxml import etree
 except ImportError:
   import xml.etree.ElementTree as etree
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 5 - Production/Stable",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [],
+    'extras_requires': {
+        'lxml': ['lxml'],
+    },
+}
 
 def pprint(xml, fp=None):
   ''' Directly derived from the suggestion at:
