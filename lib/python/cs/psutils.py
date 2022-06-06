@@ -5,7 +5,7 @@ r'''
 Assorted process and subprocess management functions.
 '''
 
-from __future__ import print_function
+from builtins import print as builtin_print
 from contextlib import contextmanager
 import errno
 import io
@@ -13,11 +13,14 @@ import logging
 import os
 import shlex
 from signal import SIGTERM, SIGKILL, signal
-import subprocess
+from subprocess import PIPE, Popen, run as subprocess_run
 import sys
 import time
 
 from cs.gimmicks import DEVNULL
+from cs.logutils import trace, warning
+from cs.pfx import pfx_call
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20220531-post'
 
@@ -28,7 +31,12 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks>=devnull'],
+    'install_requires': [
+        'cs.gimmicks>=devnull',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.upd',
+    ],
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions
