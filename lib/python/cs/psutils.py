@@ -234,7 +234,7 @@ def run(argv, doit=True, logger=None, quiet=False, **subp_options):
     )
   return cp
 
-def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
+def pipefrom(argv, quiet=False, binary=False, keep_stdin=False, **kw):
   ''' Pipe text from a command.
       Optionally trace invocation.
       Return the `Popen` object with `.stdout` decoded as text.
@@ -243,7 +243,8 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
       * `argv`: the command argument list
       * `binary`: if true (default false)
         return the raw stdout instead of a text wrapper
-      * `trace`: if true (default `False`),
+      * `quiet`: optional flag, default `False`;
+
         if `trace` is `True`, recite invocation to stderr
         otherwise presume that `trace` is a stream
         to which to recite the invocation.
@@ -256,14 +257,12 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
       Other keyword arguments are passed to the `io.TextIOWrapper`
       which wraps the command's output.
   '''
-  if trace:
-    tracefp = sys.stderr if trace is True else trace
-    pargv = ['+'] + list(argv) + ['|']
-    print(*pargv, file=tracefp)
+  if not quiet:
+    print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   popen_kw = {}
   if not keep_stdin:
     popen_kw['stdin'] = DEVNULL
-  P = subprocess.Popen(argv, stdout=subprocess.PIPE, **popen_kw)  # pylint: disable=consider-using-with
+  P = Popen(argv, stdout=PIPE, **popen_kw)  # pylint: disable=consider-using-with
   if binary:
     if kw:
       raise ValueError(
@@ -273,7 +272,7 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
     P.stdout = io.TextIOWrapper(P.stdout, **kw)
   return P
 
-def pipeto(argv, trace=False, **kw):
+def pipeto(argv, quiet=False, **kw):
   ''' Pipe text to a command.
       Optionally trace invocation.
       Return the Popen object with .stdin encoded as text.
@@ -288,11 +287,9 @@ def pipeto(argv, trace=False, **kw):
       Other keyword arguments are passed to the `io.TextIOWrapper`
       which wraps the command's input.
   '''
-  if trace:
-    tracefp = sys.stderr if trace is True else trace
-    pargv = ['+', '|'] + argv
-    print(*pargv, file=tracefp)
-  P = subprocess.Popen(argv, stdin=subprocess.PIPE)  # pylint: disable=consider-using-with
+  if not quiet:
+    print_argv(*argv, indent="| ", file=sys.stderr)
+  P = Popen(argv, stdin=PIPE)  # pylint: disable=consider-using-with
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
 
