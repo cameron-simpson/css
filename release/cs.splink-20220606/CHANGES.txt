@@ -1,0 +1,61 @@
+lib/python/cs/splink.py: cs.splink: new module to process Selectronic SP-Link CSV data, very incomplete
+lib/python/cs/splink.py: cs.splink: the log time offsets are from 2001-01-01 (inverter local time), not 2000-01-01
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import usage message; rework the import and storage as classes
+lib/python/cs/splink.py: cs.splink: new SPLinkCSVDir.sitename property, inferred from one of the CSV filenames
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: make per-dataset time series directories underneath timeseries-dirpath; SPLinkDataDir is now for a single dataset
+lib/python/cs/splink.py: cs.splink: update imports, update docstrings, clean lint
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir: rename cvspath to csvfilename, add cvspath, add csv_tagsets to read a CSV file and return an iterable of (when,tagset)
+lib/python/cs/splink.py: cs.splink: SPLinkCommand: cmd_import: handle event logs and time series logs; cmd_plot: modernise based on cs.timeseries.TimeSeriesCommand.cmd_plot
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir: rename import_csv_data to export_to_timeseries, minor updates
+lib/python/cs/splink.py: cs.splink: DISTINFO
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: fields are mandatory
+lib/python/cs/splink.py: cs.splink: fixup previous
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: fix up fields parse
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: import progress summary
+lib/python/cs/splink.py: cs.splink: update method name
+lib/python/cs/splink.py: cs.timeseries: SPLinkCommand now subclasses TimeSeriesBaseCommand
+lib/python/cs/splink.py: cs.timeseries: SPLinkCommand: improve message, add progress bar
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir.export_to_timeseries: tweak
+lib/python/cs/splink.py: cs.splink: rename "which" to "dataset"
+lib/python/cs/splink.py: cs.splink: move SPLinkCommand down to the bottom, implement cmd_fetch, upgrade cmd_import
+lib/python/cs/splink.py: cs.splink: new SPLinkData class managing the directory containing the downloads, time series etc
+lib/python/cs/splink.py: cs.splink: SPLinkDataDir.import_from: accept a CSV file, a download directory containing the target CSV file or an SPLinkCSVDir for same
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir: split export_to_timeseries into export_to_timeseries and export_csv_to_timeseries
+lib/python/cs/splink.py: cs.splink: drop SPLINK_LOG_INTERVAL, now comes from SPLinkData.TIMESERIES_DEFAULTS
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir: new dataset_tagsets(dataset) method yielding TagSets from the CSV file for dataset
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir.csv_tagsets() now expects a CSV file path, called from dataset_tagsets()
+lib/python/cs/splink.py: cs.splink: import updates
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: check existence of import path, return correct exit code
+lib/python/cs/splink.py: cs.splink: SPLinkData: new resolve(fieldspec) method to turn [dataset:]field_spec into an iterable of (timeseries,key)
+lib/python/cs/splink.py: cs.splink: SPLinkCommand: catch SIGINT and SIGTERM, cancel the global RunState; honour the cancellation during cmd_import
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: do not insert events which already exist; strip a lot of noise, tweak some progress reporting
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: set dstags["imported"]=1 for event imports
+lib/python/cs/splink.py: cs.spplink: SPLinkCommand.cmd_plot: plot events, many other updates
+lib/python/cs/splink.py: cs.splink: clean lint
+lib/python/cs/splink.py: cs.splink: drop runstate.catch_signal() calls, now default in cs.cmdutils
+lib/python/cs/splink.py: cs.cmdutils: rename BaseCommand.popargv to poparg; adjust callers elsewhere
+lib/python/cs/splink.py: cs.splink: docstring updates
+lib/python/cs/splink.py: cs.splink: SPLinkData.download_subdirs: drop unused parameer, get glob from self.PERFORMANCEDATA_GLOB
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_fetch: rsync-source now uses the -F option, default still from self.DEFAULT_FETCH_SOURCE_ENVVAR, update option parsing
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_fetch: constrain the rsync to match self.PERFORMANCEDATA_GLOB
+lib/python/cs/splink.py: cs.splink: SPLinkCommand: basic cmd_info, make it the default
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: return 1 if cancelled
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: improve some proress messages
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir.export_csv_to_timeseries: better short_csvpath
+lib/python/cs/splink.py: cs.timeseries: rename TimeSeriesDataDir.makeitem to make_ts for clarity, adjust callers in cs.splink and cs.timeseries
+lib/python/cs/splink.py: cs.splink: update imports, DISTINFO
+lib/python/cs/splink.py: cs.splink: remove DEFAULT_LOG_FREQUENCY, make SPLinkDataDir step mandatory
+lib/python/cs/splink.py: cs.splink: say TimespanPolicyYearly instead of TimespanPolicyAnnual
+lib/python/cs/splink.py: cs.splink: SPLinkDataDir: update super() to use epoch
+lib/python/cs/splink.py: cs.splink: SPLinkData: create directory if needed
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir.export_csv_to_timeseries: open/close the TimeSeriesDataDir around the export, add progress reporting, etc
+lib/python/cs/splink.py: cs.splink: SPLinkData: add __str__ and info_dict()
+lib/python/cs/splink.py: cs.splink: SPLinkCommand: drop duplicate (and obsolete) cmd_info, update docstring and usage
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: update option parse
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: improve progress reporting, make the event import more efficient, assorted other changes
+lib/python/cs/splink.py: cs.splink: SPLinkCommand: the replacement cmd_info method
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: work a lot more link TimeSeriesCommand.cmd_plot, infer event style from other fields, etc
+lib/python/cs/splink.py: cs.splink: move plot logic from SPLinkCommand.cmd_plot to SPLinkData.plot
+lib/python/cs/splink.py: cs.splink: remove debug
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_fetch: add -O to the rsync options since the source machine runs Windows
+lib/python/cs/splink.py: cs.splink: update module docstring and DISTINFO

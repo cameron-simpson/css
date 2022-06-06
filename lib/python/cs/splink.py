@@ -57,6 +57,8 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
+__version__ = '20220606'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
