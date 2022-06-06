@@ -25,7 +25,7 @@ cs.clockutils pypi.release=20190101
 cs.cmdutils pypi.release="20220606" ok_revision="518492dd317331bd53520d1f8c9de65c2dae51cd" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"]}
 cs.configutils pypi.release="20220606" ok_revision="646d06810607e97ae0aaefbcce18806fb0ded874" features={"20220430":["HasConfigIni"],"20220606":["info_dict"]}
 cs.context pypi.release="20220227" ok_revision="5b24e4b71ed207d9f9c0af211214c1faaef28283" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"]}
-cs.csvutils pypi.release="20201228"
+cs.csvutils pypi.release="20201228" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
 cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
 cs.deco pypi.release="20220327" ok_revision="32bec58fa13ecf43043978d574e76a589e266220"
