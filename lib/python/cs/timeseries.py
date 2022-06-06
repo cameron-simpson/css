@@ -1449,6 +1449,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     if header.bigendian != NATIVE_BIGENDIANNESS[header.typecode]:
       ary.byteswap()
     self._mmap_close()
+    self.modified = False
     return ary
 
   def _mmap_open(self):
