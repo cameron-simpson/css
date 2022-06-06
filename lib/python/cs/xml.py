@@ -12,6 +12,8 @@ try:
 except ImportError:
   import xml.etree.ElementTree as etree
 
+__version__ = '20220606'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
