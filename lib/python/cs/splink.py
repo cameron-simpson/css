@@ -3,6 +3,8 @@
 ''' Assorted utility functions for working with data
     downloaded from Selectronics' SP-LINK programme
     which communicates with their controllers.
+
+    I use this to gather and plot data from my solar inverter.
 '''
 
 from collections import defaultdict, namedtuple
@@ -62,8 +64,22 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.timeseries',
         'arrow',
+        'cs.context',
+        'cs.csvutils',
+        'cs.deco',
+        'cs.fs',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.progress',
+        'cs.psutils',
+        'cs.resources',
+        'cs.sqltags',
+        'cs.tagset',
+        'cs.timeseries',
+        'cs.upd',
         'matplotlib',
         'typeguard',
     ],
