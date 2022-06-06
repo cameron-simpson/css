@@ -1,0 +1,1 @@
+SingletonMixin: add default __hash__ and __eq__ methods to support dict and set membership.

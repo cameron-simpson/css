@@ -296,6 +296,11 @@ class MailFiler(NS):
     self._maildir_watchers = {}
     self._rules_pattern = None
 
+  def __str__(self):
+    return "%s(config_path=%s,..,rules_pattern=%r)" % (
+        type(self).__name__, shortpath(self.config_path), self.rules_pattern
+    )
+
   @property
   def cfg(self):
     ''' The [DEFAULT] configuration section.
@@ -434,11 +439,17 @@ class MailFiler(NS):
         these_folders = op_cfg.get('folders', '').split()
       nmsgs = 0
       for folder in these_folders:
+        if runstate and runstate.cancelled:
+          break
         wmdir = self.maildir_watcher(folder)
         with Pfx(wmdir.shortname):
           try:
             nmsgs += self.sweep(
-                wmdir, justone=justone, no_remove=no_remove, upd=upd
+                wmdir,
+                justone=justone,
+                no_remove=no_remove,
+                upd=upd,
+                runstate=runstate,
             )
           except KeyboardInterrupt:
             raise
@@ -477,7 +488,14 @@ class MailFiler(NS):
     )
 
   def sweep(
-      self, wmdir, *, justone=False, no_remove=False, logfile=None, upd=None
+      self,
+      wmdir,
+      *,
+      justone=False,
+      no_remove=False,
+      logfile=None,
+      upd=None,
+      runstate=None,
   ):
     ''' Scan a WatchedMaildir for messages to filter.
         Return the number of messages processed.
@@ -494,6 +512,8 @@ class MailFiler(NS):
       skipped = 0
       with LogTime("all keys") as all_keys_time:
         for key in list(wmdir.keys(flush=True)):
+          if runstate and runstate.cancelled:
+            break
           if upd:
             status(key)
           if key in wmdir.lurking:

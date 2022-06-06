@@ -77,7 +77,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20220311-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -869,13 +869,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
   def __init__(self, *, db_url):
     super().__init__(db_url)
-    self.engine_keywords.update(
-        case_sensitive=True,
-        echo=(
-            self.engine_keywords.get('echo', False)
-            or 'echo' in os.environ.get('SQLTAGS_MODES', '').split(',')
-        ),
-    )
+    self.engine_keywords.update(case_sensitive=True)
+    if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
+                                               '').split(',')):
+      self.engine_keywords.update(echo=True)
     db_fspath = self.db_fspath
     if db_fspath is not None and not existspath(db_fspath):
       track("create and init %r", db_fspath)
@@ -1782,6 +1779,7 @@ class SQLTags(BaseTagSets):
         [SQTCriterion.from_equality(k, v) for k, v in crit_kw.items()]
     )
     post_criteria = []
+    # promote criteria from str to SQTCriterion as needed
     for i, criterion in enumerate(criteria):
       cr0 = criterion
       with Pfx(str(criterion)):

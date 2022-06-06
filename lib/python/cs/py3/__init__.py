@@ -36,7 +36,7 @@ try:
 except ImportError:
   StringTypes = (str,)
 
-__version__ = '20200517-post'
+__version__ = '20220523-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

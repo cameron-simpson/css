@@ -119,7 +119,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20220430-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -301,7 +301,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       with Pfx(path):
         if directories_like_files or not isdirpath(path):
           # edit the Tags, one per line
-          fstags[path].edit(verbose=state.verbose)
+          fstags[path].edit(verbose=state.verbose, comments=["", path, ""])
         # edit the tagsets, on per file on a line
         elif not fstags.edit_dirpath(path, all_names=all_names):
           xit = 1
