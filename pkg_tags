@@ -8,6 +8,7 @@ cs.app.mailfiler pypi.release="20200719"
 cs.app.megacli pypi.release="20211031" ok_revision="03033cc34d810f17745cceee447af3df5566ae33"
 cs.app.mklinks pypi.release="20210404" ok_revision="9f7cac4e2461bf0dc4851ae4d4714d9c4e56f55f"
 cs.app.nodedb
+cs.app.osx.plist
 cs.app.playon ok_revision="9b884dfceafcc251cbbd3e174e99937a7e76e9ae" pypi.release="20220311"
 cs.app.portfwd pypi.release="20210316" ok_revision=a340f42feecc3b8910c40cef2d2d2c8a0ca8e96c
 cs.app.ssh pypi.release=20161003
@@ -28,6 +29,7 @@ cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="
 cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
 cs.deco pypi.release="20220327" ok_revision="32bec58fa13ecf43043978d574e76a589e266220"
 cs.distinfo
+cs.ebooks
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
@@ -40,6 +42,7 @@ cs.html pypi.release=20160828
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.iso14496 pypi.release="20220606" ok_revision=b98d5cc1c47872fae8a9580a424e115bd70ae473
+cs.iso8601
 cs.jdson
 cs.later pypi.release="20220605" ok_revision="258f06f68c5714444c510ea19c3f45a0f574d151"
 cs.lex pypi.release="20220227" ok_revision=fb121c6afe95e80f0be91dcff41366e19527c28a features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"]}
@@ -93,6 +96,7 @@ cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
 cs.wol pypi.release=20171228
 cs.x pypi.release="20211208" ok_revision="0e559c85f5a23d1a9e643f71e202a1f5f7ee134c"
+cs.xml ok_revision=eff5f66345a4bd34fc5b4d005500c99a3b9ec506
 icontract
 sqlalchemy
 typeguard
