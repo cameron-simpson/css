@@ -97,6 +97,8 @@ from cs.resources import MultiOpenMixin
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
+__version__ = '20220606'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
