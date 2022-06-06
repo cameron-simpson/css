@@ -18,7 +18,7 @@ from cs.pfx import Pfx
 import cs.sh
 from cs.xml import etree
 
-__version__ = '20220606'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
