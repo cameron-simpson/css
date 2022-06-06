@@ -96,7 +96,7 @@ cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
 cs.wol pypi.release=20171228
 cs.x pypi.release="20211208" ok_revision="0e559c85f5a23d1a9e643f71e202a1f5f7ee134c"
-cs.xml ok_revision=eff5f66345a4bd34fc5b4d005500c99a3b9ec506
+cs.xml ok_revision=eff5f66345a4bd34fc5b4d005500c99a3b9ec506 pypi.release="20220606"
 icontract
 sqlalchemy
 typeguard
