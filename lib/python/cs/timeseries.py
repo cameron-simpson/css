@@ -40,7 +40,12 @@ from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
 from math import nan  # pylint: disable=no-name-in-module
-from mmap import mmap, MAP_PRIVATE, PROT_READ  # pylint: disable=no-name-in-module,c-extension-no-member
+from mmap import (
+    mmap,
+    MAP_PRIVATE,
+    PROT_READ,
+    PROT_WRITE,
+)  # pylint: disable=no-name-in-module,c-extension-no-member
 import os
 from os.path import (
     basename,
@@ -1307,7 +1312,14 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     self._itemsize = array(typecode).itemsize
     assert self._itemsize == self.header.datum_type.length
     self.modified = False
+    # only one of ._array or ._mmap may be not None at a time
+    # in memory copy of the file data
     self._array = None
+    # mmaped file data
+    self._mmap = None
+    self._mmap_fd = None
+    self._mmap_data_offset = None
+    self._mmap_datum_struct = None
 
   def __str__(self):
     return "%s(%s,%r,%d:%d,%r)" % (
@@ -1348,35 +1360,31 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
   def peek(self, when: Numeric, f=None):
     ''' Read a single data value for the UNIX time `when`
         from the file `f`.
-        The default file is obtained by opening `self.fspath` for read.
+
+        This method uses the `mmap` interface if the array is not already loaded.
     '''
     if when < self.start:
       raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
     return self.peek_offset(self.offset(when), f=f)
 
-  def peek_offset(self, offset, f=None):
+  def peek_offset(self, offset):
     ''' Read a single data value from the binary file `f` at _data_
         offset `offset` i.e. the array index.
         Return the value.
-        The default file is obtained by opening `self.fspath` for read.
+
+        This method uses the `mmap` interface if the array is not already loaded.
     '''
-    if f is None:
-      with open(self.fspath, 'rb') as f2:
-        return self.peek_offset(offset, f2)
-    read_len = self.header.datum_type.length
-    bs = f.pread(f.fileno(), self.file_offset(offset), read_len)
-    if len(bs) == 0:
-      return self.fill
-    if len(bs) < read_len:
-      raise ValueError(
-          "%s.peek(f=%s,%d): expected %d bytes, got %d bytes: %r" %
-          (self, f, offset, read_len, len(bs), bs)
-      )
-    return self.header.parse_value(bs)
+    if self._array is not None:
+      assert self._mmap is None
+      return self._array_peek(offset)
+    if self._mmap is None:
+      self._mmap_open()
+    return self._mmap_peek(offset)
 
   def poke(self, when: Numeric, value: Numeric, f=None):
     ''' Write a single data value for the UNIX time `when` to the file `f`.
-        The default file is obtained by opening `self.fspath` for update.
+
+        This method uses the `mmap` interface if the array is not already loaded.
     '''
     if when < self.start:
       raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
@@ -1385,37 +1393,20 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
   def poke_offset(self, offset: int, value: Numeric, f=None):
     ''' Write a single data value to the binary file `f` at _data_
         offset `offset` i.e. the array offset.
-        The default file is obtained by opening `self.fspath` for update.
+
+        This method uses the `mmap` interface if the array is not already loaded.
     '''
     if offset < 0:
       raise ValueError("offset:%d must be >= 0" % (offset,))
-    if f is None:
-      with open(self.fspath, 'w+b') as f2:
-        self.poke_offset(offset, value, f=f2)
+    if self._array is not None:
+      # array in memory, write to it
+      assert self._mmap is None
+      self._array_poke(offset, value)
       return
-    seek_offset = self.file_offset(offset)
-    dtype = self.header.datum_type
-    S = os.fstat(f.fileno())
-    if S.st_size > seek_offset:
-      # pad intervening data with self.fill
-      pad_length = S.st_size - seek_offset
-      assert pad_length % dtype.length == 0
-      pad_count = pad_length // dtype.length
-      pad_bs = self.fill_bs * pad_count
-      nwritten = os.pwrite(f.fileno(), S.st_size, pad_bs)
-      if nwritten != len(pad_bs):
-        raise IOError(
-            "tried to write %d bytes, wrote %d bytes" %
-            (len(pad_bs), nwritten)
-        )
-    datum_bs = dtype.transscribe_value(value)
-    assert len(datum_bs) == dtype.length
-    nwritten = os.pwrite(f.fileno(), seek_offset, datum_bs)
-    if nwritten != len(datum_bs):
-      raise IOError(
-          "tried to write %d bytes, wrote %d bytes" %
-          (len(datum_bs), nwritten)
-      )
+    # save to the mmap
+    if self._mmap is None:
+      self._mmap_open()
+    self._mmap_poke_offset(offset, value)
 
   @property
   @cachedmethod
@@ -1430,54 +1421,138 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ''' The time series as an `array.array` object.
         This loads the array data from `self.fspath` on first use.
     '''
-    try:
-      hdr, ary = self.load_from(self.fspath)
-    except FileNotFoundError:
-      # no file, empty array
-      ary = array(self.typecode)
+    assert self._array is None
+    # we load the data from an mmap
+    # ensure we have a current mmap, use it, close it
+    if self._mmap is None:
+      try:
+        self._mmap_open()
+      except FileNotFoundError:
+        # no file, empty array
+        return array(self.typecode)
     else:
-      # sanity check the header
-      if hdr.typecode != self.typecode:
-        raise ValueError(
-            "file typecode %r does not match self.typecode:%r" %
-            (hdr.typecode, self.typecode)
-        )
-      if hdr.time_typecode != self.time_typecode:
-        warning(
-            "file time typecode %r does not match self.time_typecode:%r",
-            hdr.time_typecode, self.time_typecode
-        )
-      if hdr.step != self.step:
-        raise ValueError(
-            "file step %r does not match self.step:%r" % (hdr.step, self.step)
-        )
-    return ary
-
-  @staticmethod
-  def load_from(fspath):
-    ''' Load the data from `fspath`, return the header and an
-        `array.array(typecode)` containing the file data.
-        Raises `FileNotFoundError` if the file does not exist.
-    '''
-    with pfx_open(fspath, 'rb') as tsf:
-      bfr = CornuCopyBuffer.from_file(tsf)
-      header = TimeSeriesFileHeader.parse(bfr)
-      ary = array(header.typecode)
-      itemsize = header.datum_type.length
-      flen = os.fstat(tsf.fileno()).st_size
-      datalen = flen - bfr.offset
-      if datalen % ary.itemsize != 0:
-        warning(
-            "data length:%d is not a multiple of item size:%d", datalen,
-            itemsize
-        )
-      with mmap(tsf.fileno(), flen, MAP_PRIVATE, PROT_READ) as mm:
-        mv = memoryview(mm)
-        ary.frombytes(mv[bfr.offset:flen])
-        mv = None
+      # see if it is valid
+      flen = os.fstat(self._mmap_fd).st_size
+      if flen != len(self._mmap):
+        self._mmap_close()
+        try:
+          self._mmap_open()
+        except FileNotFoundError:
+          # no file, empty array
+          return array(self.typecode)
+    mm = self._mmap
+    ary = array(self.typecode)
+    mv = memoryview(mm)
+    ary.frombytes(mv[self._mmap_offset:])
+    mv = None  # prom,pot release of reference
+    header = self.header
     if header.bigendian != NATIVE_BIGENDIANNESS[header.typecode]:
       ary.byteswap()
-    return header, ary
+    self._mmap_close()
+    return ary
+
+  def _mmap_open(self):
+    ''' Open a `mmap` of the data file.
+        This requires the data to not already be loaded into memory as `self._array`.
+    '''
+    assert self._array is None
+    assert self._mmap_fd is None
+    assert self._mmap_data_offset is None
+    with Pfx("_mmap_open: fspath %r", self.fspath):
+      self._mmap_fd = pfx_call(os.open, self.fspath, os.O_RDWR)
+      flen = os.fstat(self._mmap_fd).st_size
+      self._mmap = pfx_call(
+          mmap, self._mmap_fd, flen, MAP_PRIVATE, PROT_READ | PROT_WRITE
+      )
+      bfr = CornuCopyBuffer([self._mmap])
+      header = self.header = TimeSeriesFileHeader.parse(bfr)
+      self._mmap_offset = bfr.offset
+      assert self._mmap_offset == header.HEADER_LENGTH
+      self._mmap_datum_struct = header.datum_type.struct
+
+  def _mmap_close(self):
+    ''' Close the open `mmap` of the data file.
+    '''
+    assert self._mmap is not None
+    assert self._mmap_fd is not None
+    assert self._mmap_offset is not None
+    assert self._mmap_datum_struct is not None
+    self._mmap.close()
+    self._mmap = None
+    os.close(self._mmap_fd)
+    self._mmap_fd = None
+    self._mmap_offset = None
+    self._mmap_datum_struct = None
+
+  def _mmap_peek_offset(self, offset: int):
+    ''' Fetch a datum from the open `mmap` of the data file.
+    '''
+    assert offset >= 0
+    # run as a loop to always recompute the mm* variables
+    while True:
+      mm = self._mmap
+      assert mm is not None
+      mm_size = self._mmap_datum_struct.size
+      mm_offset = self._mmap_offset + offset * mm_size
+      mm_end_offset = mm_offset + mm_size
+      if mm_end_offset > len(mm):
+        # not within the current mmap
+        flen = os.fstat(self._mmap_fd).st_size
+        if mm_end_offset > flen:
+          # file too short, return the fill value
+          return self.fill
+        # file has grown, reopen it
+        self._mmap_close()
+        self._mmap_open()
+        flen = os.fstat(self._mmap_fd).st_size
+        assert flen >= mm_end_offset
+        # retry with the larger mapping
+        continue
+      # unpack the datum from the mmap
+      datum, = self._mmap_datum_struct.unpack_from(mm, mm_offset)
+      return datum
+
+  def _mmap_poke_offset(self, offset: int, value):
+    ''' Write the datum `value` to the open `mmap` of the data file.
+    '''
+    assert offset >= 0
+    # run as a loop to always recompute the mm* variables
+    while True:
+      mm = self._mmap
+      assert mm is not None
+      mm_struct = self._mmap_datum_struct
+      mm_size = mm_struct.size
+      mm_offset = self._mmap_offset + offset * mm_size
+      mm_end_offset = mm_offset + mm_size
+      value_bs = mm_struct.pack(value)
+      assert len(value_bs) == mm_size
+      if mm_end_offset <= len(mm):
+        # within the current mmap, save and return
+        mm[mm_offset:mm_end_offset] = value_bs
+        return
+      # not within the current mmap
+      flen = os.fstat(self._mmap_fd).st_size
+      if mm_end_offset <= flen:
+        # file has grown to sufficient size
+        self._mm_close()
+        self._mm_open()
+        # retry with the larger mapping
+        continue
+      # file too short, pad the file and append the value
+      # TODO: overpad to mmap.ALLOCATIONGRANULARITY ?
+      self._mmap_close()
+      with open(self.fspath, 'r+b') as f:
+        flen = f.seek(0, os.SEEK_END)
+        if flen < mm_offset:
+          pad_len = mm_offset - flen
+          datum_len = self.header.datum_type.length
+          assert pad_len % datum_len == 0
+          pad_count = pad_len // datum_len
+          assert pad_count > 0
+          pad_data = self.header.datum_type.pack(self.fill) * pad_count
+          f.write(pad_data)
+          f.write(value_bs)
+      return
 
   def flush(self, keep_array=False):
     ''' Save the data file if `self.modified`.
