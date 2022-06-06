@@ -7,7 +7,7 @@
 ''' A few ad hoc numeric alogrithms: `factors` and `primes`.
 '''
 
-__version__ = '20220606'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
