@@ -29,8 +29,6 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-from cs.x import X
-
 __version__ = '20220311-post'
 
 DISTINFO = {
