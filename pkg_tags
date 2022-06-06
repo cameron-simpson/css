@@ -30,7 +30,7 @@ cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="
 cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
 cs.deco pypi.release="20220327" ok_revision="32bec58fa13ecf43043978d574e76a589e266220"
 cs.distinfo
-cs.ebooks ok_revision="2a594210040834141fff0f9a431c13dd49356eb0"
+cs.ebooks ok_revision="2a594210040834141fff0f9a431c13dd49356eb0" pypi.release="20220606"
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
@@ -99,5 +99,7 @@ cs.wol pypi.release=20171228
 cs.x pypi.release="20211208" ok_revision="0e559c85f5a23d1a9e643f71e202a1f5f7ee134c"
 cs.xml ok_revision=eff5f66345a4bd34fc5b4d005500c99a3b9ec506 pypi.release="20220606"
 icontract
+mobi
+os.path
 sqlalchemy
 typeguard
