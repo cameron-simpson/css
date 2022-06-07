@@ -217,6 +217,9 @@ NATIVE_BIGENDIANNESS = {
 }
 
 def _dt64(times):
+  ''' Return a Numpy array of `datetime64` values
+      computes from an iterable of `int`/`float` UNIX timestamp values.
+  '''
   return np.array(list(map(int, times))).astype('datetime64[s]')
 
 class TimeSeriesBaseCommand(BaseCommand, ABC):
@@ -846,15 +849,15 @@ class TimeStepsMixin:
 
             values = ts[start:stop]
     '''
-    # this would be a range but they only work in integers
+    # this would be a Python range but they only work in integers
     return (
         self.start + self.step * offset_step
         for offset_step in self.offset_range(start, stop)
     )
 
 class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
-  ''' The basis of time references with a starting UNIX time, the
-      `epoch` and the `step` defining the width of a time slot.
+  ''' The basis of time references with a starting UNIX time `start`
+      and the `step` defining the width of a time slot.
   '''
 
   def __new__(cls, *a, **kw):
