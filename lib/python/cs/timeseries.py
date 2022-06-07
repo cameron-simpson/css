@@ -143,46 +143,62 @@ pfx_listdir = partial(pfx_call, os.listdir)
 pfx_mkdir = partial(pfx_call, os.mkdir)
 pfx_open = partial(pfx_call, open)
 
-# initial support is singled 64 bit integers and double floats
-SUPPORTED_TYPECODES = {
-    'q': int,
-    'd': float,
-}
-assert all(typecode in typecodes for typecode in SUPPORTED_TYPECODES)
-TYPECODE_FOR = {type_: code for code, type_ in SUPPORTED_TYPECODES.items()}
-assert len(SUPPORTED_TYPECODES) == len(TYPECODE_FOR)
-
-def typecode_of(type_) -> str:
-  ''' Return the `array` typecode for the type `type_`.
-      This supports the types in `SUPPORTED_TYPECODES`: `int` and `float`.
+class TypeCode(str):
+  ''' A valid `array` typecode with convenience methods.
   '''
-  try:
-    return TYPECODE_FOR[type_]
-  except KeyError as e:
-    raise TypeError(
-        "unsupported type %s, SUPPORTED_TYPED=%r" %
-        (type_, SUPPORTED_TYPECODES)
-    ) from e
 
-def type_of(typecode: str) -> type:
-  ''' Return the type associated with `array` `typecode`.
-      This supports the types in `SUPPORTED_TYPECODES`: `int` and `float`.
-  '''
-  try:
-    return SUPPORTED_TYPECODES[typecode]
-  except KeyError as e:
-    raise ValueError(
-        "unsupported typecode %r, SUPPORTED_TYPED=%r" %
-        (typecode, SUPPORTED_TYPECODES)
-    ) from e
+  TYPES = ('q', int), ('d', float)
+  BY_CODE = {code: type_ for code, type_ in TYPES}  # pylint: disable=unnecessary-comprehension
+  BY_TYPE = {type_: code for code, type_ in TYPES}
+
+  def __new__(cls, t):
+    if isinstance(t, str):
+      if t not in cls.BY_CODE:
+        raise ValueError(
+            "invalid typecode %r, I know %r" % (t, sorted(cls.BY_CODE.keys()))
+        )
+    elif isinstance(t, type):
+      try:
+        t = cls.BY_TYPE[t]
+      except KeyError:
+        # pylint: disable=raise-missing-from
+        raise ValueError(
+            "invalid type %r, I know %r" % (t, sorted(cls.BY_TYPE.keys()))
+        )
+    else:
+      raise TypeError("unsupported type for %s, should be str or type" % r(t))
+    return super().__new__(cls, t)
+
+  @classmethod
+  def promote(cls, t):
+    ''' Promote `t` to a `TypeCode`.
+    '''
+    if not isinstance(t, cls):
+      if isinstance(t, (str, type)):
+        t = cls(t)
+      else:
+        raise TypeError(
+            "cannot promote %s to %s, expect str or type" % (r(t), cls)
+        )
+    return t
+
+  @property
+  def type(self):
+    ''' The Python type for this `TypeCode`.
+    '''
+    return self.BY_CODE[self]
+
+  def struct_format(self, bigendian):
+    ''' Return a `struct` format string for the supplied big endianness.
+    '''
+    return ('>' if bigendian else '<') + self
 
 @typechecked
-@require(lambda typecode: typecode in SUPPORTED_TYPECODES)
 def deduce_type_bigendianness(typecode: str) -> bool:
   ''' Deduce the native endianness for `typecode`,
       an array/struct typecode character.
   '''
-  test_value = SUPPORTED_TYPECODES[typecode](1)
+  test_value = TypeCode(typecode).type(1)
   bs_a = array(typecode, (test_value,)).tobytes()
   bs_s_be = pack('>' + typecode, test_value)
   bs_s_le = pack('<' + typecode, test_value)
@@ -197,7 +213,7 @@ def deduce_type_bigendianness(typecode: str) -> bool:
 
 NATIVE_BIGENDIANNESS = {
     typecode: deduce_type_bigendianness(typecode)
-    for typecode in SUPPORTED_TYPECODES
+    for typecode in TypeCode.BY_CODE.keys()
 }
 
 def _dt64(times):
@@ -709,12 +725,6 @@ def get_default_timezone_name():
   '''
   return arrow.now('local').format('ZZZ')
 
-@require(lambda typecode: typecode in SUPPORTED_TYPECODES)
-def struct_format(typecode, bigendian):
-  ''' Return a `struct` format string for the supplied `typecode` and big endianness.
-  '''
-  return ('>' if bigendian else '<') + typecode
-
 @contextmanager
 def array_byteswapped(ary):
   ''' Context manager to byteswap the `array.array` `ary` temporarily.
@@ -875,9 +885,8 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
   @property
   def typecode(self):
     ''' The `array` typecode for the times from this `Epoch`.
-        This returns `typecode_of(type(self.start))`.
     '''
-    return typecode_of(type(self.start))
+    return TypeCode(type(self.start))
 
   @classmethod
   def promote(cls, epochy):
@@ -1153,22 +1162,8 @@ class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
           "invalid endian marker, expected '>' or '<', got %r" %
           (struct_endian_marker,)
       )
-    typecode = chr(typecode_b)
-    if typecode not in SUPPORTED_TYPECODES:
-      raise ValueError(
-          "unsupported typecode, expected one of %r, got %r" % (
-              SUPPORTED_TYPECODES,
-              typecode,
-          )
-      )
-    time_typecode = chr(time_typecode_b)
-    if time_typecode not in SUPPORTED_TYPECODES:
-      raise ValueError(
-          "unsupported time_typecode, expected one of %r, got %r" % (
-              SUPPORTED_TYPECODES,
-              time_typecode,
-          )
-      )
+    typecode = TypeCode(chr(typecode_b))
+    time_typecode = TypeCode(chr(time_typecode_b))
     if pad != ord('_'):
       warning(
           "ignoring unexpected header pad, expected %r, got %r" % (b'_', pad)
@@ -1614,7 +1609,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     fstags = self.fstags[fspath]
     fstags['start'] = self.epoch.start
     fstags['step'] = self.epoch.step
-    fstags['datatype'] = SUPPORTED_TYPECODES[self.typecode].__name__
+    fstags['datatype'] = self.typecode.type.__name__
     fstags['timetype'] = type(self.epoch.start).__name__
 
   @ensure(lambda result: result >= 0)
@@ -2570,14 +2565,9 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     if fstags is None:
       fstags = FSTags()
     if typecode is None:
-      typecode = self.tags.typecode
-      if typecode is None:
-        raise ValueError("no typecode and no FSTags 'typecode' tag")
-    if typecode not in SUPPORTED_TYPECODES:
-      raise ValueError(
-          "typecode=%s not in SUPPORTED_TYPECODES:%r" %
-          (s(typecode), sorted(SUPPORTED_TYPECODES.keys()))
-      )
+      typecode = TypeCode(self.tags.typecode)
+    else:
+      typecode = TypeCode.promote(typecode)
     policy = TimespanPolicy.promote(policy, epoch=epoch)
     assert isinstance(policy, ArrowBasedTimespanPolicy)
     TimeSeries.__init__(self, policy.epoch, typecode)
