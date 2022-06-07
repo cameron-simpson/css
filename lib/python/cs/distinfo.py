@@ -50,6 +50,7 @@ from cs.lex import (
     is_identifier,
 )
 from cs.logutils import error, warning, info, status, trace
+from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
 import cs.psutils
 from cs.py.doc import module_doc
@@ -768,7 +769,7 @@ def ask(message, fin=None, fout=None):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output file object of a command.
   '''
-  P = cs.psutils.pipefrom(argv, trace=False, **kw)
+  P = cs.psutils.pipefrom(argv, **kw)
   yield P.stdout
   if P.wait() != 0:
     pipecmd = ' '.join(argv)
@@ -997,9 +998,10 @@ class Module:
       release_version = tags.get('pypi.release')
       if release_version is None:
         raise ValueError("no pypi.release")
+    release_version = intif(float(release_version))
     release_set = set()
     for version, feature_set in sorted(self.release_feature_set()):
-      if version > release_version:
+      if intif(float(version)) > release_version:
         break
       release_set = feature_set
     return release_set

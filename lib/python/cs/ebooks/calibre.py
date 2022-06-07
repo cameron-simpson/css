@@ -49,9 +49,11 @@ from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import cutprefix
 from cs.logutils import warning, error
+from cs.numeric import intif
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
+from cs.psutils import run
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
@@ -60,8 +62,6 @@ from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
-
-from . import intif, run
 
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.

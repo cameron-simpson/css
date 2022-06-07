@@ -22,7 +22,7 @@ from cs.logutils import warning
 from cs.mappings import named_column_tuples
 from cs.pfx import Pfx
 
-__version__ = '20201228-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'description':

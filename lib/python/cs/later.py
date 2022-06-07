@@ -51,7 +51,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import bg as bg_thread, State as ThreadState
 
-__version__ = '20201021-post'
+__version__ = '20220605-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -60,6 +60,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.context',
         'cs.deco',
         'cs.excutils',
         'cs.logutils',

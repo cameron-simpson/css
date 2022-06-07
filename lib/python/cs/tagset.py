@@ -230,7 +230,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20220430-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python3"],

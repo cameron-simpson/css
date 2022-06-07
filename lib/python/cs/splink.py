@@ -3,6 +3,8 @@
 ''' Assorted utility functions for working with data
     downloaded from Selectronics' SP-LINK programme
     which communicates with their controllers.
+
+    I use this to gather and plot data from my solar inverter.
 '''
 
 from collections import defaultdict, namedtuple
@@ -55,6 +57,8 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
+__version__ = '20220606-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -62,8 +66,22 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.timeseries',
         'arrow',
+        'cs.context',
+        'cs.csvutils',
+        'cs.deco',
+        'cs.fs',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.progress',
+        'cs.psutils',
+        'cs.resources',
+        'cs.sqltags',
+        'cs.tagset',
+        'cs.timeseries',
+        'cs.upd',
         'matplotlib',
         'typeguard',
     ],
@@ -627,7 +645,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           f"no fetch source: no ${self.DEFAULT_FETCH_SOURCE_ENVVAR} and no -F option"
       )
     spd = options.spd
-    rsopts = ['-ia']
+    rsopts = ['-iaO']
     rsargv = ['set-x', 'rsync']
     rsargv.extend(rsopts)
     if expunge:

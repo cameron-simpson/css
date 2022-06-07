@@ -8,7 +8,6 @@ from getopt import GetoptError
 from glob import glob
 from os.path import join as joinpath
 from pprint import pprint
-from subprocess import run
 import sys
 
 from sqlalchemy import (
@@ -27,6 +26,7 @@ from cs.deco import strable
 from cs.fs import FSPathBasedSingleton
 from cs.logutils import warning
 from cs.pfx import pfx_call, pfx_method
+from cs.psutils import run
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import ORM, BasicTableMixin
 from cs.threads import locked_property
