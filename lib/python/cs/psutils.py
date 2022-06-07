@@ -197,7 +197,7 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
-def run(argv, doit=True, logger=None, quiet=False, **subp_options):
+def run(argv, doit=True, logger=None, quiet=True, **subp_options):
   ''' Run a command via `subprocess.run`.
       Return the `CompletedProcess` result or `None` if `doit` is false.
 
@@ -208,7 +208,7 @@ def run(argv, doit=True, logger=None, quiet=False, **subp_options):
       * `logger`: optional logger, default `None`;
         if `True`, use `logging.getLogger()`;
         if not `None` or `False` trace using `print_argv`
-      * `quiet`: default `False`; if true, do not print the command or its output
+      * `quiet`: default `True`; if false, print the command and its output
       * `subp_options`: optional mapping of keyword arguments
         to pass to `subprocess.run`
   '''
