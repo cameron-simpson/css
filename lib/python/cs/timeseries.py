@@ -76,7 +76,7 @@ from arrow import Arrow
 from icontract import ensure, require, DBC
 from matplotlib.figure import Figure
 import numpy as np
-from numpy import datetime64
+from numpy import datetime64, timedelta64
 from typeguard import typechecked
 
 from cs.binary import BinarySingleStruct, SimpleBinary
@@ -216,11 +216,19 @@ NATIVE_BIGENDIANNESS = {
     for typecode in TypeCode.BY_CODE.keys()
 }
 
-def _dt64(times):
+DT64_0 = datetime64(0,'s')
+TD_1S = np.timedelta64(1,'s')
+
+def as_datetime64s(times):
   ''' Return a Numpy array of `datetime64` values
-      computes from an iterable of `int`/`float` UNIX timestamp values.
+      computed from an iterable of `int`/`float` UNIX timestamp values.
   '''
   return np.array(list(map(int, times))).astype('datetime64[s]')
+
+def datetime64_as_timestamp(dt64:datetime64):
+  ''' Return the UNIX timestamp for the `datetime64` value `dt64`.
+  '''
+  return dt64 / TD_1S
 
 class TimeSeriesBaseCommand(BaseCommand, ABC):
   ''' Abstract base class for command line interfaces to `TimeSeries` data files.
@@ -1055,7 +1063,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
     times, data = self.data2(start, stop)
-    return pd.Series(data, _dt64(times), self.np_type)
+    return pd.Series(data, as_datetime64s(times), self.np_type)
 
   @plotrange
   def plot(
@@ -1080,7 +1088,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     if label is None:
       label = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
     xdata, yaxis = self.data2(start, stop)
-    xaxis = _dt64(xdata)
+    xaxis = as_datetime64s(xdata)
     assert len(xaxis) == len(yaxis), (
         "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
         (len(xaxis), len(yaxis), start, stop)
@@ -2274,7 +2282,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       keys = self.keys()
     elif not isinstance(keys, (tuple, list)):
       keys = tuple(keys)
-    indices = _dt64(self.range(start, stop))
+    indices = as_datetime64s(self.range(start, stop))
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
       for key in progressbar(keys, "gather fields"):
