@@ -1214,21 +1214,52 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       The instance can be indexed by UNIX time stamp for time based access
       or its `.array` property can be accessed for the raw data.
 
-      Read only users can just instantiate an instance.
-      Read/write users should use the instance as a context manager,
-      which will automatically rewrite the file with the array data
-      on exit.
-
-      Note that the save-on-close is done with `TimeSeries.flush()`
-      which ony saves if `self.modified`.
-      Use of the `__setitem__` or `pad_to` methods set this flag automatically.
-      Direct access via the `.array` will not set it,
-      so users working that way for performance should update the flag themselves.
-
       The data file itself has a header indicating the file data big endianness,
       the datum type and the time type (both `array.array` type codes).
       Following these are the start and step sizes in the time type format.
       This is automatically honoured on load and save.
+
+      A new file will use the native endianness, but files of other
+      endianness are correctly handled, making a `TimeSeriesFile`
+      portable between architectures.
+
+      Read only users can just instantiate an instance and access
+      its `.array` property, or use the `peek` and `peek_offset` methods.
+
+      Read/write users should use the instance as a context manager,
+      which will automatically update the file with the array data
+      on exit:
+
+          with TimeSeriesFile(fspath) as ts:
+              ... work with ts here ...
+
+      Note that the save-on-close is done with `TimeSeries.flush()`
+      which only saves if `self.modified`.
+      Use of the `__setitem__` or `pad_to` methods set this flag automatically.
+      Direct access via the `.array` will not set it,
+      so users working that way for performance should update the flag themselves.
+
+      A `TimeSeriesFile` has two underlying modes of operation:
+      in-memory `array.array` mode and direct-to-file `mmap` mode.
+
+      The in-memory mode reads the whole file into an `array.array` instance,
+      and all updates then modify the in-memory `array`.
+      The file is save when the context manager exits or when `.save()` is called.
+      This maximises efficiency when many accesses are done.
+
+      The `mmap` mode maps the file into memory, and accesses work
+      directly against the file contents.
+      This is more efficient for just a few accesses,
+      but every "write" access (setting a datum) will make the mmaped page dirty,
+      causing the OS to queue it for disc.
+      This mode is recommended for small accesses
+      such as updating a single datum, eg from polling a data source.
+
+      Presently the mode used is triggered by the access method.
+      Using the `peek` and `poke` methods uses `mmap` by default.
+      Other accesses including any access to the `.array` property
+      use the in-memory mode, which is this the default on most cases.
+      Poll/update operations should usually choose to use `peek`/`poke`.
   '''
 
   DOTEXT = '.csts'
