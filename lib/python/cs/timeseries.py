@@ -42,6 +42,7 @@ from getopt import GetoptError
 from math import nan  # pylint: disable=no-name-in-module
 from mmap import (
     mmap,
+    ALLOCATIONGRANULARITY,
     MAP_PRIVATE,
     PROT_READ,
     PROT_WRITE,
@@ -1566,7 +1567,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         # retry with the larger mapping
         continue
       # file too short, pad the file and append the value
-      # TODO: overpad to mmap.ALLOCATIONGRANULARITY ?
       self._mmap_close()
       with open(self.fspath, 'r+b') as f:
         flen = f.seek(0, os.SEEK_END)
@@ -1580,6 +1580,22 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           f.write(pad_data)
           assert f.tell() == mm_offset
         f.write(value_bs)
+        flen = f.tell()
+        assert flen == mm_end_offset
+        partial_alloc = flen % ALLOCATIONGRANULARITY
+        if partial_alloc > 0:
+          # pad to the end of ALLOCATIONGRANULARITY
+          pad_len = ALLOCATIONGRANULARITY - partial_alloc
+          pad_count = pad_len // datum_len
+          if pad_count < 1:
+            warning(
+                "file length=%d, ALLOCATIONGRANULARITY=%d:"
+                " pad_len:%d < datum_len:%d, would overpad - not padding",
+                flen, ALLOCATIONGRANULARITY, pad_len, datum_len
+            )
+          else:
+            pad_data = self.header.datum_type.pack(self.fill) * pad_count
+            f.write(pad_data)
       return
 
   def flush(self, keep_array=False):
