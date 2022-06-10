@@ -76,7 +76,7 @@ from arrow import Arrow
 from icontract import ensure, require, DBC
 from matplotlib.figure import Figure
 import numpy as np
-from numpy import datetime64, timedelta64
+from numpy import datetime64, timedelta64, int64
 from typeguard import typechecked
 
 from cs.binary import BinarySingleStruct, SimpleBinary
@@ -90,6 +90,7 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning
+from cs.mappings import column_name_to_identifier
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
@@ -150,6 +151,7 @@ class TypeCode(str):
   TYPES = ('q', int), ('d', float)
   BY_CODE = {code: type_ for code, type_ in TYPES}  # pylint: disable=unnecessary-comprehension
   BY_TYPE = {type_: code for code, type_ in TYPES}
+  assert all(map(lambda typecode: typecode in typecodes, BY_CODE.keys()))
 
   def __new__(cls, t):
     if isinstance(t, str):
