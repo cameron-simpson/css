@@ -2649,6 +2649,14 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     return self.fstags[self.fspath]
 
+  def update_tag(self, tag_name, new_tag_value):
+    ''' Update tag with new value.
+    '''
+    tag_value = self.tags.get(tag_name)
+    if tag_value != new_tag_value:
+      print("%s + %s=%r", self, tag_name, new_tag_value)
+      self.tags[tag_name] = tag_value
+
   @typechecked
   def subseries(self, spec: Union[str, Numeric]):
     ''' Return the `TimeSeries` for `spec`,
