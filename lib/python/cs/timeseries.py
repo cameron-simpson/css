@@ -1244,21 +1244,21 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
       The in-memory mode reads the whole file into an `array.array` instance,
       and all updates then modify the in-memory `array`.
-      The file is save when the context manager exits or when `.save()` is called.
+      The file is saved when the context manager exits or when `.save()` is called.
       This maximises efficiency when many accesses are done.
 
       The `mmap` mode maps the file into memory, and accesses work
       directly against the file contents.
       This is more efficient for just a few accesses,
-      but every "write" access (setting a datum) will make the mmaped page dirty,
+      but every "write" access (setting a datum) will make the mmapped page dirty,
       causing the OS to queue it for disc.
       This mode is recommended for small accesses
       such as updating a single datum, eg from polling a data source.
 
       Presently the mode used is triggered by the access method.
       Using the `peek` and `poke` methods uses `mmap` by default.
-      Other accesses including any access to the `.array` property
-      use the in-memory mode, which is this the default on most cases.
+      Other accesses default to the use the in-memory mode.
+      Access to the `.array` property forces use of the `array` mode.
       Poll/update operations should usually choose to use `peek`/`poke`.
   '''
 
