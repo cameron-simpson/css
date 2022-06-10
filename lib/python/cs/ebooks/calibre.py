@@ -217,6 +217,22 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         '''
         return [tag.name for tag in db_row.tags]
 
+      # TODO: should really edit the db directly
+      @tags.setter
+      def tags(self, new_tags):
+        ''' Update the tags.
+        '''
+        self.tree.calibredb(
+            'set_metadata',
+            '--field',
+            f'tags:{",".join(new_tags)}',
+            str(self.dbid),
+        )
+        try:
+          del self._RelProxy__fields['tags']
+        except KeyError:
+          pass
+
       def formatpath(self, fmtk):
         ''' Return the filesystem path of the format file for `fmtk`
             or `None` if the format is not present.
@@ -428,7 +444,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
               )
             return
         # pylint: disable=expression-not-assigned
-        quiet or print(self, '+', fmtk, '<=', shortpath(ofmtpath))
+        quiet or print(
+            self, self.formats, '+', fmtk, '<=', shortpath(ofmtpath)
+        )
         self.add_format(ofmtpath, doit=doit, force=force, quiet=quiet)
 
     self.CalibreBook = CalibreBook
@@ -1404,9 +1422,10 @@ class CalibreCommand(BaseCommand):
                   if dbid is None:
                     error("calibre add failed")
                     xit = 1
-                  cbook = calibre[dbid]
-                  # pylint: disable=expression-not-assigned
-                  quiet or print('new', cbook, '<=', obook)
+                  else:
+                    cbook = calibre[dbid]
+                    # pylint: disable=expression-not-assigned
+                    quiet or print('new', cbook, '<=', obook)
                 elif len(cbooks) > 1:
                   # pylint: disable=expression-not-assigned
                   verbose or warning(
@@ -1448,6 +1467,45 @@ class CalibreCommand(BaseCommand):
             options=options,
         )
     )
+
+  def cmd_tag(self, argv):
+    ''' Usage: {cmd} [-n] [--] [-]tag[,tag...] book_specs...
+    '''
+    options = self.options
+    if argv and argv[0] == '-n':
+      argv.pop(0)
+      options.doit = False
+    calibre = options.calibre
+    doit = options.doit
+    upd = options.upd
+    tags = self.poparg(argv, "tags")
+    add_mode = True
+    if tags.startswith('-'):
+      add_mode = False
+      tags = tags[1:]
+    tag_names = sorted(map(str.lower, filter(None, tags.split(','))))
+    if not tag_names:
+      raise GetoptError("no tags specified")
+    if not argv:
+      raise GetoptError("missing book_specs")
+    cbooks = self.popbooks(argv)
+    with upd.insert(1) as proxy:
+      for cbook in cbooks:
+        proxy.text = f'{cbook} {cbook.tags}'
+        tags = set(cbook.tags)
+        new_tags = set(cbook.tags)
+        for tag_name in tag_names:
+          if add_mode:
+            new_tags.add(tag_name)
+          else:
+            new_tags.discard(tag_name)
+        if new_tags != tags:
+          if add_mode:
+            print(cbook, '+', sorted(new_tags - tags))
+          else:
+            print(cbook, '-', sorted(tags - new_tags))
+          if doit:
+            cbook.tags = new_tags
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
