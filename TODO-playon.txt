@@ -1,1 +1,2 @@
+honour SIGINT during dl and during refresh, run_task during refresh
 playon not autorefreshing
