@@ -76,7 +76,7 @@ from arrow import Arrow
 from icontract import ensure, require, DBC
 from matplotlib.figure import Figure
 import numpy as np
-from numpy import datetime64, timedelta64, int64
+from numpy import datetime64, timedelta64
 from typeguard import typechecked
 
 from cs.binary import BinarySingleStruct, SimpleBinary
@@ -2211,6 +2211,14 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         getattr(self, 'policy', 'POLICY_UNDEFINED'),
     )
 
+  @abstractmethod
+  def shortname(self):
+    ''' Return a short identifying name for this `TimeSeriesMapping`.
+        For example, `TimeSeriesDataDir` returns `self.shortpath`
+        for this function.
+    '''
+    raise NotImplementedError
+
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
         about this `TimeSeriesMapping`, handy for use with `pformat()` or `pprint()`.
@@ -2232,6 +2240,13 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       for key, ts in list(self.items()):
         ts.close()
         del self[key]
+
+  @abstractmethod
+  def make_ts(self, key):
+    ''' Return the `TimeSeries` for `key`,
+        creating it if necessary.
+    '''
+    raise NotImplementedError
 
   @staticmethod
   def validate_key(key):
@@ -2408,7 +2423,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         for former_name, new_name in renamed.items()
     }
     with Upd().insert(1) as proxy:
-      proxy.prefix = f'update {self.shortpath}: '
+      proxy.prefix = f'update {self.shortname()}: '
       for column_name in df.columns:
         with Pfx(column_name):
           proxy.text = column_name
@@ -2509,6 +2524,11 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     )
 
   __repr__ = __str__
+
+  def shortname(self):
+    ''' Return `self.shortpath`.
+    '''
+    return self.shortpath
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
