@@ -1498,7 +1498,7 @@ class CalibreCommand(BaseCommand):
           if add_mode:
             new_tags.add(tag_name)
           else:
-            new_tags.remove(tag_name)
+            new_tags.discard(tag_name)
         if new_tags != tags:
           if add_mode:
             print(cbook, '+', sorted(new_tags - tags))
