@@ -2337,6 +2337,77 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       raise CancellationError
     return df.plot(**plot_kw)
 
+  @pfx_method
+  def read_csv(self, csvpath, column_name_map=None, **pd_read_csv_kw):
+    ''' Shim for `pandas.read_csv` to read a CSV file and save the contents
+        in this `TimeSeriesMapping`.
+        Return the `DataFrame` used for the import.
+
+        Parameters:
+        * `csvpath`: the filesystem path of the CSV file to read,
+          passed to `pandas.read_csv`
+        * `column_name_map`: an optional rename mapping for column names
+          as detailed below
+        * `pd_read_csv_kw`: other keyword arguments are passed to
+          `pandas.read_csv`
+
+        The `column_name_map` may have the following values:
+        * `None`: the default, which renames columns which uses the
+          `column_name_to_identifier` function from `cs.mappings` to
+          create indentifiers from column names
+        * `id`: the builtin `id` function, which leaves column names unchanged
+        * a `bool`: use the `column_name_to_identifier` with
+          its `snake_case` parameter set to `column_name_map`
+        * a `callable`: compute the renamed column name from
+          `column_name_map(column_name)`
+        * otherwise assume `column_name_map` is a mapping and compute
+          the renamed column name as
+          `column_name_map.get(column_name,column_name)`
+    '''
+    pd = import_extra('pandas', DISTINFO)
+    df = pfx_call(pd.read_csv, csvpath, **pd_read_csv_kw)
+    # prepare column renames
+    renamed = {}
+    if column_name_map is not id:
+      if column_name_map is None:
+        column_name_map = column_name_to_identifier
+      elif column_name_map is id:
+        column_name_map = None
+      elif isinstance(column_name_map, bool):
+        column_name_map = partial(
+            column_name_to_identifier, snake_case=column_name_map
+        )
+      elif callable(column_name_map):
+        pass
+      else:
+        # a mapping
+        column_name_map = lambda column_name: column_name_map.get(
+            column_name, column_name
+        )
+      for column_name in df.columns:
+        new_column_name = column_name_map(column_name)
+        if new_column_name != column_name:
+          renamed[column_name] = new_column_name
+    if renamed:
+      df.rename(columns=renamed, inplace=True, errors='raise')
+    former_names = {
+        new_name: former_name
+        for former_name, new_name in renamed.items()
+    }
+    with Upd().insert(1) as proxy:
+      proxy.prefix = f'update {self.shortpath}: '
+      for column_name in df.columns:
+        with Pfx(column_name):
+          proxy.text = column_name
+          series = df[column_name]
+          ts = self.make_ts(column_name)
+          proxy.prefix = f'update {ts.shortpath}: '
+          ts.setitems(series.index, series.values)
+          former_name = former_names.get(column_name)
+          if former_name:
+            ts.update_tag('csv.header', former_name)
+    return df, renamed
+
 # pylint: disable=too-many-ancestors
 class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
                         HasEpochMixin):
