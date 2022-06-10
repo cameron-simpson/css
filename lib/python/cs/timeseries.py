@@ -1578,7 +1578,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           assert pad_count > 0
           pad_data = self.header.datum_type.pack(self.fill) * pad_count
           f.write(pad_data)
-          f.write(value_bs)
+          assert f.tell() == mm_offset
+        f.write(value_bs)
       return
 
   def flush(self, keep_array=False):
