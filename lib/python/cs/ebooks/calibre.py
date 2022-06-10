@@ -424,8 +424,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           fmtpath = self.formatpath(fmtk)
           if fmtpath is None and fmtk.startswith('AZW'):
             fmtpath = (
-                self.formatpath('AZW3') or self.formatpath('AZW')
-                or self.formatpath('MOBI')
+                self.formatpath('AZW4') or self.formatpath('AZW3')
+                or self.formatpath('AZW') or self.formatpath('MOBI')
             )
           if fmtpath is not None and not force:
             if filecmp.cmp(fmtpath, ofmtpath):
@@ -1260,11 +1260,12 @@ class CalibreCommand(BaseCommand):
         for cbook in cbooks:
           if runstate.cancelled:
             break
-          try:
-            pfx_call(cbook.make_cbz)
-          except ValueError as e:
-            warning("cannot make CBZ from %s: %s" % (cbook, e))
-            xit = 1
+          with Pfx(cbook):
+            try:
+              pfx_call(cbook.make_cbz)
+            except ValueError as e:
+              warning("cannot make CBZ from %s: %s" % (cbook, e))
+              xit = 1
     if runstate.cancelled:
       xit = 1
     return xit
