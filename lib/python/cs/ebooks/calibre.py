@@ -1471,7 +1471,9 @@ class CalibreCommand(BaseCommand):
     ''' Usage: {cmd} [-n] [--] [-]tag[,tag...] book_specs...
     '''
     options = self.options
-    self.popopts(argv, options, n='-doit')
+    if argv and argv[0] == '-n':
+      argv.pop(0)
+      options.doit = False
     calibre = options.calibre
     doit = options.doit
     upd = options.upd
