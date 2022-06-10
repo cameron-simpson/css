@@ -1422,9 +1422,10 @@ class CalibreCommand(BaseCommand):
                   if dbid is None:
                     error("calibre add failed")
                     xit = 1
-                  cbook = calibre[dbid]
-                  # pylint: disable=expression-not-assigned
-                  quiet or print('new', cbook, '<=', obook)
+                  else:
+                    cbook = calibre[dbid]
+                    # pylint: disable=expression-not-assigned
+                    quiet or print('new', cbook, '<=', obook)
                 elif len(cbooks) > 1:
                   # pylint: disable=expression-not-assigned
                   verbose or warning(
