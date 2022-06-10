@@ -1590,17 +1590,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       if not keep_array:
         self._array = None
 
-  def save(self, fspath=None):
+  def save(self, fspath=None, truncate=False):
     ''' Save the time series to `fspath`, default `self.fspath`.
-    '''
-    assert self._array is not None, "array not yet loaded, nothing to save"
-    if fspath is None:
-      fspath = self.fspath
-    self.save_to(fspath)
-
-  @typechecked
-  def save_to(self, fspath: str):
-    ''' Save the time series to `fspath`.
 
         *Warning*:
         if the file endianness is not the native endianness,
@@ -1608,10 +1599,36 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         during the file write operation.
         Concurrent users should avoid using the array during this function.
     '''
+    assert self._array is not None, "array not yet loaded, nothing to save"
+    if fspath is None:
+      fspath = self.fspath
+    self.save_to(fspath, truncate=truncate)
+
+  @typechecked
+  def save_to(self, fspath: str, truncate=False):
+    ''' Save the time series to `fspath`.
+
+        *Warning*:
+        if the file endianness is not the native endianness,
+        the array will be byte swapped temporarily
+        during the file write operation.
+        Concurrent users should avoid using the array during this function.
+
+        Note:
+        the default behaviour (`truncate=False`) overwrites the data in place,
+        leaving data beyond the in-memory array untouched.
+        This is more robust against interruptions or errors,
+        or updates by other programmes (beyond the in-memory array).
+        However, if the file is changing endianness or data type
+        (which never happens without deliberate effort)
+        this could leave a mix of data, resulting in nonsense
+        beyond the in-memory array.
+    '''
+    assert self._array is not None, "array not yet loaded, nothing to save"
     ary = self.array
     header = self.header
     native_bigendian = NATIVE_BIGENDIANNESS[ary.typecode]
-    with pfx_open(fspath, 'wb') as tsf:
+    with pfx_open(fspath, 'wb' if truncate else 'r+b') as tsf:
       for bs in header.transcribe_flat():
         tsf.write(bs)
       if header.bigendian != native_bigendian:
@@ -1619,11 +1636,11 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           ary.tofile(tsf)
       else:
         ary.tofile(tsf)
-    fstags = self.fstags[fspath]
-    fstags['start'] = self.epoch.start
-    fstags['step'] = self.epoch.step
-    fstags['datatype'] = self.typecode.type.__name__
-    fstags['timetype'] = type(self.epoch.start).__name__
+    tags = self.fstags[fspath]
+    tags['start'] = self.epoch.start
+    tags['step'] = self.epoch.step
+    tags['datatype'] = self.typecode.type.__name__
+    tags['timetype'] = type(self.epoch.start).__name__
 
   @ensure(lambda result: result >= 0)
   def array_index(self, when) -> int:
