@@ -444,7 +444,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
               )
             return
         # pylint: disable=expression-not-assigned
-        quiet or print(self, '+', fmtk, '<=', shortpath(ofmtpath))
+        quiet or print(
+            self, self.formats, '+', fmtk, '<=', shortpath(ofmtpath)
+        )
         self.add_format(ofmtpath, doit=doit, force=force, quiet=quiet)
 
     self.CalibreBook = CalibreBook
