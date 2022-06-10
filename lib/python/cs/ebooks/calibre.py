@@ -1506,8 +1506,6 @@ class CalibreCommand(BaseCommand):
             print(cbook, '-', sorted(tags - new_tags))
           if doit:
             cbook.tags = new_tags
-          else:
-            time.sleep(0.2)
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
