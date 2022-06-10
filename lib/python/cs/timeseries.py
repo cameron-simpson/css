@@ -1749,10 +1749,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     self.pad_to(when)
-    assert isinstance(value, (int, float, int64)
-                      ), "value should be int, int64 or float, is a %s:%r" % (
-                          type(value), value
-                      )
     self.poke_offset(self.array_index(when), value)
 
   def pad_to(self, when, fill=None):
