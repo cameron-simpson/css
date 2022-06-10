@@ -216,8 +216,8 @@ NATIVE_BIGENDIANNESS = {
     for typecode in TypeCode.BY_CODE.keys()
 }
 
-DT64_0 = datetime64(0,'s')
-TD_1S = np.timedelta64(1,'s')
+DT64_0 = datetime64(0, 's')
+TD_1S = timedelta64(1, 's')
 
 def as_datetime64s(times):
   ''' Return a Numpy array of `datetime64` values
@@ -225,7 +225,7 @@ def as_datetime64s(times):
   '''
   return np.array(list(map(int, times))).astype('datetime64[s]')
 
-def datetime64_as_timestamp(dt64:datetime64):
+def datetime64_as_timestamp(dt64: datetime64):
   ''' Return the UNIX timestamp for the `datetime64` value `dt64`.
   '''
   return dt64 / TD_1S
