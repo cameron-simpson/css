@@ -38,7 +38,7 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import s
 from cs.logutils import warning, error
-from cs.pfx import pfx, pfx_call, Pfx
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
 from cs.resources import MultiOpenMixin
@@ -157,7 +157,8 @@ class SPLinkCSVDir(HasFSPath):
       self, dataset: str, tsd: TimeSeriesDataDir, tzname=None
   ):
     ''' Read the CSV file in `self.fspath` specified by `dataset`
-        and export its contents into the `tsd:TimeSeriesDataDir.
+        and export its contents into the `tsd:TimeSeriesDataDir`.
+        Return exported `DataFrame`.
     '''
     return self.export_csv_to_timeseries(
         self.csvpath(dataset), tsd, tzname=tzname
@@ -168,6 +169,7 @@ class SPLinkCSVDir(HasFSPath):
   ):
     ''' Read the CSV file specified by `cvspath`
         and export its contents into the `tsd:TimeSeriesDataDir.
+        Return exported `DataFrame`.
     '''
     nan = float('nan')
     ts2001 = ts2001_unixtime(tzname)
@@ -180,33 +182,22 @@ class SPLinkCSVDir(HasFSPath):
     if short_csvpath.startswith('../'):
       short_csvpath = shortpath(csvpath)
     with tsd:
-      for row in progressbar(
-          rows,
-          short_csvpath,
-          update_frequency=128,
-          report_print=True,
-      ):
-        for key, value in zip(keys, row):
-          if key == key0:
-            # seconds since 2001-01-01; make UNIX time
-            value = int(value) + ts2001
-          else:
-            try:
-              value = int(value)
-            except ValueError:
-              try:
-                value = float(value)
-              except ValueError:
-                value = nan
-          key_values[key].append(value)
-      with UpdProxy(prefix=f"{short_csvpath}: write per-column values: "
-                    ) as proxy:
-        for key in keys[2:]:
-          proxy.text = key
-          with Pfx(key):
-            ts = tsd.make_ts(key)
-            ts.tags['csv.header'] = rowtype.name_of_[key]
-            ts.setitems(key_values[key0], key_values[key])
+      index_col = 'Date/Time Stamp [Seconds From The Year 2001]'
+      skip_cols = (
+          'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]',
+          'Date/Time Stamp [dd/MM/yyyy]',
+      )
+      ts2001_offset = int(ts2001_unixtime())
+      # dataframe indexed by UNIX timestamp
+      df, _ = tsd.read_csv(
+          csvpath,
+          index_col=index_col,
+          usecols=lambda column_name: column_name not in skip_cols,
+          converters={
+              index_col: lambda seconds_s: ts2001_offset + int(seconds_s),
+          },
+      )
+    return df
 
 # pylint: disable=too-many-ancestors
 class SPLinkDataDir(TimeSeriesDataDir):
@@ -239,8 +230,10 @@ class SPLinkDataDir(TimeSeriesDataDir):
     super().__init__(dirpath, epoch=epoch, policy=policy, **kw)
     self.dataset = dataset
 
+  @pfx_method
   def import_from(self, csv, tzname=None):
     ''' Import the CSV data from `csv` specified by `self.dataset`.
+        Return the imported `DataFrame`.
 
         Parameters:
         * `csv`: an `SPLinkCSVDir` instance or the pathname of a directory
@@ -255,28 +248,27 @@ class SPLinkDataDir(TimeSeriesDataDir):
             )
     '''
     if isinstance(csv, str):
-      with Pfx(csv):
-        if isfilepath(csv):
-          if not csv.endswith('.CSV'):
-            raise ValueError("filename does not end in .CSV")
-          try:
-            dsinfo = SPLinkData.parse_dataset_filename(csv)
-          except ValueError as e:
-            warning("unusual filename: %s", e)
-          else:
-            if dsinfo.dataset != self.dataset:
-              raise ValueError(
-                  "filename dataset:%r does not match self.dataset:%r" %
-                  (dsinfo.dataset, self.dataset)
-              )
-            csvdir = SPLinkCSVDir(dirname(csv))
-            return csvdir.export_csv_to_timeseries(csv, self, tzname=tzname)
-          if isdirpath(csv):
-            csvdir = SPLinkCSVDir(csv)
-            return csvdir.export_to_timeseries(
-                self.dataset, self, tzname=tzname
+      if isfilepath(csv):
+        # an individual SP-Link CSV download
+        if not csv.endswith('.CSV'):
+          raise ValueError("filename does not end in .CSV")
+        try:
+          dsinfo = SPLinkData.parse_dataset_filename(csv)
+        except ValueError as e:
+          warning("unusual filename: %s", e)
+        else:
+          if dsinfo.dataset != self.dataset:
+            raise ValueError(
+                "filename dataset:%r does not match self.dataset:%r" %
+                (dsinfo.dataset, self.dataset)
             )
-          raise ValueError("neither a CSV file nor a directory")
+          csvdir = SPLinkCSVDir(dirname(csv))
+          return csvdir.export_csv_to_timeseries(csv, self, tzname=tzname)
+      if isdirpath(csv):
+        # a directory of SP-Link CSV downloads
+        csvdir = SPLinkCSVDir(csv)
+        return csvdir.export_to_timeseries(self.dataset, self, tzname=tzname)
+      raise ValueError("neither a CSV file nor a directory")
     if isinstance(csv, SPLinkCSVDir):
       return csv.export_to_timeseries(self.dataset, self, tzname=tzname)
     raise TypeError(
@@ -662,6 +654,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     fstags = options.fstags
     runstate = options.runstate
     spd = options.spd
+    upd = options.upd
     options.datasets = self.ALL_DATASETS
     options.once = False
     badopts = False
@@ -687,6 +680,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       raise GetoptError("bad invocation")
     xit = 0
     seen_events = defaultdict(set)
+    upd.cursor_invisible()
     for path in argv:
       if runstate.cancelled:
         break
@@ -718,33 +712,32 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             if dsinfo.dotext != '.CSV':
               continue
             dspath = joinpath(dirpath, filename)
+            rdspath = relpath(dspath, path)
             short_dspath = relpath(dspath, spd.fspath)
             if short_dspath.startswith('../'):
               short_dspath = shortpath(dspath)
-            dataset = dsinfo.dataset
-            with Pfx(dspath):
-              dstags = fstags[dspath]
-              if not force and dstags.imported:
-                print("already imported:", short_dspath)
-                continue
-              if dataset in spd.TIMESERIES_DATASETS:
-                ts = getattr(spd, dataset)
-                if doit:
-                  pfx_call(ts.import_from, dspath)
-                  dstags['imported'] = 1
-                else:
-                  print("import", dspath, "=>", ts)
-              elif dataset in spd.EVENTS_DATASETS:
-                db = spd.eventsdb
-                seen = seen_events[dataset]
-                if doit:
-                  with UpdProxy(prefix=f"{short_dspath}: import ... "
-                                ) as proxy:
-                    proxy.text = 'load ' + short_dspath
-                    with Upd().run_task(
-                        f'{short_dspath}: load ',
-                        report_print=True,
-                    ):
+            with upd.run_task("import %s" % short_dspath):
+              dataset = dsinfo.dataset
+              with Pfx(rdspath):
+                dstags = fstags[dspath]
+                if not force and dstags.imported:
+                  print("already imported:", short_dspath)
+                  continue
+                if dataset in spd.TIMESERIES_DATASETS:
+                  ts = getattr(spd, dataset)
+                  if doit:
+                    df = ts.import_from(dspath)
+                    dstags['imported'] = 1
+                    print(f'{len(df.index)} rows from {rdspath}')
+                  else:
+                    print("import", dspath, "=>", ts)
+                elif dataset in spd.EVENTS_DATASETS:
+                  ##warning("SKIP %s", dataset)
+                  continue
+                  db = spd.eventsdb
+                  seen = seen_events[dataset]
+                  if doit:
+                    with upd.run_task(f'{short_dspath}: read'):
                       when_tags = sorted(
                           SPLinkCSVDir.csv_tagsets(dspath),
                           key=lambda wt: wt[0]
@@ -752,8 +745,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                     with db:
                       if when_tags:
                         if not seen:
-                          proxy.text = 'load events from db ...'
-                          with Upd().run_task(
+                          with upd.run_task(
                               f'{short_dspath}: load events from {db}',
                               report_print=True,
                               tick_delay=0.15,
@@ -762,9 +754,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                                 (ev.unixtime, ev.event_description)
                                 for ev in db.find()
                             )
+                          print(f'{len(seen)} old events from {db}')
                           if runstate.cancelled:
                             break
-                        proxy.text = 'insert new events'
+                        seen_size0 = len(seen)
                         for when, tags in progressbar(
                             when_tags,
                             short_dspath,
@@ -776,17 +769,22 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                             tags['dataset'] = dataset
                             db.default_factory(None, unixtime=when, tags=tags)
                             seen.add(key)
-                  dstags['imported'] = 1
+                        seen_size = len(seen)
+                        if seen_size > seen_size0:
+                          print(
+                              f'{seen_size - seen_size0} new events from {rdspath}'
+                          )
+                    dstags['imported'] = 1
+                  else:
+                    print("import", dspath, "=>", db)
                 else:
-                  print("import", dspath, "=>", db)
-              else:
-                raise RuntimeError(
-                    "do not know how to process dataset,"
-                    " I know: events=%s, timeseries=%s" % (
-                        ",".join(spd.EVENTS_DATASETS),
-                        ",".join(spd.TIMESERIES_DATASETS),
-                    )
-                )
+                  raise RuntimeError(
+                      "do not know how to process dataset,"
+                      " I know: events=%s, timeseries=%s" % (
+                          ",".join(spd.EVENTS_DATASETS),
+                          ",".join(spd.TIMESERIES_DATASETS),
+                      )
+                  )
     if runstate.cancelled:
       xit = xit or 1
     return xit
