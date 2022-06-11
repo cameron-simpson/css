@@ -42,6 +42,7 @@ from getopt import GetoptError
 from math import nan  # pylint: disable=no-name-in-module
 from mmap import (
     mmap,
+    ALLOCATIONGRANULARITY,
     MAP_PRIVATE,
     PROT_READ,
     PROT_WRITE,
@@ -76,7 +77,7 @@ from arrow import Arrow
 from icontract import ensure, require, DBC
 from matplotlib.figure import Figure
 import numpy as np
-from numpy import datetime64
+from numpy import datetime64, timedelta64
 from typeguard import typechecked
 
 from cs.binary import BinarySingleStruct, SimpleBinary
@@ -90,6 +91,7 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning
+from cs.mappings import column_name_to_identifier
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
@@ -158,6 +160,7 @@ class TypeCode(str):
   TYPES = ('q', int), ('d', float)
   BY_CODE = {code: type_ for code, type_ in TYPES}  # pylint: disable=unnecessary-comprehension
   BY_TYPE = {type_: code for code, type_ in TYPES}
+  assert all(map(lambda typecode: typecode in typecodes, BY_CODE.keys()))
 
   def __new__(cls, t):
     if isinstance(t, str):
@@ -224,11 +227,19 @@ NATIVE_BIGENDIANNESS = {
     for typecode in TypeCode.BY_CODE.keys()
 }
 
-def _dt64(times):
+DT64_0 = datetime64(0, 's')
+TD_1S = timedelta64(1, 's')
+
+def as_datetime64s(times):
   ''' Return a Numpy array of `datetime64` values
-      computes from an iterable of `int`/`float` UNIX timestamp values.
+      computed from an iterable of `int`/`float` UNIX timestamp values.
   '''
   return np.array(list(map(int, times))).astype('datetime64[s]')
+
+def datetime64_as_timestamp(dt64: datetime64):
+  ''' Return the UNIX timestamp for the `datetime64` value `dt64`.
+  '''
+  return dt64 / TD_1S
 
 class TimeSeriesBaseCommand(BaseCommand, ABC):
   ''' Abstract base class for command line interfaces to `TimeSeries` data files.
@@ -1063,7 +1074,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
     times, data = self.data2(start, stop)
-    return pd.Series(data, _dt64(times), self.np_type)
+    return pd.Series(data, as_datetime64s(times), self.np_type)
 
   @plotrange
   def plot(
@@ -1088,7 +1099,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     if label is None:
       label = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
     xdata, yaxis = self.data2(start, stop)
-    xaxis = _dt64(xdata)
+    xaxis = as_datetime64s(xdata)
     assert len(xaxis) == len(yaxis), (
         "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
         (len(xaxis), len(yaxis), start, stop)
@@ -1211,21 +1222,52 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       The instance can be indexed by UNIX time stamp for time based access
       or its `.array` property can be accessed for the raw data.
 
-      Read only users can just instantiate an instance.
-      Read/write users should use the instance as a context manager,
-      which will automatically rewrite the file with the array data
-      on exit.
-
-      Note that the save-on-close is done with `TimeSeries.flush()`
-      which ony saves if `self.modified`.
-      Use of the `__setitem__` or `pad_to` methods set this flag automatically.
-      Direct access via the `.array` will not set it,
-      so users working that way for performance should update the flag themselves.
-
       The data file itself has a header indicating the file data big endianness,
       the datum type and the time type (both `array.array` type codes).
       Following these are the start and step sizes in the time type format.
       This is automatically honoured on load and save.
+
+      A new file will use the native endianness, but files of other
+      endianness are correctly handled, making a `TimeSeriesFile`
+      portable between architectures.
+
+      Read only users can just instantiate an instance and access
+      its `.array` property, or use the `peek` and `peek_offset` methods.
+
+      Read/write users should use the instance as a context manager,
+      which will automatically update the file with the array data
+      on exit:
+
+          with TimeSeriesFile(fspath) as ts:
+              ... work with ts here ...
+
+      Note that the save-on-close is done with `TimeSeries.flush()`
+      which only saves if `self.modified`.
+      Use of the `__setitem__` or `pad_to` methods set this flag automatically.
+      Direct access via the `.array` will not set it,
+      so users working that way for performance should update the flag themselves.
+
+      A `TimeSeriesFile` has two underlying modes of operation:
+      in-memory `array.array` mode and direct-to-file `mmap` mode.
+
+      The in-memory mode reads the whole file into an `array.array` instance,
+      and all updates then modify the in-memory `array`.
+      The file is saved when the context manager exits or when `.save()` is called.
+      This maximises efficiency when many accesses are done.
+
+      The `mmap` mode maps the file into memory, and accesses work
+      directly against the file contents.
+      This is more efficient for just a few accesses,
+      but every "write" access (setting a datum) will make the mmapped page dirty,
+      causing the OS to queue it for disc.
+      This mode is recommended for small accesses
+      such as updating a single datum, eg from polling a data source.
+
+      Presently the mode used is triggered by the access method.
+      Using the `peek` and `poke` methods uses `mmap` by default.
+      Other accesses default to the use the in-memory mode.
+      Access to the `.array` property forces use of the `array` mode.
+      Poll/update operations should usually choose to use `peek`/`poke`.
   '''
 
   DOTEXT = '.csts'
@@ -1564,9 +1606,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         # retry with the larger mapping
         continue
       # file too short, pad the file and append the value
-      # TODO: overpad to mmap.ALLOCATIONGRANULARITY ?
       self._mmap_close()
-      with open(self.fspath, 'r+b') as f:
+      with open(self.fspath, 'r+b' if existspath(self.fspath) else 'wb') as f:
         flen = f.seek(0, os.SEEK_END)
         if flen < mm_offset:
           pad_len = mm_offset - flen
@@ -1576,7 +1617,24 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           assert pad_count > 0
           pad_data = self.header.datum_type.pack(self.fill) * pad_count
           f.write(pad_data)
-          f.write(value_bs)
+          assert f.tell() == mm_offset
+        f.write(value_bs)
+        flen = f.tell()
+        assert flen == mm_end_offset
+        partial_alloc = flen % ALLOCATIONGRANULARITY
+        if partial_alloc > 0:
+          # pad to the end of ALLOCATIONGRANULARITY
+          pad_len = ALLOCATIONGRANULARITY - partial_alloc
+          pad_count = pad_len // datum_len
+          if pad_count < 1:
+            warning(
+                "file length=%d, ALLOCATIONGRANULARITY=%d:"
+                " pad_len:%d < datum_len:%d, would overpad - not padding",
+                flen, ALLOCATIONGRANULARITY, pad_len, datum_len
+            )
+          else:
+            pad_data = self.header.datum_type.pack(self.fill) * pad_count
+            f.write(pad_data)
       return
 
   def flush(self, keep_array=False):
@@ -1588,17 +1646,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       if not keep_array:
         self._array = None
 
-  def save(self, fspath=None):
+  def save(self, fspath=None, truncate=False):
     ''' Save the time series to `fspath`, default `self.fspath`.
-    '''
-    assert self._array is not None, "array not yet loaded, nothing to save"
-    if fspath is None:
-      fspath = self.fspath
-    self.save_to(fspath)
-
-  @typechecked
-  def save_to(self, fspath: str):
-    ''' Save the time series to `fspath`.
 
         *Warning*:
         if the file endianness is not the native endianness,
@@ -1606,10 +1655,43 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         during the file write operation.
         Concurrent users should avoid using the array during this function.
     '''
+    assert self._array is not None, "array not yet loaded, nothing to save"
+    if fspath is None:
+      fspath = self.fspath
+    self.save_to(fspath, truncate=truncate)
+
+  @pfx_method
+  @typechecked
+  def save_to(self, fspath: str, truncate=False):
+    ''' Save the time series to `fspath`.
+
+        *Warning*:
+        if the file endianness is not the native endianness,
+        the array will be byte swapped temporarily
+        during the file write operation.
+        Concurrent users should avoid using the array during this function.
+
+        Note:
+        the default behaviour (`truncate=False`) overwrites the data in place,
+        leaving data beyond the in-memory array untouched.
+        This is more robust against interruptions or errors,
+        or updates by other programmes (beyond the in-memory array).
+        However, if the file is changing endianness or data type
+        (which never happens without deliberate effort)
+        this could leave a mix of data, resulting in nonsense
+        beyond the in-memory array.
+    '''
+    assert self._array is not None, "array not yet loaded, nothing to save"
     ary = self.array
+    if len(ary) == 0:
+      warning("no data, not saving")
+      return
     header = self.header
     native_bigendian = NATIVE_BIGENDIANNESS[ary.typecode]
-    with pfx_open(fspath, 'wb') as tsf:
+    with pfx_open(
+        fspath,
+        'wb' if truncate or not existspath(fspath) else 'r+b',
+    ) as tsf:
       for bs in header.transcribe_flat():
         tsf.write(bs)
       if header.bigendian != native_bigendian:
@@ -1617,11 +1699,11 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           ary.tofile(tsf)
       else:
         ary.tofile(tsf)
-    fstags = self.fstags[fspath]
-    fstags['start'] = self.epoch.start
-    fstags['step'] = self.epoch.step
-    fstags['datatype'] = self.typecode.type.__name__
-    fstags['timetype'] = type(self.epoch.start).__name__
+    tags = self.fstags[fspath]
+    tags['start'] = self.epoch.start
+    tags['step'] = self.epoch.step
+    tags['datatype'] = self.typecode.type.__name__
+    tags['timetype'] = type(self.epoch.start).__name__
 
   @ensure(lambda result: result >= 0)
   def array_index(self, when) -> int:
@@ -1747,8 +1829,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     self.pad_to(when)
-    assert isinstance(value,
-                      (int, float)), "value is a %s:%r" % (type(value), value)
     self.poke_offset(self.array_index(when), value)
 
   def pad_to(self, when, fill=None):
@@ -2194,6 +2274,14 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         getattr(self, 'policy', 'POLICY_UNDEFINED'),
     )
 
+  @abstractmethod
+  def shortname(self):
+    ''' Return a short identifying name for this `TimeSeriesMapping`.
+        For example, `TimeSeriesDataDir` returns `self.shortpath`
+        for this function.
+    '''
+    raise NotImplementedError
+
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
         about this `TimeSeriesMapping`, handy for use with `pformat()` or `pprint()`.
@@ -2215,6 +2303,13 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       for key, ts in list(self.items()):
         ts.close()
         del self[key]
+
+  @abstractmethod
+  def make_ts(self, key):
+    ''' Return the `TimeSeries` for `key`,
+        creating it if necessary.
+    '''
+    raise NotImplementedError
 
   @staticmethod
   def validate_key(key):
@@ -2282,7 +2377,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       keys = self.keys()
     elif not isinstance(keys, (tuple, list)):
       keys = tuple(keys)
-    indices = _dt64(self.range(start, stop))
+    indices = as_datetime64s(self.range(start, stop))
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
       for key in progressbar(keys, "gather fields"):
@@ -2324,14 +2419,84 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     for key in keys:
       with Pfx(key):
         ts = self[key]
-        kname = ts.tags.get('csv.header', key)
-        if label:
-          kname = label + ': ' + kname
+        csv_header = ts.tags.get('csv.header', key)
+        kname = f'{csv_header}\n{key}' if csv_header else key
         if kname != key:
           df.rename(columns={key: kname}, inplace=True)
     if runstate and runstate.cancelled:
       raise CancellationError
     return df.plot(**plot_kw)
+
+  @pfx_method
+  def read_csv(self, csvpath, column_name_map=None, **pd_read_csv_kw):
+    ''' Shim for `pandas.read_csv` to read a CSV file and save the contents
+        in this `TimeSeriesMapping`.
+        Return the `DataFrame` used for the import.
+
+        Parameters:
+        * `csvpath`: the filesystem path of the CSV file to read,
+          passed to `pandas.read_csv`
+        * `column_name_map`: an optional rename mapping for column names
+          as detailed below
+        * `pd_read_csv_kw`: other keyword arguments are passed to
+          `pandas.read_csv`
+
+        The `column_name_map` may have the following values:
+        * `None`: the default, which renames columns using the
+          `column_name_to_identifier` function from `cs.mappings` to
+          create identifiers from column names
+        * `id`: the builtin `id` function, which leaves column names unchanged
+        * a `bool`: use `column_name_to_identifier` with
+          its `snake_case` parameter set to `column_name_map`
+        * a `callable`: compute the renamed column name from
+          `column_name_map(column_name)`
+        * otherwise assume `column_name_map` is a mapping and compute
+          the renamed column name as
+          `column_name_map.get(column_name,column_name)`
+    '''
+    pd = import_extra('pandas', DISTINFO)
+    df = pfx_call(pd.read_csv, csvpath, **pd_read_csv_kw)
+    # prepare column renames
+    renamed = {}
+    if column_name_map is not id:
+      if column_name_map is None:
+        column_name_map = column_name_to_identifier
+      elif column_name_map is id:
+        column_name_map = None
+      elif isinstance(column_name_map, bool):
+        column_name_map = partial(
+            column_name_to_identifier, snake_case=column_name_map
+        )
+      elif callable(column_name_map):
+        pass
+      else:
+        # a mapping
+        column_name_map = lambda column_name: column_name_map.get(
+            column_name, column_name
+        )
+      for column_name in df.columns:
+        new_column_name = column_name_map(column_name)
+        if new_column_name != column_name:
+          renamed[column_name] = new_column_name
+    if renamed:
+      df.rename(columns=renamed, inplace=True, errors='raise')
+    former_names = {
+        new_name: former_name
+        for former_name, new_name in renamed.items()
+    }
+    with Upd().insert(1) as proxy:
+      proxy.prefix = f'update {self.shortname()}: '
+      for column_name in df.columns:
+        with Pfx(column_name):
+          proxy.text = column_name
+          series = df[column_name]
+          ts = self.make_ts(column_name)
+          proxy.prefix = f'update {ts.shortpath}: '
+          ts.setitems(series.index, series.values)
+          former_name = former_names.get(column_name)
+          if former_name:
+            ts.update_tag('csv.header', former_name)
+    return df, renamed
 
 # pylint: disable=too-many-ancestors
 class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
@@ -2421,6 +2586,11 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     )
 
   __repr__ = __str__
+
+  def shortname(self):
+    ''' Return `self.shortpath`.
+    '''
+    return self.shortpath
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
@@ -2648,6 +2818,14 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     ''' The `TagSet` associated with this `TimeSeriesPartitioned` instance.
     '''
     return self.fstags[self.fspath]
+
+  def update_tag(self, tag_name, new_tag_value):
+    ''' Update tag with new value.
+    '''
+    tag_value = self.tags.get(tag_name)
+    if tag_value != new_tag_value:
+      print("%s + %s=%r", self, tag_name, new_tag_value)
+      self.tags[tag_name] = tag_value
 
   @typechecked
   def subseries(self, spec: Union[str, Numeric]):

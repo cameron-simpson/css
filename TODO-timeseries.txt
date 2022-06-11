@@ -1,3 +1,5 @@
+ts.setitems: use poke?
+ts.setitems: prepad to max(when)
 classes to accept int/float as an alternative to array typecodes
 TimeSeriesDataDir: put the column mapping into the config.ini ?
 TimeSeriesFile: open modes: basic read/modify/save, open for r or rw, mmap ro or rw

@@ -332,7 +332,6 @@ class Upd(SingletonMixin):
             txts.append('\n')
           txts.append(self._set_cursor_visible(True))
           self._backend.write(''.join(txts))
-          self.cursor_visible()
           self._backend.flush()
     self._reset()
 
@@ -355,14 +354,16 @@ class Upd(SingletonMixin):
     '''
     with self._lock:
       if not self._disabled and self._backend is not None:
-        self._set_cursor_visible(True)
+        self._backend.write(self._set_cursor_visible(True))
+        self._backend.flush()
 
   def cursor_invisible(self):
     ''' Make the cursor vinisible.
     '''
     with self._lock:
       if not self._disabled and self._backend is not None:
-        self._set_cursor_visible(False)
+        self._backend.write(self._set_cursor_visible(False))
+        self._backend.flush()
 
   @property
   def disabled(self):
