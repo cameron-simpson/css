@@ -1676,7 +1676,10 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ary = self.array
     header = self.header
     native_bigendian = NATIVE_BIGENDIANNESS[ary.typecode]
-    with pfx_open(fspath, 'wb' if truncate else 'r+b') as tsf:
+    with pfx_open(
+        fspath,
+        'wb' if truncate or not existspath(fspath) else 'r+b',
+    ) as tsf:
       for bs in header.transcribe_flat():
         tsf.write(bs)
       if header.bigendian != native_bigendian:
