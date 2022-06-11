@@ -1652,6 +1652,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       fspath = self.fspath
     self.save_to(fspath, truncate=truncate)
 
+  @pfx_method
   @typechecked
   def save_to(self, fspath: str, truncate=False):
     ''' Save the time series to `fspath`.
@@ -1674,6 +1675,9 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     '''
     assert self._array is not None, "array not yet loaded, nothing to save"
     ary = self.array
+    if len(ary) == 0:
+      warning("no data, not saving")
+      return
     header = self.header
     native_bigendian = NATIVE_BIGENDIANNESS[ary.typecode]
     with pfx_open(
@@ -2431,11 +2435,11 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
           `pandas.read_csv`
 
         The `column_name_map` may have the following values:
-        * `None`: the default, which renames columns which uses the
+        * `None`: the default, which renames columns using the
           `column_name_to_identifier` function from `cs.mappings` to
-          create indentifiers from column names
+          create identifiers from column names
         * `id`: the builtin `id` function, which leaves column names unchanged
-        * a `bool`: use the `column_name_to_identifier` with
+        * a `bool`: use `column_name_to_identifier` with
           its `snake_case` parameter set to `column_name_map`
         * a `callable`: compute the renamed column name from
           `column_name_map(column_name)`
