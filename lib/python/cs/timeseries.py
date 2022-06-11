@@ -2411,9 +2411,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     for key in keys:
       with Pfx(key):
         ts = self[key]
-        kname = ts.tags.get('csv.header', key)
-        if label:
-          kname = label + ': ' + kname
+        csv_header = ts.tags.get('csv.header', key)
+        kname = f'{csv_header}\n{key}' if csv_header else key
         if kname != key:
           df.rename(columns={key: kname}, inplace=True)
     if runstate and runstate.cancelled:
