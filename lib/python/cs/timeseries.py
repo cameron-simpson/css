@@ -1599,7 +1599,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         continue
       # file too short, pad the file and append the value
       self._mmap_close()
-      with open(self.fspath, 'r+b') as f:
+      with open(self.fspath, 'r+b' if existspath(self.fspath) else 'wb') as f:
         flen = f.seek(0, os.SEEK_END)
         if flen < mm_offset:
           pad_len = mm_offset - flen
