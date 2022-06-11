@@ -732,8 +732,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                   else:
                     print("import", dspath, "=>", ts)
                 elif dataset in spd.EVENTS_DATASETS:
-                  ##warning("SKIP %s", dataset)
-                  continue
                   db = spd.eventsdb
                   seen = seen_events[dataset]
                   if doit:
