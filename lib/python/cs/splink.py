@@ -481,7 +481,6 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       mode=None,
       figsize=None,
       dpi=None,
-      event_labels=None
       event_labels=None,
       mode_patterns=None,
   ):
