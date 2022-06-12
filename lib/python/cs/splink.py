@@ -780,23 +780,24 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                           print(f'{len(seen)} old events from {db}')
                           if runstate.cancelled:
                             break
-                        seen_size0 = len(seen)
-                        for when, tags in progressbar(
-                            when_tags,
-                            short_dspath,
-                            update_frequency=16,
-                            report_print=True,
-                        ):
-                          key = when, tags['event_description']
-                          if key not in seen:
+                        when_tags = [
+                            (when, tags)
+                            for when, tags in when_tags
+                            if (when, tags['event_description']) not in seen
+                        ]
+                        if when_tags:
+                          for when, tags in progressbar(
+                              when_tags,
+                              short_dspath,
+                              update_frequency=16,
+                              report_print=True,
+                          ):
+                            key = when, tags['event_description']
+                            assert key not in seen
                             tags['dataset'] = dataset
                             db.default_factory(None, unixtime=when, tags=tags)
                             seen.add(key)
-                        seen_size = len(seen)
-                        if seen_size > seen_size0:
-                          print(
-                              f'{seen_size - seen_size0} new events from {rdspath}'
-                          )
+                          print(f'{len(when_tags)} new events from {rdspath}')
                     dstags['imported'] = 1
                   else:
                     print("import", dspath, "=>", db)
