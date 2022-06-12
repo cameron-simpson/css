@@ -2320,7 +2320,12 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         ts = derivation(key)
         self[key] = ts
         return
-    raise KeyError("no entry for key %r and no implied time series" % (key,))
+    raise KeyError(
+        "%s[%r]: no entry for key and no implied time series" % (
+            type(self).__name__,
+            key,
+        )
+    )
 
   @typechecked
   def __setitem__(self, key: str, ts):
