@@ -1813,6 +1813,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     return self.peek_offset(self.array_index(when))
 
+  # TODO: if when is a slice, compute whens and call setitems?
   def __setitem__(self, when, value):
     ''' Set the datum for the UNIX time `when`.
     '''
