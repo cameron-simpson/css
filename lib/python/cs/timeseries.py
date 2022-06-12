@@ -2977,14 +2977,23 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     ts = None
     span = None
+    when_group, value_group = None, None
     for when, value in zip(whens, values):
-      if value is None and skipNone:
+      if skipNone and value is None:
         continue
       if span is None or when not in span:
+        # flush data to the current time series
+        if ts is not None:
+          ts.setitems(when_group, value_group, skipNone=skipNone)
+        when_group, value_group = [], []
         # new partition required, sets ts as well
         ts = self.subseries(when)
         span = ts.partition_span
-      ts[when] = value
+      when_group.append(when)
+      value_group.append(value)
+    if ts is not None:
+      # flush data to the current time series
+      ts.setitems(when_group, value_group, skipNone=skipNone)
 
   def partitioned_spans(self, start, stop):
     ''' Generator yielding a sequence of `TimePartition`s covering
