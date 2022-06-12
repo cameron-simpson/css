@@ -1821,6 +1821,16 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     self.poke_offset(self.array_index(when), value)
 
+  def setitems(self, whens, values, *, skipNone=False):
+    ''' Bulk set values.
+    '''
+    # ensure we're using array mode
+    self.array
+    for offset, value in zip(map(self.offset, whens), values):
+      if skipNone and value is None:
+        continue
+      self._array_poke_offset(offset, value)
+
   def pad_to(self, when, fill=None):
     ''' Pad the time series to store values up to the UNIX time `when`.
 
