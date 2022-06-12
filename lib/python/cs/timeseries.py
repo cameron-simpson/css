@@ -1478,11 +1478,11 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ary = array(self.typecode)
     mv = memoryview(mm)
     ary.frombytes(mv[self._mmap_offset:])
-    mv = None  # prom,pot release of reference
+    mv = None  # prompt release of reference
+    self._mmap_close()  # release mmap also
     header = self.header
     if header.bigendian != NATIVE_BIGENDIANNESS[header.typecode]:
       ary.byteswap()
-    self._mmap_close()
     self.modified = False
     return ary
 
