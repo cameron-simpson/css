@@ -6,19 +6,19 @@
 '''
 
 import base64
+from datetime import datetime, timezone
 import os
 import plistlib
 import shutil
 import subprocess
 import tempfile
 
-import cs.iso8601
 from cs.logutils import warning
 from cs.pfx import Pfx
 import cs.sh
 from cs.xml import etree
 
-__version__ = '20211208-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,7 +28,6 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.iso1806',
         'cs.logutils',
         'cs.pfx',
         'cs.sh',
@@ -150,7 +149,9 @@ def ingest_plist_elem(e):
   if e.tag == 'data':
     return base64.b64decode(e.text)
   if e.tag == 'date':
-    return cs.iso8601.parseZ(e.text)
+    dt = datetime.strptime(e.text, '%Y-%m-%dT%H:%M:%SZ')
+    dt = datetime.combine(dt.date(), dt.time(), timezone.utc)
+    return dt
   return e
 
 def ingest_plist_array(pa):

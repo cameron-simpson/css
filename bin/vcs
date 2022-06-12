@@ -216,8 +216,8 @@ case "$op" in
                           continue
                         }
                         case "$mode" in
-                          cp) $trace cp -a "$srcpath" "$clonedir/$subdir/" ;;
-                          sym)$trace ln -s "$srcpath" "$clonedir/$subdir/" ;;
+                          cp) $trace cp -a "$srcpath" "$clonedir/$subdir/" || : ;;
+                          sym)$trace ln -s "$srcpath" "$clonedir/$subdir/" || : ;;
                           *)  echo "$context: mode=$mode: unimplemented mode, skipping" >&2 ;;
                         esac
                       done

@@ -3,6 +3,8 @@
 ''' Assorted utility functions for working with data
     downloaded from Selectronics' SP-LINK programme
     which communicates with their controllers.
+
+    I use this to gather and plot data from my solar inverter.
 '''
 
 from collections import defaultdict, namedtuple
@@ -55,6 +57,8 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
+__version__ = '20220606-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -62,8 +66,22 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.timeseries',
         'arrow',
+        'cs.context',
+        'cs.csvutils',
+        'cs.deco',
+        'cs.fs',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.progress',
+        'cs.psutils',
+        'cs.resources',
+        'cs.sqltags',
+        'cs.tagset',
+        'cs.timeseries',
+        'cs.upd',
         'matplotlib',
         'typeguard',
     ],
@@ -545,9 +563,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   GETOPT_SPEC = 'd:n'
   USAGE_FORMAT = r'''Usage: {cmd} [-d spdpath] [-n] subcommand...
-    -d spdpath  Specify the directory containing the SP-LInk downloads
+    -d spdpath  Specify the directory containing the SP-Link downloads
                 and time series. Default from ${DEFAULT_SPDPATH_ENVVAR},
-                or {DEFAULT_SPDPATH!r}
+                or {DEFAULT_SPDPATH!r}.
     -n          No action; recite planned actions.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'

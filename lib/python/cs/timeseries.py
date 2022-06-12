@@ -99,6 +99,8 @@ from cs.resources import MultiOpenMixin
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
+__version__ = '20220606-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -107,17 +109,23 @@ DISTINFO = {
     ],
     'install_requires': [
         'arrow',
+        'cs.binary',
+        'cs.buffer',
         'cs.cmdutils',
         'cs.configutils>=HasConfigIni',
+        'cs.context',
+        'cs.csvutils',
         'cs.deco',
         'cs.fs',
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
+        'cs.progress',
         'cs.py.modules',
         'cs.resources',
-        'arrow',
+        'cs.result',
+        'cs.upd',
         'icontract',
         'matplotlib',
         'numpy',

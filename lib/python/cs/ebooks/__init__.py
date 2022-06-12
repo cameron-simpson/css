@@ -6,6 +6,8 @@
     These form the basis of my personal Kindle and Calibre workflow.
 '''
 
+__version__ = '20220606-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -13,27 +15,29 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.app.oxs.plist',
+        'cs.app.osx.plist',
         'cs.cmdutils',
         'cs.context',
         'cs.deco',
         'cs.fileutils',
+        'cs.fs',
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
+        'cs.numeric',
         'cs.obj',
         'cs.pfx',
+        'cs.progress',
+        'cs.psutils',
         'cs.resources',
         'cs.sqlalchemy_utils',
         'cs.tagset',
         'cs.threads',
         'cs.units',
+        'icontract',
         'mobi',
+        'os.path',
+        'sqlalchemy',
+        'typeguard',
     ],
 }
-
-def intif(f: float):
-  ''' Return `int(f)` if that equals `f`, otherwise `f`.
-  '''
-  i = int(f)
-  return i if i == f else f
