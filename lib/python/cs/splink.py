@@ -92,6 +92,22 @@ DISTINFO = {
     },
 }
 
+# field name patterns for the named plot modes
+DEFAULT_PLOT_MODE_PATTERNS = {
+    'energy': '*_kwh',
+    'power': '*_average_kw',
+    'vac': '*_v_ac',
+    'vdc': '*_v_dc',
+}
+
+DEFAULT_PLOT_EVENT_LABELS = (
+    'System - AC Source no longer detected',
+    'System - AC Source outside operating range',
+    'Bridge negative correction',
+    'Bridge positive correction',
+    'AC Mode - Synchronised begin',
+)
+
 pfx_listdir = partial(pfx_call, os.listdir)
 
 def main(argv=None):
@@ -466,6 +482,8 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       figsize=None,
       dpi=None,
       event_labels=None
+      event_labels=None,
+      mode_patterns=None,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
@@ -475,26 +493,16 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     if dpi is None:
       dpi = 100
     if event_labels is None:
-      event_labels = (
-          'System - AC Source no longer detected',
-          'System - AC Source outside operating range',
-          'Bridge negative correction',
-          'Bridge positive correction',
-          'AC Mode - Synchronised begin',
-      )
-    modes = {
-        'energy': '*_kwh',
-        'power': '*_kw',
-        'vac': '*_v_ac',
-        'vdc': '*_v_dc',
-    }
+      event_labels = DEFAULT_PLOT_EVENT_LABELS
+    if mode_patterns is None:
+      mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
     with Pfx("key_specs"):
       tsd_keys = []
       for key_spec in key_specs:
         with Pfx(key_spec):
-          if mode is None and key_spec in modes:
+          if mode is None and key_spec in mode_patterns:
             mode = key_spec
-          key_spec = modes.get(key_spec, key_spec)
+          key_spec = mode_patterns.get(key_spec, key_spec)
           matches = list(self.resolve(key_spec))
           if matches:
             tsd_keys.extend(self.resolve(key_spec))
@@ -506,7 +514,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       # scan the keys looking for a match to a mode
       for tsd_key in tsd_keys:
         _, key = tsd_key
-        for mode_name, mode_glob in modes.items():
+        for mode_name, mode_glob in mode_patterns.items():
           if pfx_call(fnmatch, key, mode_glob):
             mode = mode_name
             break
