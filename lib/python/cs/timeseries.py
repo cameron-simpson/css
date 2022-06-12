@@ -1273,6 +1273,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
   DOTEXT = '.csts'
 
   # pylint: disable=too-many-branches,too-many-statements
+  @pfx_method
   @typechecked
   def __init__(
       self,
@@ -1284,7 +1285,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       fstags=None,
   ):
     ''' Prepare a new time series stored in the file at `fspath`
-        containing machine data for the time series values.
+        containing machine native data for the time series values.
 
         Parameters:
         * `fspath`: the filename of the data file
@@ -1292,20 +1293,13 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           if specified and the data file exists, they must match;
           if not specified then the data file must exist
           and the `typecode` will be obtained from its header
-        * `start`: the UNIX epoch time for the first datum
-        * `step`: the increment between data times
-        * `time_typecode`: the type of the start and step times;
-          inferred from the type of the start time value if unspecified
+        * `epoch`: optional `Epoch` specifying the start time and
+          step size for the time series data in the file;
+          if not specified then the data file must exist
+          and the `epoch` will be obtained from its header
         * `fill`: optional default fill values for `pad_to`;
           if unspecified, fill with `0` for `'q'`
           and `float('nan') for `'d'`
-
-        If `start` or `step` are omitted the file's fstags will be
-        consulted for their values.
-        This class does not set these tags (that would presume write
-        access to the parent directory or its `.fstags` file)
-        when a `TimeSeriesFile` is made by a `TimeSeriesPartitioned` instance
-        it sets these flags.
     '''
     epoch = Epoch.promote(epoch)
     HasFSPath.__init__(self, fspath)
@@ -1316,22 +1310,22 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       header, = TimeSeriesFileHeader.scan_fspath(self.fspath, max_count=1)
     except FileNotFoundError:
       # a missing file is ok, other exceptions are not
-      header = None
-    # compare the file against the supplied arguments
-    if header is None:
-      # no existing file
+      ok = True
       if typecode is None:
-        raise ValueError(
-            "no typecode supplied and no data file %r" % (fspath,)
-        )
+        ok = False
+        warning("no typecode supplied and no data file %r", fspath)
       if epoch is None:
-        raise ValueError("no epoch supplied and no data file %r" % (fspath,))
+        ok = False
+        warning("no epoch supplied and no data file %r", fspath)
+      if not ok:
+        raise
       header = TimeSeriesFileHeader(
           bigendian=NATIVE_BIGENDIANNESS[typecode],
           typecode=typecode,
           epoch=epoch,
       )
     else:
+      # check the header against supplied parameters
       if typecode is not None and typecode != header.typecode:
         raise ValueError(
             "typecode=%r but data file %s has typecode %r" %
@@ -1397,7 +1391,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     '''
     return self.when(len(self.array))
 
-  def file_offset(self, offset):
+  def file_offset(self, offset: int) -> int:
     ''' Return the file position for the data with position `offset`.
     '''
     return (
@@ -1405,16 +1399,14 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         self.header.datum_type.length * offset
     )
 
-  def peek(self, when: Numeric):
+  def peek(self, when: Numeric) -> Numeric:
     ''' Read a single data value for the UNIX time `when`.
 
         This method uses the `mmap` interface if the array is not already loaded.
     '''
-    if when < self.start:
-      raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
     return self.peek_offset(self.offset(when))
 
-  def peek_offset(self, offset):
+  def peek_offset(self, offset: int) -> Numeric:
     ''' Read a single data value from `offset`.
 
         This method uses the `mmap` interface if the array is not already loaded.
@@ -1431,8 +1423,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
         This method uses the `mmap` interface if the array is not already loaded.
     '''
-    if when < self.start:
-      raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
     self.poke_offset(self.offset(when), value)
 
   def poke_offset(self, offset: int, value: Numeric):
@@ -1475,7 +1465,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         # no file, empty array
         return array(self.typecode)
     else:
-      # see if it is valid
+      # see if its length is still valid
       flen = os.fstat(self._mmap_fd).st_size
       if flen != len(self._mmap):
         self._mmap_close()
@@ -1488,11 +1478,11 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ary = array(self.typecode)
     mv = memoryview(mm)
     ary.frombytes(mv[self._mmap_offset:])
-    mv = None  # prom,pot release of reference
+    mv = None  # prompt release of reference
+    self._mmap_close()  # release mmap also
     header = self.header
     if header.bigendian != NATIVE_BIGENDIANNESS[header.typecode]:
       ary.byteswap()
-    self._mmap_close()
     self.modified = False
     return ary
 
@@ -1823,13 +1813,23 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     return self.peek_offset(self.array_index(when))
 
+  # TODO: if when is a slice, compute whens and call setitems?
   def __setitem__(self, when, value):
     ''' Set the datum for the UNIX time `when`.
     '''
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
-    self.pad_to(when)
     self.poke_offset(self.array_index(when), value)
+
+  def setitems(self, whens, values, *, skipNone=False):
+    ''' Bulk set values.
+    '''
+    # ensure we're using array mode
+    self.array
+    for offset, value in zip(map(self.offset, whens), values):
+      if skipNone and value is None:
+        continue
+      self._array_poke_offset(offset, value)
 
   def pad_to(self, when, fill=None):
     ''' Pad the time series to store values up to the UNIX time `when`.
@@ -2331,7 +2331,12 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         ts = derivation(key)
         self[key] = ts
         return
-    raise KeyError("no entry for key %r and no implied time series" % (key,))
+    raise KeyError(
+        "%s[%r]: no entry for key and no implied time series" % (
+            type(self).__name__,
+            key,
+        )
+    )
 
   @typechecked
   def __setitem__(self, key: str, ts):
@@ -2972,14 +2977,23 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     ts = None
     span = None
+    when_group, value_group = None, None
     for when, value in zip(whens, values):
-      if value is None and skipNone:
+      if skipNone and value is None:
         continue
       if span is None or when not in span:
+        # flush data to the current time series
+        if ts is not None:
+          ts.setitems(when_group, value_group, skipNone=skipNone)
+        when_group, value_group = [], []
         # new partition required, sets ts as well
         ts = self.subseries(when)
         span = ts.partition_span
-      ts[when] = value
+      when_group.append(when)
+      value_group.append(value)
+    if ts is not None:
+      # flush data to the current time series
+      ts.setitems(when_group, value_group, skipNone=skipNone)
 
   def partitioned_spans(self, start, stop):
     ''' Generator yielding a sequence of `TimePartition`s covering

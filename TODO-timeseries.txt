@@ -1,3 +1,4 @@
+typed memoryviews for mmap mode?
 ts.setitems: use poke?
 ts.setitems: prepad to max(when)
 classes to accept int/float as an alternative to array typecodes
