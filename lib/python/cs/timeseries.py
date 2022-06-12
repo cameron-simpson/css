@@ -1284,7 +1284,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       fstags=None,
   ):
     ''' Prepare a new time series stored in the file at `fspath`
-        containing machine data for the time series values.
+        containing machine native data for the time series values.
 
         Parameters:
         * `fspath`: the filename of the data file
@@ -1292,20 +1292,13 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           if specified and the data file exists, they must match;
           if not specified then the data file must exist
           and the `typecode` will be obtained from its header
-        * `start`: the UNIX epoch time for the first datum
-        * `step`: the increment between data times
-        * `time_typecode`: the type of the start and step times;
-          inferred from the type of the start time value if unspecified
+        * `epoch`: optional `Epoch` specifying the start time and
+          step size for the time series data in the file;
+          if not specified then the data file must exist
+          and the `epoch` will be obtained from its header
         * `fill`: optional default fill values for `pad_to`;
           if unspecified, fill with `0` for `'q'`
           and `float('nan') for `'d'`
-
-        If `start` or `step` are omitted the file's fstags will be
-        consulted for their values.
-        This class does not set these tags (that would presume write
-        access to the parent directory or its `.fstags` file)
-        when a `TimeSeriesFile` is made by a `TimeSeriesPartitioned` instance
-        it sets these flags.
     '''
     epoch = Epoch.promote(epoch)
     HasFSPath.__init__(self, fspath)
@@ -1316,22 +1309,22 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       header, = TimeSeriesFileHeader.scan_fspath(self.fspath, max_count=1)
     except FileNotFoundError:
       # a missing file is ok, other exceptions are not
-      header = None
-    # compare the file against the supplied arguments
-    if header is None:
-      # no existing file
+      ok = True
       if typecode is None:
-        raise ValueError(
-            "no typecode supplied and no data file %r" % (fspath,)
-        )
+        ok = False
+        warning("no typecode supplied and no data file %r", fspath)
       if epoch is None:
-        raise ValueError("no epoch supplied and no data file %r" % (fspath,))
+        ok = False
+        warning("no epoch supplied and no data file %r", fspath)
+      if not ok:
+        raise
       header = TimeSeriesFileHeader(
           bigendian=NATIVE_BIGENDIANNESS[typecode],
           typecode=typecode,
           epoch=epoch,
       )
     else:
+      # check the header against supplied parameters
       if typecode is not None and typecode != header.typecode:
         raise ValueError(
             "typecode=%r but data file %s has typecode %r" %
