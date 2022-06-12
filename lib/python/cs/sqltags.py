@@ -1575,6 +1575,7 @@ class SQLTags(BaseTagSets):
       self, name: Optional[str] = None, *, unixtime=None, tags=None
   ):
     ''' Fetch or create an `SQLTagSet` for `name`.
+        Return the `SQLTagSet`.
 
         Note that `name` may be `None` to create a new "log" entry.
     '''
