@@ -1273,6 +1273,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
   DOTEXT = '.csts'
 
   # pylint: disable=too-many-branches,too-many-statements
+  @pfx_method
   @typechecked
   def __init__(
       self,
@@ -1390,7 +1391,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     '''
     return self.when(len(self.array))
 
-  def file_offset(self, offset):
+  def file_offset(self, offset: int) -> int:
     ''' Return the file position for the data with position `offset`.
     '''
     return (
@@ -1398,16 +1399,14 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         self.header.datum_type.length * offset
     )
 
-  def peek(self, when: Numeric):
+  def peek(self, when: Numeric) -> Numeric:
     ''' Read a single data value for the UNIX time `when`.
 
         This method uses the `mmap` interface if the array is not already loaded.
     '''
-    if when < self.start:
-      raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
     return self.peek_offset(self.offset(when))
 
-  def peek_offset(self, offset):
+  def peek_offset(self, offset: int) -> Numeric:
     ''' Read a single data value from `offset`.
 
         This method uses the `mmap` interface if the array is not already loaded.
@@ -1424,8 +1423,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
         This method uses the `mmap` interface if the array is not already loaded.
     '''
-    if when < self.start:
-      raise ValueError("when:%s must be >=self.start:%s" % (when.self.start))
     self.poke_offset(self.offset(when), value)
 
   def poke_offset(self, offset: int, value: Numeric):
@@ -1468,7 +1465,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         # no file, empty array
         return array(self.typecode)
     else:
-      # see if it is valid
+      # see if its length is still valid
       flen = os.fstat(self._mmap_fd).st_size
       if flen != len(self._mmap):
         self._mmap_close()
