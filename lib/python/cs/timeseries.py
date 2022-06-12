@@ -1818,7 +1818,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     '''
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
-    self.pad_to(when)
     self.poke_offset(self.array_index(when), value)
 
   def pad_to(self, when, fill=None):
