@@ -204,6 +204,17 @@ class TypeCode(str):
     '''
     return ('>' if bigendian else '<') + self
 
+  @property
+  def default_fill(self):
+    ''' The default fill for the type code.
+    '''
+    if self == 'd':
+      return nan
+    if self == 'q':
+      return 0
+    else:
+      raise RuntimeError('no default fill value for %r' % (self,))
+
 @typechecked
 def deduce_type_bigendianness(typecode: str) -> bool:
   ''' Deduce the native endianness for `typecode`,
@@ -1341,14 +1352,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     typecode = header.typecode
     TimeSeries.__init__(self, epoch, typecode)
     if fill is None:
-      if typecode == 'd':
-        fill = nan
-      elif typecode == 'q':
-        fill = 0
-      else:
-        raise RuntimeError(
-            "no default fill value for typecode=%r" % (typecode,)
-        )
+      fill = typecode.default_fill
+      warning("typecode=%r, fill=%s:%r", typecode, type(fill), fill)
     self.fill = fill
     self.fill_bs = header.datum_type.transcribe_value(self.fill)
     self._itemsize = array(typecode).itemsize
