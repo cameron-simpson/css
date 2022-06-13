@@ -1400,7 +1400,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     TimeSeries.__init__(self, epoch, typecode)
     if fill is None:
       fill = typecode.default_fill
-      warning("typecode=%r, fill=%s:%r", typecode, type(fill), fill)
     self.fill = fill
     self.fill_bs = header.datum_type.transcribe_value(self.fill)
     self._itemsize = array(typecode).itemsize
