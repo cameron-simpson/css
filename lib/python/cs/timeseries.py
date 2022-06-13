@@ -1050,6 +1050,53 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     data = list(self.data(start, stop))
     return [d[0] for d in data], [d[1] for d in data]
 
+  def slice(self, start, stop, pad=False, prepad=False):
+    ''' Return a slice of the underlying array
+        for the times `start:stop`.
+
+        If `stop` implies values beyond the end of the array
+        and `pad` is true, pad the resulting list with `self.fill`
+        to the expected length.
+
+        If `start` corresponds to an offset before the start of the array
+        raise an `IndexError` unless `prepad` is true,
+        in which case the list of values will be prepended
+        with enough of `self.fill` to reach the array start.
+    '''
+    astart, astop = self.offset_bounds(start, stop)
+    return self.offset_slice(astart, astop, pad=pad, prepad=prepad)
+
+  def offset_slice(self, astart: int, astop: int, pad=False, prepad=False):
+    ''' Return a slice of the underlying array
+        for the array indices `astart:astop`.
+
+        If `astop` implies values beyond the end of the array
+        and `pad` is true, pad the resulting list with `self.fill`
+        to the expected length.
+
+        If `astart` is an offset before the start of the array
+        raise an `IndexError` unless `prepad` is true,
+        in which case the list of values will be prepended
+        with enough of `self.fill` to reach the array start.
+    '''
+    if astart < 0:
+      if prepad:
+        prepad_len = -astart
+      else:
+        raise IndexError(
+            "%s slice index %s starts at a negative offset" %
+            (type(self).__name__, astart)
+        )
+    else:
+      prepad_len = 0
+    ary = self.array
+    values = ary[astart:astop]
+    if prepad_len > 0:
+      values[:0] = [self.fill] * prepad_len
+    if astop > len(ary) and pad:
+      values.extend([self.fill] * (astop - len(ary)))
+    return values
+
   @property
   def np_type(self):
     ''' The `numpy` type corresponding to `self.typecode`.
@@ -1749,53 +1796,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         from `len(self.array)`.
     '''
     return len(self.array)
-
-  def slice(self, start, stop, pad=False, prepad=False):
-    ''' Return a slice of the underlying array
-        for the times `start:stop`.
-
-        If `stop` implies values beyond the end of the array
-        and `pad` is true, pad the resulting list with `self.fill`
-        to the expected length.
-
-        If `start` corresponds to an offset before the start of the array
-        raise an `IndexError` unless `prepad` is true,
-        in which case the list of values will be prepended
-        with enough of `self.fill` to reach the array start.
-    '''
-    astart, astop = self.offset_bounds(start, stop)
-    return self.offset_slice(astart, astop, pad=pad, prepad=prepad)
-
-  def offset_slice(self, astart: int, astop: int, pad=False, prepad=False):
-    ''' Return a slice of the underlying array
-        for the array indices `astart:astop`.
-
-        If `astop` implies values beyond the end of the array
-        and `pad` is true, pad the resulting list with `self.fill`
-        to the expected length.
-
-        If `astart` is an offset before the start of the array
-        raise an `IndexError` unless `prepad` is true,
-        in which case the list of values will be prepended
-        with enough of `self.fill` to reach the array start.
-    '''
-    if astart < 0:
-      if prepad:
-        prepad_len = -astart
-      else:
-        raise IndexError(
-            "%s slice index %s starts at a negative offset" %
-            (type(self).__name__, astart)
-        )
-    else:
-      prepad_len = 0
-    ary = self.array
-    values = ary[astart:astop]
-    if prepad_len > 0:
-      values[:0] = [self.fill] * prepad_len
-    if astop > len(ary) and pad:
-      values.extend([self.fill] * (astop - len(ary)))
-    return values
 
   def __getitem__(self, when: Union[Numeric, slice]):
     ''' Return the datum for the UNIX time `when`.
