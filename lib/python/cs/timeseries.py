@@ -1852,13 +1852,14 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       self.modified = True
       assert len(ary) == ary_index + 1
 
-class TimePartition(namedtuple('TimePartition', 'epoch name offset0 steps'),
+class TimePartition(namedtuple('TimePartition',
+                               'epoch name start_offset end_offset'),
                     TimeStepsMixin):
   ''' A `namedtuple` for a slice of time with the following attributes:
       * `epoch`: the reference `Epoch`
       * `name`: the name for this slice
-      * `offset0`: the epoch offset of the start time (`self.start`)
-      * `steps`: the number of time slots in this partition
+      * `start_offset`: the epoch offset of the start time (`self.start`)
+      * `end_offset`: the epoch offset of the end time (`self.stop`)
 
       These are used by `TimespanPolicy` instances to express the partitions
       into which they divide time.
@@ -1866,15 +1867,15 @@ class TimePartition(namedtuple('TimePartition', 'epoch name offset0 steps'),
 
   @property
   def start(self):
-    ''' The start UNIX time derived from `self.epoch` and `self.offset0`.
+    ''' The start UNIX time derived from `self.epoch` and `self.start_offset`.
     '''
-    return self.epoch.when(self.offset0)
+    return self.epoch.when(self.start_offset)
 
   @property
   def stop(self):
-    ''' The start UNIX time derived from `self.epoch` and `self.offset0` and `self.steps`.
+    ''' The end UNIX time derived from `self.epoch` and `self.end_offset`.
     '''
-    return self.epoch.when(self.offset0 + self.steps)
+    return self.epoch.when(self.end_offset)
 
   @property
   def step(self):
@@ -1891,7 +1892,7 @@ class TimePartition(namedtuple('TimePartition', 'epoch name offset0 steps'),
     ''' A generator yielding times from this partition from
         `self.start` to `self.stop` by `self.step`.
     '''
-    offset = self.offset0
+    offset = self.start_offset
     epoch = self.epoch
     for offset in self.offsets():
       yield epoch.when(offset)
@@ -1899,7 +1900,7 @@ class TimePartition(namedtuple('TimePartition', 'epoch name offset0 steps'),
   def offsets(self):
     ''' Return an iterable of the epoch offsets from `self.start` to `self.stop`.
     '''
-    return range(self.offset0, self.offset0 + self.steps)
+    return range(self.start_offset, self.end_offset)
 
 class TimespanPolicy(DBC, HasEpochMixin):
   ''' A class implementing a policy allocating times to named time spans.
@@ -2042,8 +2043,8 @@ class TimespanPolicy(DBC, HasEpochMixin):
     return TimePartition(
         epoch=epoch,
         name=name,
-        offset0=start_offset,
-        steps=end_offset - start_offset
+        start_offset=start_offset,
+        end_offset=end_offset,
     )
 
   @abstractmethod
@@ -2075,9 +2076,14 @@ class TimespanPolicy(DBC, HasEpochMixin):
     when = start
     while when < stop:
       span = self.span_for_time(when)
-      offset0 = epoch.offset(max(span.start, when))
-      offset1 = epoch.offset(min(span.stop, stop))
-      yield TimePartition(epoch, span.name, offset0, offset1 - offset0)
+      start_offset = epoch.offset(max(span.start, when))
+      end_offset = epoch.offset(min(span.stop, stop))
+      yield TimePartition(
+          epoch=epoch,
+          name=span.name,
+          start_offset=start_offset,
+          end_offset=end_offset,
+      )
       when = span.stop
 
   def spans_for_times(self, whens):
@@ -2877,9 +2883,12 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         ts_values = ts[span.start:span.stop]
         steps = span.stop - span.start
         values.extend(ts_values)
-        difflen = steps - len(ts_values)
+        difflen = (span.end_offset - span.start_offset) - len(ts_values)
         if difflen > 0:
-          warning("pad with %d fill values", difflen)
+          warning(
+              "span:%s:%s: %d values, pad with %d fill values", span.start,
+              span.stop, len(ts_values), difflen
+          )
           values.extend([ts.fill] * difflen)
         else:
           assert difflen == 0, "difflen should be 0, but is %r" % difflen
