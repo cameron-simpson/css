@@ -1400,7 +1400,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     TimeSeries.__init__(self, epoch, typecode)
     if fill is None:
       fill = typecode.default_fill
-      warning("typecode=%r, fill=%s:%r", typecode, type(fill), fill)
     self.fill = fill
     self.fill_bs = header.datum_type.transcribe_value(self.fill)
     self._itemsize = array(typecode).itemsize
@@ -2876,7 +2875,14 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       for span in self.policy.partitioned_spans(index.start, index.stop):
         ts = self.timeseriesfile_from_partition_name(span.name)
         ts_values = ts[span.start:span.stop]
+        steps = span.stop - span.start
         values.extend(ts_values)
+        difflen = steps - len(ts_values)
+        if difflen > 0:
+          warning("pad with %d fill values", difflen)
+          values.extend([ts.fill] * difflen)
+        else:
+          assert difflen == 0, "difflen should be 0, but is %r" % difflen
       return values
     if isinstance(index, str):
       if index.endswith(TimeSeriesFile.DOTEXT):
