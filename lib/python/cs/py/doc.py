@@ -15,7 +15,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.modules import module_attributes
 
-__version__ = '20210306-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -46,6 +46,9 @@ def module_doc(
         default: `name`
       * filter_key`: optional test for a key used to select or reject keys
         to appear in the documentation
+      * `method_names`: optional list of method names to document;
+        the default is to document `__init__`, then CONSTANTS, the
+        dunders, then other public names
   '''
   if isinstance(module, str):
     module_name = module

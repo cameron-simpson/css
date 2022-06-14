@@ -1,3 +1,19 @@
+cs.upd: above should do clear-toend-of-screen?
+cs.binary: BinaryMixin.scan_file: CCB.from_file: return the unread buffer bytes to the file? seek if possible, warning if not and some buffered data
+cs.logutils: PfxFormatter: dict args support needed
+Pfx: accept a mode to defer computing the format string, eg for pfx_call et al, to make them nearly free
+@locked_property: replace with @cachedmethod throughout
+@cachedmethod: needs a __lock attribute, then review use throughout
+cs.upd: Upd activation always makes the status line, Upd.insert can never create slot 0
+cs.upd: print to know if inside above(), or above() to enter disabled mode
+cs.iso14496: adapt for mp4 records with padding if short - adjust length field
+cs.binary: a safe packet view into a file, based off the binary offset/length whihc can save via a safe sized buffer
+cs.units: make decompose return an object which proxies to the list but is formattable and has a nice __str__, supporting print(bytes_geek(nbytes)) etc
+cs.edit: use subprocess.run check=True
+cs.app.maildb: port to BaseCommand
+BaseCommand: move most of __init__ into run-context along with setup_logging context manager use
+cs.logutils: new LoggingSetup class embodying infer_log_level etc, as a context manager to push and pop the setup, setup_logging to do the first part, easy replacement for setup_logging of some kind and use it in run_context
+shortpath: optional using_symlinks mode switch to use bin-cs/shortpath-prompt sylink algoritm
 BaseCommand: drop run_argv method
 cs.logutils: supplant_logger should override the logging-already-set-up check?
 cs.logutils: call basicConfig for the no-existing-logging mode

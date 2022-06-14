@@ -1,0 +1,7 @@
+lib/python/cs/app/playon.py: cs.app.playon: Recording.resolution: docstring update
+lib/python/cs/app/playon.py: cs.app.playon: some more docstring updates
+lib/python/cs/app/playon.py: cs.app.playon: docstring updates
+lib/python/cs/app/playon.py: merge default ==> playon
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand._refresh_sqltags_data: bugfix criteria for refreshing the PlayOn state
+lib/python/cs/app/playon.py: cs.app.playon.py: remove fleck of lint
+lib/python/cs/app/playon.py: cs.app.playon: whitespace

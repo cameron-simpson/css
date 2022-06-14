@@ -1,0 +1,18 @@
+lib/python/cs/app/osx/plist.py: obsolete cs.macosx for cs.app.osx; cs.app.osx: add iphone and plist modules from cs.macosx
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: add import_as_etree to read a plist into an etree.Element and export_xml_to_plist to transcribe an etree.Element to a plist
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: import_as_etree: control logic fixes
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: conversion functions to ingest a plist ElementTree, returning native Python objects
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: ingest_plist_etree: correctly handle the ElementTree
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: ingest_plist_elem: support <real> => float
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: PListDict: add ._keys method
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: PListDict: add _pop and __contains__ methods
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: new ingest_plist convenience function
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: ingest_plist_elem: decode <data> into bytes
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: ingest_plist_elem: ingest "date" tags as ISO8601 strings
+lib/python/cs/app/osx/plist.py: cs.app.osx.iphoto: fix call to cs.iso8601.parseZ
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: ingest_plist additional `recurse` and `resolve` parameters; move resolve_object in from cs.app.osx.iphoto
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: resolve_object: incomplete support for NSLocation and NSRangeData
+lib/python/cs/app/osx/plist.py: my email address has changed - update Python code
+lib/python/cs/app/osx/plist.py: cs.dbutils,cs.app.osx.plist: import fixes
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: clean up for release, required by the cs.ebooks.apple module
+lib/python/cs/app/osx/plist.py: cs.app.osx.plist: inline the ISO8601 parse, drop the cs.iso8601 module (not used elsewhere, too trite)

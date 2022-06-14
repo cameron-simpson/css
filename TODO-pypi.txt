@@ -1,3 +1,8 @@
+cs.distinfo: use the trove-classifiers package for sanity checking?
+default url to point into the sr.ht repo
+wheels
+try using flit instead of twine, obsolete setup.py -- but still provide it?
+use SOURCE_DATE_EPOCH - see https://reproducible-builds.org/specs/source-date-epoch/ and https://flit.readthedocs.io/en/latest/cmdline.html#environment-variables
 module_doc: special case BaseCommand subclass cmd_ method formattings, partiularly the usage string
 module_doc: partition names into constants, functions, classes etc
 cs.distinfo: update URLs from bitbucket to sr.ht

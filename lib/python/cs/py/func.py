@@ -12,8 +12,9 @@ from functools import partial
 from pprint import pformat
 from cs.deco import decorator
 from cs.py3 import unicode, raise_from
+from cs.x import X
 
-__version__ = '20210913-post'
+__version__ = '20220311.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -70,7 +71,29 @@ def func_a_kw_fmt(func, *a, **kw):
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
 
+def callif(doit, func, *a, **kw):
+  ''' Call `func(*a,**kw)` if `doit` is true
+      otherwise just print it out.
+
+      The parameter `func` may be preceeded optionally by a `dict`
+      containing modes. The current modes are:
+      * `'print'`: the print function, default the builtin `print`
+  '''
+  if isinstance(func, dict):
+    modes = func
+    a = list(a)
+    func = a.pop(0)
+  else:
+    modes = {}
+  modes.setdefault('print', print)
+  if doit:
+    return func(*a, **kw)
+  fmt, av = func_a_kw_fmt(func, *a, **kw)
+  modes['print'](fmt % tuple(av))
+  return None
+
 @decorator
+# pylint: disable=too-many-arguments
 def trace(
     func, call=True, retval=False, exception=False, pfx=False, pprint=False
 ):
@@ -83,18 +106,19 @@ def trace(
     ''' Wrapper for `func` to trace call and return.
     '''
     # late import so that we can use this in modules we import
+    # pylint: disable=import-outside-toplevel
     if pfx:
       try:
         from cs.pfx import XP as xlog
       except ImportError:
-        from cs.x import X as xlog
+        xlog = X
     else:
-      from cs.x import X as xlog
+      xlog = X
     if call:
       fmt, av = func_a_kw_fmt(citation, *a, **kw)
       xlog("CALL " + fmt, *av)
     try:
-      retval = func(*a, **kw)
+      result = func(*a, **kw)
     except Exception as e:
       if exception:
         xlog("CALL %s RAISE %r", citation, e)
@@ -103,9 +127,9 @@ def trace(
       if retval:
         xlog(
             "CALL %s RETURN %s", citation,
-            (pformat if pprint else repr)(retval)
+            (pformat if pprint else repr)(result)
         )
-      return retval
+      return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
   traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
@@ -139,6 +163,7 @@ def prop(func):
       into RuntimeErrors.
   '''
 
+  # pylint: disable=inconsistent-return-statements
   def prop_wrapper(*a, **kw):
     try:
       return func(*a, **kw)

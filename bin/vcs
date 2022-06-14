@@ -174,7 +174,10 @@ case "$op" in
                             base=$( basename "$wd" )
                             case "$base" in
                               *-"$br")  pfx=$( expr "x$base" : 'x\(.*\)-'"$br" )
-                                        clonedir=../$pfx-$clone_branch
+                                        case "$clone_branch" in
+                                          [1-9][0-9]*-*)    clonedir=../$clone_branch ;;
+                                          *)                clonedir=../$pfx-$clone_branch ;;
+                                        esac
                                         ;;
                               *)        clonedir=$wd-$br
                                         ;;
@@ -213,8 +216,8 @@ case "$op" in
                           continue
                         }
                         case "$mode" in
-                          cp) $trace cp -a "$srcpath" "$clonedir/$subdir/" ;;
-                          sym)$trace ln -s "$srcpath" "$clonedir/$subdir/" ;;
+                          cp) $trace cp -a "$srcpath" "$clonedir/$subdir/" || : ;;
+                          sym)$trace ln -s "$srcpath" "$clonedir/$subdir/" || : ;;
                           *)  echo "$context: mode=$mode: unimplemented mode, skipping" >&2 ;;
                         esac
                       done

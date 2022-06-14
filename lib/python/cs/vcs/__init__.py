@@ -13,7 +13,7 @@ from subprocess import check_call
 import sys
 from os.path import exists as existspath, join as joinpath, realpath
 from cs.fileutils import findup
-from cs.logutils import debug, warning
+from cs.logutils import debug, trace, warning
 from cs.pfx import pfx_method
 from cs.psutils import pipefrom
 
@@ -23,7 +23,7 @@ ReleaseLogEntry = namedtuple('ReleaseLogEntry', 'tag entry')
 def pipef(*argv, **kw):
   ''' Context manager returning the standard output of a command.
   '''
-  debug("+ %r |", argv)
+  trace("+ %r |", argv)
   P = pipefrom(argv, **kw)
   yield P.stdout
   if P.wait() != 0:
@@ -46,11 +46,11 @@ class VCS(ABC):
   def _pipefrom(self, *vcscmd_args):
     ''' Context manager return the stdout of a VCS command.
     '''
-    return pipef(self.COMMAND_NAME, *vcscmd_args)
+    return pipef(self.COMMAND_NAME, *vcscmd_args, quiet=True)
 
   def _cmd(self, *vcscmd_args):
     argv = [self.COMMAND_NAME] + list(vcscmd_args)
-    debug("+ %r", argv)
+    trace("+ %r", argv)
     check_call(argv)
 
   @pfx_method

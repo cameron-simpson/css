@@ -19,7 +19,7 @@ from collections import namedtuple
 from cs.deco import OBSOLETE
 from cs.lex import get_chars, get_decimal, skipwhite
 
-__version__ = '20210809-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -112,8 +112,10 @@ def decompose(n, scale):
     raise ValueError("invalid scale, final factor must be 0: %r" % (scale,))
   return components
 
-@OBSOLETE(suggestion="decompose")
+@OBSOLETE(suggestion="decompose")  # pylint: disable=no-value-for-parameter
 def human(n, scale):
+  ''' Obsolete shim for `decompose()`.
+  '''
   return decompose(n, scale)
 
 def geek_bytes(n):
@@ -128,8 +130,10 @@ def decompose_bytes(n):
   '''
   return decompose(n, DECIMAL_BYTES_SCALE)
 
-@OBSOLETE(suggestion="decompose_bytes")
+@OBSOLETE(suggestion="decompose_bytes")  # pylint: disable=no-value-for-parameter
 def human_bytes(n):
+  ''' Obsolete shim for `decompose_bytes()`.
+  '''
   return decompose_bytes(n)
 
 def decompose_time(n, scale=None):
@@ -140,8 +144,10 @@ def decompose_time(n, scale=None):
     scale = TIME_SCALE
   return decompose(n, scale)
 
-@OBSOLETE(suggestion="decompose_time")
+@OBSOLETE(suggestion="decompose_time")  # pylint: disable=no-value-for-parameter
 def human_time(n, scale=None):
+  ''' Obsolete shim for `decompose_time()`.
+  '''
   return decompose_time(n, scale=scale)
 
 def combine(components, scale):

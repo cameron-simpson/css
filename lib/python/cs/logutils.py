@@ -70,7 +70,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20220227-post'
+__version__ = '20220531-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -97,14 +97,20 @@ DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 # High level action tracking, above INFO and below WARNING.
 TRACK = logging.INFO + 5
 
+# Quiet messaging, below TRACK and above the rest.
+QUIET = TRACK - 1
+
 # Special status line tracking, above INFO and below TRACK and WARNING
-STATUS = TRACK - 1
+STATUS = QUIET - 1
 
 # Special verbose value, below INFO but above DEBUG.
 VERBOSE = logging.INFO - 1
 
 # check the hierarchy
-assert logging.DEBUG < VERBOSE < logging.INFO < STATUS < TRACK < logging.WARNING
+assert (
+    logging.DEBUG < VERBOSE < logging.INFO < STATUS < QUIET < TRACK <
+    logging.WARNING
+)
 
 loginfo = None
 D_mode = False
@@ -422,20 +428,43 @@ class PfxFormatter(Formatter):
     ''' Monkey patch an existing `Formatter` instance
         with a `format` method which prepends the current `Pfx` prefix.
     '''
-    old_format = formatter.format
+    if isinstance(formatter, PfxFormatter):
+      return
+    try:
+      getattr(formatter, 'PfxFormatter__monkey_patched')
+    except AttributeError:
+      old_format = formatter.format
 
-    def new_format(record):
-      ''' Call the former `formatter.format` method
-          and prepend the current `Pfx` prefix to the start.
-      '''
-      cur_pfx = Pfx._state.prefix
-      if not cur_pfx:
-        return old_format(record)
-      with stackattrs(record,
-                      msg=cur_pfx + cs.pfx.DEFAULT_SEPARATOR + record.msg):
-        return old_format(record)
+      def new_format(record):
+        ''' Call the former `formatter.format` method
+            and prepend the current `Pfx` prefix to the start.
+        '''
+        msg0 = record.msg
+        args0 = record.args
+        cur_pfx = Pfx._state.prefix
+        if not cur_pfx:
+          return old_format(record)
+        if not isinstance(record.args, tuple):
+          # TODO: dict support
+          return old_format(record)
+        else:
+          if record.args:
+            new_msg = '%s' + str(record.msg)
+            new_args = (cur_pfx +
+                        cs.pfx.DEFAULT_SEPARATOR,) + tuple(record.args)
+          else:
+            new_msg = cur_pfx + cs.pfx.DEFAULT_SEPARATOR + str(record.msg)
+            new_args = record.args
+          try:
+            with stackattrs(record, msg=new_msg, args=new_args):
+              return old_format(record)
+          except Exception as e:
+            # unsupported in some way, fall back to the original
+            # and lose the prefix
+            return old_format(record)
 
-    formatter.format = new_format
+      formatter.format = new_format
+      formatter.PfxFormatter__monkey_patched = True
 
 # pylint: disable=too-many-branches,too-many-statements,redefined-outer-name
 def infer_logging_level(env_debug=None, environ=None, verbose=None):
@@ -468,10 +497,11 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   if env_debug is None:
     if environ is None:
       environ = os.environ
-    env_debug = os.environ.get('DEBUG', '')
-  level = TRACK
+    env_debug = environ.get('DEBUG', '')
   if verbose is None:
-    if not sys.stderr.isatty():
+    if sys.stderr.isatty():
+      level = TRACK
+    else:
       level = logging.WARNING
   elif verbose:
     level = logging.VERBOSE
@@ -638,6 +668,12 @@ def track(msg, *args, **kwargs):
   ''' Emit a log at `TRACK` level with the current `Pfx` prefix.
   '''
   log(TRACK, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def quiet(msg, *args, **kwargs):
+  ''' Emit a log at `QUIET` level with the current `Pfx` prefix.
+  '''
+  log(QUIET, msg, *args, **kwargs)
 
 @logging_wrapper(stacklevel_increment=1)
 def verbose(msg, *args, **kwargs):
