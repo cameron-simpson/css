@@ -385,7 +385,14 @@ def setup_cmgr(cmgr):
   '''
   cmgr_twostep = twostep(cmgr)
   next(cmgr_twostep)
-  return lambda: next(cmgr_twostep)
+
+  def next2():
+    try:
+      next(cmgr_twostep)
+    except StopIteration:
+      pass
+
+  return next2
 
 def push_cmgr(o, attr, cmgr):
   ''' A convenience wrapper for `twostep(cmgr)`
