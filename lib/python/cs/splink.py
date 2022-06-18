@@ -635,7 +635,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     '''
     options = self.options
     options.expunge = False
-    self.popopts(argv, options, F='fetch_source', n='dry_run', x='expunge')
+    self.popopts(argv, options, F_='fetch_source', n='dry_run', x='expunge')
     doit = options.doit
     expunge = options.expunge
     fetch_source = options.fetch_source
@@ -646,6 +646,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     spd = options.spd
     rsopts = ['-iaO']
     rsargv = ['set-x', 'rsync']
+    if not doit:
+      rsargv.append('-n')
     rsargv.extend(rsopts)
     if expunge:
       rsargv.append('--delete-source')
@@ -656,9 +658,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             spd.downloadspath + '/'
         ]
     )
-    if not doit:
-      print(shlex.join(argv))
-      return 0
     print('+', shlex.join(argv))
     return run(rsargv)
 
