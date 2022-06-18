@@ -856,5 +856,46 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     else:
       print_figure(figure)
 
+  def cmd_pull(self, argv):
+    ''' Usage: {cmd} [-d dataset,...] [-F rsync-source] [-nx]
+          Fetch and import data.
+          -d dataset,...
+                Specify the datasets to import.
+          -F    Fetch rsync source, default from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
+          -n    No action; pass -n to rsync. Just more convenient than putting it at the end.
+          -x    Delete source files.
+    '''
+    options = self.options
+    options.expunge = False
+    self.popopts(
+        argv,
+        options,
+        d='datasets',
+        F_='fetch_source',
+        n='dry_run',
+        x='expunge',
+    )
+    doit = options.doit
+    expunge = options.expunge
+    fetch_source = options.fetch_source
+    fetch_argv = []
+    if fetch_source:
+      fetch_argv.extend(['-F', fetch_source])
+    if not doit:
+      fetch_argv.append('-n')
+    if expunge:
+      fetch_argv.append('-x')
+    xit = self.cmd_fetch(fetch_argv)
+    if xit == 0:
+      import_argv = []
+      if not doit:
+        import_argv.append('-n')
+      if datasets:
+        import_argv.extend(['-d', datasets])
+      if argv:
+        import_argv.extend(['--', *argv])
+      xit = self.cmd_import(import_argv)
+    return xit
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
