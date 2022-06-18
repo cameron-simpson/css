@@ -1175,7 +1175,9 @@ class UpdProxy(object):
     if self.upd is not None:
       with self.upd._lock:  # pylint: disable=protected-access
         index = self.index
-        if index is not None:
+        if index is None:
+          self.text = ''
+        else:
           self.upd.delete(index)
 
   __del__ = delete
