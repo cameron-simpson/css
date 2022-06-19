@@ -2950,7 +2950,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     tag_value = self.tags.get(tag_name)
     if tag_value != new_tag_value:
-      print("%s + %s=%r", self, tag_name, new_tag_value)
       self.tags[tag_name] = tag_value
 
   @typechecked
