@@ -36,6 +36,7 @@ from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+from datetime import datetime, tzinfo
 from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
@@ -74,6 +75,7 @@ from typing import (
 
 import arrow
 from arrow import Arrow
+import dateutil
 from icontract import ensure, require, DBC
 from matplotlib.figure import Figure
 import numpy as np
