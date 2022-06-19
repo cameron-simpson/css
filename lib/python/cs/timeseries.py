@@ -36,6 +36,7 @@ from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+from datetime import datetime, tzinfo
 from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
@@ -74,6 +75,7 @@ from typing import (
 
 import arrow
 from arrow import Arrow
+import dateutil
 from icontract import ensure, require, DBC
 from matplotlib.figure import Figure
 import numpy as np
@@ -212,8 +214,7 @@ class TypeCode(str):
       return nan
     if self == 'q':
       return 0
-    else:
-      raise RuntimeError('no default fill value for %r' % (self,))
+    raise RuntimeError('no default fill value for %r' % (self,))
 
 @typechecked
 def deduce_type_bigendianness(typecode: str) -> bool:
@@ -241,11 +242,30 @@ NATIVE_BIGENDIANNESS = {
 DT64_0 = datetime64(0, 's')
 TD_1S = timedelta64(1, 's')
 
-def as_datetime64s(times):
+def as_datetime64s(times, unit='s'):
   ''' Return a Numpy array of `datetime64` values
       computed from an iterable of `int`/`float` UNIX timestamp values.
+
+      The optional `unit` parameter (default `'s'`) may be one of:
+      - `'s'`: seconds
+      - `'ms'`: milliseconds
+      - `'us'`: microseconds
+      - `'ns'`: nanoseconds
+      and represents the precision to preserve in the source time
+      when converting to a `datetime64`.
+      Less precision gives greater time range.
   '''
-  return np.array(list(map(int, times))).astype('datetime64[s]')
+  try:
+    scale = {
+        's': int,
+        'ms': lambda f: int(f * 1000),
+        'us': lambda f: int(f * 1000000),
+        'ns': lambda f: int(f * 1000000000),
+    }[unit]
+  except KeyError:
+    # pylint: disable=raise-missing-from
+    raise ValueError("as_datetime64s: unhandled unit %r" % (unit,))
+  return np.array(list(map(scale, times))).astype(f'datetime64[{unit}]')
 
 def datetime64_as_timestamp(dt64: datetime64):
   ''' Return the UNIX timestamp for the `datetime64` value `dt64`.
@@ -283,12 +303,14 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] days [{{glob|fields}}...]
+    ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] [--tz tzspec] days [{{glob|fields}}...]
           Plot the most recent days of data from the time series at tspath.
           Options:
           -f              Force. -o will overwrite an existing image file.
           -o imgpath.png  File system path to which to save the plot.
           --show          Show the image in the GUI.
+          --tz tzspec     Skew the UTC times presented on the graph
+                          to emulate the timezone spcified by tzspec.
           --stacked       Stack the plot lines/areas.
           glob|fields     If glob is supplied, constrain the keys of
                           a TimeSeriesDataDir by the glob.
@@ -297,8 +319,9 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     runstate = options.runstate
     options.show_image = False
     options.imgpath = None
-    options.stacked = False
     options.multi = False
+    options.stacked = False
+    options.tz = None
     self.popopts(
         argv,
         options,
@@ -307,9 +330,11 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         o_='imgpath',
         show='show_image',
         stacked=None,
+        tz_=('tz', tzfor),
     )
     force = options.force
     imgpath = options.imgpath
+    tz = options.tz
     if imgpath and not force and existspath(imgpath):
       raise GetoptError("imgpath exists: %r" % (imgpath,))
     days = self.poparg(argv, int, "days to display", lambda days: days > 0)
@@ -333,6 +358,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           now,
           ax=ax,
           runstate=runstate,
+          tz=tz,
           figsize=(plot_dx, plot_dy),
           **plot_kw
       )  # pylint: disable=missing-kwoa
@@ -357,6 +383,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           now,
           keys,
           runstate=runstate,
+          tz=tz,
           ax=ax,
           **plot_kw,
       )  # pylint: too-many-function-args.disable=missing-kwoa
@@ -710,14 +737,59 @@ def plotrange(func, needs_start=False, needs_stop=False):
   # pylint: disable=keyword-arg-before-vararg
   @require(lambda start: not needs_start or start is not None)
   @require(lambda stop: not needs_stop or stop is not None)
-  def plotrange_wrapper(self, start=None, stop=None, *a, **kw):
+  def plotrange_wrapper(
+      self, start=None, stop=None, *a, tz=None, utcoffset=None, **kw
+  ):
     import_extra('pandas', DISTINFO)
     import_extra('matplotlib', DISTINFO)
     if start is None:
       start = self.start
     if stop is None:
       stop = self.stop
-    return func(self, start, stop, *a, **kw)
+    if utcoffset is None:
+      if tz is None:
+        utcoffset = 0.0
+      else:
+        if isinstance(tz, str):
+          tz = tzfor(tz)
+          assert isinstance(tz, tzinfo)
+        # DF hack: compute the timezone offset for "stop",
+        # use it to skew the UNIX timestamps so that UTC tick marks and
+        # placements look "local"
+        dt = datetime.fromtimestamp(stop, tz=tz)
+        utcoffset = tz.utcoffset(dt).total_seconds()
+    elif tz is not None:
+      raise ValueError(
+          "may not supply both utcoffset:%s and tz:%s" % (r(utcoffset), r(tz))
+      )
+
+    func.__doc__ += '''
+
+        The `utcoffset` or `tz` parameters may be used to provide
+        an offset from UT in seconds for the timestamps _as presented
+        on the index/x-axis_. It is an error to specify both.
+        Specifying neither uses an offset of `0.0`.
+
+        The `utcoffset` parameter is a plain offset from UTC in seconds.
+
+        The timezone parameter is a little idiosyncratic.
+        `DataFrame.plot` _has no timezone support_. It uses its own
+        locators and formatters, which render UTC.
+        For most scientific data that is a sound practice, so that
+        graphs have a common time reference for people in different
+        time zones.
+
+        For some data a timezone _is_ relevant, for example my
+        originating use case which plots my solar inverter data -
+        the curves are correlated with the position of the sun,
+        which is closely correlated with the local timezone; for
+        this use case `dateutil.tz.tzlocal()` is a good choice.
+
+        When you supply a `tzinfo` object it will be used to compute
+        the offset from UTC for the rightmost timestamp on the graph
+        (`stop`) and that offset will be applied to all the timestamps
+        on the graph.'''
+    return func(self, start, stop, *a, utcoffset=utcoffset, **kw)
 
   return plotrange_wrapper
 
@@ -757,6 +829,19 @@ def get_default_timezone_name():
   ''' Return the default timezone name.
   '''
   return arrow.now('local').format('ZZZ')
+
+def tzfor(tzspec=None) -> tzinfo:
+  ''' Return a `tzinfo` from the timezone specification `tzspec`.
+      If `tzspec` is omitted or the string `'local'` this returns
+      `dateutil.tz.gettz()`, the local system timezone.
+      Otherwise it returns `dateutil.tz.gettz(tzspec)`.
+  '''
+  if tzspec is None or tzspec == 'local':
+    return dateutil.tz.gettz()
+  tz = dateutil.tz.gettz(tzspec)
+  if tz is None:
+    raise ValueError("dateutil.tz.gettz(%r) gave None" % (tzspec,))
+  return tz
 
 @contextmanager
 def array_byteswapped(ary):
@@ -1122,7 +1207,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     return np.array(self[start:stop], self.np_type)
 
   @pfx
-  def as_pd_series(self, start=None, stop=None):
+  def as_pd_series(self, start=None, stop=None, utcoffset=None):
     ''' Return a `pandas.Series` containing the data from `start` to `stop`,
         default from `self.start` and `self.stop` respectively.
     '''
@@ -1131,8 +1216,12 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
       start = self.start  # pylint: disable=no-member
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
+    if utcoffset is None:
+      utcoffset = 0.0
     times, data = self.data2(start, stop)
-    return pd.Series(data, as_datetime64s(times), self.np_type)
+    return pd.Series(
+        data, as_datetime64s([t + utcoffset for t in times]), self.np_type
+    )
 
   @plotrange
   def plot(
@@ -1142,6 +1231,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
       *,
       label=None,
       runstate=None,  # pylint: disable=unused-argument
+      utcoffset,
       **plot_kw,
   ):
     ''' Convenience shim for `DataFrame.plot` to plot data from
@@ -1149,15 +1239,17 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
 
         Parameters:
         * `start`,`stop`: the time range
-        * `runstate`: optional `RunState`, ignored in this implementation
         * `label`: optional label for the graph
+        * `runstate`: optional `RunState`, ignored in this implementation
+        * `tz`: optional timezone `datetime.tzinfo` object
+        * `utcoffset`: optional timestamp skew from UTC in seconds
         Other keyword parameters are passed to `DataFrame.plot`.
     '''
     pd = import_extra('pandas', DISTINFO)
     if label is None:
       label = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
-    xdata, yaxis = self.data2(start, stop)
-    xaxis = as_datetime64s(xdata)
+    times, yaxis = self.data2(start, stop)
+    xaxis = as_datetime64s([t + utcoffset for t in times], 'ms')
     assert len(xaxis) == len(yaxis), (
         "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
         (len(xaxis), len(yaxis), start, stop)
@@ -1829,7 +1921,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ''' Bulk set values.
     '''
     # ensure we're using array mode
-    self.array
+    self.array  # pylint: disable=pointless-statement
     for offset, value in zip(map(self.offset, whens), values):
       if skipNone and value is None:
         continue
@@ -1852,13 +1944,14 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       self.modified = True
       assert len(ary) == ary_index + 1
 
-class TimePartition(namedtuple('TimePartition', 'epoch name offset0 steps'),
+class TimePartition(namedtuple('TimePartition',
+                               'epoch name start_offset end_offset'),
                     TimeStepsMixin):
   ''' A `namedtuple` for a slice of time with the following attributes:
       * `epoch`: the reference `Epoch`
       * `name`: the name for this slice
-      * `offset0`: the epoch offset of the start time (`self.start`)
-      * `steps`: the number of time slots in this partition
+      * `start_offset`: the epoch offset of the start time (`self.start`)
+      * `end_offset`: the epoch offset of the end time (`self.stop`)
 
       These are used by `TimespanPolicy` instances to express the partitions
       into which they divide time.
@@ -1866,15 +1959,15 @@ class TimePartition(namedtuple('TimePartition', 'epoch name offset0 steps'),
 
   @property
   def start(self):
-    ''' The start UNIX time derived from `self.epoch` and `self.offset0`.
+    ''' The start UNIX time derived from `self.epoch` and `self.start_offset`.
     '''
-    return self.epoch.when(self.offset0)
+    return self.epoch.when(self.start_offset)
 
   @property
   def stop(self):
-    ''' The start UNIX time derived from `self.epoch` and `self.offset0` and `self.steps`.
+    ''' The end UNIX time derived from `self.epoch` and `self.end_offset`.
     '''
-    return self.epoch.when(self.offset0 + self.steps)
+    return self.epoch.when(self.end_offset)
 
   @property
   def step(self):
@@ -1891,7 +1984,7 @@ class TimePartition(namedtuple('TimePartition', 'epoch name offset0 steps'),
     ''' A generator yielding times from this partition from
         `self.start` to `self.stop` by `self.step`.
     '''
-    offset = self.offset0
+    offset = self.start_offset
     epoch = self.epoch
     for offset in self.offsets():
       yield epoch.when(offset)
@@ -1899,7 +1992,7 @@ class TimePartition(namedtuple('TimePartition', 'epoch name offset0 steps'),
   def offsets(self):
     ''' Return an iterable of the epoch offsets from `self.start` to `self.stop`.
     '''
-    return range(self.offset0, self.offset0 + self.steps)
+    return range(self.start_offset, self.end_offset)
 
 class TimespanPolicy(DBC, HasEpochMixin):
   ''' A class implementing a policy allocating times to named time spans.
@@ -2042,8 +2135,8 @@ class TimespanPolicy(DBC, HasEpochMixin):
     return TimePartition(
         epoch=epoch,
         name=name,
-        offset0=start_offset,
-        steps=end_offset - start_offset
+        start_offset=start_offset,
+        end_offset=end_offset,
     )
 
   @abstractmethod
@@ -2075,9 +2168,14 @@ class TimespanPolicy(DBC, HasEpochMixin):
     when = start
     while when < stop:
       span = self.span_for_time(when)
-      offset0 = epoch.offset(max(span.start, when))
-      offset1 = epoch.offset(min(span.stop, stop))
-      yield TimePartition(epoch, span.name, offset0, offset1 - offset0)
+      start_offset = epoch.offset(max(span.start, when))
+      end_offset = epoch.offset(min(span.stop, stop))
+      yield TimePartition(
+          epoch=epoch,
+          name=span.name,
+          start_offset=start_offset,
+          end_offset=end_offset,
+      )
       when = span.stop
 
   def spans_for_times(self, whens):
@@ -2369,6 +2467,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       keys: Optional[Iterable[str]] = None,
       *,
       runstate=None,
+      utcoffset=None,
   ):
     ''' Return a `numpy.DataFrame` containing the specified data.
 
@@ -2384,9 +2483,11 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       stop = self.stop  # pylint: disable=no-member
     if keys is None:
       keys = self.keys()
-    elif not isinstance(keys, (tuple, list)):
+    if not isinstance(keys, (tuple, list)):
       keys = tuple(keys)
-    indices = as_datetime64s(self.range(start, stop))
+    if utcoffset is None:
+      utcoffset = 0.0
+    indices = as_datetime64s([t + utcoffset for t in self.range(start, stop)])
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
       for key in progressbar(keys, "gather fields"):
@@ -2396,7 +2497,9 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         with Pfx(key):
           if key not in self:
             raise KeyError("no such key")
-          data_dict[key] = self[key].as_pd_series(start, stop)
+          data_dict[key] = self[key].as_pd_series(
+              start, stop, utcoffset=utcoffset
+          )
     if runstate and runstate.cancelled:
       raise CancellationError
     return pfx_call(
@@ -2409,7 +2512,15 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
 
   @plotrange
   def plot(
-      self, start, stop, keys=None, *, label=None, runstate=None, **plot_kw
+      self,
+      start,
+      stop,
+      keys=None,
+      *,
+      label=None,
+      runstate=None,
+      utcoffset,
+      **plot_kw
   ):
     ''' Convenience shim for `DataFrame.plot` to plot data from
         `start` to `stop` for each key in `keys`.
@@ -2424,7 +2535,13 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     '''
     if keys is None:
       keys = sorted(self.keys())
-    df = self.as_pd_dataframe(start, stop, keys, runstate=runstate)
+    df = self.as_pd_dataframe(
+        start,
+        stop,
+        keys,
+        runstate=runstate,
+        utcoffset=utcoffset,
+    )
     for key in keys:
       with Pfx(key):
         ts = self[key]
@@ -2833,7 +2950,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     tag_value = self.tags.get(tag_name)
     if tag_value != new_tag_value:
-      print("%s + %s=%r", self, tag_name, new_tag_value)
       self.tags[tag_name] = tag_value
 
   @typechecked
@@ -2877,9 +2993,12 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         ts_values = ts[span.start:span.stop]
         steps = span.stop - span.start
         values.extend(ts_values)
-        difflen = steps - len(ts_values)
+        difflen = (span.end_offset - span.start_offset) - len(ts_values)
         if difflen > 0:
-          warning("pad with %d fill values", difflen)
+          warning(
+              "span:%s:%s: %d values, pad with %d fill values", span.start,
+              span.stop, len(ts_values), difflen
+          )
           values.extend([ts.fill] * difflen)
         else:
           assert difflen == 0, "difflen should be 0, but is %r" % difflen
