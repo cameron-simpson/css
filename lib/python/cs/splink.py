@@ -833,18 +833,29 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [--show] [-f] [-o imagepath] days {{mode|[dataset:]{{glob|field}}}}...
+    ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] days {{mode|[dataset:]{{glob|field}}}}...
+        -e events,...   Display the specified events.
+        -f              Force. Overwirte the image path even if it exists.
+        --stacked       Stack graphed values on top of each other.
+        -o imagepath    Write the plot to imagepath.
+                        If not specified, the image will be written
+                        to the standard output in sixel format if
+                        it is a terminal, and in PNG format otherwise.
+        --show          Open the image path with "open".
+        days            How many recent days to graph.
+        mode            A named graph mode, implying a group of fields.
     '''
     options = self.options
     options.show_image = False
     options.imgpath = None
     options.stacked = False
-    options.multi = False
+    options.stacked = False
+    options.event_labels = None
     self.popopts(
         argv,
         options,
+        e_='event_labels',
         f='force',
-        multi=None,
         o_='imgpath',
         show='show_image',
         stacked=None,
@@ -853,10 +864,19 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     imgpath = options.imgpath
     spd = options.spd
     show_image = options.show_image
+    stacked = options.stacked
+    event_labels = options.event_labels
     days = self.poparg(argv, int, "days to display", lambda days: days > 0)
     now = time.time()
     start = now - days * 24 * 3600
-    figure = spd.plot(start, now, key_specs=argv)
+    figure = spd.plot(
+        start,
+        now,
+        key_specs=argv,
+        tz='local',
+        event_labels=event_labels,
+        stacked=stacked
+    )
     if imgpath:
       save_figure(figure, imgpath, force=force)
       if show_image:
