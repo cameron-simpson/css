@@ -1086,7 +1086,7 @@ class UpdProxy(object):
       with upd._lock:  # pylint: disable=protected-access
         index = self.index
         if index is not None:
-          txt = upd.normalise(self.prefix + self._text + self._suffix)
+          txt = upd.normalise(self._prefix + self._text + self._suffix)
           overflow = len(txt) - upd.columns + 1
           if overflow > 0:
             txt = '<' + txt[overflow + 1:]
@@ -1175,7 +1175,9 @@ class UpdProxy(object):
     if self.upd is not None:
       with self.upd._lock:  # pylint: disable=protected-access
         index = self.index
-        if index is not None:
+        if index is None:
+          self.text = ''
+        else:
           self.upd.delete(index)
 
   __del__ = delete

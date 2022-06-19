@@ -52,10 +52,11 @@ from cs.timeseries import (
     TimeSeriesDataDir,
     TimespanPolicyYearly,
     plot_events,
+    plotrange,
     print_figure,
     save_figure,
 )
-from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20220606-post'
 
@@ -205,13 +206,7 @@ class SPLinkCSVDir(HasFSPath):
         and export its contents into the `tsd:TimeSeriesDataDir.
         Return exported `DataFrame`.
     '''
-    nan = float('nan')
-    ts2001 = ts2001_unixtime(tzname)
-    rowtype, rows = csv_import(csvpath)
     # group the values by key
-    keys = rowtype.attributes_
-    key0 = keys[0]
-    key_values = {key: [] for key in keys}
     short_csvpath = relpath(csvpath, self.fspath)
     if short_csvpath.startswith('../'):
       short_csvpath = shortpath(csvpath)
@@ -472,21 +467,28 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
           for key in pfx_call(tsd.keys, field_spec):
             yield tsd, key
 
+  @plotrange
   def plot(
       self,
       start,
       stop,
       *,
+      utcoffset,
       key_specs,
       mode=None,
       figsize=None,
       dpi=None,
       event_labels=None,
       mode_patterns=None,
+      stacked=False,
+      upd=None,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
     '''
+    # DF hack: compute the timezone offset for "stop",
+    # use it to skew the UNIX timestamps so that UTC tick marks and
+    # placements look "local"
     if figsize is None:
       figsize = 14, 8
     if dpi is None:
@@ -495,72 +497,44 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       event_labels = DEFAULT_PLOT_EVENT_LABELS
     if mode_patterns is None:
       mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
+    if upd is None:
+      upd = Upd()
+    tsd_by_id = {}
+    keys_by_id = defaultdict(list)
     with Pfx("key_specs"):
-      tsd_keys = []
       for key_spec in key_specs:
         with Pfx(key_spec):
           if mode is None and key_spec in mode_patterns:
             mode = key_spec
           key_spec = mode_patterns.get(key_spec, key_spec)
-          matches = list(self.resolve(key_spec))
-          if matches:
-            tsd_keys.extend(self.resolve(key_spec))
-          else:
+          matched = False
+          for tsd, key in self.resolve(key_spec):
+            tsd_by_id[id(tsd)] = tsd
+            keys_by_id[id(tsd)].append(key)
+            matched = True
+          if not matched:
             warning("no matches")
-    if not tsd_keys:
-      raise GetoptError("no fields were resolved")
+    if not tsd_by_id:
+      raise ValueError(
+          "no fields were resolved by key_specs=%r" % (key_specs,)
+      )
     if mode is None:
       # scan the keys looking for a match to a mode
-      for tsd_key in tsd_keys:
-        _, key = tsd_key
-        for mode_name, mode_glob in mode_patterns.items():
-          if pfx_call(fnmatch, key, mode_glob):
-            mode = mode_name
-            break
+      for keys in keys_by_id.values():
+        for key in keys:
+          for mode_name, mode_glob in mode_patterns.items():
+            if pfx_call(fnmatch, key, mode_glob):
+              mode = mode_name
+              break
         if mode is not None:
           break
     figure = Figure(figsize=figsize, dpi=dpi)
     figure.add_subplot()
     ax = figure.axes[0]
-    with UpdProxy(prefix="plot lines: ") as proxy:
-      # the data may come from different datasets
-      for tsd, key in tsd_keys:
-        name = f'{shortpath(tsd.fspath)}:{key}'
-        proxy.text = name
-        ax = tsd.plot(
-            start,
-            stop,
-            ax=ax,
-            keys=(key,),
-        )
-    with UpdProxy(prefix="plot events: ") as proxy:
-      eventsdb = self.eventsdb
-      ev_y_field = {
-          'energy': 'load_ac_power_instantaneous_kw',
-          'power': 'load_ac_power_instantaneous_kw',
-          'vac': 'ac_load_voltage_instantaneous_v_ac',
-          'vdc': 'dc_voltage_instantaneous_v_dc',
-      }.get(mode, 'ac_load_voltage_instantaneous_v_ac')
-      for label in event_labels:
-        with proxy.extend_prefix(label + ": "):
-          proxy.text = "find events"
-          events = list(
-              eventsdb.find(
-                  f"unixtime>={start}",
-                  f"unixtime<{stop}",
-                  event_description=label,
-                  # TODO: use a constant
-                  dataset='EventData',
-              )
-          )
-          print(len(events), "events found for", repr(label))
-          proxy.text = "add trace"
-          plot_events(
-              ax,
-              events,
-              lambda ev: ev[ev_y_field],
-              label=label,
-          )
+    with upd.run_task("plot"):
+      for tsd_id, tsd in tsd_by_id.items():
+        keys = keys_by_id[tsd_id]
+        tsd.plot(start, stop, keys=keys, utcoffset=utcoffset, ax=ax)
     ax.set_title(str(self))
     return figure
 
@@ -626,7 +600,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         with spd:
           yield
 
-  def cmd_fetch(self, argv):
+  def cmd_fetch(self, argv, fetch_source=None, doit=None, expunge=None):
     ''' Usage: {cmd} [-F rsync-source] [-nx] [-- [rsync-options...]]
           Rsync everything from rsync-source into the downloads area.
           -F    Fetch rsync source, default from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
@@ -634,8 +608,12 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           -x    Delete source files.
     '''
     options = self.options
-    options.expunge = False
-    self.popopts(argv, options, F='fetch_source', n='dry_run', x='expunge')
+    if doit is not None:
+      options.doit = doit
+    if fetch_source is not None:
+      options.fetch_source = fetch_source
+    options.expunge = False if expunge is None else expunge
+    self.popopts(argv, options, F_='fetch_source', n='dry_run', x='expunge')
     doit = options.doit
     expunge = options.expunge
     fetch_source = options.fetch_source
@@ -646,6 +624,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     spd = options.spd
     rsopts = ['-iaO']
     rsargv = ['set-x', 'rsync']
+    if not doit:
+      rsargv.append('-n')
     rsargv.extend(rsopts)
     if expunge:
       rsargv.append('--delete-source')
@@ -656,14 +636,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             spd.downloadspath + '/'
         ]
     )
-    if not doit:
-      print(shlex.join(argv))
-      return 0
     print('+', shlex.join(argv))
-    return run(rsargv)
+    return run(rsargv).returncode
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
-  def cmd_import(self, argv):
+  def cmd_import(self, argv, datasets=None, doit=None, force=None):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
           -d datasets       Comma separated list of datasets to import.
@@ -676,11 +653,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                             imported.
     '''
     options = self.options
-    fstags = options.fstags
-    runstate = options.runstate
-    spd = options.spd
-    upd = options.upd
-    options.datasets = self.ALL_DATASETS
+    if doit is not None:
+      options.doit = doit
+    if force is not None:
+      options.force = force
+    options.datasets = self.ALL_DATASETS if datasets is None else datasets
     options.once = False
     badopts = False
     options.popopts(
@@ -690,6 +667,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         n='dry_run',
         dry_run='dry_run',
     )
+    spd = options.spd
+    upd = options.upd
+    fstags = options.fstags
+    runstate = options.runstate
     datasets = options.datasets
     doit = options.doit
     force = options.force
@@ -826,18 +807,29 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [--show] [-f] [-o imagepath] days {{mode|[dataset:]{{glob|field}}}}...
+    ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] days {{mode|[dataset:]{{glob|field}}}}...
+        -e events,...   Display the specified events.
+        -f              Force. Overwirte the image path even if it exists.
+        --stacked       Stack graphed values on top of each other.
+        -o imagepath    Write the plot to imagepath.
+                        If not specified, the image will be written
+                        to the standard output in sixel format if
+                        it is a terminal, and in PNG format otherwise.
+        --show          Open the image path with "open".
+        days            How many recent days to graph.
+        mode            A named graph mode, implying a group of fields.
     '''
     options = self.options
     options.show_image = False
     options.imgpath = None
     options.stacked = False
-    options.multi = False
+    options.stacked = False
+    options.event_labels = None
     self.popopts(
         argv,
         options,
+        e_='event_labels',
         f='force',
-        multi=None,
         o_='imgpath',
         show='show_image',
         stacked=None,
@@ -846,16 +838,62 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     imgpath = options.imgpath
     spd = options.spd
     show_image = options.show_image
+    stacked = options.stacked
+    event_labels = options.event_labels
     days = self.poparg(argv, int, "days to display", lambda days: days > 0)
     now = time.time()
     start = now - days * 24 * 3600
-    figure = spd.plot(start, now, key_specs=argv)
+    figure = spd.plot(
+        start,
+        now,
+        key_specs=argv,
+        tz='local',
+        event_labels=event_labels,
+        stacked=stacked
+    )
     if imgpath:
       save_figure(figure, imgpath, force=force)
       if show_image:
         os.system(shlex.join(['open', imgpath]))
     else:
       print_figure(figure)
+
+  def cmd_pull(self, argv):
+    ''' Usage: {cmd} [-d dataset,...] [-F rsync-source] [-nx]
+          Fetch and import data.
+          -d dataset,...
+                Specify the datasets to import.
+          -F    Fetch rsync source, default from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
+          -n    No action; pass -n to rsync. Just more convenient than putting it at the end.
+          -x    Delete source files.
+    '''
+    options = self.options
+    options.datasets = self.ALL_DATASETS
+    options.expunge = False
+    self.popopts(
+        argv,
+        options,
+        d_=('datasets', lambda opt: opt.split(',')),
+        F_='fetch_source',
+        n='dry_run',
+        x='expunge',
+    )
+    doit = options.doit
+    datasets = options.datasets
+    expunge = options.expunge
+    fetch_source = options.fetch_source
+    fetch_argv = []
+    if fetch_source:
+      fetch_argv.extend(['-F', fetch_source])
+    if not doit:
+      fetch_argv.append('-n')
+    if expunge:
+      fetch_argv.append('-x')
+    xit = self.cmd_fetch(fetch_argv)
+    if xit == 0:
+      import_argv = ['--', *argv]
+      xit = self.cmd_import(import_argv, datasets=datasets, doit=doit)
+    return xit
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
