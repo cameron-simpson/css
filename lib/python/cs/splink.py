@@ -626,7 +626,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         with spd:
           yield
 
-  def cmd_fetch(self, argv):
+  def cmd_fetch(self, argv, fetch_source=None, doit=None, expunge=None):
     ''' Usage: {cmd} [-F rsync-source] [-nx] [-- [rsync-options...]]
           Rsync everything from rsync-source into the downloads area.
           -F    Fetch rsync source, default from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
@@ -634,7 +634,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           -x    Delete source files.
     '''
     options = self.options
-    options.expunge = False
+    if doit is not None:
+      options.doit = doit
+    if fetch_source is not None:
+      options.fetch_source = fetch_source
+    options.expunge = False if expunge is None else expunge
     self.popopts(argv, options, F_='fetch_source', n='dry_run', x='expunge')
     doit = options.doit
     expunge = options.expunge
@@ -662,7 +666,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     return run(rsargv)
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
-  def cmd_import(self, argv):
+  def cmd_import(self, argv, datasets=None, doit=None, force=None):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
           -d datasets       Comma separated list of datasets to import.
@@ -675,11 +679,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                             imported.
     '''
     options = self.options
-    fstags = options.fstags
-    runstate = options.runstate
-    spd = options.spd
-    upd = options.upd
-    options.datasets = self.ALL_DATASETS
+    if doit is not None:
+      options.doit = doit
+    if force is not None:
+      options.force = force
+    options.datasets = self.ALL_DATASETS if datasets is None else datasets
     options.once = False
     badopts = False
     options.popopts(
@@ -689,6 +693,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         n='dry_run',
         dry_run='dry_run',
     )
+    spd = options.spd
+    upd = options.upd
+    fstags = options.fstags
+    runstate = options.runstate
     datasets = options.datasets
     doit = options.doit
     force = options.force
@@ -866,16 +874,18 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           -x    Delete source files.
     '''
     options = self.options
+    options.datasets = self.ALL_DATASETS
     options.expunge = False
     self.popopts(
         argv,
         options,
-        d='datasets',
+        d_=('datasets', lambda opt: opt.split(',')),
         F_='fetch_source',
         n='dry_run',
         x='expunge',
     )
     doit = options.doit
+    datasets = options.datasets
     expunge = options.expunge
     fetch_source = options.fetch_source
     fetch_argv = []
@@ -887,14 +897,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       fetch_argv.append('-x')
     xit = self.cmd_fetch(fetch_argv)
     if xit == 0:
-      import_argv = []
-      if not doit:
-        import_argv.append('-n')
-      if datasets:
-        import_argv.extend(['-d', datasets])
-      if argv:
-        import_argv.extend(['--', *argv])
-      xit = self.cmd_import(import_argv)
+      import_argv = ['--', *argv]
+      xit = self.cmd_import(import_argv, datasets=datasets, doit=doit)
     return xit
 
 if __name__ == '__main__':
