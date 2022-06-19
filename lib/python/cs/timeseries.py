@@ -728,14 +728,59 @@ def plotrange(func, needs_start=False, needs_stop=False):
   # pylint: disable=keyword-arg-before-vararg
   @require(lambda start: not needs_start or start is not None)
   @require(lambda stop: not needs_stop or stop is not None)
-  def plotrange_wrapper(self, start=None, stop=None, *a, **kw):
+  def plotrange_wrapper(
+      self, start=None, stop=None, *a, tz=None, utcoffset=None, **kw
+  ):
     import_extra('pandas', DISTINFO)
     import_extra('matplotlib', DISTINFO)
     if start is None:
       start = self.start
     if stop is None:
       stop = self.stop
-    return func(self, start, stop, *a, **kw)
+    if utcoffset is None:
+      if tz is None:
+        utcoffset = 0.0
+      else:
+        if isinstance(tz, str):
+          tz = tzfor(tz)
+          assert isinstance(tz, tzinfo)
+        # DF hack: compute the timezone offset for "stop",
+        # use it to skew the UNIX timestamps so that UTC tick marks and
+        # placements look "local"
+        dt = datetime.fromtimestamp(stop, tz=tz)
+        utcoffset = tz.utcoffset(dt).total_seconds()
+    elif tz is not None:
+      raise ValueError(
+          "may not supply both utcoffset:%s and tz:%s" % (r(utcoffset), r(tz))
+      )
+
+    func.__doc__ += '''
+
+        The `utcoffset` or `tz` parameters may be used to provide
+        an offset from UT in seconds for the timestamps _as presented
+        on the index/x-axis_. It is an error to specify both.
+        Specifying neither uses an offset of `0.0`.
+
+        The `utcoffset` parameter is a plain offset from UTC in seconds.
+
+        The timezone parameter is a little idiosyncratic.
+        `DataFrame.plot` _has no timezone support_. It uses its own
+        locators and formatters, which render UTC.
+        For most scientific data that is a sound practice, so that
+        graphs have a common time reference for people in different
+        time zones.
+
+        For some data a timezone _is_ relevant, for example my
+        originating use case which plots my solar inverter data -
+        the curves are correlated with the position of the sun,
+        which is closely correlated with the local timezone; for
+        this use case `dateutil.tz.tzlocal()` is a good choice.
+
+        When you supply a `tzinfo` object it will be used to compute
+        the offset from UTC for the rightmost timestamp on the graph
+        (`stop`) and that offset will be applied to all the timestamps
+        on the graph.'''
+    return func(self, start, stop, *a, utcoffset=utcoffset, **kw)
 
   return plotrange_wrapper
 
