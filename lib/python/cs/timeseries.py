@@ -1225,6 +1225,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
       *,
       label=None,
       runstate=None,  # pylint: disable=unused-argument
+      utcoffset,
       **plot_kw,
   ):
     ''' Convenience shim for `DataFrame.plot` to plot data from
@@ -1232,15 +1233,17 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
 
         Parameters:
         * `start`,`stop`: the time range
-        * `runstate`: optional `RunState`, ignored in this implementation
         * `label`: optional label for the graph
+        * `runstate`: optional `RunState`, ignored in this implementation
+        * `tz`: optional timezone `datetime.tzinfo` object
+        * `utcoffset`: optional timestamp skew from UTC in seconds
         Other keyword parameters are passed to `DataFrame.plot`.
     '''
     pd = import_extra('pandas', DISTINFO)
     if label is None:
       label = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
-    xdata, yaxis = self.data2(start, stop)
-    xaxis = as_datetime64s(xdata)
+    times, yaxis = self.data2(start, stop)
+    xaxis = as_datetime64s([t + utcoffset for t in times], 'ms')
     assert len(xaxis) == len(yaxis), (
         "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
         (len(xaxis), len(yaxis), start, stop)
