@@ -1205,7 +1205,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     return np.array(self[start:stop], self.np_type)
 
   @pfx
-  def as_pd_series(self, start=None, stop=None):
+  def as_pd_series(self, start=None, stop=None, utcoffset=None):
     ''' Return a `pandas.Series` containing the data from `start` to `stop`,
         default from `self.start` and `self.stop` respectively.
     '''
@@ -1215,7 +1215,9 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
     times, data = self.data2(start, stop)
-    return pd.Series(data, as_datetime64s(times), self.np_type)
+    return pd.Series(
+        data, as_datetime64s([t + utcoffset for t in times]), self.np_type
+    )
 
   @plotrange
   def plot(
