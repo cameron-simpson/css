@@ -663,7 +663,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         ]
     )
     print('+', shlex.join(argv))
-    return run(rsargv)
+    cp = run(rsargv)
+    if cp is None:
+      return 0
+    return cp.returncode
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
   def cmd_import(self, argv, datasets=None, doit=None, force=None):
