@@ -52,10 +52,11 @@ from cs.timeseries import (
     TimeSeriesDataDir,
     TimespanPolicyYearly,
     plot_events,
+    plotrange,
     print_figure,
     save_figure,
 )
-from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20220606-post'
 
@@ -205,13 +206,7 @@ class SPLinkCSVDir(HasFSPath):
         and export its contents into the `tsd:TimeSeriesDataDir.
         Return exported `DataFrame`.
     '''
-    nan = float('nan')
-    ts2001 = ts2001_unixtime(tzname)
-    rowtype, rows = csv_import(csvpath)
     # group the values by key
-    keys = rowtype.attributes_
-    key0 = keys[0]
-    key_values = {key: [] for key in keys}
     short_csvpath = relpath(csvpath, self.fspath)
     if short_csvpath.startswith('../'):
       short_csvpath = shortpath(csvpath)
