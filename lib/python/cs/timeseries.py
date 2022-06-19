@@ -2478,7 +2478,15 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
 
   @plotrange
   def plot(
-      self, start, stop, keys=None, *, label=None, runstate=None, **plot_kw
+      self,
+      start,
+      stop,
+      keys=None,
+      *,
+      label=None,
+      runstate=None,
+      utcoffset,
+      **plot_kw
   ):
     ''' Convenience shim for `DataFrame.plot` to plot data from
         `start` to `stop` for each key in `keys`.
@@ -2493,7 +2501,13 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     '''
     if keys is None:
       keys = sorted(self.keys())
-    df = self.as_pd_dataframe(start, stop, keys, runstate=runstate)
+    df = self.as_pd_dataframe(
+        start,
+        stop,
+        keys,
+        runstate=runstate,
+        utcoffset=utcoffset,
+    )
     for key in keys:
       with Pfx(key):
         ts = self[key]
