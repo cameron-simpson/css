@@ -2458,6 +2458,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       keys: Optional[Iterable[str]] = None,
       *,
       runstate=None,
+      utcoffset=None,
   ):
     ''' Return a `numpy.DataFrame` containing the specified data.
 
@@ -2473,9 +2474,11 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       stop = self.stop  # pylint: disable=no-member
     if keys is None:
       keys = self.keys()
-    elif not isinstance(keys, (tuple, list)):
+    if not isinstance(keys, (tuple, list)):
       keys = tuple(keys)
-    indices = as_datetime64s(self.range(start, stop))
+    if utcoffset is None:
+      utcoffset = 0.0
+    indices = as_datetime64s([t + utcoffset for t in self.range(start, stop)])
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
       for key in progressbar(keys, "gather fields"):
@@ -2485,7 +2488,9 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         with Pfx(key):
           if key not in self:
             raise KeyError("no such key")
-          data_dict[key] = self[key].as_pd_series(start, stop)
+          data_dict[key] = self[key].as_pd_series(
+              start, stop, utcoffset=utcoffset
+          )
     if runstate and runstate.cancelled:
       raise CancellationError
     return pfx_call(
