@@ -15,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20220227-post'
+__version__ = '20220619'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
