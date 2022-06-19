@@ -214,8 +214,7 @@ class TypeCode(str):
       return nan
     if self == 'q':
       return 0
-    else:
-      raise RuntimeError('no default fill value for %r' % (self,))
+    raise RuntimeError('no default fill value for %r' % (self,))
 
 @typechecked
 def deduce_type_bigendianness(typecode: str) -> bool:
@@ -263,7 +262,8 @@ def as_datetime64s(times, unit='s'):
         'us': lambda f: int(f * 1000000),
         'ns': lambda f: int(f * 1000000000),
     }[unit]
-  except KeyError as e:
+  except KeyError:
+    # pylint: disable=raise-missing-from
     raise ValueError("as_datetime64s: unhandled unit %r" % (unit,))
   return np.array(list(map(scale, times))).astype(f'datetime64[{unit}]')
 
@@ -1921,7 +1921,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     ''' Bulk set values.
     '''
     # ensure we're using array mode
-    self.array
+    self.array  # pylint: disable=pointless-statement
     for offset, value in zip(map(self.offset, whens), values):
       if skipNone and value is None:
         continue
