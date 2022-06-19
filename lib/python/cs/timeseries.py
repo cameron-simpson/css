@@ -301,12 +301,14 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] days [{{glob|fields}}...]
+    ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] [--tz tzspec] days [{{glob|fields}}...]
           Plot the most recent days of data from the time series at tspath.
           Options:
           -f              Force. -o will overwrite an existing image file.
           -o imgpath.png  File system path to which to save the plot.
           --show          Show the image in the GUI.
+          --tz tzspec     Skew the UTC times presented on the graph
+                          to emulate the timezone spcified by tzspec.
           --stacked       Stack the plot lines/areas.
           glob|fields     If glob is supplied, constrain the keys of
                           a TimeSeriesDataDir by the glob.
@@ -315,8 +317,9 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     runstate = options.runstate
     options.show_image = False
     options.imgpath = None
-    options.stacked = False
     options.multi = False
+    options.stacked = False
+    options.tz = None
     self.popopts(
         argv,
         options,
@@ -325,9 +328,11 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         o_='imgpath',
         show='show_image',
         stacked=None,
+        tz_=('tz', tzfor),
     )
     force = options.force
     imgpath = options.imgpath
+    tz = options.tz
     if imgpath and not force and existspath(imgpath):
       raise GetoptError("imgpath exists: %r" % (imgpath,))
     days = self.poparg(argv, int, "days to display", lambda days: days > 0)
@@ -351,6 +356,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           now,
           ax=ax,
           runstate=runstate,
+          tz=tz,
           figsize=(plot_dx, plot_dy),
           **plot_kw
       )  # pylint: disable=missing-kwoa
@@ -375,6 +381,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           now,
           keys,
           runstate=runstate,
+          tz=tz,
           ax=ax,
           **plot_kw,
       )  # pylint: too-many-function-args.disable=missing-kwoa
