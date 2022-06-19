@@ -241,11 +241,29 @@ NATIVE_BIGENDIANNESS = {
 DT64_0 = datetime64(0, 's')
 TD_1S = timedelta64(1, 's')
 
-def as_datetime64s(times):
+def as_datetime64s(times, unit='s'):
   ''' Return a Numpy array of `datetime64` values
       computed from an iterable of `int`/`float` UNIX timestamp values.
+
+      The optional `unit` parameter (default `'s'`) may be one of:
+      - `'s'`: seconds
+      - `'ms'`: milliseconds
+      - `'us'`: microseconds
+      - `'ns'`: nanoseconds
+      and represents the precision to preserve in the source time
+      when converting to a `datetime64`.
+      Less precision gives greater time range.
   '''
-  return np.array(list(map(int, times))).astype('datetime64[s]')
+  try:
+    scale = {
+        's': int,
+        'ms': lambda f: int(f * 1000),
+        'us': lambda f: int(f * 1000000),
+        'ns': lambda f: int(f * 1000000000),
+    }[unit]
+  except KeyError as e:
+    raise ValueError("as_datetime64s: unhandled unit %r" % (unit,))
+  return np.array(list(map(scale, times))).astype(f'datetime64[{unit}]')
 
 def datetime64_as_timestamp(dt64: datetime64):
   ''' Return the UNIX timestamp for the `datetime64` value `dt64`.
