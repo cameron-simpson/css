@@ -1214,6 +1214,8 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
       start = self.start  # pylint: disable=no-member
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
+    if utcoffset is None:
+      utcoffset = 0.0
     times, data = self.data2(start, stop)
     return pd.Series(
         data, as_datetime64s([t + utcoffset for t in times]), self.np_type
