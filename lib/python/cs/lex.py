@@ -1557,7 +1557,7 @@ class FormatableFormatter(Formatter):
         assert len(format_subspec) > 0
         with Pfx("value=%r, format_subspec=%r", value, format_subspec):
           # promote bare str to FStr
-          if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+          if value is None or type(value) is str:  # pylint: disable=unidiomatic-typecheck
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
@@ -1625,7 +1625,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         As such, a `format_spec` is considered
         a sequence of colon separated terms.
 
-        Classes wanting to implement addition format string syntaxes
+        Classes wanting to implement additional format string syntaxes
         should either:
         - override `FormatableFormatter.format_field1` to implement
           terms with no colons, letting `format_field1` do the split into terms
@@ -1754,7 +1754,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     if strict is None:
       strict = self.format_mode.strict
     with self.format_mode(strict=strict):
-      return _format_as(
+      return pfx_call(
+          _format_as,
           format_s,
           format_mapping,
           formatter=self,
