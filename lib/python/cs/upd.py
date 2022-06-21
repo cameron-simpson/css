@@ -88,7 +88,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20220606-post'
+__version__ = '20220619-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -332,7 +332,6 @@ class Upd(SingletonMixin):
             txts.append('\n')
           txts.append(self._set_cursor_visible(True))
           self._backend.write(''.join(txts))
-          self.cursor_visible()
           self._backend.flush()
     self._reset()
 
@@ -355,14 +354,16 @@ class Upd(SingletonMixin):
     '''
     with self._lock:
       if not self._disabled and self._backend is not None:
-        self._set_cursor_visible(True)
+        self._backend.write(self._set_cursor_visible(True))
+        self._backend.flush()
 
   def cursor_invisible(self):
     ''' Make the cursor vinisible.
     '''
     with self._lock:
       if not self._disabled and self._backend is not None:
-        self._set_cursor_visible(False)
+        self._backend.write(self._set_cursor_visible(False))
+        self._backend.flush()
 
   @property
   def disabled(self):
@@ -1085,7 +1086,7 @@ class UpdProxy(object):
       with upd._lock:  # pylint: disable=protected-access
         index = self.index
         if index is not None:
-          txt = upd.normalise(self.prefix + self._text + self._suffix)
+          txt = upd.normalise(self._prefix + self._text + self._suffix)
           overflow = len(txt) - upd.columns + 1
           if overflow > 0:
             txt = '<' + txt[overflow + 1:]
@@ -1174,7 +1175,9 @@ class UpdProxy(object):
     if self.upd is not None:
       with self.upd._lock:  # pylint: disable=protected-access
         index = self.index
-        if index is not None:
+        if index is None:
+          self.text = ''
+        else:
           self.upd.delete(index)
 
   __del__ = delete

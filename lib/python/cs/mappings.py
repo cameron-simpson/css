@@ -50,6 +50,23 @@ DISTINFO = {
     ],
 }
 
+def column_name_to_identifier(column_name, snake_case=False):
+  ''' The default function used to convert raw column names in
+      `named_row_tuple`, for example from a CSV file, into Python
+      indentifiers.
+
+      If `snake_case` is true (default `False`) produce snake cased
+      identifiers instead of merely lowercased identifiers.
+      This means that something like 'redLines' will become `red_lines`
+      instead of `redlines`.
+  '''
+  name = re.sub(r'\W+', '_', column_name).strip('_')
+  if snake_case:
+    name = snakecase(name)
+  else:
+    name = name.lower()
+  return name
+
 # pylint: disable=too-many-statements
 def named_row_tuple(
     *column_names,
@@ -106,14 +123,7 @@ def named_row_tuple(
   if computed is None:
     computed = {}
   if column_map is None:
-    if snake_case:
-      column_map = lambda raw_column_name: snakecase(
-          re.sub(r'\W+', '_', raw_column_name).strip('_')
-      )
-    else:
-      column_map = lambda raw_column_name: re.sub(
-          r'\W+', '_', raw_column_name
-      ).strip('_').lower()
+    column_map = partial(column_name_to_identifier, snake_case=snake_case)
   elif not callable(column_map):
     attr_seq = Seq(start=1)
     mapping = column_map
