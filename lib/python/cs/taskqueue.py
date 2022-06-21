@@ -75,6 +75,7 @@ class Task(Result):
       func,
       func_args=(),
       func_kwargs=None,
+      runstate=None,
       **kw
   ):
     if lock is None:
@@ -82,13 +83,15 @@ class Task(Result):
     if func_kwargs is None:
       func_kwargs = {}
     super().__init__(*a, lock=lock, **kw)
+    if runstate is None:
+      runstate = RunState(self.name)
+    self.runstate = runstate
     self._required = set()
     self.cancel_on_exception = cancel_on_exception
     self.cancel_on_result = cancel_on_result
     self.func = func
     self.func_args = func_args
     self.func_kwargs = func_kwargs
-    self.runstate = RunState(self.name)
 
   def __hash__(self):
     return id(self)
