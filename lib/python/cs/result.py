@@ -123,6 +123,10 @@ class Result(object):
   ''' Basic class for asynchronous collection of a result.
       This is also used to make `OnDemandFunction`s, `LateFunction`s and other
       objects with asynchronous termination.
+
+      In addition to the methods below, for each state value such
+      as `self.PENDING` there is a corresponding attribute `is_pending`
+      testing whether the `Result` is in that state.
   '''
 
   _seq = Seq()
@@ -182,6 +186,17 @@ class Result(object):
 
   def __eq__(self, other):
     return self is other
+
+  def __getattr__(self, attr):
+    state_name = cutprefix(attr, 'is_')
+    if state_name is not attr:
+      try:
+        state_value = getattr(self, state_name.upper())
+      except AttributeError:
+        pass
+      else:
+        return self.state == state_value
+    raise AttributeError("no %s.%s" % (type(self).__name__, attr))
 
   @property
   def ready(self):
