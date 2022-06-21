@@ -63,6 +63,13 @@ class Task(Result):
           >>>
   '''
 
+  PREPARE = 1
+  PENDING = 2
+  RUNNING = 3
+  COMPLETED = 4
+  CANCELLED = 5
+  ABORTED = 6
+
   _seq = Seq()
   _state = ThreadState(current_task=None)
 
@@ -123,7 +130,7 @@ class Task(Result):
     ''' Add a requirement that `otask` be complete before we proceed.
     '''
     assert otask is not self
-    assert self.state == self.PENDING
+    assert self.is_prepare or self.is_pending
     with self._lock:
       self._required.add(otask)
 
