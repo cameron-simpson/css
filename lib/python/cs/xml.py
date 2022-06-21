@@ -7,6 +7,7 @@
 
 from __future__ import print_function
 import sys
+
 try:
   from lxml import etree
 except ImportError:
