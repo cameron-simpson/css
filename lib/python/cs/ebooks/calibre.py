@@ -1044,7 +1044,8 @@ class CalibreCommand(BaseCommand):
         match_fn = lambda book: (
             regexp.search(book.title) or any(
                 map(regexp.search, book.author_names)
-            ) or regexp.search(book.series_name or "")
+            ) or regexp.search(book.series_name or "") or
+            any(map(regexp.search, book.tags))
         )
       else:
         # [identifier=]id-value,...
