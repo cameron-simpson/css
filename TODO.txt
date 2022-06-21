@@ -1,4 +1,3 @@
-move Task et al from cs.result to cs.taskqueue
 cs.urlutils: drop Python 2 support
 cs.upd: above should do clear-toend-of-screen?
 cs.binary: BinaryMixin.scan_file: CCB.from_file: return the unread buffer bytes to the file? seek if possible, warning if not and some buffered data
