@@ -767,7 +767,7 @@ class Later(MultiOpenMixin):
     def put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
-      R.call(func, *a, **kw)
+      R.run_func(func, *a, **kw)
 
     put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
     return after(LFs, None, lambda: self._defer(put_func))

@@ -40,7 +40,7 @@ class Task(Result):
 
       The model here may not be quite as expected; it is aimed at
       tasks which can be repaired and rerun.
-      As such, if `self.call(func,...)` raises an exception from
+      As such, if `self.run(func,...)` raises an exception from
       `func` then this `Task` will still block dependent `Task`s.
       Dually, a `Task` which completes without an exception is
       considered complete and does not block dependent `Task`s.
@@ -101,7 +101,7 @@ class Task(Result):
 
   @classmethod
   def current_task(cls):
-    ''' The current `Task`, valid during `Task.call()`.
+    ''' The current `Task`, valid during `Task.run()`.
         This allows the function called by the `Task` to access the
         task, typically to poll its `.runstate` attribute.
     '''
@@ -143,7 +143,7 @@ class Task(Result):
             >>> final_t.ready   # the final task has not yet run
             False
             >>> # finalise t, wait for final_t (which runs immediately)
-            >>> t.call(); print(final_t.join())
+            >>> t.run(); print(final_t.join())
             1
             2
             (None, None)
@@ -178,14 +178,20 @@ class Task(Result):
     ''' Submit a function to complete the `Task` in a separate `Thread`,
         returning the `Thread`.
 
-        This dispatches a `Thread` to run `self.call()`
+        This dispatches a `Thread` to run `self.run()`
         and as such the `Task` must be in "pending" state,
         and transitions to "running".
     '''
     return bg_thread(self.call, name=self.name)
 
+  def run_func(self, func, *a, **kw):
+    raise RuntimeError(
+        "%s function is predefined, .run_func() is forbidden, use unadorned .run() instead"
+        % type(self)
+    )
+
   # pylint: disable=arguments-differ
-  def call(self):
+  def run(self):
     ''' Attempt to perform the `Task` by calling `func(*func_args,**func_kwargs)`.
 
         If we are cancelled, raise `CancellationError`.
@@ -240,7 +246,7 @@ class Task(Result):
     with self._lock:
       if not self.ready:
         try:
-          self.call()
+          self.run()
         except (BlockedError, CancellationError) as e:
           debug("%s.callif: %s", self, e)
 
@@ -289,7 +295,7 @@ def task(func, task_class=Task):
     ''' Run the function via a `Task`.
     '''
     ft = make_task(func, a, kw)
-    ft.call()
+    ft.run()
     return ft()
 
   # pylint: disable=redefined-outer-name

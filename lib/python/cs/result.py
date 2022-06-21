@@ -303,8 +303,8 @@ class Result(object):
       except:  # pylint: disable=bare-except
         self.exc_info = sys.exc_info()
 
-  def call(self, func, *a, **kw):
-    ''' Have the `Result` call `func(*a,**kw)` and store its return value as
+  def run_func(self, func, *a, **kw):
+    ''' Have the `Result` run `func(*a,**kw)` and store its return value as
         `self.result`.
         If `func` raises an exception, store it as `self.exc_info`.
     '''
@@ -328,7 +328,7 @@ class Result(object):
     ''' Submit a function to compute the result in a separate `Thread`,
         returning the `Thread`.
 
-        This dispatches a `Thread` to run `self.call(func,*a,**kw)`
+        This dispatches a `Thread` to run `self.run_func(func,*a,**kw)`
         and as such the `Result` must be in "pending" state,
         and transitions to "running".
     '''
@@ -416,7 +416,7 @@ class Result(object):
         via `Result.call` and the results applied to this `Result`.
     '''
     if a:
-      self.call(*a, **kw)
+      self.run_func(*a, **kw)
     result, exc_info = self.join()
     if self.cancelled:
       raise CancellationError(self)
@@ -533,7 +533,7 @@ def after(Rs, R, func, *a, **kw):
   Rs = list(Rs)
   count = len(Rs)
   if count == 0:
-    R.call(func, *a, **kw)
+    R.run_func(func, *a, **kw)
   else:
     countery = [
         count
@@ -549,7 +549,7 @@ def after(Rs, R, func, *a, **kw):
         # not ready yet
         return
       if count == 0:
-        R.call(func, *a, **kw)
+        R.run_func(func, *a, **kw)
       else:
         raise RuntimeError("count < 0: %d" % (count,))
 
@@ -584,7 +584,7 @@ class OnDemandResult(Result):
       )
     with self._lock:
       if self.state == self.PENDING:
-        self.call(self.func, *self.fargs, **self.fkwargs)
+        self.run_func(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()
 
 OnDemandFunction = OnDemandResult
