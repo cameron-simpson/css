@@ -685,11 +685,11 @@ class Target(Result):
     '''
     with Pfx("%r.require()", self.name):
       with self._lock:
-        if self.state == ResultState.pending:
+        if self.pending:
           # commence make of this Target
           self.maker.target_active(self)
           self.notify(self.maker.target_inactive)
-          self.state = ResultState.running
+          self.state = self.RUNNING
           self.was_missing = self.mtime is None
           self.pending_actions = list(self.actions)
           Ts = []

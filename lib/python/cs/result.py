@@ -127,7 +127,14 @@ class Result(object):
 
   _seq = Seq()
 
-  def __init__(self, name=None, lock=None, result=None, extra=None):
+  PENDING = ResultState.pending
+  RUNNING = ResultState.running
+  READY = ResultState.ready
+  CANCELLED = ResultState.cancelled
+
+  def __init__(
+      self, name=None, lock=None, result=None, state=None, extra=None
+  ):
     ''' Base initialiser for `Result` objects and subclasses.
 
         Parameter:
@@ -143,11 +150,13 @@ class Result(object):
       lock = RLock()
     if name is None:
       name = "%s-%d" % (type(self).__name__, next(self._seq))
+    if state is None:
+      state = self.PENDING
     self.name = name
     self.extra = AttrableMapping()
     if extra:
       self.extra.update(extra)
-    self.state = ResultState.pending
+    self.state = state
     self.notifiers = []
     self.collected = False
     self._get_lock = Lock()
@@ -178,19 +187,19 @@ class Result(object):
   def ready(self):
     ''' Whether the `Result` state is ready or cancelled.
     '''
-    return self.state in (ResultState.ready, ResultState.cancelled)
+    return self.state in (self.READY, self.CANCELLED)
 
   @property
   def cancelled(self):
     ''' Test whether this `Result` has been cancelled.
     '''
-    return self.state == ResultState.cancelled
+    return self.state == self.CANCELLED
 
   @property
   def pending(self):
     ''' Whether the `Result` is pending.
     '''
-    return self.state == ResultState.pending
+    return self.state == self.PENDING
 
   def empty(self):
     ''' Analogue to `Queue.empty()`.
@@ -204,15 +213,15 @@ class Result(object):
     '''
     with self._lock:
       state = self.state
-      if state == ResultState.cancelled:
+      if state == self.CANCELLED:
         # already cancelled - this is ok, no call to ._complete
         return True
-      if state == ResultState.ready:
+      if state == self.READY:
         # completed - "fail" the cancel, no call to ._complete
         return False
-      if state in (ResultState.running, ResultState.pending):
+      if state in (self.PENDING, self.RUNNING):
         # in progress or not commenced - change state to cancelled and fall through to ._complete
-        self.state = ResultState.cancelled
+        self.state = self.CANCELLED
       else:
         # state error
         raise RuntimeError(
@@ -228,10 +237,10 @@ class Result(object):
         This property is not available before completion.
     '''
     state = self.state
-    if state == ResultState.cancelled:
+    if state == self.CANCELLED:
       self.collected = True
       raise CancellationError()
-    if state == ResultState.ready:
+    if state == self.READY:
       self.collected = True
       return self._result
     raise AttributeError("%s not ready: no .result attribute" % (self,))
@@ -254,10 +263,10 @@ class Result(object):
         This is not available before completion.
     '''
     state = self.state
-    if state == ResultState.cancelled:
+    if state == self.CANCELLED:
       self.collected = True
       raise CancellationError()
-    if state == ResultState.ready:
+    if state == self.READY:
       self.collected = True
       return self._exc_info
     raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
@@ -285,11 +294,11 @@ class Result(object):
         If `func` raises an exception, store it as `self.exc_info`.
     '''
     with self._lock:
-      if self.state != ResultState.pending:
+      if self.state != self.PENDING:
         raise RuntimeError(
             "%s: state should be pending but is %s" % (self, self.state)
         )
-      self.state = ResultState.running
+      self.state = self.RUNNING
     try:
       r = func(*a, **kw)
     except BaseException:
@@ -313,8 +322,7 @@ class Result(object):
     )
 
   @require(
-      lambda self: self.state in
-      (ResultState.pending, ResultState.running, ResultState.cancelled)
+      lambda self: self.state in (self.PENDING, self.RUNNING, self.CANCELLED)
   )
   def _complete(self, result, exc_info):
     ''' Set the result.
@@ -327,17 +335,16 @@ class Result(object):
           (result, exc_info)
       )
     state = self.state
-    if state in (ResultState.cancelled, ResultState.running,
-                 ResultState.pending):
+    if state in (self.PENDING, self.RUNNING, self.CANCELLED):
       self._result = result  # pylint: disable=attribute-defined-outside-init
       self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
-      if state != ResultState.cancelled:
-        self.state = ResultState.ready
+      if state != self.CANCELLED:
+        self.state = self.READY
     else:
-      if state == ResultState.ready:
+      if state == self.READY:
         warning(
-            "<%s>.state is ResultState.ready, ignoring result=%r, exc_info=%r",
-            self, result, exc_info
+            "<%s>.state is self.state, ignoring result=%r, exc_info=%r", self,
+            result, exc_info
         )
         raise RuntimeError(
             "REPEATED _COMPLETE of %s: result=%r, exc_info=%r" %
@@ -561,7 +568,7 @@ class OnDemandResult(Result):
           (self, a, kw)
       )
     with self._lock:
-      if self.state == ResultState.pending:
+      if self.state == self.PENDING:
         self.call(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()
 
