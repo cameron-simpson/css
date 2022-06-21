@@ -1,0 +1,3 @@
+lib/python/cs/iso14496.py: cs.tagset: drop Tag.with_prefix, now folded into the constructor; adjust calls elsewhere
+lib/python/cs/iso14496.py: cs.iso14496: adjust warning text
+lib/python/cs/iso14496.py: cs.*: replace Pfx("%s",foo) with Pfx(foo)

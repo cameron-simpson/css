@@ -17,3 +17,5 @@ DISTINFO = {
         'cs.queues', 'cs.result', 'cs.lex'
     ],
 }
+
+DEFAULT_MAKE_COMMAND = 'myke'

@@ -1,0 +1,2 @@
+lib/python/cs/app/ydl.py: cs.app.ydl: YDLCommand.main: plumb options.parallel through to the OverYDL constructor
+lib/python/cs/app/ydl.py: cs.app.ydl: bump required revision for cs.cmdutils

@@ -42,8 +42,9 @@ from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
 from cs.threads import bg as bg_thread
+from cs.upd import print
 
-__version__ = '20211208-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -64,11 +65,17 @@ DISTINFO = {
         'cs.resources',
         'cs.result>=20210407',
         'cs.threads',
+        'cs.upd',
     ],
     'entry_points': {
-      'console_scripts': ['pop3 = cs.pop3:POP3Command.run_argv'],
+        'console_scripts': ['pop3 = cs.pop3:main'],
     },
 }
+
+def main(argv=None):
+  ''' The `pop3` command line mode.
+  '''
+  return POP3Command(argv).run()
 
 class POP3(MultiOpenMixin):
   ''' Simple POP3 class with support for streaming use.
@@ -112,7 +119,7 @@ class POP3(MultiOpenMixin):
       self.flush()
       logmsg("join QUIT")
       quitR.join()
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
       exception("client quit: %s", e)
       logmsg = warning
     if self._result_queue:
@@ -521,9 +528,8 @@ class POP3Command(BaseCommand):
       and obtain the remaining detail via the `netrc` entry.
   '''
 
-  # pylint: disable=too-many-locals
-  @staticmethod
-  def cmd_dl(argv):
+  # pylint: disable=no-self-use,too-many-locals
+  def cmd_dl(self, argv):
     ''' Collect messages from a POP3 server and deliver to a Maildir.
 
         Usage: {cmd} [{{ssl,tcp}}:]{{netrc_account|[user@]host[!sni_name][:port]}} maildir
@@ -555,4 +561,4 @@ class POP3Command(BaseCommand):
           deleRs.wait()
 
 if __name__ == '__main__':
-  sys.exit(POP3Command.run_argv(sys.argv))
+  sys.exit(main(sys.argv))

@@ -1,0 +1,1 @@
+lib/python/cs/py/modules.py: cs.py.modules: new import_extra(extra_package_name,distinfo) function to politely try to import a package which is associated with an extra

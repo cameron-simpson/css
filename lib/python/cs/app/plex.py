@@ -100,7 +100,7 @@ class PlexCommand(BaseCommand):
 def plex_subpath(tagged_path):
   ''' Compute a Plex filesystem subpath based on the tags of `filepath`.
   '''
-  base, ext = splitext(basename(tagged_path.filepath))
+  base, ext = splitext(basename(tagged_path.fspath))
   itags = tagged_path.infer_tags()
   t = itags.auto
   tv = t.tv

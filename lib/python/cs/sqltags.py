@@ -41,6 +41,7 @@ from subprocess import run
 from threading import RLock
 import time
 from typing import List, Optional
+
 from icontract import ensure, require
 from sqlalchemy import (
     Column,
@@ -54,6 +55,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
@@ -75,7 +77,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20211212-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -91,6 +93,7 @@ DISTINFO = {
         'cs.context',
         'cs.dateutils',
         'cs.deco',
+        'cs.fileutils',
         'cs.lex',
         'cs.logutils',
         'cs.obj',
@@ -438,6 +441,20 @@ class SQTCriterion(TagSetCriterion):
         If `self.SQL_COMPLETE` it is not necessary to call this method.
     '''
     raise NotImplementedError("sql_parameters")
+
+  @staticmethod
+  def from_equality(tag_name, tag_value):
+    ''' Return an `SQTCriterion` instance based on `tag_name==tag_value`.
+        This supports `SQLTags.find`'s keyword parameters.
+    '''
+    if tag_name == 'id':
+      if isinstance(tag_value, int):
+        tag_value = [tag_value]
+      elif isinstance(tag_value, tuple):
+        tag_value = list(tag_value)
+      return SQTEntityIdTest(tag_value)
+    tag = Tag(tag_name, tag_value)
+    return SQLTagBasedTest(str(tag), True, tag, '=')
 
 class SQTEntityIdTest(SQTCriterion):
   ''' A test on `entity.id`.
@@ -852,13 +869,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
   def __init__(self, *, db_url):
     super().__init__(db_url)
-    self.engine_keywords.update(
-        case_sensitive=True,
-        echo=(
-            self.engine_keywords.get('echo', False)
-            or 'echo' in os.environ.get('SQLTAGS_MODES', '').split(',')
-        ),
-    )
+    self.engine_keywords.update(case_sensitive=True)
+    if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
+                                               '').split(',')):
+      self.engine_keywords.update(echo=True)
     db_fspath = self.db_fspath
     if db_fspath is not None and not existspath(db_fspath):
       track("create and init %r", db_fspath)
@@ -975,6 +989,27 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         else:
           etag.set_polyvalue(pv)
         self._update_multivalues(name, pv.structured_value, session=session)
+
+      def add_new_tags(self, tags, *, session):
+        ''' Add multiple new `Tag`s
+            which may not conflict with any existing `Tag`s.
+        '''
+        tags_table = orm.tags
+        if self.id is None:
+          # obtain the id value from the database
+          session.add(self)
+          session.flush()
+        for tag in tags:
+          pv = SQLTagSet.to_polyvalue(tag.name, tag.value)
+          session.add(
+              tags_table(
+                  entity_id=self.id,
+                  name=tag.name,
+                  float_value=pv.float_value,
+                  string_value=pv.string_value,
+                  structured_value=pv.structured_value,
+              )
+          )
 
       def discard_tag(self, name, value=None, *, session):
         ''' Discard the tag matching `(name,value)`.
@@ -1513,8 +1548,8 @@ class SQLTags(BaseTagSets):
 
   @contextmanager
   def db_session(self, *, new=False):
-    ''' Context manager to obtain a db session if required,
-        just a shim for `self.orm.session()`.
+    ''' Context manager to obtain a db session if required
+        (or if `new` is true).
     '''
     orm_state = self.orm.sqla_state
     get_session = orm_state.new_session if new else orm_state.auto_session
@@ -1536,8 +1571,11 @@ class SQLTags(BaseTagSets):
     self.default_db_session.flush()
 
   @typechecked
-  def default_factory(self, name: [str, None], *, unixtime=None, tags=None):
+  def default_factory(
+      self, name: Optional[str] = None, *, unixtime=None, tags=None
+  ):
     ''' Fetch or create an `SQLTagSet` for `name`.
+        Return the `SQLTagSet`.
 
         Note that `name` may be `None` to create a new "log" entry.
     '''
@@ -1554,11 +1592,7 @@ class SQLTags(BaseTagSets):
         session.flush()
         te = self.get(entity.id)
         assert te is not None
-        to_polyvalue = te.to_polyvalue
-        for tag in tags:
-          entity.add_tag(
-              tag.name, to_polyvalue(tag.name, tag.value), session=session
-          )
+        entity.add_new_tags(tags, session=session)
       # refresh entry from some source if there is a .refresh() method
       refresh = getattr(type(te), 'refresh', None)
       if refresh is not None and callable(refresh):
@@ -1579,12 +1613,12 @@ class SQLTags(BaseTagSets):
       te = self.TagSetClass.singleton_also_by('id', index)
       if te is not None:
         return te
-      tes = self.find([SQTEntityIdTest([index])])
+      tes = self.find(id=index)
     elif isinstance(index, str):
       te = self.TagSetClass.singleton_also_by('name', index)
       if te is not None:
         return te
-      tes = self.find([SQLTagBasedTest(index, True, Tag('name', index), '=')])
+      tes = self.find(name=index)
     else:
       raise TypeError("unsupported index: %s:%r" % (type(index), index))
     tes = list(tes)
@@ -1597,6 +1631,26 @@ class SQLTags(BaseTagSets):
   def __getitem__(self, index):
     ''' Return an `SQLTagSet` for `index` (an `int` or `str`).
     '''
+    if isinstance(index, slice):
+      # a range of UNIX times
+      if index.step is not None:
+        raise IndexError("slices may not specify a step")
+      if index.start >= index.stop:
+        raise IndexError("empty range")
+      criteria = []
+      if index.start is not None:
+        criteria.append(
+            SQLTagBasedTest.by_tag_value(
+                'unixtime', index.start, comparison='>='
+            )
+        )
+      if index.stop is not None:
+        criteria.append(
+            SQLTagBasedTest.by_tag_value(
+                'unixtime', index.start, comparison='<'
+            )
+        )
+      return self.find(criteria)
     with self.db_session():
       te = self.get(index)
       if te is None:
@@ -1711,20 +1765,22 @@ class SQLTags(BaseTagSets):
     '''
     return self[0]
 
-  def find(self, criteria):
+  def find(self, *criteria, **crit_kw):
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTagSet` instances.
 
         Parameters:
-        * `criteria`: an iterable of search criteria
-          which should be `SQTCriterion`s
-          or a `str` suitable for `SQTCriterion.from_str`.
+        * `criteria`: positional arguments which should be
+          `SQTCriterion`s or a `str` suitable for `SQTCriterion.from_str`
+        * `crit_kw`: keyword parameters are appended to the criteria
+          as further tag equality tests
     '''
-    if isinstance(criteria, str):
-      criteria = [criteria]
-    else:
-      criteria = list(criteria)
+    criteria = list(criteria)
+    criteria.extend(
+        [SQTCriterion.from_equality(k, v) for k, v in crit_kw.items()]
+    )
     post_criteria = []
+    # promote criteria from str to SQTCriterion as needed
     for i, criterion in enumerate(criteria):
       cr0 = criterion
       with Pfx(str(criterion)):
@@ -2029,7 +2085,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     xit = 0
-    for te in sqltags.find(tag_criteria):
+    for te in sqltags.find(*tag_criteria):
       with Pfx(te):
         try:
           output = te.format_as(output_format, error_sep='\n  ')

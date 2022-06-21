@@ -1,3 +1,4 @@
+rework Maker using cs.result.Task?
 always run commands in dir of primary Mykefile? also findup Mykefile
 implement % inference rules
 myke: newlines in macro definitions seem to survive, leading to newlines in commmand

@@ -1,0 +1,3 @@
+lib/python/cs/upd.py: cs.upd: Upd.run_task: tweak default tick_chars
+lib/python/cs/upd.py: cs.upd: Upd.run_task: set tick_delay default to 0.15s
+lib/python/cs/upd.py: cs.upd: UpdProxy.extend_prefix: new optional print_elapsed parameter

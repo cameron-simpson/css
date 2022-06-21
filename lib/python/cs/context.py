@@ -15,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20211115.1-post'
+__version__ = '20220619-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -385,7 +385,14 @@ def setup_cmgr(cmgr):
   '''
   cmgr_twostep = twostep(cmgr)
   next(cmgr_twostep)
-  return lambda: next(cmgr_twostep)
+
+  def next2():
+    try:
+      next(cmgr_twostep)
+    except StopIteration:
+      pass
+
+  return next2
 
 def push_cmgr(o, attr, cmgr):
   ''' A convenience wrapper for `twostep(cmgr)`
@@ -441,6 +448,9 @@ class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods
       running the first and second steps of a single `__enter_exit__` generator method.
 
+      *Note*: the `__enter_exit__` method is _not_ a context manager,
+      but a short generator method.
+
       This makes it easy to use context managers inside `__enter_exit__`
       as the setup/teardown process, for example:
 
@@ -448,7 +458,6 @@ class ContextManagerMixin:
               with open(self.datafile, 'r') as f:
                   yield f
 
-      The `__enter_exit__` method is _not_ a context manager, but a short generator method.
       Like a context manager created via `@contextmanager`
       it performs the setup phase and then `yield`s the value for the `with` statement.
       If `None` is `yield`ed (as from a bare `yield`)
@@ -470,7 +479,7 @@ class ContextManagerMixin:
               def __enter_exit__(self):
                   ... do some setup here ...
                   # Returning self is common, but might be any relevant value.
-                  # Note that ifyou want `self`, you can just use a bare yield
+                  # Note that if you want `self`, you can just use a bare yield
                   # and ContextManagerMixin will provide `self` as the default.
                   enter_result = self
                   exit_result = False
@@ -510,18 +519,17 @@ class ContextManagerMixin:
     eegen, pushed = self._ContextManagerMixin__state
     popattrs(self, ('_ContextManagerMixin__state',), pushed)
     # return to the generator to run the __exit__ phase
-    try:
-      if exc_type:
-        exit_result = eegen.throw(exc_type, exc_value, traceback)
-      else:
-        exit_result = next(eegen)
-    except StopIteration:
-      # there was no optional extra yield
-      exit_result = None
+    if exc_type:
+      exit_result = eegen.throw(exc_type, exc_value, traceback)
     else:
-      if exit_result:
-        # exception handled, conceal it from the super method
-        exc_type, exc_value, traceback = None, None, None
+      try:
+        exit_result = next(eegen)
+      except StopIteration:
+        # there was no optional extra yield
+        exit_result = None
+    if exit_result:
+      # exception handled, conceal it from the super method
+      exc_type, exc_value, traceback = None, None, None
     try:
       super_exit = super().__exit__
     except AttributeError:
