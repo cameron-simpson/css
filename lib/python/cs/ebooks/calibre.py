@@ -169,7 +169,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       def asin(self):
-        ''' The Amazon ASIN, or `None`, from `self.identifiers['mobi-asin'].
+        ''' The Amazon ASIN, or `None`, from `self.identifiers['mobi-asin']`.
         '''
         return self.identifiers.get('mobi-asin', None)
 
@@ -1527,7 +1527,6 @@ class CalibreCommand(BaseCommand):
     if argv and argv[0] == '-n':
       argv.pop(0)
       options.doit = False
-    calibre = options.calibre
     doit = options.doit
     upd = options.upd
     tags = self.poparg(argv, "tags")
