@@ -47,7 +47,12 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
-from cs.lex import cutprefix
+from cs.lex import (
+    cutprefix,
+    get_dotted_identifier,
+    FormatableMixin,
+    FormatAsError,
+)
 from cs.logutils import warning, error
 from cs.numeric import intif
 from cs.obj import SingletonMixin
@@ -95,7 +100,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         'timestamp',
         'title',
         'uuid',
-    ]), HasFSPath):
+    ]), HasFSPath, FormatableMixin):
       ''' A reference to a book in a Calibre library.
       '''
 
@@ -123,6 +128,38 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         ''' An alias for `self.path`.
         '''
         return self.path
+
+      def format_tagset(self):
+        ''' Compute a `TagSet` representing this book's metadata.
+        '''
+        formats = self.formats
+        tags = TagSet(
+            dbid=self.dbid,
+            asin=self.asin,
+            title=self.title,
+            authors=self.author_names,
+            formats=formats,
+            format_names=sorted(formats.keys()),
+            tags=self.tags,
+        )
+        tags.update(
+            {
+                'series.id': self.series_id,
+                'series.name': self.series_name,
+                'series.index': intif(self.series_index),
+            }
+        )
+        return tags
+
+      def format_kwargs(self):
+        return self.format_tagset()
+
+      def get_arg_name(self, field_name):
+        ''' Override for `FormattableMixin.get_arg_name`:
+            return the leading dotted identifier,
+            which represents a tag or tag prefix.
+        '''
+        return get_dotted_identifier(field_name)
 
       @property
       def dbid(self):
@@ -1186,13 +1223,17 @@ class CalibreCommand(BaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l] [book_specs...]
+    ''' Usage: {cmd} [-l] [-o ls-format] [book_specs...]
           List the contents of the Calibre library.
+          -l            Long mode, listing book details over several lines.
+          -o ls_format  Output format for use in a single line book listing.
     '''
     options = self.options
     options.longmode = False  # pylint: disable=attribute-defined-outside-init
-    options.popopts(argv, l='longmode')
+    options.ls_format = None
+    options.popopts(argv, l='longmode', o_='ls_format')
     longmode = options.longmode
+    ls_format = options.ls_format
     calibre = options.calibre
     xit = 0
     cbooks = []
@@ -1209,21 +1250,30 @@ class CalibreCommand(BaseCommand):
       if runstate.cancelled:
         break
       with Pfx(cbook):
-        top_row = []
-        series_name = cbook.series_name
-        if series_name:
-          top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
-        top_row.append(cbook.title)
-        author_names = cbook.author_names
-        if author_names:
-          top_row.extend(
-              ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
-          )
-        top_row.append(f"({cbook.dbid})")
-        if not longmode:
-          top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
-          top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
-        print(*top_row)
+        if ls_format is None:
+          top_row = []
+          series_name = cbook.series_name
+          if series_name:
+            top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
+          top_row.append(cbook.title)
+          author_names = cbook.author_names
+          if author_names:
+            top_row.extend(
+                ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
+            )
+          top_row.append(f"({cbook.dbid})")
+          if not longmode:
+            top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
+            top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
+          print(*top_row)
+        else:
+          try:
+            output = cbook.format_as(ls_format, error_sep='\n  ')
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          print(output)
         if longmode:
           print(" ", cbook.path)
           tags = cbook.tags
