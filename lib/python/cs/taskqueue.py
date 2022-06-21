@@ -32,7 +32,7 @@ class Task(Result):
 
           t1 = Task(name="task1")
           t1.bg(time.sleep, 10)
-          t2 = Task("name="task2")
+          t2 = Task(name="task2")
           # prevent t2 from running until t1 completes
           t2.require(t1)
           # try to run sleep(5) for t2 immediately after t1 completes
@@ -54,7 +54,7 @@ class Task(Result):
 
           t1 = Task(name="task1")
           t1.bg(time.sleep, 2)
-          t2 = Task("name="task2")
+          t2 = Task(name="task2")
           # prevent t2 from running until t1 completes
           t2.require(t1)
           # try to run sleep(5) for t2 immediately after t1 completes
