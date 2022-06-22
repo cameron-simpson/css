@@ -4,13 +4,13 @@
     dependencies and failure/retry.
 '''
 
-from cs.result import Result
+from cs.result import BaseResult
 
 class BlockedError(Exception):
   ''' Raised by a blocked `Task` if attempted.
   '''
 
-class Task(Result):
+class Task(BaseResult):
   ''' A task which may require the completion of other tasks.
       This is a subclass of `Result`.
 

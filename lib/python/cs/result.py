@@ -119,22 +119,15 @@ class CancellationError(Exception):
     Exception.__init__(self, msg)
 
 # pylint: disable=too-many-instance-attributes
-class Result(object):
-  ''' Basic class for asynchronous collection of a result.
-      This is also used to make `OnDemandFunction`s, `LateFunction`s and other
-      objects with asynchronous termination.
+class BaseResult(object):
+  ''' Base class for asynchronous collection of a result.
+      This is used to make `Result`, `OnDemandFunction`s, `LateFunction`s
+      and other objects with asynchronous termination.
 
       In addition to the methods below, for each state value such
       as `self.PENDING` there is a corresponding attribute `is_pending`
       testing whether the `Result` is in that state.
   '''
-
-  _seq = Seq()
-
-  PENDING = ResultState.pending
-  RUNNING = ResultState.running
-  READY = ResultState.ready
-  CANCELLED = ResultState.cancelled
 
   def __init__(
       self, name=None, lock=None, result=None, state=None, extra=None
@@ -458,6 +451,17 @@ class Result(object):
       return None
 
     self.notify(notifier)
+
+class Result(BaseResult):
+  ''' A `BaseResult` with state definitions.
+  '''
+
+  PENDING = ResultState.pending
+  RUNNING = ResultState.running
+  READY = ResultState.ready
+  CANCELLED = ResultState.cancelled
+
+  _seq = Seq()
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
