@@ -26,7 +26,7 @@ import cs.pfx
 from cs.pfx import pfx, Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
-from cs.result import Result, ResultState
+from cs.result import Result
 from cs.threads import Lock, locked, locked_property
 
 from . import DEFAULT_MAKE_COMMAND
