@@ -1,3 +1,4 @@
+use the new Task and TaskQueue when they're ready
 parser for /etc/terminal-colors.d
 BaseCommand: if getopterror from subcommand, show only the help for that subcommand instead of whole usage
 cs.upd/cs.logutils: if the Upd is disabled, logging upd_mode goes silent - fall back to plain nonupd_mode?
