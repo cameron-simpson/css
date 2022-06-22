@@ -233,7 +233,7 @@ class BaseResult(object):
       else:
         # state error
         raise RuntimeError(
-            "<%s>.state not one of (pending, cancelled, running, ready): %r" %
+            "<%s>.state not one of (PENDING, CANCELLED, RUNNING, READY): %r" %
             (self, state)
         )
       self._complete(None, None)
