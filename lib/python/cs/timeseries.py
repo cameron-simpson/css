@@ -2598,9 +2598,9 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     for key in keys:
       with Pfx(key):
         ts = self[key]
-        csv_header = ts.tags.get('csv.header', key)
-        kname = f'{csv_header}\n{key}' if csv_header else key
-        if kname != key:
+        csv_header = self.csv_header(key)
+        if csv_header != key:
+          kname = f'{csv_header}\n{key}'
           df.rename(columns={key: kname}, inplace=True)
     if runstate and runstate.cancelled:
       raise CancellationError
