@@ -2424,8 +2424,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       )
     elif tz is not None:
       raise ValueError(
-          "may not provide both tz:%s and a TimespanPolicy:%s", s(tz),
-          s(policy)
+          "may not provide both tz:%s and a TimespanPolicy:%s" %
+          (s(tz), s(policy))
       )
     self.policy = policy
     self._rules = {}
@@ -2638,7 +2638,6 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     )
     for key in keys:
       with Pfx(key):
-        ts = self[key]
         csv_header = self.csv_header(key)
         if csv_header != key:
           kname = f'{csv_header}\n{key}'
