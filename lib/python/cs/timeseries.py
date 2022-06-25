@@ -2741,47 +2741,37 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       tz: Optional[str] = None,
       fstags: Optional[FSTags] = None,
   ):
-    epoch = Epoch.promote(epoch)
-    self.epoch = epoch
-    if not isdirpath(fspath):
-      pfx_call(needdir, fspath)
+    HasConfigIni.__init__(self, self.CONFIG_SECTION_NAME)
     HasFSPath.__init__(self, fspath)
     if fstags is None:
       fstags = FSTags()
-    HasConfigIni.__init__(self, self.CONFIG_SECTION_NAME)
     self.fstags = fstags
     config = self.config
-    cfg_start = config.start
-    cfg_step = config.step
-    if epoch is None:
-      if cfg_start is None or cfg_step is None:
-        raise ValueError(
-            "no epoch provided and start or step missing from config %s[%s]: %r"
-            % (
-                shortpath(self.configpath),
-                self.CONFIG_SECTION_NAME,
-                self.config,
-            )
-        )
-
-      epoch = Epoch(cfg_start, cfg_step)
-    start, step = epoch.start, epoch.step
-    if start is None:
-      start = 0 if cfg_start is None else cfg_start
-      config.start = start
-    elif cfg_start is None:
-      config.start = start
-    elif start != cfg_start:
-      raise ValueError("start:%r != config.start:%r" % (start, cfg_start))
-    if step is None:
-      step = 0 if cfg_step is None else cfg_step
-      config.step = step
-    elif cfg_step is None:
-      config.step = step
-    elif step != cfg_step:
-      raise ValueError("step:%r != config.step:%r" % (step, self.step))
+    if not isdirpath(fspath):
+      # new data dir, create it and save config
+      pfx_call(needdir, fspath)
+      epoch = Epoch.promote(epoch)
+      config.start = epoch.start
+      config.step = epoch.step
+    else:
+      # existing data dir, check params against config, fill in
+      # gaps in config
+      cfg_start = config.start
+      cfg_step = config.step
+      if epoch is None:
+        epoch = Epoch(cfg_start, cfg_step)
+      else:
+        epoch = Epoch.promote(epoch)
+        if cfg_start is not None and cfg_start != epoch.start:
+          raise ValueError(
+              "config.start:%s != epoch,start:%s" %
+              (s(cfg_start), s(epoch.start))
+          )
+        if cfg_step is not None and cfg_step != epoch.step:
+          raise ValueError(
+              "config.step:%s != epoch,step:%s" % (s(cfg_step), s(epoch.step))
+          )
     self.epoch = epoch
-    tzinfo = tzinfo or self.tzinfo
     if policy is None:
       policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
       policy = TimespanPolicy.from_name(policy_name, epoch=epoch)
@@ -2790,11 +2780,12 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       policy_name = policy.name
     # fill in holes in the config
     if not config.auto.policy.name:
-      self.policy_name = policy_name
-    if not config.auto.policy.tzinfo:
-      self.tzinfo = tzinfo
-    TimeSeriesMapping.__init__(self, epoch=epoch, policy=policy, tzinfo=tzinfo)
+      config['policy.name'] = policy_name
+    if not config.auto.policy.tz:
+      config['policy.tz'] = str(tz)
+    TimeSeriesMapping.__init__(self, epoch=epoch, policy=policy, tz=tz)
     self._infill_keys_from_subdirs()
+    self.config_flush()
 
   def __str__(self):
     return "%s(%s,%s,%s)" % (
