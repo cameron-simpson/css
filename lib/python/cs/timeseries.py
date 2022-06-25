@@ -2530,7 +2530,6 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         pd.DataFrame,
         data=data_dict,
         index=indices,
-        columns=keys,
         copy=False,
     )
 
