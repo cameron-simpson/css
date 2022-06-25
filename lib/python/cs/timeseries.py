@@ -1132,9 +1132,13 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
   '''
 
   @typechecked
-  def __init__(self, epoch: Epoch, typecode: str):
+  def __init__(self, epoch: Epoch, typecode: Union[str | TypeCode]):
+    typecode = TypeCode.promote(typecode)
+    if fill is None:
+      fill = typecode.default_fill
     self.epoch = epoch
     self.typecode = typecode
+    self.fill = fill
 
   def info_dict(self, d=None):
     ''' Return an informational `dict` containing salient information
@@ -1544,10 +1548,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     self.header = header
     epoch = header.epoch
     typecode = header.typecode
-    TimeSeries.__init__(self, epoch, typecode)
-    if fill is None:
-      fill = typecode.default_fill
-    self.fill = fill
+    TimeSeries.__init__(self, epoch, typecode, fill)
     self.fill_bs = header.datum_type.transcribe_value(self.fill)
     self._itemsize = array(typecode).itemsize
     assert self._itemsize == self.header.datum_type.length
