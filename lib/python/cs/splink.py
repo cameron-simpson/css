@@ -263,12 +263,12 @@ class SPLinkDataDir(TimeSeriesDataDir):
     self.dataset = dataset
 
   @pfx_method
-  def import_from(self, csv, tzname=None):
-    ''' Import the CSV data from `csv` specified by `self.dataset`.
+  def import_from(self, csvsrc, tzname=None):
+    ''' Import the CSV data from `csvsrc` specified by `self.dataset`.
         Return the imported `DataFrame`.
 
         Parameters:
-        * `csv`: an `SPLinkCSVDir` instance or the pathname of a directory
+        * `csvsrc`: an `SPLinkCSVDir` instance or the pathname of a directory
           containing SP-Link CSV download data, or the pathname of a CSV file.
 
         Example:
@@ -279,13 +279,13 @@ class SPLinkDataDir(TimeSeriesDataDir):
                 'DetailedData',
             )
     '''
-    if isinstance(csv, str):
-      if isfilepath(csv):
+    if isinstance(csvsrc, str):
+      if isfilepath(csvsrc):
         # an individual SP-Link CSV download
-        if not csv.endswith('.CSV'):
+        if not csvsrc.endswith('.CSV'):
           raise ValueError("filename does not end in .CSV")
         try:
-          dsinfo = SPLinkData.parse_dataset_filename(csv)
+          dsinfo = SPLinkData.parse_dataset_filename(csvsrc)
         except ValueError as e:
           warning("unusual filename: %s", e)
         else:
@@ -294,17 +294,17 @@ class SPLinkDataDir(TimeSeriesDataDir):
                 "filename dataset:%r does not match self.dataset:%r" %
                 (dsinfo.dataset, self.dataset)
             )
-          csvdir = SPLinkCSVDir(dirname(csv))
-          return csvdir.export_csv_to_timeseries(csv, self, tzname=tzname)
-      if isdirpath(csv):
+          csvdir = SPLinkCSVDir(dirname(csvsrc))
+          return csvdir.export_csv_to_timeseries(csvsrc, self, tzname=tzname)
+      if isdirpath(csvsrc):
         # a directory of SP-Link CSV downloads
-        csvdir = SPLinkCSVDir(csv)
+        csvdir = SPLinkCSVDir(csvsrc)
         return csvdir.export_to_timeseries(self.dataset, self, tzname=tzname)
       raise ValueError("neither a CSV file nor a directory")
-    if isinstance(csv, SPLinkCSVDir):
-      return csv.export_to_timeseries(self.dataset, self, tzname=tzname)
+    if isinstance(csvsrc, SPLinkCSVDir):
+      return csvsrc.export_to_timeseries(self.dataset, self, tzname=tzname)
     raise TypeError(
-        "expected filesystem path or SPLinkCSVDir, got: %s" % (s(csv),)
+        "expected filesystem path or SPLinkCSVDir, got: %s" % (s(csvsrc),)
     )
 
   def to_csv(self, start, stop, f, *, columns=None, key_map=None, **to_csv_kw):
