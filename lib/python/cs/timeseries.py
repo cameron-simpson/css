@@ -2486,6 +2486,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       stop=None,
       keys: Optional[Iterable[str]] = None,
       *,
+      key_map=None,
       runstate=None,
       utcoffset=None,
   ):
@@ -2505,6 +2506,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       keys = self.keys()
     if not isinstance(keys, (tuple, list)):
       keys = tuple(keys)
+    if key_map is None:
+      key_map = {}
     if utcoffset is None:
       utcoffset = 0.0
     indices = as_datetime64s([t + utcoffset for t in self.range(start, stop)])
@@ -2517,7 +2520,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         with Pfx(key):
           if key not in self:
             raise KeyError("no such key")
-          data_dict[key] = self[key].as_pd_series(
+          data_key = key_map.get(key, key)
+          data_dict[data_key] = self[key].as_pd_series(
               start, stop, utcoffset=utcoffset
           )
     if runstate and runstate.cancelled:
