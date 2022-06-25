@@ -1297,7 +1297,6 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
         * `start`,`stop`: the time range
         * `label`: optional label for the graph
         * `runstate`: optional `RunState`, ignored in this implementation
-        * `tz`: optional timezone `datetime.tzinfo` object
         * `utcoffset`: optional timestamp skew from UTC in seconds
         Other keyword parameters are passed to `DataFrame.plot`.
     '''
@@ -2263,20 +2262,20 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
   ARROW_SHIFT_PARAMS = None
 
   @typechecked
-  def __init__(self, epoch: Epochy, *, tzinfo: Optional[str] = None):
+  def __init__(self, epoch: Epochy, *, tz: Optional[str] = None):
     super().__init__(epoch)
-    if tzinfo is None:
-      tzinfo = get_default_timezone_name()
-    self.tzinfo = tzinfo
+    if tz is None:
+      tz = get_default_timezone_name()
+    self.tz = tzfor(tz)
 
   def __str__(self):
-    return "%s:%s" % (super().__str__(), self.tzinfo)
+    return "%s:%s" % (super().__str__(), self.tz)
 
   def Arrow(self, when):
     ''' Return an `arrow.Arrow` instance for the UNIX time `when`
         in the policy timezone.
     '''
-    return arrow.Arrow.fromtimestamp(when, tzinfo=self.tzinfo)
+    return arrow.Arrow.fromtimestamp(when, tzinfo=self.tz)
 
   # pylint: disable=no-self-use
   def partition_format_cononical(self, txt):
@@ -2309,7 +2308,7 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
   def span_for_name(self, span_name: str):
     ''' Return a `TimePartition` derived from the `span_name`.
     '''
-    a = arrow.get(span_name, self.PARTITION_FORMAT, tzinfo=self.tzinfo)
+    a = arrow.get(span_name, self.PARTITION_FORMAT, tzinfo=self.tz)
     return self.span_for_time(a.timestamp())
 
   @typechecked
@@ -2331,7 +2330,7 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
     '''
     a = self.Arrow(when)
     name = self._arrow_name(a)
-    calendar_start = pfx_call(arrow.get, name, tzinfo=self.tzinfo)
+    calendar_start = pfx_call(arrow.get, name, tzinfo=self.tz)
     calendar_end = calendar_start.shift(**self.ARROW_SHIFT_PARAMS)
     raw_start = calendar_start.timestamp()
     raw_end = calendar_end.timestamp()
@@ -2411,16 +2410,21 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       *,
       epoch: Epoch,
       policy=None,  # :TimespanPolicy
-      tzinfo: Optional[str] = None,
+      tz: Optional[str] = None,
   ):
     super().__init__()
     self.epoch = epoch
-    if tzinfo is None:
-      tzinfo = get_default_timezone_name()
-    if policy is None:
-      policy_name = self.DEFAULT_POLICY_NAME
+    if policy is None or isinstance(policy, str):
+      policy_name = policy or self.DEFAULT_POLICY_NAME
       policy = TimespanPolicy.from_name(
-          policy_name, epoch=self.epoch, tzinfo=tzinfo
+          policy_name,
+          epoch=self.epoch,
+          tz=tz,
+      )
+    elif tz is not None:
+      raise ValueError(
+          "may not provide both tz:%s and a TimespanPolicy:%s", s(tz),
+          s(policy)
       )
     self.policy = policy
     self._rules = {}
@@ -2734,7 +2738,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       *,
       epoch: OptionalEpochy = None,
       policy=None,  # :TimespanPolicy
-      tzinfo: Optional[str] = None,
+      tz: Optional[str] = None,
       fstags: Optional[FSTags] = None,
   ):
     epoch = Epoch.promote(epoch)
@@ -2889,20 +2893,10 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     self.config['policy.name'] = new_policy_name
 
   @property
-  def tzinfo(self):
-    ''' The `policy.tzinfo` config value, a timezone name.
+  def tz(self):
+    ''' The `policy.tz` config value, a timezone name.
     '''
-    name = self.config.auto.policy.tzinfo
-    if not name:
-      name = get_default_timezone_name()
-      self.tzinfo = name
-    return name
-
-  @tzinfo.setter
-  def tzinfo(self, new_timezone: str):
-    ''' Set the `policy.tzinfo` config value, a timezone name.
-    '''
-    self.config['policy.tzinfo'] = new_timezone
+    return self.policy.tz
 
   def keys(self, fnglobs: Optional[Union[str, List[str]]] = None):
     ''' Return a list of the known keys, derived from the subdirectories,
