@@ -1132,7 +1132,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
   '''
 
   @typechecked
-  def __init__(self, epoch: Epoch, typecode: Union[str | TypeCode]):
+  def __init__(self, epoch: Epoch, typecode: Union[str | TypeCode], fill=None):
     typecode = TypeCode.promote(typecode)
     if fill is None:
       fill = typecode.default_fill
