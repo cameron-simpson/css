@@ -1231,6 +1231,18 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
       warning("%s: %s <= %r, was %r", self, tag_name, new_tag_value, tag_value)
       self.tags[tag_name] = new_tag_value
 
+  @property
+  def csv_header(self):
+    ''' The value of the `csv.header` tag for this `TimeSeries`, or `None`.
+    '''
+    return self.tags.get('csv.header')
+
+  @csv_header.setter
+  def csv_header(self, new_header):
+    ''' Set the `csv.header` tag to `new_header`.
+    '''
+    self.update_tag('csv.header', new_header)
+
   @plotrange
   def plot(
       self,
