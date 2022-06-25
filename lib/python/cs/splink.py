@@ -419,7 +419,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       step, policy_name = self.TIMESERIES_DEFAULTS[tsname]
     except KeyError as e:
       raise AttributeError(
-          "%s: no .%s attribute" % (type(self).__name__, tsname)
+          "%s.%s: unknown attribute" % (type(self).__name__, tsname)
       ) from e
     tspath = self.pathto(tsname)
     needdir(tspath)
