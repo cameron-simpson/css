@@ -318,11 +318,11 @@ class SPLinkDataDir(TimeSeriesDataDir):
       '''
       dt_column = {
           'DetailedData': SPLinkCSVDir.COLUMN_DATETIME,
-          'DailyData': SPLinkCSVDir.COLUMN_DATE,
+          'DailySummaryData': SPLinkCSVDir.COLUMN_DATE,
       }[self.dataset]
       dt_strftime_format = {
           'DetailedData': SPLinkCSVDir.COLUMN_DATETIME_STRPTIME,
-          'DailyData': SPLinkCSVDir.COLUMN_DATE_STRPTIME,
+          'DailySummaryData': SPLinkCSVDir.COLUMN_DATE_STRPTIME,
       }[self.dataset]
       dt_values = [when.strftime(dt_strftime_format) for when in df.index]
       ts2001base = ts2001_unixtime(self.tz)
@@ -610,6 +610,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   USAGE_KEYWORDS = {
       'ALL_DATASETS': ' '.join(sorted(ALL_DATASETS)),
+      'TIMESERIES_DATASETS': ' '.join(sorted(SPLinkData.TIMESERIES_DATASETS)),
       'DEFAULT_SPDPATH': DEFAULT_SPDPATH,
       'DEFAULT_SPDPATH_ENVVAR': DEFAULT_SPDPATH_ENVVAR,
       'DEFAULT_FETCH_SOURCE_ENVVAR': DEFAULT_FETCH_SOURCE_ENVVAR,
@@ -654,11 +655,16 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   def cmd_export(self, argv):
     ''' Usage: {cmd} dataset
           Export the named dataset in the original CSV form.
+          Available datasets: {TIMESERIES_DATASETS}
     '''
     options = self.options
     spd = options.spd
     dataset = self.poparg(
-        argv, 'dataset', str, lambda ds: ds in spd.TIMESERIES_DATASETS
+        argv,
+        'dataset',
+        str,
+        lambda ds: ds in spd.TIMESERIES_DATASETS,
+        f'dataset should be one of {SPLinkData.TIMESERIES_DATASETS}',
     )
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
