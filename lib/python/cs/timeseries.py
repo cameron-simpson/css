@@ -2674,7 +2674,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
           ts.setitems(series.index, series.values)
           former_name = former_names.get(column_name)
           if former_name:
-            ts.update_tag('csv.header', former_name)
+            ts.csv_header = former_name
     return df, renamed
 
 # pylint: disable=too-many-ancestors
@@ -3037,13 +3037,15 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       for span in self.policy.partitioned_spans(index.start, index.stop):
         ts = self.timeseriesfile_from_partition_name(span.name)
         ts_values = ts[span.start:span.stop]
-        steps = span.stop - span.start
         values.extend(ts_values)
         difflen = (span.end_offset - span.start_offset) - len(ts_values)
         if difflen > 0:
           warning(
-              "span:%s:%s: %d values, pad with %d fill values", span.start,
-              span.stop, len(ts_values), difflen
+              "span:%s:%s: %d values, pad with %d fill values",
+              span.start,
+              span.stop,
+              len(ts_values),
+              difflen,
           )
           values.extend([ts.fill] * difflen)
         else:
