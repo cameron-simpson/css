@@ -2790,7 +2790,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
   def __str__(self):
     return "%s(%s,%s,%s)" % (
         type(self).__name__,
-        shortpath(self.fspath),
+        self.shortpath,
         getattr(self, 'step', 'STEP_UNDEFINED'),
         getattr(self, 'policy', 'POLICY_UNDEFINED'),
     )
@@ -2878,7 +2878,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   @policy_name.setter
   def policy_name(self, new_policy_name: str):
-    ''' Set the `policy.tzinfo` config value, usually a key from
+    ''' Set the `policy.name` config value, usually a key from
         `TimespanPolicy.FACTORIES`.
     '''
     self.config['policy.name'] = new_policy_name
