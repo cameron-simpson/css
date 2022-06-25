@@ -650,6 +650,21 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         with spd:
           yield
 
+  def cmd_export(self, argv):
+    ''' Usage: {cmd} dataset
+          Export the named dataset in the original CSV form.
+    '''
+    options = self.options
+    spd = options.spd
+    dataset = self.poparg(
+        argv, 'dataset', str, lambda ds: ds in spd.TIMESERIES_DATASETS
+    )
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    now = time.time()
+    start = now - 3 * 24 * 3600
+    spd.to_csv(dataset, start, now, sys.stdout)
+
   def cmd_fetch(self, argv, fetch_source=None, doit=None, expunge=None):
     ''' Usage: {cmd} [-F rsync-source] [-nx] [-- [rsync-options...]]
           Rsync everything from rsync-source into the downloads area.
