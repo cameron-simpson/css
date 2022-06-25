@@ -862,14 +862,18 @@ def get_default_timezone_name():
   '''
   return arrow.now('local').format('ZZZ')
 
-def tzfor(tzspec=None) -> tzinfo:
-  ''' Return a `tzinfo` from the timezone specification `tzspec`.
+@typechecked
+def tzfor(tzspec: Optional[str] = None) -> tzinfo:
+  ''' Promote the timezone specification `tzspec` to a `tzinfo` instance.
+      If `tzspec` is an instance of `tzinfo` it is returned unchanged.
       If `tzspec` is omitted or the string `'local'` this returns
       `dateutil.tz.gettz()`, the local system timezone.
       Otherwise it returns `dateutil.tz.gettz(tzspec)`.
   '''
   if tzspec is None or tzspec == 'local':
     return dateutil.tz.gettz()
+  if isinstance(tzspec, tzinfo):
+    return tzspec
   tz = dateutil.tz.gettz(tzspec)
   if tz is None:
     raise ValueError("dateutil.tz.gettz(%r) gave None" % (tzspec,))
