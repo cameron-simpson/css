@@ -505,6 +505,18 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
           for key in pfx_call(tsd.keys, field_spec):
             yield tsd, key
 
+  def to_csv(self, dsname, start, stop, f, **to_csv_kw):
+    ''' Export the data from the dataset `dsname`
+        between the times `start` to `stop`.
+    '''
+    if dsname not in self.TIMESERIES_DATASETS:
+      raise ValueError(
+          "dsname %r not in TIMESERIES_DATASETS:%r" %
+          (dsname, self.TIMESERIES_DATASETS)
+      )
+    tsd = getattr(self, dsname)
+    return tsd.to_csv(start, stop, f, **to_csv_kw)
+
   @plotrange
   def plot(
       self,
