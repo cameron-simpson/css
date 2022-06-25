@@ -715,30 +715,62 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         ) as tmpdirpath:
           testfunc_map[testname](tmpdirpath)
 
+# TODO: accept a `datetime` for `tz`, use its offset for `utcoffset`
 @decorator
-def plotrange(func, needs_start=False, needs_stop=False):
-  ''' A decorator for plotting methods with optional `start` and `stop`
-      leading positional parameters and an optional `figure` keyword parameter.
+def plotrange(method, needs_start=False, needs_stop=False):
+  ''' A decorator for plotting methods which presents optional
+      `start` and `stop` leading positional parameters and optional `tz` or `utcoffset`
+      keyword parameters.
+      The decorated function will be called with leading `start`
+      and `stop` positional parameters and a specific `utcoffset`
+      parameter.
 
-      The decorator parameters `needs_start` and `needs_stop`
-      may be set to require non-`None` values for `start` and `stop`.
-
-      If `start` is `None` its value is set to `self.start`.
-      If `stop` is `None` its value is set to `self.stop`.
+      The as-decorated function is called with the following parameters:
+      * `start`: an optional UNIX timestamp for the start of the range;
+        if omitted the default is `self.start`;
+        this is a required parameter if the decorator has `needs_start=True`
+      * `stop`: an optional UNIX timestamp for the end of the range;
+        if omitted the default is `self.stop`;
+        this is a required parameter if the decorator has `needs_stop=True`
+      * `tz`: optional timezone `datetime.tzinfo` object or
+        specification as for `tzfor()`;
+        this is used to infer a UTC offset in seconds
+      * `utcoffset`: an offset from UTC time in seconds
+      Other parameters are passed through to the deocrated function.
 
       The decorated method is then called as:
 
-          func(self, start, stop, *a, **kw)
+          method(self, start, stop, *a, utcoffset, **kw)
 
       where `*a` and `**kw` are the additional positional and keyword
       parameters respectively, if any.
+
+      The `utcoffset` is an offset to apply to UTC-based time data
+      for _presentation_ on the graph, largely because the plotting
+      functions use `DataFrame.plot` which broadly ignores attempts
+      to set locators or formatters because it supplies its own.
+
+      If neither `utcoffset` or `tz` is supplied by the caller, the
+      `utcoffset` is `0.0`.
+      A specified `utcoffset` is passed through.
+      A `tz` is promoted to a `tzinfo` instance via the `tzfor()`
+      function and applied to the `stop` timestamp to obtain a
+      `datetime` from which the `utcoffset` will be derived.
+      It is an error to specify both `utcoffset` and `tz`.
   '''
 
   # pylint: disable=keyword-arg-before-vararg
+  @typechecked
   @require(lambda start: not needs_start or start is not None)
   @require(lambda stop: not needs_stop or stop is not None)
-  def plotrange_wrapper(
-      self, start=None, stop=None, *a, tz=None, utcoffset=None, **kw
+  def plotrange_method_wrapper(
+      self,
+      start: Optional[Numeric] = None,
+      stop: Optional[Numeric] = None,
+      *a,
+      tz: Optional[tzinfo] = None,
+      utcoffset: Optional[Numeric] = None,
+      **kw,
   ):
     import_extra('pandas', DISTINFO)
     import_extra('matplotlib', DISTINFO)
@@ -750,9 +782,8 @@ def plotrange(func, needs_start=False, needs_stop=False):
       if tz is None:
         utcoffset = 0.0
       else:
-        if isinstance(tz, str):
-          tz = tzfor(tz)
-          assert isinstance(tz, tzinfo)
+        tz = tzfor(tz)
+        assert isinstance(tz, tzinfo)
         # DF hack: compute the timezone offset for "stop",
         # use it to skew the UNIX timestamps so that UTC tick marks and
         # placements look "local"
@@ -763,7 +794,7 @@ def plotrange(func, needs_start=False, needs_stop=False):
           "may not supply both utcoffset:%s and tz:%s" % (r(utcoffset), r(tz))
       )
 
-    func.__doc__ += '''
+    method.__doc__ += '''
 
         The `utcoffset` or `tz` parameters may be used to provide
         an offset from UT in seconds for the timestamps _as presented
@@ -789,10 +820,11 @@ def plotrange(func, needs_start=False, needs_stop=False):
         the offset from UTC for the rightmost timestamp on the graph
         (`stop`) and that offset will be applied to all the timestamps
         on the graph.'''
-    return func(self, start, stop, *a, utcoffset=utcoffset, **kw)
+    return method(self, start, stop, *a, utcoffset=utcoffset, **kw)
 
-  return plotrange_wrapper
+  return plotrange_method_wrapper
 
+# TODO: optional `utcoffset`/`tz` parameters for presentation
 # pylint: disable=too-many-locals
 def plot_events(
     ax, events, value_func, *, start=None, stop=None, **scatter_kw
