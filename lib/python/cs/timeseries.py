@@ -1223,6 +1223,14 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
         data, as_datetime64s([t + utcoffset for t in times]), self.np_type
     )
 
+  def update_tag(self, tag_name, new_tag_value):
+    ''' Update tag with new value.
+    '''
+    tag_value = self.tags.get(tag_name)
+    if tag_value != new_tag_value:
+      warning("%s: %s <= %r, was %r", self, tag_name, new_tag_value, tag_value)
+      self.tags[tag_name] = new_tag_value
+
   @plotrange
   def plot(
       self,
@@ -2944,13 +2952,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     ''' The `TagSet` associated with this `TimeSeriesPartitioned` instance.
     '''
     return self.fstags[self.fspath]
-
-  def update_tag(self, tag_name, new_tag_value):
-    ''' Update tag with new value.
-    '''
-    tag_value = self.tags.get(tag_name)
-    if tag_value != new_tag_value:
-      self.tags[tag_name] = tag_value
 
   @typechecked
   def subseries(self, spec: Union[str, Numeric]):
