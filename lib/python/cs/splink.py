@@ -131,6 +131,12 @@ class SPLinkCSVDir(HasFSPath):
       referring to a particular `PerformanceData*` download directory.
   '''
 
+  COLUMN_SECONDS_2001 = 'Date/Time Stamp [Seconds From The Year 2001]"'
+  COLUMN_DATE = 'Date/Time Stamp [dd/MM/yyyy]'
+  COLUMN_DATE_STRPTIME = '%d/%m/%Y'
+  COLUMN_DATETIME = 'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]'
+  COLUMN_DATETIME_STRPTIME = '%d/%m/%Y - %H:%M:%S'
+
   @property
   @cachedmethod
   def sitename(self):
@@ -211,11 +217,8 @@ class SPLinkCSVDir(HasFSPath):
     if short_csvpath.startswith('../'):
       short_csvpath = shortpath(csvpath)
     with tsd:
-      index_col = 'Date/Time Stamp [Seconds From The Year 2001]'
-      skip_cols = (
-          'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]',
-          'Date/Time Stamp [dd/MM/yyyy]',
-      )
+      index_col = self.COLUMN_SECONDS_2001
+      skip_cols = (self.COLUMN_DATETIME, self.COLUMN_DATE)
       ts2001_offset = int(ts2001_unixtime())
       # dataframe indexed by UNIX timestamp
       df, _ = tsd.read_csv(
