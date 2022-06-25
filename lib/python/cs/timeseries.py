@@ -2601,7 +2601,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     df = self.as_pd_dataframe(start, stop, columns, key_map=key_map)
     if df_mangle:
       df_mangle(df)
-    df.to_csv(f, index=False, **to_csv_kw)
+    df.to_csv(f, **to_csv_kw)
 
   @plotrange
   def plot(
