@@ -2539,6 +2539,30 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     '''
     return self[key].csv_header or key
 
+  def to_csv(
+      self,
+      start,
+      stop,
+      f,
+      *,
+      columns=None,
+      key_map=None,
+      df_mangle=None,
+      **to_csv_kw,
+  ):
+    ''' Return `pandas.DataFrame.to_csv()` for the data between `start` and `stop`.
+    '''
+    if columns is None:
+      columns = sorted(self.keys())
+    elif not isinstance(columns, (list, tuple)):
+      columns = list(columns)
+    if key_map is None:
+      key_map = {column: self.csv_header(column) for column in columns}
+    df = self.as_pd_dataframe(start, stop, columns, key_map=key_map)
+    if df_mangle:
+      df_mangle(df)
+    df.to_csv(f, index=False, **to_csv_kw)
+
   @plotrange
   def plot(
       self,
