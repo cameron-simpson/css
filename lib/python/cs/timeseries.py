@@ -2102,7 +2102,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
   @classmethod
   @pfx_method
   @typechecked
-  def promote(cls, policy, epoch: OptionalEpochy = None):
+  def promote(cls, policy, epoch: OptionalEpochy = None, **policy_kw):
     ''' Factory to promote `policy` to a `TimespanPolicy` instance.
 
         The supplied `policy` may be:
@@ -2112,17 +2112,17 @@ class TimespanPolicy(DBC, HasEpochMixin):
     '''
     if cls is not TimespanPolicy:
       raise TypeError(
-          "TimespanPolicy.from_name is not meaningful from a subclass (%s)" %
+          "TimespanPolicy.promote is not meaningful from a subclass (%s)" %
           (cls.__name__,)
       )
-    epoch = Epoch.promote(epoch)
     if not isinstance(policy, TimespanPolicy):
+      epoch = Epoch.promote(epoch)
       if epoch is None:
         raise ValueError("epoch may not be None if promotion is required")
       if isinstance(policy, str):
-        policy = TimespanPolicy.from_name(policy, epoch=epoch)
+        policy = TimespanPolicy.from_name(policy, epoch=epoch, **policy_kw)
       elif isinstance(policy, type) and issubclass(policy, TimespanPolicy):
-        policy = policy(epoch=epoch)
+        policy = policy(epoch=epoch, **policy_kw)
       else:
         raise TypeError(
             "%s.promote: do not know how to promote %s" %
