@@ -307,6 +307,41 @@ class SPLinkDataDir(TimeSeriesDataDir):
         "expected filesystem path or SPLinkCSVDir, got: %s" % (s(csv),)
     )
 
+  def to_csv(self, start, stop, f, *, columns=None, key_map=None, **to_csv_kw):
+    ''' Return `pandas.DataFrame.to_csv()` for the data between `start` and `stop`.
+    '''
+
+    def df_mangle(df):
+      ''' Insert the date/datetime and 2001-seconds columns at the
+          front of the `DataFrame` before transcription.
+      '''
+      dt_column = {
+          'DetailedData': SPLinkCSVDir.COLUMN_DATETIME,
+          'DailyData': SPLinkCSVDir.COLUMN_DATE,
+      }[self.dataset]
+      dt_strftime_format = {
+          'DetailedData': SPLinkCSVDir.COLUMN_DATETIME_STRPTIME,
+          'DailyData': SPLinkCSVDir.COLUMN_DATE_STRPTIME,
+      }[self.dataset]
+      dt_values = [when.strftime(dt_strftime_format) for when in df.index]
+      ts2001base = ts2001_unixtime(self.tz)
+      dts_values = [int(when.timestamp() - ts2001base) for when in df.index]
+      df.insert(0, SPLinkCSVDir.COLUMN_SECONDS_2001, dts_values)
+      df.insert(1, dt_column, dt_values)
+
+    return super().to_csv(
+        start,
+        stop,
+        f,
+        columns=columns,
+        key_map=key_map,
+        df_mangle=df_mangle,
+        index=False,
+        float_format='%g',
+        quoting=csv.QUOTE_NONNUMERIC,
+        **to_csv_kw,
+    )
+
 # information derived from the basename of an SP-Link download filename
 SPLinkDataFileInfo = namedtuple(
     'SPLinkDataFileInfo', 'fspath sitename dataset unixtime dotext'
