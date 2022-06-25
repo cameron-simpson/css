@@ -2534,6 +2534,12 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         copy=False,
     )
 
+  @typechecked
+  def csv_header(self, key: str) -> str:
+    ''' Return the CSV header name for `key`.
+    '''
+    return self[key].csv_header or key
+
   @plotrange
   def plot(
       self,
