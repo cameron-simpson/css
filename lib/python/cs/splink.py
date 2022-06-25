@@ -9,6 +9,7 @@
 
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+import csv
 from datetime import datetime
 from fnmatch import fnmatch
 from functools import partial
@@ -131,7 +132,7 @@ class SPLinkCSVDir(HasFSPath):
       referring to a particular `PerformanceData*` download directory.
   '''
 
-  COLUMN_SECONDS_2001 = 'Date/Time Stamp [Seconds From The Year 2001]"'
+  COLUMN_SECONDS_2001 = 'Date/Time Stamp [Seconds From The Year 2001]'
   COLUMN_DATE = 'Date/Time Stamp [dd/MM/yyyy]'
   COLUMN_DATE_STRPTIME = '%d/%m/%Y'
   COLUMN_DATETIME = 'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]'
