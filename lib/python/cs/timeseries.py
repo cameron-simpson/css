@@ -909,7 +909,7 @@ def get_default_timezone_name():
   return arrow.now('local').format('ZZZ')
 
 @typechecked
-def tzfor(tzspec: Optional[str] = None) -> tzinfo:
+def tzfor(tzspec: Optional[Union[str, tzinfo]] = None) -> tzinfo:
   ''' Promote the timezone specification `tzspec` to a `tzinfo` instance.
       If `tzspec` is an instance of `tzinfo` it is returned unchanged.
       If `tzspec` is omitted or the string `'local'` this returns
