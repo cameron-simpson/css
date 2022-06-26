@@ -31,6 +31,7 @@ import sys
 import time
 
 import arrow
+from dateutil.tz import tzlocal
 from matplotlib.figure import Figure
 from typeguard import typechecked
 
@@ -879,7 +880,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] days {{mode|[dataset:]{{glob|field}}}}...
+    ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] start-time [stop-time] {{mode|[dataset:]{{glob|field}}}}...
         -e events,...   Display the specified events.
         -f              Force. Overwirte the image path even if it exists.
         --stacked       Stack graphed values on top of each other.
@@ -888,10 +889,17 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                         to the standard output in sixel format if
                         it is a terminal, and in PNG format otherwise.
         --show          Open the image path with "open".
-        days            How many recent days to graph.
+        start-time      An integer number of days before the current time
+                        or any datetime specification recognised by
+                        dateutil.parser.parse.
+        stop-time       Optional stop time, default now.
+                        An integer number of days before the current time
+                        or any datetime specification recognised by
+                        dateutil.parser.parse.
         mode            A named graph mode, implying a group of fields.
     '''
     options = self.options
+    options.tz = tzlocal()
     options.show_image = False
     options.imgpath = None
     options.stacked = False
@@ -906,20 +914,28 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         show='show_image',
         stacked=None,
     )
+    tz = options.tz
+    # mandatory start time
+    start_dt = self.poptime(argv, 'start-time')
+    # check for optional stop-time, default now
+    if argv:
+      try:
+        stop_dt = self.poptime(argv, 'stop-time', unpop_on_error=True)
+      except GetoptError:
+        stop_dt = datetime.now(options.tz)
+    start = start_dt.timestamp()
+    stop = stop_dt.timestamp()
     force = options.force
     imgpath = options.imgpath
     spd = options.spd
     show_image = options.show_image
     stacked = options.stacked
     event_labels = options.event_labels
-    days = self.poparg(argv, int, "days to display", lambda days: days > 0)
-    now = time.time()
-    start = now - days * 24 * 3600
     figure = spd.plot(
         start,
-        now,
+        stop,
         key_specs=argv,
-        tz='local',
+        tz=tz,
         event_labels=event_labels,
         stacked=stacked
     )
