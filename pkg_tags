@@ -50,7 +50,7 @@ cs.later pypi.release="20220605" ok_revision="258f06f68c5714444c510ea19c3f45a0f5
 cs.lex pypi.release="20220626" ok_revision="138ffdfea02ee244fe08149aafb996ee264dfa1c" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"]}
 cs.logutils pypi.release="20220531" ok_revision=b00bf7d22f3b049e51068327ee8ffc299136d510 features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
-cs.mappings pypi.release="20220605" ok_revision=b3c4ab16741a0591cb8e2b473947755155328173 features={"20210906":["RemappedMappingProxy"]}
+cs.mappings pypi.release="20220605" ok_revision="071f69ca0d76e6334e52976e9d776c005af35246" features={"20210906":["RemappedMappingProxy"]}
 cs.mediainfo
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783" pypi.release="20211208"
