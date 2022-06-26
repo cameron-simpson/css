@@ -22,7 +22,7 @@ from cs.logutils import trace, warning
 from cs.pfx import pfx_call
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220626'
+__version__ = '20220626-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
