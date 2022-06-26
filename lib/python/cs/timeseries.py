@@ -342,7 +342,8 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           -o imgpath.png  File system path to which to save the plot.
           --show          Show the image in the GUI.
           --tz tzspec     Skew the UTC times presented on the graph
-                          to emulate the timezone spcified by tzspec.
+                          The default skew is 0 i.e. UTC.
+                          to emulate the timezone specified by tzspec.
           --stacked       Stack the plot lines/areas.
           start-time      An integer number of days before the current time
                           or any datetime specification recognised by
