@@ -379,14 +379,14 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         stop_dt = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
         stop_dt = datetime.now(tzlocal())
+    start = start_dt.timestamp()
+    stop = stop_dt.timestamp()
     force = options.force
     imgpath = options.imgpath
     tz = options.tz
     if imgpath and not force and existspath(imgpath):
       raise GetoptError("imgpath exists: %r" % (imgpath,))
     xit = 0
-    start = start_dt.timestamp()
-    stop = stop_dt.timestamp()
     ts = options.ts
     plot_dx = 14
     plot_dy = 8
