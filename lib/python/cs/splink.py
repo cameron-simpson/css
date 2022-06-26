@@ -86,6 +86,7 @@ DISTINFO = {
         'cs.tagset',
         'cs.timeseries',
         'cs.upd',
+        'dateutil',
         'matplotlib',
         'typeguard',
     ],
