@@ -339,7 +339,7 @@ class _URL(unicode):
       return ''
     return hostname.split('.', 1)[1]
 
-  @proerty
+  @property
   @locked
   def parsed(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
@@ -367,7 +367,7 @@ class _URL(unicode):
     import feedparser
     return feedparser.parse(self.content)
 
-  @proerty
+  @property
   @locked
   def xml(self):
     ''' An `ElementTree` of the URL content.
