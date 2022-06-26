@@ -57,6 +57,7 @@ from cs.timeseries import (
     plotrange,
     print_figure,
     save_figure,
+    tzfor,
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
@@ -889,6 +890,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                         to the standard output in sixel format if
                         it is a terminal, and in PNG format otherwise.
         --show          Open the image path with "open".
+        --tz tzspec     Skew the UTC times presented on the graph
+                        to emulate the timezone specified by tzspec.
+                        The default skew is the system local timezone.
         start-time      An integer number of days before the current time
                         or any datetime specification recognised by
                         dateutil.parser.parse.
@@ -913,6 +917,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         o_='imgpath',
         show='show_image',
         stacked=None,
+        tz_=('tz', tzfor),
     )
     tz = options.tz
     # mandatory start time
