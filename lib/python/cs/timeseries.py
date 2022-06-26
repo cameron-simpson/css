@@ -277,26 +277,37 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
   ''' Abstract base class for command line interfaces to `TimeSeries` data files.
   '''
 
+  # TODO: also arbitrary timedeltas eg 100d20h
   @staticmethod
   @typechecked
-  def parsetime(timespec: str) -> datetime:
-    ''' Parse `timespec` into an aware `datetime`.
-        `timespec` may be either an integer number of days, indicating
-        a time before _now_, or any format recognised by
-        `dateutil.parser.parse`, assuming the system local time if
-        no timezone is specified in `timespec`.
+  def parsetime(timespec: str) -> float:
+    ''' Parse `timespec` into a UNIX timestamp.
+        `timespec` may be one of the following:
+        * an integer number of days, indicating a time before _now_
+        * a float, an absolute UNIX timestamp in seconds
+        * any format recognised by `dateutil.parser.parse`, assuming the
+          system local time if no timezone is specified in `timespec`.
     '''
     try:
       days = int(timespec)
     except ValueError:
-      days = None
-      dt = dateutil.parser.parse(timespec)
-      if dt.tzinfo is None:
-        # assume local time if we get a naive datetime
-        dt = dt.replace(tzinfo=tzlocal())
+      try:
+        return float(timespec)
+      except ValueError:
+        try:
+          dt = dateutil.parser.parse(timespec)
+        except dateutil.parser.ParserError as e:
+          raise ValueError(
+              "%r: neither int nor float nor dateutil.parser.parse format: %s"
+              % (timespec, e)
+          )
+        if dt.tzinfo is None:
+          # assume local time if we get a naive datetime
+          dt = dt.replace(tzinfo=tzlocal())
     else:
+      # days
       dt = datetime.now(tzlocal()) - timedelta(days=days)
-    return dt
+    return dt.timestamp()
 
   @typechecked
   def poptime(self, argv: List[str], argname: str = 'timespec', **kw):
@@ -373,15 +384,13 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         tz_=('tz', tzfor),
     )
     # mandatory start time
-    start_dt = self.poptime(argv, 'start-time')
+    start = self.poptime(argv, 'start-time')
     # check for optional stop-time, default now
     if argv:
       try:
-        stop_dt = self.poptime(argv, 'stop-time', unpop_on_error=True)
+        stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
-        stop_dt = datetime.now(tzlocal())
-    start = start_dt.timestamp()
-    stop = stop_dt.timestamp()
+        stop = time.time()
     force = options.force
     imgpath = options.imgpath
     tz = options.tz
