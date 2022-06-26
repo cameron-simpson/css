@@ -927,7 +927,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       try:
         stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
-        stop_dt = time.time()
+        stop = time.time()
     force = options.force
     imgpath = options.imgpath
     spd = options.spd
