@@ -36,7 +36,7 @@ from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
-from datetime import datetime, tzinfo
+from datetime import datetime, timedelta, tzinfo
 from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
@@ -76,6 +76,7 @@ from typing import (
 import arrow
 from arrow import Arrow
 import dateutil
+from dateutil.tz import tzlocal
 from icontract import ensure, require, DBC
 from matplotlib.figure import Figure
 import numpy as np
@@ -276,6 +277,37 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
   ''' Abstract base class for command line interfaces to `TimeSeries` data files.
   '''
 
+  @staticmethod
+  @typechecked
+  def parsetime(timespec: str) -> datetime:
+    ''' Parse `timespec` into an aware `datetime`.
+        `timespec` may be either an integer number of days, indicating
+        a time before _now_, or any format recognised by
+        `dateutil.parser.parse`, assuming the system local time if
+        no timezone is specified in `timespec`.
+    '''
+    try:
+      days = int(timespec)
+    except ValueError:
+      days = None
+      dt = dateutil.parser.parse(timespec)
+      if dt.tzinfo is None:
+        # assume local time if we get a naive datetime
+        dt = dt.replace(tzinfo=tzlocal())
+    else:
+      dt = datetime.now(tzlocal()) - timedelta(days=days)
+    return dt
+
+  @typechecked
+  def poptime(self, argv: List[str], argname: str = 'timespec', **kw):
+    ''' Pop a _days_ or _timespec_ argument from the command line,
+        return an aware `datetime`.
+    '''
+    return self.poparg(
+        argv, argname, self.parsetime,
+        'expected days or dateutil.parser.parse string', **kw
+    )
+
   def cmd_fetch(self, argv):
     ''' Usage: {cmd} ...
           Fetch raw data files from the primary source to a local spool.
@@ -303,7 +335,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] [--tz tzspec] days [{{glob|fields}}...]
+    ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] [--tz tzspec] start-time [stop-time] [{{glob|fields}}...]
           Plot the most recent days of data from the time series at tspath.
           Options:
           -f              Force. -o will overwrite an existing image file.
@@ -312,6 +344,13 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           --tz tzspec     Skew the UTC times presented on the graph
                           to emulate the timezone spcified by tzspec.
           --stacked       Stack the plot lines/areas.
+          start-time      An integer number of days before the current time
+                          or any datetime specification recognised by
+                          dateutil.parser.parse.
+          stop-time       Optional stop time, default now.
+                          An integer number of days before the current time
+                          or any datetime specification recognised by
+                          dateutil.parser.parse.
           glob|fields     If glob is supplied, constrain the keys of
                           a TimeSeriesDataDir by the glob.
     '''
@@ -332,15 +371,22 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         stacked=None,
         tz_=('tz', tzfor),
     )
+    # mandatory start time
+    start_dt = self.poptime(argv, 'start-time')
+    # check for optional stop-time, default now
+    if argv:
+      try:
+        stop_dt = self.poptime(argv, 'stop-time', unpop_on_error=True)
+      except GetoptError:
+        stop_dt = datetime.now(tzlocal())
     force = options.force
     imgpath = options.imgpath
     tz = options.tz
     if imgpath and not force and existspath(imgpath):
       raise GetoptError("imgpath exists: %r" % (imgpath,))
-    days = self.poparg(argv, int, "days to display", lambda days: days > 0)
     xit = 0
-    now = time.time()
-    start = now - days * 24 * 3600
+    start = start_dt.timestamp()
+    stop = stop_dt.timestamp()
     ts = options.ts
     plot_dx = 14
     plot_dy = 8
@@ -355,7 +401,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         )
       ax = ts.plot(
           start,
-          now,
+          stop,
           ax=ax,
           runstate=runstate,
           tz=tz,
@@ -380,7 +426,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
       )
       ax = ts.plot(
           start,
-          now,
+          stop,
           keys,
           runstate=runstate,
           tz=tz,
