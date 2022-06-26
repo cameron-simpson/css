@@ -921,15 +921,13 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     )
     tz = options.tz
     # mandatory start time
-    start_dt = self.poptime(argv, 'start-time')
+    start = self.poptime(argv, 'start-time')
     # check for optional stop-time, default now
     if argv:
       try:
-        stop_dt = self.poptime(argv, 'stop-time', unpop_on_error=True)
+        stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
-        stop_dt = datetime.now(options.tz)
-    start = start_dt.timestamp()
-    stop = stop_dt.timestamp()
+        stop_dt = time.time()
     force = options.force
     imgpath = options.imgpath
     spd = options.spd
