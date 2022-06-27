@@ -154,7 +154,7 @@ The [twine tool](https://pypi.org/project/twine/)
 can upload build artifact files to PyPI for distribution,
 for example with a command like:
 
-    twine upload dist/package-name-version.tar.gz dist/package-name-version-py3-none-any.whlpy3-none-any.whl
+    twine upload dist/package-name-version.tar.gz dist/package-name-version-py3-none-any.whl
 
 Some build tools will also include upload facilities.
 
