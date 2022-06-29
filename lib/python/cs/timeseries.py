@@ -905,8 +905,9 @@ def plotrange(method, needs_start=False, needs_stop=False):
 
 # TODO: optional `utcoffset`/`tz` parameters for presentation
 # pylint: disable=too-many-locals
+@plotrange
 def plot_events(
-    ax, events, value_func, *, start=None, stop=None, **scatter_kw
+    start, stop, ax, events, value_func, *, utcoffset, **scatter_kw
 ):
   ''' Plot `events`, an iterable of objects with `.unixtime` attributes
       such as an `SQLTagSet`, on an existing set of axes `ax`.
