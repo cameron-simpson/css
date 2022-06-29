@@ -774,37 +774,43 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
 # TODO: accept a `datetime` for `tz`, use its offset for `utcoffset`
 @decorator
 def plotrange(method, needs_start=False, needs_stop=False):
-  ''' A decorator for plotting methods which presents optional
-      `start` and `stop` leading positional parameters and optional `tz` or `utcoffset`
-      keyword parameters.
+  ''' A decorator intended for plotting functions or methods which
+      presents optional `start` and `stop` leading positional
+      parameters and optional `tz` or `utcoffset` keyword parameters.
       The decorated function will be called with leading `start`
       and `stop` positional parameters and a specific `utcoffset`
-      parameter.
+      keyword parameter.
 
       The as-decorated function is called with the following parameters:
-      * `start`: an optional UNIX timestamp for the start of the range;
-        if omitted the default is `self.start`;
+      * `start`: an optional UNIX timestamp positional for the
+        start of the range; if omitted the default is `self.start`;
         this is a required parameter if the decorator has `needs_start=True`
-      * `stop`: an optional UNIX timestamp for the end of the range;
-        if omitted the default is `self.stop`;
+      * `stop`: an optional UNIX timestamp positional parameter for the end
+        of the range; if omitted the default is `self.stop`;
         this is a required parameter if the decorator has `needs_stop=True`
       * `tz`: optional timezone `datetime.tzinfo` object or
         specification as for `tzfor()`;
         this is used to infer a UTC offset in seconds
-      * `utcoffset`: an offset from UTC time in seconds
+      * `utcoffset`: an optional offset from UTC time in seconds
       Other parameters are passed through to the deocrated function.
 
-      The decorated method is then called as:
+      A decorated method is then called as:
 
-          method(self, start, stop, *a, utcoffset, **kw)
+          method(self, start, stop, *a, utcoffset=utcoffset, **kw)
 
       where `*a` and `**kw` are the additional positional and keyword
       parameters respectively, if any.
+
+      A decorated function is called as:
+
+          function(start, stop, *a, utcoffset=utcoffset, **kw)
 
       The `utcoffset` is an offset to apply to UTC-based time data
       for _presentation_ on the graph, largely because the plotting
       functions use `DataFrame.plot` which broadly ignores attempts
       to set locators or formatters because it supplies its own.
+      The plotting function would shift the values of the `DataFrame`
+      index using this value.
 
       If neither `utcoffset` or `tz` is supplied by the caller, the
       `utcoffset` is `0.0`.
@@ -817,12 +823,7 @@ def plotrange(method, needs_start=False, needs_stop=False):
 
   # pylint: disable=keyword-arg-before-vararg
   @typechecked
-  @require(lambda start: not needs_start or start is not None)
-  @require(lambda stop: not needs_stop or stop is not None)
   def plotrange_method_wrapper(
-      self,
-      start: Optional[Numeric] = None,
-      stop: Optional[Numeric] = None,
       *a,
       tz: Optional[tzinfo] = None,
       utcoffset: Optional[Numeric] = None,
@@ -830,6 +831,25 @@ def plotrange(method, needs_start=False, needs_stop=False):
   ):
     import_extra('pandas', DISTINFO)
     import_extra('matplotlib', DISTINFO)
+    a = list(a)
+    if a and not isinstance(a[0], numeric_types):
+      self = a.pop(0)
+    else:
+      self = None
+    if a:
+      start = a.pop(0)
+      assert start is None or isinstance(start, numeric_types)
+    elif needs_start:
+      raise ValueError("missing start parameter")
+    else:
+      start = None
+    if a:
+      stop = a.pop(0)
+      assert stop is None or isinstance(stop, numeric_types)
+    elif needs_stop:
+      raise ValueError("missing stop parameter")
+    else:
+      stop = None
     if start is None:
       start = self.start
     if stop is None:
@@ -876,14 +896,18 @@ def plotrange(method, needs_start=False, needs_stop=False):
         the offset from UTC for the rightmost timestamp on the graph
         (`stop`) and that offset will be applied to all the timestamps
         on the graph.'''
+    if self is None:
+      # not a method, call as a function
+      return method(start, stop, *a, utcoffset=utcoffset, **kw)
     return method(self, start, stop, *a, utcoffset=utcoffset, **kw)
 
   return plotrange_method_wrapper
 
 # TODO: optional `utcoffset`/`tz` parameters for presentation
 # pylint: disable=too-many-locals
+@plotrange
 def plot_events(
-    ax, events, value_func, *, start=None, stop=None, **scatter_kw
+    start, stop, ax, events, value_func, *, utcoffset, **scatter_kw
 ):
   ''' Plot `events`, an iterable of objects with `.unixtime` attributes
       such as an `SQLTagSet`, on an existing set of axes `ax`.
