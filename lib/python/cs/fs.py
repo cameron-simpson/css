@@ -31,7 +31,7 @@ from cs.env import envsub
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
-__version__ = '20220429-post'
+__version__ = '20220530-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -187,18 +187,40 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   '''
 
   @classmethod
-  def _resolve_fspath(cls, fspath):
-    ''' Resolve the filesystem path `fspath`.
-        If `fspath` is `None`, use the default from `${cls.FSPATH_ENVVAR}`
-        or `cls.FSPATH_DEFAULT` (neither default is defined in this base class).
-        Return `realpath(fspath)`.
+  def _resolve_fspath(cls, fspath, envvar=None, default_attr=None):
+    ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
+
+        Parameters:
+        * `fspath`: the filesystem path to resolve;
+          this may be `None` to use the class defaults
+        * `envvar`: the environment variable to consult for a default `fspath`;
+          the default for this comes from `cls.FSPATH_ENVVAR` if defined
+        * `default_attr`: the class attribute containing the default `fspath`
+          if defined and there is not environment variable for `envvar`
     '''
     if fspath is None:
       # pylint: disable=no-member
-      fspath = os.environ.get(cls.FSPATH_ENVVAR)
-      if fspath is None:
-        # pylint: disable=no-member
-        fspath = expanduser(cls.FSPATH_DEFAULT)
+      if envvar is None:
+        envvar = getattr(cls, 'FSPATH_ENVVAR', None)
+      if envvar is not None:
+        fspath = os.environ.get(envvar)
+        if fspath is not None:
+          return realpath(fspath)
+      if default_attr is None:
+        default_attr = 'FSPATH_DEFAULT'
+      defaultpath = getattr(cls, default_attr, None)
+      if defaultpath is not None:
+        return realpath(expanduser(defaultpath))
+      raise ValueError(
+          "_resolve_fspath: fspath=None and no %s no %s.%s" % (
+              (
+                  cls.__name__ + '.FSPATH_ENVVAR' if envvar is None else '$' +
+                  envvar
+              ),
+              cls.name,
+              default_attr,
+          )
+      )
     return realpath(fspath)
 
   @classmethod

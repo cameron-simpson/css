@@ -78,7 +78,7 @@ from cs.lex import cropped, cropped_repr, typed_str as s
 from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 
-__version__ = '20210316-post'
+__version__ = '20220605-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -391,20 +391,26 @@ class BinaryMixin:
       pre_offset = post_offset
 
   @classmethod
-  def scan_file(cls, f):
-    ''' Function to scan the file `f` for repeated instances of `cls`
-        until end of input,
-        yields instances of `f`.
+  def scan_fspath(cls, fspath: str, *, with_offsets=False, **kw):
+    ''' Open the file with filesystenm path `fspath` for read
+        and yield from `self.scan(..,**kw)` or
+        `self.scan_with_offsets(..,**kw)` according to the
+        `with_offsets` parameter.
 
         Parameters:
-        * `f`: the binary file object to parse;
-          if `f` is a string, that pathname is opened for binary read.
+        * `fspath`: the filesystem path of the file to scan
+        * `with_offsets`: optional flag, default `False`;
+          if true then scan with `scan_with_offsets` instead of
+          with `scan`
+        Other keyword parameters are passed to `scan` or
+        `scan_with_offsets`.
     '''
-    if isinstance(f, str):
-      with open(f, 'rb') as f2:
-        yield from cls.scan_file(f2)
-    else:
-      yield from cls.scan(CornuCopyBuffer.from_file(f))
+    with open(fspath, 'rb') as f:
+      bfr = CornuCopyBuffer.from_file(f)
+      if with_offsets:
+        yield from cls.scan_with_offsets(bfr, **kw)
+      else:
+        yield from cls.scan(bfr, **kw)
 
   def transcribe_flat(self):
     ''' Return a flat iterable of chunks transcribing this field.
@@ -493,7 +499,7 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
       thus providing a nice `__str__` and a keyword based `__init__`.
       Implementors must still define `.parse` and `.transcribe`.
 
-      To constraint the arguments passed to `__init__`,
+      To constrain the arguments passed to `__init__`,
       define an `__init__` which accepts specific keyword arguments
       and pass through to `super().__init__()`. Example:
 

@@ -5,10 +5,11 @@
 ''' Support for Calibre libraries.
 '''
 
+from code import interact
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import filecmp
-from functools import lru_cache, total_ordering
+from functools import total_ordering
 from getopt import GetoptError
 from itertools import chain
 import json
@@ -17,14 +18,17 @@ from os.path import (
     basename,
     exists as existspath,
     isabs as isabspath,
+    isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
     splitext,
 )
+import re
 import shlex
 from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
+from typing import Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -41,14 +45,20 @@ from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
-from cs.lex import cutprefix
-from cs.logutils import warning
+from cs.lex import (
+    cutprefix,
+    get_dotted_identifier,
+    FormatableMixin,
+    FormatAsError,
+)
+from cs.logutils import warning, error
+from cs.numeric import intif
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
+from cs.psutils import run
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
@@ -58,19 +68,19 @@ from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-from . import run
-
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
 
+  # used by FSPathBasedSingleton for the default library path
   FSPATH_DEFAULT = '~/CALIBRE'
   FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
 
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
 
   # pylint: disable=too-many-statements
-  def __init__(self, calibrepath):
+  @typechecked
+  def __init__(self, calibrepath: Optional[str]):
     super().__init__(calibrepath)
 
     # define the proxy classes
@@ -90,7 +100,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         'timestamp',
         'title',
         'uuid',
-    ]), HasFSPath):
+    ]), HasFSPath, FormatableMixin):
       ''' A reference to a book in a Calibre library.
       '''
 
@@ -119,6 +129,38 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         '''
         return self.path
 
+      def format_tagset(self):
+        ''' Compute a `TagSet` representing this book's metadata.
+        '''
+        formats = self.formats
+        tags = TagSet(
+            dbid=self.dbid,
+            asin=self.asin,
+            title=self.title,
+            authors=self.author_names,
+            formats=formats,
+            format_names=sorted(formats.keys()),
+            tags=self.tags,
+        )
+        tags.update(
+            {
+                'series.id': self.series_id,
+                'series.name': self.series_name,
+                'series.index': intif(self.series_index),
+            }
+        )
+        return tags
+
+      def format_kwargs(self):
+        return self.format_tagset()
+
+      def get_arg_name(self, field_name):
+        ''' Override for `FormattableMixin.get_arg_name`:
+            return the leading dotted identifier,
+            which represents a tag or tag prefix.
+        '''
+        return get_dotted_identifier(field_name)
+
       @property
       def dbid(self):
         ''' An alias for the `.id` attribute.
@@ -127,7 +169,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       def asin(self):
-        ''' The Amazon ASIN, or `None`, from `self.identifiers['mobi-asin'].
+        ''' The Amazon ASIN, or `None`, from `self.identifiers['mobi-asin']`.
         '''
         return self.identifiers.get('mobi-asin', None)
 
@@ -144,6 +186,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
       def authors(self, db_row, *, session):
         ''' The book Authors.
         '''
@@ -151,6 +194,36 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
+      def series_id(self, db_row, *, session):
+        ''' The book Series or `None`.
+        '''
+        if not db_row.series:
+          return None
+        sid, = db_row.series
+        return sid
+
+      @property
+      def series_name(self):
+        ''' The series name or `None`.
+        '''
+        sid = self.series_id
+        if sid is None:
+          return None
+        orm = self.orm
+        with orm.session() as session:
+          srow = orm.series.by_id(sid, session=session)
+          return srow.name
+
+      @property
+      def author_names(self):
+        ''' A list of the author names.
+        '''
+        return [author.name for author in self.authors]
+
+      @property
+      @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
       def formats(self, db_row, *, session):
         ''' A mapping of Calibre format keys to format paths
             computed on demand.
@@ -163,6 +236,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
       def identifiers(self, db_row, *, session):
         ''' A mapping of Calibre identifier keys to identifier values
             computed on demand.
@@ -174,10 +248,27 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
       def tags(self, db_row, *, session):
         ''' A list of Calibre tags computed on demand.
         '''
         return [tag.name for tag in db_row.tags]
+
+      # TODO: should really edit the db directly
+      @tags.setter
+      def tags(self, new_tags):
+        ''' Update the tags.
+        '''
+        self.tree.calibredb(
+            'set_metadata',
+            '--field',
+            f'tags:{",".join(new_tags)}',
+            str(self.dbid),
+        )
+        try:
+          del self._RelProxy__fields['tags']
+        except KeyError:
+          pass
 
       def formatpath(self, fmtk):
         ''' Return the filesystem path of the format file for `fmtk`
@@ -370,15 +461,17 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           fmtpath = self.formatpath(fmtk)
           if fmtpath is None and fmtk.startswith('AZW'):
             fmtpath = (
-                self.formatpath('AZW3') or self.formatpath('AZW')
-                or self.formatpath('MOBI')
+                self.formatpath('AZW4') or self.formatpath('AZW3')
+                or self.formatpath('AZW') or self.formatpath('MOBI')
             )
           if fmtpath is not None and not force:
             if filecmp.cmp(fmtpath, ofmtpath):
+              # pylint: disable=expression-not-assigned
               verbose and print(
                   self, fmtk, "identical to", shortpath(ofmtpath)
               )
             else:
+              # pylint: disable=expression-not-assigned
               verbose and warning(
                   "already present with different content\n"
                   "  present: %s\n"
@@ -388,7 +481,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
               )
             return
         # pylint: disable=expression-not-assigned
-        quiet or print(self, '+', fmtk, '<=', shortpath(ofmtpath))
+        quiet or print(
+            self, self.formats, '+', fmtk, '<=', shortpath(ofmtpath)
+        )
         self.add_format(ofmtpath, doit=doit, force=force, quiet=quiet)
 
     self.CalibreBook = CalibreBook
@@ -438,7 +533,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       return False
     return True
 
-  @lru_cache(maxsize=None)
   @typechecked
   @require(lambda dbid: dbid > 0)
   def book_by_dbid(self, dbid: int, *, db_book=None):
@@ -627,7 +721,9 @@ class CalibreMetadataDB(ORM):
       ''' Base class for Calibre tables.
       '''
 
-    def _linktable(left_name, right_name, **addtional_columns):
+    def _linktable(
+        left_name, right_name, tablename=None, **additional_columns
+    ):
       ''' Prepare and return a Calibre link table base class.
 
           Parameters:
@@ -635,17 +731,22 @@ class CalibreMetadataDB(ORM):
             example `'book'`
           * `right_name`: the right hand entity, lowercase, singular,
             example `'author'`
-          * `addtional_columns`: other keyword parameters
+          * `additional_columns`: other keyword parameters
             define further `Column`s and relationships
       '''
+      if tablename is None:
+        tablename = f'{left_name}s_{right_name}s_link'
 
       class linktable(_CalibreTable):
         ''' Prepare a `_CalibreTable` subclass representing a Calibre link table.
         '''
+        __tablename__ = tablename
 
-        __tablename__ = f'{left_name}s_{right_name}s_link'
+      def vsetattr(o, a, v):
+        ##X("setattr(%r,%r,%r)", o, a, v)
+        setattr(o, a, v)
 
-      setattr(
+      vsetattr(
           linktable, f'{left_name}_id',
           declared_attr(
               lambda self: Column(
@@ -655,7 +756,7 @@ class CalibreMetadataDB(ORM):
               )
           )
       )
-      setattr(
+      vsetattr(
           linktable, left_name,
           declared_attr(
               lambda self: relationship(
@@ -664,7 +765,7 @@ class CalibreMetadataDB(ORM):
               )
           )
       )
-      setattr(
+      vsetattr(
           linktable, f'{right_name}_id',
           declared_attr(
               lambda self: Column(
@@ -674,7 +775,7 @@ class CalibreMetadataDB(ORM):
               )
           )
       )
-      setattr(
+      vsetattr(
           linktable, right_name,
           declared_attr(
               lambda self: relationship(
@@ -683,8 +784,8 @@ class CalibreMetadataDB(ORM):
               )
           )
       )
-      for colname, colspec in addtional_columns.items():
-        setattr(
+      for colname, colspec in additional_columns.items():
+        vsetattr(
             linktable,
             colname,
             declared_attr(lambda self, colspec=colspec: colspec),
@@ -781,6 +882,13 @@ class CalibreMetadataDB(ORM):
       key = Column(String, nullable=False, unique=True)
       value = Column("val", String, nullable=False)
 
+    class Series(Base, _CalibreTable):
+      ''' Calibre preferences.
+      '''
+      __tablename__ = 'series'
+      name = Column(String, nullable=False, unique=True)
+      sort = Column(String, nullable=False)
+
     @total_ordering
     class Tags(Base, _CalibreTable):
       ''' A tag.
@@ -801,6 +909,13 @@ class CalibreMetadataDB(ORM):
       ''' Link table between `Books` and `Authors`.
       '''
 
+    class BookSeriesLink(Base, _CalibreTable):
+      ''' Link table between `Books` and `Series`.
+      '''
+      __tablename__ = 'books_series_link'
+      book = Column('book', ForeignKey('books.id'))
+      series = Column('series', ForeignKey('series.id'))
+
     class BooksTagsLink(Base, _linktable('book', 'tag')):
       ''' Link table between `Books` and `Tags`.
       '''
@@ -813,8 +928,10 @@ class CalibreMetadataDB(ORM):
 
     Books.author_links = relationship(BooksAuthorsLink)
     Books.authors = association_proxy('author_links', 'author')
-    Books.identifiers = relationship(Identifiers)
     Books.formats = relationship(Data, backref="book")
+    Books.identifiers = relationship(Identifiers)
+    Books.series_links = relationship(BookSeriesLink)
+    Books.series = association_proxy('series_links', 'series')
     Books.tag_links = relationship(BooksTagsLink)
     Books.tags = association_proxy('tag_links', 'tag')
 
@@ -837,6 +954,8 @@ class CalibreMetadataDB(ORM):
     Languages.orm = self
     self.preferences = Preferences
     Preferences.orm = self
+    self.series = Series
+    Series.orm = self
     self.tags = Tags
     Tags.orm = self
 
@@ -844,13 +963,19 @@ class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
   '''
 
-  GETOPT_SPEC = 'C:K:'
+  GETOPT_SPEC = 'C:K:O:'
 
   USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]
   -C calibre_library
     Specify calibre library location.
   -K kindle_library
-    Specify kindle library location.'''
+    Specify kindle library location.
+  -O other_calibre_library
+    Specify alternate calibre library location, the default library
+    for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.'''
+
+  # envar $CALIBRE_LIBRARY_OTHER as push/pull etc "other library"
+  OTHER_LIBRARY_PATH_ENVVAR = CalibreTree.FSPATH_ENVVAR + '_OTHER'
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
@@ -858,6 +983,7 @@ class CalibreCommand(BaseCommand):
 
   USAGE_KEYWORDS = {
       'DEFAULT_LINK_IDENTIFIER': DEFAULT_LINK_IDENTIFIER,
+      'OTHER_LIBRARY_PATH_ENVVAR': OTHER_LIBRARY_PATH_ENVVAR,
   }
 
   # mapping of target format key to source format and extra options
@@ -865,12 +991,58 @@ class CalibreCommand(BaseCommand):
       'EPUB': (['MOBI', 'AZW', 'AZW3'], ()),
   }
 
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
+  class OPTIONS_CLASS(BaseCommand.OPTIONS_CLASS):
+    ''' Special class for `self.options` with various properties.
     '''
-    options = self.options
-    options.kindle_path = None
-    options.calibre_path = None
+
+    def __init__(
+        self,
+        kindle_path=None,
+        calibre_path=None,
+        calibre_path_other=None,
+        **kw
+    ):
+      super().__init__(**kw)
+      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
+      try:
+        # pylint: disable=protected-access
+        kindle_path = KindleTree._resolve_fspath(kindle_path)
+      except ValueError:
+        kindle_path = None
+      try:
+        # pylint: disable=protected-access
+        calibre_path_other = CalibreTree._resolve_fspath(
+            calibre_path_other,
+            envvar=CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR
+        )
+      except ValueError:
+        calibre_path_other = None
+      self.kindle_path = kindle_path
+      self.calibre_path = calibre_path
+      self.calibre_path_other = calibre_path_other
+
+    @property
+    def calibre(self):
+      ''' The `CalibreTree` from `self.calibre_path`.
+      '''
+      return CalibreTree(self.calibre_path)
+
+    @property
+    def calibre_other(self):
+      ''' The alternate `CalibreTree` from `self.calibre_path_other`.
+      '''
+      if self.calibre_path_other is None:
+        raise AttributeError(".calibre_other: no .calibre_path_other")
+      return CalibreTree(self.calibre_path_other)
+
+    @property
+    def kindle(self):
+      ''' The `KindleTree` from `self.kindle_path`.
+      '''
+      if self.kindle_path is None:
+        raise AttributeError(".kindle: no .kindle_path")
+      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
+      return KindleTree(self.kindle_path)
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -880,6 +1052,8 @@ class CalibreCommand(BaseCommand):
       options.calibre_path = val
     elif opt == '-K':
       options.kindle_path = val
+    elif opt == '-O':
+      options.calibre_path_other = val
     else:
       super().apply_opt(opt, val)
 
@@ -887,41 +1061,85 @@ class CalibreCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-    options = self.options
-    with KindleTree(options.kindle_path) as kt:
-      with CalibreTree(options.calibre_path) as cal:
-        with stackattrs(
-            options,
-            kindle=kt,
-            calibre=cal,
-        ):
-          Upd().out('')
-          yield
+    with self.options.calibre:
+      yield
 
-  def popbooks(self, argv, once=False):
-    ''' Convert a list of book specifiers (currently dbids) to books.
-        Return `(cbooks,ok)` where `cbooks` is a list of books
-        and `ok` is true if all specifiers resolved.
+  @staticmethod
+  def books_from_spec(calibre, book_spec):
+    ''' Generator yielding `CalibreBook` instances from `book_spec`.
+    '''
+    # raw dbid
+    try:
+      dbid = int(book_spec)
+    except ValueError:
+      # /regexp
+      if book_spec.startswith('/'):
+        re_s = book_spec[1:]
+        if not re_s:
+          raise ValueError("empty regexp")  # pylint: disable=raise-missing-from
+        regexp = re.compile(re_s, re.I)
+        match_fn = lambda book: (
+            regexp.search(book.title) or any(
+                map(regexp.search, book.author_names)
+            ) or regexp.search(book.series_name or "") or
+            any(map(regexp.search, book.tags))
+        )
+      else:
+        # [identifier=]id-value,...
+        try:
+          identifiers_s, values_s = book_spec.split('=', 1)
+        except ValueError:
+          # id-value,...
+          identifiers = None
+          values_s = book_spec
+        else:
+          identifiers = identifiers_s.split(',')
+        values = list(map(str.lower, values_s.split(',')))
+        match_fn = lambda book: any(
+            (
+                (identifiers is None or idk in identifiers) and idv.lower() in
+                values
+            ) for idk, idv in book.identifiers.items()
+        )
+      for book in calibre:
+        if match_fn(book):
+          yield book
+    else:
+      yield calibre[dbid]
 
-        If `once` is true (default `False`) process only the first argument.
+  @staticmethod
+  def cbook_default_sortkey(cbook):
+    ''' The default presentation order for things like "ls":
+        series-name-index,title,authors,dbid.
+    '''
+    return (
+        (cbook.series_name.lower(),
+         cbook.series_index) if cbook.series_name else ("", 0),
+        cbook.title.lower(),
+        tuple(map(str.lower, cbook.author_names)),
+        cbook.dbid,
+    )
+
+  def popbooks(self, argv, once=False, sortkey=None):
+    ''' Consume `argv` as book specifications and return a list of matching books.
+
+        If `once` is true (default `False`) consume only the first argument.
+        If `sortkey` is not `None`, sort the returned books by this function.
     '''
     options = self.options
     calibre = options.calibre
-    ok = True
     cbooks = []
     while argv:
-      dbid = self.poparg(argv, "dbid", int)
-      if dbid not in calibre:
-        warning("unknown dbid %d", dbid)
-        ok = False
-      else:
-        cbook = calibre[dbid]
-        cbooks.append(cbook)
+      book_spec = self.poparg(argv, "book_spec")
+      cbooks.extend(self.books_from_spec(calibre, book_spec))
       if once:
         break
+    if sortkey is not None and sortkey is not False:
+      if sortkey is True:
+        sortkey = self.cbook_default_sortkey
+      cbooks = sorted(cbooks, key=sortkey)
     assert not argv
-    return cbooks, ok
+    return cbooks
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_convert(self, argv):
@@ -942,9 +1160,10 @@ class CalibreCommand(BaseCommand):
       )
     if not argv:
       raise GetoptError("missing dbids")
-    cbooks, ok = self.popbooks(argv)
-    if not ok:
-      raise GetoptError("invalid book specifiers")
+    try:
+      cbooks = self.popbooks(argv)
+    except ValueError as e:
+      raise GetoptError("invalid book specifiers: %s") from e
     xit = 0
     doit = options.doit
     force = options.force
@@ -957,8 +1176,10 @@ class CalibreCommand(BaseCommand):
       with Pfx(cbook):
         if dstfmtk in cbook.formats:
           if force:
+            # pylint: disable=expression-not-assigned
             verbose and warning("replacing format %r")
           else:
+            # pylint: disable=expression-not-assigned
             verbose and print(f"{cbook}: format {dstfmtk!r} already present")
             continue
         for srcfmtk in srcfmtks:
@@ -995,69 +1216,107 @@ class CalibreCommand(BaseCommand):
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     print("calibre", self.options.calibre.shortpath)
-    print("kindle", self.options.kindle.shortpath)
-
-  def cmd_make_cbz(self, argv):
-    ''' Usage: {cmd} dbids...
-          Add the CBZ format to the designated Calibre books.
-    '''
-    if not argv:
-      raise GetoptError("missing dbids")
-    options = self.options
-    runstate = options.runstate
-    xit = 0
-    while argv and not runstate.cancelled:
-      with Pfx(argv[0]):
-        cbooks, ok = self.popbooks(argv, once=True)
-        if not ok:
-          xit = 2
-          continue
-        for cbook in cbooks:
-          if runstate.cancelled:
-            break
-          pfx_call(cbook.make_cbz)
-    if runstate.cancelled:
-      xit = 1
-    return xit
+    if self.options.calibre_path_other:
+      print("calibre_other", shortpath(self.options.calibre_path_other))
+    if self.options.kindle_path:
+      print("kindle", shortpath(self.options.kindle_path))
 
   # pylint: disable=too-many-locals
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l] [dbids...]
+    ''' Usage: {cmd} [-l] [-o ls-format] [book_specs...]
           List the contents of the Calibre library.
+          -l            Long mode, listing book details over several lines.
+          -o ls_format  Output format for use in a single line book listing.
     '''
     options = self.options
-    options.longmode = False
-    options.popopts(argv, l='longmode')
+    options.longmode = False  # pylint: disable=attribute-defined-outside-init
+    options.ls_format = None
+    options.popopts(argv, l='longmode', o_='ls_format')
     longmode = options.longmode
+    ls_format = options.ls_format
     calibre = options.calibre
     xit = 0
     cbooks = []
     if argv:
-      cbooks, ok = self.popbooks(argv)
-      if not ok:
-        raise GetoptError("invalid book specifiers")
+      try:
+        cbooks = self.popbooks(argv, sortkey=True)
+      except ValueError as e:
+        raise GetoptError("invalid book specifiers: %s") from e
     else:
-      cbooks = calibre
       calibre.preload()
+      cbooks = sorted(calibre, key=self.cbook_default_sortkey)
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
         break
       with Pfx(cbook):
-        print(f"{cbook.title} ({cbook.dbid})")
+        if ls_format is None:
+          top_row = []
+          series_name = cbook.series_name
+          if series_name:
+            top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
+          top_row.append(cbook.title)
+          author_names = cbook.author_names
+          if author_names:
+            top_row.extend(
+                ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
+            )
+          top_row.append(f"({cbook.dbid})")
+          if not longmode:
+            top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
+            top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
+          print(*top_row)
+        else:
+          try:
+            output = cbook.format_as(ls_format, error_sep='\n  ')
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          print(output)
         if longmode:
           print(" ", cbook.path)
-          identifiers = cbook.identifiers
-          if identifiers:
-            print("   ", TagSet(identifiers))
           tags = cbook.tags
           if tags:
             print("   ", ", ".join(sorted(tags)))
+          identifiers = cbook.identifiers
+          if identifiers:
+            print("   ", TagSet(identifiers))
           for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
               print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
+    if runstate.cancelled:
+      xit = 1
+    return xit
+
+  def cmd_make_cbz(self, argv):
+    ''' Usage: {cmd} book_specs...
+          Add the CBZ format to the designated Calibre books.
+    '''
+    if not argv:
+      raise GetoptError("missing book_specs")
+    options = self.options
+    runstate = options.runstate
+    xit = 0
+    while argv and not runstate.cancelled:
+      with Pfx(argv[0]):
+        try:
+          cbooks = self.popbooks(argv, once=True)
+        except ValueError as e:
+          warning("invalid book specifications: %s", e)
+          xit = 2
+          continue
+        for cbook in cbooks:
+          if runstate.cancelled:
+            break
+          with Pfx(cbook):
+            try:
+              pfx_call(cbook.make_cbz)
+            except ValueError as e:
+              warning("cannot make CBZ from %s: %s" % (cbook, e))
+              xit = 1
     if runstate.cancelled:
       xit = 1
     return xit
@@ -1101,13 +1360,13 @@ class CalibreCommand(BaseCommand):
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
   def cmd_pull(self, argv):
-    ''' Usage: {cmd} [-fnqv] other-library [identifier-name [identifier-values...]]
+    ''' Usage: {cmd} [-fnqv] [/path/to/other-library] [identifiers...]
           Import formats from another Calibre library.
           -f    Force. Overwrite existing formats with formats from other-library.
           -n    No action: recite planned actions.
           -q    Quiet. Only issue warnings and errors.
           -v    Verbose. Print more information.
-          other-library: the path to another Calibre library tree
+          /path/to/other-library: optional path to another Calibre library tree
           identifier-name: the key on which to link matching books;
             the default is {DEFAULT_LINK_IDENTIFIER}
             If the identifier '?' is specified the available
@@ -1121,115 +1380,183 @@ class CalibreCommand(BaseCommand):
     calibre = options.calibre
     runstate = options.runstate
     self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
-    other_library = self.poparg(argv, "other-library", CalibreTree)
+    if argv and argv[0].startswith('/') and isdirpath(argv[0]):
+      options.calibre_path_other = argv.pop(0)
     doit = options.doit
     force = options.force
     quiet = options.quiet
     verbose = options.verbose
+    other_library = options.calibre_other
     with Pfx(other_library.shortpath):
-      if other_library is calibre:
-        raise GetoptError("cannot import from the same library")
-      if argv:
-        identifier_name = argv.pop(0)
-      else:
-        identifier_name = self.DEFAULT_LINK_IDENTIFIER
-      if identifier_name == '?':
+      with other_library:
+        if other_library is calibre:
+          raise GetoptError("cannot import from the same library")
         if argv:
-          warning("ignoring extra arguments after identifier-name=?: %r", argv)
-        print("Default identifier:", self.DEFAULT_LINK_IDENTIFIER)
-        print("Available idenitifiers in %s:" % (other_library,))
-        for identifier_name in sorted(other_library.identifier_names()):
-          print(" ", identifier_name)
-        return 0
-      with UpdProxy(text=f"scan identifiers from {other_library}..."):
-        obooks_map = {
-            idv: obook
-            for idv, obook in (
-                (obook.identifiers.get(identifier_name), obook)
-                for obook in other_library
+          identifier_name = argv.pop(0)
+        else:
+          identifier_name = self.DEFAULT_LINK_IDENTIFIER
+        if identifier_name == '?':
+          if argv:
+            warning(
+                "ignoring extra arguments after identifier-name=?: %r", argv
             )
-            if idv is not None
-        }
-      if not obooks_map:
-        raise GetoptError(
-            "no books have the identifier %r; identifiers in use are: %s" % (
-                identifier_name,
-                ', '.join(sorted(other_library.identifier_names()))
-            )
-        )
-      if argv:
-        identifier_values = argv
-      else:
-        identifier_values = [
-            idv for idv, obook in sorted(
-                obooks_map.items(),
-                key=lambda id_ob:
-                (id_ob[1].title, id_ob[1].author_sort, id_ob[1].dbid)
-            )
-        ]
-      xit = 0
-      calibre.preload()
-      with UpdProxy(prefix="pull " + other_library.shortpath + ": ") as proxy:
-        for identifier_value in progressbar(identifier_values,
-                                            "pull " + other_library.shortpath):
-          if runstate.cancelled:
-            break
-          with Pfx.scope("%s=%s", identifier_name, identifier_value):
-            try:
-              obook = obooks_map[identifier_value]
-            except KeyError:
-              warning("unknown")
-              xit = 1
-              continue
-            with proxy.extend_prefix(
-                "%s=%s: %s" % (identifier_name, identifier_value, obook)):
-              if not obook.formats:
-                verbose and print("no formats to pull")
-                continue
-              cbooks = list(
-                  calibre.by_identifier(identifier_name, identifier_value)
+          print("Default identifier:", self.DEFAULT_LINK_IDENTIFIER)
+          print("Available idenitifiers in %s:" % (other_library,))
+          for identifier_name in sorted(other_library.identifier_names()):
+            print(" ", identifier_name)
+          return 0
+        with UpdProxy(text=f"scan identifiers from {other_library}..."):
+          obooks_map = {
+              idv: obook
+              for idv, obook in (
+                  (obook.identifiers.get(identifier_name), obook)
+                  for obook in other_library
               )
-              if not cbooks:
-                # new book
-                fmtk = list(obook.formats.keys())[0]
-                ofmtpath = obook.formatpath(fmtk)
-                # pylint: disable=expression-not-assigned
-                quiet or (
-                    print(
-                        "new book from %s:%s <= %s" %
-                        (fmtk, obook, shortpath(ofmtpath))
-                    ) if verbose else
-                    print("new book from %s:%s" % (fmtk, obook))
-                )
-                dbid = calibre.add(ofmtpath, doit=doit, quiet=quiet)
-                if not doit:
-                  # we didn't make a new book, so move to the next one
+              if idv is not None
+          }
+        if not obooks_map:
+          raise GetoptError(
+              "no books have the identifier %r; identifiers in use are: %s" % (
+                  identifier_name,
+                  ', '.join(sorted(other_library.identifier_names()))
+              )
+          )
+        if argv:
+          identifier_values = argv
+        else:
+          identifier_values = [
+              idv for idv, obook in sorted(
+                  obooks_map.items(),
+                  key=lambda id_ob:
+                  (id_ob[1].title, id_ob[1].author_sort, id_ob[1].dbid)
+              )
+          ]
+        xit = 0
+        calibre.preload()
+        with UpdProxy(prefix="pull " + other_library.shortpath + ": "
+                      ) as proxy:
+          for identifier_value in progressbar(identifier_values, "pull " +
+                                              other_library.shortpath):
+            if runstate.cancelled:
+              break
+            with Pfx.scope("%s=%s", identifier_name, identifier_value):
+              try:
+                obook = obooks_map[identifier_value]
+              except KeyError:
+                warning("unknown")
+                xit = 1
+                continue
+              with proxy.extend_prefix(
+                  "%s=%s: %s" % (identifier_name, identifier_value, obook)):
+                if not obook.formats:
+                  # pylint: disable=expression-not-assigned
+                  verbose and print("no formats to pull")
                   continue
-                cbook = calibre[dbid]
-                quiet or print('new', cbook, '<=', obook)
-              elif len(cbooks) > 1:
-                verbose or warning(
-                    "  \n".join(
-                        [
-                            "multiple \"local\" books with this identifier:",
-                            *map(str, cbooks)
-                        ]
-                    )
+                cbooks = list(
+                    calibre.by_identifier(identifier_name, identifier_value)
                 )
-                continue
-              else:
-                cbook, = cbooks
-              cbook.pull(
-                  obook,
-                  runstate=runstate,
-                  doit=doit,
-                  force=force,
-                  quiet=quiet,
-                  verbose=verbose
-              )
-      if runstate.cancelled:
-        xit = 1
-      return xit
+                if not cbooks:
+                  # new book
+                  fmtk = list(obook.formats.keys())[0]
+                  ofmtpath = obook.formatpath(fmtk)
+                  # pylint: disable=expression-not-assigned
+                  quiet or (
+                      print(
+                          "new book from %s:%s <= %s" %
+                          (fmtk, obook, shortpath(ofmtpath))
+                      ) if verbose else
+                      print("new book from %s:%s" % (fmtk, obook))
+                  )
+                  dbid = calibre.add(ofmtpath, doit=doit, quiet=quiet)
+                  if not doit:
+                    # we didn't make a new book, so move to the next one
+                    continue
+                  if dbid is None:
+                    error("calibre add failed")
+                    xit = 1
+                  else:
+                    cbook = calibre[dbid]
+                    # pylint: disable=expression-not-assigned
+                    quiet or print('new', cbook, '<=', obook)
+                elif len(cbooks) > 1:
+                  # pylint: disable=expression-not-assigned
+                  verbose or warning(
+                      "  \n".join(
+                          [
+                              "multiple \"local\" books with this identifier:",
+                              *map(str, cbooks)
+                          ]
+                      )
+                  )
+                  continue
+                else:
+                  cbook, = cbooks
+                cbook.pull(
+                    obook,
+                    runstate=runstate,
+                    doit=doit,
+                    force=force,
+                    quiet=quiet,
+                    verbose=verbose
+                )
+        if runstate.cancelled:
+          xit = 1
+        return xit
+
+  def cmd_shell(self, argv):
+    ''' Usage: {cmd}
+          Run an interactive Python prompt with some predefined named:
+          calibre: the CalibreTree
+          options: self.options
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    interact(
+        banner=f'{self.cmd}: {options.calibre}',
+        local=dict(
+            calibre=options.calibre,
+            options=options,
+        )
+    )
+
+  def cmd_tag(self, argv):
+    ''' Usage: {cmd} [-n] [--] [-]tag[,tag...] book_specs...
+    '''
+    options = self.options
+    if argv and argv[0] == '-n':
+      argv.pop(0)
+      options.doit = False
+    doit = options.doit
+    upd = options.upd
+    tags = self.poparg(argv, "tags")
+    add_mode = True
+    if tags.startswith('-'):
+      add_mode = False
+      tags = tags[1:]
+    tag_names = sorted(map(str.lower, filter(None, tags.split(','))))
+    if not tag_names:
+      raise GetoptError("no tags specified")
+    if not argv:
+      raise GetoptError("missing book_specs")
+    cbooks = self.popbooks(argv)
+    with upd.insert(1) as proxy:
+      for cbook in cbooks:
+        proxy.text = f'{cbook} {cbook.tags}'
+        tags = set(cbook.tags)
+        new_tags = set(cbook.tags)
+        for tag_name in tag_names:
+          if add_mode:
+            new_tags.add(tag_name)
+          else:
+            new_tags.discard(tag_name)
+        if new_tags != tags:
+          if add_mode:
+            print(cbook, '+', sorted(new_tags - tags))
+          else:
+            print(cbook, '-', sorted(tags - new_tags))
+          if doit:
+            cbook.tags = new_tags
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())

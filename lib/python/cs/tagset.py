@@ -230,7 +230,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20220430-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -948,25 +948,36 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   #############################################################################
   # Edit tags.
 
-  def edit(self, editor=None, verbose=None):
+  def edit(self, editor=None, verbose=None, comments=()):
     ''' Edit this `TagSet`.
     '''
     if editor is None:
       editor = EDITOR
     lines = (
-        ["# Edit TagSet.", "# One tag per line."] +
-        list(map(str, sorted(self)))
+        ["# Edit TagSet.", "# One tag per line."] + [
+            ("# " + comment.replace("\n", "\n# ")).rstrip()
+            for comment in comments
+        ] + list(map(str, sorted(self)))
     )
     new_lines = edit_lines(lines, editor=editor)
     new_values = {}
+    no_discard = False
     for lineno, line in enumerate(new_lines):
       with Pfx("%d: %r", lineno, line):
         line = line.strip()
         if not line or line.startswith('#'):
           continue
-        tag = Tag.from_str(line)
-        new_values[tag.name] = tag.value
-    self.set_from(new_values, verbose=verbose)
+        try:
+          tag = Tag.from_str(line)
+        except ValueError as e:
+          warning("parse error, discarded: %s", line)
+          no_discard = True
+        else:
+          new_values[tag.name] = tag.value
+    if no_discard:
+      self.update(new_values, verbose=True)
+    else:
+      self.set_from(new_values, verbose=verbose)
 
   @classmethod
   @pfx_method

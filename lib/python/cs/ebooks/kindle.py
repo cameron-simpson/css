@@ -12,7 +12,6 @@ from os.path import (
     isfile as isfilepath,
     join as joinpath,
 )
-from subprocess import run
 import sys
 
 from icontract import require
@@ -40,6 +39,7 @@ from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
+from cs.psutils import run
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -570,8 +570,19 @@ class KindleCommand(BaseCommand):
     ''' Set up the default values in `options`.
     '''
     options = self.options
-    options.kindle_path = None
-    options.calibre_path = None
+    try:
+      # pylint: disable=protected-access
+      kindle_path = KindleTree._resolve_fspath(None)
+    except ValueError:
+      kindle_path = None
+    from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
+    try:
+      # pylint: disable=protected-access
+      calibre_path = CalibreTree._resolve_fspath(None)
+    except ValueError:
+      calibre_path = None
+    options.kindle_path = kindle_path
+    options.calibre_path = calibre_path
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
