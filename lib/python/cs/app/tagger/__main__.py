@@ -20,11 +20,11 @@ from os.path import (
 from pprint import pprint
 import sys
 
-from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
+from cs.gui_tk import BaseTkCommand
 from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint, pfx_method
@@ -34,15 +34,18 @@ from cs.tagset import Tag
 from cs.upd import print  # pylint: disable=redefined-builtin
 
 from . import Tagger
+from .gui_tk import TaggerWidget
 
 def main(argv=None):
   ''' Command line for the tagger.
   '''
   return TaggerCommand(argv).run()
 
-class TaggerCommand(BaseCommand):
+class TaggerCommand(BaseTkCommand):
   ''' Tagger command line implementation.
   '''
+
+  DEFAULT_WIDGET_CLASS = TaggerWidget
 
   @contextmanager
   def run_context(self):
@@ -118,6 +121,7 @@ class TaggerCommand(BaseCommand):
           )
           for linkpath in linked_to:
             print(shortpath(path), '=>', shortpath(linkpath))
+    return 0
 
   def cmd_autotag(self, argv):
     ''' Usage: {cmd} [-fn] paths...
@@ -144,6 +148,7 @@ class TaggerCommand(BaseCommand):
       print(" ", repr(tagger.conf))
       for tag in tagger.infer_tags(path, mode=infer_mode):
         print(" ", tag)
+    return 0
 
   def cmd_conf(self, argv):
     ''' Usage: {cmd} [dirpath]
@@ -169,6 +174,7 @@ class TaggerCommand(BaseCommand):
       if cf not in edited:
         del conf[cf]
     print(json.dumps(conf.as_dict(), sort_keys=True, indent=4))
+    return 0
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
@@ -184,6 +190,7 @@ class TaggerCommand(BaseCommand):
       print("scan", path)
       mapping = tagger.per_tag_auto_file_map(path, tag_names)
       pprint(mapping)
+    return 0
 
   def cmd_gui(self, argv):
     ''' Usage: {cmd} pathnames...
