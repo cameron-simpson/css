@@ -300,6 +300,10 @@ class Config(_Config):
               )
 
   def squid_cache_peer_access(self, acl_name, proxy_names):
+    ''' Yield squid configuration lines directing traffic matching
+        `acl_name` to the named proxies and preventing sending it to
+        the unnamed proxies.
+    '''
     for proxy_name, P in sorted(self.proxies.items()):
       if proxy_name in proxy_names:
         if P.host is None:
@@ -365,7 +369,7 @@ class Pattern(_Pattern):
           return r'hdr(host) %s || hdr_reg(host) ^%s:[1-9][0-9]*$' \
                  % (haquote(pattern), haquote(escape(pattern)))
         if style == 'proxy.pac': return 'host == %r' % (pattern,)
-        if style == 'squid_acl': return 'dstdomain -n %s' % (pattern,)
+        if style == 'squid_acl': return 'dstdomain -n .%s' % (pattern,)
         raise ValueError('unsupported isalpha domain pattern')
       # *substr* - hostname substring
       if len(pattern) > 2 and pattern.startswith('*') and pattern.endswith('*'):
