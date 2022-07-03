@@ -1,3 +1,4 @@
+proxy-peerage: name acls using proxies:ptn passed through the identifier stuff from named_row_tuples - should make for better diffs and more readable configs
 proxy-peerage: host/fqdn pattern: turn into an exact regexp?
 cs.urlutils: drop Python 2 support
 cs.upd: above should do clear-toend-of-screen?
