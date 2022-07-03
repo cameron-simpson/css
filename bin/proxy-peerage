@@ -45,7 +45,7 @@ def main(argv):
         config = Config({'DIRECT': Proxy('DIRECT', None, None, None)}, [])
         with Pfx('stdin'):
           try:
-            config = read_peerage(sys.stdin, config)
+            config = read_peerage(sys.stdin, config, srcpath='<sys.stdin>')
           except ValueError as e:
             error("reading config: %s", e)
             xit = 1
@@ -159,7 +159,7 @@ def cmd_squid(config, argv):
       print(line)
   return 0
 
-def read_peerage(fp, config=None):
+def read_peerage(fp, config=None,srcpath=None):
   ''' Read proxy peer information from a file `fp`. Return Config and ok.
   '''
   if config is None:
@@ -168,7 +168,7 @@ def read_peerage(fp, config=None):
     filename = fp
     with Pfx(filename):
       with open(filename) as fp:
-        return read_peerage(fp, config)
+        return read_peerage(fp, config, srcpath=filename)
   proxies = config.proxies
   rules = config.rules
   ok = True
