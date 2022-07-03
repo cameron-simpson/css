@@ -228,7 +228,7 @@ def read_peerage(fp, config=None,srcpath=None):
         proxy_names = sorted(proxy_names)
         if R is None or proxy_names != R.proxy_names:
           # commence new rule
-          R = Rule(proxy_names, lineno, [])
+          R = Rule(srcpath,lineno,line,proxy_names, [])
           rules.append(R)
         for pattern in words:
           P = Pattern(pattern, lineno)
@@ -322,7 +322,7 @@ class Proxy(_Proxy):
       return 'DIRECT'
     return "%s:%d" % (self.host, self.port)
 
-_Rule = namedtuple('Rule', 'proxy_names lineno patterns')
+_Rule = namedtuple('Rule', 'srcpath lineno line proxy_names patterns')
 class Rule(_Rule):
 
   def proxy_names_tuple(self):
