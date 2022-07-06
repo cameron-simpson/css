@@ -9,6 +9,7 @@
 
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+import csv
 from datetime import datetime
 from fnmatch import fnmatch
 from functools import partial
@@ -30,6 +31,7 @@ import sys
 import time
 
 import arrow
+from dateutil.tz import tzlocal
 from matplotlib.figure import Figure
 from typeguard import typechecked
 
@@ -52,12 +54,14 @@ from cs.timeseries import (
     TimeSeriesDataDir,
     TimespanPolicyYearly,
     plot_events,
+    plotrange,
     print_figure,
     save_figure,
+    tzfor,
 )
-from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220606-post'
+__version__ = '20220626-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -82,6 +86,7 @@ DISTINFO = {
         'cs.tagset',
         'cs.timeseries',
         'cs.upd',
+        'dateutil',
         'matplotlib',
         'typeguard',
     ],
@@ -129,6 +134,12 @@ class SPLinkCSVDir(HasFSPath):
   ''' A class for working with SP-Link data downloads,
       referring to a particular `PerformanceData*` download directory.
   '''
+
+  COLUMN_SECONDS_2001 = 'Date/Time Stamp [Seconds From The Year 2001]'
+  COLUMN_DATE = 'Date/Time Stamp [dd/MM/yyyy]'
+  COLUMN_DATE_STRPTIME = '%d/%m/%Y'
+  COLUMN_DATETIME = 'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]'
+  COLUMN_DATETIME_STRPTIME = '%d/%m/%Y - %H:%M:%S'
 
   @property
   @cachedmethod
@@ -205,23 +216,14 @@ class SPLinkCSVDir(HasFSPath):
         and export its contents into the `tsd:TimeSeriesDataDir.
         Return exported `DataFrame`.
     '''
-    nan = float('nan')
-    ts2001 = ts2001_unixtime(tzname)
-    rowtype, rows = csv_import(csvpath)
     # group the values by key
-    keys = rowtype.attributes_
-    key0 = keys[0]
-    key_values = {key: [] for key in keys}
     short_csvpath = relpath(csvpath, self.fspath)
     if short_csvpath.startswith('../'):
       short_csvpath = shortpath(csvpath)
     with tsd:
-      index_col = 'Date/Time Stamp [Seconds From The Year 2001]'
-      skip_cols = (
-          'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]',
-          'Date/Time Stamp [dd/MM/yyyy]',
-      )
-      ts2001_offset = int(ts2001_unixtime())
+      index_col = self.COLUMN_SECONDS_2001
+      skip_cols = (self.COLUMN_DATETIME, self.COLUMN_DATE)
+      ts2001_offset = int(ts2001_unixtime(tzname))
       # dataframe indexed by UNIX timestamp
       df, _ = tsd.read_csv(
           csvpath,
@@ -265,12 +267,12 @@ class SPLinkDataDir(TimeSeriesDataDir):
     self.dataset = dataset
 
   @pfx_method
-  def import_from(self, csv, tzname=None):
-    ''' Import the CSV data from `csv` specified by `self.dataset`.
+  def import_from(self, csvsrc, tzname=None):
+    ''' Import the CSV data from `csvsrc` specified by `self.dataset`.
         Return the imported `DataFrame`.
 
         Parameters:
-        * `csv`: an `SPLinkCSVDir` instance or the pathname of a directory
+        * `csvsrc`: an `SPLinkCSVDir` instance or the pathname of a directory
           containing SP-Link CSV download data, or the pathname of a CSV file.
 
         Example:
@@ -281,13 +283,13 @@ class SPLinkDataDir(TimeSeriesDataDir):
                 'DetailedData',
             )
     '''
-    if isinstance(csv, str):
-      if isfilepath(csv):
+    if isinstance(csvsrc, str):
+      if isfilepath(csvsrc):
         # an individual SP-Link CSV download
-        if not csv.endswith('.CSV'):
+        if not csvsrc.endswith('.CSV'):
           raise ValueError("filename does not end in .CSV")
         try:
-          dsinfo = SPLinkData.parse_dataset_filename(csv)
+          dsinfo = SPLinkData.parse_dataset_filename(csvsrc)
         except ValueError as e:
           warning("unusual filename: %s", e)
         else:
@@ -296,17 +298,52 @@ class SPLinkDataDir(TimeSeriesDataDir):
                 "filename dataset:%r does not match self.dataset:%r" %
                 (dsinfo.dataset, self.dataset)
             )
-          csvdir = SPLinkCSVDir(dirname(csv))
-          return csvdir.export_csv_to_timeseries(csv, self, tzname=tzname)
-      if isdirpath(csv):
+          csvdir = SPLinkCSVDir(dirname(csvsrc))
+          return csvdir.export_csv_to_timeseries(csvsrc, self, tzname=tzname)
+      if isdirpath(csvsrc):
         # a directory of SP-Link CSV downloads
-        csvdir = SPLinkCSVDir(csv)
+        csvdir = SPLinkCSVDir(csvsrc)
         return csvdir.export_to_timeseries(self.dataset, self, tzname=tzname)
       raise ValueError("neither a CSV file nor a directory")
-    if isinstance(csv, SPLinkCSVDir):
-      return csv.export_to_timeseries(self.dataset, self, tzname=tzname)
+    if isinstance(csvsrc, SPLinkCSVDir):
+      return csvsrc.export_to_timeseries(self.dataset, self, tzname=tzname)
     raise TypeError(
-        "expected filesystem path or SPLinkCSVDir, got: %s" % (s(csv),)
+        "expected filesystem path or SPLinkCSVDir, got: %s" % (s(csvsrc),)
+    )
+
+  def to_csv(self, start, stop, f, *, columns=None, key_map=None, **to_csv_kw):
+    ''' Return `pandas.DataFrame.to_csv()` for the data between `start` and `stop`.
+    '''
+
+    def df_mangle(df):
+      ''' Insert the date/datetime and 2001-seconds columns at the
+          front of the `DataFrame` before transcription.
+      '''
+      dt_column = {
+          'DetailedData': SPLinkCSVDir.COLUMN_DATETIME,
+          'DailySummaryData': SPLinkCSVDir.COLUMN_DATE,
+      }[self.dataset]
+      dt_strftime_format = {
+          'DetailedData': SPLinkCSVDir.COLUMN_DATETIME_STRPTIME,
+          'DailySummaryData': SPLinkCSVDir.COLUMN_DATE_STRPTIME,
+      }[self.dataset]
+      dt_values = [when.strftime(dt_strftime_format) for when in df.index]
+      ts2001base = ts2001_unixtime(self.tz)
+      dts_values = [int(when.timestamp() - ts2001base) for when in df.index]
+      df.insert(0, SPLinkCSVDir.COLUMN_SECONDS_2001, dts_values)
+      df.insert(1, dt_column, dt_values)
+
+    return super().to_csv(
+        start,
+        stop,
+        f,
+        columns=columns,
+        key_map=key_map,
+        df_mangle=df_mangle,
+        index=False,
+        float_format='%g',
+        quoting=csv.QUOTE_NONNUMERIC,
+        **to_csv_kw,
     )
 
 # information derived from the basename of an SP-Link download filename
@@ -386,7 +423,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       step, policy_name = self.TIMESERIES_DEFAULTS[tsname]
     except KeyError as e:
       raise AttributeError(
-          "%s: no .%s attribute" % (type(self).__name__, tsname)
+          "%s.%s: unknown attribute" % (type(self).__name__, tsname)
       ) from e
     tspath = self.pathto(tsname)
     needdir(tspath)
@@ -472,21 +509,40 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
           for key in pfx_call(tsd.keys, field_spec):
             yield tsd, key
 
+  def to_csv(self, dsname, start, stop, f, **to_csv_kw):
+    ''' Export the data from the dataset `dsname`
+        between the times `start` to `stop`.
+    '''
+    if dsname not in self.TIMESERIES_DATASETS:
+      raise ValueError(
+          "dsname %r not in TIMESERIES_DATASETS:%r" %
+          (dsname, self.TIMESERIES_DATASETS)
+      )
+    tsd = getattr(self, dsname)
+    return tsd.to_csv(start, stop, f, **to_csv_kw)
+
+  @plotrange
   def plot(
       self,
       start,
       stop,
       *,
+      utcoffset,
       key_specs,
       mode=None,
       figsize=None,
       dpi=None,
       event_labels=None,
       mode_patterns=None,
+      stacked=False,
+      upd=None,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
     '''
+    # DF hack: compute the timezone offset for "stop",
+    # use it to skew the UNIX timestamps so that UTC tick marks and
+    # placements look "local"
     if figsize is None:
       figsize = 14, 8
     if dpi is None:
@@ -495,72 +551,44 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       event_labels = DEFAULT_PLOT_EVENT_LABELS
     if mode_patterns is None:
       mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
+    if upd is None:
+      upd = Upd()
+    tsd_by_id = {}
+    keys_by_id = defaultdict(list)
     with Pfx("key_specs"):
-      tsd_keys = []
       for key_spec in key_specs:
         with Pfx(key_spec):
           if mode is None and key_spec in mode_patterns:
             mode = key_spec
           key_spec = mode_patterns.get(key_spec, key_spec)
-          matches = list(self.resolve(key_spec))
-          if matches:
-            tsd_keys.extend(self.resolve(key_spec))
-          else:
+          matched = False
+          for tsd, key in self.resolve(key_spec):
+            tsd_by_id[id(tsd)] = tsd
+            keys_by_id[id(tsd)].append(key)
+            matched = True
+          if not matched:
             warning("no matches")
-    if not tsd_keys:
-      raise GetoptError("no fields were resolved")
+    if not tsd_by_id:
+      raise ValueError(
+          "no fields were resolved by key_specs=%r" % (key_specs,)
+      )
     if mode is None:
       # scan the keys looking for a match to a mode
-      for tsd_key in tsd_keys:
-        _, key = tsd_key
-        for mode_name, mode_glob in mode_patterns.items():
-          if pfx_call(fnmatch, key, mode_glob):
-            mode = mode_name
-            break
+      for keys in keys_by_id.values():
+        for key in keys:
+          for mode_name, mode_glob in mode_patterns.items():
+            if pfx_call(fnmatch, key, mode_glob):
+              mode = mode_name
+              break
         if mode is not None:
           break
     figure = Figure(figsize=figsize, dpi=dpi)
     figure.add_subplot()
     ax = figure.axes[0]
-    with UpdProxy(prefix="plot lines: ") as proxy:
-      # the data may come from different datasets
-      for tsd, key in tsd_keys:
-        name = f'{shortpath(tsd.fspath)}:{key}'
-        proxy.text = name
-        ax = tsd.plot(
-            start,
-            stop,
-            ax=ax,
-            keys=(key,),
-        )
-    with UpdProxy(prefix="plot events: ") as proxy:
-      eventsdb = self.eventsdb
-      ev_y_field = {
-          'energy': 'load_ac_power_instantaneous_kw',
-          'power': 'load_ac_power_instantaneous_kw',
-          'vac': 'ac_load_voltage_instantaneous_v_ac',
-          'vdc': 'dc_voltage_instantaneous_v_dc',
-      }.get(mode, 'ac_load_voltage_instantaneous_v_ac')
-      for label in event_labels:
-        with proxy.extend_prefix(label + ": "):
-          proxy.text = "find events"
-          events = list(
-              eventsdb.find(
-                  f"unixtime>={start}",
-                  f"unixtime<{stop}",
-                  event_description=label,
-                  # TODO: use a constant
-                  dataset='EventData',
-              )
-          )
-          print(len(events), "events found for", repr(label))
-          proxy.text = "add trace"
-          plot_events(
-              ax,
-              events,
-              lambda ev: ev[ev_y_field],
-              label=label,
-          )
+    with upd.run_task("plot"):
+      for tsd_id, tsd in tsd_by_id.items():
+        keys = keys_by_id[tsd_id]
+        tsd.plot(start, stop, keys=keys, utcoffset=utcoffset, ax=ax)
     ax.set_title(str(self))
     return figure
 
@@ -585,6 +613,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   USAGE_KEYWORDS = {
       'ALL_DATASETS': ' '.join(sorted(ALL_DATASETS)),
+      'TIMESERIES_DATASETS': ' '.join(sorted(SPLinkData.TIMESERIES_DATASETS)),
       'DEFAULT_SPDPATH': DEFAULT_SPDPATH,
       'DEFAULT_SPDPATH_ENVVAR': DEFAULT_SPDPATH_ENVVAR,
       'DEFAULT_FETCH_SOURCE_ENVVAR': DEFAULT_FETCH_SOURCE_ENVVAR,
@@ -626,7 +655,27 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         with spd:
           yield
 
-  def cmd_fetch(self, argv):
+  def cmd_export(self, argv):
+    ''' Usage: {cmd} dataset
+          Export the named dataset in the original CSV form.
+          Available datasets: {TIMESERIES_DATASETS}
+    '''
+    options = self.options
+    spd = options.spd
+    dataset = self.poparg(
+        argv,
+        'dataset',
+        str,
+        lambda ds: ds in spd.TIMESERIES_DATASETS,
+        f'dataset should be one of {SPLinkData.TIMESERIES_DATASETS}',
+    )
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    now = time.time()
+    start = now - 3 * 24 * 3600
+    spd.to_csv(dataset, start, now, sys.stdout)
+
+  def cmd_fetch(self, argv, fetch_source=None, doit=None, expunge=None):
     ''' Usage: {cmd} [-F rsync-source] [-nx] [-- [rsync-options...]]
           Rsync everything from rsync-source into the downloads area.
           -F    Fetch rsync source, default from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
@@ -634,8 +683,12 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           -x    Delete source files.
     '''
     options = self.options
-    options.expunge = False
-    self.popopts(argv, options, F='fetch_source', n='dry_run', x='expunge')
+    if doit is not None:
+      options.doit = doit
+    if fetch_source is not None:
+      options.fetch_source = fetch_source
+    options.expunge = False if expunge is None else expunge
+    self.popopts(argv, options, F_='fetch_source', n='dry_run', x='expunge')
     doit = options.doit
     expunge = options.expunge
     fetch_source = options.fetch_source
@@ -646,6 +699,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     spd = options.spd
     rsopts = ['-iaO']
     rsargv = ['set-x', 'rsync']
+    if not doit:
+      rsargv.append('-n')
     rsargv.extend(rsopts)
     if expunge:
       rsargv.append('--delete-source')
@@ -656,14 +711,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             spd.downloadspath + '/'
         ]
     )
-    if not doit:
-      print(shlex.join(argv))
-      return 0
     print('+', shlex.join(argv))
-    return run(rsargv)
+    return run(rsargv).returncode
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
-  def cmd_import(self, argv):
+  def cmd_import(self, argv, datasets=None, doit=None, force=None):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
           -d datasets       Comma separated list of datasets to import.
@@ -676,11 +728,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                             imported.
     '''
     options = self.options
-    fstags = options.fstags
-    runstate = options.runstate
-    spd = options.spd
-    upd = options.upd
-    options.datasets = self.ALL_DATASETS
+    if doit is not None:
+      options.doit = doit
+    if force is not None:
+      options.force = force
+    options.datasets = self.ALL_DATASETS if datasets is None else datasets
     options.once = False
     badopts = False
     options.popopts(
@@ -690,6 +742,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         n='dry_run',
         dry_run='dry_run',
     )
+    spd = options.spd
+    upd = options.upd
+    fstags = options.fstags
+    runstate = options.runstate
     datasets = options.datasets
     doit = options.doit
     force = options.force
@@ -826,36 +882,110 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [--show] [-f] [-o imagepath] days {{mode|[dataset:]{{glob|field}}}}...
+    ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] start-time [stop-time] {{mode|[dataset:]{{glob|field}}}}...
+        -e events,...   Display the specified events.
+        -f              Force. Overwirte the image path even if it exists.
+        --stacked       Stack graphed values on top of each other.
+        -o imagepath    Write the plot to imagepath.
+                        If not specified, the image will be written
+                        to the standard output in sixel format if
+                        it is a terminal, and in PNG format otherwise.
+        --show          Open the image path with "open".
+        --tz tzspec     Skew the UTC times presented on the graph
+                        to emulate the timezone specified by tzspec.
+                        The default skew is the system local timezone.
+        start-time      An integer number of days before the current time
+                        or any datetime specification recognised by
+                        dateutil.parser.parse.
+        stop-time       Optional stop time, default now.
+                        An integer number of days before the current time
+                        or any datetime specification recognised by
+                        dateutil.parser.parse.
+        mode            A named graph mode, implying a group of fields.
     '''
     options = self.options
+    options.tz = tzlocal()
     options.show_image = False
     options.imgpath = None
     options.stacked = False
-    options.multi = False
+    options.stacked = False
+    options.event_labels = None
     self.popopts(
         argv,
         options,
+        e_='event_labels',
         f='force',
-        multi=None,
         o_='imgpath',
         show='show_image',
         stacked=None,
+        tz_=('tz', tzfor),
     )
+    tz = options.tz
+    # mandatory start time
+    start = self.poptime(argv, 'start-time')
+    # check for optional stop-time, default now
+    if argv:
+      try:
+        stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
+      except GetoptError:
+        stop = time.time()
     force = options.force
     imgpath = options.imgpath
     spd = options.spd
     show_image = options.show_image
-    days = self.poparg(argv, int, "days to display", lambda days: days > 0)
-    now = time.time()
-    start = now - days * 24 * 3600
-    figure = spd.plot(start, now, key_specs=argv)
+    stacked = options.stacked
+    event_labels = options.event_labels
+    figure = spd.plot(
+        start,
+        stop,
+        key_specs=argv,
+        tz=tz,
+        event_labels=event_labels,
+        stacked=stacked
+    )
     if imgpath:
       save_figure(figure, imgpath, force=force)
       if show_image:
         os.system(shlex.join(['open', imgpath]))
     else:
       print_figure(figure)
+
+  def cmd_pull(self, argv):
+    ''' Usage: {cmd} [-d dataset,...] [-F rsync-source] [-nx]
+          Fetch and import data.
+          -d dataset,...
+                Specify the datasets to import.
+          -F    Fetch rsync source, default from ${DEFAULT_FETCH_SOURCE_ENVVAR}.
+          -n    No action; pass -n to rsync. Just more convenient than putting it at the end.
+          -x    Delete source files.
+    '''
+    options = self.options
+    options.datasets = self.ALL_DATASETS
+    options.expunge = False
+    self.popopts(
+        argv,
+        options,
+        d_=('datasets', lambda opt: opt.split(',')),
+        F_='fetch_source',
+        n='dry_run',
+        x='expunge',
+    )
+    doit = options.doit
+    datasets = options.datasets
+    expunge = options.expunge
+    fetch_source = options.fetch_source
+    fetch_argv = []
+    if fetch_source:
+      fetch_argv.extend(['-F', fetch_source])
+    if not doit:
+      fetch_argv.append('-n')
+    if expunge:
+      fetch_argv.append('-x')
+    xit = self.cmd_fetch(fetch_argv)
+    if xit == 0:
+      import_argv = ['--', *argv]
+      xit = self.cmd_import(import_argv, datasets=datasets, doit=doit)
+    return xit
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

@@ -1303,7 +1303,7 @@ class Module:
         "project": projspec,
         "build-system": {
             "requires": [
-                "setuptools >= 61.0",
+                "setuptools >= 61.2",
                 'trove-classifiers',
                 "wheel",
             ],
