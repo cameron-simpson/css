@@ -305,7 +305,9 @@ class Task(BaseResult, FSM, RunStateMixin):
     ''' Trigger a call to the `Task` function if we're pending.
     '''
     with self._lock:
-      if not self.ready:
+      if self.is_prepare:
+        warning("%s.callif: ignoring call while self.state is PREPARE", self)
+      elif self.is_pending:
         try:
           self.run()
         except (BlockedError, CancellationError) as e:
