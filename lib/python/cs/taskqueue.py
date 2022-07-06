@@ -10,7 +10,7 @@ class BlockedError(Exception):
   ''' Raised by a blocked `Task` if attempted.
   '''
 
-class Task(BaseResult):
+class Task(BaseResult, FSM, RunStateMixin):
   ''' A task which may require the completion of other tasks.
       This is a subclass of `Result`.
 
@@ -63,12 +63,37 @@ class Task(BaseResult):
           >>>
   '''
 
-  PREPARE = 1
-  PENDING = 2
-  RUNNING = 3
-  COMPLETED = 4
-  CANCELLED = 5
-  ABORTED = 6
+  FSM_TRANSITIONS = {
+        'PREPARE': {
+            'ready': 'PENDING',
+        },
+        'PENDING': {
+            'dispatch': 'RUNNING',
+            ##'cancel': 'CANCELLED',
+            'abort': 'ABORT',
+        },
+        'RUNNING': {
+            'success': 'SUCCEEDED',
+            'error': 'FAILED',
+            'cancel': 'CANCELLED',
+        },
+        'CANCELLED': {
+            'requeue': 'PENDING',
+            'abort': 'ABORT',
+        },
+        'FAILED': {
+            'retry': 'PENDING',
+            'abort': 'ABORT',
+        },
+    }
+
+  PREPARE = 'PREPARE'
+  PENDING = 'PENDING'
+  RUNNING = 'RUNNING'
+  SUCCEEDED = 'SUCCEEDED'
+  CANCELLED = 'CANCELLED'
+  FAILED = 'FAILED'
+  ABORT = 'ABORT'
 
   _seq = Seq()
   _state = ThreadState(current_task=None)
@@ -89,7 +114,8 @@ class Task(BaseResult):
       lock = RLock()
     if func_kwargs is None:
       func_kwargs = {}
-    super().__init__(*a, lock=lock, **kw)
+    FSM.__init__(self, 'PREPARE')
+    BaseResult.__init__(self, *a, lock=lock, **kw)
     if runstate is None:
       runstate = RunState(self.name)
     self.runstate = runstate
@@ -106,6 +132,24 @@ class Task(BaseResult):
   def __eq__(self, otask):
     return self is otask
 
+  @property
+  def ready(self):
+    return self.fsm_state in ('SUCCEEDED', 'FAILED', 'CANCELLED')
+
+  @locked
+  def cancel(self):
+    ''' Transition this `Task` to `CANCELLED` state.
+        Return whether the transition succeeded.
+
+        If the `Task` is in `PENDING`, `RUNNING` or `CANCELLED`
+        the resulting state is `CANCELLED` and this method returns `True`.
+
+        If the `Task` is in `SUCCEEDED` or `ABORTED`
+        the resulting state is unchanged and this method returns `False`.
+    '''
+    if self.running:
+      super().cancel()
+
   @classmethod
   def current_task(cls):
     ''' The current `Task`, valid during `Task.run()`.
@@ -113,12 +157,6 @@ class Task(BaseResult):
         task, typically to poll its `.runstate` attribute.
     '''
     return cls._state.current_task  # pylint: disable=no-member
-
-  def abort(self):
-    ''' Calling `abort()` calls `self.runstate.cancel()` to indicate
-        to the running function that it should cease operation.
-    '''
-    self.runstate.cancel()
 
   def required(self):
     ''' Return a `set` containing any required tasks.
@@ -180,17 +218,6 @@ class Task(BaseResult):
         yield otask
         continue
 
-  # pylint: disable=arguments-differ
-  def bg(self):
-    ''' Submit a function to complete the `Task` in a separate `Thread`,
-        returning the `Thread`.
-
-        This dispatches a `Thread` to run `self.run()`
-        and as such the `Task` must be in "pending" state,
-        and transitions to "running".
-    '''
-    return bg_thread(self.call, name=self.name)
-
   def run_func(self, func, *a, **kw):
     raise RuntimeError(
         "%s function is predefined, .run_func() is forbidden, use unadorned .run() instead"
@@ -198,10 +225,11 @@ class Task(BaseResult):
     )
 
   # pylint: disable=arguments-differ
-  def run(self):
-    ''' Attempt to perform the `Task` by calling `func(*func_args,**func_kwargs)`.
+  def dispatch(self):
+    ''' Dispatch the `Task` by running
+        `self.func(*self.func_args,**self.func_kwargs)`.
 
-        If we are cancelled, raise `CancellationError`.
+        It is forbidden to call this on a `Task` not in `PENDING` state.
         If there are blocking required tasks, raise `BlockedError`.
         Otherwise run `r=func(self,*self.func_args,**self.func_kwargsw)`
         with the following effects:
@@ -221,30 +249,47 @@ class Task(BaseResult):
         attribute which can be polled by long running tasks to
         honour calls to `Task.abort()`.
     '''
-    if not self.cancelled:
-      for otask in self.blockers():
-        raise BlockedError("%s blocked by %s" % (self, otask))
-      if not self.cancelled:
-        state = type(self)._state
-        with self._lock:
-          with state(current_task=self):
-            try:
-              with self.runstate:
-                r = self.func(*self.func_args, **self.func_kwargs)
-            except CancellationError:
-              self.cancel()
-            except BaseException:
-              if self.cancel_on_exception:
-                self.cancel()
-              # store the exception regardless
-              self.exc_info = sys.exc_info()
+    for otask in self.blockers():
+      raise BlockedError("%s blocked by %s" % (self, otask))
+    with self._lock:
+      self.fsm_event('dispatch')
+      state = type(self)._state
+      with state(current_task=self):
+          try:
+            with self.runstate:
+              r = self.func(*self.func_args, **self.func_kwargs)
+          except CancellationError:
+            self.fsm_event('cancel')
+          except BaseException:
+            if self.cancel_on_exception:
+              self.fsm_event('cancel')
             else:
-              if self.cancel_on_result and self.cancel_on_result(r):
-                self.cancel()
-              # store the result regardless
-              self.result = r
-    if self.cancelled:
-      raise CancellationError()
+              self.fsm_event('error')
+            # store the exception regardless
+            self.exc_info = sys.exc_info()
+          else:
+            if self.cancel_on_result and self.cancel_on_result(r):
+              self.fsm_event('cancel')
+            else:
+              self.fsm_state('success')
+            # store the result regardless
+            self.result = r
+    if self.fsm_state == 'CANCELLED':
+      raise CancellationError
+
+  # pylint: disable=arguments-differ
+  def bg(self):
+    ''' Dispatch a function to complete the `Task` in a separate `Thread`,
+        returning the `Thread`.
+        It is forbidden to dispatch a `Task` not in `PENDING` state.
+
+        This dispatches a `Thread` to run `self.run()`
+        and as such the `Task` must be in "pending" state,
+        and transitions to "running".
+    '''
+    if not self.is_pending:
+      raise RuntimeError("attempt to run Task when self.state is not PENDING")
+    return bg_thread(self.run, name=self.name)
 
   def callif(self):
     ''' Trigger a call to `func(self,*self.func_args,**self.func_kwargsw)`
