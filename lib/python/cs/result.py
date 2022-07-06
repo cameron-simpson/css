@@ -64,6 +64,7 @@ import time
 from icontract import require
 
 from cs.deco import decorator
+from cs.lex import cutprefix
 from cs.logutils import exception, error, warning, debug
 from cs.mappings import AttrableMapping
 from cs.pfx import Pfx, pfx_method
