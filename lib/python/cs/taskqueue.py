@@ -4,7 +4,18 @@
     dependencies and failure/retry.
 '''
 
-from cs.result import BaseResult
+import sys
+from threading import RLock
+import time
+
+from cs.deco import decorator
+from cs.fsm import FSM
+from cs.logutils import warning, debug
+from cs.py.func import funcname
+from cs.resources import RunState, RunStateMixin
+from cs.result import BaseResult, CancellationError
+from cs.seq import Seq
+from cs.threads import bg as bg_thread, locked, State as ThreadState
 
 class BlockedError(Exception):
   ''' Raised by a blocked `Task` if attempted.
@@ -15,11 +26,11 @@ class Task(BaseResult, FSM, RunStateMixin):
       This is a subclass of `Result`.
 
       Keyword parameters:
-      * `cancel_on_exception`: if true, cancel this `Task` if `.call`
+      * `cancel_on_exception`: if true, cancel this `Task` if `.run`
         raises an exception; the default is `False`, allowing repair
         and retry
       * `cancel_on_result`: optional callable to test the `Task.result`
-        after `.call`; if it returns `True` the `Task` is marked
+        after `.run`; if it returns `True` the `Task` is marked
         as cancelled
       * `func`: the function to call to complete the `Task`;
         it will be called as `func(*func_args,**func_kwargs)`
@@ -59,8 +70,6 @@ class Task(BaseResult, FSM, RunStateMixin):
           t2.require(t1)
           # try to run sleep(5) for t2 immediately after t1 completes
           t1.notify(t2.call, sleep, 5)
-
-          >>>
   '''
 
   FSM_TRANSITIONS = {
@@ -96,6 +105,7 @@ class Task(BaseResult, FSM, RunStateMixin):
   ABORT = 'ABORT'
 
   _seq = Seq()
+
   _state = ThreadState(current_task=None)
 
   def __init__(
@@ -118,7 +128,7 @@ class Task(BaseResult, FSM, RunStateMixin):
     BaseResult.__init__(self, *a, lock=lock, **kw)
     if runstate is None:
       runstate = RunState(self.name)
-    self.runstate = runstate
+    RunStateMixin.__init__(self, runstate)
     self._required = set()
     self.cancel_on_exception = cancel_on_exception
     self.cancel_on_result = cancel_on_result
@@ -292,8 +302,7 @@ class Task(BaseResult, FSM, RunStateMixin):
     return bg_thread(self.run, name=self.name)
 
   def callif(self):
-    ''' Trigger a call to `func(self,*self.func_args,**self.func_kwargsw)`
-        if we're pending and not blocked or cancelled.
+    ''' Trigger a call to the `Task` function if we're pending.
     '''
     with self._lock:
       if not self.ready:
