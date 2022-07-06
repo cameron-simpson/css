@@ -1,0 +1,1 @@
+lib/python/cs/mappings.py: cs.mappings: expose the default column name mapping function of named_row_tuple as column_name_to_identifier for reuse
