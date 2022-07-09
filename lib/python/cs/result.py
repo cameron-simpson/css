@@ -62,8 +62,8 @@ from threading import Lock, RLock
 
 from icontract import require
 
+from cs.gimmicks import exception, error, warning
 from cs.lex import cutprefix
-from cs.logutils import exception, error, warning
 from cs.mappings import AttrableMapping
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import funcname
@@ -127,6 +127,7 @@ class BaseResult(object):
       testing whether the `Result` is in that state.
   '''
 
+  # pylint: disable=too-many-arguments
   def __init__(
       self, name=None, lock=None, result=None, state=None, extra=None
   ):
