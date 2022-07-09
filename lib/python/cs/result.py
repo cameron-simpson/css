@@ -59,20 +59,17 @@ except ImportError:
   from enum34 import Enum  # type: ignore
 import sys
 from threading import Lock, RLock
-import time
 
 from icontract import require
 
-from cs.deco import decorator
 from cs.lex import cutprefix
-from cs.logutils import exception, error, warning, debug
+from cs.logutils import exception, error, warning
 from cs.mappings import AttrableMapping
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import funcname
 from cs.py3 import Queue, raise3, StringTypes
-from cs.resources import RunState
 from cs.seq import seq, Seq
-from cs.threads import bg as bg_thread, State as ThreadState
+from cs.threads import bg as bg_thread
 
 __version__ = '20220311-post'
 
