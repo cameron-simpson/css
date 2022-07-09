@@ -1,1 +1,2 @@
+make Result subclass FSM at some point
 move Task et al from cs.result to cs.taskqueue
