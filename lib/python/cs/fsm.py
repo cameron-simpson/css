@@ -79,24 +79,31 @@ class FSM:
     return new_state
 
   @property
-  def fsm_dot(self):
-    ''' A DOT syntax state transition diagram.
+
+  def fsm_transitions_as_dot(self, fsm_transitions, sep='\n'):
+    ''' Compute a DOT syntax graph description from a transitions dictionary.
     '''
     dot = [f'digraph {type(self).__name__} {{']
     # NB: we _do not_ sort the transition graph because the "dot" programme
-    # layout is affected by the order # in which the graph is defined.
+    # layout is affected by the order in which the graph is defined.
     # In this way we execute in the dictionary order, which is
     # insertion order in modern Python, which in turn means that
     # describing the transitions in the natural order in which they
     # occur typically produces a nicer graph diagram.
-    for src_state, transitions in type(self).FSM_TRANSITIONS.items():
+    for src_state, transitions in fsm_transitions.items():
       for event, dst_state in sorted(transitions.items()):
         dot.append(f'  {src_state}->{dst_state}[label={event}];')
     dot.append('}')
-    return '\n'.join(dot)
+    return sep.join(dot)
 
-  def fsm_print(self, output=None, fmt=None, layout=None, **dot_kw):
-    ''' Print the state transition diagram to `output`, default `sys.stdout`,
+  @property
+  def fsm_dot(self):
+    ''' A DOT syntax description of `self.FSM_TRANSITIONS`.
+    '''
+    return self.fsm_transitions_as_dot(self.FSM_TRANSITIONS)
+
+  def fsm_print(self, file=None, fmt=None, layout=None, **dot_kw):
+    ''' Print the state transition diagram to `file`, default `sys.stdout`,
         in format `fmt` using the engine specified by `layout`, default `'dot'`.
     '''
     return gvprint(
