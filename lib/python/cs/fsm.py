@@ -68,8 +68,13 @@ class FSM:
     ''' Transition the FSM from the current state to a new state based on `event`.
         Returns the new state.
     '''
-    transitions = self.FSM_TRANSITIONS[self.fsm_state]
-    new_state = transitions[event]
+    old_state = self.fsm_state
+    try:
+      new_state = self.FSM_TRANSITIONS[old_state][event]
+    except KeyError as e:
+      raise FSMError(
+          f'invalid event {event!r} for state {old_state!r}', self
+      ) from e
     self.fsm_state = new_state
     return new_state
 
