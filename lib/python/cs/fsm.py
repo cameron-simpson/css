@@ -4,9 +4,23 @@
 '''
 
 from typing import Optional, TypeVar
+
+from typeguard import typechecked
 from cs.gvutils import gvprint
 
 FSMSubType = TypeVar('FSMSubType', bound='FSM')
+
+class FSMError(Exception):
+  ''' An exception associated with an `FSM`.
+
+      These have a `.fsm` attribute storing an (optional) `FSM`
+      reference supplied at initialisation.
+  '''
+
+  @typechecked
+  def __init__(self, msg: str, fsm: Optional[FSMSubType] = None):
+    super().__init__(msg)
+    self.fsm = fsm
 
 class FSM:
   ''' Base class for a finite state manchine (FSM).
