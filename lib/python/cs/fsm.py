@@ -3,10 +3,15 @@
 ''' Basic Finite State Machine (FSM) tools.
 '''
 
+from collections import defaultdict
 from typing import Optional, TypeVar
 
 from typeguard import typechecked
+
+from cs.gimmicks import warning
 from cs.gvutils import gvprint
+from cs.lex import cutprefix
+from cs.pfx import Pfx, pfx_call
 
 FSMSubType = TypeVar('FSMSubType', bound='FSM')
 
@@ -129,6 +134,6 @@ class FSM:
 if __name__ == '__main__':
 
   from cs.taskqueue import Task
-  fsm1 = Task(func=lambda: print("FUNC"))
+  fsm1 = Task('fsm1', func=lambda: print("FUNC"))
   print(fsm1.fsm_dot)
   fsm1.fsm_print()
