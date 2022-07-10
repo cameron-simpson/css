@@ -79,6 +79,11 @@ class FSM:
     return new_state
 
   @property
+  def fsm_events(self):
+    ''' Return a list of the events valid for the current state.
+    '''
+    return list(self.FSM_TRANSITIONS[self.fsm_state])
+
 
   def fsm_transitions_as_dot(self, fsm_transitions, sep='\n'):
     ''' Compute a DOT syntax graph description from a transitions dictionary.
