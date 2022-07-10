@@ -38,6 +38,7 @@ class FSM:
           )
       )
     self.fsm_state = state
+    self.__callbacks = defaultdict(list)
 
   def __getattr__(self, attr):
     ''' Provide the following attributes:
@@ -66,6 +67,7 @@ class FSM:
 
   def fsm_event(self, event):
     ''' Transition the FSM from the current state to a new state based on `event`.
+        Call any callbacks associated with the new state.
         Returns the new state.
     '''
     old_state = self.fsm_state
@@ -76,6 +78,12 @@ class FSM:
           f'invalid event {event!r} for state {old_state!r}', self
       ) from e
     self.fsm_state = new_state
+    with Pfx("%s->%s", old_state, new_state):
+      for callback in self.__callbacks[new_state]:
+        try:
+          pfx_call(callback, self, old_state, event, new_state)
+        except Exception as e:  # pylint: disable=broad-except
+          warning("exception from callback %s: %s", callback, e)
     return new_state
 
   @property
@@ -84,6 +92,11 @@ class FSM:
     '''
     return list(self.FSM_TRANSITIONS[self.fsm_state])
 
+  def fsm_callback(self, state, callback):
+    ''' Register a callback for to be called immediately on transition
+        to `state` as `callback(self,old_state,event,new_state)`.
+    '''
+    self.__callbacks[state].append(callback)
 
   def fsm_transitions_as_dot(self, fsm_transitions, sep='\n'):
     ''' Compute a DOT syntax graph description from a transitions dictionary.
