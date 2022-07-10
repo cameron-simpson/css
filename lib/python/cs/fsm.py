@@ -3,7 +3,10 @@
 ''' Basic Finite State Machine (FSM) tools.
 '''
 
+from typing import Optional, TypeVar
 from cs.gvutils import gvprint
+
+FSMSubType = TypeVar('FSMSubType', bound='FSM')
 
 class FSM:
   ''' Base class for a finite state manchine (FSM).
