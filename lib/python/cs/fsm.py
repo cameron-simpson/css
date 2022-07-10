@@ -39,6 +39,31 @@ class FSM:
       )
     self.fsm_state = state
 
+  def __getattr__(self, attr):
+    ''' Provide the following attributes:
+        - present the state names as attributes, for example:
+          `self.PENDING=='PENDING'` if there is a `'PENDING'` state
+        - present `is_`*statename* as a Boolean testing whether
+          `self.fsm_state==`*statename*`.upper()`
+        - a callable calling `self.fsm_event(attr)` if `attr`
+          is an event name for the current state
+        Fall back to the superclass `__getattr__`.
+    '''
+    if attr in self.FSM_TRANSITIONS:
+      return attr
+    in_state = cutprefix(attr, 'is_')
+    if in_state is not attr:
+      # relies on upper case state names
+      return self.fsm_state == in_state.upper()
+    try:
+      statedef = self.FSM_TRANSITIONS[self.fsm_state]
+    except KeyError:
+      pass
+    else:
+      if attr in statedef:
+        return lambda: self.fsm_event(attr)
+    return super().__getattr__(attr)  # pylint: disable=no-member
+
   def fsm_event(self, event):
     ''' Transition the FSM from the current state to a new state based on `event`.
         Returns the new state.
