@@ -111,9 +111,7 @@ class FSM:
     ''' Print the state transition diagram to `file`, default `sys.stdout`,
         in format `fmt` using the engine specified by `layout`, default `'dot'`.
     '''
-    return gvprint(
-        self.fsm_dot, output=output, fmt=fmt, layout=layout, **dot_kw
-    )
+    return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
 
 if __name__ == '__main__':
 
