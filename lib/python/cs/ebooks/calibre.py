@@ -127,9 +127,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       def fspath(self):
-        ''' An alias for `self.path`.
+        ''' The filesystem path to where the book formats are stored.
         '''
-        return self.path
+        return self.tree.pathto(self.path)
 
       def format_tagset(self):
         ''' Compute a `TagSet` representing this book's metadata.
@@ -231,8 +231,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             computed on demand.
         '''
         return {
-            fmt.format:
-            joinpath(db_row.path, f'{fmt.name}.{fmt.format.lower()}')
+            fmt.format: f'{fmt.name}.{fmt.format.lower()}'
             for fmt in db_row.formats
         }
 
@@ -277,10 +276,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             or `None` if the format is not present.
         '''
         try:
-          subpath = self.formats[fmtk]
+          fmtsubpath = self.formats[fmtk]
         except KeyError:
           return None
-        return self.tree.pathto(subpath)
+        return self.pathto(fmtsubpath)
 
       @pfx_method
       @typechecked
