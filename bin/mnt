@@ -12,6 +12,7 @@ rcfile=$HOME/.mntrc
 umount=
 mount_point=
 trace=
+use_tmux=1
 [ -t 2 ] && trace=set-x
 
 cmd=$(basename "$0")
@@ -21,6 +22,8 @@ usage="Usage:
   $cmd [-u] {mount-path|/mount/point}...
     -f rcfile   Specify config file. Default: $rcfile
     -u          Unmount the mount-path.
+    -X          Run the mount directly, not in tmux.
+    -x          Trace the executed command.
     mount-path
         ALL
           Scan the file $rcfile
@@ -39,6 +42,8 @@ do
   case "$1" in
     -f) rcfile=$1; shift ;;
     -u) umount=1 ;;
+    -X) use_tmux= ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -147,14 +152,17 @@ do_mount(){
     set -ue
     case "$type" in
       ssh | sshfs )
-        $trace tm use-session -d "MNT_${host}_${pathbase}" \
+        set -- \
           set-x sshfs -f -o reconnect -o ssh_command='datethen 2 set-x ssh' \
             -- "$host:$path/" "$mount_point"
+        [ $use_tmux ] && set -- tm use-session -d "MNT_${host}_${pathbase}" "$@"
+        set -- $trace "$@"
         ;;
       *)echo "$cmd: $mount_point: unsupported type: $type" >&2
         exit 1
         ;;
     esac
+    exec "$@"
   )
 }
 
