@@ -128,7 +128,7 @@ class FSM:
     with Pfx("%s->%s", old_state, new_state):
       for callback in self.__callbacks[new_state]:
         try:
-          pfx_call(callback, self, old_state, event, new_state)
+          pfx_call(callback, self, transition)
         except Exception as e:  # pylint: disable=broad-except
           warning("exception from callback %s: %s", callback, e)
     return new_state
