@@ -1072,8 +1072,11 @@ class CalibreCommand(BaseCommand):
     try:
       dbid = int(book_spec)
     except ValueError:
+      # FORMAT
+      if book_spec.isupper():
+        match_fn = lambda book: book_spec in book.formats
       # /regexp
-      if book_spec.startswith('/'):
+      elif book_spec.startswith('/'):
         re_s = book_spec[1:]
         if not re_s:
           raise ValueError("empty regexp")  # pylint: disable=raise-missing-from
