@@ -3,7 +3,8 @@
 ''' Basic Finite State Machine (FSM) tools.
 '''
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
+import time
 from typing import Optional, TypeVar
 
 from typeguard import typechecked
@@ -27,14 +28,35 @@ class FSMError(Exception):
     super().__init__(msg)
     self.fsm = fsm
 
+FSMTransitionEvent = namedtuple(
+    'FSMTransitionEvent', 'old_state new_state event when extra'
+)
+
 class FSM:
   ''' Base class for a finite state manchine (FSM).
+
+      The allowed states and transitions are definted by the class
+      attribute `FSM_TRANSITIONS`, a mapping of
+      *state*->*event*->*new_state*.
+
+      Each instance has the following attributes:
+      * `fsm_state`: the current state value.
+      * `fsm_history`: an optional iterable of `FSMTransitionEvent`
+        state transitions recorded by the `fsm_event` method.
+        Usually this would be `None` (the default) or a `list`.
   '''
 
   # allow state transitions
   FSM_TRANSITIONS = {}
 
-  def __init__(self, state):
+  def __init__(self, state, history=None):
+    ''' Initialise the `FSM` from:
+        * `state`: the initial state
+        * `history`: an optional object to record state transition
+          history, default `None`; if not `None` this should be an
+          iterable object with a `.append(entry)` method such as a
+          `list`.
+    '''
     if state not in self.FSM_TRANSITIONS:
       raise ValueError(
           "invalid initial state %r, expected one of %r" % (
@@ -43,6 +65,7 @@ class FSM:
           )
       )
     self.fsm_state = state
+    self.fsm_history = history
     self.__callbacks = defaultdict(list)
 
   def __getattr__(self, attr):
@@ -70,10 +93,20 @@ class FSM:
         return lambda: self.fsm_event(attr)
     return super().__getattr__(attr)  # pylint: disable=no-member
 
-  def fsm_event(self, event):
+  def fsm_event(self, event, **extra):
     ''' Transition the FSM from the current state to a new state based on `event`.
         Call any callbacks associated with the new state.
         Returns the new state.
+
+        Optional information may be passed as keyword arguments.
+        If `self.fsm_history` is not `None`
+        a new `FSMTransitionEvent` event is appended to `self.fsm_history`
+        with the following attributes:
+        * `old_state`: the state when `fsm_event` was called
+        * `new_state`: the new state
+        * `event`: the `event`
+        * `when`: a UNIX timestamp from `time.time()`
+        * `extra`: a `dict` with the `extra` information
     '''
     old_state = self.fsm_state
     try:
@@ -83,6 +116,15 @@ class FSM:
           f'invalid event {event!r} for state {old_state!r}', self
       ) from e
     self.fsm_state = new_state
+    transition = FSMTransitionEvent(
+        old_state=old_state,
+        new_state=new_state,
+        event=event,
+        when=time.time(),
+        extra=extra,
+    )
+    if self.fsm_history is not None:
+      self.fsm_history.append(transition)
     with Pfx("%s->%s", old_state, new_state):
       for callback in self.__callbacks[new_state]:
         try:
