@@ -235,42 +235,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             for fmt in db_row.formats
         }
 
-      @property
-      @proxy_on_demand_field
-      # pylint: disable=property-with-parameters
-      def identifiers(self, db_row, *, session):
-        ''' A mapping of Calibre identifier keys to identifier values
-            computed on demand.
-        '''
-        return {
-            identifier.type: identifier.val
-            for identifier in db_row.identifiers
-        }
-
-      @property
-      @proxy_on_demand_field
-      # pylint: disable=property-with-parameters
-      def tags(self, db_row, *, session):
-        ''' A list of Calibre tags computed on demand.
-        '''
-        return [tag.name for tag in db_row.tags]
-
-      # TODO: should really edit the db directly
-      @tags.setter
-      def tags(self, new_tags):
-        ''' Update the tags.
-        '''
-        self.tree.calibredb(
-            'set_metadata',
-            '--field',
-            f'tags:{",".join(new_tags)}',
-            str(self.dbid),
-        )
-        try:
-          del self._RelProxy__fields['tags']
-        except KeyError:
-          pass
-
       def formatpath(self, fmtk):
         ''' Return the filesystem path of the format file for `fmtk`
             or `None` if the format is not present.
@@ -320,6 +284,42 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           return False
         self.refresh_from_db()
         return True
+
+      @property
+      @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
+      def identifiers(self, db_row, *, session):
+        ''' A mapping of Calibre identifier keys to identifier values
+            computed on demand.
+        '''
+        return {
+            identifier.type: identifier.val
+            for identifier in db_row.identifiers
+        }
+
+      @property
+      @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
+      def tags(self, db_row, *, session):
+        ''' A list of Calibre tags computed on demand.
+        '''
+        return [tag.name for tag in db_row.tags]
+
+      # TODO: should really edit the db directly
+      @tags.setter
+      def tags(self, new_tags):
+        ''' Update the tags.
+        '''
+        self.tree.calibredb(
+            'set_metadata',
+            '--field',
+            f'tags:{",".join(new_tags)}',
+            str(self.dbid),
+        )
+        try:
+          del self._RelProxy__fields['tags']
+        except KeyError:
+          pass
 
       def convert(
           self,
