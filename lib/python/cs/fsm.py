@@ -174,8 +174,8 @@ class FSM:
     return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
 
 if __name__ == '__main__':
-
+  import sys
   from cs.taskqueue import Task
-  fsm1 = Task('fsm1', func=lambda: print("FUNC"))
-  print(fsm1.fsm_dot)
+  fsm1 = Task('fsm1', lambda: print("FUNC"))
+  print(fsm1.fsm_dot, file=sys.stderr)
   fsm1.fsm_print()
