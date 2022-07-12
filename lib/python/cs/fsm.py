@@ -141,7 +141,7 @@ class FSM:
 
   def fsm_callback(self, state, callback):
     ''' Register a callback for to be called immediately on transition
-        to `state` as `callback(self,old_state,event,new_state)`.
+        to `state` as `callback(self,FSMEventTransition)`.
     '''
     self.__callbacks[state].append(callback)
 
