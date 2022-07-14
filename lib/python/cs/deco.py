@@ -481,23 +481,25 @@ def OBSOLETE(func, suggestion=None):
       This emits a warning log message before calling the decorated function.
   '''
 
+  callers = set()
+
   def wrapped(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
     frame = traceback.extract_stack(None, 2)[0]
     caller = frame[0], frame[1]
-    # pylint: disable=protected-access
-    try:
-      callers = func._OBSOLETE_callers
-    except AttributeError:
-      callers = func._OBSOLETE_callers = set()
     if caller not in callers:
       callers.add(caller)
-      warning(
-          "OBSOLETE call to %s:%d %s(), called from %s:%d %s",
-          func.__code__.co_filename, func.__code__.co_firstlineno,
-          func.__name__, frame[0], frame[1], frame[2]
+      prefix = (
+          "OBSOLETE call" if suggestion is None else
+          ("OBSOLETE (suggest %r) call" % suggestion)
       )
+      fmt = "%s to %s:%d %s(), called from %s:%d %s"
+      fmtargs = [
+          prefix, func.__code__.co_filename, func.__code__.co_firstlineno,
+          func.__name__, frame[0], frame[1], frame[2]
+      ]
+      warning(fmt, *fmtargs)
     return func(*args, **kwargs)
 
   funcname = getattr(func, '__name__', str(func))
