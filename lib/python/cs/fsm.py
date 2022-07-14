@@ -98,7 +98,13 @@ class FSM:
     else:
       if attr in statedef:
         return lambda: self.fsm_event(attr)
-    return super().__getattr__(attr)  # pylint: disable=no-member
+    try:
+      sga = super().__getattr__
+    except AttributeError as e:
+      raise AttributeError(
+          "no %s.%s attribute" % (type(self).__name__, attr)
+      ) from e
+    return sga(attr)
 
   def fsm_event(self, event, **extra):
     ''' Transition the FSM from the current state to a new state based on `event`.
