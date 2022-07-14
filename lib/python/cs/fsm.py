@@ -49,14 +49,20 @@ class FSM:
   # allow state transitions
   FSM_TRANSITIONS = {}
 
-  def __init__(self, state, history=None):
+  def __init__(self, state, history=None, lock=None):
     ''' Initialise the `FSM` from:
         * `state`: the initial state
         * `history`: an optional object to record state transition
           history, default `None`; if not `None` this should be an
           iterable object with a `.append(entry)` method such as a
           `list`.
+        * `lock`: an optional mutex to control access;
+          if presupplied and shared with the caller
+          it should probably be an `RLock`;
+          the default is a `Lock`, which is enough for `FSM` private use
     '''
+    if lock is None:
+      lock = Lock()
     if state not in self.FSM_TRANSITIONS:
       raise ValueError(
           "invalid initial state %r, expected one of %r" % (
@@ -66,6 +72,7 @@ class FSM:
       )
     self.fsm_state = state
     self.fsm_history = history
+    self.__lock = lock
     self.__callbacks = defaultdict(list)
 
   def __getattr__(self, attr):
@@ -108,23 +115,24 @@ class FSM:
         * `when`: a UNIX timestamp from `time.time()`
         * `extra`: a `dict` with the `extra` information
     '''
-    old_state = self.fsm_state
-    try:
-      new_state = self.FSM_TRANSITIONS[old_state][event]
-    except KeyError as e:
-      raise FSMError(
-          f'invalid event {event!r} for state {old_state!r}', self
-      ) from e
-    self.fsm_state = new_state
-    transition = FSMTransitionEvent(
-        old_state=old_state,
-        new_state=new_state,
-        event=event,
-        when=time.time(),
-        extra=extra,
-    )
-    if self.fsm_history is not None:
-      self.fsm_history.append(transition)
+    with self.__lock:
+      old_state = self.fsm_state
+      try:
+        new_state = self.FSM_TRANSITIONS[old_state][event]
+      except KeyError as e:
+        raise FSMError(
+            f'invalid event {event!r} for state {old_state!r}', self
+        ) from e
+      self.fsm_state = new_state
+      transition = FSMTransitionEvent(
+          old_state=old_state,
+          new_state=new_state,
+          event=event,
+          when=time.time(),
+          extra=extra,
+      )
+      if self.fsm_history is not None:
+        self.fsm_history.append(transition)
     with Pfx("%s->%s", old_state, new_state):
       for callback in self.__callbacks[new_state]:
         try:
@@ -143,7 +151,8 @@ class FSM:
     ''' Register a callback for to be called immediately on transition
         to `state` as `callback(self,FSMEventTransition)`.
     '''
-    self.__callbacks[state].append(callback)
+    with self.__lock:
+      self.__callbacks[state].append(callback)
 
   def fsm_transitions_as_dot(self, fsm_transitions, sep='\n'):
     ''' Compute a DOT syntax graph description from a transitions dictionary.
