@@ -478,7 +478,13 @@ def OBSOLETE(func, suggestion=None):
           @OBSOLETE
           def func(...):
 
+      or
+
+          @OBSOLETE("new_func_name")
+          def func(...):
+
       This emits a warning log message before calling the decorated function.
+      Only one warning is emitted per calling location.
   '''
 
   callers = set()
