@@ -33,7 +33,7 @@ FSMTransitionEvent = namedtuple(
 )
 
 class FSM:
-  ''' Base class for a finite state manchine (FSM).
+  ''' Base class for a finite state machine (FSM).
 
       The allowed states and transitions are definted by the class
       attribute `FSM_TRANSITIONS`, a mapping of
@@ -170,6 +170,7 @@ class FSM:
   def fsm_print(self, file=None, fmt=None, layout=None, **dot_kw):
     ''' Print the state transition diagram to `file`, default `sys.stdout`,
         in format `fmt` using the engine specified by `layout`, default `'dot'`.
+        This is a wrapper for `cs.gvutils.gvprint`.
     '''
     return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
 
