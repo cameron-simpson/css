@@ -7,6 +7,17 @@ from os.path import exists as existspath
 from subprocess import Popen, PIPE
 import sys
 
+from cs.lex import is_identifier
+
+def quote(s):
+  ''' Quote a string for use in DOT syntax.
+      This implementation passes identifiers and sequences of decimal numerals
+      through unchanged and double quotes other strings.
+  '''
+  if s.isalnum() or is_identifier(s):
+    return s
+  return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
 # pylint: disable=too-many-branches,too-many-statements,too-many-locals
 def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
   ''' Print the graph specified by `dot_s`, a graph in graphViz DOT syntax,
