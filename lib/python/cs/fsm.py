@@ -10,7 +10,7 @@ from typing import Optional, TypeVar
 from typeguard import typechecked
 
 from cs.gimmicks import warning
-from cs.gvutils import gvprint
+from cs.gvutils import gvprint, quote as gvq
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 
@@ -148,7 +148,7 @@ class FSM:
   def fsm_transitions_as_dot(self, fsm_transitions, sep='\n'):
     ''' Compute a DOT syntax graph description from a transitions dictionary.
     '''
-    dot = [f'digraph {type(self).__name__} {{']
+    dot = [f'digraph {gvq(type(self).__name__)} {{']
     # NB: we _do not_ sort the transition graph because the "dot" programme
     # layout is affected by the order in which the graph is defined.
     # In this way we execute in the dictionary order, which is
@@ -157,7 +157,9 @@ class FSM:
     # occur typically produces a nicer graph diagram.
     for src_state, transitions in fsm_transitions.items():
       for event, dst_state in sorted(transitions.items()):
-        dot.append(f'  {src_state}->{dst_state}[label={event}];')
+        dot.append(
+            f'  {gvq(src_state)}->{gvq(dst_state)}[label={gvq(event)}];'
+        )
     dot.append('}')
     return sep.join(dot)
 
