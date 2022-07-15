@@ -384,27 +384,13 @@ class Task(FSM, RunStateMixin):
   def bg(self):
     ''' Dispatch a function to complete the `Task` in a separate `Thread`,
         returning the `Thread`.
-        It is forbidden to dispatch a `Task` not in `PENDING` state.
-
-        This dispatches a `Thread` to run `self.run()`
-        and as such the `Task` must be in "pending" state,
-        and transitions to "running".
-    '''
-    if not self.is_pending:
-      raise RuntimeError("attempt to run Task when self.state is not PENDING")
-    return bg_thread(self.run, name=self.name)
-
-  def callif(self):
-    ''' Trigger a call to the `Task` function if we're pending.
+        This raises `BlockedError` for a blocked task.
+        otherwise the thread runs `self.dispatch()`.
     '''
     with self._lock:
-      if self.is_prepare:
-        warning("%s.callif: ignoring call while self.state is PREPARE", self)
-      elif self.is_pending:
-        try:
-          self.run()
-        except (BlockedError, CancellationError) as e:
-          debug("%s.callif: %s", self, e)
+      for otask in self.blockers():
+        raise BlockedError("%s blocked by %s" % (self, otask), self, otask)
+      return bg_thread(self.dispatch, name=self.name)
 
   def make(self, fail_fast=False):
     ''' Generator to complete `self` and its prerequisites.
