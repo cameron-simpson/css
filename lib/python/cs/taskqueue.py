@@ -294,6 +294,62 @@ class Task(FSM, RunStateMixin):
     if self.fsm_state == 'CANCELLED':
       raise CancellationError
 
+  def run(self):
+    ''' Run the function associated with this task,
+        completing the `self.result` `Result` appropriately when finished.
+
+        *WARNING*: this _ignores_ the current state and any blocking `Task`s.
+        You should usually use `dispatch` or `make`.
+
+        During the run the thread local `self.state.current_task`
+        will be `self` and the `self.runstate` will be running.
+
+        Otherwise run `func_result=self.func(*self.func_args,**self.func_kwargs)`
+        with the following effects:
+        * if the function raises a `CancellationError`, cancel the `Task`
+        * if the function raises another exception,
+          if `self.cancel_on_exception` then cancel the task
+          else complete `self.result` with the exception
+          and fire the `'error'` `event
+        * if `self.runstate.canceled` or `self.cancel_on_result`
+          was provided and `self.cancel_on_result(func_result)` is
+          true, cancel the task
+        * otherwise complete `self.result` with `func_result`
+          and fire the `'done'` event
+    '''
+    if not self.is_running:
+      warning(f'.run() when state is not {self.RUNNING!r}')
+    state = type(self)._state
+    R = self.result
+    with state(current_task=self):
+      try:
+        with self.runstate:
+          func_result = self.func(*self.func_args, **self.func_kwargs)
+      except CancellationError:
+        # cancel the task, ready for retry
+        self.fsm_event('cancel')
+      except BaseException:
+        if self.cancel_on_exception:
+          # cancel the task, ready for retry
+          self.fsm_event('cancel')
+        else:
+          # error->FAILED
+          # complete self.result with the exception
+          R.exc_info = sys.exc_info()
+          self.fsm_event('error')
+      else:
+        # if the runstate was cancelled or the result indicates
+        # cancellation cancel the task otherwise complete `self.result`
+        if (self.runstate.cancelled
+            or (self.cancel_on_result and self.cancel_on_result(func_result))):
+          # cancel the task, ready for retry
+          self.fsm_event('cancel')
+        else:
+          # 'done'->DONE
+          # complete self.result with the function return value
+          R.result = func_result
+          self.fsm_event('done')
+
   # pylint: disable=arguments-differ
   def bg(self):
     ''' Dispatch a function to complete the `Task` in a separate `Thread`,
