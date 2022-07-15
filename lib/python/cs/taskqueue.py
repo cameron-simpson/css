@@ -260,17 +260,11 @@ class Task(FSM, RunStateMixin):
         Aborted tasks are not blockers
         but if we encounter one we do abort the current task.
     '''
-    for otask in self.required():
-      if otask.cancelled:
-        warning("%s cancelled because %s is also cancelled" % (self, otask))
-        self.cancel()
+    unblocked_states = self.DONE, self.FAILED, self.ABORT
+    for otask in self.required:
+      if otask.fsm_state in unblocked_states:
         continue
-      if not otask.ready:
-        yield otask
-        continue
-      if otask.exc_info:
-        yield otask
-        continue
+      yield otask
 
   def run_func(self, func, *a, **kw):
     raise RuntimeError(
