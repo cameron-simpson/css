@@ -53,10 +53,6 @@ You can also collect multiple `Result`s in completion order using the `report()`
         print(x)    # print result
 '''
 
-try:
-  from enum import Enum
-except ImportError:
-  from enum34 import Enum  # type: ignore
 import sys
 from threading import Lock, RLock
 
@@ -94,17 +90,6 @@ DISTINFO = {
     ],
 }
 
-class ResultState(Enum):
-  ''' State tokens for `Result`s.
-  '''
-  pending = 'pending'
-  running = 'running'
-  ready = 'ready'
-  cancelled = 'cancelled'
-
-# compatability name
-AsynchState = ResultState
-
 class CancellationError(Exception):
   ''' Raised when accessing `result` or `exc_info` after cancellation.
   '''
@@ -117,7 +102,7 @@ class CancellationError(Exception):
     Exception.__init__(self, msg)
 
 # pylint: disable=too-many-instance-attributes
-class BaseResult(object):
+class Result(FSM):
   ''' Base class for asynchronous collection of a result.
       This is used to make `Result`, `OnDemandFunction`s, `LateFunction`s
       and other objects with asynchronous termination.
@@ -127,6 +112,23 @@ class BaseResult(object):
       testing whether the `Result` is in that state.
   '''
 
+
+  FSM_TRANSITIONS = {
+      'PREPARE': {
+          'prepared': 'PENDING',
+      },
+      'PENDING': {
+          'dispatch': 'RUNNING',
+          'cancel': 'CANCELLED',
+          'complete': 'DONE',
+      },
+      'RUNNING': {
+          'cancel': 'CANCELLED',
+          'complete': 'DONE',
+      },
+      'CANCELLED': {},
+      'DONE': {},
+  }
   # pylint: disable=too-many-arguments
   def __init__(
       self, name=None, lock=None, result=None, state=None, extra=None
@@ -152,8 +154,7 @@ class BaseResult(object):
     self.extra = AttrableMapping()
     if extra:
       self.extra.update(extra)
-    self.state = state
-    self.notifiers = []
+    FSM.__init__(self, state, lock=lock)
     self.collected = False
     self._get_lock = Lock()
     self._get_lock.acquire()  # pylint: disable=consider-using-with
@@ -162,13 +163,13 @@ class BaseResult(object):
       self.result = result
 
   def __str__(self):
-    return "%s[%r:%s]" % (type(self).__name__, self.name, self.state)
+    return "%s[%r:%s]" % (type(self).__name__, self.name, self.fsm_state)
 
   __repr__ = __str__
 
   def __del__(self):
     if not self.collected:
-      if self.ready:
+      if self.is_done:
         exc_info = self.exc_info
         if exc_info:
           raise RuntimeError("UNREPORTED EXCEPTION: %r" % (exc_info,))
@@ -194,19 +195,19 @@ class BaseResult(object):
   def ready(self):
     ''' Whether the `Result` state is ready or cancelled.
     '''
-    return self.state in (self.READY, self.CANCELLED)
+    return self.fsm_state in (self.DONE, self.CANCELLED)
 
   @property
   def cancelled(self):
     ''' Test whether this `Result` has been cancelled.
     '''
-    return self.state == self.CANCELLED
+    return self.fsm_state == self.CANCELLED
 
   @property
   def pending(self):
     ''' Whether the `Result` is pending.
     '''
-    return self.state == self.PENDING
+    return self.fsm_state == self.PENDING
 
   def empty(self):
     ''' Analogue to `Queue.empty()`.
@@ -215,15 +216,15 @@ class BaseResult(object):
 
   def cancel(self):
     ''' Cancel this function.
-        If `self.state` is pending or cancelled, return `True`.
+        If `self.fsm_state` is `PENDING`` or `'CANCELLED'`, return `True`.
         Otherwise return `False` (too late to cancel).
     '''
     with self._lock:
-      state = self.state
+      state = self.fsm_state
       if state == self.CANCELLED:
         # already cancelled - this is ok, no call to ._complete
         return True
-      if state == self.READY:
+      if state == self.DONE:
         # completed - "fail" the cancel, no call to ._complete
         return False
       if state in (self.PENDING, self.RUNNING):
@@ -243,7 +244,9 @@ class BaseResult(object):
     ''' The result.
         This property is not available before completion.
     '''
-    state = self.state
+    state = self.fsm_state
+    if state not in (self.CANCELLED, self.DONE):
+      raise AttributeError("%s not ready: no .result attribute" % (self,))
     if state == self.CANCELLED:
       self.collected = True
       raise CancellationError()
@@ -269,7 +272,9 @@ class BaseResult(object):
     ''' The exception information from a completed `Result`.
         This is not available before completion.
     '''
-    state = self.state
+    state = self.fsm_state
+    if state not in (self.CANCELLED, self.DONE):
+      raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
     if state == self.CANCELLED:
       self.collected = True
       raise CancellationError()
@@ -300,12 +305,7 @@ class BaseResult(object):
         `self.result`.
         If `func` raises an exception, store it as `self.exc_info`.
     '''
-    with self._lock:
-      if self.state != self.PENDING:
-        raise RuntimeError(
-            "%s: state should be pending but is %s" % (self, self.state)
-        )
-      self.state = self.RUNNING
+    self.fsm_event('dispatch')
     try:
       r = func(*a, **kw)
     except BaseException:
@@ -329,7 +329,8 @@ class BaseResult(object):
     )
 
   @require(
-      lambda self: self.state in (self.PENDING, self.RUNNING, self.CANCELLED)
+      lambda self: self.fsm_state in
+      (self.PENDING, self.RUNNING, self.CANCELLED)
   )
   def _complete(self, result, exc_info):
     ''' Set the result.
@@ -396,7 +397,7 @@ class BaseResult(object):
         otherwise `default`.
     '''
     result, exc_info = self.join()
-    if not self.cancelled and exc_info is None:
+    if not self.is_cancelled and exc_info is None:
       return result
     return default
 
@@ -409,9 +410,9 @@ class BaseResult(object):
     '''
     if a:
       self.run_func(*a, **kw)
-    result, exc_info = self.join()
-    if self.cancelled:
+    if self.is_cancelled:
       raise CancellationError(self)
+    result, exc_info = self.join()
     if exc_info:
       raise3(*exc_info)
     return result
@@ -450,17 +451,6 @@ class BaseResult(object):
       return None
 
     self.notify(notifier)
-
-class Result(BaseResult):
-  ''' A `BaseResult` with state definitions.
-  '''
-
-  PENDING = ResultState.pending
-  RUNNING = ResultState.running
-  READY = ResultState.ready
-  CANCELLED = ResultState.cancelled
-
-  _seq = Seq()
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
