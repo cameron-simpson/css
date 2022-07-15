@@ -166,20 +166,7 @@ class Task(FSM, RunStateMixin):
   @property
   def ready(self):
     return self.fsm_state in ('SUCCEEDED', 'FAILED', 'CANCELLED')
-
-  @locked
-  def cancel(self):
-    ''' Transition this `Task` to `CANCELLED` state.
-        Return whether the transition succeeded.
-
-        If the `Task` is in `PENDING`, `RUNNING` or `CANCELLED`
-        the resulting state is `CANCELLED` and this method returns `True`.
-
-        If the `Task` is in `SUCCEEDED` or `ABORTED`
-        the resulting state is unchanged and this method returns `False`.
     '''
-    if self.running:
-      super().cancel()
 
   @classmethod
   def current_task(cls):
@@ -258,6 +245,18 @@ class Task(FSM, RunStateMixin):
         "%s function is predefined, .run_func() is forbidden, use unadorned .run() instead"
         % type(self)
     )
+  @locked
+  def cancel(self):
+    ''' Transition this `Task` to `CANCELLED` state.
+        If the task is running, set `.cancelled` on the `RunState`,
+        allowing clean task cancellation and subsequent transition
+        (mediated by the `.run()` method).
+        Otherwise fire the `'cancel'` event directly.
+    '''
+    if self.is_running:
+      self.runstate.cancel()
+    else:
+      FSM.event(self, 'cancel')
 
   # pylint: disable=arguments-differ
   def dispatch(self):
