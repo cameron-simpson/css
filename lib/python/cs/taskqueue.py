@@ -163,7 +163,11 @@ class Task(FSM, RunStateMixin):
   def __eq__(self, otask):
     return self is otask
 
+  def __call__(self):
+    ''' Block on `self.result` awaiting completion
+        by calling `self.result()`.
     '''
+    return self.result()
 
   @classmethod
   def current_task(cls):
