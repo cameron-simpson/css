@@ -232,16 +232,7 @@ class Result(FSM):
       if state == self.DONE:
         # completed - "fail" the cancel, no call to ._complete
         return False
-      if state in (self.PENDING, self.RUNNING):
-        # in progress or not commenced - change state to cancelled and fall through to ._complete
-        self.state = self.CANCELLED
-      else:
-        # state error
-        raise RuntimeError(
-            "<%s>.state not one of (PENDING, CANCELLED, RUNNING, READY): %r" %
-            (self, state)
-        )
-      self._complete(None, None)
+      self.fsm_event('cancel')
     return True
 
   @property
@@ -252,20 +243,16 @@ class Result(FSM):
     state = self.fsm_state
     if state not in (self.CANCELLED, self.DONE):
       raise AttributeError("%s not ready: no .result attribute" % (self,))
+    self.collected = True
     if state == self.CANCELLED:
-      self.collected = True
       raise CancellationError()
-    if state == self.READY:
-      self.collected = True
-      return self._result
-    raise AttributeError("%s not ready: no .result attribute" % (self,))
+    return self._result
 
   @result.setter
   def result(self, new_result):
     ''' Set the `.result` attribute, completing the `Result`.
     '''
-    with self._lock:
-      self._complete(new_result, None)
+    self._complete(new_result, None)
 
   def put(self, value):
     ''' Store the value. `Queue`-like idiom.
@@ -280,18 +267,15 @@ class Result(FSM):
     state = self.fsm_state
     if state not in (self.CANCELLED, self.DONE):
       raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
+    self.collected = True
     if state == self.CANCELLED:
       self.collected = True
       raise CancellationError()
-    if state == self.READY:
-      self.collected = True
-      return self._exc_info
-    raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
+    return self._exc_info
 
   @exc_info.setter
   def exc_info(self, exc_info):
-    with self._lock:
-      self._complete(None, exc_info)
+    self._complete(None, exc_info)
 
   def raise_(self, exc=None):
     ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
@@ -347,38 +331,27 @@ class Result(FSM):
           "one of (result, exc_info) must be None, got (%r, %r)" %
           (result, exc_info)
       )
-    state = self.state
-    if state in (self.PENDING, self.RUNNING, self.CANCELLED):
-      self._result = result  # pylint: disable=attribute-defined-outside-init
-      self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
-      if state != self.CANCELLED:
-        self.state = self.READY
-    else:
-      if state == self.READY:
+    with self._lock:
+      state = self.fsm_state
+      if state in (self.PENDING, self.RUNNING, self.CANCELLED):
+        self._result = result  # pylint: disable=attribute-defined-outside-init
+        self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+        if state != self.CANCELLED:
+          self.fsm_event('complete')
+      elif state == self.DONE:
         warning(
-            "<%s>.state is self.state, ignoring result=%r, exc_info=%r", self,
-            result, exc_info
-        )
-        raise RuntimeError(
-            "REPEATED _COMPLETE of %s: result=%r, exc_info=%r" %
-            (self, result, exc_info)
-        )
-      raise RuntimeError(
-          "<%s>.state is not one of (cancelled, running, pending, ready): %r" %
-          (self, state)
-      )
-    self._get_lock.release()
-    notifiers = self.notifiers
-    del self.notifiers
-    for notifier in notifiers:
-      try:
-        notifier(self)
-      except Exception as e:  # pylint: disable=broad-except
-        exception(
-            "%s._complete: calling notifier %s: exc=%s", self, notifier, e
+            "<%s>: state is %s, ignoring result=%r, exc_info=%r",
+            self,
+            self.fsm_state,
+            result,
+            exc_info,
         )
       else:
-        self.collected = True
+        raise RuntimeError(
+            "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE)"
+            % (self, self.fsm_state)
+        )
+      self._get_lock.release()
 
   @pfx_method
   def join(self):
@@ -427,18 +400,6 @@ class Result(FSM):
 
         If the function has already completed this will happen immediately.
         example: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
-    '''
-    with self._lock:
-      if not self.ready:
-        self.notifiers.append(notifier)
-        notifier = None
-    if notifier is not None:
-      notifier(self)
-      self.collected = True
-
-  def with_result(self, submitter, prefix=None):
-    ''' On completion without an exception, call `submitter(self.result)`
-        or report exception.
     '''
 
     def notifier(R):
