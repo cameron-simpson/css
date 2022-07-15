@@ -18,6 +18,14 @@ from cs.seq import Seq
 from cs.threads import bg as bg_thread, locked, State as ThreadState
 
 class BlockedError(Exception):
+
+class TaskError(FSMError):
+  ''' Raised by `Task` related errors.
+  '''
+
+  @typechecked
+  def __init__(self, msg: str, task: 'TaskSubType'):
+    super().__init__(msg, task)
   ''' Raised by a blocked `Task` if attempted.
   '''
 
