@@ -17,7 +17,6 @@ from cs.result import BaseResult, CancellationError
 from cs.seq import Seq
 from cs.threads import bg as bg_thread, locked, State as ThreadState
 
-class BlockedError(Exception):
 
 class TaskError(FSMError):
   ''' Raised by `Task` related errors.
@@ -38,15 +37,21 @@ class BlockedError(TaskError):
 
 class Task(FSM, RunStateMixin):
   ''' A task which may require the completion of other tasks.
-      This is a subclass of `Result`.
+
+      The model here may not be quite as expected; it is aimed at
+      tasks which can be repaired and rerun.
+      As such, if `self.run(func,...)` raises an exception from
+      `func` then this `Task` will still block dependent `Task`s.
+      Dually, a `Task` which completes without an exception is
+      considered complete and does not block dependent `Task`s.
 
       Keyword parameters:
       * `cancel_on_exception`: if true, cancel this `Task` if `.run`
         raises an exception; the default is `False`, allowing repair
         and retry
       * `cancel_on_result`: optional callable to test the `Task.result`
-        after `.run`; if it returns `True` the `Task` is marked
-        as cancelled
+        after `.run`; if the callable returns `True` the `Task` is marked
+        as cancelled, allowing repair and retry
       * `func`: the function to call to complete the `Task`;
         it will be called as `func(*func_args,**func_kwargs)`
       * `func_args`: optional positional arguments, default `()`
@@ -64,17 +69,9 @@ class Task(FSM, RunStateMixin):
           # try to run sleep(5) for t2 immediately after t1 completes
           t1.notify(t2.call, sleep, 5)
 
-      The model here may not be quite as expected; it is aimed at
-      tasks which can be repaired and rerun.
-      As such, if `self.run(func,...)` raises an exception from
-      `func` then this `Task` will still block dependent `Task`s.
-      Dually, a `Task` which completes without an exception is
-      considered complete and does not block dependent `Task`s.
-      To cancel dependent `Tasks` the function should raise a
-      `CancellationError`.
-
-      Users wanting more immediate semantics can supply `cancel_on_exception`
-      and/or `cancel_on_result` to control these behaviours.
+      Users wanting more immediate semantics can supply
+      `cancel_on_exception` and/or `cancel_on_result` to control
+      these behaviours.
 
       Example:
 
@@ -177,9 +174,10 @@ class Task(FSM, RunStateMixin):
 
   @classmethod
   def current_task(cls):
-    ''' The current `Task`, valid during `Task.run()`.
+    ''' The current `Task`, valid while the task is running.
         This allows the function called by the `Task` to access the
         task, typically to poll its `.runstate` attribute.
+        This is a `Thread` local value.
     '''
     return cls._state.current_task  # pylint: disable=no-member
 
@@ -226,10 +224,10 @@ class Task(FSM, RunStateMixin):
     return post_task
 
   def blockers(self):
-    ''' A generator yielding tasks from `self.required()`
+    ''' A generator yielding tasks from `self.required`
         which should block this task.
-        Cancelled tasks are not blockers
-        but if we encounter one we do cancel the current task.
+        Aborted tasks are not blockers
+        but if we encounter one we do abort the current task.
     '''
     for otask in self.required():
       if otask.cancelled:
@@ -251,28 +249,11 @@ class Task(FSM, RunStateMixin):
 
   # pylint: disable=arguments-differ
   def dispatch(self):
-    ''' Dispatch the `Task` by running
-        `self.func(*self.func_args,**self.func_kwargs)`.
-
-        It is forbidden to call this on a `Task` not in `PENDING` state.
-        If there are blocking required tasks, raise `BlockedError`.
-        Otherwise run `r=func(self,*self.func_args,**self.func_kwargsw)`
-        with the following effects:
-        * if `func()` raises a `CancellationError`, cancel the `Task`
-        * otherwise, if an exception is raised and `self.cancel_on_exception`
-          is true, cancel the `Task`;
-          store the exception information from `sys.exc_info()` as `self.exc_info`
-          regardless
-        * otherwise, if `self.cancel_on_result` is not `None`
-          and `self.cancel_on_result(r)` is true, cancel the `Task`;
-          store `r` as `self.result` regardless
-        If we were cancelled, raise `CancellationError`.
-
-        During the duration of the call the property `Task.current_task`
-        is set to `self` allowing access to the `Task`.
-        A typical use is to access the current `Task`'s `.runstate`
-        attribute which can be polled by long running tasks to
-        honour calls to `Task.abort()`.
+    ''' Dispatch the `Task`:
+        If the task is blocked, raise `BlockedError`.
+        If a prerequisite is aborted, fire the 'abort' method.
+        Otherwise fire the `'dispatch'` event and then run the
+        task's function via the `.run()` method.
     '''
     for otask in self.blockers():
       raise BlockedError("%s blocked by %s" % (self, otask))
