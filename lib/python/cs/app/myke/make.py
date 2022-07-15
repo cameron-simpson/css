@@ -686,7 +686,7 @@ class Target(Result):
     '''
     with Pfx("%r.require()", self.name):
       with self._lock:
-        if self.pending:
+        if self.is_pending:
           # commence make of this Target
           self.maker.target_active(self)
           self.notify(self.maker.target_inactive)
