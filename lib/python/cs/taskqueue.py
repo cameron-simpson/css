@@ -415,6 +415,11 @@ class Task(FSM, RunStateMixin):
       assert t is self
     return t.is_done
 
+  def join(self):
+    ''' Wait for this task to complete.
+    '''
+    self.result.join()
+
 TaskSubType = TypeVar('TaskSubType', bound=Task)
 
 def make(*tasks, fail_fast=False):
