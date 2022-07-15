@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
-''' Graphviz utility functions, initially just gvprint(dot_s,...).
+''' Graphviz utility functions.
+
+    See also the [https://www.graphviz.org/documentation/](graphviz documentation)
+    and particularly the [https://graphviz.org/doc/info/lang.html](DOT language specification)
+    and the [https://www.graphviz.org/doc/info/command.html](`dot` command line tool).
 '''
 
 from os.path import exists as existspath
@@ -28,7 +32,8 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
       is a terminal in which case it defaults to `'sixel'`.
 
       This uses the graphviz utility `dot` to draw graphs.
-      If printing in SIXEL format the `img2sixel` utility is required.
+      If printing in SIXEL format the `img2sixel` utility is required,
+      see [https://saitoha.github.io/libsixel/](libsixel).
     '''
   if isinstance(file, str):
     if existspath(file):
@@ -68,8 +73,7 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
       else:
         raise ValueError(
             "%s=%r: unknown mode type %r,"
-            " expected one of graph, node, edge" %
-            (dot_mode, value, modetype)
+            " expected one of graph, node, edge" % (dot_mode, value, modetype)
         )
   dot_fmt = 'png' if fmt == 'sixel' else fmt
   dot_argv = ['dot', f'-T{dot_fmt}']
