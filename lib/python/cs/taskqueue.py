@@ -85,36 +85,31 @@ class Task(FSM, RunStateMixin):
   '''
 
   FSM_TRANSITIONS = {
-        'PREPARE': {
-            'ready': 'PENDING',
-        },
-        'PENDING': {
-            'dispatch': 'RUNNING',
-            ##'cancel': 'CANCELLED',
-            'abort': 'ABORT',
-        },
-        'RUNNING': {
-            'success': 'SUCCEEDED',
-            'error': 'FAILED',
-            'cancel': 'CANCELLED',
-        },
-        'CANCELLED': {
-            'requeue': 'PENDING',
-            'abort': 'ABORT',
-        },
-        'FAILED': {
-            'retry': 'PENDING',
-            'abort': 'ABORT',
-        },
-    }
-
-  PREPARE = 'PREPARE'
-  PENDING = 'PENDING'
-  RUNNING = 'RUNNING'
-  SUCCEEDED = 'SUCCEEDED'
-  CANCELLED = 'CANCELLED'
-  FAILED = 'FAILED'
-  ABORT = 'ABORT'
+      'PREPARE': {
+          'prepared': 'PENDING',
+      },
+      'PENDING': {
+          'dispatch': 'RUNNING',
+          'cancel': 'CANCELLED',
+          'error': 'FAILED',
+          'abort': 'ABORT',
+      },
+      'RUNNING': {
+          'done': 'DONE',
+          'except': 'FAILED',
+          'cancel': 'CANCELLED',
+      },
+      'CANCELLED': {
+          'requeue': 'PENDING',
+          'abort': 'ABORT',
+      },
+      'DONE': {},
+      'FAILED': {
+          'retry': 'PENDING',
+          'abort': 'ABORT',
+      },
+      'ABORT': {},
+  }
 
   _seq = Seq()
 
