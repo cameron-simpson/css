@@ -219,6 +219,22 @@ class Task(FSM, RunStateMixin):
     self.notify(lambda _: post_task.bg())
     return post_task
 
+  @typechecked
+  @require(lambda self, otask: otask is not self)
+  @require(lambda self: self.is_prepare or self.is_pending)
+  def require(self, otask: 'TaskSubType'):
+    ''' Add a requirement that `otask` be complete before we proceed.
+        This si the simple `Task` only version of `.then()`.
+    '''
+    with self._lock:
+      self.required.add(otask)
+
+  def block(self, otask):
+    ''' Block another task until we are complete.
+        The converse of `.require()`.
+    '''
+    otask.require(self)
+
   def blockers(self):
     ''' A generator yielding tasks from `self.required`
         which should block this task.
