@@ -26,10 +26,17 @@ class TaskError(FSMError):
   @typechecked
   def __init__(self, msg: str, task: 'TaskSubType'):
     super().__init__(msg, task)
+
+class BlockedError(TaskError):
   ''' Raised by a blocked `Task` if attempted.
   '''
 
-class Task(BaseResult, FSM, RunStateMixin):
+  @typechecked
+  def __init__(self, msg: str, task: 'TaskSubType', blocking_task: 'TaskSubType'):
+    super().__init__(msg, task)
+    self.blocking_task = blocking_task
+
+class Task(FSM, RunStateMixin):
   ''' A task which may require the completion of other tasks.
       This is a subclass of `Result`.
 
