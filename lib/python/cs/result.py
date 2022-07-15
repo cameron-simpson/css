@@ -58,10 +58,11 @@ from threading import Lock, RLock
 
 from icontract import require
 
-from cs.gimmicks import exception, error, warning
-from cs.lex import cutprefix
+from cs.deco import OBSOLETE
+from cs.fsm import FSM
+from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import pfx_method
 from cs.py.func import funcname
 from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
@@ -78,6 +79,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.fsm',
         'cs.logutils',
         'cs.mappings',
         'cs.pfx',
