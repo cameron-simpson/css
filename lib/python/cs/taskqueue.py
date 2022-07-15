@@ -163,9 +163,6 @@ class Task(FSM, RunStateMixin):
   def __eq__(self, otask):
     return self is otask
 
-  @property
-  def ready(self):
-    return self.fsm_state in ('SUCCEEDED', 'FAILED', 'CANCELLED')
     '''
 
   @classmethod
@@ -177,11 +174,6 @@ class Task(FSM, RunStateMixin):
     '''
     return cls._state.current_task  # pylint: disable=no-member
 
-
-  def block(self, otask):
-    ''' Block another task until we are complete.
-    '''
-    otask.require(self)
 
   def then(self, func, *a, **kw):
     ''' Queue a call to `func(*a,**kw)` to run after the completion of
