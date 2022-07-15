@@ -376,6 +376,8 @@ class Task(FSM, RunStateMixin):
         except (BlockedError, CancellationError) as e:
           debug("%s.callif: %s", self, e)
 
+TaskSubType = TypeVar('TaskSubType', bound=Task)
+
 @decorator
 def task(func, task_class=Task):
   ''' Decorator for a function which runs it as a `Task`.
