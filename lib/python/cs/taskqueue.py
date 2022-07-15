@@ -376,7 +376,98 @@ class Task(FSM, RunStateMixin):
         except (BlockedError, CancellationError) as e:
           debug("%s.callif: %s", self, e)
 
+  def make(self, fail_fast=False):
+    ''' Generator to complete `self` and its prerequisites.
+        This calls the global `make()` function with `self`.
+        It returns a Boolean indicating whether this task succeeded.
+    '''
+    for t in make(self, fail_fast=fail_fast):
+      assert t is self
+    return t.is_done
+
 TaskSubType = TypeVar('TaskSubType', bound=Task)
+
+def make(*tasks, fail_fast=False):
+  ''' Generator which completes all the supplied `tasks` by dispatching them
+      once they are no longer blocked.
+      Yield each task from `tasks` as it completes.
+
+      Parameters:
+      * `tasks`: `Task`s as positional parameters
+      * `fail_fast`: default `False`; if true, cease evaluation as soon as a
+        task completes in a state with is not `DONE`
+
+      The following rules are applied by this function:
+      - if a task is being prepared, raise an `FSMError`
+      - if a task is already running, wait for its completion
+      - if a task is pending:
+        * if any prerequisite has failed, fail this task
+        * if any prerequisite is cancelled, cancel this task
+        * if any prerequisite is pending, make it first
+        * otherwise dispatch this task and then yield it
+
+      Examples:
+
+          >>> t1 = Task('t1', lambda: print('t1'))
+          >>> t2 = t1.then(lambda: print('t2'))
+          >>> list(make(t2))    # doctest: +ELLIPSIS
+          t1
+          t2
+          [<cs.taskqueue.Task object at ...>]
+  '''
+  tasks0 = set(tasks)
+  q = ListQueue(tasks)
+  for qtask in q:
+    with Pfx(qtask):
+      if qtask in tasks0:
+        do_yield = True
+        tasks0.remove(qtask)
+      else:
+        do_yield = False
+      if qtask.is_prepare:
+        raise FSMError(f'cannot make a {qtask.fsm_state} task', qtask)
+      if qtask.is_running:
+        qtask.join()
+        assert qtask.fsm_state not in (
+            qtask.PREPARE,
+            qtask.PENDING,
+            qtask.RUNNING,
+        )
+      elif qtask.is_pending:
+        failed = [prereq for prereq in qtask.required if prereq.is_failed]
+        if failed:
+          qtask.fsm_event(
+              'error', failed_prereq_uuids=[task.uuid for task in failed]
+          )
+        else:
+          cancelled = [
+              prereq for prereq in qtask.required if prereq.is_cancelled
+          ]
+          if cancelled:
+            qtask.fsm_event(
+                'cancel',
+                cancelled_prereq_uuids=[task.uuid for task in cancelled]
+            )
+          else:
+            pending = [
+                prereq for prereq in qtask.required if prereq.is_pending
+            ]
+            if pending:
+              # queue the pending tasks and qtask behind them
+              pending.append(qtask)
+              q.prepend(pending)
+              if do_yield:
+                # suppress the yield
+                tasks0.add(qtask)
+              continue
+            # in principle all prereqs are now done
+            assert all(prereq.is_done for prereq in qtask.required)
+            qtask.dispatch()
+      assert qtask.fsm_state in (qtask.CANCELLED, qtask.DONE, qtask.FAILED)
+      if do_yield:
+        yield qtask
+      if fail_fast and not qtask.is_done:
+        return
 
 @decorator
 def task(func, task_class=Task):
