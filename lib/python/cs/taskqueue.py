@@ -190,19 +190,6 @@ class Task(FSM, RunStateMixin):
     '''
     return cls._state.current_task  # pylint: disable=no-member
 
-  def required(self):
-    ''' Return a `set` containing any required tasks.
-    '''
-    with self._lock:
-      return set(self._required)
-
-  def require(self, otask):
-    ''' Add a requirement that `otask` be complete before we proceed.
-    '''
-    assert otask is not self
-    assert self.is_prepare or self.is_pending
-    with self._lock:
-      self._required.add(otask)
 
   def block(self, otask):
     ''' Block another task until we are complete.
