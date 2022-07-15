@@ -112,6 +112,7 @@ class Result(FSM):
       testing whether the `Result` is in that state.
   '''
 
+  _seq = Seq()
 
   FSM_TRANSITIONS = {
       'PREPARE': {
@@ -129,6 +130,7 @@ class Result(FSM):
       'CANCELLED': {},
       'DONE': {},
   }
+
   # pylint: disable=too-many-arguments
   def __init__(
       self, name=None, lock=None, result=None, state=None, extra=None
@@ -180,16 +182,6 @@ class Result(FSM):
   def __eq__(self, other):
     return self is other
 
-  def __getattr__(self, attr):
-    state_name = cutprefix(attr, 'is_')
-    if state_name is not attr:
-      try:
-        state_value = getattr(self, state_name.upper())
-      except AttributeError:
-        pass
-      else:
-        return self.state == state_value
-    raise AttributeError("no %s.%s" % (type(self).__name__, attr))
 
   @property
   def ready(self):
