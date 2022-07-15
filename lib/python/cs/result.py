@@ -279,7 +279,7 @@ class Result(FSM):
 
   def raise_(self, exc=None):
     ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
-        If `exc` is omitted or `None`, use `sys.exc_info()`.
+        If `exc` is omitted or `None`, uses `sys.exc_info()`.
     '''
     if exc is None:
       self.exc_info = sys.exc_info()
@@ -314,7 +314,7 @@ class Result(FSM):
         and transitions to "running".
     '''
     return bg_thread(
-        self.call, name=self.name, args=[func] + list(a), kwargs=kw
+        self.run_func, name=self.name, args=[func] + list(a), kwargs=kw
     )
 
   @require(
