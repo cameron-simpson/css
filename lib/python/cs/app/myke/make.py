@@ -221,27 +221,28 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
     self._makeQ.after(LFs, R, func, *a, **kw)
     return R
 
-  @pfx
   def make(self, targets):
     ''' Synchronous call to make targets in series.
     '''
-    ok = True
-    for target in targets:
-      if isinstance(target, str):
-        T = self[target]
-      else:
-        T = target
-      T.require()
-      if T.get():
-        self.debug_make("MAKE %s: OK", T)
-      else:
-        self.debug_make("MAKE %s: FAILED", T)
-        ok = False
-        if self.fail_fast:
-          self.debug_make("ABORT MAKE")
-          break
-    self.debug_make("%r: %s", targets, ok)
-    return ok
+    with Pfx("%s.make", type(self).__name__):
+      ok = True
+      for target in targets:
+        with Pfx(target):
+          if isinstance(target, str):
+            T = self[target]
+          else:
+            T = target
+          T.require()
+          if T.get():
+            self.debug_make("MAKE %s: OK", T)
+          else:
+            self.debug_make("MAKE %s: FAILED", T)
+            ok = False
+            if self.fail_fast:
+              self.debug_make("ABORT MAKE")
+              break
+      self.debug_make("%r: %s", targets, ok)
+      return ok
 
   def __getitem__(self, name):
     ''' Return the specified Target.
