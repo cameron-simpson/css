@@ -178,28 +178,62 @@ class Task(FSM, RunStateMixin):
     '''
     return cls._state.current_task  # pylint: disable=no-member
 
+  @typechecked
+  def then(
+      self,
+      func: Union[str, Callable, 'TaskSubType'],
+      *a,
+      func_args=(),
+      func_kwargs=None,
+      **task_kw,
+  ):
+    ''' Prepare a new `Task` or function which may not run before `self` completes.
+        This may be called in two ways:
+        - `task.then(some_Task): block the `Task` instance `some_Task` behind `self`
+        - `task.then([name,]func[,func_args=][,func_kwargs=][,Task_kwargs...]):
+          make a new `Task` to be blocked behind `self`
+        Return the new `Task`.
 
-  def then(self, func, *a, **kw):
-    ''' Queue a call to `func(*a,**kw)` to run after the completion of
-        this task.
+        This supports preparing a chain of actions:
 
-        This supports a chain of actions:
-
-            >>> t = Task(func=lambda: 1)
-            >>> final_t = t.then(print,1).then(print,2)
+            >>> t = Task("t", lambda: 0)
+            >>> final_t = t.then(lambda: 1).then(lambda: 2)
             >>> final_t.ready   # the final task has not yet run
             False
             >>> # finalise t, wait for final_t (which runs immediately)
-            >>> t.run(); print(final_t.join())
+            >>> t(); print(final_t.join())
             1
             2
             (None, None)
             >>> final_t.ready
             True
     '''
-    post_task = type(self)(func=func, func_args=a, func_kwargs=kw)
+    if isinstance(func, Task):
+      if func_args or func_kwargs:
+        raise ValueError("may not supply arguments when func is a Task")
+      post_task = func
+    else:
+      # optional name
+      if isinstance(func, str):
+        name = func
+        a = list(a)
+        func = a.pop(0)
+      else:
+        name = f'{self}.then({func},...)'
+      if a:
+        raise ValueError(
+            "unexpected positional arguments after func: %r" % (a,)
+        )
+      if func_kwargs is None:
+        func_kwargs = {}
+      post_task = type(self)(
+          name,
+          func,
+          func_args=func_args,
+          func_kwargs=func_kwargs,
+          **task_kw,
+      )
     post_task.require(self)
-    self.notify(lambda _: post_task.bg())
     return post_task
 
   @typechecked
