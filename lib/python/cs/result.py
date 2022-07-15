@@ -402,21 +402,20 @@ class Result(FSM):
         example: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
 
-    def notifier(R):
-      ''' Wrapper for `submitter`.
+    # TODO: adjust all users of .notify() to use fsm_callback and
+    # accept a transition object?
+    # pylint: disable=unused-argument
+    def callback(fsm, fsm_transition):
+      ''' `FSM.fsm_callback` shim for plain `notify(Result)` notifier functions.
       '''
-      exc_info = R.exc_info
-      if exc_info is None:
-        return submitter(R.result)
-      # report error
-      if prefix:
-        with Pfx(prefix):
-          error("exception: %r", exc_info)
-      else:
-        error("exception: %r", exc_info)
-      return None
+      self.collected = True
+      return notifier(fsm)
 
-    self.notify(notifier)
+    with self._lock:
+      self.fsm_callback('CANCELLED', callback)
+      self.fsm_callback('DONE', callback)
+      if self.fsm_state in (self.CANCELLED, self.DONE):
+        notifier(self)
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
