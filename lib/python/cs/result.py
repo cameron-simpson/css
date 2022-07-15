@@ -184,22 +184,33 @@ class Result(FSM):
   def __eq__(self, other):
     return self is other
 
+  @property
+  @OBSOLETE("fsm_state")
+  def state(self):
+    ''' The `FSM` state (obsolete).
+        Obsolete: use `.fsm_state`.
+    '''
+    return self.fsm_state
 
   @property
   def ready(self):
-    ''' Whether the `Result` state is ready or cancelled.
+    ''' True if `Result` state is `DONE` or `CANCLLED`..
     '''
     return self.fsm_state in (self.DONE, self.CANCELLED)
 
   @property
+  @OBSOLETE("is_cancelled")
   def cancelled(self):
     ''' Test whether this `Result` has been cancelled.
+        Obsolete: use `.is_cancelled`.
     '''
     return self.fsm_state == self.CANCELLED
 
   @property
+  @OBSOLETE("is_pending")
   def pending(self):
     ''' Whether the `Result` is pending.
+        Obsolete: use `.is_pending`.
     '''
     return self.fsm_state == self.PENDING
 
