@@ -37,7 +37,9 @@ class BlockedError(TaskError):
   '''
 
   @typechecked
-  def __init__(self, msg: str, task: 'TaskSubType', blocking_task: 'TaskSubType'):
+  def __init__(
+      self, msg: str, task: 'TaskSubType', blocking_task: 'TaskSubType'
+  ):
     super().__init__(msg, task)
     self.blocking_task = blocking_task
 
@@ -275,6 +277,10 @@ class Task(FSM, RunStateMixin):
         "%s function is predefined, .run_func() is forbidden, use unadorned .run() instead"
         % type(self)
     )
+  ##############################################################
+  # Specific implementations for things which would otherwise be
+  # state transition events.
+  #
   @locked
   def cancel(self):
     ''' Transition this `Task` to `CANCELLED` state.
