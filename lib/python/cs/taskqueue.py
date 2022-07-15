@@ -266,11 +266,6 @@ class Task(FSM, RunStateMixin):
         continue
       yield otask
 
-  def run_func(self, func, *a, **kw):
-    raise RuntimeError(
-        "%s function is predefined, .run_func() is forbidden, use unadorned .run() instead"
-        % type(self)
-    )
   ##############################################################
   # Specific implementations for things which would otherwise be
   # state transition events.
