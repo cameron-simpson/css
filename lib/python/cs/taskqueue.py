@@ -113,35 +113,43 @@ class Task(FSM, RunStateMixin):
 
   _seq = Seq()
 
-  _state = ThreadState(current_task=None)
+  _state = ThreadState(current_task=None, initial_state='PENDING')
 
   def __init__(
       self,
+      func,
       *a,
-      lock=None,
+      state=None,
       cancel_on_exception=False,
       cancel_on_result=None,
-      func,
       func_args=(),
       func_kwargs=None,
-      runstate=None,
-      **kw
   ):
-    if lock is None:
-      lock = RLock()
+    if isinstance(func, str):
+      name = func
+      a = list(a)
+      func = a.pop(0)
+    else:
+      name = f'{type(self).__name__}:{self._seq()}'
+    if a:
+      raise ValueError(
+          "unexpected positional parameters after func: %r" % (a,)
+      )
+    if state is None:
+      state = type(self)._state.initial_state
     if func_kwargs is None:
       func_kwargs = {}
-    FSM.__init__(self, 'PREPARE')
-    BaseResult.__init__(self, *a, lock=lock, **kw)
-    if runstate is None:
-      runstate = RunState(self.name)
+    self._lock = RLock()
+    FSM.__init__(self, state)
+    runstate = RunState(name)
     RunStateMixin.__init__(self, runstate)
-    self._required = set()
+    self.required = set()
     self.cancel_on_exception = cancel_on_exception
     self.cancel_on_result = cancel_on_result
     self.func = func
     self.func_args = func_args
     self.func_kwargs = func_kwargs
+    self.result = Result()
 
   def __hash__(self):
     return id(self)
