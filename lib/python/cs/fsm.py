@@ -83,6 +83,9 @@ class FSM:
     self.__lock = lock
     self.__callbacks = defaultdict(list)
 
+  def __str__(self):
+    return f'{type(self).__name__}:{self.fsm_state}'
+
   def __getattr__(self, attr):
     ''' Provide the following attributes:
         - present the state names as attributes, for example:
