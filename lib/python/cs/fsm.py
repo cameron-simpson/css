@@ -53,7 +53,7 @@ class FSM:
   # allow state transitions
   FSM_TRANSITIONS = {}
 
-  def __init__(self, state, history=None, lock=None):
+  def __init__(self, state, *, history=None, lock=None, transitions=None):
     ''' Initialise the `FSM` from:
         * `state`: the initial state
         * `history`: an optional object to record state transition
@@ -64,9 +64,13 @@ class FSM:
           if presupplied and shared with the caller
           it should probably be an `RLock`;
           the default is a `Lock`, which is enough for `FSM` private use
+        * `transitions`: optional *state*->*event*->*state* mapping;
+          if provided, this will override the class `FSM_TRANSITIONS` mapping
     '''
     if lock is None:
       lock = Lock()
+    if transitions is not None:
+      self.FSM_TRANSITIONS = transitions
     if state not in self.FSM_TRANSITIONS:
       raise ValueError(
           "invalid initial state %r, expected one of %r" % (
