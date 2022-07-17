@@ -172,6 +172,22 @@ class FSM:
   def fsm_callback(self, state, callback):
     ''' Register a callback for to be called immediately on transition
         to `state` as `callback(self,FSMEventTransition)`.
+        The special `state` value `FSM.FSM_ANY_STATE` may be supplied
+        to register a callback which fires for every state transation.
+
+            >>> fsm = FSM('state1',transitions={
+            ...   'state1':{'ev_a':'state2'},
+            ...   'state2':{'ev_b':'state1'},
+            ... })
+            >>> fsm.fsm_callback('state2',lambda task, transition: print(task, transition))
+            >>> fsm.fsm_callback(FSM.FSM_ANY_STATE,lambda task, transition: print("ANY", task, transition))
+            >>> fsm.ev_a(foo=3) # doctest: +ELLIPSIS
+            ANY FSM:state2 FSMTransitionEvent(old_state='state1', new_state='state2', event='ev_a', when=..., extra={'foo': 3})
+            FSM:state2 FSMTransitionEvent(old_state='state1', new_state='state2', event='ev_a', when=..., extra={'foo': 3})
+            'state2'
+            >>> fsm.ev_b(foo=4) # doctest: +ELLIPSIS
+            ANY FSM:state1 FSMTransitionEvent(old_state='state2', new_state='state1', event='ev_b', when=..., extra={'foo': 4})
+            'state1'
     '''
     with self.__lock:
       self.__callbacks[state].append(callback)
