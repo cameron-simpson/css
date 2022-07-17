@@ -192,6 +192,14 @@ class FSM:
     with self.__lock:
       self.__callbacks[state].append(callback)
 
+  def fsm_callback_discard(self, state, callback):
+    ''' Deregister a callback for `state`.
+    '''
+    with self.__lock:
+      self.__callbacks[state] = [
+          cb for cb in self.__callbacks[state] if cb != callback
+      ]
+
   @classmethod
   def fsm_transitions_as_dot(cls, fsm_transitions, sep='\n', graph_name=None):
     ''' Compute a DOT syntax graph description from a transitions dictionary.
