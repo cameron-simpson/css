@@ -123,14 +123,18 @@ class FSM:
         Returns the new state.
 
         Optional information may be passed as keyword arguments.
-        If `self.fsm_history` is not `None`
-        a new `FSMTransitionEvent` event is appended to `self.fsm_history`
+
+        A `transition` instance of `FSMTransitionEvent` is created
         with the following attributes:
         * `old_state`: the state when `fsm_event` was called
         * `new_state`: the new state
         * `event`: the `event`
         * `when`: a UNIX timestamp from `time.time()`
         * `extra`: a `dict` with the `extra` information
+        If `self.fsm_history` is not `None`,
+        `transition` is appended to it.
+        If there are callbacks for `new_state` or `FSM.FSM_ANY_STATE`,
+        call each callback as `callback(self,transition)`.
     '''
     with self.__lock:
       old_state = self.fsm_state
