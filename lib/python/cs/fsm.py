@@ -108,7 +108,7 @@ class FSM:
       pass
     else:
       if attr in statedef:
-        return lambda: self.fsm_event(attr)
+        return lambda **kw: self.fsm_event(attr, **kw)
     try:
       sga = super().__getattr__
     except AttributeError as e:
