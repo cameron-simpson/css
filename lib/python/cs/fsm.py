@@ -47,6 +47,9 @@ class FSM:
         Usually this would be `None` (the default) or a `list`.
   '''
 
+  # token representing "any state" in the callbacks
+  FSM_ANY_STATE = object()
+
   # allow state transitions
   FSM_TRANSITIONS = {}
 
@@ -141,7 +144,8 @@ class FSM:
       if self.fsm_history is not None:
         self.fsm_history.append(transition)
     with Pfx("%s->%s", old_state, new_state):
-      for callback in self.__callbacks[new_state]:
+      for callback in self.__callbacks[self.FSM_ANY_STATE
+                                       ] + self.__callbacks[new_state]:
         try:
           pfx_call(callback, self, transition)
         except Exception as e:  # pylint: disable=broad-except
