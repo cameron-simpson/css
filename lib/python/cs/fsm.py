@@ -192,10 +192,18 @@ class FSM:
     with self.__lock:
       self.__callbacks[state].append(callback)
 
-  def fsm_transitions_as_dot(self, fsm_transitions, sep='\n'):
+  @classmethod
+  def fsm_transitions_as_dot(cls, fsm_transitions, sep='\n', graph_name=None):
     ''' Compute a DOT syntax graph description from a transitions dictionary.
+
+        Parameters:
+        * `fsm_transitions`: a mapping of *state*->*event*->*state*
+        * `sep`: optional separator between "lines", default `'\n'`
+        * `graph_name`: optional name for the graph, default the class name
     '''
-    dot = [f'digraph {gvq(type(self).__name__)} {{']
+    if graph_name is None:
+      graph_name = cls.__name__
+    dot = [f'digraph {gvq(graph_name)} {{']
     # NB: we _do not_ sort the transition graph because the "dot" programme
     # layout is affected by the order in which the graph is defined.
     # In this way we execute in the dictionary order, which is
