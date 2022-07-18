@@ -15,7 +15,7 @@ from typeguard import typechecked
 from cs.deco import decorator
 from cs.fsm import FSM, FSMError
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx
 from cs.py.func import funcname
 from cs.queues import ListQueue
 from cs.resources import RunState, RunStateMixin
