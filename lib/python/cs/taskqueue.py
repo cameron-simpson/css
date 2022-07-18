@@ -169,7 +169,9 @@ class Task(FSM, RunStateMixin):
     self.result = Result()
     if track:
       if track is True:
-        track = lambda t, tr: print(f'{t.name} {tr.old_state}->{tr.event}->{tr.new_state}')
+        track = lambda t, tr: print(
+            f'{t.name} {tr.old_state}->{tr.event}->{tr.new_state}'
+        )
       self.fsm_callback(FSM.FSM_ANY_STATE, track)
 
   def __str__(self):
@@ -489,7 +491,9 @@ def make(*tasks, fail_fast=False):
               q.prepend(pending)
               continue
             # see if any prerequisiters are some unhanlded not-DONE state
-            undone = [prereq for prereq in qtask.required if not prereq.is_done]
+            undone = [
+                prereq for prereq in qtask.required if not prereq.is_done
+            ]
             if undone:
               qtask.fsm_event(
                   'error',
