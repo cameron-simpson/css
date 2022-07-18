@@ -214,16 +214,22 @@ class Task(FSM, RunStateMixin):
 
         This supports preparing a chain of actions:
 
-            >>> t = Task("t", lambda: 0)
-            >>> final_t = t.then(lambda: 1).then(lambda: 2)
-            >>> final_t.ready   # the final task has not yet run
+            >>> t_root = Task("t_root", lambda: 0)
+            >>> t_leaf = t_root.then(lambda: 1).then(lambda: 2)
+            >>> t_root.iscompleted()   # the root task has not yet run
             False
-            >>> # finalise t, wait for final_t (which runs immediately)
-            >>> t(); print(final_t.join())
-            1
-            2
-            (None, None)
-            >>> final_t.ready
+            >>> t_leaf.iscompleted()   # the final task has not yet run
+            False
+            >>> # t_leaf is blocked by t_root
+            >>> t_leaf.dispatch()      # doctest: +ELLIPSIS
+            Traceback (most recent call last):
+              ...
+            cs.taskqueue.BlockedError: ...
+            >>> t_leaf.make()          # make the leaf, but make t_root first
+            True
+            >>> t_root.iscompleted()   # implicitly completed by make
+            True
+            >>> t_leaf.iscompleted()
             True
     '''
     if isinstance(func, Task):
