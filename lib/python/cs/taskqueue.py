@@ -405,7 +405,7 @@ class Task(FSM, RunStateMixin):
     '''
     for t in make(self, fail_fast=fail_fast):
       assert t is self
-    return t.is_done
+    return self.iscompleted()
 
   def join(self):
     ''' Wait for this task to complete.
