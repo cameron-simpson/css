@@ -17,6 +17,7 @@ import os
 from os.path import (
     basename,
     exists as existspath,
+    expanduser,
     isabs as isabspath,
     isdir as isdirpath,
     isfile as isfilepath,
@@ -47,7 +48,12 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
-from cs.lex import cutprefix
+from cs.lex import (
+    cutprefix,
+    get_dotted_identifier,
+    FormatableMixin,
+    FormatAsError,
+)
 from cs.logutils import warning, error
 from cs.numeric import intif
 from cs.obj import SingletonMixin
@@ -55,6 +61,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
 from cs.resources import MultiOpenMixin
+from cs.seq import unrepeated
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
 )
@@ -95,7 +102,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         'timestamp',
         'title',
         'uuid',
-    ]), HasFSPath):
+    ]), HasFSPath, FormatableMixin):
       ''' A reference to a book in a Calibre library.
       '''
 
@@ -120,9 +127,41 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       def fspath(self):
-        ''' An alias for `self.path`.
+        ''' The filesystem path to where the book formats are stored.
         '''
-        return self.path
+        return self.tree.pathto(self.path)
+
+      def format_tagset(self):
+        ''' Compute a `TagSet` representing this book's metadata.
+        '''
+        formats = self.formats
+        tags = TagSet(
+            dbid=self.dbid,
+            asin=self.asin,
+            title=self.title,
+            authors=self.author_names,
+            formats=formats,
+            format_names=sorted(formats.keys()),
+            tags=self.tags,
+        )
+        tags.update(
+            {
+                'series.id': self.series_id,
+                'series.name': self.series_name,
+                'series.index': intif(self.series_index),
+            }
+        )
+        return tags
+
+      def format_kwargs(self):
+        return self.format_tagset()
+
+      def get_arg_name(self, field_name):
+        ''' Override for `FormattableMixin.get_arg_name`:
+            return the leading dotted identifier,
+            which represents a tag or tag prefix.
+        '''
+        return get_dotted_identifier(field_name)
 
       @property
       def dbid(self):
@@ -132,7 +171,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       def asin(self):
-        ''' The Amazon ASIN, or `None`, from `self.identifiers['mobi-asin'].
+        ''' The Amazon ASIN, or `None`, from `self.identifiers['mobi-asin']`.
         '''
         return self.identifiers.get('mobi-asin', None)
 
@@ -192,56 +231,19 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             computed on demand.
         '''
         return {
-            fmt.format:
-            joinpath(db_row.path, f'{fmt.name}.{fmt.format.lower()}')
+            fmt.format: f'{fmt.name}.{fmt.format.lower()}'
             for fmt in db_row.formats
         }
-
-      @property
-      @proxy_on_demand_field
-      # pylint: disable=property-with-parameters
-      def identifiers(self, db_row, *, session):
-        ''' A mapping of Calibre identifier keys to identifier values
-            computed on demand.
-        '''
-        return {
-            identifier.type: identifier.val
-            for identifier in db_row.identifiers
-        }
-
-      @property
-      @proxy_on_demand_field
-      # pylint: disable=property-with-parameters
-      def tags(self, db_row, *, session):
-        ''' A list of Calibre tags computed on demand.
-        '''
-        return [tag.name for tag in db_row.tags]
-
-      # TODO: should really edit the db directly
-      @tags.setter
-      def tags(self, new_tags):
-        ''' Update the tags.
-        '''
-        self.tree.calibredb(
-            'set_metadata',
-            '--field',
-            f'tags:{",".join(new_tags)}',
-            str(self.dbid),
-        )
-        try:
-          del self._RelProxy__fields['tags']
-        except KeyError:
-          pass
 
       def formatpath(self, fmtk):
         ''' Return the filesystem path of the format file for `fmtk`
             or `None` if the format is not present.
         '''
         try:
-          subpath = self.formats[fmtk]
+          fmtsubpath = self.formats[fmtk]
         except KeyError:
           return None
-        return self.tree.pathto(subpath)
+        return self.pathto(fmtsubpath)
 
       @pfx_method
       @typechecked
@@ -282,6 +284,42 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           return False
         self.refresh_from_db()
         return True
+
+      @property
+      @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
+      def identifiers(self, db_row, *, session):
+        ''' A mapping of Calibre identifier keys to identifier values
+            computed on demand.
+        '''
+        return {
+            identifier.type: identifier.val
+            for identifier in db_row.identifiers
+        }
+
+      @property
+      @proxy_on_demand_field
+      # pylint: disable=property-with-parameters
+      def tags(self, db_row, *, session):
+        ''' A list of Calibre tags computed on demand.
+        '''
+        return [tag.name for tag in db_row.tags]
+
+      # TODO: should really edit the db directly
+      @tags.setter
+      def tags(self, new_tags):
+        ''' Update the tags.
+        '''
+        self.tree.calibredb(
+            'set_metadata',
+            '--field',
+            f'tags:{",".join(new_tags)}',
+            str(self.dbid),
+        )
+        try:
+          del self._RelProxy__fields['tags']
+        except KeyError:
+          pass
 
       def convert(
           self,
@@ -944,9 +982,22 @@ class CalibreCommand(BaseCommand):
 
   DEFAULT_LINK_IDENTIFIER = 'mobi-asin'
 
+  DEFAULT_LINKTO_DIRPATH = '~/media/books'
+  DEFAULT_LINKTO_DIRPATH_ENVVAR = 'MEDIA_BOOKSPATH'
+  DEFAULT_LINKTO_FORMATS = ['CBZ', 'EPUB']
+  DEFAULT_LINKTO_SELECTORS = ['CBZ', 'EPUB']
+  DEFAULT_LINKTO_SERIES_FORMAT = '{series.name:lc}--{series.index}--{title:lc}'
+  DEFAULT_LINKTO_NOSERIES_FORMAT = '{title:lc}'
+
   USAGE_KEYWORDS = {
       'DEFAULT_LINK_IDENTIFIER': DEFAULT_LINK_IDENTIFIER,
       'OTHER_LIBRARY_PATH_ENVVAR': OTHER_LIBRARY_PATH_ENVVAR,
+      'DEFAULT_LINKTO_DIRPATH': DEFAULT_LINKTO_DIRPATH,
+      'DEFAULT_LINKTO_DIRPATH_ENVVAR': DEFAULT_LINKTO_DIRPATH_ENVVAR,
+      'DEFAULT_LINKTO_FORMATS': DEFAULT_LINKTO_FORMATS,
+      'DEFAULT_LINKTO_SELECTORS': DEFAULT_LINKTO_SELECTORS,
+      'DEFAULT_LINKTO_SERIES_FORMAT': DEFAULT_LINKTO_SERIES_FORMAT,
+      'DEFAULT_LINKTO_NOSERIES_FORMAT': DEFAULT_LINKTO_NOSERIES_FORMAT,
   }
 
   # mapping of target format key to source format and extra options
@@ -963,7 +1014,8 @@ class CalibreCommand(BaseCommand):
         kindle_path=None,
         calibre_path=None,
         calibre_path_other=None,
-        **kw
+        linkto_dirpath=None,
+        **kw,
     ):
       super().__init__(**kw)
       from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
@@ -983,6 +1035,11 @@ class CalibreCommand(BaseCommand):
       self.kindle_path = kindle_path
       self.calibre_path = calibre_path
       self.calibre_path_other = calibre_path_other
+      self.linkto_dirpath = (
+          linkto_dirpath
+          or os.environ.get(CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR)
+          or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
+      )
 
     @property
     def calibre(self):
@@ -1035,8 +1092,11 @@ class CalibreCommand(BaseCommand):
     try:
       dbid = int(book_spec)
     except ValueError:
+      # FORMAT
+      if book_spec.isupper():
+        match_fn = lambda book: book_spec in book.formats
       # /regexp
-      if book_spec.startswith('/'):
+      elif book_spec.startswith('/'):
         re_s = book_spec[1:]
         if not re_s:
           raise ValueError("empty regexp")  # pylint: disable=raise-missing-from
@@ -1044,7 +1104,8 @@ class CalibreCommand(BaseCommand):
         match_fn = lambda book: (
             regexp.search(book.title) or any(
                 map(regexp.search, book.author_names)
-            ) or regexp.search(book.series_name or "")
+            ) or regexp.search(book.series_name or "") or
+            any(map(regexp.search, book.tags))
         )
       else:
         # [identifier=]id-value,...
@@ -1183,15 +1244,105 @@ class CalibreCommand(BaseCommand):
     if self.options.kindle_path:
       print("kindle", shortpath(self.options.kindle_path))
 
+  def cmd_linkto(self, argv):
+    ''' Usage: {cmd} [-1fnqv] [-d linkto-dir] [-F fmt,...] [-o link-format] [dbids...]
+          Export books to linkto-dir by hard linking.
+          -1              Link only the first format found.
+          -d linkto-dir   Specify the target directory, default from ${DEFAULT_LINKTO_DIRPATH_ENVVAR}
+                          or {DEFAULT_LINKTO_DIRPATH}.
+          -F fmt,...      Source formats, default: {DEFAULT_LINKTO_FORMATS}
+          -f              Force. Replace existing links.
+          -n              No action. Report planned actions.
+          -o link-format  Link name format.
+          -q              Quiet.
+          -v              Verbose.
+    '''
+    ##Default with series: {DEFAULT_LINKTO_SERIES_FORMAT}
+    ##Default without series: {DEFAULT_LINKTO_NOSERIES_FORMAT}
+    options = self.options
+    options.formats = ['CBZ', 'EPUB']
+    options.first_format = False
+    options.link_format = None
+    self.popopts(
+        argv,
+        options,
+        _1='first_format',
+        d_='linkto_dirpath',
+        F_='formats',
+        f='force',
+        n='-doit',
+        o_='link_format',
+        q='quiet',
+        v='verbose',
+    )
+    doit = options.doit
+    first_format = options.first_format
+    force = options.force
+    formats = options.formats
+    if isinstance(formats, str):
+      # pylint: disable=no-member
+      formats = [fmt.strip().upper() for fmt in formats.split(',')]
+    link_format = options.link_format
+    linkto_dirpath = options.linkto_dirpath
+    quiet = options.quiet
+    runstate = options.runstate
+    verbose = options.verbose
+    cbooks = self.popbooks(argv or list(self.DEFAULT_LINKTO_SELECTORS))
+    with UpdProxy(prefix='linkto: ') as proxy:
+      for cbook in unrepeated(cbooks):
+        if runstate.cancelled:
+          break
+        proxy.text = str(cbook)
+        with Pfx(cbook):
+          fmttags = cbook.format_tagset()
+          series_name = fmttags.get('series.name')
+          name_format = link_format or (
+              '{series.name:lc}--{series.index}--{title:lc}'
+              if series_name else '{title:lc}'
+          )
+          name = (
+              cbook.format_as(name_format).replace('_', '-').replace('/', ':')
+          )
+          for fmt in formats:
+            if runstate.cancelled:
+              break
+            proxy.text = f'{cbook}: {fmt}'
+            srcpath = cbook.formatpath(fmt)
+            if srcpath is None:
+              continue
+            dstpath = joinpath(linkto_dirpath, name + '.' + fmt.lower())
+            if existspath(dstpath):
+              if force:
+                warning("dst already exists, will be replaced: %s", dstpath)
+              else:
+                warning("dst already exists, skipped: %s", dstpath)
+                continue
+            if existspath(dstpath):
+              (verbose or not doit) and print("unlink", shortpath(dstpath))
+              doit and pfx_call(os.unlink, dstpath)
+            (quiet and doit
+             ) or print("link", shortpath(srcpath), '=>', shortpath(dstpath))
+            doit and pfx_call(os.link, srcpath, dstpath)
+            if first_format:
+              break
+          proxy.text = f'{cbook}'
+    if runstate.cancelled:
+      return 1
+    return 0
+
   # pylint: disable=too-many-locals
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l] [book_specs...]
+    ''' Usage: {cmd} [-l] [-o ls-format] [book_specs...]
           List the contents of the Calibre library.
+          -l            Long mode, listing book details over several lines.
+          -o ls_format  Output format for use in a single line book listing.
     '''
     options = self.options
     options.longmode = False  # pylint: disable=attribute-defined-outside-init
-    options.popopts(argv, l='longmode')
+    options.ls_format = None
+    options.popopts(argv, l='longmode', o_='ls_format')
     longmode = options.longmode
+    ls_format = options.ls_format
     calibre = options.calibre
     xit = 0
     cbooks = []
@@ -1208,21 +1359,30 @@ class CalibreCommand(BaseCommand):
       if runstate.cancelled:
         break
       with Pfx(cbook):
-        top_row = []
-        series_name = cbook.series_name
-        if series_name:
-          top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
-        top_row.append(cbook.title)
-        author_names = cbook.author_names
-        if author_names:
-          top_row.extend(
-              ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
-          )
-        top_row.append(f"({cbook.dbid})")
-        if not longmode:
-          top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
-          top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
-        print(*top_row)
+        if ls_format is None:
+          top_row = []
+          series_name = cbook.series_name
+          if series_name:
+            top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
+          top_row.append(cbook.title)
+          author_names = cbook.author_names
+          if author_names:
+            top_row.extend(
+                ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
+            )
+          top_row.append(f"({cbook.dbid})")
+          if not longmode:
+            top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
+            top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
+          print(*top_row)
+        else:
+          try:
+            output = cbook.format_as(ls_format, error_sep='\n  ')
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          print(output)
         if longmode:
           print(" ", cbook.path)
           tags = cbook.tags
@@ -1476,7 +1636,6 @@ class CalibreCommand(BaseCommand):
     if argv and argv[0] == '-n':
       argv.pop(0)
       options.doit = False
-    calibre = options.calibre
     doit = options.doit
     upd = options.upd
     tags = self.poparg(argv, "tags")

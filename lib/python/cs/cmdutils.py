@@ -35,7 +35,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20220606-post'
+__version__ = '20220626-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -730,13 +730,12 @@ class BaseCommand:
         with Pfx("%r", spec):
           if help_text is None and isinstance(spec, str):
             help_text = spec
+          elif unvalidated_message is None and isinstance(spec, str):
+            unvalidated_message = spec
           elif parse is None and callable(spec):
             parse = spec
           elif validate is None and callable(spec):
             validate = spec
-          elif (validate is not None and unvalidated_message is None
-                and isinstance(spec, str)):
-            unvalidated_message = spec
           else:
             raise TypeError(
                 "unexpected argument, expected help_text or parse,"
@@ -773,7 +772,7 @@ class BaseCommand:
       return value
 
   @classmethod
-  def poparg(cls, argv: List[str], *a):
+  def poparg(cls, argv: List[str], *a, unpop_on_error=False):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
         Raises `getopt.GetoptError` on a missing or invalid argument.
@@ -797,6 +796,9 @@ class BaseCommand:
           or return a false value or raise a `ValueError` if invalid
         * `unvalidated_message`: an optional message after `validate`
           for values failing the validation
+        * `unpop_on_error`: optional keyword parameter, default `False`;
+          if true then push the argument back onto the front of `argv`
+          if it fails to parse; `GetoptError` is still raised
 
         Typical use inside a `main` or `cmd_*` method might look like:
 
@@ -827,13 +829,31 @@ class BaseCommand:
             Traceback (most recent call last):
               ...
             getopt.GetoptError: length: missing argument
+            >>> argv = ['-5', 'zz']
+            >>> BaseCommand.poparg(argv, float, "size", lambda f: f>0, "size should be >0")
+            Traceback (most recent call last):
+              ...
+            getopt.GetoptError: size '-5': size should be >0
+            >>> argv  # -5 was still consumed
+            ['zz']
+            >>> BaseCommand.poparg(argv, float, "size2", unpop_on_error=True)
+            Traceback (most recent call last):
+              ...
+            getopt.GetoptError: size2 'zz': float('zz'): could not convert string to float: 'zz'
+            >>> argv  # zz was pushed back
+            ['zz']
     '''
     opt_spec = cls._OptSpec.from_specs(*a)
     with Pfx(opt_spec.help_text):
       if not argv:
         raise GetoptError("missing argument")
       arg0 = argv.pop(0)
-    return opt_spec.parse_value(arg0)
+    try:
+      return opt_spec.parse_value(arg0)
+    except GetoptError:
+      if unpop_on_error:
+        argv.insert(0, arg0)
+      raise
 
   @classmethod
   def popopts(

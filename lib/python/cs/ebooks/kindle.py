@@ -238,7 +238,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
               fmtpath = cbook.formatpath(fmtk)
               if fmtpath and filecmp.cmp(fmtpath, azwpath):
                 # pylint: disable=expression-not-assigned
-                quiet or print(
+                verbose and print(
                     cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
                 )
                 return cbook, False
