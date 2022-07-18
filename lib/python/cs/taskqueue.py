@@ -5,7 +5,7 @@
 '''
 
 import sys
-from threading import RLock
+from threading import Lock, RLock
 import time
 from typing import Callable, TypeVar, Union
 
@@ -15,7 +15,7 @@ from typeguard import typechecked
 from cs.deco import decorator
 from cs.fsm import FSM, FSMError
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import funcname
 from cs.queues import ListQueue
 from cs.resources import RunState, RunStateMixin
@@ -23,11 +23,11 @@ from cs.result import Result, CancellationError
 from cs.seq import Seq
 from cs.threads import bg as bg_thread, locked, State as ThreadState
 
-
 class TaskError(FSMError):
   ''' Raised by `Task` related errors.
   '''
 
+  # pylint: disable=redefined-outer-name
   @typechecked
   def __init__(self, msg: str, task: 'TaskSubType'):
     super().__init__(msg, task)
@@ -36,6 +36,7 @@ class BlockedError(TaskError):
   ''' Raised by a blocked `Task` if attempted.
   '''
 
+  # pylint: disable=redefined-outer-name
   @typechecked
   def __init__(
       self, msg: str, task: 'TaskSubType', blocking_task: 'TaskSubType'
@@ -43,6 +44,7 @@ class BlockedError(TaskError):
     super().__init__(msg, task)
     self.blocking_task = blocking_task
 
+# pylint: disable=too-many-instance-attributes
 class Task(FSM, RunStateMixin):
   ''' A task which may require the completion of other tasks.
 
@@ -417,6 +419,7 @@ class Task(FSM, RunStateMixin):
 
 TaskSubType = TypeVar('TaskSubType', bound=Task)
 
+# pylint: disable=too-many-branches
 def make(*tasks, fail_fast=False):
   ''' Generator which completes all the supplied `tasks` by dispatching them
       once they are no longer blocked.
@@ -522,12 +525,13 @@ class TaskQueue:
     '''
     self._tasks = set()
     self._up = set()  # unblocked pending
-    self._ready()  # completed tasks
+    self._ready = set()  # completed tasks
     self._unready = set()  # not unblocked pending and not completed
     self._lock = Lock()
-    for task in tasks:
-      self.add(task)
+    for t in tasks:
+      self.add(t)
 
+  # pylint: disable=redefined-outer-name
   @locked
   def add(self, task):
     ''' Add a task to the tasks managed by this queue.
@@ -539,6 +543,7 @@ class TaskQueue:
     # update the task categories
     self._on_state_change(task, None)
 
+  # pylint: disable=redefined-outer-name
   @locked
   def _on_state_change(self, task, transition):
     ''' Update task state sets based on task state transitions.
@@ -552,7 +557,7 @@ class TaskQueue:
       self._up.discard(task)
       self._ready.add(task)
       self._unready.discard(task)
-    elif task.is_pending and not talk.isblocked():
+    elif task.is_pending and not task.isblocked():
       # pending unblocked
       self._up.add(task)
       self._ready.discard(task)
@@ -563,6 +568,7 @@ class TaskQueue:
       self._ready.discard(task)
       self._unready.add(task)
 
+  # pylint: disable=redefined-outer-name
   def get(self):
     ''' Pull a completed or an unblocked pending task from the queue.
         Return the task or `None` if nothing is available.
@@ -580,6 +586,7 @@ class TaskQueue:
     task.fsm_callback_discard(self._on_state_change)
     return task
 
+  # pylint: disable=redefined-outer-name
   def run(self, runstate=None):
     ''' Process tasks in the queue until the queue has no completed tasks,
         yielding each task, immediately if `task.iscompleted()`
