@@ -172,6 +172,9 @@ class Task(FSM, RunStateMixin):
         track = lambda t, tr: print(f'{t.name} {tr.old_state}->{tr.event}->{tr.new_state}')
       self.fsm_callback(FSM.FSM_ANY_STATE, track)
 
+  def __str__(self):
+    return f'{type(self).__name__}:{self.name}:{self.fsm_state}'
+
   def __hash__(self):
     return id(self)
 
