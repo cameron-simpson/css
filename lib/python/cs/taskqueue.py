@@ -286,11 +286,9 @@ class Task(FSM, RunStateMixin):
         Aborted tasks are not blockers
         but if we encounter one we do abort the current task.
     '''
-    unblocked_states = self.DONE, self.FAILED, self.ABORT
     for otask in self.required:
-      if otask.fsm_state in unblocked_states:
-        continue
-      yield otask
+      if not otask.iscompleted():
+        yield otask
 
   ##############################################################
   # Specific implementations for things which would otherwise be
@@ -470,11 +468,7 @@ def make(*tasks, fail_fast=False):
         raise FSMError(f'cannot make a {qtask.fsm_state} task', qtask)
       if qtask.is_running:
         qtask.join()
-        assert qtask.fsm_state not in (
-            qtask.PREPARE,
-            qtask.PENDING,
-            qtask.RUNNING,
-        )
+        assert qtask.iscompleted()
       elif qtask.is_pending:
         failed = [prereq for prereq in qtask.required if prereq.is_failed]
         if failed:
