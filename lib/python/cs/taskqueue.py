@@ -300,6 +300,7 @@ class Task(FSM, RunStateMixin):
   # Specific implementations for things which would otherwise be
   # state transition events.
   #
+
   @locked
   def cancel(self):
     ''' Transition this `Task` to `CANCELLED` state.
@@ -401,7 +402,7 @@ class Task(FSM, RunStateMixin):
   def make(self, fail_fast=False):
     ''' Generator to complete `self` and its prerequisites.
         This calls the global `make()` function with `self`.
-        It returns a Boolean indicating whether this task succeeded.
+        It returns a Boolean indicating whether this task completed.
     '''
     for t in make(self, fail_fast=fail_fast):
       assert t is self
