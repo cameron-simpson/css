@@ -232,12 +232,12 @@ class Task(FSM, RunStateMixin):
       post_task = func
     else:
       # optional name
-      if isinstance(func, str):
+      if func is None or isinstance(func, str):
         name = func
         a = list(a)
         func = a.pop(0)
       else:
-        name = f'{self}.then({func},...)'
+        name = None
       if a:
         raise ValueError(
             "unexpected positional arguments after func: %r" % (a,)
