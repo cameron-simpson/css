@@ -315,9 +315,12 @@ class Task(FSM, RunStateMixin):
         Otherwise fire the `'dispatch'` event and then run the
         task's function via the `.run()` method.
     '''
-    for otask in self.blockers():
-      raise BlockedError("%s blocked by %s" % (self, otask))
     with self._lock:
+      for otask in self.blockers():
+        if otask.is_abort:
+          warning("%s requires %s which is aborted: aborting", self, otask)
+          self.fsm_event('abort')
+        raise BlockedError("%s blocked by %s" % (self, otask), self, otask)
       self.fsm_event('dispatch')
       state = type(self)._state
       with state(current_task=self):
