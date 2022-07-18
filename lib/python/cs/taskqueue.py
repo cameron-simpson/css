@@ -510,6 +510,97 @@ def make(*tasks, fail_fast=False):
       if fail_fast and not qtask.is_done:
         return
 
+class TaskQueue:
+  ''' A task queue for managing and running a set of related tasks.
+
+      Unlike `make` and `Task.make`, this is aimed at a "dispatch" worker
+      which dispatches individual tasks as required.
+  '''
+
+  def __init__(self, *tasks):
+    ''' Initialise the queue with the supplied `tasks`.
+    '''
+    self._tasks = set()
+    self._up = set()  # unblocked pending
+    self._ready()  # completed tasks
+    self._unready = set()  # not unblocked pending and not completed
+    self._lock = Lock()
+    for task in tasks:
+      self.add(task)
+
+  @locked
+  def add(self, task):
+    ''' Add a task to the tasks managed by this queue.
+    '''
+    if task not in self._tasks:
+      # apply the callback the first time a task is added to the queue
+      task.fsm_callback(FSM.FSM_ANY_STATE, self._on_state_change)
+      self._tasks.add(task)
+    # update the task categories
+    self._on_state_change(task, None)
+
+  @locked
+  def _on_state_change(self, task, transition):
+    ''' Update task state sets based on task state transitions.
+    '''
+    print(task, transition)
+    if task not in self._tasks:
+      warning("%s: callback for untracked task %s", self, task)
+      return
+    if task.iscompleted():
+      # completed
+      self._up.discard(task)
+      self._ready.add(task)
+      self._unready.discard(task)
+    elif task.is_pending and not talk.isblocked():
+      # pending unblocked
+      self._up.add(task)
+      self._ready.discard(task)
+      self._unready.discard(task)
+    else:
+      # unready
+      self._up.discard(task)
+      self._ready.discard(task)
+      self._unready.add(task)
+
+  def get(self):
+    ''' Pull a completed or an unblocked pending task from the queue.
+        Return the task or `None` if nothing is available.
+
+        The returned task is no longer tracked by this queue.
+    '''
+    try:
+      task = self._ready.pop()
+    except KeyError:
+      try:
+        task = self._up.pop()
+      except KeyError:
+        return None
+    self._tasks.remove(task)
+    task.fsm_callback_discard(self._on_state_change)
+    return task
+
+  def run(self, runstate=None):
+    ''' Process tasks in the queue until the queue has no completed tasks,
+        yielding each task, immediately if `task.iscompleted()`
+        otherwise after `taks.dispatch()`.
+
+        An optional `RunState` may be provided to allow early termination
+        via `runstate.cancel()`.
+
+        An incomplete task is `dispatch`ed before `yield`;
+        ideally it will be complete when the yield happens,
+        but its semantics might mean it is in another state such as `CANCELLED`.
+        The consumer of `run` must handle these situations.
+    '''
+    while runstate is None or not runstate.cancelled:
+      task = self.get()
+      if task is None:
+        break
+      if not task.iscompleted():
+        task.dispatch()
+      yield task
+
 @decorator
 def task(func, task_class=Task):
   ''' Decorator for a function which runs it as a `Task`.
