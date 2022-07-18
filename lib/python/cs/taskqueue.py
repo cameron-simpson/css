@@ -65,6 +65,11 @@ class Task(FSM, RunStateMixin):
       * `func_args`: optional positional arguments, default `()`
       * `func_kwargs`: optional keyword arguments, default `{}`
       * `lock`: optional lock, default an `RLock`
+      * `state`: initial state, default from `self._state.initial_state`,
+        which is initally '`PENDING`'
+      * `track`: default `False`;
+        if `True` then apply a callback for all states to print task transitions;
+        otherwise it should be a callback function suitable for `FSM.fsm_callback`
       Other arguments are passed to the `Result` initialiser.
 
       Example:
@@ -119,19 +124,22 @@ class Task(FSM, RunStateMixin):
       'ABORT': {},
   }
 
+  FSM_DEFAULT_STATE = 'PENDING'
+
   _seq = Seq()
 
-  _state = ThreadState(current_task=None, initial_state='PENDING')
+  _state = ThreadState(current_task=None, initial_state=FSM_DEFAULT_STATE)
 
   def __init__(
       self,
       func,
       *a,
+      func_args=(),
+      func_kwargs=None,
       state=None,
       cancel_on_exception=False,
       cancel_on_result=None,
-      func_args=(),
-      func_kwargs=None,
+      track=False,
   ):
     if isinstance(func, str):
       name = func
@@ -158,6 +166,10 @@ class Task(FSM, RunStateMixin):
     self.func_args = func_args
     self.func_kwargs = func_kwargs
     self.result = Result()
+    if track:
+      if track is True:
+        track = lambda t, tr: print(f'{t.name} {tr.old_state}->{tr.event}->{tr.new_state}')
+      self.fsm_callback(FSM.FSM_ANY_STATE, track)
 
   def __hash__(self):
     return id(self)
