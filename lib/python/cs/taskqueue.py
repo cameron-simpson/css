@@ -417,7 +417,7 @@ TaskSubType = TypeVar('TaskSubType', bound=Task)
 def make(*tasks, fail_fast=False):
   ''' Generator which completes all the supplied `tasks` by dispatching them
       once they are no longer blocked.
-      Yield each task from `tasks` as it completes.
+      Yield each task from `tasks` as it completes (or becomes cancelled).
 
       Parameters:
       * `tasks`: `Task`s as positional parameters
@@ -431,36 +431,42 @@ def make(*tasks, fail_fast=False):
         * if any prerequisite has failed, fail this task
         * if any prerequisite is cancelled, cancel this task
         * if any prerequisite is pending, make it first
+        * if any prerequisite is not done, fail this task
         * otherwise dispatch this task and then yield it
+      - if `fail_fast` and the task is not done, return
 
       Examples:
 
-          >>> t1 = Task('t1', lambda: print('t1'))
-          >>> t2 = t1.then(lambda: print('t2'))
+          >>> t1 = Task('t1', lambda: print('doing t1'), track=True)
+          >>> t2 = t1.then('t2', lambda: print('doing t2'), track=True)
           >>> list(make(t2))    # doctest: +ELLIPSIS
-          t1
-          t2
+          t1 PENDING->dispatch->RUNNING
+          doing t1
+          t1 RUNNING->done->DONE
+          t2 PENDING->dispatch->RUNNING
+          doing t2
+          t2 RUNNING->done->DONE
           [<cs.taskqueue.Task object at ...>]
   '''
   tasks0 = set(tasks)
   q = ListQueue(tasks)
   for qtask in q:
     with Pfx(qtask):
-      if qtask in tasks0:
-        do_yield = True
-        tasks0.remove(qtask)
-      else:
-        do_yield = False
       if qtask.is_prepare:
         raise FSMError(f'cannot make a {qtask.fsm_state} task', qtask)
       if qtask.is_running:
         qtask.join()
         assert qtask.iscompleted()
       elif qtask.is_pending:
-        failed = [prereq for prereq in qtask.required if prereq.is_failed]
+        failed = [
+            prereq for prereq in qtask.required
+            if prereq.is_failed or prereq.is_abort
+        ]
         if failed:
           qtask.fsm_event(
-              'error', failed_prereq_uuids=[task.uuid for task in failed]
+              'error',
+              because='failed prerequisites',
+              failed=failed,
           )
         else:
           cancelled = [
@@ -469,7 +475,8 @@ def make(*tasks, fail_fast=False):
           if cancelled:
             qtask.fsm_event(
                 'cancel',
-                cancelled_prereq_uuids=[task.uuid for task in cancelled]
+                because='cancelled prerequisites',
+                cancelled=cancelled,
             )
           else:
             pending = [
@@ -479,16 +486,22 @@ def make(*tasks, fail_fast=False):
               # queue the pending tasks and qtask behind them
               pending.append(qtask)
               q.prepend(pending)
-              if do_yield:
-                # suppress the yield
-                tasks0.add(qtask)
               continue
-            # in principle all prereqs are now done
-            assert all(prereq.is_done for prereq in qtask.required)
-            qtask.dispatch()
-      assert qtask.fsm_state in (qtask.CANCELLED, qtask.DONE, qtask.FAILED)
-      if do_yield:
+            # see if any prerequisiters are some unhanlded not-DONE state
+            undone = [prereq for prereq in qtask.required if not prereq.is_done]
+            if undone:
+              qtask.fsm_event(
+                  'error',
+                  because='some prerequisites are not done',
+                  undone=undone,
+              )
+            else:
+              # prerequsites all done, run the task
+              qtask.dispatch()
+      assert qtask.iscompleted() or qtask.is_cancelled()
+      if qtask in tasks0:
         yield qtask
+        tasks0.remove(qtask)
       if fail_fast and not qtask.is_done:
         return
 
