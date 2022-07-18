@@ -141,12 +141,13 @@ class Task(FSM, RunStateMixin):
       cancel_on_result=None,
       track=False,
   ):
-    if isinstance(func, str):
+    if func is None or isinstance(func, str):
       name = func
       a = list(a)
       func = a.pop(0)
-    else:
-      name = f'{type(self).__name__}:{self._seq()}'
+    if name is None:
+      name = funcname(func)
+    self.name = name
     if a:
       raise ValueError(
           "unexpected positional parameters after func: %r" % (a,)
