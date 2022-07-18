@@ -270,6 +270,16 @@ class Task(FSM, RunStateMixin):
     '''
     otask.require(self)
 
+  def iscompleted(self):
+    ''' This task is completed (even if failed) and does not block contingent tasks.
+    '''
+    return self.fsm_state in (self.DONE, self.FAILED, self.ABORT)
+
+  def isblocked(self):
+    ''' A task is blocked if any prerequisite is not complete.
+    '''
+    return any(not prereq.iscompleted() for prereq in self.required)
+
   def blockers(self):
     ''' A generator yielding tasks from `self.required`
         which should block this task.
