@@ -328,29 +328,7 @@ class Task(FSM, RunStateMixin):
           self.fsm_event('abort')
         raise BlockedError("%s blocked by %s" % (self, otask), self, otask)
       self.fsm_event('dispatch')
-      state = type(self)._state
-      with state(current_task=self):
-          try:
-            with self.runstate:
-              r = self.func(*self.func_args, **self.func_kwargs)
-          except CancellationError:
-            self.fsm_event('cancel')
-          except BaseException:
-            if self.cancel_on_exception:
-              self.fsm_event('cancel')
-            else:
-              self.fsm_event('error')
-            # store the exception regardless
-            self.exc_info = sys.exc_info()
-          else:
-            if self.cancel_on_result and self.cancel_on_result(r):
-              self.fsm_event('cancel')
-            else:
-              self.fsm_state('success')
-            # store the result regardless
-            self.result = r
-    if self.fsm_state == 'CANCELLED':
-      raise CancellationError
+      return self.run()
 
   def run(self):
     ''' Run the function associated with this task,
