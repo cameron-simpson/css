@@ -76,7 +76,7 @@ from arrow import Arrow
 import dateutil
 from dateutil.tz import tzlocal
 from icontract import ensure, require, DBC
-from matplotlib.figure import Figure
+from matplotlib.figure import Axes, Figure
 import numpy as np
 from numpy import datetime64, timedelta64
 from typeguard import typechecked
@@ -93,7 +93,7 @@ from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning
 from cs.mappings import column_name_to_identifier
-from cs.mplutils import print_figure, save_figure
+from cs.mplutils import axes, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
@@ -905,20 +905,32 @@ def timerange(method, needs_start=False, needs_stop=False):
 # TODO: optional `utcoffset`/`tz` parameters for presentation
 # pylint: disable=too-many-locals
 @timerange
+@typechecked
 def plot_events(
-    start, stop, ax, events, value_func, *, utcoffset, **scatter_kw
-):
-  ''' Plot `events`, an iterable of objects with `.unixtime` attributes
-      such as an `SQLTagSet`, on an existing set of axes `ax`.
+    start,
+    stop,
+    events,
+    value_func,
+    *,
+    utcoffset,
+    figure=None,
+    ax=None,
+    **scatter_kw
+) -> Axes:
+  ''' Plot `events`, an iterable of objects with `.unixtime`
+      attributes such as an `SQLTagSet`.
+      Return the `Axes` on which the plot was made.
 
       Parameters:
-      * `ax`: axes on which to plot
       * `events`: an iterable of objects with `.unixtime` attributes
       * `value_func`: a callable to compute the y-axis value from an event
       * `start`: optional start UNIX time, used to crop the events plotted
       * `stop`: optional stop UNIX time, used to crop the events plotted
+      * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
+      * `utcoffset`: optional UTC offset for presentation
       Other keyword parameters are passed to `Axes.scatter`.
   '''
+  ax = axes(figure, ax)
   xaxis = []
   yaxis = []
   for event in (ev for ev in events
@@ -935,6 +947,7 @@ def plot_events(
     xaxis.append(x)
     yaxis.append(value_func(event))
   ax.scatter(xaxis, yaxis, **scatter_kw)
+  return ax
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
@@ -1363,16 +1376,19 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     self.update_tag('csv.header', new_header)
 
   @timerange
+  @typechecked
   def plot(
       self,
       start,
       stop,
       *,
+      figure=None,
+      ax=None,
       label=None,
       runstate=None,  # pylint: disable=unused-argument
       utcoffset,
       **plot_kw,
-  ):
+  ) -> Axes:
     ''' Convenience shim for `DataFrame.plot` to plot data from
         `start` to `stop`.  Return the plot `Axes`.
 
@@ -1381,9 +1397,11 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
         * `label`: optional label for the graph
         * `runstate`: optional `RunState`, ignored in this implementation
         * `utcoffset`: optional timestamp skew from UTC in seconds
+        * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
     '''
     pd = import_extra('pandas', DISTINFO)
+    ax = axes(figure, ax)
     if label is None:
       label = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
     times, yaxis = self.data2(start, stop)
@@ -1393,7 +1411,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
         (len(xaxis), len(yaxis), start, stop)
     )
     df = pd.DataFrame(dict(x=xaxis, y=yaxis))
-    return df.plot('x', 'y', title=label, **plot_kw)
+    return df.plot('x', 'y', ax=ax, title=label, **plot_kw)
 
 class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
   ''' The binary data structure of the `TimeSeriesFile` file header.
@@ -2685,17 +2703,20 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     df.to_csv(f, **to_csv_kw)
 
   @timerange
+  @typechecked
   def plot(
       self,
       start,
       stop,
       keys=None,
       *,
+      figure=None,
+      ax=None,
       label=None,
       runstate=None,
       utcoffset,
-      **plot_kw
-  ):
+      **plot_kw,
+  ) -> Axes:
     ''' Convenience shim for `DataFrame.plot` to plot data from
         `start` to `stop` for each key in `keys`.
         Return the plot `Axes`.
@@ -2706,8 +2727,10 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         * `keys`: optional list of keys, default all keys
         * `label`: optional label for the graph
         * `runstate`: optional `RunState` to allow interruption
+        * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
     '''
+    ax = axes(figure, ax)
     if keys is None:
       keys = sorted(self.keys())
     df = self.as_pd_dataframe(
@@ -2725,7 +2748,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
           df.rename(columns={key: kname}, inplace=True)
     if runstate and runstate.cancelled:
       raise CancellationError
-    return df.plot(**plot_kw)
+    return df.plot(ax=ax, **plot_kw)
 
   @pfx_method
   def read_csv(self, csvpath, column_name_map=None, **pd_read_csv_kw):
@@ -3292,20 +3315,40 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     return xydata
 
   @timerange
-  def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
+  @typechecked
+  def plot(
+      self,
+      start,
+      stop,
+      *,
+      figure=None,
+      ax=None,
+      label=None,
+      runstate=None,
+      **plot_kw,
+  ) -> Axes:
     ''' Convenience shim for `DataFrame.plot` to plot data from
-        `start` to `stop`.  Return the plot `Axes`.
+        `start` to `stop`.
+        Return the plot `Axes`.
 
         Parameters:
         * `start`,`stop`: the time range
-        * `ax`: optional `Axes`; new `Axes` will be made if not specified
+        * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         * `label`: optional label for the graph
         Other keyword parameters are passed to `Axes.plot`
         or `DataFrame.plot` for new axes.
     '''
     if label is None:
       label = self.tags.get('csv.header')
-    return super().plot(start, stop, label=label, runstate=runstate, **plot_kw)
+    return super().plot(
+        start,
+        stop,
+        figure=figure,
+        ax=ax,
+        label=label,
+        runstate=runstate,
+        **plot_kw
+    )
 
 @typechecked
 def timeseries_from_path(
