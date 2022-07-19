@@ -925,11 +925,11 @@ def plot_events(
                 if (start is None or ev.unixtime >= start) and (
                     stop is None or ev.unixtime < stop)):
     try:
-      x = datetime64(int(event.unixtime), 's')
+      x = datetime64(int(event.unixtime + utcoffset), 's')
     except ValueError as e:
       warning(
-          "cannot convert event.unixtime=%s to datetime64: %s",
-          r(event.unixtime), e
+          "cannot convert event.unixtime=%s+utcoffset=%s to datetime64: %s",
+          r(event.unixtime), r(utcoffset), e
       )
       continue
     xaxis.append(x)
