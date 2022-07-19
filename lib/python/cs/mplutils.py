@@ -79,6 +79,7 @@ def print_figure(figure_or_ax, imgformat=None, file=None):
   with saved_figure(figure_or_ax) as tmpimgpath:
     with open(tmpimgpath, 'rb') as imgf:
       if imgformat == 'sixel':
+        file.flush()
         run(['img2sixel'], stdin=imgf, stdout=file.fileno(), check=True)
       else:
         for bs in CornuCopyBuffer.from_file(imgf):
