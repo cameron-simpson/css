@@ -54,7 +54,7 @@ from cs.timeseries import (
     TimeSeriesDataDir,
     TimespanPolicyYearly,
     plot_events,
-    plotrange,
+    timerange,
     print_figure,
     save_figure,
     tzfor,
@@ -521,7 +521,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     tsd = getattr(self, dsname)
     return tsd.to_csv(start, stop, f, **to_csv_kw)
 
-  @plotrange
+  @timerange
   def plot(
       self,
       start,

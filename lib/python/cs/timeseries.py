@@ -771,9 +771,9 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         ) as tmpdirpath:
           testfunc_map[testname](tmpdirpath)
 
-# TODO: accept a `datetime` for `tz`, use its offset for `utcoffset`
+# TODO: accept a reference `datetime` for `tz`, use its offset for `utcoffset`
 @decorator
-def plotrange(method, needs_start=False, needs_stop=False):
+def timerange(method, needs_start=False, needs_stop=False):
   ''' A decorator intended for plotting functions or methods which
       presents optional `start` and `stop` leading positional
       parameters and optional `tz` or `utcoffset` keyword parameters.
@@ -794,14 +794,14 @@ def plotrange(method, needs_start=False, needs_stop=False):
       * `utcoffset`: an optional offset from UTC time in seconds
       Other parameters are passed through to the deocrated function.
 
-      A decorated method is then called as:
+      A decorated *method* is then called as:
 
           method(self, start, stop, *a, utcoffset=utcoffset, **kw)
 
       where `*a` and `**kw` are the additional positional and keyword
       parameters respectively, if any.
 
-      A decorated function is called as:
+      A decorated *function* is called as:
 
           function(start, stop, *a, utcoffset=utcoffset, **kw)
 
@@ -823,14 +823,12 @@ def plotrange(method, needs_start=False, needs_stop=False):
 
   # pylint: disable=keyword-arg-before-vararg
   @typechecked
-  def plotrange_method_wrapper(
+  def timerange_method_wrapper(
       *a,
       tz: Optional[tzinfo] = None,
       utcoffset: Optional[Numeric] = None,
       **kw,
   ):
-    import_extra('pandas', DISTINFO)
-    import_extra('matplotlib', DISTINFO)
     a = list(a)
     if a and not isinstance(a[0], numeric_types):
       self = a.pop(0)
@@ -901,11 +899,11 @@ def plotrange(method, needs_start=False, needs_stop=False):
       return method(start, stop, *a, utcoffset=utcoffset, **kw)
     return method(self, start, stop, *a, utcoffset=utcoffset, **kw)
 
-  return plotrange_method_wrapper
+  return timerange_method_wrapper
 
 # TODO: optional `utcoffset`/`tz` parameters for presentation
 # pylint: disable=too-many-locals
-@plotrange
+@timerange
 def plot_events(
     start, stop, ax, events, value_func, *, utcoffset, **scatter_kw
 ):
@@ -1363,7 +1361,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     '''
     self.update_tag('csv.header', new_header)
 
-  @plotrange
+  @timerange
   def plot(
       self,
       start,
@@ -2684,7 +2682,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       df_mangle(df)
     df.to_csv(f, **to_csv_kw)
 
-  @plotrange
+  @timerange
   def plot(
       self,
       start,
@@ -3290,7 +3288,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       xydata.extend(ts.data(span.start, span.stop))
     return xydata
 
-  @plotrange
+  @timerange
   def plot(self, start, stop, *, label=None, runstate=None, **plot_kw):
     ''' Convenience shim for `DataFrame.plot` to plot data from
         `start` to `stop`.  Return the plot `Axes`.
