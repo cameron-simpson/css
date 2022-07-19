@@ -404,6 +404,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     ax = figure.axes[0]
     plot_kw = {}
     if isinstance(ts, TimeSeries):
+      # a single timeseries, no key
       if argv:
         raise GetoptError(
             "fields:%r should not be suppplied for a %s" % (argv, s(ts))
@@ -417,7 +418,8 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           figsize=(plot_dx, plot_dy),
           **plot_kw
       )  # pylint: disable=missing-kwoa
-    elif isinstance(ts, TimeSeriesDataDir):
+    elif isinstance(ts, TimeSeriesMapping):
+      # multiple timeseries each with their own key
       if argv:
         keys = ts.keys(argv)
         if not keys:
