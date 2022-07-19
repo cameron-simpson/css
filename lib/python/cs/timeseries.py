@@ -3338,3 +3338,6 @@ def timeseries_from_path(
       )
     return TimeSeriesDataDir(tspath, policy='annual', epoch=epoch)
   raise ValueError("cannot deduce time series type from tspath %r" % (tspath,))
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
