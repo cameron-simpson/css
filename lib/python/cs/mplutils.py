@@ -16,8 +16,75 @@ from subprocess import run
 import sys
 from tempfile import TemporaryDirectory
 
+from typeguard import typechecked
+from matplotlib.figure import Axes, Figure
+
 from cs.buffer import CornuCopyBuffer
+from cs.deco import fmtdoc
+from cs.lex import r
 from cs.pfx import pfx_call
+
+DEFAULT_FIGURE_SIZE = 10, 7
+DEFAULT_FIGURE_DPI = 100
+
+@typechecked
+@fmtdoc
+def axes(figure=None, ax=None, **fig_kw) -> Axes:
+  ''' Return a set of `Axes`.
+
+      Parameters:
+      * `figure`: optional `Figure` from which to obtain the `Axes`
+        or an `(x,y)` figure size or an `(x,y,dpi)` figure size
+      * `ax`: optional `Axes` or axes index
+
+      If `ax` is already an `Axes` it is returned unchanged.
+      Otherwise `ax` should be the index of a set of axes,
+      default `0`.
+
+      If `figure` is a `Figure`, `ax` is used to select one of its
+      sets of axes.
+
+      Otherwise a `Figure` is created and a set of axes is selected.
+      The default figure size comes from `DEFAULT_FIGURE_SIZE` (`{DEFAULT_FIGURE_SIZE}`)
+      and the default dpi comes from `DEFAULT_FIGURE_DPI` (`{DEFAULT_FIGURE_DPI}`).
+      The `figure` positional parameter may be supplied
+      as a 2-tuple `(fig_dx,fig_dy)` to override the default size
+      or as a 3-tuple `(fig_dx,fig_dy,dpi)` to override the default size and dpi.
+  '''
+  # default Figure dimensions
+  fig_dx, fig_dy = DEFAULT_FIGURE_SIZE
+  dpi = DEFAULT_FIGURE_DPI
+  if not isinstance(ax, Axes):
+    if isinstance(figure, Figure):
+      ax = figure.axes[0 if ax is None else ax]
+    elif figure is None:
+      if ax is None:
+        # make a figure and choose the Axes from it
+        figure = Figure(figsize=(fig_dx, fig_dy), dpi=dpi, **fig_kw)
+        figure.add_subplot()
+        # pylint: disable=unsubscriptable-object
+        ax = figure.axes[0 if ax is None else ax]
+      else:
+        # Axes already have a Figure
+        figure = ax.figure
+    else:
+      try:
+        fig_dx, fig_dy = figure
+      except ValueError:
+        try:
+          fig_dx, fig_dy, dpi = figure
+        except ValueError:
+          # pylint: disable=raise-missing-from
+          raise TypeError(
+              "invalid figure:%s, expected Figure or (x,y) or (x,y,dpi)" %
+              (r(figure),)
+          )
+      # make a figure and choose the Axes from it
+      figure = Figure(figsize=(fig_dx, fig_dy), dpi=dpi, **fig_kw)
+      figure.add_subplot()
+      # pylint: disable=unsubscriptable-object
+      ax = figure.axes[0 if ax is None else ax]
+  return ax
 
 # pylint: disable=redefined-builtin
 @contextmanager
