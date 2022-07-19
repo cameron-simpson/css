@@ -24,6 +24,19 @@ from cs.deco import fmtdoc
 from cs.lex import r
 from cs.pfx import pfx_call
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 3 - Alpha",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'icontract',
+        'matplotlib',
+        'typeguard',
+    ],
+}
+
 DEFAULT_FIGURE_SIZE = 10, 7
 DEFAULT_FIGURE_DPI = 100
 
