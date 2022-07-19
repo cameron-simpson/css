@@ -51,7 +51,6 @@ from mmap import (
 import os
 from os.path import (
     basename,
-    dirname,
     exists as existspath,
     isdir as isdirpath,
     isfile as isfilepath,
@@ -60,7 +59,6 @@ from os.path import (
 )
 from pprint import pformat
 from struct import pack  # pylint: disable=no-name-in-module
-from subprocess import run
 import sys
 from tempfile import TemporaryDirectory
 import time
@@ -301,7 +299,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           raise ValueError(
               "%r: neither int nor float nor dateutil.parser.parse format: %s"
               % (timespec, e)
-          )
+          ) from e
         if dt.tzinfo is None:
           # assume local time if we get a naive datetime
           dt = dt.replace(tzinfo=tzlocal())
@@ -822,7 +820,7 @@ def timerange(method, needs_start=False, needs_stop=False):
       It is an error to specify both `utcoffset` and `tz`.
   '''
 
-  # pylint: disable=keyword-arg-before-vararg
+  # pylint: disable=keyword-arg-before-vararg,too-many-branches
   @typechecked
   def timerange_method_wrapper(
       *a,
@@ -1543,7 +1541,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       The file is saved when the context manager exits or when `.save()` is called.
       This maximises efficiency when many accesses are done.
 
-      The `mmap` mode maps the file into memory, and accesses work
+      The `mmap` mode maps the file into memory, and accesses operate
       directly against the file contents.
       This is more efficient for just a few accesses,
       but every "write" access (setting a datum) will make the mmapped page dirty,
@@ -1553,7 +1551,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
       Presently the mode used is triggered by the access method.
       Using the `peek` and `poke` methods uses `mmap` by default.
-      Other accesses default to the use the in-memory mode.
+      Other accesses default to use the in-memory mode.
       Access to the `.array` property forces use of the `array` mode.
       Poll/update operations should usually choose to use `peek`/`poke`.
   '''
@@ -1583,11 +1581,12 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           and the `typecode` will be obtained from its header
         * `epoch`: optional `Epoch` specifying the start time and
           step size for the time series data in the file;
+          if specified and the data file exists, they must match;
           if not specified then the data file must exist
           and the `epoch` will be obtained from its header
         * `fill`: optional default fill values for `pad_to`;
           if unspecified, fill with `0` for `'q'`
-          and `float('nan') for `'d'`
+          and `float('nan')` for `'d'`
     '''
     epoch = Epoch.promote(epoch)
     HasFSPath.__init__(self, fspath)
@@ -2704,6 +2703,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         * `stop`: optional stop, default `self.stop`
         * `keys`: optional list of keys, default all keys
         * `label`: optional label for the graph
+        * `runstate`: optional `RunState` to allow interruption
         Other keyword parameters are passed to `DataFrame.plot`.
     '''
     if keys is None:
