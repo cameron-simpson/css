@@ -5,7 +5,7 @@
 '''
 
 import sys
-from threading import Lock, RLock
+from threading import RLock
 import time
 from typing import Callable, TypeVar, Union
 
@@ -20,8 +20,18 @@ from cs.py.func import funcname
 from cs.queues import ListQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result, CancellationError
-from cs.seq import Seq
+from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, State as ThreadState
+
+def main(_):
+  ''' Dummy main programme to exercise something.
+  '''
+  t1 = Task("t1", lambda: print("t1"), track=True)
+  t2 = t1.then("t2", lambda: print("t2"), track=True)
+  ##q = TaskQueue(t1, t2)
+  q = TaskQueue(t1, run_dependent_tasks=True)
+  for t in q.run():
+    print("completed", t)
 
 class TaskError(FSMError):
   ''' Raised by `Task` related errors.
@@ -457,7 +467,7 @@ def make(*tasks, fail_fast=False):
           t2 PENDING->dispatch->RUNNING
           doing t2
           t2 RUNNING->done->DONE
-          [<cs.taskqueue.Task object at ...>]
+          [Task('t2',<function <lambda> at ...>,state='DONE')]
   '''
   tasks0 = set(tasks)
   q = ListQueue(tasks)
@@ -523,6 +533,38 @@ class TaskQueue:
 
       Unlike `make` and `Task.make`, this is aimed at a "dispatch" worker
       which dispatches individual tasks as required.
+
+      Example 1, put 2 dependent tasks in a queue and run:
+
+           >>> t1 = Task("t1", lambda: print("t1"))
+           >>> t2 = t1.then("t2", lambda: print("t2"))
+           >>> q = TaskQueue(t1, t2)
+           >>> for _ in q.run(): pass
+           ...
+           t1
+           t2
+
+      Example 2, put 1 task in a queue and run.
+      The queue only runs the specified tasks:
+
+           >>> t1 = Task("t1", lambda: print("t1"))
+           >>> t2 = t1.then("t2", lambda: print("t2"))
+           >>> q = TaskQueue(t1)
+           >>> for _ in q.run(): pass
+           ...
+           t1
+
+      Example 2, put 1 task in a queue with `run_dependent_tasks=True` and run.
+      The queue pulls in the dependencies of completed tasks and also runs those:
+
+
+           >>> t1 = Task("t1", lambda: print("t1"))
+           >>> t2 = t1.then("t2", lambda: print("t2"))
+           >>> q = TaskQueue(t1, run_dependent_tasks=True)
+           >>> for _ in q.run(): pass
+           ...
+           t1
+           t2
   '''
 
   def __init__(self, *tasks, run_dependent_tasks=False):
@@ -533,7 +575,7 @@ class TaskQueue:
     self._up = set()  # unblocked pending
     self._ready = set()  # completed tasks
     self._unready = set()  # not unblocked pending and not completed
-    self._lock = Lock()
+    self._lock = RLock()
     for t in tasks:
       self.add(t)
 
@@ -545,19 +587,27 @@ class TaskQueue:
     self._tasks.add(task)
     self._update_sets(task)
 
-  def _set_add(self, taskset, task):
+  @staticmethod
+  def _set_add(taskset, task):
+    ''' Add `task` to `taskset`, return whether it was new.
+    '''
     if task in taskset:
       return False
     taskset.add(task)
     return True
 
-  def _set_discard(self, taskset, task):
+  @staticmethod
+  def _set_discard(taskset, task):
+    ''' Discard `task` to `taskset`, return whether it removed.
+    '''
     if task not in taskset:
       return False
     taskset.remove(task)
     return True
 
   def _update_sets(self, task):
+    ''' Update the queue set membership for `task`.
+    '''
     changed = False
     if task not in self._tasks:
       warning("%s._update_sets: ignoring untracked task %s", self, task)
@@ -640,7 +690,6 @@ class TaskQueue:
 def task(func, task_class=Task):
   ''' Decorator for a function which runs it as a `Task`.
       The function may still be called directly.
-      The function should accept a `Task` as its first argument.
 
       The following function attributes are provided:
       * `dispatch(after=(),deferred=False,delay=0.0)`: run this function
@@ -730,3 +779,6 @@ def task(func, task_class=Task):
 
   task_func_wrapper.dispatch = dispatch
   return task_func_wrapper
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
