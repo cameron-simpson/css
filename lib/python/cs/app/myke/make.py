@@ -188,7 +188,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
     ''' Remove this target from the set of "in progress" targets.
     '''
     self.debug_make(
-        "note target %r as inactive (%s)", target.name, target.state
+        "note target %r as inactive (%s)", target.name, target.fsm_state
     )
     with self._active_lock:
       self.active.remove(target)
@@ -565,8 +565,8 @@ class Target(Result):
     #
 
   def __str__(self):
-    return "{}[{}]".format(self.name, self.state)
-    ##return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
+    return "{}[{}]".format(self.name, self.fsm_state)
+    ##return "{}[{}]:{}:{}".format(self.name, self.fsm_state, self._prereqs, self._postprereqs)
 
   def mdebug(self, msg, *a):
     ''' Emit a debug message.
@@ -690,7 +690,7 @@ class Target(Result):
           # commence make of this Target
           self.maker.target_active(self)
           self.notify(self.maker.target_inactive)
-          self.state = self.RUNNING
+          self.dispatch()
           self.was_missing = self.mtime is None
           self.pending_actions = list(self.actions)
           Ts = []
