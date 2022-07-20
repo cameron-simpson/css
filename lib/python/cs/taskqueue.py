@@ -525,9 +525,10 @@ class TaskQueue:
       which dispatches individual tasks as required.
   '''
 
-  def __init__(self, *tasks):
+  def __init__(self, *tasks,run_dependent_tasks=False):
     ''' Initialise the queue with the supplied `tasks`.
     '''
+    self.run_dependent_tasks=run_dependent_tasks
     self._tasks = set()
     self._up = set()  # unblocked pending
     self._ready = set()  # completed tasks
@@ -541,37 +542,53 @@ class TaskQueue:
   def add(self, task):
     ''' Add a task to the tasks managed by this queue.
     '''
+    self._tasks.add(task)
+    self._update_sets(task)
+
+  def _set_add(self, taskset, task):
+    if task in taskset:
+      return False
+    taskset.add(task)
+    return True
+
+  def _set_discard(self, taskset, task):
+    if task not in taskset:
+      return False
+    taskset.remove(task)
+    return True
+
+  def _update_sets(self, task):
+    changed = False
     if task not in self._tasks:
-      # apply the callback the first time a task is added to the queue
-      task.fsm_callback(FSM.FSM_ANY_STATE, self._on_state_change)
-      self._tasks.add(task)
-    # update the task categories
-    self._on_state_change(task, None)
+      warning("%s._update_sets: ignoring untracked task %s", self, task)
+    else:
+      if task.iscompleted():
+        # completed
+        changed |= self._set_discard(self._up, task)
+        changed |= self._set_add(self._ready, task)
+        changed |= self._set_discard(self._unready, task)
+      elif task.is_pending and not task.isblocked():
+        # pending unblocked
+        changed |= self._set_add(self._up, task)
+        changed |= self._set_discard(self._ready, task)
+        changed |= self._set_discard(self._unready, task)
+      else:
+        # unready
+        changed |= self._set_discard(self._up, task)
+        changed |= self._set_discard(self._ready, task)
+        changed |= self._set_add(self._unready, task)
+    return changed
 
   # pylint: disable=redefined-outer-name
   @locked
-  def _on_state_change(self, task, transition):
+  def _on_state_change(self, *tasks):
     ''' Update task state sets based on task state transitions.
     '''
-    print(task, transition)
-    if task not in self._tasks:
-      warning("%s: callback for untracked task %s", self, task)
-      return
-    if task.iscompleted():
-      # completed
-      self._up.discard(task)
-      self._ready.add(task)
-      self._unready.discard(task)
-    elif task.is_pending and not task.isblocked():
-      # pending unblocked
-      self._up.add(task)
-      self._ready.discard(task)
-      self._unready.discard(task)
-    else:
-      # unready
-      self._up.discard(task)
-      self._ready.discard(task)
-      self._unready.add(task)
+    q = ListQueue(tasks)
+    for task in unrepeated(q):
+      changed = self._update_sets(task)
+      if changed:
+        q.extend(task.blocking)
 
   # pylint: disable=redefined-outer-name
   def get(self):
@@ -588,7 +605,6 @@ class TaskQueue:
       except KeyError:
         return None
     self._tasks.remove(task)
-    task.fsm_callback_discard(self._on_state_change)
     return task
 
   # pylint: disable=redefined-outer-name
@@ -611,6 +627,11 @@ class TaskQueue:
         break
       if not task.iscompleted():
         task.dispatch()
+        # update the state of tasks we are blocking
+        if self.run_dependent_tasks:
+          # add these tasks to the queue
+          self._tasks|=set(task.blocking)
+        self._on_state_change(*task.blocking)
       yield task
 
 @decorator
