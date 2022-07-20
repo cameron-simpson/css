@@ -1,3 +1,4 @@
+replace calls to .format with f-strings
 Target to become a Task
 Action to become a Task
 rework Maker using cs.result.Task?
