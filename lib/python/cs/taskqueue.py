@@ -525,10 +525,10 @@ class TaskQueue:
       which dispatches individual tasks as required.
   '''
 
-  def __init__(self, *tasks,run_dependent_tasks=False):
+  def __init__(self, *tasks, run_dependent_tasks=False):
     ''' Initialise the queue with the supplied `tasks`.
     '''
-    self.run_dependent_tasks=run_dependent_tasks
+    self.run_dependent_tasks = run_dependent_tasks
     self._tasks = set()
     self._up = set()  # unblocked pending
     self._ready = set()  # completed tasks
@@ -608,7 +608,7 @@ class TaskQueue:
     return task
 
   # pylint: disable=redefined-outer-name
-  def run(self, runstate=None):
+  def run(self, runstate=None, once=False):
     ''' Process tasks in the queue until the queue has no completed tasks,
         yielding each task, immediately if `task.iscompleted()`
         otherwise after `taks.dispatch()`.
@@ -630,9 +630,11 @@ class TaskQueue:
         # update the state of tasks we are blocking
         if self.run_dependent_tasks:
           # add these tasks to the queue
-          self._tasks|=set(task.blocking)
+          self._tasks |= set(task.blocking)
         self._on_state_change(*task.blocking)
       yield task
+      if once:
+        break
 
 @decorator
 def task(func, task_class=Task):
