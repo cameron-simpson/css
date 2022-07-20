@@ -77,7 +77,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20220311-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1575,6 +1575,7 @@ class SQLTags(BaseTagSets):
       self, name: Optional[str] = None, *, unixtime=None, tags=None
   ):
     ''' Fetch or create an `SQLTagSet` for `name`.
+        Return the `SQLTagSet`.
 
         Note that `name` may be `None` to create a new "log" entry.
     '''

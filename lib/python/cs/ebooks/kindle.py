@@ -12,7 +12,6 @@ from os.path import (
     isfile as isfilepath,
     join as joinpath,
 )
-from subprocess import run
 import sys
 
 from icontract import require
@@ -40,6 +39,7 @@ from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
+from cs.psutils import run
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -238,7 +238,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
               fmtpath = cbook.formatpath(fmtk)
               if fmtpath and filecmp.cmp(fmtpath, azwpath):
                 # pylint: disable=expression-not-assigned
-                quiet or print(
+                verbose and print(
                     cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
                 )
                 return cbook, False

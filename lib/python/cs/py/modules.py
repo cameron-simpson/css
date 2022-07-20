@@ -14,7 +14,7 @@ from cs.context import stackattrs
 from cs.gimmicks import warning
 from cs.pfx import Pfx
 
-__version__ = '20210123-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -168,7 +168,7 @@ def direct_imports(src_filename, module_name=None):
 
 def import_extra(extra_package_name, distinfo):
   ''' Try to import the package named `extra_package_name`
-      using `importlib.import_module` and return the imported package.
+      using `importlib.import_module`. Return the imported package.
 
       If an `ImportError` is raised,
       riffle through the extras mapping in `distinfo['extras_requires']`
