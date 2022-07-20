@@ -163,6 +163,7 @@ class Task(FSM, RunStateMixin):
     runstate = RunState(name)
     RunStateMixin.__init__(self, runstate)
     self.required = set()
+    self.blocking = set()
     self.cancel_on_exception = cancel_on_exception
     self.cancel_on_result = cancel_on_result
     self.func = func
@@ -273,6 +274,7 @@ class Task(FSM, RunStateMixin):
     '''
     with self._lock:
       self.required.add(otask)
+      otask.blocking.add(self)
 
   def block(self, otask):
     ''' Block another task until we are complete.
