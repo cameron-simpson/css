@@ -36,7 +36,7 @@ FSMTransitionEvent = namedtuple(
 class FSM:
   ''' Base class for a finite state machine (FSM).
 
-      The allowed states and transitions are definted by the class
+      The allowed states and transitions are defined by the class
       attribute `FSM_TRANSITIONS`, a mapping of
       *state*->*event*->*new_state*.
 
