@@ -1,3 +1,4 @@
+Target: working dir for action commands
 Target should be a FSPathBasedSingleton, step towards one maker for an entire tree
 replace calls to .format with f-strings
 Target to become a Task
