@@ -134,10 +134,11 @@ class Result(object):
         * `name`: optional parameter naming this object.
         * `lock`: optional locking object, defaults to a new `threading.Lock`.
         * `result`: if not `None`, prefill the `.result` property.
-        * `extra`: a mapping of extra information to associate with the `Result`,
-          useful to provide context when collecting the result;
-          the `Result` has a public attribute `.extra`
-          which is an `AttrableMapping` to hold this information.
+        * `extra`: an optional mapping of extra information to
+          associate with the `Result`, useful to provide context
+          when collecting the result; the `Result` has a public
+          attribute `.extra` which is an `AttrableMapping` to hold
+          this information.
     '''
     if lock is None:
       lock = RLock()
