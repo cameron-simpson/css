@@ -180,6 +180,9 @@ class Task(FSM, RunStateMixin):
   def __str__(self):
     return f'{type(self).__name__}:{self.name}:{self.fsm_state}'
 
+  def __repr__(self):
+    return f'{type(self).__name__}({self.name!r},{self.func!r},state={self.fsm_state!r})'
+
   def __hash__(self):
     return id(self)
 
@@ -270,7 +273,7 @@ class Task(FSM, RunStateMixin):
   @require(lambda self: self.is_prepare or self.is_pending)
   def require(self, otask: 'TaskSubType'):
     ''' Add a requirement that `otask` be complete before we proceed.
-        This si the simple `Task` only version of `.then()`.
+        This is the simple `Task` only version of `.then()`.
     '''
     with self._lock:
       self.required.add(otask)
