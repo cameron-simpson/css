@@ -99,6 +99,15 @@ def axes(figure=None, ax=None, **fig_kw) -> Axes:
       ax = figure.axes[0 if ax is None else ax]
   return ax
 
+def remove_decorations(figure):
+  ''' Remove all decorations from a figure, intended for make bare
+      plots, such as a tile in GUI.
+  '''
+  for ax in figure.axes:
+    ax.set_axis_off()
+    ax.get_legend().remove()
+  figure.subplots_adjust(bottom=0, top=1, left=0, right=1, hspace=0, wspace=0)
+
 # pylint: disable=redefined-builtin
 @contextmanager
 def saved_figure(figure_or_ax, dir=None, ext=None):

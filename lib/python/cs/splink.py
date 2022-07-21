@@ -42,7 +42,7 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import s
 from cs.logutils import warning, error
-from cs.mplutils import axes, print_figure, save_figure
+from cs.mplutils import axes, remove_decorations, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
@@ -879,6 +879,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] start-time [stop-time] {{mode|[dataset:]{{glob|field}}}}...
+        --bare          Strip axes and padding from the plot.
         -e events,...   Display the specified events.
         -f              Force. Overwirte the image path even if it exists.
         --stacked       Stack graphed values on top of each other.
@@ -901,6 +902,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     '''
     options = self.options
     options.tz = tzlocal()
+    options.bare = False
     options.show_image = False
     options.imgpath = None
     options.stacked = False
@@ -909,6 +911,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     self.popopts(
         argv,
         options,
+        bare='bare',
         e_='event_labels',
         f='force',
         o_='imgpath',
@@ -925,6 +928,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
         stop = time.time()
+    bare = options.bare
     force = options.force
     imgpath = options.imgpath
     spd = options.spd
@@ -939,6 +943,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         event_labels=event_labels,
         stacked=stacked
     )
+    if bare:
+      remove_decorations(figure)
     if imgpath:
       save_figure(figure, imgpath, force=force)
       if show_image:
