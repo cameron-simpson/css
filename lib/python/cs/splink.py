@@ -879,26 +879,28 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] start-time [stop-time] {{mode|[dataset:]{{glob|field}}}}...
-        --bare          Strip axes and padding from the plot.
-        -e events,...   Display the specified events.
-        -f              Force. Overwirte the image path even if it exists.
-        --stacked       Stack graphed values on top of each other.
-        -o imagepath    Write the plot to imagepath.
-                        If not specified, the image will be written
-                        to the standard output in sixel format if
-                        it is a terminal, and in PNG format otherwise.
-        --show          Open the image path with "open".
-        --tz tzspec     Skew the UTC times presented on the graph
-                        to emulate the timezone specified by tzspec.
-                        The default skew is the system local timezone.
-        start-time      An integer number of days before the current time
-                        or any datetime specification recognised by
-                        dateutil.parser.parse.
-        stop-time       Optional stop time, default now.
-                        An integer number of days before the current time
-                        or any datetime specification recognised by
-                        dateutil.parser.parse.
-        mode            A named graph mode, implying a group of fields.
+          Plot the data from specified fields for the specified time range.
+          Options:
+            --bare          Strip axes and padding from the plot.
+            -e events,...   Display the specified events.
+            -f              Force. Overwirte the image path even if it exists.
+            --stacked       Stack graphed values on top of each other.
+            -o imagepath    Write the plot to imagepath.
+                            If not specified, the image will be written
+                            to the standard output in sixel format if
+                            it is a terminal, and in PNG format otherwise.
+            --show          Open the image path with "open".
+            --tz tzspec     Skew the UTC times presented on the graph
+                            to emulate the timezone specified by tzspec.
+                            The default skew is the system local timezone.
+            start-time      An integer number of days before the current time
+                            or any datetime specification recognised by
+                            dateutil.parser.parse.
+            stop-time       Optional stop time, default now.
+                            An integer number of days before the current time
+                            or any datetime specification recognised by
+                            dateutil.parser.parse.
+            mode            A named graph mode, implying a group of fields.
     '''
     options = self.options
     options.tz = tzlocal()
