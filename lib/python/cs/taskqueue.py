@@ -4,6 +4,7 @@
     dependencies and failure/retry.
 '''
 
+from itertools import chain
 import sys
 from threading import RLock
 import time
@@ -14,6 +15,7 @@ from typeguard import typechecked
 
 from cs.deco import decorator
 from cs.fsm import FSM, FSMError
+from cs.gvutils import quote as gvq, gvprint
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import funcname
@@ -138,6 +140,14 @@ class Task(FSM, RunStateMixin):
 
   FSM_DEFAULT_STATE = 'PENDING'
 
+  DOT_NODE_FILL_PALETTE = {
+      'DONE': 'green',
+      'FAILED': 'red',
+      'CANCELLED': 'gray',
+      'ABORT': 'darkred',
+      None: 'white',
+  }
+
   _seq = Seq()
 
   _state = ThreadState(current_task=None, initial_state=FSM_DEFAULT_STATE)
@@ -198,6 +208,69 @@ class Task(FSM, RunStateMixin):
 
   def __eq__(self, otask):
     return self is otask
+
+  @classmethod
+  def tasks_as_dot(
+      cls,
+      tasks,
+      name=None,
+      *,
+      follow_blocking=False,
+      sep=None,
+      node_fill_palette=None,
+  ):
+    ''' Return a DOT syntax digraph of the iterable `tasks`.
+        Nodes will be coloured according to `DOT_NODE_FILL_PALETTE`
+        based on their state.
+
+        Parameters:
+        * `tasks`: an iterable of `Task`s to populate the graph
+        * `name`: optional graph name
+        * `follow_blocking`: optional flag to follow each `Task`'s
+          `.blocking` attribute recursively and also render those
+          `Task`s
+        * `sep`: optional node seprator, default `'\n'`
+        * `node_palette`: optional node `fillcolor` palatte based
+          on the `Task.fsm_state`; default `Task.DOT_NODE_FILL_PALETTE`
+    '''
+    if sep is None:
+      sep = '\n'
+    if node_fill_palette is None:
+      node_fill_palette = cls.DOT_NODE_FILL_PALETTE
+    digraph = [f'digraph {gvq(name)} {{' if name else 'digraph {']
+    q = ListQueue(unrepeated(tasks))
+    for qtask in unrepeated(q):
+      node_attrs = dict(style='solid')
+      node_attrs.update(style='solid')
+      node_fill_colour = None
+      try:
+        node_fill_colour = node_fill_palette[qtask.fsm_state]
+      except KeyError:
+        node_fill_colour = node_fill_palette.get(None, 'white')
+      if node_fill_colour is not None:
+        node_attrs.update(style='filled')
+        node_attrs.update(fillcolor=node_fill_colour)
+      node_attrs_s = ','.join(
+          f'{gvq(attr)}={gvq(value)}' for attr, value in node_attrs.items()
+      )
+      digraph.append(f'  {gvq(qtask.name)}[{node_attrs_s}];')
+      blocking = sorted(qtask.blocking, key=lambda t: t.name)
+      for subt in blocking:
+        digraph.append(f'  {gvq(qtask.name)}->{gvq(subt.name)};')
+      if follow_blocking:
+        q.extend(blocking)
+    digraph.append('}')
+    return sep.join(digraph)
+
+  def as_dot(self, name=None, **kw):
+    ''' Return a DOT syntax digraph starting at this `Task`.
+        Parameters are as for `Task.tasks_as_dot`.
+    '''
+    return self.tasks_as_dot(
+        [self],
+        name=name,
+        **kw,
+    )
 
   def __call__(self):
     ''' Block on `self.result` awaiting completion
@@ -578,6 +651,19 @@ class TaskQueue:
     self._lock = RLock()
     for t in tasks:
       self.add(t)
+
+  def as_dot(self, name=None, **kw):
+    ''' Compute a DOT syntax graph description of the tasks in the queue.
+    '''
+    return Task.tasks_as_dot(
+        chain(
+            sorted(self._ready, key=lambda t: t.name),
+            sorted(self._up, key=lambda t: t.name),
+            sorted(self._unready, key=lambda t: t.name),
+        ),
+        name,
+        **kw,
+    )
 
   # pylint: disable=redefined-outer-name
   @locked
