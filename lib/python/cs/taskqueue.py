@@ -241,7 +241,6 @@ class Task(FSM, RunStateMixin):
     q = ListQueue(unrepeated(tasks))
     for qtask in unrepeated(q):
       node_attrs = dict(style='solid')
-      node_attrs.update(style='solid')
       node_fill_colour = None
       try:
         node_fill_colour = node_fill_palette[qtask.fsm_state]
@@ -250,6 +249,9 @@ class Task(FSM, RunStateMixin):
       if node_fill_colour is not None:
         node_attrs.update(style='filled')
         node_attrs.update(fillcolor=node_fill_colour)
+      task_node_attrs = qtask.dot_node_attrs()
+      if task_node_attrs:
+        node_attrs.update(**task_node_attrs)
       node_attrs_s = ','.join(
           f'{gvq(attr)}={gvq(value)}' for attr, value in node_attrs.items()
       )
@@ -271,6 +273,14 @@ class Task(FSM, RunStateMixin):
         name=name,
         **kw,
     )
+
+  def dot_node_attrs(self):
+    ''' Hook to return a mapping of DOT specific node attributes
+        particular to this `Task`, such as `href` for image maps.
+
+        This default implementation returns `None`.
+    '''
+    return None
 
   def __call__(self):
     ''' Block on `self.result` awaiting completion
