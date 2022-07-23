@@ -244,25 +244,13 @@ class Task(FSM, RunStateMixin):
     digraph = [f'digraph {gvq(name)} {{' if name else 'digraph {']
     q = ListQueue(unrepeated(tasks))
     for qtask in unrepeated(q):
-      node_attrs = dict(style='solid')
-      node_fill_colour = None
-      try:
-        node_fill_colour = node_fill_palette[qtask.fsm_state]
-      except KeyError:
-        node_fill_colour = node_fill_palette.get(None, 'white')
-      if node_fill_colour is not None:
-        node_attrs.update(style='filled')
-        node_attrs.update(fillcolor=node_fill_colour)
-      task_node_attrs = qtask.dot_node_attrs()
-      if task_node_attrs:
-        node_attrs.update(**task_node_attrs)
-      node_attrs_s = ','.join(
-          f'{gvq(attr)}={gvq(value)}' for attr, value in node_attrs.items()
-      )
-      digraph.append(f'  {gvq(qtask.name)}[{node_attrs_s}];')
+      nodedef = qtask.dot_node()
+      digraph.append(f'  {nodedef};')
       blocking = sorted(qtask.blocking, key=lambda t: t.name)
       for subt in blocking:
-        digraph.append(f'  {gvq(qtask.name)}->{gvq(subt.name)};')
+        digraph.append(
+            f'  {gvq(qtask.dot_node_label())}->{gvq(subt.dot_node_label())};'
+        )
       if follow_blocking:
         q.extend(blocking)
     digraph.append('}')
@@ -278,13 +266,10 @@ class Task(FSM, RunStateMixin):
         **kw,
     )
 
-  def dot_node_attrs(self):
-    ''' Hook to return a mapping of DOT specific node attributes
-        particular to this `Task`, such as `href` for image maps.
-
-        This default implementation returns `None`.
+  def dot_node_label(self):
+    ''' The default DOT node label.
     '''
-    return None
+    return f'{self.name}\n{self.fsm_state}'
 
   def __call__(self):
     ''' Block on `self.result` awaiting completion
