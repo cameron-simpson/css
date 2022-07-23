@@ -151,6 +151,7 @@ class Task(FSM, RunStateMixin):
   FSM_DEFAULT_STATE = 'PENDING'
 
   DOT_NODE_FILL_PALETTE = {
+      'RUNNING': 'yellow',
       'DONE': 'green',
       'FAILED': 'red',
       'CANCELLED': 'gray',
