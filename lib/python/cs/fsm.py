@@ -170,10 +170,10 @@ class FSM(DOTNodeMixin):
     return list(self.FSM_TRANSITIONS[self.fsm_state])
 
   def fsm_callback(self, state, callback):
-    ''' Register a callback for to be called immediately on transition
+    ''' Register a callback to be called immediately on transition
         to `state` as `callback(self,FSMEventTransition)`.
         The special `state` value `FSM.FSM_ANY_STATE` may be supplied
-        to register a callback which fires for every state transation.
+        to register a callback which fires for every state transition.
 
             >>> fsm = FSM('state1',transitions={
             ...   'state1':{'ev_a':'state2'},
