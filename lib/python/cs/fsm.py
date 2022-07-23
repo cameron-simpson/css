@@ -11,7 +11,7 @@ from typing import Optional, TypeVar
 from typeguard import typechecked
 
 from cs.gimmicks import warning
-from cs.gvutils import gvprint, quote as gvq
+from cs.gvutils import gvprint, quote as gvq, DOTNodeMixin
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 
@@ -33,7 +33,7 @@ FSMTransitionEvent = namedtuple(
     'FSMTransitionEvent', 'old_state new_state event when extra'
 )
 
-class FSM:
+class FSM(DOTNodeMixin):
   ''' Base class for a finite state machine (FSM).
 
       The allowed states and transitions are defined by the class
@@ -231,6 +231,38 @@ class FSM:
     ''' A DOT syntax description of `self.FSM_TRANSITIONS`.
     '''
     return self.fsm_transitions_as_dot(self.FSM_TRANSITIONS)
+
+  def dot_node_fillcolor(self) -> Optional[str]:
+    ''' The default DOT node `fillcolor`.
+        Return a color name or `None`.
+
+        This implementation looks up `self.fsm_state`
+        in `self.DOT_NODE_FILL_PALETTE` if that exists.
+        A default color can be provided with the key `None`
+        in the palette mapping.
+    '''
+    fillcolor = None
+    try:
+      fill_palette = self.DOT_NODE_FILL_PALETTE
+    except AttributeError:
+      # no colour palette
+      pass
+    else:
+      try:
+        fillcolor = fill_palette[self.fsm_state]
+      except KeyError:
+        fillcolor = fill_palette.get(None)
+    return fillcolor
+
+  def dot_node_attrs(self):
+    ''' DOT Node attributes.
+    '''
+    attrs = super().dot_node_attrs()
+    fillcolor = self.dot_node_fillcolor()
+    if fillcolor is not None:
+      attrs.update(style='filled')
+      attrs.update(fillcolor=fillcolor)
+    return attrs
 
   def fsm_print(self, file=None, fmt=None, layout=None, **dot_kw):
     ''' Print the state transition diagram to `file`, default `sys.stdout`,
