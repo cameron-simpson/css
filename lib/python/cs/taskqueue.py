@@ -28,16 +28,22 @@ from cs.threads import bg as bg_thread, locked, State as ThreadState
 def main(argv):
   ''' Dummy main programme to exercise something.
   '''
-  cmd=argv.pop(0)
+  cmd = argv.pop(0)
   layout = argv.pop(0) if argv else 'dot'
   t1 = Task("t1", lambda: print("t1"), track=True)
   t2 = t1.then("t2", lambda: print("t2"), track=True)
   t3 = t1.then("t3", lambda: print("t3"), track=True)
   t2b = t2.then("t2b", lambda: print("t2b"), track=True)
   ##q = TaskQueue(t1, t2)
-  q = TaskQueue(t1, run_dependent_tasks=True)
-  for t in q.run():
-    print("completed", t)
+  q = TaskQueue(t1, t2, t3, t2b, run_dependent_tasks=True)
+  t1.dispatch()
+  dot = t1.as_dot("T1", follow_blocking=True)
+  print(dot)
+  gvprint(dot, layout=layout, fmt='svg')
+  gvprint(dot, layout=layout, fmt='cmapx')
+  gvprint(dot, layout=layout)
+  ##for t in q.run():
+  ##  print("completed", t)
 
 class TaskError(FSMError):
   ''' Raised by `Task` related errors.
@@ -241,7 +247,10 @@ class Task(FSM, RunStateMixin):
       sep = '\n'
     if node_fill_palette is None:
       node_fill_palette = cls.DOT_NODE_FILL_PALETTE
-    digraph = [f'digraph {gvq(name)} {{' if name else 'digraph {']
+    digraph = [
+        f'digraph {gvq(name)} {{' if name else 'digraph {',
+        ##'graph[orientation=land]',
+    ]
     q = ListQueue(unrepeated(tasks))
     for qtask in unrepeated(q):
       nodedef = qtask.dot_node()
