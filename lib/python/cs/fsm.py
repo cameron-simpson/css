@@ -237,13 +237,13 @@ class FSM(DOTNodeMixin):
         Return a color name or `None`.
 
         This implementation looks up `self.fsm_state`
-        in `self.DOT_NODE_FILL_PALETTE` if that exists.
+        in `self.DOT_NODE_FILLCOLOR_PALETTE` if that exists.
         A default color can be provided with the key `None`
         in the palette mapping.
     '''
     fillcolor = None
     try:
-      fill_palette = self.DOT_NODE_FILL_PALETTE
+      fill_palette = self.DOT_NODE_FILLCOLOR_PALETTE
     except AttributeError:
       # no colour palette
       pass

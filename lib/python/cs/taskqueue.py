@@ -150,7 +150,7 @@ class Task(FSM, RunStateMixin):
 
   FSM_DEFAULT_STATE = 'PENDING'
 
-  DOT_NODE_FILL_PALETTE = {
+  DOT_NODE_FILLCOLOR_PALETTE = {
       'RUNNING': 'yellow',
       'DONE': 'green',
       'FAILED': 'red',
@@ -228,10 +228,9 @@ class Task(FSM, RunStateMixin):
       *,
       follow_blocking=False,
       sep=None,
-      node_fill_palette=None,
   ):
     ''' Return a DOT syntax digraph of the iterable `tasks`.
-        Nodes will be coloured according to `DOT_NODE_FILL_PALETTE`
+        Nodes will be coloured according to `DOT_NODE_FILLCOLOR_PALETTE`
         based on their state.
 
         Parameters:
@@ -241,13 +240,9 @@ class Task(FSM, RunStateMixin):
           `.blocking` attribute recursively and also render those
           `Task`s
         * `sep`: optional node seprator, default `'\n'`
-        * `node_palette`: optional node `fillcolor` palatte based
-          on the `Task.fsm_state`; default `Task.DOT_NODE_FILL_PALETTE`
     '''
     if sep is None:
       sep = '\n'
-    if node_fill_palette is None:
-      node_fill_palette = cls.DOT_NODE_FILL_PALETTE
     digraph = [
         f'digraph {gvq(name)} {{' if name else 'digraph {',
         ##'graph[orientation=land]',
