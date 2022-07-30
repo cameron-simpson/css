@@ -438,7 +438,8 @@ def unrepeated(it, seen=None, signature=None):
         which produces the value to compare to recognise repeated items;
         its values are stored in the `seen` set
 
-      The default `signature` function is identity - items are stored and compared.
+      The default `signature` function is identity, the item itself;
+      items are stored and compared.
       This requires the items to be hashable and support equality tests.
       The same applies to whatever values the `signature` function produces.
 

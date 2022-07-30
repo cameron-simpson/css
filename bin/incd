@@ -35,7 +35,7 @@ done
 
 if [ $# = 0 ]
 then
-  if target=$( fstags ls -d -o "{$fstags_latest}" . ) && [ -n "$target" ]
+  if target=$( fstag "$fstags_latest" ) && [ -n "$target" ]
   then
     set_latest=
   else

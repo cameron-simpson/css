@@ -53,25 +53,20 @@ You can also collect multiple `Result`s in completion order using the `report()`
         print(x)    # print result
 '''
 
-try:
-  from enum import Enum
-except ImportError:
-  from enum34 import Enum  # type: ignore
 import sys
 from threading import Lock, RLock
-import time
 
 from icontract import require
 
-from cs.deco import decorator
-from cs.logutils import exception, error, warning, debug
+from cs.deco import OBSOLETE
+from cs.fsm import FSM
+from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import pfx_method
 from cs.py.func import funcname
 from cs.py3 import Queue, raise3, StringTypes
-from cs.resources import RunState
 from cs.seq import seq, Seq
-from cs.threads import bg as bg_thread, State as ThreadState
+from cs.threads import bg as bg_thread
 
 __version__ = '20220311-post'
 
@@ -84,6 +79,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.fsm',
         'cs.logutils',
         'cs.mappings',
         'cs.pfx',
@@ -95,17 +91,6 @@ DISTINFO = {
         'icontract',
     ],
 }
-
-class ResultState(Enum):
-  ''' State tokens for `Result`s.
-  '''
-  pending = 'pending'
-  running = 'running'
-  ready = 'ready'
-  cancelled = 'cancelled'
-
-# compatability name
-AsynchState = ResultState
 
 class CancellationError(Exception):
   ''' Raised when accessing `result` or `exc_info` after cancellation.
@@ -119,36 +104,62 @@ class CancellationError(Exception):
     Exception.__init__(self, msg)
 
 # pylint: disable=too-many-instance-attributes
-class Result(object):
-  ''' Basic class for asynchronous collection of a result.
-      This is also used to make `OnDemandFunction`s, `LateFunction`s and other
-      objects with asynchronous termination.
+class Result(FSM):
+  ''' Base class for asynchronous collection of a result.
+      This is used to make `Result`, `OnDemandFunction`s, `LateFunction`s
+      and other objects with asynchronous termination.
+
+      In addition to the methods below, for each state value such
+      as `self.PENDING` there is a corresponding attribute `is_pending`
+      testing whether the `Result` is in that state.
   '''
 
   _seq = Seq()
 
-  def __init__(self, name=None, lock=None, result=None, extra=None):
+  FSM_TRANSITIONS = {
+      'PREPARE': {
+          'prepared': 'PENDING',
+      },
+      'PENDING': {
+          'dispatch': 'RUNNING',
+          'cancel': 'CANCELLED',
+          'complete': 'DONE',
+      },
+      'RUNNING': {
+          'cancel': 'CANCELLED',
+          'complete': 'DONE',
+      },
+      'CANCELLED': {},
+      'DONE': {},
+  }
+
+  # pylint: disable=too-many-arguments
+  def __init__(
+      self, name=None, lock=None, result=None, state=None, extra=None
+  ):
     ''' Base initialiser for `Result` objects and subclasses.
 
         Parameter:
         * `name`: optional parameter naming this object.
         * `lock`: optional locking object, defaults to a new `threading.Lock`.
         * `result`: if not `None`, prefill the `.result` property.
-        * `extra`: a mapping of extra information to associate with the `Result`,
-          useful to provide context when collecting the result;
-          the `Result` has a public attribute `.extra`
-          which is an `AttrableMapping` to hold this information.
+        * `extra`: an optional mapping of extra information to
+          associate with the `Result`, useful to provide context
+          when collecting the result; the `Result` has a public
+          attribute `.extra` which is an `AttrableMapping` to hold
+          this information.
     '''
     if lock is None:
       lock = RLock()
     if name is None:
       name = "%s-%d" % (type(self).__name__, next(self._seq))
+    if state is None:
+      state = self.PENDING
     self.name = name
     self.extra = AttrableMapping()
     if extra:
       self.extra.update(extra)
-    self.state = ResultState.pending
-    self.notifiers = []
+    FSM.__init__(self, state, lock=lock)
     self.collected = False
     self._get_lock = Lock()
     self._get_lock.acquire()  # pylint: disable=consider-using-with
@@ -157,13 +168,13 @@ class Result(object):
       self.result = result
 
   def __str__(self):
-    return "%s[%r:%s]" % (type(self).__name__, self.name, self.state)
+    return "%s[%r:%s]" % (type(self).__name__, self.name, self.fsm_state)
 
   __repr__ = __str__
 
   def __del__(self):
     if not self.collected:
-      if self.ready:
+      if self.is_done:
         exc_info = self.exc_info
         if exc_info:
           raise RuntimeError("UNREPORTED EXCEPTION: %r" % (exc_info,))
@@ -175,22 +186,34 @@ class Result(object):
     return self is other
 
   @property
-  def ready(self):
-    ''' Whether the `Result` state is ready or cancelled.
+  @OBSOLETE("fsm_state")
+  def state(self):
+    ''' The `FSM` state (obsolete).
+        Obsolete: use `.fsm_state`.
     '''
-    return self.state in (ResultState.ready, ResultState.cancelled)
+    return self.fsm_state
 
   @property
+  def ready(self):
+    ''' True if `Result` state is `DONE` or `CANCLLED`..
+    '''
+    return self.fsm_state in (self.DONE, self.CANCELLED)
+
+  @property
+  @OBSOLETE("is_cancelled")
   def cancelled(self):
     ''' Test whether this `Result` has been cancelled.
+        Obsolete: use `.is_cancelled`.
     '''
-    return self.state == ResultState.cancelled
+    return self.fsm_state == self.CANCELLED
 
   @property
+  @OBSOLETE("is_pending")
   def pending(self):
     ''' Whether the `Result` is pending.
+        Obsolete: use `.is_pending`.
     '''
-    return self.state == ResultState.pending
+    return self.fsm_state == self.PENDING
 
   def empty(self):
     ''' Analogue to `Queue.empty()`.
@@ -199,27 +222,18 @@ class Result(object):
 
   def cancel(self):
     ''' Cancel this function.
-        If `self.state` is pending or cancelled, return `True`.
+        If `self.fsm_state` is `PENDING`` or `'CANCELLED'`, return `True`.
         Otherwise return `False` (too late to cancel).
     '''
     with self._lock:
-      state = self.state
-      if state == ResultState.cancelled:
+      state = self.fsm_state
+      if state == self.CANCELLED:
         # already cancelled - this is ok, no call to ._complete
         return True
-      if state == ResultState.ready:
+      if state == self.DONE:
         # completed - "fail" the cancel, no call to ._complete
         return False
-      if state in (ResultState.running, ResultState.pending):
-        # in progress or not commenced - change state to cancelled and fall through to ._complete
-        self.state = ResultState.cancelled
-      else:
-        # state error
-        raise RuntimeError(
-            "<%s>.state not one of (pending, cancelled, running, ready): %r" %
-            (self, state)
-        )
-      self._complete(None, None)
+      self.fsm_event('cancel')
     return True
 
   @property
@@ -227,21 +241,19 @@ class Result(object):
     ''' The result.
         This property is not available before completion.
     '''
-    state = self.state
-    if state == ResultState.cancelled:
-      self.collected = True
+    state = self.fsm_state
+    if state not in (self.CANCELLED, self.DONE):
+      raise AttributeError("%s not ready: no .result attribute" % (self,))
+    self.collected = True
+    if state == self.CANCELLED:
       raise CancellationError()
-    if state == ResultState.ready:
-      self.collected = True
-      return self._result
-    raise AttributeError("%s not ready: no .result attribute" % (self,))
+    return self._result
 
   @result.setter
   def result(self, new_result):
     ''' Set the `.result` attribute, completing the `Result`.
     '''
-    with self._lock:
-      self._complete(new_result, None)
+    self._complete(new_result, None)
 
   def put(self, value):
     ''' Store the value. `Queue`-like idiom.
@@ -253,23 +265,22 @@ class Result(object):
     ''' The exception information from a completed `Result`.
         This is not available before completion.
     '''
-    state = self.state
-    if state == ResultState.cancelled:
+    state = self.fsm_state
+    if state not in (self.CANCELLED, self.DONE):
+      raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
+    self.collected = True
+    if state == self.CANCELLED:
       self.collected = True
       raise CancellationError()
-    if state == ResultState.ready:
-      self.collected = True
-      return self._exc_info
-    raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
+    return self._exc_info
 
   @exc_info.setter
   def exc_info(self, exc_info):
-    with self._lock:
-      self._complete(None, exc_info)
+    self._complete(None, exc_info)
 
   def raise_(self, exc=None):
     ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
-        If `exc` is omitted or `None`, use `sys.exc_info()`.
+        If `exc` is omitted or `None`, uses `sys.exc_info()`.
     '''
     if exc is None:
       self.exc_info = sys.exc_info()
@@ -279,17 +290,12 @@ class Result(object):
       except:  # pylint: disable=bare-except
         self.exc_info = sys.exc_info()
 
-  def call(self, func, *a, **kw):
-    ''' Have the `Result` call `func(*a,**kw)` and store its return value as
+  def run_func(self, func, *a, **kw):
+    ''' Have the `Result` run `func(*a,**kw)` and store its return value as
         `self.result`.
         If `func` raises an exception, store it as `self.exc_info`.
     '''
-    with self._lock:
-      if self.state != ResultState.pending:
-        raise RuntimeError(
-            "%s: state should be pending but is %s" % (self, self.state)
-        )
-      self.state = ResultState.running
+    self.fsm_event('dispatch')
     try:
       r = func(*a, **kw)
     except BaseException:
@@ -304,17 +310,17 @@ class Result(object):
     ''' Submit a function to compute the result in a separate `Thread`,
         returning the `Thread`.
 
-        This dispatches a `Thread` to run `self.call(func,*a,**kw)`
+        This dispatches a `Thread` to run `self.run_func(func,*a,**kw)`
         and as such the `Result` must be in "pending" state,
         and transitions to "running".
     '''
     return bg_thread(
-        self.call, name=self.name, args=[func] + list(a), kwargs=kw
+        self.run_func, name=self.name, args=[func] + list(a), kwargs=kw
     )
 
   @require(
-      lambda self: self.state in
-      (ResultState.pending, ResultState.running, ResultState.cancelled)
+      lambda self: self.fsm_state in
+      (self.PENDING, self.RUNNING, self.CANCELLED)
   )
   def _complete(self, result, exc_info):
     ''' Set the result.
@@ -326,39 +332,27 @@ class Result(object):
           "one of (result, exc_info) must be None, got (%r, %r)" %
           (result, exc_info)
       )
-    state = self.state
-    if state in (ResultState.cancelled, ResultState.running,
-                 ResultState.pending):
-      self._result = result  # pylint: disable=attribute-defined-outside-init
-      self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
-      if state != ResultState.cancelled:
-        self.state = ResultState.ready
-    else:
-      if state == ResultState.ready:
+    with self._lock:
+      state = self.fsm_state
+      if state in (self.PENDING, self.RUNNING, self.CANCELLED):
+        self._result = result  # pylint: disable=attribute-defined-outside-init
+        self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+        if state != self.CANCELLED:
+          self.fsm_event('complete')
+      elif state == self.DONE:
         warning(
-            "<%s>.state is ResultState.ready, ignoring result=%r, exc_info=%r",
-            self, result, exc_info
-        )
-        raise RuntimeError(
-            "REPEATED _COMPLETE of %s: result=%r, exc_info=%r" %
-            (self, result, exc_info)
-        )
-      raise RuntimeError(
-          "<%s>.state is not one of (cancelled, running, pending, ready): %r" %
-          (self, state)
-      )
-    self._get_lock.release()
-    notifiers = self.notifiers
-    del self.notifiers
-    for notifier in notifiers:
-      try:
-        notifier(self)
-      except Exception as e:  # pylint: disable=broad-except
-        exception(
-            "%s._complete: calling notifier %s: exc=%s", self, notifier, e
+            "<%s>: state is %s, ignoring result=%r, exc_info=%r",
+            self,
+            self.fsm_state,
+            result,
+            exc_info,
         )
       else:
-        self.collected = True
+        raise RuntimeError(
+            "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE)"
+            % (self, self.fsm_state)
+        )
+      self._get_lock.release()
 
   @pfx_method
   def join(self):
@@ -382,7 +376,7 @@ class Result(object):
         otherwise `default`.
     '''
     result, exc_info = self.join()
-    if not self.cancelled and exc_info is None:
+    if not self.is_cancelled and exc_info is None:
       return result
     return default
 
@@ -394,10 +388,10 @@ class Result(object):
         via `Result.call` and the results applied to this `Result`.
     '''
     if a:
-      self.call(*a, **kw)
-    result, exc_info = self.join()
-    if self.cancelled:
+      self.run_func(*a, **kw)
+    if self.is_cancelled:
       raise CancellationError(self)
+    result, exc_info = self.join()
     if exc_info:
       raise3(*exc_info)
     return result
@@ -408,34 +402,21 @@ class Result(object):
         If the function has already completed this will happen immediately.
         example: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
-    with self._lock:
-      if not self.ready:
-        self.notifiers.append(notifier)
-        notifier = None
-    if notifier is not None:
-      notifier(self)
-      self.collected = True
 
-  def with_result(self, submitter, prefix=None):
-    ''' On completion without an exception, call `submitter(self.result)`
-        or report exception.
-    '''
-
-    def notifier(R):
-      ''' Wrapper for `submitter`.
+    # TODO: adjust all users of .notify() to use fsm_callback and
+    # accept a transition object?
+    # pylint: disable=unused-argument
+    def callback(fsm, fsm_transition):
+      ''' `FSM.fsm_callback` shim for plain `notify(Result)` notifier functions.
       '''
-      exc_info = R.exc_info
-      if exc_info is None:
-        return submitter(R.result)
-      # report error
-      if prefix:
-        with Pfx(prefix):
-          error("exception: %r", exc_info)
-      else:
-        error("exception: %r", exc_info)
-      return None
+      self.collected = True
+      return notifier(fsm)
 
-    self.notify(notifier)
+    with self._lock:
+      self.fsm_callback('CANCELLED', callback)
+      self.fsm_callback('DONE', callback)
+      if self.fsm_state in (self.CANCELLED, self.DONE):
+        notifier(self)
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
@@ -511,7 +492,7 @@ def after(Rs, R, func, *a, **kw):
   Rs = list(Rs)
   count = len(Rs)
   if count == 0:
-    R.call(func, *a, **kw)
+    R.run_func(func, *a, **kw)
   else:
     countery = [
         count
@@ -527,7 +508,7 @@ def after(Rs, R, func, *a, **kw):
         # not ready yet
         return
       if count == 0:
-        R.call(func, *a, **kw)
+        R.run_func(func, *a, **kw)
       else:
         raise RuntimeError("count < 0: %d" % (count,))
 
@@ -561,341 +542,11 @@ class OnDemandResult(Result):
           (self, a, kw)
       )
     with self._lock:
-      if self.state == ResultState.pending:
-        self.call(self.func, *self.fargs, **self.fkwargs)
+      if self.state == self.PENDING:
+        self.run_func(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()
 
 OnDemandFunction = OnDemandResult
-
-class BlockedError(Exception):
-  ''' Raised by a blocked `Task` if attempted.
-  '''
-
-class Task(Result):
-  ''' A task which may require the completion of other tasks.
-      This is a subclass of `Result`.
-
-      Keyword parameters:
-      * `cancel_on_exception`: if true, cancel this `Task` if `.call`
-        raises an exception; the default is `False`, allowing repair
-        and retry
-      * `cancel_on_result`: optional callable to test the `Task.result`
-        after `.call`; if it returns `True` the `Task` is marked
-        as cancelled
-      * `func`: the function to call to complete the `Task`;
-        it will be called as `func(*func_args,**func_kwargs)`
-      * `func_args`: optional positional arguments, default `()`
-      * `func_kwargs`: optional keyword arguments, default `{}`
-      * `lock`: optional lock, default an `RLock`
-      Other arguments are passed to the `Result` initialiser.
-
-      Example:
-
-          t1 = Task(name="task1")
-          t1.bg(time.sleep, 10)
-          t2 = Task("name="task2")
-          # prevent t2 from running until t1 completes
-          t2.require(t1)
-          # try to run sleep(5) for t2 immediately after t1 completes
-          t1.notify(t2.call, sleep, 5)
-
-      The model here may not be quite as expected; it is aimed at
-      tasks which can be repaired and rerun.
-      As such, if `self.call(func,...)` raises an exception from
-      `func` then this `Task` will still block dependent `Task`s.
-      Dually, a `Task` which completes without an exception is
-      considered complete and does not block dependent `Task`s.
-      To cancel dependent `Tasks` the function should raise a
-      `CancellationError`.
-
-      Users wanting more immediate semantics can supply `cancel_on_exception`
-      and/or `cancel_on_result` to control these behaviours.
-
-      Example:
-
-          t1 = Task(name="task1")
-          t1.bg(time.sleep, 2)
-          t2 = Task("name="task2")
-          # prevent t2 from running until t1 completes
-          t2.require(t1)
-          # try to run sleep(5) for t2 immediately after t1 completes
-          t1.notify(t2.call, sleep, 5)
-
-          >>>
-  '''
-
-  _seq = Seq()
-  _state = ThreadState(current_task=None)
-
-  def __init__(
-      self,
-      *a,
-      lock=None,
-      cancel_on_exception=False,
-      cancel_on_result=None,
-      func,
-      func_args=(),
-      func_kwargs=None,
-      **kw
-  ):
-    if lock is None:
-      lock = RLock()
-    if func_kwargs is None:
-      func_kwargs = {}
-    super().__init__(*a, lock=lock, **kw)
-    self._required = set()
-    self.cancel_on_exception = cancel_on_exception
-    self.cancel_on_result = cancel_on_result
-    self.func = func
-    self.func_args = func_args
-    self.func_kwargs = func_kwargs
-    self.runstate = RunState(self.name)
-
-  def __hash__(self):
-    return id(self)
-
-  def __eq__(self, otask):
-    return self is otask
-
-  @classmethod
-  def current_task(cls):
-    ''' The current `Task`, valid during `Task.call()`.
-        This allows the function called by the `Task` to access the
-        task, typically to poll its `.runstate` attribute.
-    '''
-    return cls._state.current_task  # pylint: disable=no-member
-
-  def abort(self):
-    ''' Calling `abort()` calls `self.runstate.cancel()` to indicate
-        to the running function that it should cease operation.
-    '''
-    self.runstate.cancel()
-
-  def required(self):
-    ''' Return a `set` containing any required tasks.
-    '''
-    with self._lock:
-      return set(self._required)
-
-  def require(self, otask):
-    ''' Add a requirement that `otask` be complete before we proceed.
-    '''
-    assert otask is not self
-    assert self.state == ResultState.pending
-    with self._lock:
-      self._required.add(otask)
-
-  def block(self, otask):
-    ''' Block another task until we are complete.
-    '''
-    otask.require(self)
-
-  def then(self, func, *a, **kw):
-    ''' Queue a call to `func(*a,**kw)` to run after the completion of
-        this task.
-
-        This supports a chain of actions:
-
-            >>> t = Task(func=lambda: 1)
-            >>> final_t = t.then(print,1).then(print,2)
-            >>> final_t.ready   # the final task has not yet run
-            False
-            >>> # finalise t, wait for final_t (which runs immediately)
-            >>> t.call(); print(final_t.join())
-            1
-            2
-            (None, None)
-            >>> final_t.ready
-            True
-    '''
-    post_task = type(self)(func=func, func_args=a, func_kwargs=kw)
-    post_task.require(self)
-    self.notify(lambda _: post_task.bg())
-    return post_task
-
-  def blockers(self):
-    ''' A generator yielding tasks from `self.required()`
-        which should block this task.
-        Cancelled tasks are not blockers
-        but if we encounter one we do cancel the current task.
-    '''
-    for otask in self.required():
-      if otask.cancelled:
-        warning("%s cancelled because %s is also cancelled" % (self, otask))
-        self.cancel()
-        continue
-      if not otask.ready:
-        yield otask
-        continue
-      if otask.exc_info:
-        yield otask
-        continue
-
-  # pylint: disable=arguments-differ
-  def bg(self):
-    ''' Submit a function to complete the `Task` in a separate `Thread`,
-        returning the `Thread`.
-
-        This dispatches a `Thread` to run `self.call()`
-        and as such the `Task` must be in "pending" state,
-        and transitions to "running".
-    '''
-    return bg_thread(self.call, name=self.name)
-
-  # pylint: disable=arguments-differ
-  def call(self):
-    ''' Attempt to perform the `Task` by calling `func(*func_args,**func_kwargs)`.
-
-        If we are cancelled, raise `CancellationError`.
-        If there are blocking required tasks, raise `BlockedError`.
-        Otherwise run `r=func(self,*self.func_args,**self.func_kwargsw)`
-        with the following effects:
-        * if `func()` raises a `CancellationError`, cancel the `Task`
-        * otherwise, if an exception is raised and `self.cancel_on_exception`
-          is true, cancel the `Task`;
-          store the exception information from `sys.exc_info()` as `self.exc_info`
-          regardless
-        * otherwise, if `self.cancel_on_result` is not `None`
-          and `self.cancel_on_result(r)` is true, cancel the `Task`;
-          store `r` as `self.result` regardless
-        If we were cancelled, raise `CancellationError`.
-
-        During the duration of the call the property `Task.current_task`
-        is set to `self` allowing access to the `Task`.
-        A typical use is to access the current `Task`'s `.runstate`
-        attribute which can be polled by long running tasks to
-        honour calls to `Task.abort()`.
-    '''
-    if not self.cancelled:
-      for otask in self.blockers():
-        raise BlockedError("%s blocked by %s" % (self, otask))
-      if not self.cancelled:
-        state = type(self)._state
-        with self._lock:
-          with state(current_task=self):
-            try:
-              with self.runstate:
-                r = self.func(*self.func_args, **self.func_kwargs)
-            except CancellationError:
-              self.cancel()
-            except BaseException:
-              if self.cancel_on_exception:
-                self.cancel()
-              # store the exception regardless
-              self.exc_info = sys.exc_info()
-            else:
-              if self.cancel_on_result and self.cancel_on_result(r):
-                self.cancel()
-              # store the result regardless
-              self.result = r
-    if self.cancelled:
-      raise CancellationError()
-
-  def callif(self):
-    ''' Trigger a call to `func(self,*self.func_args,**self.func_kwargsw)`
-        if we're pending and not blocked or cancelled.
-    '''
-    with self._lock:
-      if not self.ready:
-        try:
-          self.call()
-        except (BlockedError, CancellationError) as e:
-          debug("%s.callif: %s", self, e)
-
-@decorator
-def task(func, task_class=Task):
-  ''' Decorator for a function which runs it as a `Task`.
-      The function may still be called directly.
-      The function should accept a `Task` as its first argument.
-
-      The following function attributes are provided:
-      * `dispatch(after=(),deferred=False,delay=0.0)`: run this function
-        after the completion of the tasks specified by `after`
-        and after at least `delay` seconds;
-        return the `Task` for the queued function
-
-      Examples:
-
-          >>> import time
-          >>> @task
-          ... def f(x):
-          ...     return x * 2
-          ...
-          >>> print(f(3))  # call the function normally
-          6
-          >>> # dispatch f(5) after 0.5s, get Task
-          >>> t0 = time.time()
-          >>> ft = f.dispatch((5,), delay=0.5)
-          >>> # calling a Task, as with a Result, is like calling the function
-          >>> print(ft())
-          10
-          >>> # check that we were blocked for 0.5s
-          >>> now = time.time()
-          >>> now - t0 >= 0.5
-          True
-  '''
-
-  def make_task(func, a, kw):
-    ft_name = funcname(func) + '-task'
-    if a:
-      ft_name = ft_name + ':' + repr(a)
-    if kw:
-      ft_name = ft_name + ':' + repr(kw)
-    return task_class(name=ft_name, func=func, func_args=a, func_kwargs=kw)
-
-  def task_func_wrapper(*a, **kw):
-    ''' Run the function via a `Task`.
-    '''
-    ft = make_task(func, a, kw)
-    ft.call()
-    return ft()
-
-  # pylint: disable=redefined-outer-name
-  def dispatch(a=None, kw=None, after=(), deferred=False, delay=0.0):
-    ''' Dispatch the function asynchronously.
-        Return the `Task`.
-
-        Optional positional parameters:
-        * `a`: an iterable of positional arguments for `func`
-        * `kw`: a mapping of keyword arguments for `func`
-
-        Keyword parameters:
-        * `after`: optional iterable of `Task`s;
-          `func` will not be dispatched until these are complete.
-        * `deferred`: (default `False`); if true,
-          block the task on `after` but do not trigger a call on
-          their completion.
-          This thus creates the `Task` but does not dispatch it.
-        * `delay`: delay the dispatch of `func` by at least `delay` seconds,
-          default `0.0`s.
-    '''
-    if a is None:
-      a = ()
-    if kw is None:
-      kw = {}
-    if not isinstance(after, list):
-      after = list(after)
-    if delay > 0.0:
-      delay_task = task_class(
-          name="sleep(%s)" % (delay,), func=time.sleep, func_args=(delay,)
-      )
-      delay_task.bg()
-      after.append(delay_task)
-    ft = make_task(func, a, kw)
-    if after:
-      for otask in after:
-        ft.require(otask)
-    if not deferred:
-      if after:
-        for otask in after:
-          otask.notify(lambda _: ft.callif())
-      else:
-        # dispatch the task immediately, but in another Thread
-        ft.bg(ft.call, func, *a, **kw)
-    return ft
-
-  task_func_wrapper.dispatch = dispatch
-  return task_func_wrapper
 
 if __name__ == '__main__':
   import cs.result_tests

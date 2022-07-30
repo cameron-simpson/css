@@ -42,6 +42,7 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import s
 from cs.logutils import warning, error
+from cs.mplutils import axes, remove_decorations, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
@@ -54,9 +55,7 @@ from cs.timeseries import (
     TimeSeriesDataDir,
     TimespanPolicyYearly,
     plot_events,
-    plotrange,
-    print_figure,
-    save_figure,
+    timerange,
     tzfor,
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
@@ -521,17 +520,17 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     tsd = getattr(self, dsname)
     return tsd.to_csv(start, stop, f, **to_csv_kw)
 
-  @plotrange
+  @timerange
   def plot(
       self,
       start,
       stop,
       *,
       utcoffset,
+      figure=None,
+      ax=None,
       key_specs,
       mode=None,
-      figsize=None,
-      dpi=None,
       event_labels=None,
       mode_patterns=None,
       stacked=False,
@@ -543,10 +542,10 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     # DF hack: compute the timezone offset for "stop",
     # use it to skew the UNIX timestamps so that UTC tick marks and
     # placements look "local"
-    if figsize is None:
-      figsize = 14, 8
-    if dpi is None:
-      dpi = 100
+    if figure is None:
+      figure = 14, 8, 100
+    ax = axes(figure, ax)
+    figure = ax.figure
     if event_labels is None:
       event_labels = DEFAULT_PLOT_EVENT_LABELS
     if mode_patterns is None:
@@ -582,9 +581,6 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
               break
         if mode is not None:
           break
-    figure = Figure(figsize=figsize, dpi=dpi)
-    figure.add_subplot()
-    ax = figure.axes[0]
     with upd.run_task("plot"):
       for tsd_id, tsd in tsd_by_id.items():
         keys = keys_by_id[tsd_id]
@@ -883,6 +879,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] start-time [stop-time] {{mode|[dataset:]{{glob|field}}}}...
+        --bare          Strip axes and padding from the plot.
         -e events,...   Display the specified events.
         -f              Force. Overwirte the image path even if it exists.
         --stacked       Stack graphed values on top of each other.
@@ -905,6 +902,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     '''
     options = self.options
     options.tz = tzlocal()
+    options.bare = False
     options.show_image = False
     options.imgpath = None
     options.stacked = False
@@ -913,6 +911,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     self.popopts(
         argv,
         options,
+        bare='bare',
         e_='event_labels',
         f='force',
         o_='imgpath',
@@ -929,6 +928,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
         stop = time.time()
+    bare = options.bare
     force = options.force
     imgpath = options.imgpath
     spd = options.spd
@@ -943,6 +943,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         event_labels=event_labels,
         stacked=stacked
     )
+    if bare:
+      remove_decorations(figure)
     if imgpath:
       save_figure(figure, imgpath, force=force)
       if show_image:
