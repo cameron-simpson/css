@@ -188,7 +188,7 @@ class Task(FSM, RunStateMixin):
     self.name = name
     if a:
       raise ValueError(
-          "unexpected positional parameters after func: %r" % (a,)
+          "unexpected positional parameters after func:%r: %r" % (func, a)
       )
     if state is None:
       state = type(self)._state.initial_state
@@ -501,7 +501,7 @@ class Task(FSM, RunStateMixin):
       return bg_thread(self.dispatch, name=self.name)
 
   def make(self, fail_fast=False):
-    ''' Generator to complete `self` and its prerequisites.
+    ''' Complete `self` and its prerequisites.
         This calls the global `make()` function with `self`.
         It returns a Boolean indicating whether this task completed.
     '''
