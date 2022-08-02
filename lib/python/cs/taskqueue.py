@@ -531,7 +531,7 @@ def make(*tasks, fail_fast=False, queue=None):
 
       The following rules are applied by this function:
       - if a task is being prepared, raise an `FSMError`
-      - if a task is already running, wait for its completion
+      - if a task is already running or queued, wait for its completion
       - if a task is pending:
         * if any prerequisite has failed, fail this task
         * if any prerequisite is cancelled, cancel this task
