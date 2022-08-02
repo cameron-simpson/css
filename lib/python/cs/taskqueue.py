@@ -517,7 +517,7 @@ class Task(FSM, RunStateMixin):
 TaskSubType = TypeVar('TaskSubType', bound=Task)
 
 # pylint: disable=too-many-branches
-def make(*tasks, fail_fast=False):
+def make(*tasks, fail_fast=False, queue=None):
   ''' Generator which completes all the supplied `tasks` by dispatching them
       once they are no longer blocked.
       Yield each task from `tasks` as it completes (or becomes cancelled).
@@ -526,6 +526,8 @@ def make(*tasks, fail_fast=False):
       * `tasks`: `Task`s as positional parameters
       * `fail_fast`: default `False`; if true, cease evaluation as soon as a
         task completes in a state with is not `DONE`
+      * `queue`: optional callable to submit a task for execution later
+        via some queue such as `Later` or celery
 
       The following rules are applied by this function:
       - if a task is being prepared, raise an `FSMError`
@@ -557,7 +559,8 @@ def make(*tasks, fail_fast=False):
     with Pfx(qtask):
       if qtask.is_prepare:
         raise FSMError(f'cannot make a {qtask.fsm_state} task', qtask)
-      if qtask.is_running:
+      if qtask.is_running or qtask.is_queued:
+        # task is already running, or queued and will be run
         qtask.join()
         assert qtask.iscompleted()
       elif qtask.is_pending:
@@ -602,7 +605,15 @@ def make(*tasks, fail_fast=False):
               )
             else:
               # prerequsites all done, run the task
-              qtask.dispatch()
+              if queue is None:
+                # run the task directly
+                qtask.dispatch()
+              else:
+                # queue the task via some runner such as a Later
+                qtask.queue()
+                queue(qtask.dispatch)
+                q.append(qtask)
+                continue
       assert qtask.iscompleted() or qtask.is_cancelled()
       if qtask in tasks0:
         yield qtask
