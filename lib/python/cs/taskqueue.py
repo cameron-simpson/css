@@ -627,6 +627,21 @@ def make_now(*tasks, fail_fast=False, queue=None):
   '''
   return list(make(*tasks, fail_fast=fail_fast, queue=queue))
 
+def make_later(L, *tasks, fail_fast=False):
+  ''' Dispatch the `tasks` via `L:Later` for asynchronous execution
+      if it is not already completed.
+      The caller can wait on `t.result` for completion.
+
+      This calls `make_now()` in a thread and uses `L.defer` to
+      queue the task and its prerequisites for execution.
+  '''
+  bg_thread(
+      make_now,
+      name=f'make({",".join(t.name for t in tasks)})',
+      args=tasks,
+      kwargs=dict(fail_fast=fail_fast, queue=L.defer),
+  )
+
 class TaskQueue:
   ''' A task queue for managing and running a set of related tasks.
 
