@@ -127,9 +127,14 @@ class Task(FSM, RunStateMixin):
       },
       'PENDING': {
           'dispatch': 'RUNNING',
+          'queue': 'QUEUED',
           'cancel': 'CANCELLED',
           'error': 'FAILED',
           'abort': 'ABORT',
+      },
+      'QUEUED': {
+          'cancel': 'CANCELLED',
+          'dispatch': 'RUNNING',
       },
       'RUNNING': {
           'done': 'DONE',
@@ -137,7 +142,7 @@ class Task(FSM, RunStateMixin):
           'cancel': 'CANCELLED',
       },
       'CANCELLED': {
-          'requeue': 'PENDING',
+          'retry': 'PENDING',
           'abort': 'ABORT',
       },
       'DONE': {},
