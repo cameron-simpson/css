@@ -621,6 +621,12 @@ def make(*tasks, fail_fast=False, queue=None):
       if fail_fast and not qtask.is_done:
         return
 
+def make_now(*tasks, fail_fast=False, queue=None):
+  ''' Run the generator `make(*tasks)` to completion and return the
+      list of completed tasks.
+  '''
+  return list(make(*tasks, fail_fast=fail_fast, queue=queue))
+
 class TaskQueue:
   ''' A task queue for managing and running a set of related tasks.
 
