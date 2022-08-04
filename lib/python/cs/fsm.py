@@ -15,6 +15,21 @@ from cs.gvutils import gvprint, quote as gvq
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.gimmicks',
+        'cs.gvutils',
+        'cs.lex',
+        'cs.pfx',
+        'typeguard',
+    ],
+}
+
 FSMSubType = TypeVar('FSMSubType', bound='FSM')
 
 class FSMError(Exception):
