@@ -32,6 +32,10 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.buffer',
+        'cs.deco',
+        'cs.lex',
+        'cs.pfx',
         'matplotlib',
         'typeguard',
     ],
