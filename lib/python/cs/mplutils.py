@@ -15,6 +15,7 @@ from os.path import (
 from subprocess import run
 import sys
 from tempfile import TemporaryDirectory
+from typing import Union
 
 from typeguard import typechecked
 from matplotlib.figure import Axes, Figure
@@ -99,11 +100,22 @@ def axes(figure=None, ax=None, **fig_kw) -> Axes:
       ax = figure.axes[0 if ax is None else ax]
   return ax
 
-def remove_decorations(figure):
-  ''' Remove all decorations from a figure, intended for make bare
-      plots, such as a tile in GUI.
+@typechecked
+def remove_decorations(figure_or_ax: Union[Figure, Axes]):
+  ''' Remove all decorations from a `Figure` or `Axes` instance,
+      intended for making bare plots such as a tile in GUI.
+
+      Presently this removes:
+      - axes markings and legend from each axis
+      - the padding from all the figure subplots
   '''
-  for ax in figure.axes:
+  if isinstance(figure_or_ax, Axes):
+    axs = (figure_or_ax,)
+    figure = figure_or_ax.figure
+  else:
+    figure = figure_or_ax
+    axs = figure.axes
+  for ax in axs:
     ax.set_axis_off()
     ax.get_legend().remove()
   figure.subplots_adjust(bottom=0, top=1, left=0, right=1, hspace=0, wspace=0)
