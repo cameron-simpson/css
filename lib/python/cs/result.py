@@ -80,12 +80,11 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.fsm',
-        'cs.logutils',
+        'cs.gimmicks',
         'cs.mappings',
         'cs.pfx',
         'cs.py.func',
         'cs.py3',
-        'cs.resources',
         'cs.seq',
         'cs.threads',
         'icontract',
