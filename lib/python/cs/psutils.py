@@ -227,7 +227,7 @@ def run(argv, doit=True, logger=None, quiet=True, **subp_options):
       if logger:
         trace("+ %s", shlex.join(argv))
       else:
-        print_argv(*argv)
+        print_argv(*argv, file=sys.stderr)
     cp = pfx_call(subprocess_run, argv, **subp_options)
     if cp.stdout and not quiet:
       builtin_print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
