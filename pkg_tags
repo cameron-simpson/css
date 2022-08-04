@@ -29,7 +29,7 @@ cs.context pypi.release="20220619" ok_revision="5a112bcd61dc7138895ba70dad24ca74
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
 cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
-cs.deco pypi.release="20220327" ok_revision="32bec58fa13ecf43043978d574e76a589e266220"
+cs.deco pypi.release="20220327" ok_revision=ea9410ad09a23b81a08d942a952fdfe96423a3fb
 cs.distinfo
 cs.ebooks ok_revision="3aa8b3c8216b262ecc0d6710891d3c9e79d59eb6" pypi.release="20220626"
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
@@ -38,6 +38,7 @@ cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20220429" ok_revision=aa4e636d2e086f5e309990c0557ba7cfbf5e8628 features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
 cs.fs ok_revision="7e97819a99a2e9c48b96c55fdff603264591d12d" pypi.release="20220530" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
+cs.fsm
 cs.fstags pypi.release="20220606" ok_revision="8d7cf241e48009267aef9fdd7f3676adc6701ab4"
 cs.gimmicks ok_revision="69717a798c9d840f055eb77ace16dff72c95fd15" pypi.release="20220429" features={"20211208":["TimeoutError"],"20220429":["devnull"]}
 cs.html pypi.release=20160828
@@ -53,6 +54,7 @@ cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcf
 cs.mappings pypi.release="20220626" ok_revision="071f69ca0d76e6334e52976e9d776c005af35246" features={"20210906":["RemappedMappingProxy"]}
 cs.mediainfo
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
+cs.mplutils
 cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783" pypi.release="20211208"
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309 ok_revision="59303dd747cbf52f6fdf1777c1f6979d1085156d" features={"20220606":["intif"]}
