@@ -13,7 +13,7 @@ import sys
 
 from cs.lex import is_identifier
 
-__version__ = '20220805'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python3"],
