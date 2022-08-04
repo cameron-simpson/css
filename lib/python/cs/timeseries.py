@@ -1684,8 +1684,11 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   @contextmanager
   def startup_shutdown(self):
-    yield self
-    self.flush()
+    try:
+      yield self
+    finally:
+      # TODO: should some exceptions prevent a flush?
+      self.flush()
 
   @property
   def stop(self):
