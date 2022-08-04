@@ -37,7 +37,7 @@ cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20220429" ok_revision=aa4e636d2e086f5e309990c0557ba7cfbf5e8628 features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
-cs.fs ok_revision="7e97819a99a2e9c48b96c55fdff603264591d12d" pypi.release="20220530" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
+cs.fs ok_revision="1fa6299d7ddc225c54ce23ef6d566f752aaf5313" pypi.release="20220530" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
 cs.fsm
 cs.fstags pypi.release="20220606" ok_revision="8d7cf241e48009267aef9fdd7f3676adc6701ab4"
 cs.gimmicks ok_revision="69717a798c9d840f055eb77ace16dff72c95fd15" pypi.release="20220429" features={"20211208":["TimeoutError"],"20220429":["devnull"]}
