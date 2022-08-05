@@ -94,7 +94,7 @@ cs.sqltags ok_revision=e3093e204c7d8313b26f3fb343f2b41340d58a34 pypi.release="20
 cs.tagset pypi.release="20220606" ok_revision="02c43cd9ba3a329194743541bdcdf0505f177fec" features={"20210428":["fix_tagset_missed_in_place_value_modifications"]}
 cs.tagsset
 cs.threads pypi.release="20211208" ok_revision=b9025dfd67aae44b210a842772767d5e8723b31b
-cs.timeseries ok_revision="13cff510ed3554ea7f8d0bd866e76ef7865a0698" pypi.release="20220626"
+cs.timeseries ok_revision="5931ba5b0fdaa0eb016d0372b91bbc8e7a4bb5fd" pypi.release="20220626"
 cs.timeutils pypi.release="20211208" ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.tty pypi.release="20210316" ok_revision="62e7c17f710e13db7893ea64324ef77bca01d6ec"
 cs.units pypi.release="20220311" ok_revision="8dcc9126e735454e3e888690cda70854e9bccfa8"
