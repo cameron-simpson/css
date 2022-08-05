@@ -10,6 +10,7 @@
 from os.path import exists as existspath
 from subprocess import Popen, PIPE
 import sys
+from typing import Mapping
 
 from cs.lex import is_identifier
 
@@ -102,12 +103,14 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
   subprocs = []
   if fmt == 'sixel':
     # pipeline to pipe "dot" through "img2sixel"
+    # pylint: disable=consider-using-with
     img2sixel_popen = Popen(['img2sixel'], stdin=PIPE, stdout=file)
     dot_output = img2sixel_popen.stdin
     subprocs.append(img2sixel_popen)
   else:
     img2sixel_popen = None
     dot_output = file
+  # pylint: disable=consider-using-with
   dot_popen = Popen(dot_argv, stdin=PIPE, stdout=dot_output)
   subprocs.insert(0, dot_popen)
   if img2sixel_popen is not None:
@@ -119,3 +122,33 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
   for subp in subprocs:
     subp.wait()
   return None
+
+class DOTNodeMixin:
+  ''' A mixin providing methods for things which can be drawn as
+      nodes in a DOT graph description.
+  '''
+
+  def dot_node(self, label=None, **node_attrs) -> str:
+    ''' A DOT syntax node definition for `self`.
+    '''
+    if label is None:
+      label = self.dot_node_label()
+    attrs = dict(self.dot_node_attrs())
+    attrs.update(node_attrs)
+    attrs_s = ','.join(
+        f'{quote(attr)}={quote(value)}' for attr, value in attrs.items()
+    )
+    return f'{quote(label)}[{attrs_s}]'
+
+  # pylint: disable=no-self-use
+  def dot_node_attrs(self) -> Mapping[str, str]:
+    ''' The default DOT node attributes.
+    '''
+    return dict(style='solid')
+
+  def dot_node_label(self) -> str:
+    ''' The default node label.
+        This implementation returns `str(serlf)`
+        and a common implementation might return `self.name` or similar.
+    '''
+    return str(self)
