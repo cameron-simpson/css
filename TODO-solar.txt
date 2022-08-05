@@ -1,3 +1,4 @@
+battery state in power graph on secondary axis
 stacked power graph
 why is the event db so expensive?
 identifierish event name selection
