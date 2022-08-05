@@ -68,7 +68,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20220311-post'
+__version__ = '20220805'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
