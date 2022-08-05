@@ -519,6 +519,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     tsd = getattr(self, dsname)
     return tsd.to_csv(start, stop, f, **to_csv_kw)
 
+  # pylint: disable=too-many-branches
   @timerange
   def plot(
       self,
