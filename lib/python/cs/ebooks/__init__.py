@@ -30,6 +30,7 @@ DISTINFO = {
         'cs.progress',
         'cs.psutils',
         'cs.resources',
+        'cs.seq',
         'cs.sqlalchemy_utils',
         'cs.tagset',
         'cs.threads',
