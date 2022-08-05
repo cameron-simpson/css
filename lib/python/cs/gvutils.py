@@ -14,7 +14,7 @@ from typing import Mapping
 
 from cs.lex import is_identifier
 
-__version__ = '20220805-post'
+__version__ = '20220805.1'
 
 DISTINFO = {
     'keywords': ["python3"],
