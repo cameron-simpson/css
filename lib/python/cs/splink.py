@@ -32,7 +32,6 @@ import time
 
 import arrow
 from dateutil.tz import tzlocal
-from matplotlib.figure import Figure
 from typeguard import typechecked
 
 from cs.context import stackattrs
@@ -87,7 +86,6 @@ DISTINFO = {
         'cs.timeseries',
         'cs.upd',
         'dateutil',
-        'matplotlib',
         'typeguard',
     ],
     'entry_points': {
