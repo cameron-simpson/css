@@ -13,6 +13,7 @@ cs.app.osx.plist ok_revision="32b9b61a781c4a329778a954b3124ec3ee61392f" pypi.rel
 cs.app.osx.release
 cs.app.playon ok_revision="9b884dfceafcc251cbbd3e174e99937a7e76e9ae" pypi.release="20220311"
 cs.app.portfwd pypi.release="20210316" ok_revision=a340f42feecc3b8910c40cef2d2d2c8a0ca8e96c
+cs.app.solar
 cs.app.ssh pypi.release=20161003
 cs.app.svcd pypi.release="20210316" ok_revision=ef88e3114c7f2dc23e8e794046d469b5270ebfb6
 cs.app.tagger
@@ -67,7 +68,7 @@ cs.pipeline pypi.release="20191007.1" ok_revision=fdf8009af610626fe5788b22eec90c
 cs.pop3 ok_revision="0485ea744e650b31af28cade1f7572c225ef1dc3" pypi.release="20220606"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
 cs.progress pypi.release="20211208" ok_revision="9b03cdb97f403edafe0ab10451d70f6a38f0f6e6" features={"20210803":["progress_runstate"]}
-cs.psutils pypi.release="20220626" ok_revision=b9ba0d091db1a9f2e6904f12a1c6aa5da664fcd3 features={"20220429":["signal_handler"],"20220531":["print_argv"]}
+cs.psutils pypi.release="20220626" ok_revision="8a1f7cc9d7d93f79c39de09c84fa12ae8e1aaa9e" features={"20220429":["signal_handler"],"20220531":["print_argv"]}
 cs.py.doc pypi.release="20220311" ok_revision="5f879c6cede60f3878cfe95e303a529b273f306f"
 cs.py.func pypi.release="20220619" ok_revision="442b0f301edf0f113ca02cccb773cc1bf4e0d6d2" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"]}
 cs.py.modules pypi.release="20220606" ok_revision="47871444e5c52d21dde402b72b4c5b1e71d38ee9" features={"20220606":["import_extra"]}
