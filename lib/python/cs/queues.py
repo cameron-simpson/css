@@ -526,11 +526,16 @@ class ListQueue:
       except IndexError:
         raise Queue_Empty("list is empty")  # pylint: disable=raise-missing-from
 
-  def put(self, item):
-    ''' Put appends to the queue.
+  def append(self, item):
+    ''' Append an item to the queue, aka `put`.
     '''
     with self._lock:
       self.queued.append(item)
+
+  def put(self, item):
+    ''' Put appends to the queue.
+    '''
+    return self.append(item)
 
   def extend(self, items):
     ''' Convenient/performant queue-lots-of-items.
