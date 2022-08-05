@@ -420,6 +420,7 @@ class TimerQueue(object):
     assert self.mainThread is not None, "no main thread to join"
     self.mainThread.join()
 
+  # pylint: disable=too-many-statements
   def _main(self):
     ''' The main loop.
 
