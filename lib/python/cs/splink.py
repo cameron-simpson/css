@@ -77,6 +77,7 @@ DISTINFO = {
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
+        'cs.mplutils',
         'cs.pfx',
         'cs.progress',
         'cs.psutils',
