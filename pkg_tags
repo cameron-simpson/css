@@ -92,7 +92,7 @@ cs.splink ok_revision=c196002cb47870037646fa8f73cb39aec9e1c130 pypi.release="202
 cs.sqlalchemy
 cs.sqlalchemy_release
 cs.sqlalchemy_utils pypi.release="20220606" ok_revision="0e1f27997a7bda9798a5047b279d40df8d6113df" features={"20220606":["RelationProxy"]}
-cs.sqltags ok_revision=e3093e204c7d8313b26f3fb343f2b41340d58a34 pypi.release="20220606"
+cs.sqltags ok_revision="8beb9be7a2af049cc43ac09b481d49ba5c49322c" pypi.release="20220606"
 cs.tagset pypi.release="20220806" ok_revision="10bdecdb32e95c58abe889ea3a404532de781817" features={"20210428":["fix_tagset_missed_in_place_value_modifications"]}
 cs.tagsset
 cs.taskqueue ok_revision="34c722e980134ed58ece73060c692c610b596b63" pypi.release="20220805"
