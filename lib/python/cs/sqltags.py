@@ -1782,8 +1782,7 @@ class SQLTags(BaseTagSets):
     for i, criterion in enumerate(criteria):
       cr0 = criterion
       with Pfx(str(criterion)):
-        if isinstance(criterion, str):
-          criterion = criteria[i] = SQTCriterion.from_str(criterion)
+        criterion = criteria[i] = SQTCriterion.promote(criterion)
         if not criterion.SQL_COMPLETE:
           post_criteria.append(criterion)
     with self.db_session() as session:
