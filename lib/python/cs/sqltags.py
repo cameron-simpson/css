@@ -1071,8 +1071,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         The `mode` parameter has the following values:
         * `'id'`: the query only yields entity ids
         * `'entity'`: (default) the query yields entities without tags
-        * `'tagged'`: (default) the query yields entities left
-        outer joined with their matching tags
+        * `'tagged'`: (default) the query yields entities left outer
+          joined with their matching tags
 
         Note that the `'tagged'` result produces multiple rows for any
         entity with multiple tags, and that this requires the caller to
@@ -1176,10 +1176,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       if mode == 'id':
         pass
       elif mode == 'entity':
-        query = session.query(entities.id, entities.unixtime,
-                              entities.name).filter(
-                                  entities.id.in_(query.distinct())
-                              )
+        query = session.query(entities.id, entities.unixtime, entities.name)
+        ##.filter( entities.id.in_(query.distinct()))
       elif mode == 'tagged':
         query = query.join(
             tags, isouter=True
