@@ -1763,13 +1763,17 @@ class SQLTags(BaseTagSets):
     '''
     return self[0]
 
-  def find(self, *criteria, **crit_kw):
+  def find(self, *criteria, _without_tags=False, **crit_kw):
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTagSet` instances.
 
         Parameters:
         * `criteria`: positional arguments which should be
           `SQTCriterion`s or a `str` suitable for `SQTCriterion.from_str`
+        * `_without_tags`: optional flag to return entities without tags,
+          default `False`;
+          this can be used for a much faster scan of the entities
+          because it omits the `JOIN` against the tag table
         * `crit_kw`: keyword parameters are appended to the criteria
           as further tag equality tests
     '''
@@ -1789,7 +1793,7 @@ class SQLTags(BaseTagSets):
       orm = self.orm
       query = orm.search(
           criteria,
-          mode='tagged',
+          mode='entity' if _without_tags else 'tagged',
           session=session,
       )
       # merge entities and tag information
@@ -1797,7 +1801,13 @@ class SQLTags(BaseTagSets):
       for row in query:
         entity_id = row.id
         te = entity_map.get(entity_id)
-        if not te:
+        if te:
+          if _without_tags:
+            warning(
+                "SQLTags.find: repeated entity with id=%s; query=%r",
+                entity_id, str(query)
+            )
+        else:
           # not seen before
           te = entity_map[entity_id] = self.TagSetClass(
               _id=entity_id,
@@ -1806,18 +1816,19 @@ class SQLTags(BaseTagSets):
               name=row.name,
               unixtime=row.unixtime,
           )
-        # a None tag_name means no tags
-        if row.tag_name is not None:
-          # set the dict entry directly - we are loading db values,
-          # not applying them to the db
-          tag_value = te.from_polyvalue(
-              row.tag_name,
-              PolyValue(
-                  row.tag_float_value, row.tag_string_value,
-                  row.tag_structured_value
-              )
-          )
-          te.set(row.tag_name, tag_value, skip_db=True)
+        if not _without_tags:
+          # a None tag_name means that there were no tags
+          if row.tag_name is not None:
+            # set the dict entry directly - we are loading db values,
+            # not applying them to the db
+            tag_value = te.from_polyvalue(
+                row.tag_name,
+                PolyValue(
+                    row.tag_float_value, row.tag_string_value,
+                    row.tag_structured_value
+                )
+            )
+            te.set(row.tag_name, tag_value, skip_db=True)
     if not post_criteria:
       yield from entity_map.values()
     else:
