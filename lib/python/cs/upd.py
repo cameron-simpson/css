@@ -789,7 +789,6 @@ class Upd(SingletonMixin):
   # pylint: disable=too-many-branches,too-many-statements
   def insert(self, index, txt='', proxy=None):
     ''' Insert a new status line at `index`.
-
         Return the `UpdProxy` for the new status line.
     '''
     if proxy and proxy.upd is not None:
@@ -1053,10 +1052,10 @@ class UpdProxy(object):
     self.index = None
     if upd is None:
       upd = Upd()
-    upd.insert(index, proxy=self)
     self._prefix = prefix or ''
     self._text = ''
     self._suffix = suffix or ''
+    upd.insert(index, proxy=self)
     if text:
       self(text)
 

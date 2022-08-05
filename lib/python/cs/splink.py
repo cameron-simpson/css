@@ -798,7 +798,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
               with Pfx(rdspath):
                 dstags = fstags[dspath]
                 if not force and dstags.imported:
-                  print("already imported:", short_dspath)
+                  ##print('already imported {short_dspath}')
                   continue
                 if dataset in spd.TIMESERIES_DATASETS:
                   ts = getattr(spd, dataset)
@@ -825,17 +825,19 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                               report_print=True,
                               tick_delay=0.15,
                           ):
+                            # the UNIX timestamp seems to be unique, min sep is 0.3ms
                             seen.update(
-                                (ev.unixtime, ev.event_description)
-                                for ev in db.find()
+                                ev.unixtime
+                                for ev in db.find(_without_tags=True)
                             )
                           print(f'{len(seen)} old events from {db}')
                           if runstate.cancelled:
                             break
+                        # get unseen tags
                         when_tags = [
                             (when, tags)
                             for when, tags in when_tags
-                            if (when, tags['event_description']) not in seen
+                            if when not in seen
                         ]
                         if when_tags:
                           for when, tags in progressbar(
@@ -844,7 +846,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                               update_frequency=16,
                               report_print=True,
                           ):
-                            key = when, tags['event_description']
+                            key = when
                             assert key not in seen
                             tags['dataset'] = dataset
                             db.default_factory(None, unixtime=when, tags=tags)
