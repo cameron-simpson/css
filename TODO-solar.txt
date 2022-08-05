@@ -1,3 +1,4 @@
+stacked power graph
 why is the event db so expensive?
 identifierish event name selection
 histograms grouped by time period?
