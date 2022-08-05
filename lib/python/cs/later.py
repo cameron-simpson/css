@@ -51,7 +51,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import bg as bg_thread, State as ThreadState
 
-__version__ = '20220605-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -764,13 +764,15 @@ class Later(MultiOpenMixin):
           (R,)
       )
 
-    def put_func():
+    def _after_put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
-      R.call(func, *a, **kw)
+      R.run_func(func, *a, **kw)
 
-    put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
-    return after(LFs, None, lambda: self._defer(put_func))
+    _after_put_func.__name__ = "%s._after(%r)[func=%s]" % (
+        self, LFs, funcname(func)
+    )
+    return after(LFs, None, lambda: self._defer(_after_put_func))
 
   def defer_iterable(self, it, outQ, test_ready=None):
     ''' Submit an iterable `it` for asynchronous stepwise iteration

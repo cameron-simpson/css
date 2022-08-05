@@ -1,0 +1,6 @@
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleTree.export_to_calibre: reduce progress noise
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.books_from_spec: UPPERCASE matches a format
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: new cmd_linkto to link book files into an external directory with nice names
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: fix .fspath and the associated .pathto and format paths
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: group the format methods together
+lib/python/cs/ebooks/__init__.py: cs.ebooks: update DISTINFO

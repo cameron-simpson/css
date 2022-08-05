@@ -26,7 +26,7 @@ import cs.pfx
 from cs.pfx import pfx, Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
-from cs.result import Result, ResultState
+from cs.result import Result
 from cs.threads import Lock, locked, locked_property
 
 from . import DEFAULT_MAKE_COMMAND
@@ -188,7 +188,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
     ''' Remove this target from the set of "in progress" targets.
     '''
     self.debug_make(
-        "note target %r as inactive (%s)", target.name, target.state
+        "note target %r as inactive (%s)", target.name, target.fsm_state
     )
     with self._active_lock:
       self.active.remove(target)
@@ -221,27 +221,28 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
     self._makeQ.after(LFs, R, func, *a, **kw)
     return R
 
-  @pfx
   def make(self, targets):
     ''' Synchronous call to make targets in series.
     '''
-    ok = True
-    for target in targets:
-      if isinstance(target, str):
-        T = self[target]
-      else:
-        T = target
-      T.require()
-      if T.get():
-        self.debug_make("MAKE %s: OK", T)
-      else:
-        self.debug_make("MAKE %s: FAILED", T)
-        ok = False
-        if self.fail_fast:
-          self.debug_make("ABORT MAKE")
-          break
-    self.debug_make("%r: %s", targets, ok)
-    return ok
+    with Pfx("%s.make", type(self).__name__):
+      ok = True
+      for target in targets:
+        with Pfx(target):
+          if isinstance(target, str):
+            T = self[target]
+          else:
+            T = target
+          T.require()
+          if T.get():
+            self.debug_make("MAKE %s: OK", T)
+          else:
+            self.debug_make("MAKE %s: FAILED", T)
+            ok = False
+            if self.fail_fast:
+              self.debug_make("ABORT MAKE")
+              break
+      self.debug_make("%r: %s", targets, ok)
+      return ok
 
   def __getitem__(self, name):
     ''' Return the specified Target.
@@ -564,8 +565,8 @@ class Target(Result):
     #
 
   def __str__(self):
-    return "{}[{}]".format(self.name, self.state)
-    ##return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
+    return "{}[{}]".format(self.name, self.fsm_state)
+    ##return "{}[{}]:{}:{}".format(self.name, self.fsm_state, self._prereqs, self._postprereqs)
 
   def mdebug(self, msg, *a):
     ''' Emit a debug message.
@@ -685,11 +686,11 @@ class Target(Result):
     '''
     with Pfx("%r.require()", self.name):
       with self._lock:
-        if self.state == ResultState.pending:
+        if self.is_pending:
           # commence make of this Target
           self.maker.target_active(self)
           self.notify(self.maker.target_inactive)
-          self.state = ResultState.running
+          self.dispatch()
           self.was_missing = self.mtime is None
           self.pending_actions = list(self.actions)
           Ts = []
