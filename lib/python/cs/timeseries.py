@@ -2,8 +2,8 @@
 #
 # pylint: disable=too-many-lines
 
-''' Efficient portable machine native columnar storage of time series data
-    for double float and signed 64-bit integers.
+''' Efficient portable machine native columnar file storage of time
+    series data for double float and signed 64-bit integers.
 
     The core purpose is to provide time series data storage; there
     are assorted convenience methods to export arbitrary subsets
@@ -1109,7 +1109,7 @@ class TimeStepsMixin:
 
 class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
   ''' The basis of time references with a starting UNIX time `start`
-      and the `step` defining the width of a time slot.
+      and a `step` defining the width of a time slot.
   '''
 
   def __new__(cls, *a, **kw):
@@ -1198,7 +1198,7 @@ Epochy = Union[Epoch, Tuple[Numeric, Numeric], Numeric]
 OptionalEpochy = Optional[Epochy]
 
 class HasEpochMixin(TimeStepsMixin):
-  ''' A `TimeStepsMixin` with `.start` and `.step` derive from `self.epoch`.
+  ''' A `TimeStepsMixin` with `.start` and `.step` derived from `self.epoch`.
   '''
 
   def info_dict(self, d=None):
@@ -2116,8 +2116,8 @@ class TimePartition(namedtuple('TimePartition',
   ''' A `namedtuple` for a slice of time with the following attributes:
       * `epoch`: the reference `Epoch`
       * `name`: the name for this slice
-      * `start_offset`: the epoch offset of the start time (`self.start`)
-      * `end_offset`: the epoch offset of the end time (`self.stop`)
+      * `start_offset`: the epoch offset of the start time
+      * `end_offset`: the epoch offset of the end time
 
       These are used by `TimespanPolicy` instances to express the partitions
       into which they divide time.
@@ -2168,7 +2168,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
 
       Probably the most important methods are:
       * `span_for_time`: return a `TimePartition` from a UNIX time
-      * `span_for_name`: return a `TimePartition` a partition name
+      * `span_for_name`: return a `TimePartition` from a partition name
   '''
 
   # definition to happy linters
