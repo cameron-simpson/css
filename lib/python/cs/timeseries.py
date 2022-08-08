@@ -2738,47 +2738,51 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       self,
       start,
       stop,
-      keys=None,
+      plot_data=None,
       *,
       figure=None,
       ax=None,
       label=None,
       runstate=None,
       utcoffset,
+      stacked=False,
+      kind=None,
       **plot_kw,
   ) -> Axes:
     ''' Convenience shim for `DataFrame.plot` to plot data from
-        `start` to `stop` for each key in `keys`.
+        `start` to `stop` for each timeseries in `plot_data`.
         Return the plot `Axes`.
 
         Parameters:
         * `start`: optional start, default `self.start`
         * `stop`: optional stop, default `self.stop`
-        * `keys`: optional list of keys, default all keys
+        * `plot_data`: optional iterable of plot data,
+          default `sorted(self.keys())`
         * `label`: optional label for the graph
         * `runstate`: optional `RunState` to allow interruption
         * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
+
+        The plot data items are either
+        a key for a timeseries from this `TimeSeriesMapping`
+        or a `(label,series)` 2-tuple being a label and timeseries data.
     '''
     ax = axes(figure, ax)
-    if keys is None:
-      keys = sorted(self.keys())
+    if plot_data is None:
+      plot_data = sorted(self.keys())
+    if kind is None:
+      kind = 'area' if stacked else 'line'
+    plot_data = list(plot_data)
     df = self.as_pd_dataframe(
         start,
         stop,
-        keys,
+        plot_data,
         runstate=runstate,
         utcoffset=utcoffset,
     )
-    for key in keys:
-      with Pfx(key):
-        csv_header = self.csv_header(key)
-        if csv_header != key:
-          kname = f'{csv_header}\n{key}'
-          df.rename(columns={key: kname}, inplace=True)
     if runstate and runstate.cancelled:
       raise CancellationError
-    return df.plot(ax=ax, **plot_kw)
+    return df.plot(ax=ax, kind=kind, stacked=stacked, **plot_kw)
 
   @pfx_method
   def read_csv(self, csvpath, column_name_map=None, **pd_read_csv_kw):
