@@ -934,7 +934,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     options.show_image = False
     options.imgpath = None
     options.stacked = False
-    options.stacked = False
     options.event_labels = None
     self.popopts(
         argv,
@@ -956,6 +955,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
         stop = time.time()
+    data_specs = argv
     bare = options.bare
     force = options.force
     imgpath = options.imgpath
@@ -966,10 +966,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     figure = spd.plot(
         start,
         stop,
-        key_specs=argv,
+        data_specs,
         tz=tz,
         event_labels=event_labels,
-        stacked=stacked
+        stacked=stacked,
     )
     if bare:
       remove_decorations(figure)
