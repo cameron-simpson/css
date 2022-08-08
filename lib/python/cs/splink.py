@@ -45,11 +45,13 @@ from cs.mplutils import axes, remove_decorations, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
+from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
     Epoch,
+    TimeSeries,
     TimeSeriesBaseCommand,
     TimeSeriesDataDir,
     TimespanPolicyYearly,
@@ -535,6 +537,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       mode_patterns=None,
       stacked=False,
       upd=None,
+      runstate=None,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
