@@ -525,11 +525,11 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       self,
       start,
       stop,
+      data_specs,
       *,
       utcoffset,
       figure=None,
       ax=None,
-      key_specs,
       mode=None,
       event_labels=None,
       mode_patterns=None,
@@ -539,9 +539,6 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
     '''
-    # DF hack: compute the timezone offset for "stop",
-    # use it to skew the UNIX timestamps so that UTC tick marks and
-    # placements look "local"
     if figure is None:
       figure = 14, 8, 100
     ax = axes(figure, ax)
@@ -552,39 +549,66 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
     if upd is None:
       upd = Upd()
-    tsd_by_id = {}
-    keys_by_id = defaultdict(list)
-    with Pfx("key_specs"):
-      for key_spec in key_specs:
-        with Pfx(key_spec):
-          if mode is None and key_spec in mode_patterns:
-            mode = key_spec
-          key_spec = mode_patterns.get(key_spec, key_spec)
-          matched = False
-          for tsd, key in self.resolve(key_spec):
-            tsd_by_id[id(tsd)] = tsd
-            keys_by_id[id(tsd)].append(key)
-            matched = True
-          if not matched:
-            warning("no matches")
-    if not tsd_by_id:
+    plot_map = {}
+    with Pfx("data_specs"):
+      specq = ListQueue(data_specs)
+      for data_spec in specq:
+        with Pfx(data_spec):
+          if isinstance(data_spec, str):
+            # key name or pattern
+            if mode is None and data_spec in mode_patterns:
+              mode = data_spec
+            patterns = mode_patterns.get(data_spec, data_spec)
+            if isinstance(patterns, str):
+              patterns = [patterns]
+            matched = False
+            for pattern in patterns:
+              with Pfx("pattern %r", pattern):
+                for tsd, label in self.resolve(pattern):
+                  with Pfx("%s[%r]", tsd, label):
+                    if label in plot_map:
+                      warning("overwriting existing label")
+                    ts = tsd[label]
+                    series = ts.as_pd_series(start, stop, utcoffset=utcoffset)
+                    plot_map[label] = series
+                    matched = True
+            if not matched:
+              warning("no matches")
+          else:
+            # label, series
+            try:
+              label, series = data_spec
+            except (IndexError, ValueError):
+              raise ValueError("unhandled data_spec")
+            else:
+              if isinstance(series, TimeSeries):
+                series = series.as_pd_series(start, stop, utcoffset=utcoffset)
+              else:
+                # needs to already be a series with time indices
+                plot_map[label] = series
+    if not plot_map:
       raise ValueError(
-          "no fields were resolved by key_specs=%r" % (key_specs,)
+          "no fields were resolved by data_specs=%r" % (data_specs,)
       )
     if mode is None:
       # scan the keys looking for a match to a mode
-      for keys in keys_by_id.values():
-        for key in keys:
-          for mode_name, mode_glob in mode_patterns.items():
-            if pfx_call(fnmatch, key, mode_glob):
-              mode = mode_name
-              break
+      for key in plot_map.keys():
+        for mode_name, mode_glob in mode_patterns.items():
+          if pfx_call(fnmatch, key, mode_glob):
+            mode = mode_name
+            break
         if mode is not None:
           break
     with upd.run_task("plot"):
-      for tsd_id, tsd in tsd_by_id.items():
-        keys = keys_by_id[tsd_id]
-        tsd.plot(start, stop, keys=keys, utcoffset=utcoffset, ax=ax)
+      self.DetailedData.plot(
+          start,
+          stop,
+          plot_map.items(),
+          ax=ax,
+          stacked=stacked,
+          runstate=runstate,
+          utcoffset=utcoffset,
+      )
     ax.set_title(str(self))
     return figure
 
