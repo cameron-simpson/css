@@ -63,6 +63,7 @@ import sys
 from tempfile import TemporaryDirectory
 import time
 from typing import (
+    Any,
     Callable,
     Iterable,
     List,
@@ -2635,7 +2636,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       self,
       start=None,
       stop=None,
-      keys: Optional[Iterable[str]] = None,
+      df_data: Optional[Iterable[Union[str, Tuple[str, Any]]]] = None,
       *,
       key_map=None,
       runstate=None,
@@ -2646,35 +2647,47 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         Parameters:
         * `start`: start time of the data
         * `stop`: end time of the data
-        * `keys`: optional iterable of keys, default from `self.keys()`
+        * `df_data`: optional iterable of data, default from `self.keys()`;
+          each item may either be a time series name
+          or a `(key,series)` 2-tuple to support presupplied series,
+          possibly computed
     '''
     pd = import_extra('pandas', DISTINFO)
     if start is None:
       start = self.start  # pylint: disable=no-member
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
-    if keys is None:
-      keys = self.keys()
-    if not isinstance(keys, (tuple, list)):
-      keys = tuple(keys)
+    if df_data is None:
+      df_data = self.keys()
+    if not isinstance(df_data, (tuple, list)):
+      df_data = tuple(df_data)
     if key_map is None:
       key_map = {}
     if utcoffset is None:
       utcoffset = 0.0
+    # we require the indices to ensure that the dataframe covers
+    # the entire time range
     indices = as_datetime64s([t + utcoffset for t in self.range(start, stop)])
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
-      for key in progressbar(keys, "gather fields"):
+      for data in progressbar(df_data, "gather fields"):
         if runstate and runstate.cancelled:
           raise CancellationError
-        proxy.text = key
-        with Pfx(key):
-          if key not in self:
-            raise KeyError("no such key")
+        pfx_context = (
+            data
+            if isinstance(data, str) else f'{data[0]}:{type(data[1]).__name__}'
+        )
+        proxy.text = pfx_context
+        with Pfx(pfx_context):
+          if isinstance(data, str):
+            ##key, *args = key.split('__')
+            key = data
+            ts = self[key]
+            series = ts.as_pd_series(start, stop, utcoffset=utcoffset)
+          else:
+            key, series = data
           data_key = key_map.get(key, key)
-          data_dict[data_key] = self[key].as_pd_series(
-              start, stop, utcoffset=utcoffset
-          )
+          data_dict[data_key] = series
     if runstate and runstate.cancelled:
       raise CancellationError
     return pfx_call(
