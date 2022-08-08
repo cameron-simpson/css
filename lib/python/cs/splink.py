@@ -665,10 +665,13 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   @contextmanager
   def run_context(self):
-    ''' Define `self.options.spd`.
+    ''' Define `self.options` attributes:
+        * `tz`: the default local timezone
+        * `spd`: the `SPLinkData` instance for `options.spdpath`
     '''
     options = self.options
     fstags = options.fstags
+    options.tz = tzlocal()
     with fstags:
       spd = SPLinkData(options.spdpath)
       with stackattrs(options, spd=spd):
@@ -929,7 +932,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             mode            A named graph mode, implying a group of fields.
     '''
     options = self.options
-    options.tz = tzlocal()
     options.bare = False
     options.show_image = False
     options.imgpath = None
