@@ -2662,7 +2662,12 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     if not isinstance(df_data, (tuple, list)):
       df_data = tuple(df_data)
     if key_map is None:
+      # the default key map annotates keys with their CSV column headings
       key_map = {}
+      for key in self.keys():
+        csv_header = self.csv_header(key)
+        if csv_header is not None and csv_header != key:
+          key_map[key] = f'{csv_header}\n{key}'
     if utcoffset is None:
       utcoffset = 0.0
     # we require the indices to ensure that the dataframe covers
