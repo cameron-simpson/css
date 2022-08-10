@@ -15,6 +15,7 @@ from os.path import (
 from subprocess import run
 import sys
 from tempfile import TemporaryDirectory
+from typing import Union
 
 from typeguard import typechecked
 from matplotlib.figure import Axes, Figure
@@ -24,6 +25,8 @@ from cs.deco import fmtdoc
 from cs.lex import r
 from cs.pfx import pfx_call
 
+__version__ = '20220805-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -31,7 +34,10 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'icontract',
+        'cs.buffer',
+        'cs.deco',
+        'cs.lex',
+        'cs.pfx',
         'matplotlib',
         'typeguard',
     ],
@@ -98,6 +104,26 @@ def axes(figure=None, ax=None, **fig_kw) -> Axes:
       # pylint: disable=unsubscriptable-object
       ax = figure.axes[0 if ax is None else ax]
   return ax
+
+@typechecked
+def remove_decorations(figure_or_ax: Union[Figure, Axes]):
+  ''' Remove all decorations from a `Figure` or `Axes` instance,
+      intended for making bare plots such as a tile in GUI.
+
+      Presently this removes:
+      - axes markings and legend from each axis
+      - the padding from all the figure subplots
+  '''
+  if isinstance(figure_or_ax, Axes):
+    axs = (figure_or_ax,)
+    figure = figure_or_ax.figure
+  else:
+    figure = figure_or_ax
+    axs = figure.axes
+  for ax in axs:
+    ax.set_axis_off()
+    ax.get_legend().remove()
+  figure.subplots_adjust(bottom=0, top=1, left=0, right=1, hspace=0, wspace=0)
 
 # pylint: disable=redefined-builtin
 @contextmanager

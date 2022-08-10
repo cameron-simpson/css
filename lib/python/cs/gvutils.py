@@ -14,6 +14,19 @@ from typing import Mapping
 
 from cs.lex import is_identifier
 
+__version__ = '20220805.1-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.lex',
+    ],
+}
+
 def quote(s):
   ''' Quote a string for use in DOT syntax.
       This implementation passes identifiers and sequences of decimal numerals

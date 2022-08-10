@@ -32,7 +32,6 @@ import time
 
 import arrow
 from dateutil.tz import tzlocal
-from matplotlib.figure import Figure
 from typeguard import typechecked
 
 from cs.context import stackattrs
@@ -42,7 +41,7 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import s
 from cs.logutils import warning, error
-from cs.mplutils import axes, print_figure, save_figure
+from cs.mplutils import axes, remove_decorations, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
@@ -60,7 +59,7 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220626-post'
+__version__ = '20220806-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -77,6 +76,7 @@ DISTINFO = {
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
+        'cs.mplutils',
         'cs.pfx',
         'cs.progress',
         'cs.psutils',
@@ -86,7 +86,6 @@ DISTINFO = {
         'cs.timeseries',
         'cs.upd',
         'dateutil',
-        'matplotlib',
         'typeguard',
     ],
     'entry_points': {
@@ -520,6 +519,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     tsd = getattr(self, dsname)
     return tsd.to_csv(start, stop, f, **to_csv_kw)
 
+  # pylint: disable=too-many-branches
   @timerange
   def plot(
       self,
@@ -798,7 +798,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
               with Pfx(rdspath):
                 dstags = fstags[dspath]
                 if not force and dstags.imported:
-                  print("already imported:", short_dspath)
+                  ##print('already imported {short_dspath}')
                   continue
                 if dataset in spd.TIMESERIES_DATASETS:
                   ts = getattr(spd, dataset)
@@ -825,17 +825,19 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                               report_print=True,
                               tick_delay=0.15,
                           ):
+                            # the UNIX timestamp seems to be unique, min sep is 0.3ms
                             seen.update(
-                                (ev.unixtime, ev.event_description)
-                                for ev in db.find()
+                                ev.unixtime
+                                for ev in db.find(_without_tags=True)
                             )
                           print(f'{len(seen)} old events from {db}')
                           if runstate.cancelled:
                             break
+                        # get unseen tags
                         when_tags = [
                             (when, tags)
                             for when, tags in when_tags
-                            if (when, tags['event_description']) not in seen
+                            if when not in seen
                         ]
                         if when_tags:
                           for when, tags in progressbar(
@@ -844,7 +846,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                               update_frequency=16,
                               report_print=True,
                           ):
-                            key = when, tags['event_description']
+                            key = when
                             assert key not in seen
                             tags['dataset'] = dataset
                             db.default_factory(None, unixtime=when, tags=tags)
@@ -879,28 +881,32 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] start-time [stop-time] {{mode|[dataset:]{{glob|field}}}}...
-        -e events,...   Display the specified events.
-        -f              Force. Overwirte the image path even if it exists.
-        --stacked       Stack graphed values on top of each other.
-        -o imagepath    Write the plot to imagepath.
-                        If not specified, the image will be written
-                        to the standard output in sixel format if
-                        it is a terminal, and in PNG format otherwise.
-        --show          Open the image path with "open".
-        --tz tzspec     Skew the UTC times presented on the graph
-                        to emulate the timezone specified by tzspec.
-                        The default skew is the system local timezone.
-        start-time      An integer number of days before the current time
-                        or any datetime specification recognised by
-                        dateutil.parser.parse.
-        stop-time       Optional stop time, default now.
-                        An integer number of days before the current time
-                        or any datetime specification recognised by
-                        dateutil.parser.parse.
-        mode            A named graph mode, implying a group of fields.
+          Plot the data from specified fields for the specified time range.
+          Options:
+            --bare          Strip axes and padding from the plot.
+            -e events,...   Display the specified events.
+            -f              Force. Overwirte the image path even if it exists.
+            --stacked       Stack graphed values on top of each other.
+            -o imagepath    Write the plot to imagepath.
+                            If not specified, the image will be written
+                            to the standard output in sixel format if
+                            it is a terminal, and in PNG format otherwise.
+            --show          Open the image path with "open".
+            --tz tzspec     Skew the UTC times presented on the graph
+                            to emulate the timezone specified by tzspec.
+                            The default skew is the system local timezone.
+            start-time      An integer number of days before the current time
+                            or any datetime specification recognised by
+                            dateutil.parser.parse.
+            stop-time       Optional stop time, default now.
+                            An integer number of days before the current time
+                            or any datetime specification recognised by
+                            dateutil.parser.parse.
+            mode            A named graph mode, implying a group of fields.
     '''
     options = self.options
     options.tz = tzlocal()
+    options.bare = False
     options.show_image = False
     options.imgpath = None
     options.stacked = False
@@ -909,6 +915,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     self.popopts(
         argv,
         options,
+        bare='bare',
         e_='event_labels',
         f='force',
         o_='imgpath',
@@ -925,6 +932,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
         stop = time.time()
+    bare = options.bare
     force = options.force
     imgpath = options.imgpath
     spd = options.spd
@@ -939,6 +947,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         event_labels=event_labels,
         stacked=stacked
     )
+    if bare:
+      remove_decorations(figure)
     if imgpath:
       save_figure(figure, imgpath, force=force)
       if show_image:

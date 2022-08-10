@@ -93,7 +93,7 @@ from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning
 from cs.mappings import column_name_to_identifier
-from cs.mplutils import axes, print_figure, save_figure
+from cs.mplutils import axes, remove_decorations, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
@@ -101,7 +101,7 @@ from cs.resources import MultiOpenMixin
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220626-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -122,12 +122,15 @@ DISTINFO = {
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
+        'cs.mappings',
+        'cs.mplutils',
         'cs.pfx',
         'cs.progress',
         'cs.py.modules',
         'cs.resources',
         'cs.result',
         'cs.upd',
+        'dateutil',
         'icontract',
         'matplotlib',
         'numpy',
@@ -346,27 +349,29 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] [--tz tzspec] start-time [stop-time] [{{glob|fields}}...]
-          Plot the most recent days of data from the time series at tspath.
+          Plot the data from specified fields for the specified time range.
           Options:
-          -f              Force. -o will overwrite an existing image file.
-          -o imgpath.png  File system path to which to save the plot.
-          --show          Show the image in the GUI.
-          --tz tzspec     Skew the UTC times presented on the graph
-                          The default skew is 0 i.e. UTC.
-                          to emulate the timezone specified by tzspec.
-          --stacked       Stack the plot lines/areas.
-          start-time      An integer number of days before the current time
-                          or any datetime specification recognised by
-                          dateutil.parser.parse.
-          stop-time       Optional stop time, default now.
-                          An integer number of days before the current time
-                          or any datetime specification recognised by
-                          dateutil.parser.parse.
-          glob|fields     If glob is supplied, constrain the keys of
-                          a TimeSeriesDataDir by the glob.
+            --bare          Strip axes and padding from the plot.
+            -f              Force. -o will overwrite an existing image file.
+            -o imgpath.png  File system path to which to save the plot.
+            --show          Show the image in the GUI.
+            --tz tzspec     Skew the UTC times presented on the graph
+                            The default skew is 0 i.e. UTC.
+                            to emulate the timezone specified by tzspec.
+            --stacked       Stack the plot lines/areas.
+            start-time      An integer number of days before the current time
+                            or any datetime specification recognised by
+                            dateutil.parser.parse.
+            stop-time       Optional stop time, default now.
+                            An integer number of days before the current time
+                            or any datetime specification recognised by
+                            dateutil.parser.parse.
+            glob|fields     If glob is supplied, constrain the keys of
+                            a TimeSeriesDataDir by the glob.
     '''
     options = self.options
     runstate = options.runstate
+    options.bare = False
     options.show_image = False
     options.imgpath = None
     options.multi = False
@@ -375,6 +380,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     self.popopts(
         argv,
         options,
+        bare='bare',
         f='force',
         multi=None,
         o_='imgpath',
@@ -390,6 +396,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
         stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
         stop = time.time()
+    bare = options.bare
     force = options.force
     imgpath = options.imgpath
     tz = options.tz
@@ -449,6 +456,8 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
       raise RuntimeError("unhandled type %s" % (s(ts),))
     if runstate.cancelled:
       return 1
+    if bare:
+      remove_decorations(figure)
     if imgpath:
       save_figure(figure, imgpath, force=force)
     else:
@@ -1678,8 +1687,11 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   @contextmanager
   def startup_shutdown(self):
-    yield self
-    self.flush()
+    try:
+      yield self
+    finally:
+      # TODO: should some exceptions prevent a flush?
+      self.flush()
 
   @property
   def stop(self):

@@ -51,7 +51,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import bg as bg_thread, State as ThreadState
 
-__version__ = '20220605-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python3"],

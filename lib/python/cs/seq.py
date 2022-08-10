@@ -66,7 +66,6 @@ __seq = Seq()
 def seq():
   ''' Return a new sequential value.
   '''
-  global __seq  # pylint: disable=global-statement
   return next(__seq)
 
 def the(iterable, context=None):

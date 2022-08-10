@@ -31,7 +31,7 @@ from cs.env import envsub
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
-__version__ = '20220530-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -196,7 +196,13 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         * `envvar`: the environment variable to consult for a default `fspath`;
           the default for this comes from `cls.FSPATH_ENVVAR` if defined
         * `default_attr`: the class attribute containing the default `fspath`
-          if defined and there is not environment variable for `envvar`
+          if defined and there is no environment variable for `envvar`
+
+        The common mode is where each instance might have an arbitrary path,
+        such as a `TagFile`.
+
+        The "class default" mode is intended for things like `CalibreTree`
+        which has the notion of a default location for your Calibre library.
     '''
     if fspath is None:
       # pylint: disable=no-member

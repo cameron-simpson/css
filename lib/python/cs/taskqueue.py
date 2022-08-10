@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-''' A general purpose task queue for running tasks in parallel with
-    dependencies and failure/retry.
+''' A general purpose Task and TaskQueue for running tasks with
+    dependencies and failure/retry, potentially in parallel.
 '''
 
 from itertools import chain
@@ -24,6 +24,31 @@ from cs.resources import RunState, RunStateMixin
 from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, State as ThreadState
+
+__version__ = '20220805-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 3 - Alpha",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.deco',
+        'cs.fsm',
+        'cs.gvutils',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.queues',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+        'cs.threads',
+        'icontract',
+        'typeguard',
+    ],
+}
 
 def main(argv):
   ''' Dummy main programme to exercise something.

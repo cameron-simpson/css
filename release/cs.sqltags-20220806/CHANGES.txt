@@ -1,0 +1,4 @@
+lib/python/cs/sqltags.py: cs.sqltags: docstring tweak
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.search: mode='entity': drop distinct() filter, should be pointless anyway; tweak docstring
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: use SQTCriterion.promote
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: new _without_tags=False parameter to allow fast searches omitting the entity tags

@@ -68,7 +68,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20220311-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -80,12 +80,11 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.fsm',
-        'cs.logutils',
+        'cs.gimmicks',
         'cs.mappings',
         'cs.pfx',
         'cs.py.func',
         'cs.py3',
-        'cs.resources',
         'cs.seq',
         'cs.threads',
         'icontract',
@@ -143,10 +142,11 @@ class Result(FSM):
         * `name`: optional parameter naming this object.
         * `lock`: optional locking object, defaults to a new `threading.Lock`.
         * `result`: if not `None`, prefill the `.result` property.
-        * `extra`: a mapping of extra information to associate with the `Result`,
-          useful to provide context when collecting the result;
-          the `Result` has a public attribute `.extra`
-          which is an `AttrableMapping` to hold this information.
+        * `extra`: an optional mapping of extra information to
+          associate with the `Result`, useful to provide context
+          when collecting the result; the `Result` has a public
+          attribute `.extra` which is an `AttrableMapping` to hold
+          this information.
     '''
     if lock is None:
       lock = RLock()
