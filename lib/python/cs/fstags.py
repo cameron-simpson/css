@@ -1068,7 +1068,8 @@ class FSTags(MultiOpenMixin):
   def __getitem__(self, path):
     ''' Return the `TaggedPath` for `abspath(path)`.
     '''
-    path = abspath(path)
+    path = realpath(path) if self.config.physical else abspath(path)
+    assert path == normpath(path)
     tagged_path = self._tagged_paths.get(path)
     if tagged_path is None:
       tagfile = self.tagfile_for(path)
