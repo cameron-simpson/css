@@ -21,7 +21,7 @@ import sys
 from threading import Thread
 from cs.py3 import pread
 
-__version__ = '20210316-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -126,7 +126,7 @@ class CornuCopyBuffer(object):
         * `offset`: the current byte offset of the iterator; this
           is used during the buffer initialisation to compute
           `input_data_displacement`, the difference between the
-          buffer's logical offset and the input data's logical offset;
+          buffer's logical offset and the input data iterable's logical offset;
           if unavailable during initialisation this is presumed to
           be `0`.
         * `end_offset`: the end offset of the iterator if known.
@@ -145,9 +145,10 @@ class CornuCopyBuffer(object):
       self.buflen = len(buf)
     self.offset = offset
     self.seekable = seekable
-    input_data = self.input_data = iter(input_data)
+    input_data = iter(input_data)
     if copy_chunks is not None:
       input_data = CopyingIterator(input_data, copy_chunks)
+    self.input_data = input_data
     self.copy_offsets = copy_offsets
     # Try to compute the displacement between the input_data byte
     # offset and the buffer's logical offset.
@@ -416,7 +417,7 @@ class CornuCopyBuffer(object):
         buffered byte is returned.
 
         This is usually not a very useful method;
-        its primary use case it to probe the buffer to make a parsing decision
+        its primary use case is to probe the buffer to make a parsing decision
         instead of taking a byte off and (possibly) pushing it back.
     '''
     if isinstance(index, slice):
@@ -952,7 +953,7 @@ class _BoundedBufferIterator(object):
     if limit <= 0:
       if limit < 0:
         raise RuntimeError("limit:%d < 0" % (limit,))
-      raise StopIteration
+      raise StopIteration("limit reached")
     # post: limit > 0
     buf = next(bfr)
     # post: bfr.buf now empty, can be modified

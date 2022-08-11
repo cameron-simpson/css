@@ -1,0 +1,2 @@
+lib/python/cs/later.py: cs.result: Result: [BREAKING] rename call to run_func for clarity; cs.taskqueue: Task: prevent .run_func(), rename .call() to .run()
+lib/python/cs/later.py: cs.later: Later._after: rename internal function for clarity

@@ -6,12 +6,42 @@
 
 set -ue
 
-cd
-
 cmd=$0
-usage="Usage: $cmd org startdate enddate [repo-dirs...]"
+usage="Usage:
+  $cmd org startdate enddate [repo-dirs...]
+  $cmd org@hosts YYYY-MM [repo-dirs]"
 
 badopts=
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    *@*)
+      org=$(   expr "x$1" : 'x\([^@]*\)@.*' )
+      hosts=$( expr "x$1" : 'x[^@]*@\(.*\)' | tr , ' ' )
+      shift
+      case $1 in
+        20[0-9][0-9]-[01][0-9])
+          yyyy=$( expr "x$1" : 'x\(....\)-..' )
+          mm=$(   expr "x$1" : 'x....-0*\(1*[0-9]\)' )
+          shift
+          yyyy2=$yyyy
+          mm2=$( expr "$mm" + 1 )
+          [ $mm2 -le 12 ] || { yyyy2=$( expr "$yyyy" + 1 ) mm2=$( expr "$mm2" - 12 ); }
+          logs=
+          for host in $hosts
+          do  log=$host-$yyyy-$mm-ALL.log
+              set-x envssh $host invoice-log $org $yyyy-$mm $yyyy2-$mm2 $* >"$log"
+              logs="$logs $log"
+          done
+          set-x sort -u -o MERGED-$yyyy-$mm.log $logs
+          exit 0
+          ;;
+      esac
+      exit 1
+      ;;
+  esac
+fi
 
 if [ $# -lt 3 ]
 then
@@ -45,6 +75,7 @@ set -x
   for d in $repodirs*
   do
     [ -d "$d/" ] || continue
+    dbase=$( basename "$d" )
     ( cd "$d"
       if [ -d ".git/" ]
       then  git log '--format=tformat:%ci %ae %s %d' "--since=$start" "--until=$end"
@@ -53,7 +84,7 @@ set -x
       else
         echo "$d: NO VCS" >&2
       fi
-    )
+    ) | sed "s/^[^ ][^ ]* [^ ][^ ]*/& $dbase/" || :
   done \
   | awk -v "email=$EMAIL" '$4 == email { $3=""; $4=""; print}'
 ) \

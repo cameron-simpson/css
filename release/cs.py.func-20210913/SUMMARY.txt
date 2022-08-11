@@ -1,0 +1,1 @@
+New func_a_kw_fmt(func,*a,**kw) imported from cs.pfx, hooked it into @trace.

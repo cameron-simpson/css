@@ -272,8 +272,7 @@ class MP3Command(BaseCommand):
   ''' MP3 command line tool.
   '''
 
-  @staticmethod
-  def cmd_tags(argv):
+  def cmd_tags(self, argv):
     ''' Usage: {cmd} mp3filenames...
           Print the tags from the named files.
     '''

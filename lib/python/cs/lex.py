@@ -30,23 +30,22 @@ from string import (
 )
 import sys
 from textwrap import dedent
+from threading import Lock
 
 from typeguard import typechecked
 
 from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
-from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20210906-post'
+__version__ = '20220626-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -54,7 +53,6 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
-        'cs.py3',
         'cs.seq>=20200914',
         'typeguard',
     ],
@@ -73,7 +71,7 @@ if sys.hexversion >= 0x030000:
 
 ord_space = ord(' ')
 
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches,redefined-outer-name
 def unctrl(s, tabsize=8):
   ''' Return the string `s` with `TAB`s expanded and control characters
       replaced with printable representations.
@@ -152,6 +150,7 @@ def tabpadding(padlen, tabsize=8, offset=0):
 
 def typed_str(o, use_cls=False, use_repr=False, max_length=None):
   ''' Return "type(o).__name__:str(o)" for some object `o`.
+      This is available as both `typed_str` and `s`.
 
       Parameters:
       * `use_cls`: default `False`;
@@ -165,6 +164,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=None):
           ......
           X("foo = %s", s(foo))
   '''
+  # pylint: disable=redefined-outer-name
   s = "%s:%s" % (
       type(o) if use_cls else type(o).__name__,
       repr(o) if use_repr else str(o),
@@ -173,16 +173,24 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=None):
     s = cropped(s, max_length)
   return s
 
+# convenience alias
+s = typed_str
+
 def typed_repr(o, use_cls=False, max_length=None):
   ''' Like `typed_str` but using `repr` instead of `str`.
+      This is available as both `typed_repr` and `r`.
   '''
   return typed_str(o, use_cls=use_cls, max_length=max_length, use_repr=True)
+
+# convenience alias
+r = typed_repr
 
 def strlist(ary, sep=", "):
   ''' Convert an iterable to strings and join with `sep` (default `', '`).
   '''
   return sep.join([str(a) for a in ary])
 
+# pylint: disable=redefined-outer-name
 def htmlify(s, nbsp=False):
   ''' Convert a string for safe transcription in HTML.
 
@@ -267,7 +275,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   '''
   if whitelist is None:
     whitelist = _texthexify_white_chars
-  if isinstance(whitelist, StringTypes) and not isinstance(whitelist, bytes):
+  if isinstance(whitelist, str):
     whitelist = bytes(ord(ch) for ch in whitelist)
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
@@ -308,6 +316,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
     chunks.append(chunk)
   return ''.join(chunks)
 
+# pylint: disable=redefined-outer-name
 def untexthexify(s, shiftin='[', shiftout=']'):
   ''' Decode a textual representation of binary data into binary data.
 
@@ -352,8 +361,9 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     if len(s) % 2 != 0:
       raise ValueError("uneven hex sequence %r" % (s,))
     chunks.append(unhexify(s))
-  return joinbytes(chunks)
+  return b''.join(chunks)
 
+# pylint: disable=redefined-outer-name
 def get_chars(s, offset, gochars):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`.
       Return `(match,new_offset)`.
@@ -370,6 +380,7 @@ def get_chars(s, offset, gochars):
       offset += 1
   return s[ooffset:offset], offset
 
+# pylint: disable=redefined-outer-name
 def get_white(s, offset=0):
   ''' Scan the string `s` for characters in `string.whitespace`
       starting at `offset` (default `0`).
@@ -377,6 +388,7 @@ def get_white(s, offset=0):
   '''
   return get_chars(s, offset, whitespace)
 
+# pylint: disable=redefined-outer-name
 def skipwhite(s, offset=0):
   ''' Convenience routine for skipping past whitespace;
       returns the offset of the next nonwhitespace character.
@@ -419,6 +431,7 @@ def stripped_dedent(s):
   adjusted = dedent('\n'.join(lines))
   return line1 + '\n' + adjusted
 
+# pylint: disable=redefined-outer-name
 def strip_prefix_n(s, prefix, n=None):
   ''' Strip a leading `prefix` and numeric value `n` from the start of a
       string.  Return the remaining string, or the original string if the
@@ -428,7 +441,7 @@ def strip_prefix_n(s, prefix, n=None):
       * `s`: the string to strip
       * `prefix`: the prefix string which must appear at the start of `s`
       * `n`: optional integer value;
-        if omitted any value will be accepted, otherise the numeric
+        if omitted any value will be accepted, otherwise the numeric
         part must match `n`
 
       Examples:
@@ -456,7 +469,7 @@ def strip_prefix_n(s, prefix, n=None):
     s = s.lstrip(digits)
   else:
     # evaluate the numeric part
-    s = s.lstrip('0')
+    s = s.lstrip('0')  # pylint: disable=no-member
     if not s or not s[0].isdigit():
       # all zeroes, leading value is 0
       sn = 0
@@ -473,6 +486,7 @@ def strip_prefix_n(s, prefix, n=None):
     s = s[pos:]
   return s
 
+# pylint: disable=redefined-outer-name
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in `string.whitespace`
       starting at `offset` (default `0`).
@@ -480,12 +494,14 @@ def get_nonwhite(s, offset=0):
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
 
+# pylint: disable=redefined-outer-name
 def get_decimal(s, offset=0):
   ''' Scan the string `s` for decimal characters starting at `offset` (default `0`).
       Return `(dec_string,new_offset)`.
   '''
   return get_chars(s, offset, digits)
 
+# pylint: disable=redefined-outer-name
 def get_decimal_value(s, offset=0):
   ''' Scan the string `s` for a decimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
@@ -495,12 +511,14 @@ def get_decimal_value(s, offset=0):
     raise ValueError("expected decimal value")
   return int(value_s), offset
 
+# pylint: disable=redefined-outer-name
 def get_hexadecimal(s, offset=0):
   ''' Scan the string `s` for hexadecimal characters starting at `offset` (default `0`).
       Return `(hex_string,new_offset)`.
   '''
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
+# pylint: disable=redefined-outer-name
 def get_hexadecimal_value(s, offset=0):
   ''' Scan the string `s` for a hexadecimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
@@ -510,6 +528,7 @@ def get_hexadecimal_value(s, offset=0):
     raise ValueError("expected hexadecimal value")
   return int('0x' + value_s), offset
 
+# pylint: disable=redefined-outer-name
 def get_decimal_or_float_value(s, offset=0):
   ''' Fetch a decimal or basic float (nnn.nnn) value
       from the str `s` at `offset` (default `0`).
@@ -552,6 +571,7 @@ def get_identifier(
   idtail, offset = get_chars(s, offset + 1, alpha + number + extras)
   return ch + idtail, offset
 
+# pylint: disable=redefined-outer-name
 def is_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier
       from position `offset` (default `0`) onward.
@@ -559,6 +579,7 @@ def is_identifier(s, offset=0, **kw):
   s2, offset2 = get_identifier(s, offset=offset, **kw)
   return s2 and offset2 == len(s)
 
+# pylint: disable=redefined-outer-name
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier as for `get_identifier`,
       but require the letters to be uppercase.
@@ -567,6 +588,7 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
       s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras
   )
 
+# pylint: disable=redefined-outer-name
 def get_dotted_identifier(s, offset=0, **kw):
   ''' Scan the string `s` for a dotted identifier (by default an
       ASCII letter or underscore followed by letters, digits or
@@ -590,12 +612,14 @@ def get_dotted_identifier(s, offset=0, **kw):
       offset = offset2
   return s[offset0:offset], offset
 
+# pylint: disable=redefined-outer-name
 def is_dotted_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier from position `offset` onward.
   '''
   s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
   return len(s2) > 0 and offset2 == len(s)
 
+# pylint: disable=redefined-outer-name
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
       at `offset` (default `0`).
@@ -775,8 +799,9 @@ def get_sloshed_text(
         break
       offset += 1
     chunks.append(s[offset0:offset])
-  return u''.join(ustr(chunk) for chunk in chunks), offset
+  return ''.join(chunks), offset
 
+# pylint: disable=redefined-outer-name
 def get_envvar(s, offset=0, environ=None, default=None, specials=None):
   ''' Parse a simple environment variable reference to $varname or
       $x where "x" is a special character.
@@ -850,6 +875,7 @@ def get_qstr(
   )
   return get_sloshed_text(s, delim, offset, specials={'$': getvar})
 
+# pylint: disable=redefined-outer-name
 def get_qstr_or_identifier(s, offset):
   ''' Parse a double quoted string or an identifier.
   '''
@@ -857,6 +883,7 @@ def get_qstr_or_identifier(s, offset):
     return get_qstr(s, offset, q='"')
   return get_identifier(s, offset)
 
+# pylint: disable=redefined-outer-name
 def get_delimited(s, offset, delim):
   ''' Collect text from the string `s` from position `offset` up
       to the first occurence of delimiter `delim`; return the text
@@ -869,6 +896,7 @@ def get_delimited(s, offset, delim):
     )
   return s[offset:pos], pos + len(delim)
 
+# pylint: disable=redefined-outer-name
 def get_tokens(s, offset, getters):
   ''' Parse the string `s` from position `offset` using the supplied
       tokeniser functions `getters`.
@@ -895,8 +923,9 @@ def get_tokens(s, offset, getters):
     kwargs = {}
     if callable(getter):
       func = getter
-    elif isinstance(getter, StringTypes):
+    elif isinstance(getter, str):
 
+      # pylint: disable=redefined-outer-name
       def func(s, offset):
         ''' Wrapper for a literal string: require the string to be
             present at the current offset.
@@ -908,6 +937,7 @@ def get_tokens(s, offset, getters):
       func, args, kwargs = getter
     elif hasattr(getter, 'match'):
 
+      # pylint: disable=redefined-outer-name
       def func(s, offset):
         ''' Wrapper for a getter with a .match method, such as a regular
             expression.
@@ -922,6 +952,7 @@ def get_tokens(s, offset, getters):
     tokens.append(token)
   return tokens, offset
 
+# pylint: disable=redefined-outer-name
 def match_tokens(s, offset, getters):
   ''' Wrapper for `get_tokens` which catches `ValueError` exceptions
       and returns `(None,offset)`.
@@ -993,6 +1024,7 @@ def as_lines(chunks, partials=None):
     if pos < len(chunk):
       partials.append(chunk[pos:])
 
+# pylint: disable=redefined-outer-name
 def cutprefix(s, prefix):
   ''' Strip a `prefix` from the front of `s`.
       Return the suffix if `s.startswith(prefix)`, else `s`.
@@ -1011,6 +1043,7 @@ def cutprefix(s, prefix):
     return s[len(prefix):]
   return s
 
+# pylint: disable=redefined-outer-name
 def cutsuffix(s, suffix):
   ''' Strip a `suffix` from the end of `s`.
       Return the prefix if `s.endswith(suffix)`, else `s`.
@@ -1057,6 +1090,7 @@ def common_suffix(*strs):
     return ''
   return strs[0][-length:]
 
+# pylint: disable=redefined-outer-name,unsubscriptable-object
 def cropped(
     s: str, max_length: int = 32, roffset: int = 1, ellipsis: str = '...'
 ):
@@ -1107,6 +1141,7 @@ def cropped_repr(o, roffset=1, max_length=32, inner_max_length=None):
     o_repr = repr(o)
   return cropped(o_repr, max_length=max_length, roffset=roffset)
 
+# pylint: disable=redefined-outer-name
 def get_ini_clausename(s, offset=0):
   ''' Parse a `[`*clausename*`]` string from `s` at `offset` (default `0`).
       Return `(clausename,new_offset)`.
@@ -1124,6 +1159,7 @@ def get_ini_clausename(s, offset=0):
     raise ValueError("missing closing ']' at position %d" % (offset,))
   return clausename, offset + 1
 
+# pylint: disable=redefined-outer-name
 def get_ini_clause_entryname(s, offset=0):
   ''' Parse a `[`*clausename*`]`*entryname* string
       from `s` at `offset` (default `0`).
@@ -1136,6 +1172,72 @@ def get_ini_clause_entryname(s, offset=0):
     raise ValueError("missing entryname identifier at position %d" % (offset,))
   return clausename, entryname, offset
 
+def camelcase(snakecased, first_letter_only=False):
+  ''' Convert a snake cased string `snakecased` into camel case.
+
+      Parameters:
+      * `snakecased`: the snake case string to convert
+      * `first_letter_only`: optional flag (default `False`);
+        if true then just ensure that the first character of a word
+        is uppercased, otherwise use `str.title`
+
+      Example:
+
+          >>> camelcase('abc_def')
+          'abcDef'
+          >>> camelcase('ABc_def')
+          'abcDef'
+          >>> camelcase('abc_dEf')
+          'abcDef'
+          >>> camelcase('abc_dEf', first_letter_only=True)
+          'abcDEf'
+  '''
+  words = snakecased.split('_')
+  for i, word in enumerate(words):
+    if not word:
+      continue
+    if first_letter_only:
+      word = word[0].upper() + word[1:]
+    else:
+      word = word.title()
+    if i == 0:
+      word = word[0].lower() + word[1:]
+    words[i] = word
+  return ''.join(words)
+
+def snakecase(camelcased):
+  ''' Convert a camel cased string `camelcased` into snake case.
+
+      Parameters:
+      * `cameelcased`: the cameel case string to convert
+      * `first_letter_only`: optional flag (default `False`);
+        if true then just ensure that the first character of a word
+        is uppercased, otherwise use `str.title`
+
+      Example:
+
+          >>> snakecase('abcDef')
+          'abc_def'
+          >>> snakecase('abcDEf')
+          'abc_def'
+          >>> snakecase('AbcDef')
+          'abc_def'
+  '''
+  strs = []
+  was_lower = False
+  for i, c in enumerate(camelcased):
+    if c.isupper():
+      c = c.lower()
+      if was_lower:
+        # boundary
+        was_lower = False
+        strs.append('_')
+    else:
+      was_lower = True
+    strs.append(c)
+  return ''.join(strs)
+
+# pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
   '''
@@ -1184,7 +1286,13 @@ def format_recover(method):
 
 @typechecked
 @fmtdoc
-def format_as(format_s: str, format_mapping, formatter=None, error_sep=None):
+def format_as(
+    format_s: str,
+    format_mapping,
+    formatter=None,
+    error_sep=None,
+    strict=None,
+):
   ''' Format the string `format_s` using `Formatter.vformat`,
       return the formatted result.
       This is a wrapper for `str.format_map`
@@ -1196,27 +1304,52 @@ def format_as(format_s: str, format_mapping, formatter=None, error_sep=None):
       * `formatter`: an optional `string.Formatter`-like instance
         with a `.vformat(format_string,args,kwargs)` method,
         usually a subclass of `string.Formatter`;
-        if not specified then `str.Formatter` is used
+        if not specified then `FormatableFormatter` is used
       * `error_sep`: optional separator for the multipart error message,
         default from `FormatAsError.DEFAULT_SEPARATOR`:
         `'{FormatAsError.DEFAULT_SEPARATOR}'`
+      * `strict`: optional flag (default `False`)
+        indicating that an unresolveable field should raise a
+        `KeyError` instead of inserting a placeholder
   '''
   if formatter is None:
     formatter = FormatableFormatter(format_mapping)
-  try:
-    formatted = formatter.vformat(format_s, (), format_mapping)
-  except KeyError as e:
-    # pylint: disable=raise-missing-from
-    raise FormatAsError(
-        e.args[0], format_s, format_mapping, error_sep=error_sep
-    )
-  return formatted
+  if strict is None:
+    strict = formatter.format_mode.strict
+  with formatter.format_mode(strict=strict):
+    try:
+      formatted = formatter.vformat(format_s, (), format_mapping)
+    except KeyError as e:
+      # pylint: disable=raise-missing-from
+      raise FormatAsError(
+          e.args[0], format_s, format_mapping, error_sep=error_sep
+      )
+    return formatted
 
 _format_as = format_as  # for reuse in the format_as method below
 
 def format_attribute(method):
   ''' Mark a method as available as a format method.
       Requires the enclosing class to be decorated with `@has_format_attributes`.
+
+      For example,
+      the `FormatableMixin.json` method is defined like this:
+
+          @format_attribute
+          def json(self):
+              return self.FORMAT_JSON_ENCODER.encode(self)
+
+      which allows a `FormatableMixin` subclass instance
+      to be used in a format string like this:
+
+          {instance:json}
+
+      to insert a JSON transcription of the instance.
+
+      It is recommended that methods marked with `@format_attribute`
+      have no side effects and do not modify state,
+      as they are intended for use in ad hoc format strings
+      supplied by an end user.
   '''
   method.is_format_attribute = True
   return method
@@ -1244,7 +1377,7 @@ class FormatableFormatter(Formatter):
 
   FORMAT_RE_LITERAL_TEXT = re.compile(r'([^{]+|{{)*')
   FORMAT_RE_IDENTIFIER_s = r'[a-z_][a-z_0-9]*'
-  FORMAT_RE_ARG_NAME_s = rf'({FORMAT_RE_IDENTIFIER_s}|\d+)'
+  FORMAT_RE_ARG_NAME_s = rf'({FORMAT_RE_IDENTIFIER_s}|\d+(\.\d+)?[a-z]+)'
   FORMAT_RE_ATTRIBUTE_NAME_s = rf'\.{FORMAT_RE_IDENTIFIER_s}'
   FORMAT_RE_ELEMENT_INDEX_s = r'[^]]*'
   FORMAT_RE_FIELD_EXPR_s = (
@@ -1259,6 +1392,27 @@ class FormatableFormatter(Formatter):
           r'(!(?P<conversion>[^:}]*))?' + r'(:(?P<format_spec>[^}]*))?' + r'}'
       ), re.I
   )
+
+  @property
+  def format_mode(self):
+    ''' Thread local state object.
+
+        Attributes:
+        * `strict`: initially `False`; raise a `KeyError` for
+          unresolveable field names
+    '''
+    try:
+      lock = self.__dict__['_lock']
+    except KeyError:
+      lock = self.__dict__['_lock'] = Lock()
+    with lock:
+      try:
+        mode = self.__dict__['format_mode']
+      except KeyError:
+        # pylint: disable=import-outside-toplevel
+        from cs.threads import State as ThreadState
+        mode = self.__dict__['format_mode'] = ThreadState(strict=False)
+    return mode
 
   if False:  # pylint: disable=using-constant-test
 
@@ -1308,14 +1462,12 @@ class FormatableFormatter(Formatter):
   @pfx_method
   def get_field(self, field_name, a, kw):
     ''' Get the object referenced by the field text `field_name`.
+        Raises `KeyError` for an unknown `field_name`.
     '''
     assert not a
     with Pfx("field_name=%r: kw=%r", field_name, kw):
       arg_name, offset = self.get_arg_name(field_name)
-      try:
-        arg_value, _ = self.get_value(arg_name, a, kw)
-      except KeyError as e:
-        raise ValueError("no value for arg_name=%r: %s" % (arg_name, e)) from e
+      arg_value, _ = self.get_value(arg_name, a, kw)
       # resolve the rest of the field
       subfield = self.get_subfield(arg_value, field_name[offset:])
       return subfield, field_name
@@ -1338,12 +1490,15 @@ class FormatableFormatter(Formatter):
     '''
     if subfield_text == '':
       return value
-    subfield_fmt = f'{{value{subfield_text}}}'
-    subfield_map = {'value': value}
-    with Pfx("%r.format_map(%r)", subfield_fmt, subfield_map):
-      value = subfield_fmt.format_map(subfield_map)
-    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-      value = FStr(value)
+    if subfield_text[0] in '.[':
+      subfield_fmt = f'{{value{subfield_text}}}'
+      subfield_map = {'value': value}
+      with Pfx("%r.format_map(%r)", subfield_fmt, subfield_map):
+        value = subfield_fmt.format_map(subfield_map)
+    else:
+      # use the subfield_text after the colon
+      fmt = f'{{value:{subfield_text}}}'
+      value = fmt.format(value=value)
     return value
 
   # pylint: disable=arguments-differ
@@ -1359,7 +1514,7 @@ class FormatableFormatter(Formatter):
   @classmethod
   def get_format_subspecs(cls, format_spec):
     ''' Parse a `format_spec` as a sequence of colon separated components,
-        return the components.
+        return a list of the components.
     '''
     subspecs = []
     offset = 0
@@ -1382,27 +1537,6 @@ class FormatableFormatter(Formatter):
     return subspecs
 
   @classmethod
-  def format_field1(cls, value, format_subspec):
-    ''' Format a subspec of a larger colon separated `format_spec`
-        as from `format_field(value,format_spec)`.
-        Return the new value, which need not be a `str`;
-        the outer `format_field` call does a final conversion to an `FStr`.
-    '''
-    with Pfx("value=%r, format_subspec=%r", value, format_subspec):
-      # promote bare str to FStr
-      if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-        value = FStr(value)
-      try:
-        value.convert_via_method_or_attr
-      except AttributeError:
-        # promote to something with convert_via_method_or_attr
-        value = FStr(value)
-      value, offset = value.convert_via_method_or_attr(value, format_subspec)
-      if offset < len(format_subspec):
-        value = cls.get_subfield(value, format_subspec[offset:])
-    return value
-
-  @classmethod
   @pfx_method
   @typechecked
   def format_field(cls, value, format_spec: str):
@@ -1412,26 +1546,42 @@ class FormatableFormatter(Formatter):
 
         We actually recognise colon separated chains of formats
         and apply each format to the previously converted value.
-        `str` values are promoted to `FStr` at each step.
-
-        At each step, for the current value
-        we try `format(value)` first
-        then `FormattableMixin.convert_via_method_or_attr(value)`
-        then `FormattableMixin.convert_via_method_or_attr(FStr(value))`
-        in turn.
+        The final result is promoted to an `FStr` before return.
     '''
     # parse the format_spec into multiple subspecs
-    format_subspecs = cls.get_format_subspecs(format_spec)
-    # promote str to FStr before formatting
-    # chain the various subspecifications
-    for format_subspec in format_subspecs or ('',):
-      value = cls.format_field1(value, format_subspec)
+    format_subspecs = cls.get_format_subspecs(format_spec) or []
+    while format_subspecs:
+      format_subspec = format_subspecs.pop(0)
+      with Pfx("subspec %r", format_subspec):
+        assert isinstance(format_subspec, str)
+        assert len(format_subspec) > 0
+        with Pfx("value=%r, format_subspec=%r", value, format_subspec):
+          # promote bare str to FStr
+          if value is None or type(value) is str:  # pylint: disable=unidiomatic-typecheck
+            value = FStr(value)
+          if format_subspec[0].isalpha():
+            try:
+              value.convert_via_method_or_attr
+            except AttributeError:
+              # promote to something with convert_via_method_or_attr
+              if isinstance(value, str):
+                value = FStr(value)
+              else:
+                value = pfx_call(format, value, format_subspec)
+            value, offset = value.convert_via_method_or_attr(
+                value, format_subspec
+            )
+            if offset < len(format_subspec):
+              subspec_tail = format_subspec[offset:]
+              value = cls.get_subfield(value, subspec_tail)
+          else:
+            value = format(value, format_subspec)
     return FStr(value)
 
 @has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
   ''' A subclass of `FormatableFormatter` which  provides 2 features:
-      - a `__format__ method which parses the `format_spec` string
+      - a `__format__` method which parses the `format_spec` string
         into multiple colon separated terms whose results chain
       - a `format_as` method which formats a format string using `str.format_map`
         with a suitable mapping derived from the instance
@@ -1475,7 +1625,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         As such, a `format_spec` is considered
         a sequence of colon separated terms.
 
-        Classes wanting to implement addition format string syntaxes
+        Classes wanting to implement additional format string syntaxes
         should either:
         - override `FormatableFormatter.format_field1` to implement
           terms with no colons, letting `format_field1` do the split into terms
@@ -1516,7 +1666,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   ##@staticmethod
   def convert_field(self, value, conversion):
-    ''' Default converter for fields calls `Formatter.convert_field`.
+    ''' The default converter for fields calls `Formatter.convert_field`.
     '''
     if conversion == '':
       warning(
@@ -1534,6 +1684,9 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         Return `(converted,offset)`
         being the converted value and the offset after the method name.
 
+        Note that if there is not a leading identifier on `format_spec`
+        then `value` is returned unchanged with `offset=0`.
+
         The methods/attributes are looked up in the mapping
         returned by `.format_attributes()` which represents allowed methods
         (broadly, one should not allow methods which modify any state).
@@ -1548,7 +1701,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         (the `value` isn't suitable)
         and the `value` is not an instance of `FStr`,
         convert it to an `FStr` and try again.
-        This provides the command utility methods on other types.
+        This provides the common utility methods on other types.
 
         The motivating example was a `PurePosixPath`,
         which does not JSON transcribe;
@@ -1574,13 +1727,13 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       else:
         converted = attribute
       return converted, offset
-    except TypeError as e:
+    except TypeError:
       if not isinstance(value, FStr):
         with Pfx("fall back to FStr(value=%s).convert_via_method_or_attr"):
           return self.convert_via_method_or_attr(FStr(value), format_spec)
       raise
 
-  def format_as(self, format_s, error_sep=None, **control_kw):
+  def format_as(self, format_s, error_sep=None, strict=None, **control_kw):
     ''' Return the string `format_s` formatted using the mapping
         returned by `self.format_kwargs(**control_kw)`.
 
@@ -1598,9 +1751,16 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       format_mapping = self
     else:
       format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
-    return _format_as(
-        format_s, format_mapping, formatter=self, error_sep=error_sep
-    )
+    if strict is None:
+      strict = self.format_mode.strict
+    with self.format_mode(strict=strict):
+      return pfx_call(
+          _format_as,
+          format_s,
+          format_mapping,
+          formatter=self,
+          error_sep=error_sep,
+      )
 
   # Utility methods for formats.
   @format_attribute
@@ -1612,8 +1772,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 @has_format_attributes
 class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
-      particularly its `__format__`
-      which use `str` method names as valid formats.
+      particularly its `__format__` method
+      which uses `str` method names as valid formats.
 
       It also has a bunch of utility methods which are available
       as `:`*method* in format strings.

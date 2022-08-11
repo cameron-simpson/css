@@ -51,11 +51,11 @@ import sys
 import threading
 import traceback
 from cs.deco import decorator, contextdecorator, fmtdoc, logging_wrapper
-from cs.py.func import funcname
+from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20210906-post'
+__version__ = '20220523-post'
 
 DISTINFO = {
     'description':
@@ -68,7 +68,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
-        'cs.py.func',
+        'cs.py.func>=func_a_kw_fmt',
         'cs.py3',
         'cs.x',
     ],
@@ -105,20 +105,6 @@ def pfx_iter(tag, iterable):
         break
     yield i
 
-def _func_a_kw_fmt(func, *a, **kw):
-  ''' Prepare a format string and associated argument list
-      describing a call to `func(*a,**kw)`.
-      Return `format,args`.
-
-  '''
-  av = [getattr(func, '__name__', str(func))]
-  afv = ['%r'] * len(a)
-  av.extend(a)
-  afv.extend(['%s=%r'] * len(kw))
-  for kv in kw.items():
-    av.extend(kv)
-  return '%s(' + ','.join(afv) + ')', av
-
 def pfx_call(func, *a, **kw):
   ''' Call `func(*a,**kw)` within an enclosing `Pfx` context manager
       reciting the function name and arguments.
@@ -128,7 +114,7 @@ def pfx_call(func, *a, **kw):
           >>> import os
           >>> pfx_call(os.rename, "oldname", "newname")
   '''
-  pfxf, pfxav = _func_a_kw_fmt(func, *a, **kw)
+  pfxf, pfxav = func_a_kw_fmt(func, *a, **kw)
   with Pfx(pfxf, *pfxav):
     return func(*a, **kw)
 
@@ -199,7 +185,7 @@ class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
 
-  # instantiate the thread-local state object
+  # instantiate the thread-local class state object
   _state = _PfxThreadState()
 
   def __init__(self, mark, *args, **kwargs):
@@ -260,6 +246,7 @@ class Pfx(object):
 
   def __enter__(self):
     # push this Pfx onto the per-Thread stack
+    self._push(self)
     print_func = self.print_func
     if print_func:
       mark = self.mark
@@ -267,11 +254,22 @@ class Pfx(object):
       if mark_args:
         mark = mark % mark_args
       print_func(mark)
-    _state = self._state
-    _state.append(self)
-    _state.raise_needs_prefix = True
-    if _state.trace:
-      _state.trace(_state.prefix)
+
+  @classmethod
+  def _push(cls, P):
+    ''' Push this `Pfx` instance onto the current `Thread`'s stack.
+    '''
+    state = cls._state
+    state.append(P)
+    state.raise_needs_prefix = True
+    if state.trace:
+      state.trace(state.prefix)
+
+  @classmethod
+  def push(cls, msg, *a):
+    ''' A new `Pfx(msg,*a)` onto the `Thread` stack.
+    '''
+    cls._push(cls(msg, *a))
 
   def __exit__(self, exc_type, exc_value, _):
     _state = self._state
@@ -281,7 +279,7 @@ class Pfx(object):
         _state.raise_needs_prefix = False
         # now hack the exception attributes
         if not self.prefixify_exception(exc_value):
-          print(
+          True or print(
               "warning: %s: %s:%s: message not prefixed" %
               (self._state.prefix, type(exc_value).__name__, exc_value),
               file=sys.stderr
@@ -304,13 +302,7 @@ class Pfx(object):
     '''
     u = self._umark
     if u is None:
-      mark = ustr(self.mark)
-      if not isinstance(mark, unicode):
-        if isinstance(mark, str):
-          mark = unicode(mark, errors='replace')
-        else:
-          mark = unicode(mark)
-      u = mark
+      u = ustr(self.mark)
       if self.mark_args:
         try:
           u = u % self.mark_args
@@ -354,6 +346,8 @@ class Pfx(object):
         value = getattr(e, attr)
       except AttributeError:
         continue
+      if value is None:
+        continue
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
         try:
@@ -374,6 +368,9 @@ class Pfx(object):
           continue
         else:
           value = (value0, cls.prefixify(value1))
+      elif attr == 'args' and isinstance(e, LookupError):
+        # args[0] is the key, do not fiddle with it
+        continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
@@ -446,6 +443,37 @@ class Pfx(object):
   enter = __enter__
   exit = __exit__
 
+  @classmethod
+  def scope(cls, msg=None, *a):
+    ''' Context manager to save the current `Thread`'s stack state
+        and to restore it on exit.
+
+        This is to aid long suites which progressively add `Pfx` context
+        as the suite progresses, example:
+
+            for item in items:
+                with Pfx.scope("item %s", item):
+                    db_row = db.get(item)
+                    Pfx.push("db_row = %r", db_row)
+                    matches = db.lookup(db_row.category)
+                    if not matches:
+                        continue
+                    Pfx.push("%d matches", len(matches):
+                    ... etc etc ...
+    '''
+
+    @contextmanager
+    def scope_cmgr():
+      old_stack = list(cls._state.stack)
+      try:
+        if msg is not None:
+          cls.push(msg, *a)
+        yield
+      finally:
+        cls._state.stack[:] = old_stack
+
+    return scope_cmgr()
+
   # Logger methods
   @logging_wrapper
   def exception(self, msg, *args, **kwargs):
@@ -504,10 +532,15 @@ def prefix():
   '''
   return Pfx._state.prefix
 
-def pfxprint(*a, **kw):
+def pfxprint(*a, print_func=None, **kw):
   ''' Call `print()` with the current prefix.
+
+      The optional keyword parameter `print_func`
+      provides an alternative function to the builtin `print()`.
   '''
-  print(prefix() + ':', *a, **kw)
+  if print_func is None:
+    print_func = print
+  print_func(prefix() + ':', *a, **kw)
 
 @contextmanager
 def PrePfx(tag, *args):
@@ -654,7 +687,7 @@ def pfx_method(method, use_str=False, with_args=False):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
     classref = self if use_str else type(self).__name__
-    pfxfmt, pfxargs = _func_a_kw_fmt(method, *a, **kw)
+    pfxfmt, pfxargs = func_a_kw_fmt(method, *a, **kw)
     with Pfx("%s." + pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)
 

@@ -15,10 +15,11 @@ from os.path import dirname, isabs
 import re
 from string import whitespace
 import unittest
+
 from cs.deco import strable
-from cs.lex import get_other_chars, get_white, get_identifier
+from cs.lex import get_other_chars, get_white, get_identifier, r
 from cs.logutils import error, warning, debug
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import prop
 
 # mapping of special macro names to evaluation functions
@@ -220,7 +221,6 @@ class ModNormpath(Modifier):
   ''' A modifier which returns os.path.normpath(word) for each word in `text`.
   '''
 
-  @pfx_method
   def modify(self, text, namespaces):
     ''' Normalise the path `text`.
     '''
@@ -235,7 +235,6 @@ class ModGlob(Modifier):
     self.muststat = muststat
     self.lax = lax
 
-  @pfx_method
   def modify(self, text, namespaces):
     ''' Expand the glob.
     '''
@@ -252,13 +251,12 @@ class ModGlob(Modifier):
         else:
           if not self.lax:
             raise ValueError("no matches")
-    return " ".join(globbed)
+    return " ".join(sorted(globbed))
 
 class ModEval(Modifier):
   ''' A modifier which evaluates text as a macro expression.
   '''
 
-  @pfx_method
   def modify(self, text, namespaces):
     ''' Evaluate `text` as a macro expression.
     '''
@@ -273,7 +271,6 @@ class ModFromFiles(Modifier):
     Modifier.__init__(self, context, modtext)
     self.lax = lax
 
-  @pfx_method
   def modify(self, text, namespaces):
     ''' Read file contents.
     '''
@@ -298,7 +295,6 @@ class ModSelectRegexp(Modifier):
     self.regexp_mexpr = regexp_mexpr
     self.invert = bool(invert)
 
-  @pfx_method
   def modify(self, text, namespaces):
     ''' Select by regular expression.
     '''
@@ -316,7 +312,6 @@ class ModSelectRange(Modifier):
     self.range = select_range
     self.invert = bool(invert)
 
-  @pfx_method
   def modify(self, text, namespaces):
     ''' Select the range.
     '''
@@ -332,12 +327,12 @@ class ModSelectRange(Modifier):
 ## TODO: check against below ## class ModSubstitute(Modifier):
 ## TODO: check against below ##   ''' A modifier which returns `text` with substitutions.
 ## TODO: check against below ##   '''
-## TODO: check against below ## 
+## TODO: check against below ##
 ## TODO: check against below ##   def __init__(self, context, modtext, regexp_mexpr, replacement):
 ## TODO: check against below ##     Modifier.__init__(self, context, modtext)
 ## TODO: check against below ##     self.regexp_mexpr = regexp_mexpr
 ## TODO: check against below ##     self.replacement = replacement
-## TODO: check against below ## 
+## TODO: check against below ##
 ## TODO: check against below ##   @pfx_method
 ## TODO: check against below ##   def modify(self, text, namespaces):
 ## TODO: check against below ##     ''' Apply the substitution.
@@ -373,7 +368,6 @@ class ModSetOp(Modifier):
     self.macroname = macroname
     self.literal = literal
 
-  @pfx_method
   def modify(self, text, namespaces):
     ''' Apply the set operation.
     '''
@@ -449,8 +443,8 @@ class Macro(object):
     return self._mexpr
 
   def __call__(self, context, namespaces, *param_values):
-    with Pfx("%s.__call__(...,param_values=%r)...", self, param_values):
-      assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
+    with Pfx("$(%s)", self.name):
+      assert type(namespaces) is list, "namespaces = %s" % r(namespaces)
       if len(param_values) != len(self.params):
         raise ValueError(
             "mismatched Macro parameters: self.params = %r (%d items) but got %d param_values: %r"
@@ -472,10 +466,10 @@ def readMakefileLines(
     # open file, yield contents
     filename = fp
     try:
-      with Pfx("open %r", filename).partial(open, filename)() as fp:
-        for O in readMakefileLines(M, fp, parent_context,
-                                   missing_ok=missing_ok):
-          yield O
+      with pfx_call(open, filename) as fp:
+        yield from readMakefileLines(
+            M, fp, parent_context, missing_ok=missing_ok
+        )
     except OSError as e:
       if e.errno == errno.ENOENT or e.errno == errno.EPERM:
         yield parent_context, e
@@ -1034,7 +1028,7 @@ def parseMacro(context, text=None, offset=0):
     )
     offset += 1
     if mpermute:
-      if text[offset] != mmark2:
+      if offset >= len(text) or text[offset] != mmark2:
         raise ParseError(context, offset, 'incomplete macro closing brackets')
       else:
         offset += 1

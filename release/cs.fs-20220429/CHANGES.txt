@@ -1,0 +1,14 @@
+lib/python/cs/fs.py: cs.fs,cs.ebooks: move HasFSPath and FSPathBasedSingleton to cs.fs
+lib/python/cs/fs.py: cs.fs: clean lint
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton._singleton_key: this base method ignores keyword arguments
+lib/python/cs/fs.py: cs.fs: HasFSPath.pathto: sanity check the subpath
+lib/python/cs/fs.py: cs.fileutils,cs.fs: move longpath and shortpath to cs.fs, leave legacy names behind
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton: replace _get_default_fspath() with _resolve_fspath(fspath)
+lib/python/cs/fs.py: cs.fs: new is_clean_subpath(subpath)
+lib/python/cs/fs.py: cs.fs: HasFSPath: new fnmatch(fnglob) method
+lib/python/cs/fs.py: cs.fspath: HasFSPath.__init__: drop the requirement that fspath is an absolute path
+lib/python/cs/fs.py: cs.fs: streamline the pfx_call invocations, add missing import
+lib/python/cs/fs.py: cs.fs: new needdir function
+lib/python/cs/fs.py: cs.fs: new fnmatchdir(dirpath,fnglob) pulled out from HasFSPath.fnmatch(fnglob)
+lib/python/cs/fs.py: cs.fs: HasFSPath: new .shortpath property returning shortpath(self.fspath)
+lib/python/cs/fs.py: cs.fs: update DISTINFO, fix missing symbol

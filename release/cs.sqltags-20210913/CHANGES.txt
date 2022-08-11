@@ -1,0 +1,43 @@
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM._update_multivalues: bugfix the delete step
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: implement __iter__ and __delitem__
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: rename cmd_ns to cmd_list,cmd_ls
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_export: accept "-F export_format" for csv or fstags export, accept no criteria to mean all tagsets
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_export: accept "-F export_format" for csv or fstags export, accept no criteria to mean all tagsets
+lib/python/cs/sqltags.py: cs.sqltags: add a PolyValue namedtuple(float_value string_value structured_value) and extract the value->PolyValue conversion
+lib/python/cs/sqltags.py: cs.sqltags: PolyValueColumnMixin: drop a debug exception
+lib/python/cs/sqltags.py: cs.sqltags: PolyValueMixin renamed to PolyValueColumnMixin, new SQLTagSet.normalise_sql_value and SQLTagSet.normalise_tag_value conversion methods
+lib/python/cs/sqltags.py: cs.sqltags: fix import
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.Entities.__str__: put the name first; add a comment
+lib/python/cs/sqltags.py: cs.sqltags: PolyValue: add docstring describing the encoding scheme for nonJSONable values, add a sanity check method
+lib/python/cs/sqltags.py: cs.sqltags: implement the encoding scheme for nonJSONable types, and formalise that we use tag_value in tags and SQL ready values in PolyValue tuples
+lib/python/cs/sqltags.py: cs.sqltags: PolyValue: ename is_single_value to is_valid; drop PolyValueColumnMixin.pick-value, no longer used
+lib/python/cs/sqltags.py: cs.sqltags: PolyValueColumnMixin: drop .polyvalue, add .as_polyvalue, drop value getter and setter and set_all in favour of set_polyvalue, drop unixtime (long its own field)
+lib/python/cs/sqltags.py: cs.sqltags: rename tag_subvalues to tag_subvalues_table and so forth, use set_polyvalue, pass pv.structured_value to _update_multivalues
+lib/python/cs/sqltags.py: cs.sqltags: rename as_js_str to to_js_str, update some preconditions
+lib/python/cs/sqltags.py: cs.sqltags: add_db_tag now takes a PolyValue, replace pick_value with from_poly_value
+lib/python/cs/sqltags.py: cs.sqltags: update imports
+lib/python/cs/sqltags.py: cs.sqltags: documentation for the database schema and the type support for tag values
+lib/python/cs/sqltags.py: cs.sqltags: some type fixing
+lib/python/cs/sqltags.py: cs.sqltags: fix a couple of docstring typos
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.from_polyvalue: return an int from float_value if it round trips
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: describe the TYPE_JS_MAPPING class attribute in the docstring
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.default_factory: now that self.TagSetClass can be a factory (see cs.cdrip) we derive to_polyvalue from_the constructed TagSet instance; is the instance has a .autofill() method, call it for newly created instances - this supports cs.cdrip polling MusicBrainz as new ontology entries are created
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: update call to add_tag, now requires a PolyValue
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new entities: if there is a te.refresh() method, call it
+lib/python/cs/sqltags.py: cs.tagset,cs.inttags,cs.sqltags: rename the TagSets abstract base class to BaseTagSets
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: fix _singleton_key and __init__ to take the reference SQLTags as the first positional parameter
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.TagSetClass: make a local factory method and annotate with a .singleton_also_by attribute hooked to SQLTagSet.singleton_also_by; also provide TAGSETCLASS_DEFAULT=SQLTagSet
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: drop sqltags=self keyword argument in call to self.TagSetClass()
+lib/python/cs/sqltags.py: cs.sqltags: autoformat
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.keys: simplify the SQL WHWRE condition
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.values: fix the transcription of the prefix in the search condition
+lib/python/cs/sqltags.py: cs.cmdutils: BaseCommand.cmd_help: fix obsolete parameter list
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.values: bugfix the prefix match criterion
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand.cmd_edit: implement rename
+lib/python/cs/sqltags.py: merge tagsets ==> default: merge tagsets ==> default in playon dev tree
+lib/python/cs/sqltags.py: cs.sqltags,tagset: drop stray debug, clean some lint
+lib/python/cs/sqltags.py: cs.sqltags,cs.tagset: SQLTagSet: undo the leading sqltags param, instead make the self.TAGSETCLASS_DEFAULT factory receive an _sqltags context parameter - this makes the main call match the base TagSet classes use, which do not pass a context so that a TagSet can be standalone
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.TAGSETCLASS_DEFAULT now a method which does a shuffle around thew _sqltags parameter
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.__init__: fix spelling of "_sqltags"
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.default_factory: look for .refresh() on the class, not the instance - avoids TagSet attribute inference
+lib/python/cs/sqltags.py: cs.sqltags: autoformat

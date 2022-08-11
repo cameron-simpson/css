@@ -14,10 +14,11 @@ in the course of its function.
 
 import heapq
 import itertools
-from threading import Lock, Condition
+from threading import Lock, Condition, Thread
+from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20201025-post'
+__version__ = '20220530-post'
 
 DISTINFO = {
     'description':
@@ -28,11 +29,18 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks'],
+    'install_requires': [
+        'cs.deco',
+        'cs.gimmicks',
+    ],
 }
 
 class Seq(object):
-  ''' A thread safe wrapper for itertools.count().
+  ''' A numeric sequence implemented as a thread safe wrapper for
+      `itertools.count()`.
+
+      A `Seq` is iterable and both iterating and calling it return
+      the next number in the sequence.
   '''
 
   __slots__ = ('counter', '_lock')
@@ -51,13 +59,13 @@ class Seq(object):
       return next(self.counter)
 
   next = __next__
+  __call__ = __next__
 
 __seq = Seq()
 
 def seq():
   ''' Return a new sequential value.
   '''
-  global __seq  # pylint: disable=global-statement
   return next(__seq)
 
 def the(iterable, context=None):
@@ -418,6 +426,204 @@ def splitoff(sq, *sizes):
     offset = end_offset
   parts.append(sq[offset:])
   return parts
+
+def unrepeated(it, seen=None, signature=None):
+  ''' A generator yielding items from the iterable `it` with no repetitions.
+
+      Parameters:
+      * `it`: the iterable to process
+      * `seen`: an optional setlike container supporting `in` and `.add()`
+      * `signature`: an optional signature function for items from `it`
+        which produces the value to compare to recognise repeated items;
+        its values are stored in the `seen` set
+
+      The default `signature` function is identity, the item itself;
+      items are stored and compared.
+      This requires the items to be hashable and support equality tests.
+      The same applies to whatever values the `signature` function produces.
+
+      Since `seen` accrues all the signature values for yielded items
+      generally it will grow monotonicly as iteration proceeeds.
+      If the items are complaex or large it is well worth providing a signature
+      function even it the items themselves can be used in a set.
+  '''
+  if seen is None:
+    seen = set()
+  if signature is None:
+    signature = lambda item: item
+  for item in it:
+    sig = signature(item)
+    if sig in seen:
+      continue
+    seen.add(sig)
+    yield item
+
+@decorator
+def _greedy_decorator(g, queue_depth=0):
+
+  def greedy_generator(*a, **kw):
+    return greedy(g(*a, **kw), queue_depth=queue_depth)
+
+  return greedy_generator
+
+def greedy(g=None, queue_depth=0):
+  ''' A decorator or function for greedy computation of iterables.
+
+      If `g` is omitted or callable
+      this is a decorator for a generator function
+      causing it to compute greedily,
+      capacity limited by `queue_depth`.
+
+      If `g` is iterable
+      this function dispatches it in a `Thread` to compute greedily,
+      capacity limited by `queue_depth`.
+
+      Example with an iterable:
+
+          for packet in greedy(parse_data_stream(stream)):
+              ... process packet ...
+
+      which does some readahead of the stream.
+
+      Example as a function decorator:
+
+          @greedy
+          def g(n):
+              for item in range(n):
+                  yield n
+
+      This can also be used directly on an existing iterable:
+
+          for item in greedy(range(n)):
+              yield n
+
+      Normally a generator runs on demand.
+      This function dispatches a `Thread` to run the iterable
+      (typically a generator)
+      putting yielded values to a queue
+      and returns a new generator yielding from the queue.
+
+      The `queue_depth` parameter specifies the depth of the queue
+      and therefore how many values the original generator can compute
+      before blocking at the queue's capacity.
+
+      The default `queue_depth` is `0` which creates a `Channel`
+      as the queue - a zero storage buffer - which lets the generator
+      compute only a single value ahead of time.
+
+      A larger `queue_depth` allocates a `Queue` with that much storage
+      allowing the generator to compute as many as `queue_depth+1` values
+      ahead of time.
+
+      Here's a comparison of the behaviour:
+
+      Example without `@greedy`
+      where the "yield 1" step does not occur until after the "got 0":
+
+          >>> from time import sleep
+          >>> def g():
+          ...   for i in range(2):
+          ...     print("yield", i)
+          ...     yield i
+          ...   print("g done")
+          ...
+          >>> G = g(); sleep(0.1)
+          >>> for i in G:
+          ...   print("got", i)
+          ...   sleep(0.1)
+          ...
+          yield 0
+          got 0
+          yield 1
+          got 1
+          g done
+
+      Example with `@greedy`
+      where the "yield 1" step computes before the "got 0":
+
+          >>> from time import sleep
+          >>> @greedy
+          ... def g():
+          ...   for i in range(2):
+          ...     print("yield", i)
+          ...     yield i
+          ...   print("g done")
+          ...
+          >>> G = g(); sleep(0.1)
+          yield 0
+          >>> for i in G:
+          ...   print("got", repr(i))
+          ...   sleep(0.1)
+          ...
+          yield 1
+          got 0
+          g done
+          got 1
+
+      Example with `@greedy(queue_depth=1)`
+      where the "yield 1" step computes before the "got 0":
+
+          >>> from cs.x import X
+          >>> from time import sleep
+          >>> @greedy
+          ... def g():
+          ...   for i in range(3):
+          ...     X("Y")
+          ...     print("yield", i)
+          ...     yield i
+          ...   print("g done")
+          ...
+          >>> G = g(); sleep(2)
+          yield 0
+          yield 1
+          >>> for i in G:
+          ...   print("got", repr(i))
+          ...   sleep(0.1)
+          ...
+          yield 2
+          got 0
+          yield 3
+          got 1
+          g done
+          got 2
+
+  '''
+  assert queue_depth >= 0
+
+  if g is None:
+    # the parameterised @greedy(queue_depth=n) form
+    # pylint: disable=no-value-for-parameter
+    return _greedy_decorator(queue_depth=queue_depth)
+
+  if callable(g):
+    # the direct @greedy form
+    return _greedy_decorator(g, queue_depth=queue_depth)
+
+  # presumably an iterator - dispatch it in a Thread
+  try:
+    it = iter(g)
+  except TypeError as e:
+    # pylint: disable=raise-missing-from
+    raise TypeError("g=%r: neither callable nor iterable: %s" % (g, e))
+
+  # pylint: disable=import-outside-toplevel
+  from cs.queues import Channel, IterableQueue
+  if queue_depth == 0:
+    q = Channel()
+  else:
+    q = IterableQueue(queue_depth)
+
+  def run_generator():
+    ''' Thread body for greedy generator.
+    '''
+    try:
+      for item in it:
+        q.put(item)
+    finally:
+      q.close()
+
+  Thread(target=run_generator).start()
+  return iter(q)
 
 if __name__ == '__main__':
   import sys

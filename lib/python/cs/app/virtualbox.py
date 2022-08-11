@@ -10,12 +10,15 @@ from __future__ import print_function
 from getopt import GetoptError
 import os
 import os.path
-from os.path import splitext
+from os.path import exists as existspath, splitext
 import sys
+
 from cs.cmdutils import BaseCommand
 from cs.psutils import run
 from cs.logutils import warning, error
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
+
+from typeguard import typechecked
 
 VBOXMANAGE = 'VBoxManage'
 
@@ -52,7 +55,9 @@ class VBoxCommand(BaseCommand):
       pre_argv = [pre_argv]
     if isinstance(argv, str):
       argv = [argv]
-    return run([VBOXMANAGE] + pre_argv + argv + list(post_argv), logger=True)
+    return run(
+        [VBOXMANAGE] + pre_argv + argv + list(post_argv), logger=True
+    ).returncode
 
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [VBoxManage list options...]
@@ -112,6 +117,36 @@ class VBoxCommand(BaseCommand):
           List runnings VMs.
     '''
     return self.vbmg('list', argv, ['runningvms'])
+
+  @staticmethod
+  def cmd_resize(argv):
+    ''' Usage: {cmd} vdipath new_size_mb
+          Resize a .vdi file to new_size_mb, a size in megabytes.
+    '''
+    if not argv:
+      raise GetoptError("missing vdi")
+    vdipath = argv.pop(0)
+    with Pfx("vdipath %r", vdipath):
+      if not vdipath.endswith('.vdi'):
+        raise GetoptError("does not end with .vdi")
+      if not existspath(vdipath):
+        raise GetoptError("does not exist")
+    if not argv:
+      raise GetoptError("missing new_size_mb")
+    new_size_mb_s = argv.pop(0)
+    with Pfx("new_size_mb %r", new_size_mb_s):
+      try:
+        new_size_mb = int(new_size_mb_s)
+      except ValueError as e:
+        raise GetoptError("not an integer: %s" % (e,))
+      else:
+        if new_size_mb <= 0:
+          raise GetoptError("must be >0")
+    try:
+      return pfx_call(resizevdi, vdipath, new_size_mb, trace=True)
+    except ValueError as e:
+      error("resize fails: %s", e)
+      return 1
 
   def cmd_resume(self, argv):
     ''' Usage: {cmd} vmname [VBoxManage controlvm options...]
@@ -175,6 +210,20 @@ def mkvdi(srcimg, dstvdi, argv, trace=False):
   return run(
       [VBOXMANAGE, 'convertfromraw', srcimg, dstvdi, '--format', 'VDI'] + argv,
       logger=trace
+  )
+
+@typechecked
+def resizevdi(vdipath: str, new_size_mb: int, trace=False) -> int:
+  ''' Resize VDI image `vdipath` to `new_size_mb`, a size in megabytes,
+      using `modifyhd`.
+      Return `VBoxManage modifyhd` exit code.
+  '''
+  if not os.path.exists(vdipath):
+    raise ValueError("VDI image does not exist: %r" % (vdipath,))
+  return run(
+      [VBOXMANAGE, 'modifyhd', vdipath, '--resize',
+       str(new_size_mb)],
+      logger=trace,
   )
 
 def mkimg(src, dstimg, argv, trace=False):

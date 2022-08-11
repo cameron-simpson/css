@@ -119,6 +119,7 @@ class TVWiz(_Recording):
 
   def __init__(self, wizdir):
     _Recording.__init__(self, wizdir)
+    self.srcfmt = 'mpegts'
     self.dirpath = wizdir
     self.path_title, self.path_datetime = self._parse_path()
     self.headerpath = os.path.join(self.dirpath, TVHDR)

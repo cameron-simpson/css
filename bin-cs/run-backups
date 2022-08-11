@@ -122,29 +122,22 @@ do
               esac
               ;;
     esac
-    case "$mode" in
-      hg)         $dont pfx "$src:$dsthost:$dst" $trace \
-                    incd "$src" hg push -f $etc "ssh://$dsthost/$dst"
-                  ;;
-      image)      $dont pfx "$src:$dsthost:$dst" $trace \
-                    rsync -a $rsvopts --delete-after $etc \
-                      "$src$suffix" "$dsthost:$dst$suffix"
-                  ;;
-      mv)         $dont pfx "$src:$dsthost:$dst" $trace \
-                    rsync -a $rsvopts --remove-source-files $etc \
-                      "$src$suffix" "$dsthost:$dst$suffix"
-                  ;;
-      push)       $dont pfx "$src:$dsthost:$dst" $trace \
-                    rsync -a $rsvopts $etc \
-                      "$src$suffix" "$dsthost:$dst$suffix"
-                  ;;
-      histbackup) $dont pfx "$src:$dsthost:$dst" $trace \
-                    rhistbackup "$src:$dsthost:$dst"
-                  ;;
-      *)          echo "$0: $backups:$lineno: unsupported mode: $mode" >&2
-                  exit 1
-                  ;;
-    esac || xit=1
+    (
+      case "$mode" in
+        hg)         set -- incd "$src" hg push -f $etc "ssh://$dsthost/$dst" ;;
+        image)      set -- rsync -a $rsvopts --delete-after $etc "$src$suffix" "$dsthost:$dst$suffix" ;;
+        mv)         set -- rsync -a $rsvopts --remove-source-files $etc "$src$suffix" "$dsthost:$dst$suffix" ;;
+        push)       set -- rsync -a $rsvopts $etc "$src$suffix" "$dsthost:$dst$suffix" ;;
+        histbackup) set -- rhistbackup "$src:$dsthost:$dst" ;;
+        *)          echo "$0: $backups:$lineno: unsupported mode: $mode" >&2
+                    exit 1
+                    ;;
+      esac
+      if [ $doit ]
+      then  pfx "$src:$dsthost:$dst" $trace incd "$src" "$@"
+      else  echo "$src $mode $dsthost:$dst: $*"
+      fi
+    ) || xit=1
   done
 done
 

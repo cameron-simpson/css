@@ -1,0 +1,1 @@
+PfxFormatter.patch_formatter: notice if record.args is not a tuple and do not try to prefix it (for now).

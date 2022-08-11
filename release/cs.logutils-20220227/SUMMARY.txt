@@ -1,0 +1,2 @@
+PfxFormatter: new patch_formatter() static method to modify an existing Formatter.
+setup_logging: just use PfxFormatter.patch_formatter on the first handler's formatter if logging is already set up.
