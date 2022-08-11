@@ -91,6 +91,68 @@ class BlockedError(TaskError):
     super().__init__(msg, task)
     self.blocking_task = blocking_task
 
+class BaseTask(FSM, RunStateMixin):
+
+  def __init__(self, state=None, runstate=None):
+    FSM.__init__(self, state)
+    RunStateMixin.__init__(self, runstate)
+
+  @classmethod
+  def tasks_as_dot(
+      cls,
+      tasks,
+      name=None,
+      *,
+      follow_blocking=False,
+      sep=None,
+  ):
+    ''' Return a DOT syntax digraph of the iterable `tasks`.
+        Nodes will be coloured according to `DOT_NODE_FILLCOLOR_PALETTE`
+        based on their state.
+
+        Parameters:
+        * `tasks`: an iterable of `Task`s to populate the graph
+        * `name`: optional graph name
+        * `follow_blocking`: optional flag to follow each `Task`'s
+          `.blocking` attribute recursively and also render those
+          `Task`s
+        * `sep`: optional node seprator, default `'\n'`
+    '''
+    if sep is None:
+      sep = '\n'
+    digraph = [
+        f'digraph {gvq(name)} {{' if name else 'digraph {',
+        ##'graph[orientation=land]',
+    ]
+    q = ListQueue(unrepeated(tasks))
+    for qtask in unrepeated(q):
+      nodedef = qtask.dot_node()
+      digraph.append(f'  {nodedef};')
+      blocking = sorted(qtask.blocking, key=lambda t: t.name)
+      for subt in blocking:
+        digraph.append(
+            f'  {gvq(qtask.dot_node_label())}->{gvq(subt.dot_node_label())};'
+        )
+      if follow_blocking:
+        q.extend(blocking)
+    digraph.append('}')
+    return sep.join(digraph)
+
+  def as_dot(self, name=None, **kw):
+    ''' Return a DOT syntax digraph starting at this `Task`.
+        Parameters are as for `Task.tasks_as_dot`.
+    '''
+    return self.tasks_as_dot(
+        [self],
+        name=name,
+        **kw,
+    )
+
+  def dot_node_label(self):
+    ''' The default DOT node label.
+    '''
+    return f'{self.name}\n{self.fsm_state}'
+
 # pylint: disable=too-many-instance-attributes
 class Task(FSM, RunStateMixin):
   ''' A task which may require the completion of other tasks.
@@ -220,9 +282,7 @@ class Task(FSM, RunStateMixin):
     if func_kwargs is None:
       func_kwargs = {}
     self._lock = RLock()
-    FSM.__init__(self, state)
-    runstate = RunState(name)
-    RunStateMixin.__init__(self, runstate)
+    super().__init__(state=state, runstate=RunState(name))
     self.required = set()
     self.blocking = set()
     self.cancel_on_exception = cancel_on_exception
@@ -249,62 +309,6 @@ class Task(FSM, RunStateMixin):
 
   def __eq__(self, otask):
     return self is otask
-
-  @classmethod
-  def tasks_as_dot(
-      cls,
-      tasks,
-      name=None,
-      *,
-      follow_blocking=False,
-      sep=None,
-  ):
-    ''' Return a DOT syntax digraph of the iterable `tasks`.
-        Nodes will be coloured according to `DOT_NODE_FILLCOLOR_PALETTE`
-        based on their state.
-
-        Parameters:
-        * `tasks`: an iterable of `Task`s to populate the graph
-        * `name`: optional graph name
-        * `follow_blocking`: optional flag to follow each `Task`'s
-          `.blocking` attribute recursively and also render those
-          `Task`s
-        * `sep`: optional node seprator, default `'\n'`
-    '''
-    if sep is None:
-      sep = '\n'
-    digraph = [
-        f'digraph {gvq(name)} {{' if name else 'digraph {',
-        ##'graph[orientation=land]',
-    ]
-    q = ListQueue(unrepeated(tasks))
-    for qtask in unrepeated(q):
-      nodedef = qtask.dot_node()
-      digraph.append(f'  {nodedef};')
-      blocking = sorted(qtask.blocking, key=lambda t: t.name)
-      for subt in blocking:
-        digraph.append(
-            f'  {gvq(qtask.dot_node_label())}->{gvq(subt.dot_node_label())};'
-        )
-      if follow_blocking:
-        q.extend(blocking)
-    digraph.append('}')
-    return sep.join(digraph)
-
-  def as_dot(self, name=None, **kw):
-    ''' Return a DOT syntax digraph starting at this `Task`.
-        Parameters are as for `Task.tasks_as_dot`.
-    '''
-    return self.tasks_as_dot(
-        [self],
-        name=name,
-        **kw,
-    )
-
-  def dot_node_label(self):
-    ''' The default DOT node label.
-    '''
-    return f'{self.name}\n{self.fsm_state}'
 
   def __call__(self):
     ''' Block on `self.result` awaiting completion
