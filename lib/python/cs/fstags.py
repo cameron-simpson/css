@@ -79,9 +79,18 @@ from getopt import getopt, GetoptError
 import json
 import os
 from os.path import (
-    abspath, basename, dirname, exists as existspath, expanduser, isabs as
-    isabspath, isdir as isdirpath, isfile as isfilepath, join as joinpath,
-    realpath, relpath, samefile
+    abspath,
+    basename,
+    dirname,
+    exists as existspath,
+    isabs as isabspath,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+    normpath,
+    realpath,
+    relpath,
+    samefile,
 )
 from pathlib import PurePath
 import shutil
@@ -95,7 +104,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import crop_name, findup, shortpath
-from cs.fs import HasFSPath
+from cs.fs import HasFSPath, FSPathBasedSingleton
 from cs.lex import (
     cutsuffix,
     get_ini_clause_entryname,
@@ -183,15 +192,18 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
 
-  GETOPT_SPEC = 'o:'
+  GETOPT_SPEC = 'o:P'
 
-  USAGE_FORMAT = '''Usage: {cmd} [-o ontology] subcommand [...]
-  -o ontology   Specify the path to an ontology file.'''
+  USAGE_FORMAT = '''Usage: {cmd} [-o ontology] [-P] subcommand [...]
+  -o ontology   Specify the path to an ontology file.
+  -P            Physical. Resolve pathnames through symlinks.
+                Default ~/.fstagsrc[general]physical or False.'''
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
     self.options.ontology_path = os.environ.get('FSTAGS_ONTOLOGY')
+    self.options.physical = None
 
   def apply_opt(self, opt, val):
     ''' Apply command line option.
@@ -199,6 +211,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     options = self.options
     if opt == '-o':
       options.ontology_path = val
+    elif opt == '-P':
+      options.physical = True
     else:
       raise RuntimeError("unhandled option")
 
@@ -207,9 +221,15 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Push the `FSTags`.
     '''
     options = self.options
-    fstags = FSTags(ontology_filepath=options.ontology_path)
+    fstags = FSTags(
+        ontology_filepath=options.ontology_path, physical=options.physical
+    )
     with fstags:
-      with stackattrs(options, fstags=fstags):
+      with stackattrs(
+          options,
+          fstags=fstags,
+          physical=fstags.config.physical,
+      ):
         yield
 
   def cmd_autotag(self, argv):
@@ -1002,12 +1022,14 @@ class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
-  def __init__(self, tagsfile_basename=None, ontology_filepath=None):
+  def __init__(
+      self, tagsfile_basename=None, ontology_filepath=None, physical=None
+  ):
     if tagsfile_basename is None:
       tagsfile_basename = TAGSFILE_BASENAME
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
-    self.config = FSTagsConfig()
+    self.config = FSTagsConfig(physical=physical)
     self.config.tagsfile_basename = tagsfile_basename
     self.config.ontology_filepath = ontology_filepath
     self._tagfiles = {}  # cache of `FSTagsTagFile`s from their actual paths
@@ -1068,7 +1090,8 @@ class FSTags(MultiOpenMixin):
   def __getitem__(self, path):
     ''' Return the `TaggedPath` for `abspath(path)`.
     '''
-    path = abspath(path)
+    path = realpath(path) if self.config.physical else abspath(path)
+    assert path == normpath(path)
     tagged_path = self._tagged_paths.get(path)
     if tagged_path is None:
       tagfile = self.tagfile_for(path)
@@ -1497,9 +1520,9 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     if _ontology is None:
       _ontology = fstags.ontology_for(fspath)
     self.__dict__.update(
+        _all_tags=None,
         _fstags=fstags,
         _lock=Lock(),
-        _all_tags=None,
         tagfile=None,
         fspath=fspath,
     )
@@ -1869,21 +1892,24 @@ def rsync_patterns(paths, top_path):
   patterns.append('- *')
   return patterns
 
-class FSTagsConfig:
+class FSTagsConfig(FSPathBasedSingleton):
   ''' A configuration for fstags.
   '''
 
+  FSPATH_DEFAULT = RCFILE
+
   @fmtdoc
-  def __init__(self, rcfilepath=None):
+  def __init__(self, rcfilepath=None, physical=None):
     ''' Initialise the config.
 
         Parameters:
         * `rcfilepath`: the path to the confguration file
           If `None`, default to `'{RCFILE}'` (from `RCFILE`).
     '''
-    if rcfilepath is None:
-      rcfilepath = expanduser(RCFILE)
-    self.fspath = rcfilepath
+    if super().__init__(rcfilepath):
+      self.provided = {}
+      if physical is not None:
+        self.provided.update(physical=physical)
 
   @pfx_method
   def __getattr__(self, attr):
@@ -1918,6 +1944,14 @@ class FSTagsConfig:
         if e.errno != errno.ENOENT:
           raise
       return config
+
+  @property
+  def physical(self):
+    '''
+    '''
+    return self.config['general'].getboolean(
+        'physical', vars=self.provided, fallback=False
+    )
 
   @staticmethod
   def filename_rules_from_config(config):

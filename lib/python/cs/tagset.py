@@ -3196,10 +3196,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       itself a mapping of tag name => tag value.
   '''
 
-  @classmethod
-  def _singleton_key(cls, fspath, **_):
-    return fspath
-
   @typechecked
   def __init__(self, fspath: str, *, ontology=None):
     if hasattr(self, 'fspath'):
