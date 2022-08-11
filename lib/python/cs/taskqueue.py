@@ -322,7 +322,7 @@ class Task(FSM, RunStateMixin):
         This allows the function called by the `Task` to access the
         task, typically to poll its `.runstate` attribute.
         This is a `Thread` local value.
-    '''
+        '''
     return cls._state.current_task  # pylint: disable=no-member
 
   @typechecked
@@ -507,8 +507,8 @@ class Task(FSM, RunStateMixin):
       else:
         # if the runstate was cancelled or the result indicates
         # cancellation cancel the task otherwise complete `self.result`
-        if (self.runstate.cancelled
-            or (self.cancel_on_result and self.cancel_on_result(func_result))):
+        if self.runstate.cancelled or (self.cancel_on_result
+                                       and self.cancel_on_result(func_result)):
           # cancel the task, ready for retry
           self.fsm_event('cancel')
         else:
@@ -699,7 +699,6 @@ class TaskQueue:
 
       Example 2, put 1 task in a queue with `run_dependent_tasks=True` and run.
       The queue pulls in the dependencies of completed tasks and also runs those:
-
 
            >>> t1 = Task("t1", lambda: print("t1"))
            >>> t2 = t1.then("t2", lambda: print("t2"))
