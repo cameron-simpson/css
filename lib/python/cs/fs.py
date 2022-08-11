@@ -235,13 +235,25 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
     '''
     return cls._resolve_fspath(fspath)
 
-  @typechecked
-  def __init__(self, fspath: Optional[str] = None):
-    if hasattr(self, '_lock'):
-      return
+  ##@typechecked
+  def __init__(self, fspath: Optional[str] = None, lock=None):
+    ''' Initialise the singleton:
+
+        On the first call:
+        - set `.fspath` to `self._resolve_fspath(fspath)`
+        - set `._lock` to `lock` (or `threading.Lock()` if not specified)
+        - return `True`
+        On subsequent calls return `False`.
+
+    '''
+    if '_lock' in self.__dict__:
+      return False
     fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
-    self._lock = Lock()
+    if lock is None:
+      lock = Lock()
+    self._lock = lock
+    return True
 
 DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
 
