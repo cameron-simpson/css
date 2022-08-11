@@ -1876,7 +1876,7 @@ class FSTagsConfig(FSPathBasedSingleton):
   FSPATH_DEFAULT = RCFILE
 
   @fmtdoc
-  def __init__(self, rcfilepath=None):
+  def __init__(self, rcfilepath=None, physical=None):
     ''' Initialise the config.
 
         Parameters:
@@ -1885,6 +1885,8 @@ class FSTagsConfig(FSPathBasedSingleton):
     '''
     if super().__init__(rcfilepath):
       self.provided = {}
+      if physical is not None:
+        self.provided.update(physical=physical)
 
   @pfx_method
   def __getattr__(self, attr):
@@ -1919,6 +1921,14 @@ class FSTagsConfig(FSPathBasedSingleton):
         if e.errno != errno.ENOENT:
           raise
       return config
+
+  @property
+  def physical(self):
+    '''
+    '''
+    return self.config['general'].getboolean(
+        'physical', vars=self.provided, fallback=False
+    )
 
   @staticmethod
   def filename_rules_from_config(config):
