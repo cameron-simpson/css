@@ -183,15 +183,18 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
 
-  GETOPT_SPEC = 'o:'
+  GETOPT_SPEC = 'o:P'
 
-  USAGE_FORMAT = '''Usage: {cmd} [-o ontology] subcommand [...]
-  -o ontology   Specify the path to an ontology file.'''
+  USAGE_FORMAT = '''Usage: {cmd} [-o ontology] [-P] subcommand [...]
+  -o ontology   Specify the path to an ontology file.
+  -P            Physical. Resolve pathnames through symlinks.
+                Default ~/.fstagsrc[general]physical or False.'''
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
     self.options.ontology_path = os.environ.get('FSTAGS_ONTOLOGY')
+    self.options.physical = None
 
   def apply_opt(self, opt, val):
     ''' Apply command line option.
@@ -199,6 +202,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     options = self.options
     if opt == '-o':
       options.ontology_path = val
+    elif opt == '-P':
+      options.physical = True
     else:
       raise RuntimeError("unhandled option")
 
@@ -207,9 +212,15 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Push the `FSTags`.
     '''
     options = self.options
-    fstags = FSTags(ontology_filepath=options.ontology_path)
+    fstags = FSTags(
+        ontology_filepath=options.ontology_path, physical=options.physical
+    )
     with fstags:
-      with stackattrs(options, fstags=fstags):
+      with stackattrs(
+          options,
+          fstags=fstags,
+          physical=fstags.config['general']['physical'],
+      ):
         yield
 
   def cmd_autotag(self, argv):
@@ -1002,12 +1013,14 @@ class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
-  def __init__(self, tagsfile_basename=None, ontology_filepath=None):
+  def __init__(
+      self, tagsfile_basename=None, ontology_filepath=None, physical=None
+  ):
     if tagsfile_basename is None:
       tagsfile_basename = TAGSFILE_BASENAME
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
-    self.config = FSTagsConfig()
+    self.config = FSTagsConfig(physical=physical)
     self.config.tagsfile_basename = tagsfile_basename
     self.config.ontology_filepath = ontology_filepath
     self._tagfiles = {}  # cache of `FSTagsTagFile`s from their actual paths
