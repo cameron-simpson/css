@@ -67,7 +67,7 @@ class FSM(DOTNodeMixin):
   # token representing "any state" in the callbacks
   FSM_ANY_STATE = object()
 
-  # allow state transitions
+  # allowed state transitions
   FSM_TRANSITIONS = {}
 
   def __init__(self, state=None, *, history=None, lock=None, transitions=None):
@@ -174,8 +174,8 @@ class FSM(DOTNodeMixin):
       if self.fsm_history is not None:
         self.fsm_history.append(transition)
     with Pfx("%s->%s", old_state, new_state):
-      for callback in self.__callbacks[self.FSM_ANY_STATE
-                                       ] + self.__callbacks[new_state]:
+      for callback in (self.__callbacks[self.FSM_ANY_STATE] +
+                       self.__callbacks[new_state]):
         try:
           pfx_call(callback, self, transition)
         except Exception as e:  # pylint: disable=broad-except
@@ -213,7 +213,7 @@ class FSM(DOTNodeMixin):
 
   def fsm_callback_discard(self, state, callback):
     ''' Deregister a callback for `state`.
-    '''
+        '''
     with self.__lock:
       self.__callbacks[state] = [
           cb for cb in self.__callbacks[state] if cb != callback
@@ -275,7 +275,7 @@ class FSM(DOTNodeMixin):
 
   def dot_node_attrs(self):
     ''' DOT Node attributes.
-    '''
+        '''
     attrs = super().dot_node_attrs()
     fillcolor = self.dot_node_fillcolor()
     if fillcolor is not None:
