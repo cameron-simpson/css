@@ -1873,6 +1873,8 @@ class FSTagsConfig(FSPathBasedSingleton):
   ''' A configuration for fstags.
   '''
 
+  FSPATH_DEFAULT = RCFILE
+
   @fmtdoc
   def __init__(self, rcfilepath=None):
     ''' Initialise the config.
