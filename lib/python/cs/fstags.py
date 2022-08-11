@@ -219,7 +219,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       with stackattrs(
           options,
           fstags=fstags,
-          physical=fstags.config['general']['physical'],
+          physical=fstags.config.physical,
       ):
         yield
 
