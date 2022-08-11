@@ -79,9 +79,18 @@ from getopt import getopt, GetoptError
 import json
 import os
 from os.path import (
-    abspath, basename, dirname, exists as existspath, expanduser, isabs as
-    isabspath, isdir as isdirpath, isfile as isfilepath, join as joinpath,
-    realpath, relpath, samefile
+    abspath,
+    basename,
+    dirname,
+    exists as existspath,
+    isabs as isabspath,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+    normpath,
+    realpath,
+    relpath,
+    samefile,
 )
 from pathlib import PurePath
 import shutil
@@ -95,7 +104,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import crop_name, findup, shortpath
-from cs.fs import HasFSPath
+from cs.fs import HasFSPath, FSPathBasedSingleton
 from cs.lex import (
     cutsuffix,
     get_ini_clause_entryname,
@@ -1511,9 +1520,9 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     if _ontology is None:
       _ontology = fstags.ontology_for(fspath)
     self.__dict__.update(
+        _all_tags=None,
         _fstags=fstags,
         _lock=Lock(),
-        _all_tags=None,
         tagfile=None,
         fspath=fspath,
     )
