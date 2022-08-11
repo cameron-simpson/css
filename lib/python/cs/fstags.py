@@ -1869,7 +1869,7 @@ def rsync_patterns(paths, top_path):
   patterns.append('- *')
   return patterns
 
-class FSTagsConfig:
+class FSTagsConfig(FSPathBasedSingleton):
   ''' A configuration for fstags.
   '''
 
@@ -1881,9 +1881,8 @@ class FSTagsConfig:
         * `rcfilepath`: the path to the confguration file
           If `None`, default to `'{RCFILE}'` (from `RCFILE`).
     '''
-    if rcfilepath is None:
-      rcfilepath = expanduser(RCFILE)
-    self.fspath = rcfilepath
+    if super().__init__(rcfilepath):
+      self.provided = {}
 
   @pfx_method
   def __getattr__(self, attr):
