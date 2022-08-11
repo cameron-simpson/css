@@ -70,9 +70,9 @@ class FSM(DOTNodeMixin):
   # allow state transitions
   FSM_TRANSITIONS = {}
 
-  def __init__(self, state, *, history=None, lock=None, transitions=None):
+  def __init__(self, state=None, *, history=None, lock=None, transitions=None):
     ''' Initialise the `FSM` from:
-        * `state`: the initial state
+        * `state`: optional initial state, default `self.FSM_DEFAULT_STATE`
         * `history`: an optional object to record state transition
           history, default `None`; if not `None` this should be an
           iterable object with a `.append(entry)` method such as a
@@ -84,6 +84,8 @@ class FSM(DOTNodeMixin):
         * `transitions`: optional *state*->*event*->*state* mapping;
           if provided, this will override the class `FSM_TRANSITIONS` mapping
     '''
+    if state is None:
+      state = self.FSM_DEFAULT_STATE
     if lock is None:
       lock = Lock()
     if transitions is not None:
