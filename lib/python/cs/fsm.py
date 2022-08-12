@@ -174,7 +174,7 @@ class FSM(DOTNodeMixin):
       if self.fsm_history is not None:
         self.fsm_history.append(transition)
     with Pfx("%s->%s", old_state, new_state):
-      for callback in (self.__callbacks[self.FSM_ANY_STATE] +
+      for callback in (self.__callbacks[FSM.FSM_ANY_STATE] +
                        self.__callbacks[new_state]):
         try:
           pfx_call(callback, self, transition)
