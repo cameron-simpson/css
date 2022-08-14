@@ -968,6 +968,28 @@ def plot_events(
   ax.scatter(xaxis, yaxis, **scatter_kw)
   return ax
 
+class PlotSeries(namedtuple('PlotSeries', 'label series extra')):
+  ''' Information about a series to be plotted:
+      - `label`: the label for this series
+      - `series`: an series
+      - `extra`: a `dict` of extra information such as plot styling
+  '''
+
+  @timerange
+  def promote(cls, data, tsmap=None, extra=None):
+    ''' Promote `data` to a `PlotSeries`.
+    '''
+    if isinstance(data, str):
+      # label from tsmap
+      if tsmap is None:
+        raise ValueError("cannot promote str to %s without a tsmap" % (cls,))
+      label = data
+      series = self[label].as_pd_series
+      series = tsmap.as_pd_series(start, stop, utcoffset=utcoffset)
+      extra = {}
+    else:
+      label, series = data
+
 def get_default_timezone_name():
   ''' Return the default timezone name.
   '''
