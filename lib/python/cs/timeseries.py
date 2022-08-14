@@ -246,7 +246,15 @@ NATIVE_BIGENDIANNESS = {
 DT64_0 = datetime64(0, 's')
 TD_1S = timedelta64(1, 's')
 
-def as_datetime64s(times, unit='s'):
+# functions producing ints from seconds for various datetime64 flavours
+DT64_FROM_SECONDS = {
+    's': int,
+    'ms': lambda f: int(f * 1000),
+    'us': lambda f: int(f * 1000000),
+    'ns': lambda f: int(f * 1000000000),
+}
+
+def as_datetime64s(times, unit='s', utcoffset=0):
   ''' Return a Numpy array of `datetime64` values
       computed from an iterable of `int`/`float` UNIX timestamp values.
 
@@ -259,13 +267,9 @@ def as_datetime64s(times, unit='s'):
       when converting to a `datetime64`.
       Less precision gives greater time range.
   '''
+  # select scaling function
   try:
-    scale = {
-        's': int,
-        'ms': lambda f: int(f * 1000),
-        'us': lambda f: int(f * 1000000),
-        'ns': lambda f: int(f * 1000000000),
-    }[unit]
+    scale = DT64_FROM_SECONDS[unit]
   except KeyError:
     # pylint: disable=raise-missing-from
     raise ValueError("as_datetime64s: unhandled unit %r" % (unit,))
