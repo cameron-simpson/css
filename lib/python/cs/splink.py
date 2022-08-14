@@ -51,6 +51,7 @@ from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
     Epoch,
+    PlotSeries as PS,
     TimeSeries,
     TimeSeriesBaseCommand,
     TimeSeriesDataDir,
@@ -521,6 +522,48 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       )
     tsd = getattr(self, dsname)
     return tsd.to_csv(start, stop, f, **to_csv_kw)
+
+  @timerange
+  @pfx_method
+  @typechecked
+  def plot_data_from_spec(
+      self,
+      start: float,
+      stop: float,
+      data_spec: str,
+      *,
+      utcoffset: float,
+      mode_patterns=None,
+  ) -> List[PS]:
+    ''' Decode `data_spec` into a list of `PlotSeries` instances.
+    '''
+    if mode_patterns is None:
+      mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
+    plot_data = []
+    # key name or pattern
+    patterns = mode_patterns.get(data_spec, data_spec)
+    if isinstance(patterns, str):
+      patterns = [patterns]
+    for pattern in patterns:
+      with Pfx("pattern %r", pattern):
+        for tsd, tsd_key in self.resolve(pattern):
+          ps = PS(
+              tsd_key,
+              tsd[tsd_key].as_pd_series(
+                  start,
+                  stop,
+                  pad=True,
+                  utcoffset=utcoffset,
+              ),
+              {},
+          )
+          ##assert len(ps.series) == 192, "PS(%s[%r]).series: expected 192, got %d" % ( tsd, tsd_key, len(ps.series))
+          plot_data.append(ps)
+    if not plot_data:
+      raise ValueError(
+          "no fields were resolved by data_spec=%r" % (data_spec,)
+      )
+    return plot_data
 
   # pylint: disable=too-many-branches
   @timerange
