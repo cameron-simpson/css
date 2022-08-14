@@ -953,6 +953,8 @@ def plot_events(
   for event in (ev for ev in events
                 if (start is None or ev.unixtime >= start) and (
                     stop is None or ev.unixtime < stop)):
+    # not using bulk as_datetime64s because we want to individually
+    # handle event time conversion failure
     try:
       x = datetime64(int(event.unixtime + utcoffset), 's')
     except ValueError as e:
