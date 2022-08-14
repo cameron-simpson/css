@@ -273,7 +273,10 @@ def as_datetime64s(times, unit='s', utcoffset=0):
   except KeyError:
     # pylint: disable=raise-missing-from
     raise ValueError("as_datetime64s: unhandled unit %r" % (unit,))
-  return np.array(list(map(scale, times))).astype(f'datetime64[{unit}]')
+  # apply optional utcoffset shift
+  if utcoffset != 0:
+    times = [t + utcoffset for t in times]
+  return np.array([scale(t) for t in times]).astype(f'datetime64[{unit}]')
 
 def datetime64_as_timestamp(dt64: datetime64):
   ''' Return the UNIX timestamp for the `datetime64` value `dt64`.
