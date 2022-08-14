@@ -710,6 +710,27 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     else:
       raise RuntimeError("unhandled pre-option")
 
+  @timerange
+  @typechecked
+  def popdata(
+      self,
+      start: float,
+      stop: float,
+      argv: List[str],
+      argname: str = 'data-spec',
+      *,
+      utcoffset: float,
+      **kw
+  ) -> List[PS]:
+    ''' Pop a data specification from the command line,
+        return a list of `PlotSeries` instances derived from it.
+    '''
+    return self.poparg(
+        argv, argname, lambda data_spec: self.options.spd.
+        plot_data_from_spec(start, stop, data_spec, utcoffset=utcoffset),
+        'expected a data specification', **kw
+    )
+
   @contextmanager
   def run_context(self):
     ''' Define `self.options` attributes:
