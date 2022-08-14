@@ -1366,7 +1366,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     pd = import_extra('pandas', DISTINFO)
     times, data = self.data2(start, stop, pad=pad)
     return pd.Series(
-        data, as_datetime64s([t + utcoffset for t in times]), self.np_type
+        data, as_datetime64s(times, utcoffset=utcoffset), self.np_type
     )
 
   def update_tag(self, tag_name, new_tag_value):
@@ -1419,7 +1419,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     if label is None:
       label = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
     times, yaxis = self.data2(start, stop)
-    xaxis = as_datetime64s([t + utcoffset for t in times], 'ms')
+    xaxis = as_datetime64s(times, 'ms', utcoffset=utcoffset)
     assert len(xaxis) == len(yaxis), (
         "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
         (len(xaxis), len(yaxis), start, stop)
@@ -2676,7 +2676,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       utcoffset = 0.0
     # we require the indices to ensure that the dataframe covers
     # the entire time range
-    indices = as_datetime64s([t + utcoffset for t in self.range(start, stop)])
+    indices = as_datetime64s(self.range(start, stop), utcoffset=utcoffset)
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
       for data in progressbar(df_data, "gather fields"):
