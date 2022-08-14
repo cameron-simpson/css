@@ -1274,16 +1274,16 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     '''
     raise NotImplementedError
 
-  def data(self, start, stop):
+  def data(self, start, stop, pad=False):
     ''' Return an iterable of `(when,datum)` tuples for each time `when`
         from `start` to `stop`.
     '''
-    return zip(self.range(start, stop), self[start:stop])
+    return zip(self.range(start, stop), self.slice(start, stop, pad=pad))
 
-  def data2(self, start, stop):
+  def data2(self, start, stop, pad=False):
     ''' Like `data(start,stop)` but returning 2 lists: one of time and one of data.
     '''
-    data = list(self.data(start, stop))
+    data = list(self.data(start, stop, pad=pad))
     return [d[0] for d in data], [d[1] for d in data]
 
   def slice(self, start, stop, pad=False, prepad=False):
@@ -1358,18 +1358,13 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     return np.array(self[start:stop], self.np_type)
 
   @pfx
-  def as_pd_series(self, start=None, stop=None, utcoffset=None):
+  @timerange
+  def as_pd_series(self, start, stop, *, utcoffset, pad=False):
     ''' Return a `pandas.Series` containing the data from `start` to `stop`,
         default from `self.start` and `self.stop` respectively.
     '''
     pd = import_extra('pandas', DISTINFO)
-    if start is None:
-      start = self.start  # pylint: disable=no-member
-    if stop is None:
-      stop = self.stop  # pylint: disable=no-member
-    if utcoffset is None:
-      utcoffset = 0.0
-    times, data = self.data2(start, stop)
+    times, data = self.data2(start, stop, pad=pad)
     return pd.Series(
         data, as_datetime64s([t + utcoffset for t in times]), self.np_type
     )
@@ -3348,13 +3343,13 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     return self.policy.partitioned_spans(start, stop)
 
-  def data(self, start, stop):
+  def data(self, start, stop, pad=False):
     ''' Return a list of `(when,datum)` tuples for the slot times from `start` to `stop`.
     '''
     xydata = []
     for span in self.partitioned_spans(start, stop):
       ts = self.subseries(span.name)
-      xydata.extend(ts.data(span.start, span.stop))
+      xydata.extend(ts.data(span.start, span.stop, pad=pad))
     return xydata
 
   @timerange
