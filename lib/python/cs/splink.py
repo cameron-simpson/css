@@ -491,18 +491,19 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     '''
     return SQLTags(self.pathto('events.sqlite'))
 
-  def resolve(self, spec):
-    ''' Resolve a field spec into an iterable of `(timeseries,key)`.
+  def resolve(self, *specs):
+    ''' Resolve field specs into an iterable of `(timeseries,key)`.
     '''
-    with Pfx(spec):
-      try:
-        dsname, field_spec = spec.split(':', 1)
-      except ValueError:
-        # just a glob, poll all datasets
-        dsnames = self.TIMESERIES_DATASETS
-        field_spec = spec
-      else:
-        dsnames = dsname,  # pylint: disable=trailing-comma-tuple
+    for spec in specs:
+      with Pfx(spec):
+        try:
+          dsname, field_spec = spec.split(':', 1)
+        except ValueError:
+          # just a glob, poll all datasets
+          dsnames = self.TIMESERIES_DATASETS
+          field_spec = spec
+        else:
+          dsnames = dsname,  # pylint: disable=trailing-comma-tuple
       for dsname in dsnames:
         with Pfx(dsname):
           tsd = getattr(self, dsname)
