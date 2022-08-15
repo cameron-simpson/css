@@ -1027,7 +1027,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
         stop = time.time()
-    data_specs = argv
+    data_specs = argv if argv else ['POWER']
     bare = options.bare
     force = options.force
     imgpath = options.imgpath
@@ -1035,14 +1035,79 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     show_image = options.show_image
     stacked = options.stacked
     event_labels = options.event_labels
-    figure = spd.plot(
-        start,
-        stop,
-        data_specs,
-        tz=tz,
-        event_labels=event_labels,
-        stacked=stacked,
+    detailed = spd.DetailedData
+    det_data = lambda field: detailed[field].as_pd_series(
+        start, stop, pad=True, tz=tz
     )
+    if data_specs == ['POWER']:
+      grid = det_data('ac_input_power_average_kw')
+      grid_in = -grid.clip(upper=0.0)
+      grid_out = grid.clip(lower=0.0)
+      pv = det_data('total_ac_coupled_power_average_kw')
+      battery = det_data('inverter_ac_power_average_kw')
+      battery_drain = -battery.clip(upper=0.0)
+      battery_charge = battery.clip(lower=0.0)
+      load = det_data('load_ac_power_average_kw')
+      figure, (power_ax, usage_ax) = plt.subplots(2, 1, figsize=(8, 6))
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'load [load_ac_power_average_kw]',
+                  load,
+                  dict(color='black'),
+              ),
+              PS(
+                  'battery charge [inverter_ac_power_average_kw]',
+                  battery_charge,
+                  dict(color='green'),
+              ),
+              PS(
+                  'grid out [ac_input_power_average_kw]',
+                  grid_out,
+                  dict(color='yellow'),
+              ),
+          ],
+          ax=usage_ax,
+          tz=tz,
+      )
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'pv [total_ac_coupled_power_average_kw]',
+                  pv,
+                  dict(color='blue'),
+              ),
+              PS(
+                  'battery drain [-inverter_ac_power_average_kw]',
+                  battery_drain,
+                  dict(color='pink'),
+              ),
+              PS(
+                  'grid in [-ac_input_power_average_kw]',
+                  grid_in,
+                  dict(color='red'),
+              ),
+          ],
+          ax=power_ax,
+          stacked=True,
+          tz=tz,
+      )
+    else:
+      plot_data = []
+      for data_spec in data_specs:
+        plot_data.extend(self.popdata(start, stop, argv, tz=tz))
+      figure = spd.plot(
+          start,
+          stop,
+          plot_data,
+          tz=tz,
+          event_labels=event_labels,
+          stacked=stacked,
+      )
     if bare:
       remove_decorations(figure)
     if imgpath:
