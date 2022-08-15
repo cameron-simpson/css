@@ -2,7 +2,7 @@
 
 ''' Assorted utility functions for working with data
     downloaded from Selectronics' SP-LINK programme
-    which communicates with their controllers.
+    which communicates with their solar inverter controllers.
 
     I use this to gather and plot data from my solar inverter.
 '''
@@ -14,6 +14,7 @@ from datetime import datetime
 from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
+from itertools import chain, cycle
 import os
 from os.path import (
     basename,
@@ -29,9 +30,12 @@ from pprint import pprint
 import shlex
 import sys
 import time
+from typing import List
 
 import arrow
 from dateutil.tz import tzlocal
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 from typeguard import typechecked
 
 from cs.context import stackattrs
@@ -45,17 +49,16 @@ from cs.mplutils import axes, remove_decorations, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
     Epoch,
     PlotSeries as PS,
-    TimeSeries,
     TimeSeriesBaseCommand,
     TimeSeriesDataDir,
     TimespanPolicyYearly,
+    as_datetime64s,
     plot_events,
     timerange,
     tzfor,
