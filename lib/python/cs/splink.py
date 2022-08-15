@@ -593,8 +593,6 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
         `data_specs` is an iterable of `PlotSeries` instances or `str`
         data specifications.
     '''
-    if figure is None:
-      figure = 14, 8, 100
     ax = axes(figure, ax)
     figure = ax.figure
     if event_labels is None:
