@@ -576,7 +576,8 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       utcoffset,
       figure=None,
       ax=None,
-      mode=None,
+      key_map={},  # labels from keys
+      color_map={},  # colors for keys
       event_labels=None,
       mode_patterns=None,
       stacked=False,
@@ -618,17 +619,46 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       raise ValueError(
           "no fields were resolved by data_specs=%r" % (data_specs,)
       )
+    indices = as_datetime64s(
+        self.DetailedData.range(start, stop), utcoffset=utcoffset
+    )
     with upd.run_task("plot"):
-      self.DetailedData.plot(
-          start,
-          stop,
-          plot_map.items(),
-          ax=ax,
-          stacked=stacked,
-          runstate=runstate,
-          utcoffset=utcoffset,
+      default_colors = map(
+          lambda prop: prop['color'], cycle(mpl.rcParams['axes.prop_cycle'])
       )
-    ax.set_title(str(self))
+      plot_ps = []
+      for ps in plot_data:
+        label, series, extra = ps
+        with Pfx(label):
+          if len(series) != len(indices):
+            # TODO: how to plot the less frequent DailyData?
+            warning(
+                "skipping: %d items in series, expected %d to match the indices",
+                len(series), len(indices)
+            )
+            continue
+          # get the color from extra or the color_map, fall back
+          # to a color from the default palette
+          if 'color' not in extra:
+            color = color_map.get(label)
+            if color is None:
+              color = next(default_colors)
+            extra['color'] = color
+          plot_ps.append(ps)
+      if stacked:
+        pfx_call(
+            ax.stackplot,
+            indices,
+            *map(lambda ps: ps.series, plot_ps),
+            labels=map(lambda ps: key_map.get(ps.label, ps.label), plot_ps),
+            colors=map(lambda ps: ps.extra['color'], plot_ps),
+        )
+      else:
+        for label, series, extra in plot_ps:
+          if runstate and runstate.canclled:
+            break
+          ax.plot(indices, series, label=label, **extra)
+      ax.set_title(str(self))
     return figure
 
 class SPLinkCommand(TimeSeriesBaseCommand):
