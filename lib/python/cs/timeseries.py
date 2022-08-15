@@ -2,8 +2,8 @@
 #
 # pylint: disable=too-many-lines
 
-''' Efficient portable machine native columnar storage of time series data
-    for double float and signed 64-bit integers.
+''' Efficient portable machine native columnar file storage of time
+    series data for double float and signed 64-bit integers.
 
     The core purpose is to provide time series data storage; there
     are assorted convenience methods to export arbitrary subsets
@@ -63,6 +63,7 @@ import sys
 from tempfile import TemporaryDirectory
 import time
 from typing import (
+    Any,
     Callable,
     Iterable,
     List,
@@ -245,7 +246,15 @@ NATIVE_BIGENDIANNESS = {
 DT64_0 = datetime64(0, 's')
 TD_1S = timedelta64(1, 's')
 
-def as_datetime64s(times, unit='s'):
+# functions producing ints from seconds for various datetime64 flavours
+DT64_FROM_SECONDS = {
+    's': int,
+    'ms': lambda f: int(f * 1000),
+    'us': lambda f: int(f * 1000000),
+    'ns': lambda f: int(f * 1000000000),
+}
+
+def as_datetime64s(times, unit='s', utcoffset=0):
   ''' Return a Numpy array of `datetime64` values
       computed from an iterable of `int`/`float` UNIX timestamp values.
 
@@ -258,17 +267,16 @@ def as_datetime64s(times, unit='s'):
       when converting to a `datetime64`.
       Less precision gives greater time range.
   '''
+  # select scaling function
   try:
-    scale = {
-        's': int,
-        'ms': lambda f: int(f * 1000),
-        'us': lambda f: int(f * 1000000),
-        'ns': lambda f: int(f * 1000000000),
-    }[unit]
+    scale = DT64_FROM_SECONDS[unit]
   except KeyError:
     # pylint: disable=raise-missing-from
     raise ValueError("as_datetime64s: unhandled unit %r" % (unit,))
-  return np.array(list(map(scale, times))).astype(f'datetime64[{unit}]')
+  # apply optional utcoffset shift
+  if utcoffset != 0:
+    times = [t + utcoffset for t in times]
+  return np.array([scale(t) for t in times]).astype(f'datetime64[{unit}]')
 
 def datetime64_as_timestamp(dt64: datetime64):
   ''' Return the UNIX timestamp for the `datetime64` value `dt64`.
@@ -945,6 +953,8 @@ def plot_events(
   for event in (ev for ev in events
                 if (start is None or ev.unixtime >= start) and (
                     stop is None or ev.unixtime < stop)):
+    # not using bulk as_datetime64s because we want to individually
+    # handle event time conversion failure
     try:
       x = datetime64(int(event.unixtime + utcoffset), 's')
     except ValueError as e:
@@ -957,6 +967,28 @@ def plot_events(
     yaxis.append(value_func(event))
   ax.scatter(xaxis, yaxis, **scatter_kw)
   return ax
+
+class PlotSeries(namedtuple('PlotSeries', 'label series extra')):
+  ''' Information about a series to be plotted:
+      - `label`: the label for this series
+      - `series`: an series
+      - `extra`: a `dict` of extra information such as plot styling
+  '''
+
+  @timerange
+  def promote(cls, data, tsmap=None, extra=None):
+    ''' Promote `data` to a `PlotSeries`.
+    '''
+    if isinstance(data, str):
+      # label from tsmap
+      if tsmap is None:
+        raise ValueError("cannot promote str to %s without a tsmap" % (cls,))
+      label = data
+      series = self[label].as_pd_series
+      series = tsmap.as_pd_series(start, stop, utcoffset=utcoffset)
+      extra = {}
+    else:
+      label, series = data
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
@@ -1109,7 +1141,7 @@ class TimeStepsMixin:
 
 class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
   ''' The basis of time references with a starting UNIX time `start`
-      and the `step` defining the width of a time slot.
+      and a `step` defining the width of a time slot.
   '''
 
   def __new__(cls, *a, **kw):
@@ -1198,7 +1230,7 @@ Epochy = Union[Epoch, Tuple[Numeric, Numeric], Numeric]
 OptionalEpochy = Optional[Epochy]
 
 class HasEpochMixin(TimeStepsMixin):
-  ''' A `TimeStepsMixin` with `.start` and `.step` derive from `self.epoch`.
+  ''' A `TimeStepsMixin` with `.start` and `.step` derived from `self.epoch`.
   '''
 
   def info_dict(self, d=None):
@@ -1264,16 +1296,16 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     '''
     raise NotImplementedError
 
-  def data(self, start, stop):
+  def data(self, start, stop, pad=False):
     ''' Return an iterable of `(when,datum)` tuples for each time `when`
         from `start` to `stop`.
     '''
-    return zip(self.range(start, stop), self[start:stop])
+    return zip(self.range(start, stop), self.slice(start, stop, pad=pad))
 
-  def data2(self, start, stop):
+  def data2(self, start, stop, pad=False):
     ''' Like `data(start,stop)` but returning 2 lists: one of time and one of data.
     '''
-    data = list(self.data(start, stop))
+    data = list(self.data(start, stop, pad=pad))
     return [d[0] for d in data], [d[1] for d in data]
 
   def slice(self, start, stop, pad=False, prepad=False):
@@ -1348,20 +1380,15 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     return np.array(self[start:stop], self.np_type)
 
   @pfx
-  def as_pd_series(self, start=None, stop=None, utcoffset=None):
+  @timerange
+  def as_pd_series(self, start, stop, *, utcoffset, pad=False):
     ''' Return a `pandas.Series` containing the data from `start` to `stop`,
         default from `self.start` and `self.stop` respectively.
     '''
     pd = import_extra('pandas', DISTINFO)
-    if start is None:
-      start = self.start  # pylint: disable=no-member
-    if stop is None:
-      stop = self.stop  # pylint: disable=no-member
-    if utcoffset is None:
-      utcoffset = 0.0
-    times, data = self.data2(start, stop)
+    times, data = self.data2(start, stop, pad=pad)
     return pd.Series(
-        data, as_datetime64s([t + utcoffset for t in times]), self.np_type
+        data, as_datetime64s(times, utcoffset=utcoffset), self.np_type
     )
 
   def update_tag(self, tag_name, new_tag_value):
@@ -1414,7 +1441,7 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
     if label is None:
       label = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
     times, yaxis = self.data2(start, stop)
-    xaxis = as_datetime64s([t + utcoffset for t in times], 'ms')
+    xaxis = as_datetime64s(times, 'ms', utcoffset=utcoffset)
     assert len(xaxis) == len(yaxis), (
         "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
         (len(xaxis), len(yaxis), start, stop)
@@ -2116,8 +2143,8 @@ class TimePartition(namedtuple('TimePartition',
   ''' A `namedtuple` for a slice of time with the following attributes:
       * `epoch`: the reference `Epoch`
       * `name`: the name for this slice
-      * `start_offset`: the epoch offset of the start time (`self.start`)
-      * `end_offset`: the epoch offset of the end time (`self.stop`)
+      * `start_offset`: the epoch offset of the start time
+      * `end_offset`: the epoch offset of the end time
 
       These are used by `TimespanPolicy` instances to express the partitions
       into which they divide time.
@@ -2168,7 +2195,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
 
       Probably the most important methods are:
       * `span_for_time`: return a `TimePartition` from a UNIX time
-      * `span_for_name`: return a `TimePartition` a partition name
+      * `span_for_name`: return a `TimePartition` from a partition name
   '''
 
   # definition to happy linters
@@ -2635,7 +2662,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       self,
       start=None,
       stop=None,
-      keys: Optional[Iterable[str]] = None,
+      df_data: Optional[Iterable[Union[str, Tuple[str, Any]]]] = None,
       *,
       key_map=None,
       runstate=None,
@@ -2646,35 +2673,52 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         Parameters:
         * `start`: start time of the data
         * `stop`: end time of the data
-        * `keys`: optional iterable of keys, default from `self.keys()`
+        * `df_data`: optional iterable of data, default from `self.keys()`;
+          each item may either be a time series name
+          or a `(key,series)` 2-tuple to support presupplied series,
+          possibly computed
     '''
     pd = import_extra('pandas', DISTINFO)
     if start is None:
       start = self.start  # pylint: disable=no-member
     if stop is None:
       stop = self.stop  # pylint: disable=no-member
-    if keys is None:
-      keys = self.keys()
-    if not isinstance(keys, (tuple, list)):
-      keys = tuple(keys)
+    if df_data is None:
+      df_data = self.keys()
+    if not isinstance(df_data, (tuple, list)):
+      df_data = tuple(df_data)
     if key_map is None:
+      # the default key map annotates keys with their CSV column headings
       key_map = {}
+      for key in self.keys():
+        csv_header = self.csv_header(key)
+        if csv_header is not None and csv_header != key:
+          key_map[key] = f'{csv_header}\n{key}'
     if utcoffset is None:
       utcoffset = 0.0
-    indices = as_datetime64s([t + utcoffset for t in self.range(start, stop)])
+    # we require the indices to ensure that the dataframe covers
+    # the entire time range
+    indices = as_datetime64s(self.range(start, stop), utcoffset=utcoffset)
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
-      for key in progressbar(keys, "gather fields"):
+      for data in progressbar(df_data, "gather fields"):
         if runstate and runstate.cancelled:
           raise CancellationError
-        proxy.text = key
-        with Pfx(key):
-          if key not in self:
-            raise KeyError("no such key")
+        pfx_context = (
+            data
+            if isinstance(data, str) else f'{data[0]}:{type(data[1]).__name__}'
+        )
+        proxy.text = pfx_context
+        with Pfx(pfx_context):
+          if isinstance(data, str):
+            ##key, *args = key.split('__')
+            key = data
+            ts = self[key]
+            series = ts.as_pd_series(start, stop, utcoffset=utcoffset)
+          else:
+            key, series = data
           data_key = key_map.get(key, key)
-          data_dict[data_key] = self[key].as_pd_series(
-              start, stop, utcoffset=utcoffset
-          )
+          data_dict[data_key] = series
     if runstate and runstate.cancelled:
       raise CancellationError
     return pfx_call(
@@ -2720,47 +2764,51 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       self,
       start,
       stop,
-      keys=None,
+      plot_data=None,
       *,
       figure=None,
       ax=None,
       label=None,
       runstate=None,
       utcoffset,
+      stacked=False,
+      kind=None,
       **plot_kw,
   ) -> Axes:
     ''' Convenience shim for `DataFrame.plot` to plot data from
-        `start` to `stop` for each key in `keys`.
+        `start` to `stop` for each timeseries in `plot_data`.
         Return the plot `Axes`.
 
         Parameters:
         * `start`: optional start, default `self.start`
         * `stop`: optional stop, default `self.stop`
-        * `keys`: optional list of keys, default all keys
+        * `plot_data`: optional iterable of plot data,
+          default `sorted(self.keys())`
         * `label`: optional label for the graph
         * `runstate`: optional `RunState` to allow interruption
         * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
+
+        The plot data items are either
+        a key for a timeseries from this `TimeSeriesMapping`
+        or a `(label,series)` 2-tuple being a label and timeseries data.
     '''
     ax = axes(figure, ax)
-    if keys is None:
-      keys = sorted(self.keys())
+    if plot_data is None:
+      plot_data = sorted(self.keys())
+    if kind is None:
+      kind = 'area' if stacked else 'line'
+    plot_data = list(plot_data)
     df = self.as_pd_dataframe(
         start,
         stop,
-        keys,
+        plot_data,
         runstate=runstate,
         utcoffset=utcoffset,
     )
-    for key in keys:
-      with Pfx(key):
-        csv_header = self.csv_header(key)
-        if csv_header != key:
-          kname = f'{csv_header}\n{key}'
-          df.rename(columns={key: kname}, inplace=True)
     if runstate and runstate.cancelled:
       raise CancellationError
-    return df.plot(ax=ax, **plot_kw)
+    return df.plot(ax=ax, kind=kind, stacked=stacked, **plot_kw)
 
   @pfx_method
   def read_csv(self, csvpath, column_name_map=None, **pd_read_csv_kw):
@@ -3317,13 +3365,13 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     return self.policy.partitioned_spans(start, stop)
 
-  def data(self, start, stop):
+  def data(self, start, stop, pad=False):
     ''' Return a list of `(when,datum)` tuples for the slot times from `start` to `stop`.
     '''
     xydata = []
     for span in self.partitioned_spans(start, stop):
       ts = self.subseries(span.name)
-      xydata.extend(ts.data(span.start, span.stop))
+      xydata.extend(ts.data(span.start, span.stop, pad=pad))
     return xydata
 
   @timerange
