@@ -1098,8 +1098,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       )
     else:
       plot_data = []
-      for data_spec in data_specs:
-        plot_data.extend(self.popdata(start, stop, argv, tz=tz))
+      while data_specs:
+        plot_data.extend(self.popdata(start, stop, data_specs, tz=tz))
       figure = spd.plot(
           start,
           stop,
