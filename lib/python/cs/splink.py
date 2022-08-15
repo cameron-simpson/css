@@ -45,7 +45,7 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import s
 from cs.logutils import warning, error
-from cs.mplutils import axes, remove_decorations, print_figure, save_figure
+from cs.mplutils import axes, remove_decorations, print_figure, save_figure, FigureSize
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
@@ -1051,7 +1051,69 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       battery_drain = -battery.clip(upper=0.0)
       battery_charge = battery.clip(lower=0.0)
       load = det_data('load_ac_power_average_kw')
-      figure, (power_ax, usage_ax) = plt.subplots(2, 1, figsize=(8, 6))
+      figure, (power_ax, usage_ax) = plt.subplots(
+          2,
+          1,
+          figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
+          label=f'Power: {spd}',
+      )
+      X("start=%s", start)
+      X("stop=%s", stop)
+      X("call spd.plot:%s start=%s stop=%s, ...", spd.plot, start, stop)
+      # stack the power consumption
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'load [load_ac_power_average_kw]',
+                  load,
+                  dict(color='grey'),
+              ),
+              PS(
+                  'battery charge [inverter_ac_power_average_kw]',
+                  battery_charge,
+                  dict(color='blue'),
+              ),
+              PS(
+                  'grid out [ac_input_power_average_kw]',
+                  grid_out,
+                  dict(color='green'),
+              ),
+          ],
+          ax=usage_ax,
+          ax_title="Power Usage",
+          stacked=True,
+          tz=tz,
+      )
+      usage_ax.legend()
+      # stack the power sources
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'pv [total_ac_coupled_power_average_kw]',
+                  pv,
+                  dict(color='yellow'),
+              ),
+              PS(
+                  'battery drain [-inverter_ac_power_average_kw]',
+                  battery_drain,
+                  dict(color='blue'),
+              ),
+              PS(
+                  'grid in [-ac_input_power_average_kw]',
+                  grid_in,
+                  dict(color='red'),
+              ),
+          ],
+          ax=power_ax,
+          ax_title="Power Supply",
+          stacked=True,
+          tz=tz,
+      )
+      # overlay the load as a line
       spd.plot(
           start,
           stop,
@@ -1061,44 +1123,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                   load,
                   dict(color='black'),
               ),
-              PS(
-                  'battery charge [inverter_ac_power_average_kw]',
-                  battery_charge,
-                  dict(color='green'),
-              ),
-              PS(
-                  'grid out [ac_input_power_average_kw]',
-                  grid_out,
-                  dict(color='yellow'),
-              ),
-          ],
-          ax=usage_ax,
-          tz=tz,
-      )
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'pv [total_ac_coupled_power_average_kw]',
-                  pv,
-                  dict(color='blue'),
-              ),
-              PS(
-                  'battery drain [-inverter_ac_power_average_kw]',
-                  battery_drain,
-                  dict(color='pink'),
-              ),
-              PS(
-                  'grid in [-ac_input_power_average_kw]',
-                  grid_in,
-                  dict(color='red'),
-              ),
           ],
           ax=power_ax,
-          stacked=True,
           tz=tz,
       )
+      power_ax.legend()
     else:
       plot_data = []
       while data_specs:
