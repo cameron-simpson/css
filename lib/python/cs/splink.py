@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#
+# pylint: disable=too-many-lines
 
 ''' Assorted utility functions for working with data
     downloaded from Selectronics' SP-LINK programme
@@ -11,7 +13,6 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
 from datetime import datetime
-from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
 from itertools import chain, cycle
@@ -568,7 +569,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       )
     return plot_data
 
-  # pylint: disable=too-many-branches
+  # pylint: disable=too-many-branches,too-many-locals
   @timerange
   def plot(
       self,
@@ -580,8 +581,8 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       figure=None,
       ax=None,
       ax_title=None,
-      key_map={},  # labels from keys
-      color_map={},  # colors for keys
+      key_map=None,  # labels from keys
+      color_map=None,  # colors for keys
       event_labels=None,
       mode_patterns=None,
       stacked=False,
@@ -602,6 +603,10 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
     if upd is None:
       upd = Upd()
+    if key_map is None:
+      key_map = {}
+    if color_map is None:
+      color_map = {}
     plot_data = list(
         chain(
             *(
@@ -1057,9 +1062,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
           label=f'Power: {spd}',
       )
-      X("start=%s", start)
-      X("stop=%s", stop)
-      X("call spd.plot:%s start=%s stop=%s, ...", spd.plot, start, stop)
       # stack the power consumption
       spd.plot(
           start,
