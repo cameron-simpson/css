@@ -579,6 +579,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       utcoffset,
       figure=None,
       ax=None,
+      ax_title=None,
       key_map={},  # labels from keys
       color_map={},  # colors for keys
       event_labels=None,
@@ -659,7 +660,8 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
           if runstate and runstate.canclled:
             break
           ax.plot(indices, series, label=label, **extra)
-      ax.set_title(str(self))
+      if ax_title is not None:
+        ax.set_title(ax_title)
     return figure
 
 class SPLinkCommand(TimeSeriesBaseCommand):
