@@ -585,6 +585,9 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
+
+        `data_specs` is an iterable of `PlotSeries` instances or `str`
+        data specifications.
     '''
     if figure is None:
       figure = 14, 8, 100
@@ -596,56 +599,25 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
     if upd is None:
       upd = Upd()
-    plot_map = {}
-    with Pfx("data_specs"):
-      specq = ListQueue(data_specs)
-      for data_spec in specq:
-        with Pfx(data_spec):
-          if isinstance(data_spec, str):
-            # key name or pattern
-            if mode is None and data_spec in mode_patterns:
-              mode = data_spec
-            patterns = mode_patterns.get(data_spec, data_spec)
-            if isinstance(patterns, str):
-              patterns = [patterns]
-            matched = False
-            for pattern in patterns:
-              with Pfx("pattern %r", pattern):
-                for tsd, label in self.resolve(pattern):
-                  with Pfx("%s[%r]", tsd, label):
-                    if label in plot_map:
-                      warning("overwriting existing label")
-                    ts = tsd[label]
-                    series = ts.as_pd_series(start, stop, utcoffset=utcoffset)
-                    plot_map[label] = series
-                    matched = True
-            if not matched:
-              warning("no matches")
-          else:
-            # label, series
-            try:
-              label, series = data_spec
-            except (IndexError, ValueError):
-              raise ValueError("unhandled data_spec")
-            else:
-              if isinstance(series, TimeSeries):
-                series = series.as_pd_series(start, stop, utcoffset=utcoffset)
-              else:
-                # needs to already be a series with time indices
-                plot_map[label] = series
-    if not plot_map:
+    plot_data = list(
+        chain(
+            *(
+                (
+                    self.plot_data_from_spec(
+                        start,
+                        stop,
+                        spec,
+                        utcoffset=utcoffset,
+                        mode_patterns=mode_patterns
+                    ) if isinstance(spec, str) else (spec,)
+                ) for spec in data_specs
+            )
+        )
+    )
+    if not plot_data:
       raise ValueError(
           "no fields were resolved by data_specs=%r" % (data_specs,)
       )
-    if mode is None:
-      # scan the keys looking for a match to a mode
-      for key in plot_map.keys():
-        for mode_name, mode_glob in mode_patterns.items():
-          if pfx_call(fnmatch, key, mode_glob):
-            mode = mode_name
-            break
-        if mode is not None:
-          break
     with upd.run_task("plot"):
       self.DetailedData.plot(
           start,
