@@ -55,6 +55,10 @@ done
 
 xit=0
 
+srcfindup(){
+  exec findup -C "$srcdir" -P ${1+"$@"}
+}
+
 for srcfile
 do
   type=
@@ -69,19 +73,15 @@ do
       ;;
   esac
 
+  srcdir=$( dirname "$srcfile" )
+
   # Require nonempty flagfile in $srcfile directory tree.
   # Note: works from the directory of the file in order to accomodate
   # trees symlinked in.
   [ -z "$flagfile" ] || {
-    srcdir=$( dirname "$srcfile" )
     case "$flagfile" in
       ./* | /* ) ;;
-      *)  flagfile=$(
-            set -ue
-            cd "$srcdir"
-            unset PWD
-            findup "$flagfile"
-          ) || continue ;;
+      *)  flagfile=$( srcfindup "$flagfile" ) || continue ;;
     esac
     [ -s "$flagfile" ] || continue
   }
@@ -95,9 +95,6 @@ do
         ;;
       *.pl | *.pm )
         type=pl
-        ;;
-      *.py)
-        type=py
         ;;
     esac
   fi

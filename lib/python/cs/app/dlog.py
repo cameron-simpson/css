@@ -222,7 +222,7 @@ def dlog(
   logtags.add('headline', headline)
   if categories:
     logtags.add('categories', sorted(categories))
-  sqltags.default_factory(None, unixtime=when, tags=tags)
+  sqltags.default_factory(None, unixtime=when, tags=logtags)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

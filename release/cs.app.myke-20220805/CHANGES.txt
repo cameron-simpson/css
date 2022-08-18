@@ -1,0 +1,278 @@
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: myke3: initial sketch
+lib/python/cs/app/myke/parse.py: myke3: move lex.py and macros.py into parse.py
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: Macro class
+lib/python/cs/app/myke/parse.py: cs.app.mykeparse: skip blank lines and comments in makefiles
+lib/python/cs/app/myke/__init__.py: cs.app.myke: add default_cmd, start main off parsing the nearest Mykefile
+lib/python/cs/app/myke/make.py: cs.app.myke.make: initial and incomplete makefile loader and make function
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: detect blank lines and comments earlier
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: parse makefile targets
+lib/python/cs/app/myke/parse.py: cs.app.myke.make: cite line number
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: some action implementation and more macro parsing
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: parse macro parameters in macro expressions, other checks
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: start on MacroTerm.eval, a lot of lexing streamlining, assorted small changes
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: small parsing fixes
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: small bugfixes
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: drop use of "v" modifier to do named macros in favour of literal flag
+lib/python/cs/app/myke/make.py: cs.app.myke.make: add Maker.close() method
+lib/python/cs/app/myke/__init__.py: cs.app.myke.__init__: call Maker.close()
+lib/python/cs/app/myke/make.py: cs.app.myke: a little more logging
+lib/python/cs/app/myke/make.py: cs.app.myke: more logging
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: remove Action.status - it is not 1<->1, bugfix macroexpression eval, tweak logging, do not queue Actions via work queue, bugfix assembling Actions out of Makefile content
+lib/python/cs/app/myke/make.py: cs.app.myke: set default shell for target actions
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: cs.app.myke: do not call Maker.close() - using Later context manager in Maker.make()
+lib/python/cs/app/myke/make.py: cs.app.myke: enable execution of shell commands
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: bugfix parseMacroExpression to honour "text" param
+lib/python/cs/app/myke/make.py: cs.app.myke.make: wind back a lot of logging to debug level
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Action.__str__: flatten multiline actions
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: bugfix parseMacroExpression call to parseMacro, present ParseErrors with tracebacks for debug purposes
+lib/python/cs/app/myke/__init__.py: cs.app.myke: fix command exit status
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: cs.app.myke: start on option parsing
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: cs.app.myke: option parsing tweaking, implement -d and -D
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: implement "-D make" and "-D parse"
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: cs.app.myke: implement default target logic, minor bugfixes for "-D parse/make"
+lib/python/cs/app/myke/parse.py: cs.app.myke: add MacroExpression.__eq__ that compares the permutations field, fix test10parseMacroExpr_PlainText, flesh out test20parseMakeLines
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: cs.app.myke: support "-f makefile" option, support multiple makefiles
+lib/python/cs/app/myke/make.py: cs.app.myke: implement -n (no action) option
+lib/python/cs/app/myke/make.py: cs.app.myke: handle unknown make targets, honour fail_fast
+lib/python/cs/app/myke/make.py: cs.app.myke.make: terser Maker.__str__()
+lib/python/cs/app/myke/make.py: cs.app.myke.make: action invocation fixes
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: fix an invocation of Pfx
+lib/python/cs/app/myke/make.py: cs.app.myke.make: print shell commands if not a silent action, shell command debug message only if actually running it
+lib/python/cs/app/myke/parse.py: cs.range, cs.app.myke.parse: 3.x prep: __ne__, __hash__ fixes
+lib/python/cs/app/myke/make.py: cs.app.myke.make: correctly set up Target.namespaces as list-of-mapping
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: lots o macro parsing and eval fixes and additions
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: sort out deeper namespaces from Maker, implement "G" modifier
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: support $MYKERC, implement :import directive
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: implement :append directive
+lib/python/cs/app/myke/parse.py: cs.app.myke: Makefiles: move line folding and :if directives into separate generator, implement D and F modifiers, add check for target special macro names
+lib/python/cs/app/myke/parse.py: cs.app.myke: Makefiles: move line folding and :if directives into separate generator, implement D and F modifiers
+lib/python/cs/app/myke/parse.py: cs.app.myke: resolve merge conflicts from mistaken partial commit in other repository
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: remove obsolete :if check now in separate generator
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: better str() for FileContexts, trim trailing whitespace from macro definitions
+lib/python/cs/app/myke/parse.py: cs.app.myke: debugging cleanups, shorter str(Macro)
+lib/python/cs/app/myke/make.py: cs.app.myke.make: use %r instead of %s
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: shorten debug info some more
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: fix call to parseMakefile, add __init__ type checking to FileContext, implement :else and :endif
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: tweak modifier parsing to make "G?" a single modifer string
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: parse "- macroname" modifier
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: implement "-macroname" modifier, assorted small parsing fixes
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: dump namepsaces prettily on name lookup failure, shorten other error message
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: correct regexp grouping on macros-with-parameters, allow whitespace more flexibly
+lib/python/cs/app/myke/parse.py: cs.app.myek.parse: parse PpSs modifiers
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: implement PpSs modifiers, fix use of macros with arguments
+lib/python/cs/app/myke/make.py: cs.app.myke.make: add .macros attribute to Target, fix some calls to evaluate macro expressions
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: fix call in unit test
+lib/python/cs/app/myke/parse.py: cs.app.myke: remove a few debugging prints
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: implement "include directive, fix "G" modifier code
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: flow control fix for :include directive
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: implement :precious directive (still missing post-make implementation), clean up parsing syntax checks a bit
+lib/python/cs/app/myke/make.py: cs.app.myke.make: implement post-failed-make cleanup honouring :precious, implement fail_fast make cancellation
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: add +macro and *macro set modifiers
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: parse :,ptn,rep, modifier syntax
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: implement :,ptn,rep, modifier
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: implement "<" modifier
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: add parsing for [!]/regexp/ modifier
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: support macro expression inside /regexp/ modifier, implement /regexp/ modifier
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: honour "!" in /regexp/ modifier
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: prepare Modifier and subclasses to represent modifiers as callable objects
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: fix mode flags for ModSuffixShort and ModSuffixLong
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: use new Modifier subclasses in macro parsing and evaluation, still a little buggy
+lib/python/cs/app/myke/make.py: cs.app.myke.make: defer dependency name to Target
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: move Modifier implementation into .modify method so that the __call__ method can wrap it in some debugging context
+lib/python/cs/app/myke/make.py: cs.app.myke: Trace shell actions, add several docstrings.
+lib/python/cs/app/myke/make.py: cs.app.myke: add more tracing to "make" debug flag
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: raise default parallelism to 100, hack to work around misuse of LateFunctions; raise ValueError on missing Target (no inference yet), othe minor tweaks
+lib/python/cs/app/myke/make.py: cs.app.myke.make: tweak str(Action), improve "-D make" output
+lib/python/cs/app/myke/make.py: cs.app.myke.make, cs.threads: docstring tweaks
+lib/python/cs/app/myke/make.py: cs.later: move notification stuff into PendingFunction, simplify code
+lib/python/cs/app/myke/make.py: cs.app.myke.make: revert bogus commit claimed to be cs.later mods
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: pass current Maker to Target initialiser
+lib/python/cs/app/myke/__init__.py: cs.app.myke.__init__: close Maker after use, no longer part of .make() method
+lib/python/cs/app/myke/make.py: cs.app.myke.make: complete recode of make control flow - try to do as much nonblocking work as possible before deferring work to a LateFunction, use capacity control only for blocking actions
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: close Maker ater unit test
+lib/python/cs/app/myke/make.py: cs.myke.make: correct poperty name for active_lock, accept Target or str to make()
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Action.act: return CallableValues if as_func is true
+lib/python/cs/app/myke/make.py: cs.app.myke.make: tweak str(Maker) and a debug message
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: make Maker a context manager, now clean up relaibly on exceptions
+lib/python/cs/app/myke/parse.py: cs/**.py: trim trailing whitespace from blank lines
+lib/python/cs/app/myke/make.py: cs/**.py: detab
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Action.act(): calling fixes
+lib/python/cs/app/myke/make.py: cs.ap.myke.make: generate missing targets as needed, fix some submakery
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.*: make use of new Pfx deferred argument formatting
+lib/python/cs/app/myke/make.py: cs.*: migrate from thread.allocate_lock to threading.Lock
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.*: adjust a lot of except clauses
+lib/python/cs/app/myke/make.py: cs.*: lots of print, import and exception fixes for python3 compatibility
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: resolve conflicts from merge from mainline
+lib/python/cs/app/myke/make.py: cs.app.myke.make: docstring
+lib/python/cs/app/myke/make.py: cs.myke.make: format string tweak
+lib/python/cs/app/myke/__init__.py: cs.app.myke.__init__: fix use of default_target
+lib/python/cs/app/myke/make.py: cs.app.myke.make: get cmd from cs.logutils
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: no need to import string.letters
+lib/python/cs/app/myke/parse.py: cs.*: replace assertEquals with assertEqual
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: _FileContext: namedtuples are already initialised, get StringIO from cs.py3
+lib/python/cs/app/myke/make.py: cs.app.myke.make: make most classes subclasses of cs.obj.O
+lib/python/cs/app/myke/make.py: cs.app.myke.make: comment
+lib/python/cs/app/myke/make.py: cs.app.myke.make: TargetMap class to manage Target instances for a Maker
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: hook in the TargetMap class for targets
+lib/python/cs/app/myke/make.py: cs.app.myke.make: TargetMap: add __setitem__, rejecting duplicates
+lib/python/cs/app/myke/make.py: cs.app.myke.make: docstrings and minor tweaks
+lib/python/cs/app/myke/make.py: cs.app.myke.make: minor fixes
+lib/python/cs/app/myke/make.py: cs.app.myke.make: TargetMap: always instantiate missing Targets, mark existing ones as made and missing/uninferrable ones as failed
+lib/python/cs/app/myke/make.py: cs.app.myke.make: split Targets into real Targets and rules, add context to parse errors
+lib/python/cs/app/myke/make.py: cs.app.myke.make: recite source of previous definition in Target redefinition conflicts
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: str(MacroTerm): convert modifiers to strings
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: debug message tweak
+lib/python/cs/app/myke/make.py: cs.app.myke.make: get Lock and RLock from cs.threads for debugging facility
+lib/python/cs/app/myke/make.py: cs.app.myke.make: omit various wordy attributes from O_str output, add a docstring
+lib/python/cs/app/myke/parse.py: merge changes from css-myke3-betterTargets
+lib/python/cs/app/myke/make.py: cs.app.myke.make: completely redo the target and action control code, avoiding deadlocks and using shinier new cs.threads.Asynchron and friends, and separating dispatch function from what we wait for
+lib/python/cs/app/myke/__init__.py: cs.app.myke.__init__: changes associated with deadlock debug in cs.app.myke.make
+lib/python/cs/app/myke/make.py: cs.app.myke.make: make several things subclasses of cs.misc.O
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: suppress a couple of wordy attributes
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: import: recite names of undefined environment variables
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: merge with mainline
+lib/python/cs/app/myke/make.py: cs.app.myke.make: add logic for new and out of date attributes to Target; NB actions still need to mark things is_new
+lib/python/cs/app/myke/make.py: cs.app.myke.make: only queue actions if out of date or missing, queuing an action marks us as new
+lib/python/cs/app/myke/make.py: cs.app.myke.make: actions in -n mode still put(True), actions in -n mode get reports even if silent
+lib/python/cs/app/myke/make.py: cs.app.myke.make: fix call to TargetMap._newTarget
+lib/python/cs/app/myke/make.py: cs.app.myke.make: TargetMap: set new Target result, helping with main program exit status
+lib/python/cs/app/myke/make.py: cs.app.myke.make: fix typo of constant
+lib/python/cs/app/myke/make.py: cs.app.myke.make: __init__: copy supplied action list so that it can be popped during build
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target.__init__: do not take a copy of actions; it is shared and extended after initialisation
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target: fix up a lot of make debug messages
+lib/python/cs/app/myke/make.py: cs.app.myke.make: init Maker._makeQ to None prior to prepare()
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: some docstrings
+lib/python/cs/app/myke/make.py: cs.app.myke.make: update imports for cs.asynchron
+lib/python/cs/app/myke/make.py: cs.app.myke.make: fix import syntax
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker.__exit__: call self.close()
+lib/python/cs/app/myke/make.py: cs.app.myke.make: log work queue to myke-later.log, not later.log
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: split macro assignment parse into separate function for reuse with command line arguments
+lib/python/cs/app/myke/__init__.py: cs.app.myke: handle macro definitions on the command line, after options and before targets
+lib/python/cs/app/myke/make.py: cs.app.myke.make: remove Maker.bg method, unused
+lib/python/cs/app/myke/make.py: cs.app.myke.make: TargetMap: docstring fix
+lib/python/cs/app/myke/make.py: cs.app.myke.make: compute Target.new_prereqs from Target.prereqs, compute Target.was_missing at __init__, implement macro "$?"
+lib/python/cs/app/myke/make.py: cs.app.myke.make: fix fomr vaiable name stuff in _make_partial
+lib/python/cs/app/myke/make.py: cs.app.myke.make: fix spelling of debug_make
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Action: shorten __str__, add convenience .prline property
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: fix off-by-one in !/foo/ parse
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: ParseError accepts optional format arguments
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: support +- "qstr"
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Action._act: catch and report any Exception, mark action as failed; make a debug statement louder
+lib/python/cs/app/myke/__init__.py: cs.app.myke.__init__: futureproof print statement
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: remove debug statement
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: ModSetOp: correct use of set operations
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: cs.app.myke: pass sys.argv[0] into Maker() to define $(MAKE)
+lib/python/cs/app/myke/parse.py: cs.app.mykeparse: fix off by one error in set operation parse
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: TestAll.test20parseMakeLines: pass in a notional makecmd parameter to Maker()
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: subclass NestingOpenCloseMixin, fix up open/close counting
+lib/python/cs/app/myke/__init__.py: cs.app.myke.__init__: main: wrap M.make(targets) in "with M:"
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: cs.app.myke: remove Maker.prepare, fit ._makeQ into normal shutdown method
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker.shutdown: wait for ._makeQ completion
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse, cs.app.pilfer: adjust for changed signature of cs.lex.get_other_chars
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: remove unused name from import
+lib/python/cs/app/myke/__init__.py: cs.inttypes: more candor in distinfo
+lib/python/cs/app/myke/parse.py: cs.app.myke.make: get StringIO from io, not cs.py3
+lib/python/cs/app/myke/make.py: cs.resources: rename NestingOpenCloseMixin to MultiOpenMixin - easier to type, say and remember, not to mention being more accurate
+lib/python/cs/app/myke/__init__.py: cs.app.myke.__init__: import cs.logutils.X, used when debugging
+lib/python/cs/app/myke/make.py: cs.app.myke.make: MultiOpenMixin defines ._lock for us; define required .startup method symmetric with .shutdown, and move .shutdown up near .startup
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/__main__.py lib/python/cs/app/myke/make.py: cs.app.myke: move main into cs.app.myke.__main__
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target.prereqs: slight rephrase for readability
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target._apply_prereq: bugfix reset of .LFs
+lib/python/cs/app/myke/make.py: cs.app.myke.make: refer to pending targets as T and Ts instead of LF and LFs - they are all Targets
+lib/python/cs/app/myke/make.py: cs.app.myke.make: another name change from the LF => T change
+lib/python/cs/app/myke/make.py: cs.app.myke.make: more LF => T renaming
+lib/python/cs/app/myke/make.py: cs.app.myke.make: detab docstrings
+lib/python/cs/app/myke/make.py: cs.app.myke.make: remove use of @cs.debug.DEBUG, import and use cs.excutils.logexc
+lib/python/cs/app/myke/make.py: cs.app.myke.make: fixes for use of Maker.after
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: add .succeed() and .fail() methods to set both result and .failed
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: pass lock=RLock() to Result initialiser, avoids deadlock
+lib/python/cs/app/myke/make.py: cs.app.myke.make: compute out_of_date etc as special post-prereqs step before main "make" iteration
+lib/python/cs/app/myke/make.py: cs.app.myke.make: add some sanity checks, update a docstring
+lib/python/cs/app/myke/make.py: cs.app.myke.make: TargetMap.__getitem__: for preexisting targets with no rules set out_of_date=False
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker._apply_prereq: discard .is_new (treated like !.out_of_date); stop accomodating non-Targets, never passed in
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target.new_prereqs: readility/cleanup
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target._next_make: big logic cleanup/simplification
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target._make_after_prereqs: mark Target as successful if prereqs ok and not out of date
+lib/python/cs/app/myke/make.py: cs.app.myke.make: tracing cleanup
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target._apply_prereq: bugfix out of date logic - remove asymmetric mtime test; replace obsolete use of .is_new
+lib/python/cs/app/myke/make.py: cs.app.myke.make: debugging cleanup
+lib/python/cs/app/myke/make.py: rename cs.asynchron.Asynchron to Result
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: fix reference to obsolete variable in parse exception
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: improve context in reporting
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: bugfix: readMakefileLines: add missing "continue" to ":else" handler
+lib/python/cs/app/myke/make.py: cs.app.myke.make: getopt: reorder option list for easier review
+lib/python/cs/app/myke/__init__.py: cs.*: use "install_requires" instead of "requires" in DISTINFO
+lib/python/cs/app/myke/__main__.py lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: myke: detect errors loading Mykefiles, abort make; needs further nuance
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.myke: use @cs.py.func.prop instead of @property
+lib/python/cs/app/myke/make.py: cs.app.myke.make: bugfix: Maker.getopt: incorrect variable name
+lib/python/cs/app/myke/make.py: cs.app.myke.make: adjust for cs.asynchron states now being enums, drop Target.madeness method
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Action._act: bugfix result delivery from ":make"
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: rename making=>target_active and made=>target_inactive
+lib/python/cs/app/myke/make.py: cs.app.myke.make: docstring reindent
+lib/python/cs/app/myke/make.py: cs.app.myke.make: use locks on Maker.success and Maker.fail; accept optional message to .fail
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker.after: give returned Result a distinctive name
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target.name: set via superclass
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target.succeed: sanity check against succeeding a failed Target
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target.require: more context for messages, provide distinctive message for failure of a prereq, mark targets as active and inactive
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target._make_after_prereqs: better context, cope correctly with early failure detection
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target._make_next: better context, handle Target Results specially, break loop on failure
+lib/python/cs/app/myke/make.py: cs.app.myke.make: improve messaging
+lib/python/cs/app/myke/make.py: cs.app.myke.make: tweaks, no semantic change
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.*: adjust imports of cs.pfx.Pfx
+lib/python/cs/app/myke/make.py: cs.*: import XP from cs.pfx instead of cs.logutils
+lib/python/cs/app/myke/__main__.py lib/python/cs/app/myke/make.py: cs.*: import X from cs.x instead of cs.logutils
+lib/python/cs/app/myke/make.py: cs.*: get cmd from cs.pfx instead of cs.logutils
+lib/python/cs/app/myke/__main__.py: cs.app.myke.__main__: main: prepend command line macro assignments to macro namespaces
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: rename cs.asynchron to cs.result
+lib/python/cs/app/myke/make.py: cs.app.myke.make,cs.later: rename cs.result.AsynchState to ResultState
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target: subclasses Result, which no longer subclasses cs.obj.O; TODO: do not subclass Result, just hook up to one
+lib/python/cs/app/myke/make.py: cs.app.myke.make,cs.packetstream: adjust for simpler Later semantics, no longer a MultiOpenMixin subclass
+lib/python/cs/app/myke/make.py: cs.app.mykemake: update imports for recent changes
+lib/python/cs/app/myke/make.py: cs.app.myke: Maker.getopt: fix parsing of -j option
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/__main__.py lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: drop Python 2 support
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/__main__.py lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: autoformat
+lib/python/cs/app/myke/make.py: cs.app.myke.make: clean some lint
+lib/python/cs/app/myke/make.py: cs.app.myke.make: fix spelling error in message
+lib/python/cs/app/myke/__init__.py: cs.app.myke.__init__: add docstring
+lib/python/cs/app/myke/__main__.py: cs.app.myke.__main__: lint
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: improve tracing of macro modifiers
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: clean lint, tweak docstrings and message text
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: Modifier: shorten __str__
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: trace calls to Macro.__call__
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: streamline logic
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: lint
+lib/python/cs/app/myke/parse.py: cs.app.mykeparse: parseMacro: use cs.deco.strable to handle str value for `context`
+lib/python/cs/app/myke/__init__.py lib/python/cs/app/myke/make.py: sweeping removal of cs.obj.O, universally supplanted by types.SimpleNamespace
+lib/python/cs/app/myke/make.py: further cs.obj.O and related _O_* removal
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker.makefiles: better computation of $MYKERC environment variable name
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker.startup: cease writing the annoying myke.log log file
+lib/python/cs/app/myke/__main__.py: cs.app.myke.__main__: drop spurious stderr flush
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: move parseMacroExpression into MacroExpression class as class method
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: autoformat
+lib/python/cs/app/myke/__main__.py lib/python/cs/app/myke/parse.py: cs.app.myke: move parseMacroAssignment into Macro as factory method, adjust callers
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: fix spelling of MacroExpression
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: parseMakefile: :include: get the filename from fp
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: move parseMakefile into Maker
+lib/python/cs/app/myke/parse.py: cs.*: fix spelling of "parameter"
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker.parse: bugfix for syntax check at end of string
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: startup/shutdown: open/close the Later
+lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py: cs.app.myke: reduce debugging pfx noise
+lib/python/cs/app/myke/__main__.py: cs.app.myke.__main__: refactor based on cs.cmdutils.BaseCommand, use a Maker as the options object
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: minor modernisation
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: drop getopt, now done in cs.app.myke.__main__.MykeCommand, some other minor changes
+lib/python/cs/app/myke/__init__.py: cs.app.myke: new DEFAULT_MAKE_COMMAND = 'myke'
+lib/python/cs/app/myke/__main__.py: cs.app.myke.__main__: MykeCommand: set OPTIONS_CLASS = Maker directly, set .makecmd=self.cmd in run_context
+lib/python/cs/app/myke/__main__.py: cs.app.myke: MykeCommand.main: default targets from M.default_target, not M.default_target.name - already supported, and aids the long term shift to working from Tagets instead of names where reasonable
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker now subclasses BaseCommandOptions, make all init parameters optional, cleaner setup via super
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker.namespaces: insert MAKE= here instead of during __init__, supports the late setup of self.makecmd
+lib/python/cs/app/myke/make.py: cs.app.myke.make: add missing import
+lib/python/cs/app/myke/make.py: cs.app.myke.make: autoformat
+lib/python/cs/app/myke/__main__.py lib/python/cs/app/myke/parse.py: cs.app.myke: autoformat
+lib/python/cs/app/myke/__main__.py: cs.app.myke.__main__: clean some lint
+lib/python/cs/app/myke/make.py: cs.result: Result: pull ResultState values into Result as class attributes, access via self - this allows the Task subclass to override the state values, since it will have more states
+lib/python/cs/app/myke/make.py: cs.app.myke.make: drop unused import
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker.make: improve Pfx context
+lib/python/cs/app/myke/make.py: cs.app.myke.amke: Target.require: adjust Result state check
+lib/python/cs/app/myke/make.py: cs.app.myke.make: minimal changes for recent Result FSM related changes
+lib/python/cs/app/myke/parse.py: cs.app.myke.parse: ModGlob.modify: sort the globbed results, I've finally become weak and relied on ordered glob results
+lib/python/cs/app/myke/__init__.py: cs.app.myke: update DISTINFO

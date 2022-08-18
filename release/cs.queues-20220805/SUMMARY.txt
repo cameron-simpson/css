@@ -1,0 +1,1 @@
+ListQueue: add "append" synonym for "put" in keeping with the list-ish flavour.

@@ -7,65 +7,68 @@
 r'''
 Result and friends: various subclassable classes for deferred delivery of values.
 
-A Result is the base class for several callable subclasses
+A `Result` is the base class for several callable subclasses
 which will receive values at a later point in time,
 and can also be used standalone without subclassing.
 
-A call to a Result will block until the value is received or the Result is cancelled,
+A call to a `Result` will block until the value is received or the `Result` is cancelled,
 which will raise an exception in the caller.
-A Result may be called by multiple users, before or after the value has been delivered;
+A `Result` may be called by multiple users, before or after the value has been delivered;
 if the value has been delivered the caller returns with it immediately.
-A Result's state may be inspected (pending, running, ready, cancelled).
-Callbacks can be registered via a Result's .notify method.
+A `Result`'s state may be inspected (pending, running, ready, cancelled).
+Callbacks can be registered via a `Result`'s .notify method.
 
-An incomplete Result can be told to call a function to compute its value;
+An incomplete `Result` can be told to call a function to compute its value;
 the function return will be stored as the value unless the function raises an exception,
 in which case the exception information is recorded instead.
-If an exception occurred, it will be reraised for any caller of the Result.
+If an exception occurred, it will be reraised for any caller of the `Result`.
 
-Trite example::
+Trite example:
 
-  R = Result(name="my demo")
+    R = Result(name="my demo")
 
-  Thread 1:
+Thread 1:
+
     # this blocks until the Result is ready
     value = R()
     print(value)
     # prints 3 once Thread 2 (below) assigns to it
 
-  Thread 2:
+Thread 2:
+
     R.result = 3
 
-  Thread 3:
+Thread 3:
+
     value = R()
     # returns immediately with 3
 
-You can also collect multiple Results in completion order using the report() function::
+You can also collect multiple `Result`s in completion order using the `report()` function:
 
-  Rs = [ ... list of Results of whatever type ... ]
-  ...
-  for R in report(Rs):
-    x = R()     # collect result, will return immediately because
-                # the Result is complete
-    print(x)    # print result
+    Rs = [ ... list of Results of whatever type ... ]
+    ...
+    for R in report(Rs):
+        x = R()     # collect result, will return immediately because
+                    # the Result is complete
+        print(x)    # print result
 '''
 
-try:
-  from enum import Enum
-except ImportError:
-  from enum34 import Enum  # type: ignore
 import sys
 from threading import Lock, RLock
+
 from icontract import require
-from cs.logutils import exception, error, warning, debug
+
+from cs.deco import OBSOLETE
+from cs.fsm import FSM
+from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import pfx_method
 from cs.py.func import funcname
 from cs.py3 import Queue, raise3, StringTypes
-from cs.seq import seq
+from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20210420-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -75,7 +78,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.logutils',
+        'cs.deco',
+        'cs.fsm',
+        'cs.gimmicks',
         'cs.mappings',
         'cs.pfx',
         'cs.py.func',
@@ -86,19 +91,8 @@ DISTINFO = {
     ],
 }
 
-class ResultState(Enum):
-  ''' State tokens for `Result`s.
-  '''
-  pending = 'pending'
-  running = 'running'
-  ready = 'ready'
-  cancelled = 'cancelled'
-
-# compatability name
-AsynchState = ResultState
-
 class CancellationError(Exception):
-  ''' Raised when accessing result or exc_info after cancellation.
+  ''' Raised when accessing `result` or `exc_info` after cancellation.
   '''
 
   def __init__(self, msg=None):
@@ -109,49 +103,77 @@ class CancellationError(Exception):
     Exception.__init__(self, msg)
 
 # pylint: disable=too-many-instance-attributes
-class Result(object):
-  ''' Basic class for asynchronous collection of a result.
-      This is also used to make `OnDemandFunction`s, `LateFunction`s and other
-      objects with asynchronous termination.
+class Result(FSM):
+  ''' Base class for asynchronous collection of a result.
+      This is used to make `Result`, `OnDemandFunction`s, `LateFunction`s
+      and other objects with asynchronous termination.
+
+      In addition to the methods below, for each state value such
+      as `self.PENDING` there is a corresponding attribute `is_pending`
+      testing whether the `Result` is in that state.
   '''
 
-  def __init__(self, name=None, lock=None, result=None, extra=None):
+  _seq = Seq()
+
+  FSM_TRANSITIONS = {
+      'PREPARE': {
+          'prepared': 'PENDING',
+      },
+      'PENDING': {
+          'dispatch': 'RUNNING',
+          'cancel': 'CANCELLED',
+          'complete': 'DONE',
+      },
+      'RUNNING': {
+          'cancel': 'CANCELLED',
+          'complete': 'DONE',
+      },
+      'CANCELLED': {},
+      'DONE': {},
+  }
+
+  # pylint: disable=too-many-arguments
+  def __init__(
+      self, name=None, lock=None, result=None, state=None, extra=None
+  ):
     ''' Base initialiser for `Result` objects and subclasses.
 
         Parameter:
         * `name`: optional parameter naming this object.
         * `lock`: optional locking object, defaults to a new `threading.Lock`.
         * `result`: if not `None`, prefill the `.result` property.
-        * `extra`: a mapping of extra information to associate with the `Result`,
-          useful to provide context when collecting the result;
-          the `Result` has a public attribute `.extra`
-          which is an `AttrableMapping` to hold this information.
+        * `extra`: an optional mapping of extra information to
+          associate with the `Result`, useful to provide context
+          when collecting the result; the `Result` has a public
+          attribute `.extra` which is an `AttrableMapping` to hold
+          this information.
     '''
     if lock is None:
       lock = RLock()
     if name is None:
-      name = "%s-%d" % (type(self).__name__, seq())
+      name = "%s-%d" % (type(self).__name__, next(self._seq))
+    if state is None:
+      state = self.PENDING
     self.name = name
     self.extra = AttrableMapping()
     if extra:
       self.extra.update(extra)
-    self.state = ResultState.pending
-    self.notifiers = []
+    FSM.__init__(self, state, lock=lock)
     self.collected = False
     self._get_lock = Lock()
-    self._get_lock.acquire()
+    self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._lock = lock
     if result is not None:
       self.result = result
 
   def __str__(self):
-    return "%s[%r:%s]" % (type(self).__name__, self.name, self.state)
+    return "%s[%r:%s]" % (type(self).__name__, self.name, self.fsm_state)
 
   __repr__ = __str__
 
   def __del__(self):
     if not self.collected:
-      if self.ready:
+      if self.is_done:
         exc_info = self.exc_info
         if exc_info:
           raise RuntimeError("UNREPORTED EXCEPTION: %r" % (exc_info,))
@@ -163,51 +185,54 @@ class Result(object):
     return self is other
 
   @property
+  @OBSOLETE("fsm_state")
+  def state(self):
+    ''' The `FSM` state (obsolete).
+        Obsolete: use `.fsm_state`.
+    '''
+    return self.fsm_state
+
+  @property
   def ready(self):
-    ''' Whether the Result state is ready or cancelled.
+    ''' True if `Result` state is `DONE` or `CANCLLED`..
     '''
-    return self.state in (ResultState.ready, ResultState.cancelled)
+    return self.fsm_state in (self.DONE, self.CANCELLED)
 
   @property
+  @OBSOLETE("is_cancelled")
   def cancelled(self):
-    ''' Test whether this Result has been cancelled.
+    ''' Test whether this `Result` has been cancelled.
+        Obsolete: use `.is_cancelled`.
     '''
-    return self.state == ResultState.cancelled
+    return self.fsm_state == self.CANCELLED
 
   @property
+  @OBSOLETE("is_pending")
   def pending(self):
-    ''' Whether the Result is pending.
+    ''' Whether the `Result` is pending.
+        Obsolete: use `.is_pending`.
     '''
-    return self.state == ResultState.pending
+    return self.fsm_state == self.PENDING
 
   def empty(self):
-    ''' Analogue to Queue.empty().
+    ''' Analogue to `Queue.empty()`.
     '''
     return not self.ready
 
   def cancel(self):
     ''' Cancel this function.
-        If self.state is pending or cancelled, return True.
-        Otherwise return False (too late to cancel).
+        If `self.fsm_state` is `PENDING`` or `'CANCELLED'`, return `True`.
+        Otherwise return `False` (too late to cancel).
     '''
     with self._lock:
-      state = self.state
-      if state == ResultState.cancelled:
+      state = self.fsm_state
+      if state == self.CANCELLED:
         # already cancelled - this is ok, no call to ._complete
         return True
-      if state == ResultState.ready:
+      if state == self.DONE:
         # completed - "fail" the cancel, no call to ._complete
         return False
-      if state in (ResultState.running, ResultState.pending):
-        # in progress or not commenced - change state to cancelled and fall through to ._complete
-        self.state = ResultState.cancelled
-      else:
-        # state error
-        raise RuntimeError(
-            "<%s>.state not one of (pending, cancelled, running, ready): %r" %
-            (self, state)
-        )
-      self._complete(None, None)
+      self.fsm_event('cancel')
     return True
 
   @property
@@ -215,49 +240,46 @@ class Result(object):
     ''' The result.
         This property is not available before completion.
     '''
-    state = self.state
-    if state == ResultState.cancelled:
-      self.collected = True
+    state = self.fsm_state
+    if state not in (self.CANCELLED, self.DONE):
+      raise AttributeError("%s not ready: no .result attribute" % (self,))
+    self.collected = True
+    if state == self.CANCELLED:
       raise CancellationError()
-    if state == ResultState.ready:
-      self.collected = True
-      return self._result
-    raise AttributeError("%s not ready: no .result attribute" % (self,))
+    return self._result
 
   @result.setter
   def result(self, new_result):
-    ''' Set the .result attribute, completing the Result.
+    ''' Set the `.result` attribute, completing the `Result`.
     '''
-    with self._lock:
-      self._complete(new_result, None)
+    self._complete(new_result, None)
 
   def put(self, value):
-    ''' Store the value. Queue-like idiom.
+    ''' Store the value. `Queue`-like idiom.
     '''
     self.result = value
 
   @property
   def exc_info(self):
-    ''' The exception information from a completed Result.
+    ''' The exception information from a completed `Result`.
         This is not available before completion.
     '''
-    state = self.state
-    if state == ResultState.cancelled:
+    state = self.fsm_state
+    if state not in (self.CANCELLED, self.DONE):
+      raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
+    self.collected = True
+    if state == self.CANCELLED:
       self.collected = True
       raise CancellationError()
-    if state == ResultState.ready:
-      self.collected = True
-      return self._exc_info
-    raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
+    return self._exc_info
 
   @exc_info.setter
   def exc_info(self, exc_info):
-    with self._lock:
-      self._complete(None, exc_info)
+    self._complete(None, exc_info)
 
   def raise_(self, exc=None):
     ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
-        If `exc` is omitted or `None`, use `sys.exc_info()`.
+        If `exc` is omitted or `None`, uses `sys.exc_info()`.
     '''
     if exc is None:
       self.exc_info = sys.exc_info()
@@ -267,13 +289,12 @@ class Result(object):
       except:  # pylint: disable=bare-except
         self.exc_info = sys.exc_info()
 
-  @require(lambda self: self.state == ResultState.pending)
-  def call(self, func, *a, **kw):
-    ''' Have the `Result` call `func(*a,**kw)` and store its return value as
+  def run_func(self, func, *a, **kw):
+    ''' Have the `Result` run `func(*a,**kw)` and store its return value as
         `self.result`.
         If `func` raises an exception, store it as `self.exc_info`.
     '''
-    self.state = ResultState.running
+    self.fsm_event('dispatch')
     try:
       r = func(*a, **kw)
     except BaseException:
@@ -285,145 +306,116 @@ class Result(object):
       self.result = r
 
   def bg(self, func, *a, **kw):
-    ''' Submit a function to compute the result in a separate `Thread`;
+    ''' Submit a function to compute the result in a separate `Thread`,
         returning the `Thread`.
 
-        This dispatches a `Thread` to run `self.call(func,*a,**kw)`
+        This dispatches a `Thread` to run `self.run_func(func,*a,**kw)`
         and as such the `Result` must be in "pending" state,
         and transitions to "running".
     '''
     return bg_thread(
-        self.call, name=self.name, args=[func] + list(a), kwargs=kw
+        self.run_func, name=self.name, args=[func] + list(a), kwargs=kw
     )
 
   @require(
-      lambda self: self.state in
-      (ResultState.pending, ResultState.running, ResultState.cancelled)
+      lambda self: self.fsm_state in
+      (self.PENDING, self.RUNNING, self.CANCELLED)
   )
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
-        Expect to be called _inside_ self._lock.
+        Expect to be called _inside_ `self._lock`.
     '''
     if result is not None and exc_info is not None:
       raise ValueError(
           "one of (result, exc_info) must be None, got (%r, %r)" %
           (result, exc_info)
       )
-    state = self.state
-    if state in (ResultState.cancelled, ResultState.running,
-                 ResultState.pending):
-      self._result = result
-      self._exc_info = exc_info
-      if state != ResultState.cancelled:
-        self.state = ResultState.ready
-    else:
-      if state == ResultState.ready:
+    with self._lock:
+      state = self.fsm_state
+      if state in (self.PENDING, self.RUNNING, self.CANCELLED):
+        self._result = result  # pylint: disable=attribute-defined-outside-init
+        self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+        if state != self.CANCELLED:
+          self.fsm_event('complete')
+      elif state == self.DONE:
         warning(
-            "<%s>.state is ResultState.ready, ignoring result=%r, exc_info=%r",
-            self, result, exc_info
-        )
-        raise RuntimeError(
-            "REPEATED _COMPLETE of %s: result=%r, exc_info=%r" %
-            (self, result, exc_info)
-        )
-      raise RuntimeError(
-          "<%s>.state is not one of (cancelled, running, pending, ready): %r" %
-          (self, state)
-      )
-    self._get_lock.release()
-    notifiers = self.notifiers
-    del self.notifiers
-    for notifier in notifiers:
-      debug("%s._complete: notify via %r", self, notifier)
-      try:
-        notifier(self)
-      except Exception as e:  # pylint: disable=broad-except
-        exception(
-            "%s._complete: calling notifier %s: exc=%s", self, notifier, e
+            "<%s>: state is %s, ignoring result=%r, exc_info=%r",
+            self,
+            self.fsm_state,
+            result,
+            exc_info,
         )
       else:
-        self.collected = True
+        raise RuntimeError(
+            "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE)"
+            % (self, self.fsm_state)
+        )
+      self._get_lock.release()
 
   @pfx_method
   def join(self):
-    ''' Calling the .join() method waits for the function to run to
-        completion and returns a tuple as for the WorkerThreadPool's
-        .dispatch() return queue, a tuple of:
-          result, exc_info
-        On completion the sequence:
-          result, None
-        is returned.
-        If an exception occurred computing the result the sequence:
-          None, exc_info
-        is returned where exc_info is a tuple of (exc_type, exc_value, exc_traceback).
-        If the function was cancelled the sequence:
-          None, None
+    ''' Calling the `.join()` method waits for the function to run to
+        completion and returns a tuple as for the `WorkerThreadPool`'s
+        `.dispatch()` return queue, a tuple of `(result,exc_info)`.
+
+        On completion the sequence `(result,None)` is returned.
+        If an exception occurred computing the result the sequence
+        `(None,exc_info)` is returned
+        where `exc_info` is a tuple of `(exc_type,exc_value,exc_traceback)`.
+        If the function was cancelled the sequence `(None,None)`
         is returned.
     '''
-    self._get_lock.acquire()
+    self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._get_lock.release()
     return self.result, self.exc_info
 
   def get(self, default=None):
-    ''' Wait for readiness; return the result if exc_info is None, otherwise `default`.
+    ''' Wait for readiness; return the result if `self.exc_info` is `None`,
+        otherwise `default`.
     '''
     result, exc_info = self.join()
-    if not self.cancelled and exc_info is None:
+    if not self.is_cancelled and exc_info is None:
       return result
     return default
 
   def __call__(self, *a, **kw):
-    ''' Call the result: wait for it to be ready and then return or raise.
+    ''' Call the `Result`: wait for it to be ready and then return or raise.
 
         You can optionally supply a callable and arguments,
         in which case `callable(*args,**kwargs)` will be called
-        via `Result.call` and the results applied to this Result.
+        via `Result.call` and the results applied to this `Result`.
     '''
     if a:
-      if not self.pending:
-        raise RuntimeError("calling complete %s" % (type(self).__name__,))
-      self.call(*a, **kw)
-    result, exc_info = self.join()
-    if self.cancelled:
+      self.run_func(*a, **kw)
+    if self.is_cancelled:
       raise CancellationError(self)
+    result, exc_info = self.join()
     if exc_info:
       raise3(*exc_info)
     return result
 
   def notify(self, notifier):
-    ''' After the function completes, run notifier(self).
+    ''' After the function completes, call `notifier(self)`.
 
         If the function has already completed this will happen immediately.
-        Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
-    '''
-    with self._lock:
-      if not self.ready:
-        self.notifiers.append(notifier)
-        notifier = None
-    if notifier is not None:
-      notifier(self)
-      self.collected = True
-
-  def with_result(self, submitter, prefix=None):
-    ''' On completion without an exception, call `submitter(self.result)` or report exception.
+        example: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
 
-    def notifier(R):
-      ''' Wrapper for `submitter`.
+    # TODO: adjust all users of .notify() to use fsm_callback and
+    # accept a transition object?
+    # pylint: disable=unused-argument
+    def callback(fsm, fsm_transition):
+      ''' `FSM.fsm_callback` shim for plain `notify(Result)` notifier functions.
       '''
-      exc_info = R.exc_info
-      if exc_info is None:
-        return submitter(R.result)
-      # report error
-      if prefix:
-        with Pfx(prefix):
-          error("exception: %r", exc_info)
-      else:
-        error("exception: %r", exc_info)
-      return None
+      self.collected = True
+      return notifier(fsm)
 
-    self.notify(notifier)
+    with self._lock:
+      self.fsm_callback('CANCELLED', callback)
+      self.fsm_callback('DONE', callback)
+      if self.fsm_state in (self.CANCELLED, self.DONE):
+        notifier(self)
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
@@ -457,7 +449,7 @@ def report(LFs):
     yield Q.get()
 
 class ResultSet(set):
-  ''' A `set` if `Result`s,
+  ''' A `set` subclass containing `Result`s,
       on which one may iterate as `Result`s complete.
   '''
 
@@ -499,7 +491,7 @@ def after(Rs, R, func, *a, **kw):
   Rs = list(Rs)
   count = len(Rs)
   if count == 0:
-    R.call(func, *a, **kw)
+    R.run_func(func, *a, **kw)
   else:
     countery = [
         count
@@ -515,7 +507,7 @@ def after(Rs, R, func, *a, **kw):
         # not ready yet
         return
       if count == 0:
-        R.call(func, *a, **kw)
+        R.run_func(func, *a, **kw)
       else:
         raise RuntimeError("count < 0: %d" % (count,))
 
@@ -549,8 +541,8 @@ class OnDemandResult(Result):
           (self, a, kw)
       )
     with self._lock:
-      if self.state == ResultState.pending:
-        self.call(self.func, *self.fargs, **self.fkwargs)
+      if self.state == self.PENDING:
+        self.run_func(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()
 
 OnDemandFunction = OnDemandResult

@@ -1,0 +1,2 @@
+New TaggedPath.infer_tags() method to compute and return the inferred TagSet.
+New "fstags infer pathname" command.

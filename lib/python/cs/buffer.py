@@ -126,7 +126,7 @@ class CornuCopyBuffer(object):
         * `offset`: the current byte offset of the iterator; this
           is used during the buffer initialisation to compute
           `input_data_displacement`, the difference between the
-          buffer's logical offset and the input data's logical offset;
+          buffer's logical offset and the input data iterable's logical offset;
           if unavailable during initialisation this is presumed to
           be `0`.
         * `end_offset`: the end offset of the iterator if known.
@@ -953,7 +953,7 @@ class _BoundedBufferIterator(object):
     if limit <= 0:
       if limit < 0:
         raise RuntimeError("limit:%d < 0" % (limit,))
-      raise StopIteration
+      raise StopIteration("limit reached")
     # post: limit > 0
     buf = next(bfr)
     # post: bfr.buf now empty, can be modified

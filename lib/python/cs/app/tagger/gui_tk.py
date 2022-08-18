@@ -12,6 +12,7 @@ from os.path import (
     expanduser,
 )
 import platform
+import sys
 from time import sleep
 import tkinter as tk
 from tkinter import ttk
@@ -26,16 +27,28 @@ from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import pfx, pfx_method, pfx_call
+from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState
 from cs.tagset import Tag, TagSet
 
 from cs.lex import r
 from cs.x import X
 
+from . import Tagger
 from .util import pngfor
 
 is_darwin = platform.system() == "Darwin"
+
+def main(argv=None):
+  ''' Tagger GUI command line mode.
+  '''
+  if argv is None:
+    argv = sys.argv
+  cmd = argv.pop(0)
+  tagger = Tagger('.')
+  with Pfx(cmd):
+    with TaggerGUI(tagger, argv) as gui:
+      gui.run()
 
 _app = None
 
@@ -937,7 +950,6 @@ class PathView(LabelFrame):
     print("SET fspath =", repr(new_fspath))
     self._fspath = new_fspath
     self._tag_widgets = {}
-    self.config(text=shortpath(new_fspath) or "NONE")
     self.preview.fspath = new_fspath
     tagged = self.tagged
     all_tags = TagSet(tagged.merged_tags())
@@ -949,6 +961,7 @@ class PathView(LabelFrame):
         tagged, lambda tag: suggested_tags.get(tag.name), bg_tags=all_tags
     )
     print("tag suggestions =", repr(self.suggested_tags))
+    self.config(text=shortpath(new_fspath) or "NONE")
 
   @property
   def suggested_tags(self):
@@ -998,7 +1011,7 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
     self.fspaths = fspaths
 
   def set_fspaths(self, new_fspaths):
-    ''' Update the list of fielsystem paths.
+    ''' Update the list of filesystem paths.
     '''
     display_paths = super().set_fspaths(new_fspaths)
     for child in list(self.grid_slaves()):
@@ -1023,4 +1036,7 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
   def show_fspath(self, fspath):
     ''' TODO: bring to correspnding thumbnail into view.
     '''
-    warning("UNIMPLEMENTED")
+    warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

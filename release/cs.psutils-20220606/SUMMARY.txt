@@ -1,0 +1,3 @@
+run: fold in the superior run() from cs.ebooks.
+pipefrom,pipeto: replace trace= with quiet= like run().
+print_argv: add an `end` parameter (used by pipefrom).

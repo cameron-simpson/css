@@ -14,6 +14,7 @@ import json
 import os.path
 from os.path import join as joinpath, isdir as isdirpath
 import re
+import shlex
 from threading import Lock
 from types import SimpleNamespace as NS
 
@@ -28,6 +29,7 @@ from cs.fstags import HasFSTagsMixin
 from cs.logutils import info, warning, error
 from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx, pfx, pfx_method
+from cs.psutils import print_argv
 from cs.py.func import prop
 from cs.tagset import Tag
 
@@ -271,6 +273,7 @@ class _Recording(ABC, HasFSTagsMixin):
       self,
       dstpath,
       *,
+      doit=True,
       dstfmt=None,
       max_n=None,
       timespans=(),
@@ -280,6 +283,7 @@ class _Recording(ABC, HasFSTagsMixin):
   ):
     ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
     '''
+    fstags = self.fstags
     if dstfmt is None:
       dstfmt = DEFAULT_MEDIAFILE_FORMAT
     if use_data:
@@ -326,11 +330,14 @@ class _Recording(ABC, HasFSTagsMixin):
               "can't infer output format from dstpath, no extension"
           )
         dstfmt = ext[1:]
-      fstags = self.fstags
-      with fstags:
-        metatags = list(self.metadata.as_tags(prefix='beyonwiz'))
-        fstags[dstpath].update(metatags)
-        fstags.sync()
+      if doit:
+        with fstags:
+          metatags = list(self.metadata.as_tags(prefix='beyonwiz'))
+          fstags[dstpath].update(metatags)
+          fstags.sync()
+    if not doit:
+      print(srcpath)
+      print("  =>", dstpath)
     # compute the metadata for the output format
     # which may be passed with the input arguments
     M = self.metadata
@@ -376,8 +383,11 @@ class _Recording(ABC, HasFSTagsMixin):
     )
     if overwrite:
       ff = ff.overwrite_output()
-    print('ffmpeg', *map(repr, ff.get_args()))
-    ff.run()
+    if doit:
+      print_argv('ffmpeg', *ff.get_args())
+      ff.run()
+    else:
+      print_argv('ffmpeg', *ff.get_args(), fold=True)
     return ok
 
   def ffmpeg_metadata(self, dstfmt=None):

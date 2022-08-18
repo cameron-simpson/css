@@ -1,0 +1,2 @@
+New QUIET log level between TRACK and STATUS, add new quiet() logging call.
+PfxFormatter.patch_formatter: bugfix handling of record.msg,record.args.
