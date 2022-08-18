@@ -400,7 +400,7 @@ class BinaryHashCodeIndex(Mapping, HashCodeUtilsMixin, MultiOpenMixin):
     self.binary_index[hashcode] = bytes(index_entry)
 
 @pfx_method
-def VTDStore(name, path, *, hashclass, preferred_indexclass=None):
+def VTDStore(name, path, *, hashclass, index=None, preferred_indexclass=None):
   ''' Factory to return a `MappingStore` using a `BackingFile`
       using a single `.vtd` file.
   '''
@@ -412,16 +412,17 @@ def VTDStore(name, path, *, hashclass, preferred_indexclass=None):
     if not isfilepath(path):
       raise ValueError("missing path %r" % (path,))
     pathbase, _ = splitext(path)
-    index_basepath = f"{pathbase}-index-{hashclass.HASHNAME}"
-    indexclass = choose_indexclass(
-        index_basepath, preferred_indexclass=preferred_indexclass
-    )
-    binary_index = indexclass(index_basepath)
-    index = BinaryHashCodeIndex(
-        hashclass=hashclass,
-        binary_index=binary_index,
-        index_entry_class=BackingFileIndexEntry
-    )
+    if index is None:
+      index_basepath = f"{pathbase}-index-{hashclass.HASHNAME}"
+      indexclass = choose_indexclass(
+          index_basepath, preferred_indexclass=preferred_indexclass
+      )
+      binary_index = indexclass(index_basepath)
+      index = BinaryHashCodeIndex(
+          hashclass=hashclass,
+          binary_index=binary_index,
+          index_entry_class=BackingFileIndexEntry
+      )
     return MappingStore(
         name,
         CompressibleBackingFile(path, hashclass=hashclass, index=index),
