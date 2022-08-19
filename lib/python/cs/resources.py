@@ -486,11 +486,12 @@ class RunState(ContextManagerMixin):
         to be called whenever `.cancel` is called.
   '''
 
-  def __init__(self, name=None, signals=None):
+  def __init__(self, name=None, signals=None, handle_signal=None):
     self.name = name
     self._started_from = None
     self._signals = tuple(signals) if signals else ()
     self._sigstack = None
+    self._sighandler = handle_signal or self.handle_signal
     # core state
     self._running = False
     self.cancelled = False
@@ -527,7 +528,8 @@ class RunState(ContextManagerMixin):
         * cancel on exception during run
         * stop
     '''
-    with self.catch_signal(self._signals, call_previous=False) as sigstack:
+    with self.catch_signal(self._signals, call_previous=False,
+                           handle_signal=self._sighandler) as sigstack:
       with stackattrs(self, _sigstack=sigstack):
         self.start(running_ok=True)
         try:
@@ -649,7 +651,13 @@ class RunState(ContextManagerMixin):
     return max(0, stop_time - start_time)
 
   @contextmanager
-  def catch_signal(self, sig, call_previous=False, verbose=False):
+  def catch_signal(
+      self,
+      sig,
+      call_previous=False,
+      verbose=False,
+      handle_signal=None,
+  ):
     ''' Context manager to catch the signal or signals `sig` and
         cancel this `RunState`.
         Restores the previous handlers on exit.
@@ -662,20 +670,21 @@ class RunState(ContextManagerMixin):
         * `verbose`: if true (default `False`),
           issue a `warning` on receipt of a signal
     '''
-
-    def handler(sig, _):
-      ''' `RunState` signal handler: cancel the run state.
-          Warn if `verbose`.
-      '''
-      # pylint: disable=expression-not-assigned
-      verbose and warning("%s: received signal %s, cancelling", self, sig)
-      self.cancel()
-
+    if handle_signal is None:
+      handle_signal = self.handle_signal
     sigs = (sig,) if isinstance(sig, int) else sig
-    sig_hnds = map(lambda signum: (signum, handler), sigs)
+    sig_hnds = map(lambda signum: (signum, handle_signal), sigs)
     with signal_handlers(sig_hnds,
                          call_previous=call_previous) as old_handler_map:
       yield old_handler_map
+
+  def handle_signal(self, sig, _):
+    ''' `RunState` signal handler: cancel the run state.
+        Warn if `verbose`.
+      '''
+    # pylint: disable=expression-not-assigned
+    warning("%s: received signal %s, cancelling", self, sig)
+    self.cancel()
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
