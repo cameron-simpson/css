@@ -1019,9 +1019,10 @@ class BaseCommand:
         runstate = options.runstate
       except AttributeError:
         runstate = options.runstate = RunState(
-            self.cmd, signals=options.runstate_signals
+            self.cmd,
+            signals=options.runstate_signals,
+            handle_signal=getattr(self, 'handle_signal', None),
         )
-      runstate = getattr(options, 'runstate', RunState(self.cmd))
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with upd_context:
