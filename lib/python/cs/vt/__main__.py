@@ -296,7 +296,7 @@ class VTCmd(BaseCommand):
         dump_debug_threads()
 
   def cmd_benchmark(self, argv):
-    ''' Usage: {cmd} mode [args...] < data
+    ''' Usage: {cmd} mode [args...] [<data]
           Modes:
             blocked_chunks  Scan the data into edge aligned chunks without a parser.
             blocked_chunks2 Scan the data into edge aligned chunks without a parser.
