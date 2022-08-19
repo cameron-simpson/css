@@ -198,6 +198,19 @@ class VTCmd(BaseCommand):
       logTo(options.dflt_log, delay=True)
     options.config = Config(options.config_path)
 
+  def handle_signal(self, sig, frame):
+    ''' Override `BaseCommand.handle_signal`:
+        - do a threaddump for `SIGQUIT`
+        - run the default `handle_signal` method
+        - exit the programme immediately if `SIGQUIT`
+    '''
+    if sig == SIGQUIT:
+      thread_dump()
+    # call the standard RunState signal handler
+    self.options.runstate.handle_signal(sig, frame)
+    if sig == SIGQUIT:
+      sys.exit(1)
+
   @contextmanager
   def run_context(self):
     ''' Set up and tear down the surrounding context.
@@ -207,18 +220,6 @@ class VTCmd(BaseCommand):
     config = options.config
     runstate = options.runstate
     show_progress = options.show_progress
-
-    # catch signals, flag termination
-    def sig_handler(sig, frame):
-      ''' Signal handler
-      '''
-      warning("received signal %s from %s", sig, frame)
-      if sig == SIGQUIT:
-        thread_dump()
-      runstate.cancel()
-      if sig == SIGQUIT:
-        sys.exit(1)
-
     old_sighup = signal(SIGHUP, sig_handler)
     old_sigint = signal(SIGINT, sig_handler)
     old_sigquit = signal(SIGQUIT, sig_handler)
