@@ -39,7 +39,7 @@ import cs.logutils
 from cs.logutils import (
     exception, error, warning, track, info, upd, debug, logTo
 )
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
@@ -312,17 +312,15 @@ class VTCmd(BaseCommand):
     if not argv:
       raise GetoptError("missing mode")
     mode = argv.pop(0)
-    if os.isatty(0):
+    data_fd = 0
+    if os.isatty(data_fd):
       warning("reading data from %s", RANDOM_DEV)
-      inbfr = CornuCopyBuffer.from_fd(
-          os.open(RANDOM_DEV, os.O_RDONLY), readsize=1024 * 1024
-      )
-    else:
-      inbfr = CornuCopyBuffer.from_fd(0, readsize=1024 * 1024)
+      data_fd = pfx_call(os.open, RANDOM_DEV, os.O_RDONLY)
+    inbfr = CornuCopyBuffer.from_fd(data_fd, readsize=1024 * 1024)
     try:
-      S = os.fstat(0)
+      S = os.fstat(data_fd)
     except OSError as e:
-      warning("fstat(0): %s", e)
+      warning("fstat(%d): %s", data_fd, e)
       length = None
     else:
       length = S.st_size or None
