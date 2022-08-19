@@ -541,7 +541,7 @@ class OnDemandResult(Result):
           (self, a, kw)
       )
     with self._lock:
-      if self.state == self.PENDING:
+      if self.is_pending:
         self.run_func(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()
 
