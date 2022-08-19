@@ -215,87 +215,83 @@ class VTCmd(BaseCommand):
   def run_context(self):
     ''' Set up and tear down the surrounding context.
     '''
-    options = self.options
-    cmd = self.cmd
-    config = options.config
-    runstate = options.runstate
-    show_progress = options.show_progress
-    old_sighup = signal(SIGHUP, sig_handler)
-    old_sigint = signal(SIGINT, sig_handler)
-    old_sigquit = signal(SIGQUIT, sig_handler)
-    with stackattrs(common, runstate=runstate, config=config):
-      # redo these because defaults is already initialised
-      with stackattrs(defaults, runstate=runstate,
-                      show_progress=show_progress):
-        if cmd in ("config", "dump", "init", "profile", "scan", "test"):
-          yield
-        else:
-          # open the default Store
-          if options.store_spec is None:
-            if cmd == "serve":
-              store_spec = '[server]'
-            else:
-              store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
-            options.store_spec = store_spec
-          try:
-            # set up the primary Store using the main programme RunState for control
-            S = Store(options.store_spec, options.config)
-          except (KeyError, ValueError) as e:
-            raise GetoptError(
-                "unusable Store specification: %s: %s" %
-                (options.store_spec, e)
-            )
-          except Exception as e:
-            exception(
-                "UNEXPECTED EXCEPTION: can't open store %r: %s",
-                options.store_spec, e
-            )
-            raise GetoptError(
-                "unusable Store specification: %s" % (options.store_spec,)
-            )
-          if options.cache_store_spec is None:
-            cacheS = None
+    with super().run_context():
+      options = self.options
+      cmd = self.cmd
+      config = options.config
+      runstate = options.runstate
+      show_progress = options.show_progress
+      with stackattrs(common, runstate=runstate, config=config):
+        # redo these because defaults is already initialised
+        with stackattrs(defaults, runstate=runstate,
+                        show_progress=show_progress):
+          if cmd in ("config", "dump", "init", "profile", "scan", "test"):
+            yield
           else:
+            # open the default Store
+            if options.store_spec is None:
+              if cmd == "serve":
+                store_spec = '[server]'
+              else:
+                store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
+              options.store_spec = store_spec
             try:
-              cacheS = Store(options.cache_store_spec, options.config)
+              # set up the primary Store using the main programme RunState for control
+              S = Store(options.store_spec, options.config)
+            except (KeyError, ValueError) as e:
+              raise GetoptError(
+                  "unusable Store specification: %s: %s" %
+                  (options.store_spec, e)
+              )
             except Exception as e:
               exception(
-                  "can't open cache store %r: %s", options.cache_store_spec, e
+                  "UNEXPECTED EXCEPTION: can't open store %r: %s",
+                  options.store_spec, e
               )
               raise GetoptError(
-                  "unusable Store specification: %s" %
-                  (options.cache_store_spec,)
+                  "unusable Store specification: %s" % (options.store_spec,)
               )
+            if options.cache_store_spec is None:
+              cacheS = None
             else:
-              S = ProxyStore(
-                  "%s:%s" % (cacheS.name, S.name),
-                  read=(cacheS,),
-                  read2=(S,),
-                  copy2=(cacheS,),
-                  save=(cacheS, S),
-                  archives=((S, '*'),),
-              )
-              S.config = options.config
-          if show_progress:
-            S = ProgressStore(S)
-            add_bar_cmgr = S.progress_add.bar("ADD")
-            get_bar_cmgr = S.progress_get.bar("GET")
-          else:
-            add_bar_cmgr = nullcontext()
-            get_bar_cmgr = nullcontext()
-          with defaults.common_S(S):
-            with S:
-              with add_bar_cmgr:
-                with get_bar_cmgr:
-                  yield
-          if cacheS:
-            cacheS.backend = None
-    runstate.cancel()
-    signal(SIGHUP, old_sighup)
-    signal(SIGINT, old_sigint)
-    signal(SIGQUIT, old_sigquit)
-    if ifdebug():
-      dump_debug_threads()
+              try:
+                cacheS = Store(options.cache_store_spec, options.config)
+              except Exception as e:
+                exception(
+                    "can't open cache store %r: %s", options.cache_store_spec,
+                    e
+                )
+                raise GetoptError(
+                    "unusable Store specification: %s" %
+                    (options.cache_store_spec,)
+                )
+              else:
+                S = ProxyStore(
+                    "%s:%s" % (cacheS.name, S.name),
+                    read=(cacheS,),
+                    read2=(S,),
+                    copy2=(cacheS,),
+                    save=(cacheS, S),
+                    archives=((S, '*'),),
+                )
+                S.config = options.config
+            if show_progress:
+              S = ProgressStore(S)
+              add_bar_cmgr = S.progress_add.bar("ADD")
+              get_bar_cmgr = S.progress_get.bar("GET")
+            else:
+              add_bar_cmgr = nullcontext()
+              get_bar_cmgr = nullcontext()
+            with defaults.common_S(S):
+              with S:
+                with add_bar_cmgr:
+                  with get_bar_cmgr:
+                    yield
+            if cacheS:
+              cacheS.backend = None
+      runstate.cancel()
+      if ifdebug():
+        dump_debug_threads()
 
   def cmd_benchmark(self, argv):
     ''' Usage: {cmd} mode [args...] < data
