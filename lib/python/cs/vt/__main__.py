@@ -25,7 +25,7 @@ from os.path import (
     isfile as isfilepath,
 )
 import shutil
-from signal import signal, SIGINT, SIGHUP, SIGQUIT
+from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 from stat import S_ISREG
 import sys
 from typeguard import typechecked
@@ -100,6 +100,7 @@ class VTCmd(BaseCommand):
   VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
   DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
+  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
 
   GETOPT_SPEC = 'C:S:f:h:Pqv'
 
