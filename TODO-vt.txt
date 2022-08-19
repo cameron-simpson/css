@@ -1,3 +1,4 @@
+blocked_chunks_of2 seems SLOWER than blocked_chunks_of - check resulting block sizes and counts, and make other checks
 every use of os.mkdir to use needdir
 FilesDir: subclass HasFSPath, adjust uses of .topdirpath et al
 use import_extra for the FUSE stuff
