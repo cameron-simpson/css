@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Command line stuff. - Cameron Simpson <cs@cskk.id.au> 03sep2015
 #
@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
 from os.path import basename
-from signal import SIGINT, SIGTERM
+from signal import SIGHUP, SIGINT, SIGTERM
 import sys
 from types import SimpleNamespace
 from typing import List
@@ -356,6 +356,7 @@ class BaseCommand:
   GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = None
   OPTIONS_CLASS = BaseCommandOptions
+  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGTERM
 
   def __init_subclass__(cls):
     ''' Update subclasses of `BaseCommand`.
@@ -449,7 +450,7 @@ class BaseCommand:
       cmd = basename(argv0)
     self.cmd = cmd
     options = self.options = self.OPTIONS_CLASS()
-    options.runstate_signals = (SIGINT, SIGTERM)
+    options.runstate_signals = self.DEFAULT_SIGNALS
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
