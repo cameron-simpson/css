@@ -78,6 +78,8 @@ from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore, ProgressStore
 from .transcribe import parse
 
+RANDOM_DEV = '/dev/urandom'
+
 def main(argv=None):
   ''' Create a `VTCmd` instance and call its main method.
   '''
@@ -310,7 +312,13 @@ class VTCmd(BaseCommand):
     if not argv:
       raise GetoptError("missing mode")
     mode = argv.pop(0)
-    inbfr = CornuCopyBuffer.from_fd(0, readsize=1024 * 1024)
+    if os.isatty(0):
+      warning("reading data from %s", RANDOM_DEV)
+      inbfr = CornuCopyBuffer.from_fd(
+          os.open(RANDOM_DEV, os.O_RDONLY), readsize=1024 * 1024
+      )
+    else:
+      inbfr = CornuCopyBuffer.from_fd(0, readsize=1024 * 1024)
     try:
       S = os.fstat(0)
     except OSError as e:
