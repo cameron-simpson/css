@@ -241,18 +241,19 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Start the Store.
+    ''' `MultiOpenMixin.startup_shutdown` hook.
     '''
-    runstate = self.runstate
-    L = Later(self._capacity, name=self.name)
-    with L:
-      with stackattrs(self, later=L):
-        with runstate:
-          try:
-            yield
-          finally:
-            self.runstate.cancel()
-            L.wait()
+    with super().startup_shutdown():
+      runstate = self.runstate
+      L = Later(self._capacity, name=self.name)
+      with L:
+        with stackattrs(self, later=L):
+          with runstate:
+            try:
+              yield
+            finally:
+              self.runstate.cancel()
+              L.wait()
 
   #############################
   ## Function dispatch methods.
