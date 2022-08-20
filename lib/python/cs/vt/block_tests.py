@@ -8,6 +8,7 @@
 '''
 
 import sys
+
 sys.setrecursionlimit(10000)
 from random import choice
 import unittest

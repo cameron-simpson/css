@@ -11,6 +11,7 @@ from .hash import HashUtilDict
 from .pushpull import missing_hashcodes, missing_hashcodes_by_checksum
 from cs.x import X
 import cs.x
+
 cs.x.X_via_tty = True
 
 class _TestMissingHashCodes:

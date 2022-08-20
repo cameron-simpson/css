@@ -24,6 +24,7 @@ from .index import (
     indexclass_by_name
 )
 import cs.x
+
 cs.x.X_via_tty = True
 
 MAX_BLOCK_SIZE = 16383

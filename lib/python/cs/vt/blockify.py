@@ -9,6 +9,7 @@
 from heapq import heappush, heappop
 from itertools import chain
 import sys
+
 from cs.buffer import CornuCopyBuffer
 from cs.deco import fmtdoc
 from cs.logutils import warning, exception
@@ -16,6 +17,7 @@ from cs.pfx import Pfx, pfx
 from cs.queues import IterableQueue
 from cs.seq import tee
 from cs.threads import bg as bg_thread
+
 from . import defaults
 from .block import Block, IndirectBlock
 from .scan import scan, scanbuf, MIN_BLOCKSIZE, MAX_BLOCKSIZE
