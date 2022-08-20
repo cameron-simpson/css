@@ -267,12 +267,11 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     self.open()
 
-    def with_self():
+    def closing_self():
       with closing(self):
-        return pfx_call(func, *args, **kwargs)
+        return func(*args, **kwargs)
 
-    with_self.__name__ = "with_self:" + funcname(func)
-    return self.later.defer(with_self)
+    return self.later.defer(closing_self)
 
   ##########################################################################
   # Core Store methods, all abstract.
