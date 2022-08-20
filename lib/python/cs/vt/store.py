@@ -9,17 +9,18 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from fnmatch import fnmatch
 from functools import partial
 import sys
 from threading import Semaphore
 from icontract import require
+
 from cs.deco import fmtdoc
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import warning, error, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress
 from cs.py.func import prop, funcname
 from cs.queues import Channel, IterableQueue
@@ -27,6 +28,7 @@ from cs.resources import MultiOpenMixin, RunStateMixin, RunState
 from cs.result import report, bg as bg_result
 from cs.seq import Seq
 from cs.threads import bg as bg_thread
+
 from . import defaults, Lock, RLock
 from .datadir import DataDir, RawDataDir, PlatonicDir
 from .hash import (
@@ -266,13 +268,11 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     self.open()
 
     def with_self():
-      with self:
-        return func(*args, **kwargs)
+      with closing(self):
+        return pfx_call(func, *args, **kwargs)
 
     with_self.__name__ = "with_self:" + funcname(func)
-    LF = self.later.defer(with_self)
-    LF.notify(lambda LF: self.close())
-    return LF
+    return self.later.defer(with_self)
 
   ##########################################################################
   # Core Store methods, all abstract.
