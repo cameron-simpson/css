@@ -577,21 +577,13 @@ class VTCmd(BaseCommand):
 
         TODO: hook into vt.merge.
     '''
-    runstate = self.options.runstate
-    delete = False
-    overlay = False
-    whole_read = False
-    opts, argv = getopt(argv, 'oW')
-    for opt, _ in opts:
-      with Pfx(opt):
-        if opt == '-D':
-          delete = True
-        elif opt == '-o':
-          overlay = True
-        elif opt == '-W':
-          whole_read = True
-        else:
-          raise RuntimeError("unhandled option: %r" % (opt,))
+    options = self.options
+    options.update(
+        delete=False,
+        overlay=False,
+        whole_read=False,
+    )
+    options.popopts(argv, D='delete', o='overlay', W='whole_read')
     if not argv:
       raise GetoptError("missing srcpath")
     srcpath = argv.pop(0)
@@ -603,6 +595,10 @@ class VTCmd(BaseCommand):
     if argv:
       raise GetoptError("extra arguments: %s" % (' '.join(argv),))
     xit = 0
+    delete = options.delete
+    overlay = options.overlay
+    whole_read = options.whole_read
+    runstate = options.runstate
     if archivepath is None:
       D = Dir('.')
     else:
