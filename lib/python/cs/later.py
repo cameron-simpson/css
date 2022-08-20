@@ -390,14 +390,18 @@ class Later(MultiOpenMixin):
     '''
     return self._finished.is_set()
 
-  def wait(self):
-    ''' Wait for the Later to be finished.
+  @pfx_method
+  def wait(self, timeout=None):
+    ''' Wait for the `Later` to be finished.
+        Retrun the result of `self._finished.wait(timeout)`.
     '''
     f = self._finished
     if not f.is_set():
       info("Later.WAIT: %r", self)
-    if not self._finished.wait(5.0):
-      warning("  Later.WAIT TIMED OUT")
+    waited = f.wait(timeout)
+    if not waited:
+      warning("timed out after %fs", timeout)
+    return waited
 
   def __repr__(self):
     return (
