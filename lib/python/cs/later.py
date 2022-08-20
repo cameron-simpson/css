@@ -332,23 +332,25 @@ class Later(MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
-    self._finished = Event()
-    global default  # pylint: disable=global-statement
-    with stackattrs(default, current=self):
-      try:
-        yield
-      finally:
-        # Shut down the Later instance:
-        # - close the request queue
-        # - close the TimerQueue if any
-        # - close the worker thread pool
-        # - dispatch a Thread to wait for completion and fire the
-        #   _finished Event
-        if self._timerQ:
-          self._timerQ.close()
-          self._timerQ.join()
-        # queue actions to detect activity completion
-        bg_thread(self._finished.set)
+    with super().startup_shutdown():
+      finished = Event()
+      with stackattrs(self, _finished=finished):
+        global default  # pylint: disable=global-statement
+        with stackattrs(default, current=self):
+          try:
+            yield
+          finally:
+            # Shut down the Later instance:
+            # - close the request queue
+            # - close the TimerQueue if any
+            # - close the worker thread pool
+            # - dispatch a Thread to wait for completion and fire the
+            #   _finished Event
+            if self._timerQ:
+              self._timerQ.close()
+              self._timerQ.join()
+            # queue final action to detect activity completion
+            bg_thread(finished.set)
 
   def _try_dispatch(self):
     ''' Try to dispatch the next `LateFunction`.
