@@ -125,7 +125,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       self._str_attrs = {}
       self.name = name
       self._capacity = capacity
-      self.__funcQ = None
+      self.later = None
       self.hashclass = hashclass
       self._config = None
       self.logfp = None
@@ -239,24 +239,20 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   ## MultiOpenMixin methods.
   ##
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Start the Store.
     '''
-    self.runstate.start()
-    self.__funcQ = Later(
-        self._capacity, name="%s:Later(__funcQ)" % (self.name,)
-    )
-    self.__funcQ.open()
-
-  def shutdown(self):
-    ''' Called by final MultiOpenMixin.close().
-    '''
-    self.runstate.cancel()
-    L = self.__funcQ
-    L.close()
-    L.wait()
-    del self.__funcQ
-    self.runstate.stop()
+    runstate = self.runstate
+    L = Later(self._capacity, name=self.name)
+    with L:
+      with stackattrs(self, later=L):
+        with runstate:
+          try:
+            yield
+          finally:
+            self.runstate.cancel()
+            L.wait()
 
   #############################
   ## Function dispatch methods.
@@ -273,7 +269,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
         return func(*args, **kwargs)
 
     with_self.__name__ = "with_self:" + funcname(func)
-    LF = self.__funcQ.defer(with_self)
+    LF = self.later.defer(with_self)
     LF.notify(lambda LF: self.close())
     return LF
 
