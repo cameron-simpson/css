@@ -203,7 +203,7 @@ class Channel(object):
     ''' `next(Channel)` calls `Channel.get()`.
     '''
     if self.closed:
-      raise StopIteration()
+      raise StopIteration
     return self.get()
 
   # pylint: disable=consider-using-with

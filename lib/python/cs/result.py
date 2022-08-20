@@ -245,7 +245,7 @@ class Result(FSM):
       raise AttributeError("%s not ready: no .result attribute" % (self,))
     self.collected = True
     if state == self.CANCELLED:
-      raise CancellationError()
+      raise CancellationError
     return self._result
 
   @result.setter
@@ -270,7 +270,7 @@ class Result(FSM):
     self.collected = True
     if state == self.CANCELLED:
       self.collected = True
-      raise CancellationError()
+      raise CancellationError
     return self._exc_info
 
   @exc_info.setter

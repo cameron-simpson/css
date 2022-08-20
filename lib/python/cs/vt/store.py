@@ -280,50 +280,50 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   def add(self, data):
     ''' Add the `data` to the Store, return its hashcode.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def add_bg(self, data):
     ''' Dispatch the add request in the background, return a `Result`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   # pylint: disable=unused-argument
   def get(self, h, default=None):
     ''' Fetch the data for hashcode `h` from the Store, or `None`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def get_bg(self, h):
     ''' Dispatch the get request in the background, return a `Result`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def contains(self, h):
     ''' Test whether the hashcode `h` is present in the Store.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def contains_bg(self, h):
     ''' Dispatch the contains request in the background, return a `Result`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def flush(self):
     ''' Flush outstanding tasks to the next lowest abstraction.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def flush_bg(self):
     ''' Dispatch the flush request in the background, return a `Result`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   ##########################################################################
   # Archive support.
