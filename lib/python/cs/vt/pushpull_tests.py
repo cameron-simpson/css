@@ -5,14 +5,12 @@
 
 import unittest
 from random import randint
+
 from cs.randutils import rand0, make_randblock
 from cs.x import X
+
 from .hash import HashUtilDict
 from .pushpull import missing_hashcodes, missing_hashcodes_by_checksum
-from cs.x import X
-import cs.x
-
-cs.x.X_via_tty = True
 
 class _TestMissingHashCodes:
   ''' Base class for testing missing hashcodes.
