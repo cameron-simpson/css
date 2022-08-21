@@ -25,7 +25,7 @@ from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.py.func import prop
 from cs.queues import Channel, IterableQueue
-from cs.resources import MultiOpenMixin, RunStateMixin, RunState
+from cs.resources import MultiOpenMixin, openif, RunStateMixin, RunState
 from cs.result import report, bg as bg_result
 from cs.seq import Seq
 from cs.threads import bg as bg_thread
@@ -708,7 +708,6 @@ class ProxyStore(BasicStoreSync):
   @contextmanager
   def startup_shutdown(self):
     with super().startup_shutdown():
-      super().startup()
       for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
         S.open()
       for S, _ in self.archive_path:
@@ -950,7 +949,7 @@ class DataDirStore(MappingStore):
   def startup_shutdown(self):
     ''' Open/close the internal `DataDir`.
     '''
-    with super().shartup_shutdown():
+    with super().startup_shutdown():
       with self._datadir:
         yield
 
