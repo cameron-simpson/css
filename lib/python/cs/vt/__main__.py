@@ -28,7 +28,9 @@ import shutil
 from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 from stat import S_ISREG
 import sys
+
 from typeguard import typechecked
+
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -44,8 +46,7 @@ from cs.progress import progressbar
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print
-import cs.x
-from cs.x import X
+
 from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
@@ -869,7 +870,6 @@ class VTCmd(BaseCommand):
               append_only=append_only,
               fsname=fsname
           )
-          cs.x.X_via_tty = True
         except KeyboardInterrupt:
           error("keyboard interrupt, unmounting %r", mountpoint)
           xit = umount(mountpoint)
