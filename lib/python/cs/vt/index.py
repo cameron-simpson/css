@@ -454,7 +454,7 @@ class NDBMIndex(BinaryIndex):
       # pylint: disable=import-error,import-outside-toplevel
       import dbm.ndbm
       db = pfx_call(dbm.ndbm.open, self.path, 'c')
-      with stackattrs(self, _nbdm=db, _nbdm_lock=Lock(), _written=False):
+      with stackattrs(self, _ndbm=db, _ndbm_lock=Lock(), _written=False):
         try:
           yield
         finally:
