@@ -12,6 +12,7 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock
 import time
+
 from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
 from cs.logutils import error, warning
 from cs.obj import Proxy
@@ -184,10 +185,18 @@ class MultiOpenMixin(ContextManagerMixin):
   @contextmanager
   def startup_shutdown(self):
     ''' Default context manager form of startup/shutdown - just
-        call the distinct `.startup()` and `.shutdown()` methods.
+        call the distinct `.startup()` and `.shutdown()` methods
+        if both are present, do nothing if neither use present.
 
-        This supports legacy subclasses of `MultiOpenMixin` which
-        have separate `startup()` and `shutdown()` methods.
+        This supports subclasses always using:
+
+            with super().startup_shutdown():
+
+        as an outer wrapper.
+
+        The `.startup` check is to support legacy subclasses of
+        `MultiOpenMixin` which have separate `startup()` and
+        `shutdown()` methods.
         The preferred approach is a single `startup_shutdwn()`
         context manager overriding this method.
 
@@ -195,32 +204,24 @@ class MultiOpenMixin(ContextManagerMixin):
 
             @contextmanager
             def startup_shutdown(self):
-                ... do some set up ...
-                try:
-                    yield
-                finally:
-                    ... do some tear down ...
+                with super().startup_shutdown():
+                    ... do some set up ...
+                    try:
+                        yield
+                    finally:
+                        ... do some tear down ...
     '''
     try:
       startup = self.startup
     except AttributeError:
-      warning(
-          "MultiOpenMixin.startup_shutdown: no %s.startup" %
-          (type(self).__name__,)
-      )
+      shutdown = None
     else:
+      shutdown = self.shutdown
       startup()
     try:
       yield
     finally:
-      try:
-        shutdown = self.shutdown
-      except AttributeError:
-        warning(
-            "MultiOpenMixin.startup_shutdown: no %s.shutdown" %
-            (type(self).__name__,)
-        )
-      else:
+      if shutdown is not None:
         shutdown()
 
   def open(self, caller_frame=None):
