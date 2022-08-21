@@ -12,20 +12,19 @@ import shutil
 import sys
 import tempfile
 import unittest
+
 from cs.deco import decorator
 from cs.logutils import setup_logging
 from cs.pfx import Pfx, XP
 from cs.randutils import randomish_chunks
 from cs.testutils import product_test
+
 from .datadir import DataDir, RawDataDir
 from .hash import HASHCLASS_BY_NAME
 from .index import (
     FileDataIndexEntry, class_names as indexclass_names, class_by_name as
     indexclass_by_name
 )
-import cs.x
-
-cs.x.X_via_tty = True
 
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
