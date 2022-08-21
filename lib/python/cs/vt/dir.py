@@ -4,6 +4,7 @@
 ''' Implementation of directories (Dir) and their entries (FileDirent, etc).
 '''
 
+from contextlib import contextmanager
 from enum import IntEnum, IntFlag
 from functools import partial
 import grp
@@ -15,6 +16,7 @@ import sys
 from threading import Lock
 import time
 from uuid import UUID, uuid4
+
 from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import debug, error, warning, info
@@ -23,6 +25,7 @@ from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.threads import locked
+
 from . import PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
 from .blockify import top_block_for, blockify
@@ -83,8 +86,8 @@ class DirentRecord(BinarySingleValue):
     '''
     return self.value
 
-  @staticmethod
-  def parse_value(bfr):
+  @classmethod
+  def parse_value(cls, bfr):
     ''' Unserialise a serialised Dirent.
     '''
     type_ = BSUInt.parse_value(bfr)
@@ -742,37 +745,38 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
   # FileLike.lstat uses the common stat method
   lstat = stat
 
-  @locked
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Set up .open_file on first open.
     '''
-    self._check()
-    if self.open_file is not None:
-      raise RuntimeError(
-          "first open, but .open_file is not None: %r" % (self.open_file,)
-      )
-    if self._block is None:
-      raise RuntimeError("first open, but ._block is None")
-    self.open_file = RWBlockFile(self._block)
-    self._block = None
-    self._check()
-
-  @locked
-  def shutdown(self):
-    ''' On final close, close .open_file and save result as ._block.
-    '''
-    self._check()
-    if self._block is not None:
-      error(
-          "final close, but ._block is not None;"
-          " replacing with self.open_file.close(), was: %s", self._block
-      )
-    f = self.open_file
-    f.filename = self.name
-    self._block = f.sync()
-    f.close()
-    self.open_file = None
-    self._check()
+    with super().startup_shutdown():
+      with self._lock:
+        self._check()
+        if self.open_file is not None:
+          raise RuntimeError(
+              "first open, but .open_file is not None: %r" % (self.open_file,)
+          )
+        if self._block is None:
+          raise RuntimeError("first open, but ._block is None")
+        self.open_file = RWBlockFile(self._block)
+        self._block = None
+        self._check()
+      try:
+        yield
+      finally:
+        with self._lock:
+          self._check()
+          if self._block is not None:
+            error(
+                "final close, but ._block is not None;"
+                " replacing with self.open_file.close(), was: %s", self._block
+            )
+          f = self.open_file
+          f.filename = self.name
+          self._block = f.sync()
+          f.close()
+          self.open_file = None
+          self._check()
 
   def _check(self):
     ''' Internal consistency check.

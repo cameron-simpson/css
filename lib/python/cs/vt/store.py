@@ -16,13 +16,14 @@ import sys
 from threading import Semaphore
 from icontract import require
 
+from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import warning, error, info
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.py.func import prop, funcname
+from cs.py.func import prop
 from cs.queues import Channel, IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin, RunState
 from cs.result import report, bg as bg_result
@@ -522,25 +523,13 @@ class MappingStore(BasicStoreSync):
     self.mapping = mapping
     self._str_attrs.update(mapping=type(mapping).__name__)
 
-  def startup(self):
-    super().startup()
-    mapping = self.mapping
-    try:
-      openmap = mapping.open
-    except AttributeError:
-      pass
-    else:
-      openmap()
-
-  def shutdown(self):
-    mapping = self.mapping
-    try:
-      closemap = mapping.close
-    except AttributeError:
-      pass
-    else:
-      closemap()
-    super().shutdown()
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close `self.mapping` (if supported).
+    '''
+    with super().startup_shutdown():
+      with openif(self.mapping):
+        yield
 
   def add(self, data):
     ''' Add `data` to the mapping, indexed as `hashclass(data)`.
@@ -716,19 +705,21 @@ class ProxyStore(BasicStoreSync):
     for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
       S.init()
 
-  def startup(self):
-    super().startup()
-    for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
-      S.open()
-    for S, _ in self.archive_path:
-      S.open()
-
-  def shutdown(self):
-    for S, _ in self.archive_path:
-      S.close()
-    for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
-      S.close()
-    super().shutdown()
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      super().startup()
+      for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
+        S.open()
+      for S, _ in self.archive_path:
+        S.open()
+      try:
+        yield
+      finally:
+        for S, _ in self.archive_path:
+          S.close()
+        for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
+          S.close()
 
   def __len__(self):
     ''' The size of the store is the sum of the read stores.
@@ -955,17 +946,13 @@ class DataDirStore(MappingStore):
     )
     MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
 
-  def startup(self):
-    ''' Startup: open the internal DataDir.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the internal `DataDir`.
     '''
-    super().startup()
-    self._datadir.open()
-
-  def shutdown(self):
-    ''' Shutdown: close the internal DataDir.
-    '''
-    self._datadir.close()
-    super().shutdown()
+    with super().shartup_shutdown():
+      with self._datadir:
+        yield
 
   def init(self):
     ''' Init the supporting data dir.
@@ -1043,17 +1030,13 @@ class _PlatonicStore(MappingStore):
   def init(self):
     self._datadir.initdir()
 
-  def startup(self, **kw):
-    ''' Startup: open the internal DataDir.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the internal `DataDir`.
     '''
-    self._datadir.open()
-    super().startup(**kw)
-
-  def shutdown(self):
-    ''' Shutdown: close the internal DataDir.
-    '''
-    super().shutdown()
-    self._datadir.close()
+    with super().startup_shutdown():
+      with self._datadir:
+        yield
 
   def get_Archive(self, name=None, missing_ok=False):
     ''' PlatonicStore Archives are associated with the internal DataDir.

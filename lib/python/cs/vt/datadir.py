@@ -40,7 +40,7 @@
 
 from collections import namedtuple
 from collections.abc import Mapping
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 import errno
 import os
 from os import (
@@ -65,7 +65,7 @@ from typeguard import typechecked
 from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.buffer import CornuCopyBuffer
 from cs.cache import LRU_Cache
-from cs.context import nullcontext
+from cs.context import nullcontext, stackattrs
 from cs.fileutils import (
     DEFAULT_READSIZE,
     ReadMixin,
@@ -75,7 +75,7 @@ from cs.fileutils import (
 )
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress, progressbar
 from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
@@ -83,7 +83,7 @@ from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
-from cs.upd import Upd, upd_proxy, state as upd_state, print
+from cs.upd import upd_proxy, state as upd_state, print
 from . import MAX_FILE_SIZE, Lock, RLock, defaults
 from .archive import Archive
 from .block import Block
@@ -340,69 +340,71 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def startup_shutdown(self):
     ''' Start up and shut down the `FilesDir`: take locks, start worker threads etc.
     '''
-    self.initdir()
-    self._rfds = {}
-    self._unindexed = {}
-    self._filemap = SqliteFilemap(self, self.statefilepath)
-    hashname = self.hashname
-    self.index = self.indexclass(
-        self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname))
-    )
-    self.index.open()
-    self.runstate.start()
-    # cache of open DataFiles
-    self._cache = LRU_Cache(
-        maxsize=4, on_remove=lambda k, datafile: datafile.close()
-    )
-    # Set up data queue.
-    # The .add() method adds the data to self._unindexed, puts the
-    # data onto the data queue, and returns.
-    # The data queue worker saves the data to backing files and
-    # updates the indices.
-    self._data_progress = Progress(
-        name=str(self) + " data queue ",
-        total=0,
-        units_scale=BINARY_BYTES_SCALE,
-    )
-    if defaults.show_progress:
-      proxy_cmgr = upd_state.upd.insert(1)
-    else:
-      proxy_cmgr = nullcontext()
-    with proxy_cmgr as data_proxy:
-      self._data_proxy = data_proxy
-      self._dataQ = IterableQueue(65536)
-      self._data_Thread = bg_thread(
-          self._data_queue,
-          name="%s._data_queue" % (self,),
+    with super().startup_shutdown():
+      self.initdir()
+      runstate = self.runstate
+      hashname = self.hashname
+      # cache of open DataFiles
+      cache = LRU_Cache(
+          maxsize=4, on_remove=lambda k, datafile: datafile.close()
       )
-      self._monitor_Thread = bg_thread(
-          self._monitor_datafiles,
-          name="%s-datafile-monitor" % (self,),
-      )
-      yield
-      self.runstate.cancel()
-      self.flush()
-      # shut down the monitor Thread
-      mon_thread = self._monitor_Thread
-      if mon_thread is not None:
-        mon_thread.join()
-        self._monitor_Thread = None
-      # drain the data queue
-      self._dataQ.close()
-      self._data_Thread.join()
-      self._dataQ = None
-      self._data_thread = None
-    # update state to substrate
-    self._cache = None
-    self._filemap.close()
-    self._filemap = None
-    self.index.close()
-    # close the read file descriptors
-    for rfd in self._rfds.values():
-      with Pfx("os.close(rfd:%d)", rfd):
-        os.close(rfd)
-    del self._rfds
-    self.runstate.stop()
+      with self.indexclass(self.pathto(
+          self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname))) as index:
+        with stackattrs(
+            self,
+            _rfds={},
+            _unindexed={},
+            _filemap=SqliteFilemap(self, self.statefilepath),
+            index=index,
+            _cache=cache,
+        ):
+          # Set up data queue.
+          # The .add() method adds the data to self._unindexed, puts the
+          # data onto the data queue, and returns.
+          # The data queue worker saves the data to backing files and
+          # updates the indices.
+          self._data_progress = Progress(
+              name=str(self) + " data queue ",
+              total=0,
+              units_scale=BINARY_BYTES_SCALE,
+          )
+          with (upd_state.upd.insert(1)
+                if defaults.show_progress else nullcontext()) as data_proxy:
+            dataQ = IterableQueue(65536)
+            with stackattrs(
+                self,
+                _data_proxy=data_proxy,
+                _dataQ=dataQ,
+                _data_Thread=bg_thread(
+                    self._process_data_queue,
+                    name="%s._process_data_queue" % (self,),
+                    args=(dataQ,),
+                ),
+                _monitor_Thread=bg_thread(
+                    self._monitor_datafiles,
+                    name="%s-datafile-monitor" % (self,),
+                ),
+            ):
+              with runstate:
+                try:
+                  yield
+                finally:
+                  self.runstate.cancel()
+                  self.flush()
+                  # shut down the monitor Thread
+                  mon_thread = self._monitor_Thread
+                  if mon_thread is not None:
+                    mon_thread.join()
+                  # drain the data queue
+                  self._dataQ.close()
+                  self._dataQ = None
+                  self._data_Thread.join()
+                # update state to substrate
+                self._filemap.close()
+                # close the read file descriptors
+                for rfd in self._rfds.values():
+                  with Pfx("os.close(rfd:%d)", rfd):
+                    os.close(rfd)
 
   def pathto(self, rpath):
     ''' Return the path to `rpath`, which is relative to the `topdirpath`.
@@ -446,13 +448,12 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       self._dataQ.put(data)
     return hashcode
 
-  def _data_queue(self):
+  def _process_data_queue(self, dataQ):
     wf = None
     DFstate = None
     filenum = None
     index = self.index
     unindexed = self._unindexed
-    dataQ = self._dataQ
     progress = self._data_progress
     hashchunk = self.hashclass.from_chunk
     batch_size = 128
@@ -983,16 +984,19 @@ class PlatonicFile(MultiOpenMixin, ReadMixin):
   def __str__(self):
     return "PlatonicFile(%s)" % (shortpath(self.path,))
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Startup: open the file for read.
     '''
-    self._fd = os.open(self.path, os.O_RDONLY)
-
-  def shutdown(self):
-    ''' Shutdown: close the file.
-    '''
-    os.close(self._fd)
-    self._fd = None
+    with super().startup_shutdown():
+      with stackattrs(
+          self,
+          _fd=pfx_call(os.open, self.path, os.O_RDONLY),
+      ):
+        try:
+          yield
+        finally:
+          os.close(self._fd)
 
   def tell(self):
     ''' Return the notional file offset.
@@ -1098,32 +1102,38 @@ class PlatonicDir(FilesDir):
     self.archive = archive
     self.topdir = None
 
-  def startup(self):
-    if self.meta_store is not None:
-      self.meta_store.open()
-      archive = self.archive
-      D = archive.last.dirent
-      if D is None:
-        info("%r: no archive entries, create empty topdir Dir", archive)
-        D = Dir('.')
-        archive.update(D)
-      self.topdir = D
-    super().startup()
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      meta_store = self.meta_store
+      if meta_store is not None:
+        self.meta_store.open()
+        archive = self.archive
+        D = archive.last.dirent
+        if D is None:
+          info("%r: no archive entries, create empty topdir Dir", archive)
+          D = Dir('.')
+          archive.update(D)
+        self.topdir = D
+      try:
+        yield
+      finally:
+        if meta_store is not None:
+          self.sync_meta(meta_store)
+          meta_store.close()
 
-  def shutdown(self):
-    if self.meta_store is not None:
-      self.sync_meta()
-      self.meta_store.close()
-    super().shutdown()
-
-  def sync_meta(self):
+  def sync_meta(self, meta_store=None):
     ''' Update the Archive state.
     '''
-    # update the topdir state before any save
-    if self.meta_store is not None:
-      with self.meta_store:
+    if meta_store is None:
+      meta_store = self.meta_store
+    if meta_store is None:
+      self.archive.update(self.topdir)
+    else:
+      # update the archive, using meta_store as the default block store
+      with meta_store:
         self.archive.update(self.topdir)
-        ##dump_Dirent(self.topdir, recurse=True)
+    ##dump_Dirent(self.topdir, recurse=True)
 
   @staticmethod
   def _default_exclude_path(path):

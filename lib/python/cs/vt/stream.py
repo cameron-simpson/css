@@ -9,15 +9,17 @@
 ''' Protocol for accessing Stores over a stream connection.
 '''
 
-from __future__ import with_statement
+from contextlib import contextmanager
 from enum import IntEnum
 from functools import lru_cache
 from subprocess import Popen, PIPE
 from threading import Lock
 import time
 from typing import Optional
+
 from icontract import require
 from typeguard import typechecked
+
 from cs.binary import (
     BinaryMultiValue,
     BSString,
@@ -159,28 +161,24 @@ class StreamStore(BasicStoreSync):
     '''
     self.local_store = self.exports[export_name]
 
-  @pfx_method(use_str=True)
-  def startup(self):
-    ''' Start up the StreamStore.
-        Open the `local_store` if not `None`.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close `self.local_store` if not `None`.
     '''
-    super().startup()
-    local_store = self.local_store
-    if local_store is not None:
-      local_store.open()
-
-  @pfx_method
-  def shutdown(self):
-    ''' Shut down the StreamStore.
-    '''
-    conn = self._conn
-    if conn:
-      conn.shutdown()
-      self._conn = None
-    local_store = self.local_store
-    if local_store is not None:
-      local_store.close()
-    super().shutdown()
+    with super().startup_shutdown():
+      local_store = self.local_store
+      if local_store is not None:
+        local_store.open()
+      try:
+        yield
+      finally:
+        conn = self._conn
+        if conn:
+          conn.shutdown()
+          self._conn = None
+        local_store = self.local_store
+        if local_store is not None:
+          local_store.close()
 
   @pfx_method
   def connection(self):

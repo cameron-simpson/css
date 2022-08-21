@@ -7,13 +7,16 @@
 ''' Support for connections over TCP and UNIX domain sockets.
 '''
 
+from contextlib import contextmanager
 import os
 from socket import socket, AF_INET, AF_UNIX
 from socketserver import TCPServer, UnixStreamServer, \
     ThreadingMixIn, StreamRequestHandler
 import sys
-from threading import Thread
+
 from icontract import require
+
+from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.logutils import error
 from cs.pfx import Pfx, pfx_method
@@ -21,6 +24,8 @@ from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
+from cs.threads import bg as bg_thread
+
 from . import defaults
 from .stream import StreamStore
 
@@ -68,26 +73,29 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   def __str__(self):
     return "%s[%s](S=%s)" % (type(self).__name__, self.runstate.state, self.S)
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Start up the server.
     '''
-    self.socket_server_thread = Thread(
-        name="%s(%s)[server-thread]" % (type(self), self.S),
-        target=self.socket_server.serve_forever,
-        kwargs={'poll_interval': 0.5}
-    )
-    self.socket_server_thread.daemon = False
-    self.socket_server_thread.start()
-
-  def shutdown(self):
-    ''' Shut down the server.
-    '''
-    if self.socket_server:
-      self.socket_server.shutdown()
-    self.socket_server_thread.join()
-    if self.socket_server and self.socket_server.socket is not None:
-      self.socket_server.socket.close()
-    self.socket_server = None
+    with super().startup_shutdown():
+      with stackattrs(
+          self,
+          socket_server_thread=bg_thread(
+              self.socket_server.serve_forever,
+              kwargs={'poll_interval': 0.5},
+              name="%s(%s)[server-thread]" % (type(self), self.S),
+              daemon=False,
+          ),
+      ):
+        try:
+          yield
+        finally:
+          if self.socket_server:
+            self.socket_server.shutdown()
+          self.socket_server_thread.join()
+          if self.socket_server and self.socket_server.socket is not None:
+            self.socket_server.socket.close()
+          self.socket_server = None
 
   def shutdown_now(self):
     ''' Issue closes until all current opens have been consumed.
