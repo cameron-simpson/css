@@ -214,8 +214,6 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     self._lock = Lock()
     self.cachefiles = []
     self._add_cachefile()
-    self._workQ = None
-    self._worker = None
     self.runstate.notify_cancel.add(lambda rs: self.close())
 
   @contextmanager
@@ -223,20 +221,17 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     ''' Startup the proxy.
     '''
     with super().startup_shutdown():
-      with stackattrs(
-          self,
-          _workQ=IterableQueue(),
-          _worker=bg_thread(self._work, name="%s WORKER" % (self,)),
-      ):
-        try:
-          yield
-        finally:
-          self._workQ.close()
-          self._worker.join()
-          if self.cached:
-            error("blocks still in memory cache: %r", self.cached)
-          for cachefile in self.cachefiles:
-            cachefile.close()
+      workQ = IterableQueue()
+      worker = bg_thread(self._work, args=(workQ,), name="%s WORKER" % (self,))
+      try:
+        yield
+      finally:
+        workQ.close()
+        worker.join()
+        if self.cached:
+          error("blocks still in memory cache: %r", self.cached)
+        for cachefile in self.cachefiles:
+          cachefile.close()
 
   def _add_cachefile(self):
     cachefile = RWFileBlockCache(dirpath=self.dirpath)
@@ -330,8 +325,8 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     # queue for file cache and backend
     self._workQ.put((h, data, True))
 
-  def _work(self):
-    for h, data, in_backend in self._workQ:
+  def _work(self, workQ):
+    for h, data, in_backend in workQ:
       with self._lock:
         if self._getref(h):
           # already in file cache, therefore already sent to backend
