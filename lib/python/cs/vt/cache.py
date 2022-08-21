@@ -223,15 +223,16 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     with super().startup_shutdown():
       workQ = IterableQueue()
       worker = bg_thread(self._work, args=(workQ,), name="%s WORKER" % (self,))
-      try:
-        yield
-      finally:
-        workQ.close()
-        worker.join()
-        if self.cached:
-          error("blocks still in memory cache: %r", self.cached)
-        for cachefile in self.cachefiles:
-          cachefile.close()
+      with stackattrs(self, _workQ=workQ):
+        try:
+          yield
+        finally:
+          workQ.close()
+          worker.join()
+          if self.cached:
+            error("blocks still in memory cache: %r", self.cached)
+          for cachefile in self.cachefiles:
+            cachefile.close()
 
   def _add_cachefile(self):
     cachefile = RWFileBlockCache(dirpath=self.dirpath)
