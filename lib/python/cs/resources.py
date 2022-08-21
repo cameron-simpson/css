@@ -15,7 +15,7 @@ import time
 from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
 from cs.logutils import error, warning
 from cs.obj import Proxy
-from cs.pfx import pfx_method
+from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
@@ -60,6 +60,26 @@ def not_closed(func):
 
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
+
+@contextmanager
+def openif(obj):
+  ''' Context manager to open `obj` if it has a `.open` method
+      and also to close it via its `.close` method.
+      This yields `obj.open()` if defined, or `obj` otherwise.
+  '''
+  try:
+    open_method = obj.open
+  except AttributeError:
+    close_method = None
+    opened = obj
+  else:
+    close_method = obj.close
+    opened = pfx_call(open_method)
+  try:
+    yield opened
+  finally:
+    if close_method is not None:
+      pfx_call(close_method)
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
 class _mom_state(object):
