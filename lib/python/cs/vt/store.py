@@ -256,7 +256,9 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
               yield
             finally:
               self.runstate.cancel()
-              L.wait()
+        # obtain this before the Later forgets it
+        finished = L.finished_event
+      finished.wait()
 
   #############################
   ## Function dispatch methods.
