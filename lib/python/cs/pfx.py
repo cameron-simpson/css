@@ -85,7 +85,7 @@ def unpfx(s, sep=None):
       (default from `DEFAULT_SEPARATOR`: `{DEFAULT_SEPARATOR!r}`).
 
       This is a simple hack to support reporting error messages
-      which have had a preifx applied,
+      which have had a prefix applied,
       and fails accordingly if the base message itself contains the separator.
   '''
   if sep is None:
