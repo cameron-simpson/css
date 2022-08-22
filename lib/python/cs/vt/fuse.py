@@ -18,11 +18,15 @@ from os.path import abspath, dirname
 import stat
 import subprocess
 import sys
+import time
+
 from cs.context import stackattrs
+from cs.deco import decorator
 from cs.excutils import logexc
-from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT, LogTime
 from cs.pfx import Pfx, PfxThread, XP
+from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.x import X
+
 from . import defaults
 from .dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from .fs import FileHandle, FileSystem
@@ -109,75 +113,100 @@ def umount(mnt):
   '''
   return subprocess.call(['umount', mnt])
 
-def handler(method):
+@decorator
+def handler(method, trace=False):
   ''' Decorator for FUSE handlers.
 
       Prefixes exceptions with the method name, associates with the
       Store, prevents anything other than a FuseOSError being raised.
   '''
 
-  def handle(self, *a, **kw):
-    ''' Wrapper for FUSE handler methods.
+  syscall = method.__name__
+
+  def syscall_desc(syscall, a, kw):
+    ''' Return a description if the system call as `syscall(args,kwargs)`
+        suitably formatted for convenience.
     '''
-    syscall = method.__name__
     if syscall == 'write':
       fh, offset, bs = a
-      arg_desc = [
+      desc_v = [
           str(a[0]),
           str(a[1]),
           "%d bytes:%r..." % (len(bs), bytes(bs[:16]))
       ]
     else:
-      arg_desc = [
+      desc_v = [
           (
               ("<%s>" % (type(arg).__name__,))
               if isinstance(arg, llfuse.RequestContext) else repr(arg)
           ) for arg in a
       ]
-    arg_desc.extend(
+    desc_v.extend(
         "%s=%r" % (kw_name, kw_value) for kw_name, kw_value in kw.items()
     )
-    arg_desc = ','.join(arg_desc)
-    with Pfx("%s.%s(%s)", type(self).__name__, syscall, arg_desc):
-      trace = syscall in (
-          ##'getxattr',
-          ##'setxattr',
-          ##'statfs',
-      )
-      if trace:
-        X("CALL %s(%s)", syscall, arg_desc)
-      fs = self._vtfs
-      try:
-        with stackattrs(defaults, fs=fs):
-          with fs.S:
-            with LogTime("SLOW SYSCALL", threshold=5.0):
-              result = method(self, *a, **kw)
-            if trace:
-              if isinstance(result, bytes):
-                X(
-                    "CALL %s result => %d bytes, %r...", syscall, len(result),
-                    result[:16]
-                )
-              else:
-                X("CALL %s result => %s", syscall, result)
-            return result
-      ##except FuseOSError as e:
-      ##  warning("=> FuseOSError %s", e, exc_info=False)
-      ##  raise
-      except OSError as e:
-        ##warning("=> OSError %s => FuseOSError", e, exc_info=False)
-        raise FuseOSError(e.errno) from e
-      except MissingHashcodeError as e:
-        error("raising IOError from missing hashcode: %s", e)
-        raise FuseOSError(errno.EIO) from e
-      except Exception as e:
-        exception("unexpected exception, raising EINVAL %s:%s", type(e), e)
-        raise FuseOSError(errno.EINVAL) from e
-      except BaseException as e:
-        error("UNCAUGHT EXCEPTION: %s", e)
-        raise RuntimeError("UNCAUGHT EXCEPTION") from e
-      except:
-        error("=> EXCEPTION %r", sys.exc_info())
+    desc = ','.join(desc_v)
+    return desc
+
+  def handle(self, *a, **kw):
+    ''' Wrapper for FUSE handler methods.
+    '''
+    sysdesc = None
+    do_trace = (
+        syscall in (
+            ##'getxattr',
+            ##'setxattr',
+            ##'statfs',
+        ) if trace is None else trace
+    )
+    if do_trace:
+      sysdesc = sysdesc or syscall_desc(syscall, a, kw)
+      X("CALL %s", sysdesc)
+    fs = self._vtfs
+    try:
+      with defaults(fs=fs):
+        with fs.S:
+          if do_trace:
+            start_time = time.time()
+          result = method(self, *a, **kw)
+          if do_trace:
+            end_time = time.time()
+            if end_time - start_time >= 1.0:
+              sysdesc = sysdesc or syscall_desc(syscall, a, kw)
+              warning(
+                  "more that %fs spent on %s", end_time - start_time, sysdesc
+              )
+          if do_trace:
+            sysdesc = sysdesc or syscall_desc(syscall, a, kw)
+            if isinstance(result, bytes):
+              X(
+                  "CALL %s result => %d bytes, %r...", sysdesc, len(result),
+                  result[:16]
+              )
+            else:
+              X("CALL %s result => %s", sysdesc, result)
+          return result
+    except BaseException:
+      sysdesc = sysdesc or syscall_desc(syscall, a, kw)
+      with Pfx(sysdesc):
+        try:
+          raise
+        ##except FuseOSError as e:
+        ##  warning("=> FuseOSError %s", e, exc_info=False)
+        ##  raise
+        except OSError as e:
+          ##warning("=> OSError %s => FuseOSError", e, exc_info=False)
+          raise FuseOSError(e.errno) from e
+        except MissingHashcodeError as e:
+          error("raising IOError from missing hashcode: %s", e)
+          raise FuseOSError(errno.EIO) from e
+        except Exception as e:
+          exception("unexpected exception, raising EINVAL %s:%s", type(e), e)
+          raise FuseOSError(errno.EINVAL) from e
+        except BaseException as e:
+          error("UNCAUGHT EXCEPTION: %s", e)
+          raise RuntimeError("UNCAUGHT EXCEPTION") from e
+        except:
+          error("=> EXCEPTION %r", sys.exc_info())
 
   return handle
 
