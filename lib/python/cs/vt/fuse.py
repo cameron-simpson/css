@@ -23,8 +23,8 @@ import time
 from cs.context import stackattrs
 from cs.deco import decorator
 from cs.excutils import logexc
-from cs.pfx import Pfx, PfxThread, XP
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
+from cs.pfx import Pfx, PfxThread
 from cs.x import X
 
 from . import defaults
@@ -66,7 +66,7 @@ def mount(
       * `mnt`: mount point
       * `E`: Dirent of root Store directory
       * `S`: optional backing Store, default from defaults.S
-      * `archive`: if not None, an Archive or similar, with a
+      * `archive`: if not `None`, an Archive or similar, with a
         `.update(Dirent[,when])` method
       * `subpath`: relative path from `E` to the directory to attach
         to the mountpoint
@@ -1060,6 +1060,3 @@ class StoreFS_LLFUSE(llfuse.Operations):
     return written
 
 StoreFS = StoreFS_LLFUSE
-
-if __name__ == '__main__':
-  sys.exit(main(sys.argv))
