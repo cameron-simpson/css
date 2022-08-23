@@ -41,7 +41,7 @@ DISTINFO = {
     ],
 }
 
-class _QueueIterator(MultiOpenMixin):
+class QueueIterator(MultiOpenMixin):
   ''' A `QueueIterator` is a wrapper for a `Queue` (or ducktype) which
       presents an iterator interface to collect items.
       It does not offer the `.get` or `.get_nowait` methods.
@@ -70,7 +70,7 @@ class _QueueIterator(MultiOpenMixin):
     if self.closed:
       with PfxCallInfo():
         warning("%r.put: all closed: item=%s", self, item)
-      raise ClosedError("_QueueIterator closed")
+      raise ClosedError("QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
     self._item_count += 1
@@ -83,7 +83,7 @@ class _QueueIterator(MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' `MultiOpenMixin` support; putsthe sentinel onto the underlying queue
+    ''' `MultiOpenMixin` support; puts the sentinel onto the underlying queue
         on the final close.
     '''
     yield
@@ -148,12 +148,12 @@ class _QueueIterator(MultiOpenMixin):
 def IterableQueue(capacity=0, name=None):
   ''' Factory to create an iterable `Queue`.
   '''
-  return _QueueIterator(Queue(capacity), name=name).open()
+  return QueueIterator(Queue(capacity), name=name).open()
 
 def IterablePriorityQueue(capacity=0, name=None):
   ''' Factory to create an iterable `PriorityQueue`.
   '''
-  return _QueueIterator(PriorityQueue(capacity), name=name).open()
+  return QueueIterator(PriorityQueue(capacity), name=name).open()
 
 class Channel(object):
   ''' A zero-storage data passage.
