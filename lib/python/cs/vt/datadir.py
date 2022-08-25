@@ -73,6 +73,7 @@ from cs.fileutils import (
     read_from,
     shortpath,
 )
+from cs.fs import needdir
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -326,15 +327,9 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     ''' Init a directory and its "data" subdirectory.
     '''
     topdirpath = self.topdirpath
-    if not isdirpath(topdirpath):
-      info("mkdir %r", topdirpath)
-      with Pfx("mkdir(%r)", topdirpath):
-        os.mkdir(topdirpath)
+    needdir(topdirpath, log=warning)
     datasubdirpath = joinpath(topdirpath, 'data')
-    if not isdirpath(datasubdirpath):
-      info("mkdir %r", datasubdirpath)
-      with Pfx("mkdir(%r)", datasubdirpath):
-        os.mkdir(datasubdirpath)
+    needdir(datasubdirpath, log=warning)
 
   @contextmanager
   def startup_shutdown(self):
