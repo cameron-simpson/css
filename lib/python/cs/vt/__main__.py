@@ -959,41 +959,49 @@ class VTCmd(BaseCommand):
     return xit
 
   @pfx_method
-  def _parse_pushable(self, s):
+  def _parse_pushable(self, pushable_spec):
     ''' Parse an object specification and return the object.
     '''
     obj = None
-    if s.startswith('/'):
+    if pushable_spec.startswith('/'):
       # a path, hopefully a datadir or a .vtd file
-      if isdirpath(s) and isdirpath(joinpath(s, 'data')):
+      if isdirpath(pushable_spec) and isdirpath(joinpath(pushable_spec, 'data')
+                                                ):
         # /path/to/datadir
-        obj = DataDirStore(s, s)
-      elif s.endswith('.vtd') and isfilepath(s):
+        return DataDirStore(pushable_spec, pushable_spec)
+      if pushable_spec.endswith('.vtd') and isfilepath(pushable_spec):
         # /path/to/datafile.vtd
-        obj = DataFilePushable(s)
-      # TODO: /path/to/archive.vt
-      else:
-        raise ValueError("path is neither a DataDir nor a data file")
+        return DataFilePushable(pushable_spec)
+      if pushable_spec.endswith('.vt') and isfilepath(pushable_spec):
+        # /path/to/archive.vt
+        return Archive(pushable_spec).last.dirent
+      raise ValueError(
+          "path is neither a DataDir nor a data file nor an archive file"
+      )
     else:
       # try a Store specification
       try:
-        obj = Store(s, self.options.config)
+        obj = Store(pushable_spec, self.options.config)
       except ValueError:
         # try an object transcription eg "D{...}"
         try:
-          obj, offset = parse(s)
+          obj, offset = parse(pushable_spec)
         except ValueError:
           # fall back: relative path to .vtd file
-          if s.endswith('.vtd') and isfilepath(s):
+          if pushable_spec.endswith('.vtd') and isfilepath(pushable_spec):
             # /path/to/datafile.vtd
-            obj = DataFilePushable(s)
+            obj = DataFilePushable(pushable_spec)
           else:
             raise
         else:
-          if offset < len(s):
-            raise ValueError("incomplete parse, unparsed: %r" % (s[offset:],))
+          if offset < len(pushable_spec):
+            raise ValueError(
+                "incomplete parse, unparsed: %r" % (pushable_spec[offset:],)
+            )
     if not hasattr(obj, 'pushto_queue'):
-      raise ValueError("type %s is not pushable" % (type(obj),))
+      raise ValueError(
+          "type %s is not pushable (no .pushto_queue method)" % (type(obj),)
+      )
     return obj
 
   @staticmethod
