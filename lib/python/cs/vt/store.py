@@ -364,18 +364,23 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     self._blockmapdir = dirpath
 
+  @typechecked
   @require(lambda capacity: capacity >= 1)
-  def pushto(self, dstS, *, capacity=64, progress=None):
     ''' Allocate a Queue for Blocks to push from this Store to another Store `dstS`.
         Return `(Q,T)` where `Q` is the new Queue and `T` is the
         Thread processing the Queue.
+  def pushto(self,
+             dstS,
+             *,
+             capacity: int = 64,
+             progress=None) -> Tuple[QueueIterator, Thread]:
 
         Parameters:
         * `dstS`: the secondary Store to receive Blocks.
         * `capacity`: the Queue capacity, arbitrary default `64`.
         * `progress`: an optional `Progress` counting submitted and completed data bytes.
 
-        Once called, the caller can then .put Blocks onto the Queue.
+        Once called, the caller can then `.put` Blocks onto the queue.
         When finished, call Q.close() to indicate end of Blocks and
         T.join() to wait for the processing completion.
     '''
@@ -521,7 +526,7 @@ class MappingStore(BasicStoreSync):
   '''
 
   def __init__(self, name, mapping, **kw):
-    BasicStoreSync.__init__(self, name, **kw)
+    super().__init__(name, **kw)
     self.mapping = mapping
     self._str_attrs.update(mapping=type(mapping).__name__)
 
@@ -945,7 +950,7 @@ class DataDirStore(MappingStore):
         indexclass=indexclass,
         rollover=rollover
     )
-    MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
+    super().__init__(name, self._datadir, hashclass=hashclass, **kw)
 
   @contextmanager
   def startup_shutdown(self):
