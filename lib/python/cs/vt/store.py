@@ -13,7 +13,7 @@ from contextlib import closing, contextmanager
 from fnmatch import fnmatch
 from functools import partial
 import sys
-from threading import Semaphore
+from threading import Semaphore, Thread
 from typing import Tuple
 
 from icontract import require
@@ -406,6 +406,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       return Q, T
 
   @staticmethod
+  @pfx
   def push_blocks(name, blocks, srcS, dstS, sem, progress):
     ''' This is a worker function which pushes Blocks or bytes from
         the supplied iterable `blocks` to the second Store.
@@ -430,8 +431,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
                   "cannot unpack %s into Block and length: %s", type(block), e
               )
               continue
-            else:
-              block = block1
+            block = block1
           else:
             length = None
           sem.acquire()
