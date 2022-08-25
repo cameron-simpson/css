@@ -1027,29 +1027,30 @@ class VTCmd(BaseCommand):
   def cmd_pullfrom(self, argv):
     ''' Usage: {cmd} other_store [objects...]
           Pull missing content from other Stores.
+          The default is to pull the entire content of other_store.
     '''
+    options = self.options
     if not argv:
       raise GetoptError("missing other_store")
-    srcSspec = argv.pop(0)
-    with Pfx("other_store %r", srcSspec):
-      srcS = Store(srcSspec, self.options.config)
-    if not argv:
-      argv = (srcSspec,)
+    srcS = self.popStore(argv, "other_store")
     dstS = defaults.S
-    pushables = []
-    ok = True
-    for obj_spec in argv:
-      with Pfx(obj_spec):
-        try:
-          obj = self._parse_pushable(obj_spec)
-        except ValueError as e:
-          warning("unrecognised pushable: %s", e)
-          ok = False
-        else:
-          pushables.append(obj)
-    if not ok:
-      raise GetoptError("unrecognised pushables")
-    return self._push(self.options, srcS, dstS, pushables)
+    if not argv:
+      pushables = srcS,
+    else:
+      pushables = []
+      ok = True
+      for obj_spec in argv:
+        with Pfx(obj_spec):
+          try:
+            obj = self._parse_pushable(obj_spec)
+          except ValueError as e:
+            warning("unrecognised pushable: %s", e)
+            ok = False
+          else:
+            pushables.append(obj)
+      if not ok:
+        raise GetoptError("unrecognised pushables")
+    return self._push(srcS, dstS, *pushables, runstate=options.runstate)
 
   def cmd_pushto(self, argv):
     ''' Usage: {cmd} other_store [objects...]
