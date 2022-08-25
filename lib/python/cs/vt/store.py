@@ -455,8 +455,11 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
               # get the hashcode, only get the data if required
               h = block.hashcode
               if h not in dstS:
-                dstS[h] = block.get_direct_data()
-            if progress:
+                try:
+                  dstS[h] = block.get_direct_data()
+                except MissingHashcodeError as e:
+                  warning("missing data not pushed: %s", e)
+            if progress is not None:
               if length is None:
                 length = len(block)
               progress += length
