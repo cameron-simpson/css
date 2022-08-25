@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # Command script for venti-ish implementation.
-#       - Cameron Simpson <cs@cskk.id.au> 01may2007
+# - Cameron Simpson <cs@cskk.id.au> 01may2007
 #
 
 ''' cs.vt command line utility.
@@ -295,6 +295,13 @@ class VTCmd(BaseCommand):
       runstate.cancel()
       if ifdebug():
         dump_debug_threads()
+
+  def popStore(self, argv, *a):
+    ''' Pop and return a Store specified on the command line.
+    '''
+    return self.poparg(
+        argv, lambda store_spec: Store(store_spec, self.options.config), *a
+    )
 
   def cmd_benchmark(self, argv):
     ''' Usage: {cmd} mode [args...] [<data]
@@ -1046,31 +1053,32 @@ class VTCmd(BaseCommand):
 
   def cmd_pushto(self, argv):
     ''' Usage: {cmd} other_store [objects...]
-          Push something to a secondary Store,
-          such that the secondary store has all the required Blocks.
+          Push objects to another store such that the other store has all the
+          required Blocks. The default is to push all of the current Store.
     '''
+    options = self.options
     if not argv:
       raise GetoptError("missing other_store")
     srcS = defaults.S
-    dstSspec = argv.pop(0)
+    dstS = self.popStore(argv, "other_store")
     if not argv:
-      argv = (dstSspec,)
-    with Pfx("other_store %r", dstSspec):
-      dstS = Store(dstSspec, self.options.config)
-    pushables = []
-    ok = True
-    for obj_spec in argv:
-      with Pfx(obj_spec):
-        try:
-          obj = self._parse_pushable(obj_spec)
-        except ValueError as e:
-          warning("unrecognised pushable: %s", e)
-          ok = False
-        else:
-          pushables.append(obj)
-    if not ok:
-      raise GetoptError("unrecognised pushables")
-    return self._push(srcS, dstS, pushables)
+      # default is to push the entire source Store to the destination
+      pushables = srcS,
+    else:
+      pushables = []
+      ok = True
+      for obj_spec in argv:
+        with Pfx(obj_spec):
+          try:
+            obj = self._parse_pushable(obj_spec)
+          except ValueError as e:
+            warning("unrecognised pushable: %s", e)
+            ok = False
+          else:
+            pushables.append(obj)
+      if not ok:
+        raise GetoptError("unrecognised pushables")
+    return self._push(srcS, dstS, *pushables, runstate=options.runstate)
 
   def cmd_save(self, argv):
     ''' Usage: {cmd} [-F] [{{ospath|-}}...]
