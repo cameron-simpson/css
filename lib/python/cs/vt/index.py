@@ -254,15 +254,17 @@ class LMDBIndex(BinaryIndex):
   def _txn(self, write=False):
     ''' Context manager wrapper for an LMDB transaction which tracks active transactions.
     '''
+    # while no transactions are underway, check if we need to resize
     with self._txn_blocked:
       with self._txn_lock:
         resize_needed = self._resize_needed
         if resize_needed:
           self._resize_needed = False
       if resize_needed:
-        # wait for existing transactions to finish
+        # wait for existing transactions to finish, embiggen the db
         with self._txn_idle:
           self._embiggen_lmdb()
+      # on outermost transaction, take the _txn_idle lock
       with self._txn_lock:
         count = self._txn_count
         count += 1
@@ -273,7 +275,7 @@ class LMDBIndex(BinaryIndex):
     try:
       yield self._lmdb.begin(write=write)
     finally:
-      # logic mutex
+      # release _txn_idle on exit from outermost transaction
       with self._txn_lock:
         count = self._txn_count
         count -= 1
@@ -328,6 +330,7 @@ class LMDBIndex(BinaryIndex):
   def __setitem__(self, key: bytes, binary_entry: bytes):
     # pylint: disable=import-error,import-outside-toplevel
     import lmdb
+    # loop to retry after embiggening if necessary
     while True:
       try:
         with self._txn(write=True) as txn:
