@@ -20,7 +20,7 @@ from uuid import UUID, uuid4
 from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import debug, error, warning, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
@@ -1276,6 +1276,7 @@ class Dir(_Dirent, DirLike):
   def transcribe_inner(self, T, fp):
     return _Dirent.transcribe_inner(self, T, fp, {})
 
+  @pfx_method
   def pushto_queue(self, Q, runstate=None, progress=None):
     ''' Push the Dir Blocks to a queue.
 
