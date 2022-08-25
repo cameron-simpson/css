@@ -21,7 +21,7 @@ from cs.deco import fmtdoc
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import warning, error, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.progress import Progress
 from cs.py.func import prop
 from cs.queues import Channel, IterableQueue
@@ -94,6 +94,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   _seq = Seq()
 
+  @pfx_method
   @fmtdoc
   def __init__(self, name, capacity=None, hashclass=None, runstate=None):
     ''' Initialise the Store.
@@ -108,36 +109,35 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
         * `runstate`: a `cs.resources.RunState` for external control;
           if not supplied one is allocated
     '''
-    with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
-      if not isinstance(name, str):
-        raise TypeError(
-            "initial `name` argument must be a str, got %s" % (type(name),)
-        )
-      if name is None:
-        name = "%s%d" % (type(self).__name__, next(self._seq()))
-      if hashclass is None:
-        hashclass = DEFAULT_HASHCLASS
-      elif isinstance(hashclass, str):
-        hashclass = HASHCLASS_BY_NAME[hashclass]
-      assert issubclass(hashclass, HashCode)
-      if capacity is None:
-        capacity = 4
-      if runstate is None:
-        runstate = RunState(name)
-      RunStateMixin.__init__(self, runstate=runstate)
-      self._str_attrs = {}
-      self.name = name
-      self._capacity = capacity
-      self.later = None
-      self.hashclass = hashclass
-      self._config = None
-      self.logfp = None
-      self.mountdir = None
-      self.readonly = False
-      self.writeonly = False
-      self._archives = {}
-      self._blockmapdir = None
-      self.block_cache = None
+    if not isinstance(name, str):
+      raise TypeError(
+          "initial `name` argument must be a str, got %s" % (type(name),)
+      )
+    if name is None:
+      name = "%s%d" % (type(self).__name__, next(self._seq()))
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
+    elif isinstance(hashclass, str):
+      hashclass = HASHCLASS_BY_NAME[hashclass]
+    assert issubclass(hashclass, HashCode)
+    if capacity is None:
+      capacity = 4
+    if runstate is None:
+      runstate = RunState(name)
+    RunStateMixin.__init__(self, runstate=runstate)
+    self._str_attrs = {}
+    self.name = name
+    self._capacity = capacity
+    self.later = None
+    self.hashclass = hashclass
+    self._config = None
+    self.logfp = None
+    self.mountdir = None
+    self.readonly = False
+    self.writeonly = False
+    self._archives = {}
+    self._blockmapdir = None
+    self.block_cache = None
 
   def init(self):
     ''' Method provided to support "vt init".
