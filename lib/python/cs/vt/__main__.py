@@ -1005,28 +1005,35 @@ class VTCmd(BaseCommand):
     return obj
 
   @staticmethod
-  def _push(options, srcS, dstS, pushables):
+  def _push(srcS, dstS, *pushables, progress=None, runstate=None):
     ''' Push data from the source Store `srcS` to destination Store `dstS`
         to ensure that `dstS` has all the Blocks needs to support
         the `pushables`.
     '''
     xit = 0
     with Pfx("%s => %s", srcS.name, dstS.name):
-      runstate = options.runstate
-      Q, T = srcS.pushto(dstS, progress=options.progress)
+      Q, T = srcS.pushto(dstS, progress=None)
       try:
         for pushable in pushables:
-          if runstate.cancelled:
-            xit = 1
-            break
-          with Pfx(str(pushable)):
-            pushed_ok = pushable.pushto_queue(
-                Q, runstate=runstate, progress=options.progress
-            )
-            assert isinstance(pushed_ok, bool)
-            if not pushed_ok:
-              error("push failed")
+          with Pfx("push %s", pushable):
+            if runstate and runstate.cancelled:
               xit = 1
+              break
+            with Pfx(pushable):
+              progress = Progress(str(pushable))
+              try:
+                pushed_ok = pfx_call(
+                    pushable.pushto_queue(
+                        Q, runstate=runstate, progress=progress
+                    )
+                )
+                assert isinstance(pushed_ok, bool)
+              except Exception as e:
+                error("push fails: %s", e)
+                pushed_ok = False
+              if not pushed_ok:
+                error("push failed")
+                xit = 1
       finally:
         Q.close()
         T.join()
