@@ -14,7 +14,10 @@ from fnmatch import fnmatch
 from functools import partial
 import sys
 from threading import Semaphore
+from typing import Tuple
+
 from icontract import require
+from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.deco import fmtdoc
@@ -24,7 +27,7 @@ from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.progress import Progress
 from cs.py.func import prop
-from cs.queues import Channel, IterableQueue
+from cs.queues import Channel, IterableQueue, QueueIterator
 from cs.resources import MultiOpenMixin, openif, RunStateMixin, RunState
 from cs.result import report, bg as bg_result
 from cs.seq import Seq
@@ -366,14 +369,15 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   @typechecked
   @require(lambda capacity: capacity >= 1)
-    ''' Allocate a Queue for Blocks to push from this Store to another Store `dstS`.
-        Return `(Q,T)` where `Q` is the new Queue and `T` is the
-        Thread processing the Queue.
   def pushto(self,
              dstS,
              *,
              capacity: int = 64,
              progress=None) -> Tuple[QueueIterator, Thread]:
+    ''' Allocate a `QueueIterator` for Blocks to push from this
+        Store to another Store `dstS`.
+        Return `(Q,T)` where `Q` is the new `QueueIterator` and `T` is the
+        `Thread` processing the queue.
 
         Parameters:
         * `dstS`: the secondary Store to receive Blocks.
