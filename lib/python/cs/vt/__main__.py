@@ -1104,7 +1104,8 @@ class VTCmd(BaseCommand):
           The default argument list is "-".
           -F  Print a FileDirent instead of a block ref for file contents.
     '''
-    runstate = self.options.runstate
+    options = self.options
+    runstate = options.runstate
     use_filedirent = False
     if argv and argv[0] == '-F':
       use_filedirent = True
@@ -1128,7 +1129,7 @@ class VTCmd(BaseCommand):
         elif isdirpath(ospath):
           target = Dir(basename(ospath))
           source = OSDir(ospath)
-          merge(target, source, runstate=self.options.runstate)
+          merge(target, source, runstate=runstate)
           print(target, ospath)
           continue
         else:
