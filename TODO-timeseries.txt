@@ -1,3 +1,4 @@
+events timeseries with timestamp/value pairs
 typed memoryviews for mmap mode?
 ts.setitems: use poke?
 ts.setitems: prepad to max(when)
