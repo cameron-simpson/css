@@ -1,3 +1,4 @@
+standardise the sqltags for events metadata
 events partitioned timeseries
 events timeseries with timestamp/value pairs
 typed memoryviews for mmap mode?
