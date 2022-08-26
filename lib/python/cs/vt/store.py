@@ -556,6 +556,13 @@ class MappingStore(BasicStoreSync):
     '''
     return self.mapping.get(h, default)
 
+  def pushto_queue(self, Q, runstate=None, progress=None):
+    ''' Push all the keys to the queue.
+    '''
+    for h in progressbar(self.keys(), f'{self.name}', update_frequency=64):
+      Q.put(h)
+    return True
+
 class ProxyStore(BasicStoreSync):
   ''' A Store managing various subsidiary Stores.
 
