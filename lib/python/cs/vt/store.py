@@ -25,7 +25,7 @@ from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx, pfx_method
-from cs.progress import Progress
+from cs.progress import Progress, progressbar
 from cs.py.func import prop
 from cs.queues import Channel, IterableQueue, QueueIterator
 from cs.resources import MultiOpenMixin, openif, RunStateMixin, RunState
@@ -398,16 +398,15 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       dstS.open()
       T = bg_thread(
           lambda: (
-              self.push_blocks(name, Q, srcS, dstS, sem, progress),
+              self._push_blocks(name, Q, srcS, dstS, sem, progress),
               srcS.close(),
               dstS.close(),
           )
       )
       return Q, T
 
-  @staticmethod
-  @pfx
-  def push_blocks(name, blocks, srcS, dstS, sem, progress):
+  @pfx_method
+  def _push_blocks(self, name, blocks, srcS, dstS, sem, progress):
     ''' This is a worker function which pushes Blocks or bytes from
         the supplied iterable `blocks` to the second Store.
 
@@ -418,73 +417,30 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
           in which case the supplied length will be used for progress reporting
           instead of the default length
     '''
-    with Pfx("%s: worker", name):
-      lock = Lock()
-      with srcS:
-        pending_blocks = {}  # mapping of Result to Block
-        for block in blocks:
-          if type(block) is tuple:
-            try:
-              block1, length = block
-            except TypeError as e:
-              error(
-                  "cannot unpack %s into Block and length: %s", type(block), e
-              )
-              continue
-            block = block1
+    lock = Lock()
+    with srcS:
+      for item in progressbar(blocks, f'{self.name}.pushto',
+                              update_frequency=64):
+        if isinstance(item, HashCode):
+          h = item
+          if h in dstS:
+            continue
+          data = srcS[h]
+          dstS.add_bg(data)
+        else:
+          # a Block?
+          try:
+            h = item.hashcode
+          except AttributeError:
+            # just data
+            data = item
+            dstS.add(data)
           else:
-            length = None
-          sem.acquire()
-          # worker function to add a block conditionally
-
-          @logexc
-          def add_block(srcS, dstS, block, length, progress):
-            # add block content if not already present in dstS
-            try:
-              h = block.hashcode
-            except AttributeError:
-              # presume bytes-like or unStored Block type
-              try:
-                h = srcS.hash(block)
-              except TypeError:
-                warning("ignore object of type %s", type(block))
-                return
-              if h not in dstS:
-                dstS[h] = block
-            else:
-              # get the hashcode, only get the data if required
-              h = block.hashcode
-              if h not in dstS:
-                try:
-                  dstS[h] = block.get_direct_data()
-                except MissingHashcodeError as e:
-                  warning("missing data not pushed: %s", e)
-            if progress is not None:
-              if length is None:
-                length = len(block)
-              progress += length
-
-          addR = bg_result(add_block, srcS, dstS, block, length, progress)
-          with lock:
-            pending_blocks[addR] = block
-
-          # cleanup function
-          @logexc
-          def after_add_block(addR):
-            ''' Forget that `addR` is pending.
-                This will be called after `addR` completes.
-            '''
-            with lock:
-              pending_blocks.pop(addR)
-            sem.release()
-
-          addR.notify(after_add_block)
-        with lock:
-          outstanding = list(pending_blocks.keys())
-        if outstanding:
-          info("PUSHQ: %d outstanding, waiting...", len(outstanding))
-          for R in outstanding:
-            R.join()
+            # Block
+            if h in dstS:
+              continue
+            data = item.data
+            dstS.add_bg(data)
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations
