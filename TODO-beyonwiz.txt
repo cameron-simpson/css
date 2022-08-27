@@ -1,3 +1,4 @@
+record ffmpeg incantation in fstags
 obsolete cs.app.ffmpeg, move to the nice looking pypi ffmpeg module
 media,beyonwiz: use ffmpeg-python for ffmpeg control, obsolete cs.ffmpeg or turn into a shim
 use cs.binary._TestPacketFields to test the data formats in cs.app.beyonwiz
