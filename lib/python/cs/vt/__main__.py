@@ -1021,11 +1021,10 @@ class VTCmd(BaseCommand):
               break
             with Pfx(pushable):
               progress = Progress(str(pushable))
+              pushq = pushable.pushto_queue
               try:
                 pushed_ok = pfx_call(
-                    pushable.pushto_queue(
-                        Q, runstate=runstate, progress=progress
-                    )
+                    pushq, Q, runstate=runstate, progress=progress
                 )
                 assert isinstance(pushed_ok, bool)
               except Exception as e:
