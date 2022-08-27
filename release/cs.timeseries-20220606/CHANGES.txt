@@ -1,0 +1,267 @@
+lib/python/cs/timeseries.py: cs.timeseries: start on efficient time series data storage module
+lib/python/cs/timeseries.py: cs.timeseries: fill out load/save stuff, docstrings etc
+lib/python/cs/timeseries.py: cs.timeseries: stub for command line mode
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriers: new array_index(when), __getitem__(when), __setitem__(when,value), pad_to(when[,fill]) methods
+lib/python/cs/timeseries.py: cs.timeseries: clean lint
+lib/python/cs/timeseries.py: cs.timeseries: fix spelling of HEADER_LENGTH
+lib/python/cs/timeseries.py: cs.timeseries: fix open() calls
+lib/python/cs/timeseries.py: cs.timeseries: drop stary open line
+lib/python/cs/timeseries.py: cs.timeseries: bugfix TimeSeries.__init__ file header probe
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.load_from: small bugfixes
+lib/python/cs/timeseries.py: cs.timeseries: move TimeSeriesCommand up the top
+lib/python/cs/timeseries.py: cs.timeseries: new TimespanPolicy abstract class with DailyPolicy and MonthlyPolicy subclasses: used to define time brackets for distributing times to data files
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy: new get_default_timezone_name() static method to infer the timezone name, use it in __init__
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy: new Arrow(when) factory method returning an arrow.Arrow instance for a UNIX time in the policy timezone; new timespan_tag(when) returning the default identifying tag for the timespan for when; DailyPolicy,MonthlyPolicy: provide the DEFAULT_TAG_FORMAT Arrow format string
+lib/python/cs/timeseries.py: cs.timeseries: initial TimeSeriesDataDir to store multiple time series data for multiple keys
+lib/python/cs/timeseries.py: cs.timeseries: minor fixes and lint
+lib/python/cs/timeseries.py: cs.timeseries: new TimespanPolicy.tagged_spans: generator yielding (tag,tag_start,tag_end) tuples covering a time span
+lib/python/cs/timeseries.py: cs.timeseries: move the ad hoc test code into TimeSeriesCommand.cmd_test
+lib/python/cs/timeseries.py: cs.timeseries: pull out the get_default_timezone_name method as a top level function
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: new .modified flag, new .flush() method to save-if-modified, detect __setitem__ and pad_to and set .modified
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: new .end property computed as self.start + len(self.array) * self.step
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: new __len__, which is the number of data, _not_ the duration (end-start)
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: new index_when(index) method returning the UNIX time for that datum index
+lib/python/cs/timeseries.py: cs.timeseries: TimepanPolicy.get_default_timezone_name is now a top level function
+lib/python/cs/timeseries.py: cs.timeseries: rename the TimespanPolicy classes, add TimespanPolicyAnnual
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries now have a default fill value
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.__setitem__: pad the array as needed
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: initial as_pd_series() method to return a pandas Series instance
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicyMonthly.timespan_for: bugfix return values (they were missing)
+lib/python/cs/timeseries.py: cs.timeseries: drop TimeSeriesDataDir.FILENAME_FORMAT, unused
+lib/python/cs/timeseries.py: cs.timeseries: complete the TimeSeriesDataDir and TimeSeriesKeySubdir implementation
+lib/python/cs/timeseries.py: cs.timeseries: update imports, docstrings etc
+lib/python/cs/timeseries.py: cs.timeseries: __str__ methods; strip a debug message
+lib/python/cs/timeseries.py: cs.timeseries: fix references to TimeSeries.modified
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.flush: forget the .array after .save() unless keep_array=True
+lib/python/cs/timeseries.py: cs.timeseries: update imports, add sanity check
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_test: support multiple tests; strip some debug
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: implement slicing in __getitem__ and supporting methods array_index_bounds(), array_indices() and times()
+lib/python/cs/timeseries.py: cs.timeseries: module docstring update
+lib/python/cs/timeseries.py: cs.timeseries: initial sketch of DISTINFO and new import_extra(extra_package_name) to import an "extra" package, and to report meaningfully if that fails
+lib/python/cs/timeseries.py: cs.timeseries: moved import_extra() to cs.py.modules
+lib/python/cs/timeseries.py: cs.timeseries: @plotrange decorator for plot functions
+lib/python/cs/timeseries.py: cs.timeseries: pull out a lot of start/step based methods out of TimeSeries as TimeStepsMixin for reuse in the overclasses
+lib/python/cs/timeseries.py: cs.timeseries: DISTINFO: add kaleido to the plotting extra
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: adapt for the methods in the mixin
+lib/python/cs/timeseries.py: cs.timeseries: doctest fixes
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.__getitem__: fix access to slice attributes
+lib/python/cs/timeseries.py: cs.timeseries: new TimeSeries.data(start,stop): zip timestampts and data
+lib/python/cs/timeseries.py: cs.timeseries: plot() methods for the various time series classes
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.__contains__(key): test whether there's a key subdir for key
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy: inherit from icontract.DBC so that contracts are inherited by subclasses
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy: shit the Arrow factory method
+lib/python/cs/timeseries.py: cs.timeseries: rename timespan_tag to tag_for, add tag_for method for TimeSeriesKeySubdir
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesKeySubdir: new timespan_for method
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesKeySubdir.setitems: docstring, logic streamline
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesKeySubdir: has its own timespan_for method
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesKeySubdir: new partition(start,stop) method to yield (when,ts) pairs
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesKeySubdir: rename fspath parameter
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesKeySubdir.__init__: add start parameter (required for consistent time computations)
+lib/python/cs/timeseries.py: cs.timeseries: minor changes, docstring updates
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: make the typecode optional if the data file already exists
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: start and step are not keyword parameters, eases making typecode optional
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy: new tag_timespan(tag)->(start,stop) method
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.keys: return the subdirectory names (lets us make a config.ini file)
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir: new config.ini file to preserve the state which cannot be derive, avoiding nonsense
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: inherit from TimeStepsMixin to get rounding functions etc
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.__str__: make robust against use before all the attributes have been initialised
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy: make __init__(timezone) a keyword parameter; add FACTORIES[name]->factory and DEFAULT_NAME
+lib/python/cs/timeseries.py: cs.timeseries: updates imports, type, pfx_listdir
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_test: small tweaks
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.stat: is a class method, adjust accordingly
+lib/python/cs/timeseries.py: cs.timeseries: startup_shutdown: use try/finally; plumb fstags through TimeSeriesDataDir
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: new .tags property returning the TaggedPath for self.fspath, will be used by TimeSeriesDataDir key information
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: new cmd_plot and timeseries_of(tspath) methods
+lib/python/cs/timeseries.py: cs.timeseries: pull common time series methods out into new TimeSeries abstract class, rename former TimeSeries to TimeSeriesFile
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: override data() method to assemble data from the time series partitions
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.plot: overrides TimeSeries.plot to provide a default plot name
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.subseries: accept a tag or a UNIX time, update for TimeSeries->TimeSeriesFile rename
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.__init__: promote policy argument using TimespanPolicy.from_any(policy)
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.plot: add some context, plumb preferred name
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.config: hardwire the section name (behaved poorly for subclasses)
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.key_typecode: lean in to a hardwired 'd' (float64) default, subclasses should override if required
+lib/python/cs/timeseries.py: cs.timeseries: fix a couple of variable references
+lib/python/cs/timeseries.py: cs.timeseries: update imports, update docstrings, fix lint and small lintish bugs
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.__init__: logic fix around typecode and fill
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.data: now in the TimeSeries superclass
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: TimeSeriesFile and plot also in the superclass
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy: fill out the FACTORIES mapping using TimespanPolicy.register_factory, new from_name and from_any class methods
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.__init__: use TimespanPolicy.from_name
+lib/python/cs/timeseries.py: cs.timeseries: remove some debugging
+lib/python/cs/timeseries.py: cs.timeseries: clean more lint
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.__init__: use TimespanPolicy.from_any
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_plot: fill out usage, upgrade command line parse
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.__getitem__: accept a time slice
+lib/python/cs/timeseries.py: cs.timeseries: drop an assertion, add a type annotation
+lib/python/cs/timeseries.py: cs.timeseries: pull out TimeSeriesCommand.timeseries_of(tspath,...) as top level function timeseries_from_path(tspath,...)
+lib/python/cs/timeseries.py: cs.timeseries: function rename
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir: keys: accept optional fnglob; __contains__,__getitem__: require key to be an identifier
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_plot: specify output image path on command line, upgrade command line parse, add sanity checks; TimeSeries: drop an assert
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.keys: accept a glob pattern or list of glob patterns
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_plot: accept multiple fields or field patterns
+lib/python/cs/timeseries.py: cs.timeseries: switch misplaced error messages
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.plot: new key_colors optional mapping
+lib/python/cs/timeseries.py: cs.timeseries.TimeSeriesCommand.cmd_plot: honour show_image flag, use shlex.join to quote the "open" command
+lib/python/cs/timeseries.py: cs.timeseries: rename tag_for to partition_far, initial start on referring to partitions consistently (and distinct from the fstags)
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: new cmd_info method to report on time series paths
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: streamline command line parse of tspath
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile and TimeSeriesPartitioned do not themselves keep state as fstags but the enclosing structures will, so we will look at the fstags for defaults
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir,TimeSeriesPartitioned: tag the subsidiary structures as we make them
+lib/python/cs/timeseries.py: cs.timeseries: remove junk
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: new tsfilenames to return the list of existing TimeSeriesFile data filenames
+lib/python/cs/timeseries.py: cs.timeseries: catch stray tag_for -> partition_for rename
+lib/python/cs/timeseries.py: cs.timeseries: update the module docstring
+lib/python/cs/timeseries.py: cs.timeseries: add notes about use of fstags for default in class docstrings
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_plot: tidy up the time series handling
+lib/python/cs/timeseries.py: cs.timeseries: finish off the tag -> partition rename
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.__init__: set up .fstags early to support the tags property
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.__str__: make robust against early use
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.__init__: fix fstags .step access
+lib/python/cs/timeseries.py: cs.timeseries: add missing import
+lib/python/cs/timeseries.py: cs.timeseries: clean more lint
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir: get all the config file stuff from cs.configutils.HasConfigIni
+lib/python/cs/timeseries.py: cs.timeseries: new TimeSeriesDataDir.as_pd_dataframe method; adjust other pandas use for pandas being a module extra
+lib/python/cs/timeseries.py: cs.timeseries: finish the TimeSeries.as_np_array and add np_type property
+lib/python/cs/timeseries.py: cs.timeseries: add .typecode to the TimeSeries base class, adjust subclasses
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_plot: improve no matching keys error message
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy: set instance .name from class .name
+lib/python/cs/timeseries.py: cs.timeseries: drop unused variable and obsolete assertion
+lib/python/cs/timeseries.py: cs.timeseries: remove unused import
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir: set .start=0 because we need one; unconvinced about this
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: pull out common things as TimeSeriesBaseCommand abstract base class, which SPLinkCommand now uses
+lib/python/cs/timeseries.py: cs.timeseries: Arrow.timestamp is a property, not a method (recnet change?)
+lib/python/cs/timeseries.py: cs.timeseries: pull generic logic out of TimeSeriesDataDir into a TimeSeriesMapping base class which subclasses dict; also add an initial hook for rules for derived keys
+lib/python/cs/timeseries.py: cs.timeseries: nope, Arrow.timestamp _is_ a method
+lib/python/cs/timeseries.py: cs.timeseries: new TimeSeriesDataDir.makeitem(key) method to autocreate a key TimeSeriesPartitioned
+lib/python/cs/timeseries.py: cs.timeseries: docstring update, type check
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.keys: drop warning on no match, let the caller worry
+lib/python/cs/timeseries.py: cs.timeseries: new plot_events() to plot event tagged entities on an existing Figure
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.plot: accept name parameter, use it to prefix the per-key names if provided
+lib/python/cs/timeseries.py: cs.timeseries: docstring for plot_events
+lib/python/cs/timeseries.py: cs.timeseries: update DISTINFO[install_requires]
+lib/python/cs/timeseries.py: cs.cmdutils: rename BaseCommand.popargv to poparg; adjust callers elsewhere
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.setitems: new optional skipNone mode to ignore values which are None
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir: set __repr__=__str__
+lib/python/cs/timeseries.py: cs.timeseries: timeseries_from_path: plumb the step through to TimeSeriesDataDir()
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: switch SUBCOMMAND_ARGV_DEFAULT from 'test' to 'info'
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: new leading "-s ts-step" option and "tspath" filesystem path preargument
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: new run_context() to set up an Upd() for a status line
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: new cmd_import function to read a CSV file into the time series data dir from tspath
+lib/python/cs/timeseries.py: cs.timeseries: update imports, clean lint, tweak docstring
+lib/python/cs/timeseries.py: cs.timeseries: remove debug
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_import: document the datecol[:conv] command line argument
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_import: implement the optional column name command line arguments
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.data2: move up next to data
+lib/python/cs/timeseries.py: cs.timeseries: DISTINFO: switch out plotly for matplotlib
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.__getitem__: return NaN for times with no data
+lib/python/cs/timeseries.py: cs.timeseries: define an NaN name
+lib/python/cs/timeseries.py: cs.timeseries: _dt64: make an np.array of datetime64 from UNIX times
+lib/python/cs/timeseries.py: cs.timeseries: partial plumbing for options.runstate
+lib/python/cs/timeseries.py: cs.timeseries: shift the plotting from plotly to matplotlib
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesBaseCommand.cmd_plot: big rework: plotting based on DataFrame.plot, new command line options
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: usage update
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.as_np_array: bugfix np.array call
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.as_pd_series: create index using _dt64(), minor streamline
+lib/python/cs/timeseries.py: cs.timeseries: use NaN
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.as_pd_dataframe: progress bar for DataFrame construction, honour runstate.cancelled, use _dt64() to make the index
+lib/python/cs/timeseries.py: cs.timeseries: TODO about something slow
+lib/python/cs/timeseries.py: cs.timeseries: update imports, clean some lint, improve context and error message
+lib/python/cs/timeseries.py: cs.timeseries: update module docstring
+lib/python/cs/timeseries.py: cs.timeseriers: TimeSeriesCommand.run_context: include a context manager for the timeseries tspath
+lib/python/cs/timeseries.py: cs.timeseries: make TimeSeriesBaseCommand.cmd_info an abstract method, move concrete cmd_info to TimeSeriesCommand and update
+lib/python/cs/timeseries.py: cs.timeseries: fix errant warning when config has a step and the command line did not specify one (this is ok)
+lib/python/cs/timeseries.py: cs.timeseries: get NaN from math as nan
+lib/python/cs/timeseries.py: cs.timeseries: docstring clarification
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: new slice(start,stop,pad=False,prepad=False) for slicing the array; __getitem__ calls this for slice indices; adjust form variable names for consistency
+lib/python/cs/timeseries.py: cs.timeseries: small import and lint updates
+lib/python/cs/timeseries.py: cs.timeseries: augument SUPPORTED_TYPECODES with TYPECODE_FOR and associated typecode_of() and type_of() functions
+lib/python/cs/timeseries.py: cs.timeseries: new Epoch class to hold the reference start/step times for any time series; new HasEpochMixin for things with a .epoch
+lib/python/cs/timeseries.py: cs.timeseries: proper cs.binary style TimeSeriesFileHeader class for the TimeSeriesFile header record
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: use the new TimeSeriesFileHeader and assorted updates
+lib/python/cs/timeseries.py: cs.timeseries: shuffle "class TimeSeries" missed if previous commits
+lib/python/cs/timeseries.py: cs/timeseries: plum an Epoch
+lib/python/cs/timeseries.py: cs.timeseries: move timeseries_from_path to the bottom, plumb Epoch
+lib/python/cs/timeseries.py: cs.timeseries: new TimePartition to represent a slice of time associated with a TimeSeriesPartitioned, with an epoch, a name, a start offset and a step count
+lib/python/cs/timeseries.py: cs.timeseries: split TimespanPolicy into TimespanPolicy and the ArrowBasedTimespanPolicy which implements calendar based time policies using the arrow module, and define the presupplied policies succintly; we also formalise the relationship between the policy naive boundaries and the Epoch based time slots
+lib/python/cs/timeseries.py: cs.timeseries: .info_dict() methods in various things
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: new partitioned_spans(start,step) method hooking to self.policy.partitioned_spans; use it in self.data(start,step)
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.setitems: rework the partition stuff using timespans
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.partition: rework using timespans
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: new partition_name_from_filename(filename) method to return the time span name from a `TimeSeriesFile` filename
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.subseries: refactor using self.policy.span_for_name, self.policy.span_for_time etc
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: __repr__=__str__
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_info: now just pprint(ts.info_dict())
+lib/python/cs/timeseries.py: cs.timeseries: update imports, clean a little lint
+lib/python/cs/timeseries.py: cs.timeseries. some more Epoch plumbing, replacing start/step values
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.__getitem__: fix arguments to self.slice()
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.subseries: each TimeSeriesFile has its own epoch derived from the partition span
+lib/python/cs/timeseries.py: cs.timeseries: TimeStepsMixin.offset(when): huge simplification
+lib/python/cs/timeseries.py: cs.timeseries: Epoch.promote: accept a 2-tuple; update doctests for current TimeSeriesFile parameters
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_test: test_pandas: minor tweaks
+lib/python/cs/timeseries.py: cs.timeseries: some docstring updates
+lib/python/cs/timeseries.py: cs.timeseries: move Epoch above HasEpochMixin, let Epoch.promote accept None
+lib/python/cs/timeseries.py: cs.timeseries: use the new OptionalEpochy type annotation for all optional epochs, promote epoch parameters
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_test: special case as not expecting a tspath, run tests in temporary directories
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: replace "end" property with "stop", hand off its computation to self.when()
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_test: test_pandas: smaller test TimeSeriesFile
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.data2: bugfix overconsumption of iterable
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_test: test_timeseries: smaller TimeSeriesFile
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_test: test_partitioned_spans: update and improve
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.as_pd_series: modernise the Series construction
+lib/python/cs/timeseries.py: cs.timeseries: split OptionalEpochy into Epochy and OptionalEpochy
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir uses HasEpochMixin, drop "step" property
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.stop: clarify docstring
+lib/python/cs/timeseries.py: cs.timeseries: use Arrow tzinfo consistently as a parameter name
+lib/python/cs/timeseries.py: cs.timeseries: replaced partition_for and timespan_for with span_for_time and span_for_name
+lib/python/cs/timeseries.py: cs.timeseries: replaced partition_for with span_for_time
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_test: default now to run all tests
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping: new DEFAULT_POLICY_NAME='monthly'
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.partitioned_spans: fix parameter name
+lib/python/cs/timeseries.py: cs.timeseries: timeseries_from_path: epoch tweak
+lib/python/cs/timeseries.py: cs.timeseries: Epoch: add sanity checking to the constructor
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir: hardwire new CONFIG_SECTION_NAME attribute
+lib/python/cs/timeseries.py: cs.timeseries: Epoch.promote: make start and step have the same type, check that we have not lost precision
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.cmd_test: test_datadir: pass required epoch as a step size
+lib/python/cs/timeseries.py: cs.timeseries: Epoch.__new__: verbose message on failed type check
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir: create the data directory if missing
+lib/python/cs/timeseries.py: cs.timeseries: rename TimeSeriesDataDir.makeitem to make_ts for clarity, adjust callers in cs.splink and cs.timeseries
+lib/python/cs/timeseries.py: cs.timeseries: pull out numeric_types from Numeric for isinstance test elsewhere
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand: new cmd_dump to extract a TimeSeries or TimeSeriesMapping as a pandas series or array respectively and print
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesCommand.info: use pformat(..,compact=True), not that it seems to help much
+lib/python/cs/timeseries.py: cs.timeseries: improve various messages and docstrings
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: add abstract startup_shutdown context manager method
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.__init__: change the header scan incantation, shuffle some variables
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.__init__: relax the epoch check to just the step - every TimeSeriesFile.header.epoch.start is the start time of the array
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.file_offset: fix computation - the header length is defined in TimeSeriesFileHeader now
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.array: if the file header time_typecode differs from the expected time_typecode, just issue a warning instead of raising an exception, since it does not actually affect the contents of the array
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.load_from: fix stray reference in mmapped file load
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.slice: fix actual slice operation
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.slice: split out core operation into .offset_slice method (which takes indices of the array instead of UNIX timestamps)
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy.partitioned_spans:
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.__init__: redo the config vs parameters reconciliation
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.partition_name_from_filename: work on the basename, raise ValueError on parse failure
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.partition_name_from_filename: now a static method
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.subseries: pull out the TimeSeriesFile instantiation as new timeseriesfile_from_partition_name method
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: new timeseriesfiles() method returning a mapping of partition name to TimeSeriesFile for the existing data files
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: new .start and .stop properties returning the minimum start and maximum stop of the time series files respectively
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.__getitem__: now this does the work of 4! numeric->datum for UNIX time, slice->data for UNIX time range, *.csts->TimeSeriesFile, partition_name->TimeSeriesFile
+lib/python/cs/timeseries.py: cs.timeseries: timeseries_from_path: refactor
+lib/python/cs/timeseries.py: cs.timeseries: clean lint, update imports, small autoformat
+lib/python/cs/timeseries.py: cs.timeseries: remove some debug
+lib/python/cs/timeseries.py: cs.timeseries: move matplotlib Figure output code to new saved_figure() context manager, save_figure() and print_figure() functions
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping,TimeSeriesDataDir: bugfix subseries open/close logic
+lib/python/cs/timeseries.py: cs.timeseries: fix reference to ts.partition_span
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.plot: fix parameter name in df.plto() call
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.plot: use a pandas series instead of a numpy array so that we can use a timestamp index, solves length problems; update docstring and type annotations
+lib/python/cs/timeseries.py: cs.timeseries: imeseries.py b/lib/py.cmd_plot: update usage message
+lib/python/cs/timeseries.py: cs.timeseries: .plot: update signature and docstring, drop debug; add missing import
+lib/python/cs/timeseries.py: cs.timeseries: add docstrings, clean lint
+lib/python/cs/timeseries.py: cs.timeseries: DISTINFO: matplotlib no longer optional
+lib/python/cs/timeseries.py: cs.timeseries: set the default plot size
+lib/python/cs/timeseries.py: c.stimeseries: update DISTINFO
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.plot: drop debug
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: add mmapped mode for lightweight peek/poke support, make peek/poke use whichever of mmap or array is current
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.array: set modified=False after load
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: add missing array side of the peek/poke implementation, make __getitem__ and __setitem__ call peek and poke
+lib/python/cs/timeseries.py: cs.timeseries: clean lint and fix related bugs
+lib/python/cs/timeseries.py: cs.timeseries: update DISTINFO

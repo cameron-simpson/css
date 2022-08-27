@@ -1,0 +1,4 @@
+lib/python/cs/deco.py: merge default ==> solar
+lib/python/cs/deco.py: merge timeseries ==> solar
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: include suggestion in warning, simplify the caller tracking
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: improve docstring

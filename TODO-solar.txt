@@ -1,0 +1,4 @@
+battery state in power graph on secondary axis
+stacked power graph
+identifierish event name selection
+histograms grouped by time period?

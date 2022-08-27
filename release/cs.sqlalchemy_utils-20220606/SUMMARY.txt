@@ -1,0 +1,3 @@
+BasicTableMixin: provide DEFAULT_ID_COLUMN='id', by_id() has new optional id_column parameter.
+RelationProxy factory to make base classes which proxy a relation, for circumstances where you want to minimise access to the db itself.
+ORM.engine_keywords: turn on echo mode only if "SQL" in $DEBUG.

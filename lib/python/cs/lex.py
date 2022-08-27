@@ -38,16 +38,14 @@ from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
-from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20220227-post'
+__version__ = '20220626-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -55,7 +53,6 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
-        'cs.py3',
         'cs.seq>=20200914',
         'typeguard',
     ],
@@ -278,7 +275,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   '''
   if whitelist is None:
     whitelist = _texthexify_white_chars
-  if isinstance(whitelist, StringTypes) and not isinstance(whitelist, bytes):
+  if isinstance(whitelist, str):
     whitelist = bytes(ord(ch) for ch in whitelist)
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
@@ -364,7 +361,7 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     if len(s) % 2 != 0:
       raise ValueError("uneven hex sequence %r" % (s,))
     chunks.append(unhexify(s))
-  return joinbytes(chunks)
+  return b''.join(chunks)
 
 # pylint: disable=redefined-outer-name
 def get_chars(s, offset, gochars):
@@ -802,7 +799,7 @@ def get_sloshed_text(
         break
       offset += 1
     chunks.append(s[offset0:offset])
-  return u''.join(ustr(chunk) for chunk in chunks), offset
+  return ''.join(chunks), offset
 
 # pylint: disable=redefined-outer-name
 def get_envvar(s, offset=0, environ=None, default=None, specials=None):
@@ -926,7 +923,7 @@ def get_tokens(s, offset, getters):
     kwargs = {}
     if callable(getter):
       func = getter
-    elif isinstance(getter, StringTypes):
+    elif isinstance(getter, str):
 
       # pylint: disable=redefined-outer-name
       def func(s, offset):
@@ -1560,7 +1557,7 @@ class FormatableFormatter(Formatter):
         assert len(format_subspec) > 0
         with Pfx("value=%r, format_subspec=%r", value, format_subspec):
           # promote bare str to FStr
-          if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+          if value is None or type(value) is str:  # pylint: disable=unidiomatic-typecheck
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
@@ -1628,7 +1625,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         As such, a `format_spec` is considered
         a sequence of colon separated terms.
 
-        Classes wanting to implement addition format string syntaxes
+        Classes wanting to implement additional format string syntaxes
         should either:
         - override `FormatableFormatter.format_field1` to implement
           terms with no colons, letting `format_field1` do the split into terms
@@ -1757,7 +1754,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     if strict is None:
       strict = self.format_mode.strict
     with self.format_mode(strict=strict):
-      return _format_as(
+      return pfx_call(
+          _format_as,
           format_s,
           format_mapping,
           formatter=self,

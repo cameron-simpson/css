@@ -55,7 +55,9 @@ class VBoxCommand(BaseCommand):
       pre_argv = [pre_argv]
     if isinstance(argv, str):
       argv = [argv]
-    return run([VBOXMANAGE] + pre_argv + argv + list(post_argv), logger=True)
+    return run(
+        [VBOXMANAGE] + pre_argv + argv + list(post_argv), logger=True
+    ).returncode
 
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [VBoxManage list options...]

@@ -1,0 +1,1 @@
+Upd.insert: insert(1) on empty slots autocreates slot 0.

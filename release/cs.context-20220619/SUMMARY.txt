@@ -1,0 +1,1 @@
+twostep: the returned "tear down" phase function needs to ignore StopIteration from the context manager, see PEP 479.

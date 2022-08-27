@@ -46,7 +46,7 @@ class VCS(ABC):
   def _pipefrom(self, *vcscmd_args):
     ''' Context manager return the stdout of a VCS command.
     '''
-    return pipef(self.COMMAND_NAME, *vcscmd_args)
+    return pipef(self.COMMAND_NAME, *vcscmd_args, quiet=True)
 
   def _cmd(self, *vcscmd_args):
     argv = [self.COMMAND_NAME] + list(vcscmd_args)
