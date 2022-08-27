@@ -15,7 +15,7 @@ from threading import Thread
 from typing import Mapping
 from urllib.parse import quote as urlquote
 
-__version__ = '20220827'
+__version__ = '20220827-post'
 
 DISTINFO = {
     'keywords': ["python3"],
