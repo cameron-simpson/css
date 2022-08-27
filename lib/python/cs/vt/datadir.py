@@ -85,6 +85,7 @@ from cs.seq import imerge
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
 from cs.upd import upd_proxy, state as upd_state, print
+
 from . import MAX_FILE_SIZE, Lock, RLock, defaults
 from .archive import Archive
 from .block import Block
@@ -97,6 +98,12 @@ from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
 from .index import choose as choose_indexclass, FileDataIndexEntry
 from .parsers import scanner_from_filename
 from .util import createpath, openfd_read, openfd_append
+
+##_sleep = sleep
+##
+##def sleep(t):
+##  print("sleep", t, "...")
+##  return _sleep(t)
 
 DEFAULT_DATADIR_STATE_NAME = 'default'
 
@@ -855,7 +862,7 @@ class DataDir(FilesDir):
     datadirpath = self.pathto('data')
     while not self.cancelled:
       if self.flag_scan_disable:
-        sleep(1)
+        sleep(0.1)
         continue
       # scan for new datafiles
       with proxy.extend_prefix(" check datafiles"):
@@ -931,7 +938,8 @@ class DataDir(FilesDir):
                 break
             self.flush()
         self.flush()
-      sleep(1)
+      if not self.cancelled:
+        sleep(0.1)
 
 class RawDataDir(FilesDir):
   ''' Maintenance of a collection of raw data files in a directory.
@@ -1187,6 +1195,8 @@ class PlatonicDir(FilesDir):
                                                       followlinks=True):
             dirnames[:] = sorted(dirnames)
             filenames = sorted(filenames)
+            if self.cancelled:
+              break
             sleep(self.DELAY_INTRASCAN)
             if self.cancelled or self.flag_scan_disable:
               break
@@ -1349,7 +1359,7 @@ class PlatonicDir(FilesDir):
                             transcribe_bytes_geek(scan_rate)
                         )
                       # stall after a file scan, briefly, to limit impact
-                      if elapsed > 0:
+                      if elapsed > 0 and not self.cancelled:
                         sleep(min(elapsed, self.DELAY_INTRASCAN))
             # update the archive after updating from a directory
             if updated and meta_store is not None:
