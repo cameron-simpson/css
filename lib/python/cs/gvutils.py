@@ -12,8 +12,6 @@ from subprocess import Popen, PIPE
 import sys
 from typing import Mapping
 
-from cs.lex import is_identifier
-
 __version__ = '20220805.1-post'
 
 DISTINFO = {
@@ -22,9 +20,6 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [
-        'cs.lex',
-    ],
 }
 
 def quote(s):
@@ -32,7 +27,7 @@ def quote(s):
       This implementation passes identifiers and sequences of decimal numerals
       through unchanged and double quotes other strings.
   '''
-  if s.isalnum() or is_identifier(s):
+  if s.isalnum() or s.replace('_', '').isalnum():
     return s
   return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
 
