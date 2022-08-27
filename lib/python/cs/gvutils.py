@@ -7,11 +7,13 @@
     and the [https://www.graphviz.org/doc/info/command.html](`dot` command line tool).
 '''
 
+from base64 import b64encode
 from os.path import exists as existspath
 from subprocess import Popen, PIPE
 import sys
 from threading import Thread
 from typing import Mapping
+from urllib.parse import quote as urlquote
 
 __version__ = '20220805.1-post'
 
@@ -35,6 +37,9 @@ def quote(s):
 # special value to capture the output of gvprint as binary data
 GVCAPTURE = object()
 
+# special value to capture the output of gvprint as a data: URL
+GVDATAURL = object()
+
 # pylint: disable=too-many-branches,too-many-statements,too-many-locals
 def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
   ''' Print the graph specified by `dot_s`, a graph in graphViz DOT syntax,
@@ -47,10 +52,15 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
       In addition to being a file or file descriptor,
       `file` may also take the following special values:
       * `GVCAPTURE`: causes `gvprint` to return the image data as `bytes`
+      * `GVDATAURL`: causes `gvprint` to return the image data as a `data:` URL
 
       This uses the graphviz utility `dot` to draw graphs.
       If printing in SIXEL format the `img2sixel` utility is required,
       see [https://saitoha.github.io/libsixel/](libsixel).
+
+      Example:
+
+          data_url = gvprint('digraph FOO {A->B}', file=GVDATAURL, fmt='svg')
     '''
   if file is None:
     file = sys.stdout
@@ -59,6 +69,20 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
       raise ValueError("file %r: already exists" % (file,))
     with open(file, 'wb') as f:
       return gvprint(dot_s, file=f, fmt=fmt, layout=layout, **dot_kw)
+  if file is GVDATAURL:
+    gvdata = gvprint(dot_s, file=GVCAPTURE, fmt=fmt, layout=layout, **dot_kw)
+    data_content_type = f'image/{"svg+xml" if fmt == "svg" else fmt}'
+    if fmt in (
+        'dot',
+        'svg',
+    ):
+      gv_data_s = gvdata.decode('utf8')
+      data_encoding = 'utf8'
+      data_part = urlquote(gv_data_s.replace('\n', ''), safe=':/<>{}')
+    else:
+      data_encoding = 'base64'
+      data_part = b64encode(gvdata).decode('ascii')
+    return f'data:{data_content_type};{data_encoding},{data_part}'
   if file is GVCAPTURE:
     capture_mode = True
     file = PIPE
@@ -148,11 +172,22 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
     return bs
   return None
 
+gvprint.__doc__ += (
+    '\n    produces a `data:` URL rendering as:\n    <img src="' +
+    gvprint('digraph FOO {A->B}', file=GVDATAURL, fmt='svg') + '">'
+)
 
 def gvdata(dot_s, **kw):
   ''' Convenience wrapper for `gvprint` which returns the binary image data.
   '''
   return gvprint(dot_s, file=GVCAPTURE, **kw)
+
+def gvdataurl(dot_s, **kw):
+  ''' Convenience wrapper for `gvprint` which returns the binary image data
+      as a `data:` URL.
+  '''
+  return gvprint(dot_s, file=GVDATAURL, **kw)
+
 class DOTNodeMixin:
   ''' A mixin providing methods for things which can be drawn as
       nodes in a DOT graph description.
