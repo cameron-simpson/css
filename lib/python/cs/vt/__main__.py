@@ -37,12 +37,9 @@ from cs.context import stackattrs
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
-import cs.logutils
-from cs.logutils import (
-    exception, error, warning, track, info, upd, debug, logTo
-)
+from cs.logutils import (exception, error, warning, track, info, debug, logTo)
 from cs.pfx import Pfx, pfx_method, pfx_call
-from cs.progress import progressbar
+from cs.progress import progressbar, Progress
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print
@@ -843,7 +840,6 @@ class VTCmd(BaseCommand):
           E = entry.dirent
           if E is None:
             E = Dir(mount_base)
-            X("cmd_mount: new E=%r", E)
           else:
             ##dump_Dirent(E, recurse=True)
             if not E.isdir:
@@ -920,7 +916,6 @@ class VTCmd(BaseCommand):
         source = OSDir(ospath)
       else:
         source = OSFile(ospath)
-      X("target = %s, source= %s", type(target), type(source))
       if not merge(target, source, runstate=self.options.runstate):
         error("merge into %r fails", arpath)
         return 1
@@ -961,6 +956,15 @@ class VTCmd(BaseCommand):
   @pfx_method
   def _parse_pushable(self, pushable_spec):
     ''' Parse an object specification and return the object.
+
+        The following specifications are recognised:
+        * an absolute filesystem path to a directory with a `data`
+          subdirectory returns a `DataDirStore`
+        * an absolute filesystem path to a `.vtd` `DataFile` returns
+          a `DataFilePushable`
+        * an absolute filesystem path to a `.vt` `Archive` file
+          returns a `DataFilePushable`
+        * a Store specification
     '''
     obj = None
     if pushable_spec.startswith('/'):
@@ -1097,7 +1101,7 @@ class VTCmd(BaseCommand):
 
   def cmd_save(self, argv):
     ''' Usage: {cmd} [-F] [{{ospath|-}}...]
-          Save the contents of each ospath to the Store and print a fileref 
+          Save the contents of each ospath to the Store and print a fileref
           or dirref for each.
           The argument "-" reads data from standard input and prints a fileref.
           The default argument list is "-".
