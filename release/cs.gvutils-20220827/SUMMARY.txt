@@ -1,0 +1,3 @@
+Remove dependency on cs.lex - now we need only the stdlib.
+New GVCAPTURE value for gvprint(file=) to return the binary image data as a bytes object; associated gvdata() convenience function.
+New GVDATAURL value for gvprint(file=) to return the binary image data as a data URL; associated gvdataurl() convenience function.

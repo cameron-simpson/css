@@ -1,0 +1,3 @@
+lib/python/cs/gvutils.py: cs.gvutils: remove dependency of cs.lex
+lib/python/cs/gvutils.py: cs.gvutils: new GVCAPTURE value for gvprint(file=) to return the binary image data as a bytes object
+lib/python/cs/gvutils.py: cs.gvutils: new GVDATAURL value for gvprint(file=) to return the binary image data as a data URL; associated gvdataurl() convenience function
