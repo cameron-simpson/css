@@ -41,7 +41,9 @@ GVCAPTURE = object()
 GVDATAURL = object()
 
 # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
+def gvprint(
+    dot_s, file=None, fmt=None, layout=None, dataurl_encoding=None, **dot_kw
+):
   ''' Print the graph specified by `dot_s`, a graph in graphViz DOT syntax,
       to `file` (default `sys.stdout`)
       in format `fmt` using the engine specified by `layout` (default `'dot'`).
@@ -53,6 +55,10 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
       `file` may also take the following special values:
       * `GVCAPTURE`: causes `gvprint` to return the image data as `bytes`
       * `GVDATAURL`: causes `gvprint` to return the image data as a `data:` URL
+
+      For `GVDATAURL`, the parameter `dataurl_encoding` may be used
+      to override the default encoding, which is `'utf8'` for `fmt`
+      values `'dot'` and `'svg'`, otherwise `'base64'`.
 
       This uses the graphviz utility `dot` to draw graphs.
       If printing in SIXEL format the `img2sixel` utility is required,
@@ -70,19 +76,24 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
     with open(file, 'wb') as f:
       return gvprint(dot_s, file=f, fmt=fmt, layout=layout, **dot_kw)
   if file is GVDATAURL:
+    if dataurl_encoding is None:
+      dataurl_encoding = 'utf8' if fmt in (
+          'dot',
+          'svg',
+      ) else 'base64'
     gvdata = gvprint(dot_s, file=GVCAPTURE, fmt=fmt, layout=layout, **dot_kw)
     data_content_type = f'image/{"svg+xml" if fmt == "svg" else fmt}'
-    if fmt in (
-        'dot',
-        'svg',
-    ):
+    if dataurl_encoding == 'utf8':
       gv_data_s = gvdata.decode('utf8')
-      data_encoding = 'utf8'
       data_part = urlquote(gv_data_s.replace('\n', ''), safe=':/<>{}')
-    else:
-      data_encoding = 'base64'
+    elif dataurl_encoding == 'base64':
       data_part = b64encode(gvdata).decode('ascii')
-    return f'data:{data_content_type};{data_encoding},{data_part}'
+    else:
+      raise ValueError(
+          "invalid data URL encoding %r; I accept 'utf8' or 'base64'" %
+          (dataurl_encoding,)
+      )
+    return f'data:{data_content_type};{dataurl_encoding},{data_part}'
   if file is GVCAPTURE:
     capture_mode = True
     file = PIPE
@@ -173,8 +184,12 @@ def gvprint(dot_s, file=None, fmt=None, layout=None, **dot_kw):
   return None
 
 gvprint.__doc__ += (
-    '\n    produces a `data:` URL rendering as:\n    <img src="' +
-    gvprint('digraph FOO {A->B}', file=GVDATAURL, fmt='svg') + '">'
+    '\n    produces a `data:` URL rendering as:\n    <img src="' + gvprint(
+        'digraph FOO {A->B}',
+        file=GVDATAURL,
+        fmt='svg',
+        dataurl_encoding='base64',
+    ) + '">'
 )
 
 def gvdata(dot_s, **kw):
