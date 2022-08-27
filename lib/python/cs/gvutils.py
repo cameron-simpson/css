@@ -183,14 +183,16 @@ def gvprint(
     return bs
   return None
 
-gvprint.__doc__ += (
-    '\n    produces a `data:` URL rendering as:\n    <img src="' + gvprint(
-        'digraph FOO {A->B}',
-        file=GVDATAURL,
-        fmt='svg',
-        dataurl_encoding='base64',
-    ) + '">'
-)
+## Nothing renders this :-(
+##
+##gvprint.__doc__ += (
+##    '\n    produces a `data:` URL rendering as:\n    <img src="' + gvprint(
+##        'digraph FOO {A->B}',
+##        file=GVDATAURL,
+##        fmt='svg',
+##        dataurl_encoding='base64',
+##    ) + '">'
+##)
 
 def gvdata(dot_s, **kw):
   ''' Convenience wrapper for `gvprint` which returns the binary image data.
