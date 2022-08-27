@@ -388,8 +388,6 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
         When finished, call Q.close() to indicate end of Blocks and
         T.join() to wait for the processing completion.
     '''
-    sem = Semaphore(capacity)
-    ##sem = Semaphore(1)
     name = "%s.pushto(%s)" % (self.name, dstS.name)
     with Pfx(name):
       Q = IterableQueue(capacity=capacity, name=name)
@@ -398,7 +396,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       dstS.open()
       T = bg_thread(
           lambda: (
-              self._push_blocks(name, Q, srcS, dstS, sem, progress),
+              self._push_blocks(name, Q, srcS, dstS, progress),
               srcS.close(),
               dstS.close(),
           )
@@ -406,16 +404,15 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       return Q, T
 
   @pfx_method
-  def _push_blocks(self, name, blocks, srcS, dstS, sem, progress):
+  def _push_blocks(self, name, blocks, srcS, dstS, progress):
     ''' This is a worker function which pushes Blocks or bytes from
         the supplied iterable `blocks` to the second Store.
 
         Parameters:
         * `name`: name for this worker instance
-        * `blocks`: an iterable of Blocks or bytes-like objects;
-          each item may also be a tuple of `(block-or-bytes,length)`
-          in which case the supplied length will be used for progress reporting
-          instead of the default length
+        * `blocks`: an iterable of `HashCode`s or Blocks or bytes-like objects
+        * `srcS`: the source Store from which to obtain block data
+        * `dstS`: the target Store to which to push Blocks
     '''
     lock = Lock()
     with srcS:
