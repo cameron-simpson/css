@@ -43,7 +43,7 @@ cs.fs ok_revision="1fa6299d7ddc225c54ce23ef6d566f752aaf5313" pypi.release="20220
 cs.fsm ok_revision=ff4928e3732f022cfbdba2e44d7038986ae29e9a pypi.release="20220805.1"
 cs.fstags pypi.release="20220606" ok_revision="8d7cf241e48009267aef9fdd7f3676adc6701ab4"
 cs.gimmicks ok_revision="69717a798c9d840f055eb77ace16dff72c95fd15" pypi.release="20220429" features={"20211208":["TimeoutError"],"20220429":["devnull"]}
-cs.gvutils ok_revision="94eb2f3414cd22715c4ce03489b0a1c5b2bb36a4" pypi.release="20220827" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"]}
+cs.gvutils ok_revision="94eb2f3414cd22715c4ce03489b0a1c5b2bb36a4" pypi.release="20220827.1" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"]}
 cs.html pypi.release=20160828
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
