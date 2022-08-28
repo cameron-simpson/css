@@ -1251,7 +1251,7 @@ class VTCmd(BaseCommand):
           srv = serve_tcp(
               bind_addr=(host, port), exports=exports, runstate=runstate
           )
-          runstate.notify_cancel.add(lambda runstate: srv.shutdown())
+          runstate.notify_cancel.add(lambda runstate: srv.shutdown_now())
         srv.join()
       else:
         raise GetoptError(
