@@ -141,9 +141,9 @@ class _ClientConnectionHandler(StreamRequestHandler):
         local_store=self.S,
         exports=self.exports,
     )
-    remoteS.startup()
+    remoteS.open()
     remoteS.join()
-    remoteS.shutdown()
+    remoteS.close()
 
 class _TCPServer(ThreadingMixIn, TCPServer):
 
