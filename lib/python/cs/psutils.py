@@ -249,7 +249,7 @@ def pipefrom(argv, quiet=False, binary=False, keep_stdin=False, **kw):
 
       Parameters:
       * `argv`: the command argument list
-      * `binary`: if true (default false)
+      * `binary`: if true (default `False`)
         return the raw stdout instead of a text wrapper
       * `quiet`: optional flag, default `False`;
 
