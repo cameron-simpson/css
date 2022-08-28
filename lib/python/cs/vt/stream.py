@@ -84,7 +84,7 @@ class StreamStore(BasicStoreSync):
 
         Parameters:
         * `addif`: optional mode causing `.add` to probe the peer for
-          the data chunk's hash and to only submit a ADD request
+          the data chunk's hash and to only submit an ADD request
           if the block is missing; this is a bandwith optimisation
           at the expense of latency.
         * `connect`: if not `None`, a function to return `recv` and `send`.
@@ -242,27 +242,26 @@ class StreamStore(BasicStoreSync):
         Raises `StoreError` on protocol failure or not `ok` responses.
         Returns `(flags,payload)` otherwise.
     '''
-    with Pfx("%s.do(%s)", self, rq):
-      conn = self.connection()
-      if conn is None:
-        raise StoreError("no connection")
-      try:
-        retval = conn.do(rq.RQTYPE, getattr(rq, 'packet_flags', 0), bytes(rq))
-      except ClosedError as e:
-        self._conn = None
-        raise StoreError("connection closed: %s" % (e,), request=rq) from e
-      except CancellationError as e:
-        raise StoreError("request cancelled: %s" % (e,), request=rq) from e
-      else:
-        if retval is None:
-          raise StoreError("NO RESPONSE", request=rq)
-        ok, flags, payload = retval
-        if not ok:
-          raise StoreError(
-              "NOT OK response", request=rq, flags=flags, payload=payload
-          )
-        return flags, payload
-      raise RuntimeError("NOTREACHED")
+    conn = self.connection()
+    if conn is None:
+      raise StoreError("no connection")
+    try:
+      retval = conn.do(rq.RQTYPE, getattr(rq, 'packet_flags', 0), bytes(rq))
+    except ClosedError as e:
+      self._conn = None
+      raise StoreError("connection closed: %s" % (e,), request=rq) from e
+    except CancellationError as e:
+      raise StoreError("request cancelled: %s" % (e,), request=rq) from e
+    else:
+      if retval is None:
+        raise StoreError("NO RESPONSE", request=rq)
+      ok, flags, payload = retval
+      if not ok:
+        raise StoreError(
+            "NOT OK response", request=rq, flags=flags, payload=payload
+        )
+      return flags, payload
+    raise RuntimeError("NOTREACHED")
 
   @staticmethod
   def decode_request(rq_type, flags, payload):
