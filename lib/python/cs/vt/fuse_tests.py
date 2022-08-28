@@ -5,20 +5,17 @@
 #
 
 from contextlib import contextmanager
-import os
 import sys
 import time
 import unittest
-from random import randint
 from tempfile import TemporaryDirectory
-from cs.fileutils import BackedFile, BackedFile_TestMethods
+
+from cs.debug import thread_dump
 from cs.logutils import warning
-from cs.psutils import run
 from cs.resources import stackattrs
 from cs.testutils import SetupTeardownMixin
 from cs.x import X
 
-from . import defaults
 from .dir import Dir
 try:
   from .fuse import mount, umount
@@ -48,6 +45,10 @@ class Test_VTFuse(SetupTeardownMixin, unittest.TestCase):
             yield
           finally:
             umount(testdirpath)
+    time.sleep(1)
+    with open('/dev/tty', 'a') as tty:
+      with stackattrs(sys, stderr=tty):
+        thread_dump()
 
   def test_FS(self):
     X("test_FS...")
