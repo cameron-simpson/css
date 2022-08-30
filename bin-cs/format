@@ -11,7 +11,6 @@ trace=
 
 flagfile=
 pymode=3
-pyformat=${CS_FORMAT_PY:-yapf}
 
 cmd=$0
 usage="Usage: $cmd [-2] [-3] [-n] [-q] [-t flagfile] [-x] filenames...
@@ -112,6 +111,7 @@ do
     continue
   }
 
+  pyformat=${CS_FORMAT_PY:-''}
   if [ "x$type" = xpy ]
   then  type=${type}${pymode}
   fi
@@ -120,7 +120,9 @@ do
     js) $trace prettier --write "$srcfile" ;;
     json)$trace json-pprint < "$srcfile" | rewriteif -- "$srcfile" ;;
     php)$trace php-cs-fixer fix -q --rules=@PSR2 "$srcfile" ;;
-    py2)case $pyformat in
+    py2)
+        [ -n "$pyformat" ] || pyformat=$( fstags ls -d -o '{cs.format.python}' )
+        case $pyformat in
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python2 -m yapf --style "$style" -i "$srcfile" ;;
           black)  $trace black -q -t py27 "$srcfile" ;;
@@ -129,7 +131,9 @@ do
                   ;;
         esac
         ;;
-    py3)case $pyformat in
+    py3)
+        [ -n "$pyformat" ] || pyformat=$( fstags ls -d -o '{cs.format.python}' )
+        case $pyformat in
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python3 -m yapf --style "$style" -i "$srcfile" ;;
           black)  $trace black -q -t py38 -S "$srcfile" ;;
