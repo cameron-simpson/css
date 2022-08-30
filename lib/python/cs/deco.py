@@ -120,8 +120,7 @@ def decorator(deco):
           decorated.__name__ = getattr(func, '__name__', str(func))
         except AttributeError:
           pass
-        if not getattr(decorated, '__doc__', None):
-          decorated.__doc__ = getattr(func, '__doc__', '')
+        decorated.__doc__ = getattr(func, '__doc__', None) or ''
         func_module = getattr(func, '__module__', None)
         try:
           decorated.__module__ = func_module
@@ -134,7 +133,7 @@ def decorator(deco):
     # `deco(func, *da, **kw)`.
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
-      decorated.__doc__ = getattr(func, '__doc__', '')
+      decorated.__doc__ = getattr(func, '__doc__', None) or ''
       func_module = getattr(func, '__module__', None)
       try:
         decorated.__module__ = func_module
