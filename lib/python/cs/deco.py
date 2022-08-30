@@ -45,6 +45,7 @@ def ALL(func):
               ...
   '''
   sys.modules[func.__module__].__all__.append(func.__name__)
+  return func
 
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
