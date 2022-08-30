@@ -170,6 +170,9 @@ class HasFSPath:
   def __init__(self, fspath):
     self.fspath = fspath
 
+  def __str__(self):
+    return f'{self.__class__.__name__}(fspath={self.shortpath})'
+
   @property
   def shortpath(self):
     ''' The short version of `self.fspath`.
