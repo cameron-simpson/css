@@ -28,6 +28,24 @@ DISTINFO = {
     'install_requires': ['cs.gimmicks'],
 }
 
+def ALL(func):
+  ''' Include this function's name in its module's `__all__` list.
+
+      Example:
+
+          from cs.deco import ALL
+
+          __all__ = []
+
+          def obscure_function(...):
+              ...
+
+          @ALL
+          def well_known_function(...):
+              ...
+  '''
+  sys.modules[func.__module__].__all__.append(func.__name__)
+
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
       formatted against the function's module `__dict__`.
