@@ -729,6 +729,89 @@ def observable_class(property_names, only_unequal=False):
 
   return make_observable_class
 
+@decorator
+def autoparam(func, **params):
+  ''' A simple wrapper to automatically provide keyword arguments.
+
+      Operation:
+
+      For each `param_name=param_default` decorator argument,
+      the function keyword parameters are examined for `param_name`.
+      If it is missing, it is filled in with the default value;
+      if `param_default` is callable, the default value is `param_default()`
+      otherwise it is just `param_default`.
+      If you need to provide a callable default value, use
+      `param_name=lambda param_default: param_default`.
+
+      Finally the wrapper function returns the value of `func(*a,**kw)`
+      like any normal decorator.
+
+      Simple example:
+
+          def with_ds3client(func):
+              """ Fill in `ds3client` from `get_ds3client()` if not provided.
+              """
+              return autoparam(func, ds3client=get_ds3client)
+
+          @with_ds3client
+          def do_something(*a, ds3client, **kw):
+             # a function using a ds3client parameter
+
+      Elaborate example from `cs.timeseries`.
+      This defines `@with_utcoffset` which decorates a function
+      to accept optional `tz` or `utcoffset` arguments
+      and always call the underlying function with just a `utcoffset`
+      keyword argument.
+      Instead of calling `func` directly,
+      we provide a wrapper function itself decorated with `@autoparam`
+      which computes a `utcoffset` from the `tz` and `utcoffset` arguments,
+      and passes only the comoputed `utcoffset` to the underlying function.
+
+          @decorator
+          def with_utcoffset(func):
+
+            @autoparam(tz=None, utcoffset=None)
+            def with_utcoffset_wrapper(start, stop, *a, tz, utcoffset, **kw):
+              if utcoffset is None:
+                if tz is None:
+                  utcoffset = 0.0
+                else:
+                  tz = tzfor(tz)
+                  assert isinstance(tz, tzinfo)
+                  # DF hack: compute the timezone offset for "stop",
+                  # use it to skew the UNIX timestamps so that UTC tick marks and
+                  # placements look "local"
+                  dt = datetime.fromtimestamp(stop, tz=tz)
+                  utcoffset = tz.utcoffset(dt).total_seconds()
+              elif tz is not None:
+                raise ValueError(
+                    "may not supply both utcoffset:%s and tz:%s" % (r(utcoffset), r(tz))
+                )
+              return func(start, stop, *a, utcoffset=utcoffset, kw)
+
+            with_utcoffset_wrapper.__doc__ += """
+
+                The `utcoffset` or `tz` parameters may be used to provide
+                an offset from UTC in seconds .......
+            """
+
+            return with_utcoffset_wrapper
+  '''
+
+  def autoparam_wrapper(*a, **kw):
+    for param_name, param_default in params.items():
+      try:
+        kw_value = kw[param_name]
+      except KeyError:
+        if callable(param_default):
+          kw_value = param_default()
+        else:
+          kw_value = param_default
+        kw[param_name] = kw_value
+    return func(*a, **kw)
+
+  return autoparam_wrapper
+
 def _teststuff():
 
   @contextdecorator
