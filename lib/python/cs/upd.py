@@ -234,10 +234,10 @@ class Upd(SingletonMixin):
           pass
         else:
           for ti_name in (
-              'vi',
-              'vs',  # cursor invisible/visible
-              'cuu1',  # cursor up 1 line
-              'dl1',  # delete 1 line
+              'vi',  # cursor invisible
+              'vs',  # cursor visible
+              'cuu1',  # cursor up one line
+              'dl1',  # delete one line
               'il1',  # insert one line
               'el',  # clear to end of line
           ):
@@ -970,7 +970,7 @@ class Upd(SingletonMixin):
       report_print=False,
       runstate=None,
       tick_delay=0.15,
-      tick_chars='|/-\\'
+      tick_chars='|/-\\',
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
     '''
