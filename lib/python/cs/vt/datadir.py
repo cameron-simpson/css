@@ -522,8 +522,8 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
         rollover = self.rollover
         if rollover is not None and wf.tell() >= rollover:
           # file now full, close it so as to start a new one on next write
-          os.close(wfd)
-          wfd = None
+          wf.close()
+          wf = None
           self._filemap.set_indexed_to(DFstate.filenum, DFstate.indexed_to)
           DFstate = None
       if batch_length < batch_size:
