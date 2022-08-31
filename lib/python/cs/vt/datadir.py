@@ -1076,7 +1076,7 @@ class PlatonicDir(FilesDir):
         data directory path.
     '''
     if meta_store is None:
-      raise ValueError("meta_store may not be None")
+      meta_store = defaults.S
     super().__init__(topdirpath, hashclass=hashclass, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path
@@ -1086,46 +1086,37 @@ class PlatonicDir(FilesDir):
     self.exclude_file = exclude_file
     self.follow_symlinks = follow_symlinks
     self.meta_store = meta_store
-    if meta_store is not None and archive is None:
+    if archive is None:
       # use the default archive
       archive = self.get_Archive(missing_ok=True)
     elif archive is not None:
       if isinstance(archive, str):
         archive = Archive(archive)
     self.archive = archive
-    self.topdir = None
+    archive = self.archive
+    D = archive.last.dirent
+    if D is None:
+      info("%r: no archive entries, create empty topdir Dir", archive)
+      with meta_store:
+        D = Dir('.')
+        archive.update(D)
+    self.topdir = D
 
   @contextmanager
   def startup_shutdown(self):
     with super().startup_shutdown():
-      meta_store = self.meta_store
-      if meta_store is not None:
-        self.meta_store.open()
-        archive = self.archive
-        D = archive.last.dirent
-        if D is None:
-          info("%r: no archive entries, create empty topdir Dir", archive)
-          D = Dir('.')
-          archive.update(D)
-        self.topdir = D
-      try:
-        yield
-      finally:
-        if meta_store is not None:
-          self.sync_meta(meta_store)
-          meta_store.close()
+      with self.meta_store:
+        try:
+          yield
+        finally:
+          self.sync_meta()
 
-  def sync_meta(self, meta_store=None):
+  def sync_meta(self):
     ''' Update the Archive state.
     '''
-    if meta_store is None:
-      meta_store = self.meta_store
-    if meta_store is None:
+    # update the archive, using meta_store as the default block store
+    with self.meta_store:
       self.archive.update(self.topdir)
-    else:
-      # update the archive, using meta_store as the default block store
-      with meta_store:
-        self.archive.update(self.topdir)
     ##dump_Dirent(self.topdir, recurse=True)
 
   @staticmethod
