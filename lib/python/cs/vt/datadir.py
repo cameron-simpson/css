@@ -411,16 +411,6 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                   with Pfx("os.close(rfd:%d)", rfd):
                     os.close(rfd)
 
-  def pathto(self, rpath):
-    ''' Return the path to `rpath`, which is relative to the `topdirpath`.
-    '''
-    return joinpath(self.topdirpath, rpath)
-
-  def datapathto(self, rpath):
-    ''' Return the path to `rpath`, which is relative to the `datadirpath`.
-    '''
-    return self.pathto(joinpath('data', rpath))
-
   @typechecked
   def new_datafile(self) -> DataFileState:
     ''' Create a new datafile.
