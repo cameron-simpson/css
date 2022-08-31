@@ -347,6 +347,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     '''
     with super().startup_shutdown():
       self.initdir()
+      upd = upd_state.upd
       runstate = self.runstate
       hashname = self.hashname
       # cache of open DataFiles
@@ -363,53 +364,53 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
             index=index,
             _cache=cache,
         ):
-          # Set up data queue.
-          # The .add() method adds the data to self._unindexed, puts the
-          # data onto the data queue, and returns.
-          # The data queue worker saves the data to backing files and
-          # updates the indices.
-          self._data_progress = Progress(
-              name=str(self) + " data queue ",
-              total=0,
-              units_scale=BINARY_BYTES_SCALE,
-          )
-          with (upd_state.upd.insert(1)
-                if defaults.show_progress else nullcontext()) as data_proxy:
-            dataQ = IterableQueue(65536)
-            with stackattrs(
-                self,
-                _data_proxy=data_proxy,
-                _dataQ=dataQ,
-                _data_Thread=bg_thread(
-                    self._process_data_queue,
-                    name="%s._process_data_queue" % (self,),
-                    args=(dataQ,),
-                ),
-                _monitor_Thread=bg_thread(
-                    self._monitor_datafiles,
-                    name="%s-datafile-monitor" % (self,),
-                ),
-            ):
-              with runstate:
-                try:
-                  yield
-                finally:
-                  self.runstate.cancel()
-                  self.flush()
-                  # shut down the monitor Thread
-                  mon_thread = self._monitor_Thread
-                  if mon_thread is not None:
-                    mon_thread.join()
-                  # drain the data queue
-                  self._dataQ.close()
-                  self._dataQ = None
-                  self._data_Thread.join()
-                # update state to substrate
-                self._filemap.close()
-                # close the read file descriptors
-                for rfd in self._rfds.values():
-                  with Pfx("os.close(rfd:%d)", rfd):
-                    os.close(rfd)
+          with runstate:
+            # Set up data queue.
+            # The .add() method adds the data to self._unindexed, puts the
+            # data onto the data queue, and returns.
+            # The data queue worker saves the data to backing files and
+            # updates the indices.
+            data_progress = Progress(
+                name=str(self) + " data queue ",
+                total=0,
+                units_scale=BINARY_BYTES_SCALE,
+            )
+            with (upd.insert(1)
+                  if defaults.show_progress else nullcontext()) as data_proxy:
+              with upd.run_task(str(self) + " monitor ") as monitor_proxy:
+                with stackattrs(self, _monitor_proxy=monitor_proxy):
+                  dataQ = IterableQueue(65536)
+                  with stackattrs(
+                      self,
+                      _data_progress=data_progress,
+                      _data_proxy=data_proxy,
+                      _dataQ=dataQ,
+                      _data_Thread=bg_thread(
+                          self._process_data_queue,
+                          name="%s._process_data_queue" % (self,),
+                          args=(dataQ,),
+                      ),
+                      _monitor_Thread=bg_thread(
+                          self._monitor_datafiles,
+                          name="%s-datafile-monitor" % (self,),
+                      ),
+                  ):
+                    try:
+                      yield
+                    finally:
+                      self.runstate.cancel()
+                      self._monitor_Thread.join()
+                      self.flush()
+                      # drain the data queue
+                      self._dataQ.close()
+                      self._dataQ = None
+                      self._data_Thread.join()
+                    # update state to substrate
+                    self._filemap.close()
+                    # close the read file descriptors
+                    for rfd in self._rfds.values():
+                      with Pfx("os.close(rfd:%d)", rfd):
+                        os.close(rfd)
 
   @typechecked
   def new_datafile(self) -> DataFileState:
