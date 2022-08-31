@@ -110,13 +110,14 @@ def block_from_chunks(bfr, **kw):
   return top_block_for(blockify(bfr, **kw))
 
 def spliced_blocks(B, new_blocks):
-  ''' Splice `new_blocks` into the data of the `Block` `B`.
+  ''' Splice (note *insert*) the iterable `new_blocks` into the data of the `Block` `B`.
       Yield high level blocks covering the result
       i.e. all the data from `B` with `new_blocks` inserted.
 
       The parameter `new_blocks` is an iterable of `(offset,Block)`
       where `offset` is a position for `Block` within `B`.
-      The `Block`s in `new_blocks` must be in `offset` order.
+      The `Block`s in `new_blocks` must be in `offset` order
+      and may not overlap.
 
       Example:
 
@@ -127,10 +128,12 @@ def spliced_blocks(B, new_blocks):
           >>> b''.join(map(bytes, splicedBs))
           b'xxaayybbcczz'
   '''
+  # note that upto and offset count in the original space of `B`
   upto = 0  # data span yielded so far
   for offset, newB in new_blocks:
     # yield high level Blocks up to offset
     if offset > upto:
+      # fill data from upto through to the new offset
       yield from B.top_blocks(upto, offset)
       upto = offset
     elif offset < upto:
@@ -138,7 +141,8 @@ def spliced_blocks(B, new_blocks):
           "new_blocks: offset=%d,newB=%s: this position has already been passed"
           % (offset, newB)
       )
-    # splice in th the new Block
+    # splice in the new Block
+    # the newly inserted data do not advance upto
     yield newB
   if upto < len(B):
     # yield high level Blocks for the data which follow
