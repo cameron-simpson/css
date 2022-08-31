@@ -766,7 +766,7 @@ class SqliteFilemap:
         DFstate = self.n_to_DFstate[filenum]
       else:
         # already mapped
-        DFState = self.path_to_DFstate[new_path]
+        DFstate = self.path_to_DFstate[new_path]
     return DFstate
 
   def del_path(self, old_path):
