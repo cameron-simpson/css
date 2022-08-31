@@ -975,20 +975,17 @@ class RawDataDir(FilesDir):
   def _monitor_datafiles(self):
     pass
 
-class PlatonicFile(MultiOpenMixin, ReadMixin):
+class PlatonicFile(MultiOpenMixin, HasFSPath, ReadMixin):
   ''' A PlatonicFile is a normal file whose content is used as the
       reference for block data.
   '''
 
-  def __init__(self, path):
+  def __init__(self, fspath):
     MultiOpenMixin.__init__(self)
-    self.path = path
+    HasFSPath.__init__(self, fspath)
     self._fd = None
     # dummy value since all I/O goes through datafrom, which uses pread
     self._seek_offset = 0
-
-  def __str__(self):
-    return "PlatonicFile(%s)" % (shortpath(self.path,))
 
   @contextmanager
   def startup_shutdown(self):
@@ -997,7 +994,7 @@ class PlatonicFile(MultiOpenMixin, ReadMixin):
     with super().startup_shutdown():
       with stackattrs(
           self,
-          _fd=pfx_call(os.open, self.path, os.O_RDONLY),
+          _fd=pfx_call(os.open, self.fspath, os.O_RDONLY),
       ):
         try:
           yield
