@@ -1168,7 +1168,7 @@ class UpdProxy(object):
 
   @property
   def width(self):
-    ''' The available space for text after `self.prefix`.
+    ''' The available space for text after `self.prefix` and before `self.suffix`.
 
         This is available width for uncropped text,
         intended to support presizing messages such as progress bars.
@@ -1176,8 +1176,12 @@ class UpdProxy(object):
         portion of the text which fits.
     '''
     prefix = self.prefix
+    suffix = self.suffix
     upd = self.upd
-    return (upd.columns if upd else 80) - 1 - (len(prefix) if prefix else 0)
+    return (
+        (upd.columns if upd else 80) - 1 - (len(prefix) if prefix else 0) -
+        (len(suffix) if suffix else 0)
+    )
 
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
