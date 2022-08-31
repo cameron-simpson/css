@@ -253,7 +253,6 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
         flags_id=id(resolved.flags)
     )
 
-  @require(lambda topdirpath: isinstance(topdirpath, str))
   @require(lambda hashclass: issubclass(hashclass, HashCode))
   def __init__(
       self,
@@ -327,13 +326,20 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
         (self.__class__.__name__, self.fspath, self.indexclass)
     )
 
+  @property
+  def datapath(self):
+    return self.pathto('data')
+
+  def datapathto(self, rpath):
+    ''' Return the path to `rpath`, which is relative to the `datadirpath`.
+    '''
+    return joinpath(self.datapath, rpath)
+
   def initdir(self):
     ''' Init a directory and its "data" subdirectory.
     '''
-    topdirpath = self.topdirpath
-    needdir(topdirpath, log=warning)
-    datasubdirpath = joinpath(topdirpath, 'data')
-    needdir(datasubdirpath, log=warning)
+    needdir(self.fspath, log=warning)
+    needdir(self.datapath, log=warning)
 
   @contextmanager
   def startup_shutdown(self):
@@ -538,19 +544,19 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     ''' Return the Archive named `name`.
 
         If `name` is omitted or `None`
-        the Archive path is the `topdirpath`
+        the Archive path is the `fspath`
         plus the extension `'.vt'`.
-        Otherwise it is the `topdirpath` plus a dash plus the `name`
+        Otherwise it is the `fspath` plus a dash plus the `name`
         plus the extension `'.vt'`.
         The `name` may not be empty or contain a dot or a dash.
     '''
     with Pfx("%s.get_Archive", self):
       if name is None or not name:
-        archivepath = self.topdirpath + '.vt'
+        archivepath = self.fspath + '.vt'
       else:
         if '.' in name or '/' in name:
           raise ValueError("invalid name: %r" % (name,))
-        archivepath = self.topdirpath + '-' + name + '.vt'
+        archivepath = self.fspath + '-' + name + '.vt'
       return Archive(archivepath, **kw)
 
   @locked
@@ -856,7 +862,7 @@ class DataDir(FilesDir):
     proxy.prefix = str(self) + " monitor "
     index = self.index
     filemap = self._filemap
-    datadirpath = self.pathto('data')
+    datadirpath = self.datapath
     while not self.cancelled:
       if self.flag_scan_disable:
         sleep(0.1)
