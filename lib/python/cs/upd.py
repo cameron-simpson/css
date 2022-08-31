@@ -1035,10 +1035,20 @@ class UpdProxy(object):
       'index': 'The index of this slot within the parent Upd.',
       '_prefix': 'The fixed leading prefix for this slot, default "".',
       '_text': 'The text following the prefix for this slot, default "".',
+      '_text_auto':
+      'An optional callable to generate the text if _text is empty.',
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
   }
 
-  def __init__(self, index=1, upd=None, text=None, prefix=None, suffix=None):
+  def __init__(
+      self,
+      index=1,
+      upd=None,
+      text=None,
+      prefix=None,
+      suffix=None,
+      text_auto=None,
+  ):
     ''' Initialise a new `UpdProxy` status line.
 
         Parameters:
@@ -1054,6 +1064,7 @@ class UpdProxy(object):
       upd = Upd()
     self._prefix = prefix or ''
     self._text = ''
+    self._text_auto = text_auto
     self._suffix = suffix or ''
     upd.insert(index, proxy=self)
     if text:
@@ -1129,7 +1140,7 @@ class UpdProxy(object):
   def text(self):
     ''' The text of this proxy's slot, without the prefix.
     '''
-    return self._text
+    return self._text or ('' if self._auto_text is None else self._auto_text())
 
   @text.setter
   def text(self, txt):
