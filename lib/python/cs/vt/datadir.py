@@ -73,7 +73,7 @@ from cs.fileutils import (
     read_from,
     shortpath,
 )
-from cs.fs import needdir
+from cs.fs import HasFSPath, needdir
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -173,7 +173,7 @@ class DataFileState(SimpleNamespace):
     '''
     yield from self.datadir.scanfrom(self.pathname, offset=offset)
 
-class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
+class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                RunStateMixin, FlaggedMixin, Mapping):
   ''' Base class indexing locally stored data in files for a specific hashclass.
 
@@ -228,7 +228,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   @classmethod
   def _singleton_key(
       cls,
-      topdirpath,
+      fspath,
       *,
       hashclass,
       indexclass=None,
@@ -246,7 +246,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     )
     return cls._FD_Singleton_Key_Tuple(
         cls=cls,
-        realdirpath=realpath(topdirpath),
+        realdirpath=realpath(fspath),
         hashclass=resolved.hashclass,
         indexclass=resolved.indexclass,
         rollover=resolved.rollover,
@@ -265,7 +265,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       flags=None,
       flags_prefix=None,
   ):
-    ''' Initialise the `DataDir` with `topdirpath`.
+    ''' Initialise the `DataDir` at `topdirpath`.
 
         Parameters:
         * `topdirpath`: a directory containing state information about the
@@ -297,6 +297,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
         flags=flags,
         flags_prefix=flags_prefix
     )
+    HasFSPath.__init__(self, topdirpath)
     RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self)
     FlaggedMixin.__init__(
@@ -306,9 +307,8 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     self.rollover = resolved.rollover
     self.hashclass = hashclass
     self.hashname = hashclass.HASHNAME
-    self.topdirpath = topdirpath
-    self.statefilepath = joinpath(
-        topdirpath, self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
+    self.statefilepath = self.pathto(
+        self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
     )
     self.index = None
     self._filemap = None
@@ -321,13 +321,10 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     self._WDFstate = None
     self._lock = RLock()
 
-  def __str__(self):
-    return '%s(%s)' % (self.__class__.__name__, shortpath(self.topdirpath))
-
   def __repr__(self):
     return (
         '%s(topdirpath=%r,indexclass=%s)' %
-        (self.__class__.__name__, self.topdirpath, self.indexclass)
+        (self.__class__.__name__, self.fspath, self.indexclass)
     )
 
   def initdir(self):
