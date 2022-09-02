@@ -122,7 +122,7 @@ filename=$tmpf
 
 # mutt -H ignore $text_flowed, supply the header
 bsed '1i\
-Content-Type: text/plain; charset=utf-8; format=flowed' "$tmpf" || exit 1
+Content-Type: text/plain; charset=utf-8; format=flowed' "$filename" || exit 1
 
 set -- \
   rmafter "$filename" \
