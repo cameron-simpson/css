@@ -813,6 +813,50 @@ def autoparam(func, **params):
 
   return autoparam_wrapper
 
+@decorator
+def default_params(func, _strict=False, **defaults):
+  ''' Decorator to provide factory functions for default parameters.
+
+      This decorator accepts the following keyword parameters:
+      * `_strict`: default `False`; if true only replace genuinely
+        missing parameters; if false also replace the traditional
+        `None` placeholder havalue
+      Other parameters are used for the default factory functions.
+
+      Example use:
+
+          # in your support module
+          def uses_ds3(func):
+              return default_params(func, ds3client=get_ds3client)
+
+          # calling code which needs a ds3client
+          @uses_ds3
+          def do_something(..,*,ds3client,...):
+              ... make queries using ds3client ...
+
+      This saves standard boilerplate:
+
+          def do_something(..,*,ds3client=None,...):
+              if ds3client is None:
+                  ds3client = get_ds3client()
+              ... make queries using ds3client ...
+  '''
+  if not defaults:
+    raise ValueError("@default_params(%s): no defaults?" % (func,))
+
+  def defaulted_func(*a, **kw):
+    for k, def_func in defaults.items():
+      try:
+        v = kw[k]
+      except KeyError:
+        kw[k] = def_func()
+      else:
+        if v is None and not _strict:
+          kw[k] = def_func()
+    return func(*a, **kw)
+
+  return defaulted_func
+
 def _teststuff():
 
   @contextdecorator
