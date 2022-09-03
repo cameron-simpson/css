@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Invoke brew in its self contained environment.
+# Based on the article here:
+# https://gist.github.com/pudquick/29bc95b6c49703992981864e48f8e341
+# and the homebrew "untar anywhere" instructions here:
+# https://docs.brew.sh/Installation
+# - Cameron Simpson <cs@cskk.id.au> 04sep2022
+#
+
+set -ue
+
+# git clone of git@github.com:Homebrew/brew
+homebrewpath=${CS_HOMEBREW:-$HOME/var/homebrew}
+homebrewpath_git=git@github.com:Homebrew/brew
+# git clone of git@github.com:Homebrew/homebrew-core
+homebrewcore=${CS_HOMEBREW_CORE:-$HOME/src/homebrew-core}
+homebrewcore_git=git@github.com:Homebrew/homebrew-core
+
+[ -d "$homebrewcore" ] || \
+{ ask "Clone $homebrewcore_git to $homebrewcore" \
+  && git clone "$homebrewcore_git" "$homebrewcore"
+} || exit 1
+
+[ -d "$homebrewpath" ] || \
+{ ask "Clone $homebrewpath_git to $homebrewpath" \
+  && git clone "$homebrewpath_git" "$homebrewpath"
+} || exit 1
+
+brewexe=$homebrewpath/bin/brew
+[ -e "$brewexe" ] || { echo "$0: no $brewexe executable" >&2; exit 1; }
+
+qargv=$( shqstr "$brewexe" ${1+"$@"} )
+
+brewenv=$(
+  env - \
+    "HOMEBREW_BREW_GIT_REMOTE=$homebrewpath" \
+    "HOMEBREW_CORE_GIT_REMOTE=$homebrewcore" \
+    "$brewexe" shellenv
+)
+
+set -x
+cd "$homebrewpath"
+exec env - \
+    "HOMEBREW_BREW_GIT_REMOTE=$homebrewpath" \
+    "HOMEBREW_CORE_GIT_REMOTE=$homebrewcore" \
+    sh -c "
+      $brewenv
+      exec $qargv"
