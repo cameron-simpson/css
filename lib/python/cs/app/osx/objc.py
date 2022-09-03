@@ -8,19 +8,58 @@
 # - Cameron Simpson <cs@cskk.id.au> 29jun2011
 #
 
+from collections import defaultdict
+from datetime import datetime
+from os.path import isabs as isabspath
 import sys
-from datetime import datetime, tzinfo
-from AddressBook import objc, NSDate, ABMultiValueCoreDataWrapper, NSCFDictionary, NSDateComponents
 
 ##objc_path = '/System/Library/Frameworks/Python.framework/Versions/Current/Extras/lib/python/PyObjC'
 ##if objc_path not in sys.path:
 ##  sys.path.append(objc_path)
 
 import objc
+from AddressBook import NSDate, ABMultiValueCoreDataWrapper, NSCFDictionary, NSDateComponents
+from Foundation import NSBundle
 
 ##from cs.x import X
 from cs.dateutils import tzinfoHHMM
-from cs.logutils import warning, D
+from cs.deco import fmtdoc
+from cs.logutils import warning
+from cs.obj import SingletonMixin
+from cs.pfx import Pfx, pfx, pfx_call
+
+DEFAULT_BUNDLE_ID_PREFIX = 'com.apple.'
+
+class _BundlesDict(defaultdict):
+
+  def __missing__(self, key):
+    file_as = [key]
+    if isabspath(key):
+      bundle_path = key
+      bundle = pfx_call(
+          NSBundle.bundleWithPath_,
+          pfx_call(objc.pathForFramework, bundle_path)
+      )
+      if bundle is None:
+        raise FileNotFoundError(bundle_path)
+      ##bundle_id = bundle.infoDictionary()['CFBundleIdentifier']
+      bundle_id = bundle.bundleIdentifier()
+      file_as.append(bundle_id)
+    else:
+      bundle_id = key
+      if '.' not in bundle_id:
+        bundle_id = DEFAULT_BUNDLE_ID_PREFIX + bundle_id
+        file_as.append(bundle_id)
+      bundle = pfx_call(NSBundle.bundleWithIdentifier_, bundle_id)
+      if bundle is None:
+        raise KeyError(
+            "%r: NSBundle.bundleWithIdentifier_(%r)" % (key, bundle_id)
+        )
+    assert isinstance(bundle, NSBundle)
+    for k in file_as:
+      if k not in self:
+        self[k] = bundle
+    return bundle
 
 def convertObjCtype(o):
   if o is None:
