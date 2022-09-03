@@ -61,6 +61,96 @@ class _BundlesDict(defaultdict):
         self[k] = bundle
     return bundle
 
+class Bundle(SingletonMixin):
+  ''' Wrapper class for an `NSBundle`.
+
+      Instances have the following attributes:
+      * `_bundle`: the underlying `NSBundle` instance
+      * `_bundle_id`: the identifier of the underlying bundle, eg `'com.apple.HIServices'`
+      * `_ns`: a dictionary containing all the functions from the bundle
+
+      The functions from the bundle are available as attributes on the `Bundle`.
+  '''
+
+  _bundles = _BundlesDict()
+
+  # additional functions for which I don't seem to have any doco
+  # signatures gleaned from arbitrary sources like
+  # https://gist.github.com/RhetTbull/86394ac9c2cc1096e510775dee14ae08
+  _additional_functions = {
+      'com.apple.Coregraphics':
+      dict(
+          _CGSDefaultConnection=b"i",
+          CGSCopyManagedDisplaySpaces=(
+              b"^{__CFArray=}i",
+              "",
+              {
+                  "retval": {
+                      "already_retained": True
+                  }
+              },
+          ),
+          CGMainDisplayID=b"I",
+          CGSGetDisplayForUUID=b"I^{__CFUUID=}",
+      ),
+      'com.apple.HIServices':
+      dict(
+          DesktopPictureCopyDisplayForSpace=
+          b"^{__CFDictionary=}Ii^{__CFString=}",
+          DesktopPictureSetDisplayForSpace=
+          b"vI^{__CFDictionary=}ii^{__CFString=}",
+      ),
+  }
+
+  @classmethod
+  def _singleton_key(cls, bundle_spec):
+    bundle = cls._bundles[bundle_spec]
+    return bundle.bundleIdentifier()
+
+  def __init__(self, bundle_spec):
+    if '_bundle' in self.__dict__:
+      return
+    cls = self.__class__
+    self._bundle = cls._bundles[bundle_spec]
+    self._bundle_id = self._bundle.bundleIdentifier()
+    self._ns = {}
+    objc.loadBundle('', self._ns, bundle_identifier=self._bundle_id)
+    with Pfx("%s._additional_functions", self):
+      additional_functions_mapping = cls._additional_functions.get(
+          self._bundle_id, {}
+      )
+      additional_functions = []
+      for funcname, sig in additional_functions_mapping.items():
+        with Pfx("%s=%r", funcname, sig):
+          if isinstance(sig, tuple):
+            additional_functions.append((funcname, *sig))
+          elif isinstance(sig, bytes):
+            additional_functions.append((funcname, sig))
+          else:
+            warning("skipped, not tuple or bytes")
+      if additional_functions:
+        pfx_call(
+            objc.loadBundleFunctions, self._bundle, self._ns,
+            additional_functions
+        )
+
+  def __str__(self):
+    return f'{__name__}.{self.__class__.__name__}:{self._bundle_id}'
+
+  def __dir__(self):
+    return sorted(
+        set(
+            k for k in list(self.__dict__.keys()) + list(self._ns.keys())
+            if k and not k.startswith('_')
+        )
+    )
+
+  def __getattr__(self, attr):
+    try:
+      return self._ns[attr]
+    except KeyError:
+      raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
 def convertObjCtype(o):
   if o is None:
     return o
