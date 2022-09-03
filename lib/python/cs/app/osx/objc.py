@@ -1,18 +1,24 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # MacOSX Objective C facilities.
+# Requires the PyObjC package from PyPI.
 # Tweaks sys.path if necessary.
 # Includes some type conversion.
-# See also: https://pythonhosted.org/pyobjc/api/module-objc.html
-#       - Cameron Simpson <cs@cskk.id.au> 29jun2011
+# See also: https://pyobjc.readthedocs.io/en/latest/index.html
+# - Cameron Simpson <cs@cskk.id.au> 29jun2011
 #
 
 import sys
-objc_path = '/System/Library/Frameworks/Python.framework/Versions/Current/Extras/lib/python/PyObjC'
-if objc_path not in sys.path:
-  sys.path.append(objc_path)
 from datetime import datetime, tzinfo
 from AddressBook import objc, NSDate, ABMultiValueCoreDataWrapper, NSCFDictionary, NSDateComponents
+
+##objc_path = '/System/Library/Frameworks/Python.framework/Versions/Current/Extras/lib/python/PyObjC'
+##if objc_path not in sys.path:
+##  sys.path.append(objc_path)
+
+import objc
+
+##from cs.x import X
 from cs.dateutils import tzinfoHHMM
 from cs.logutils import warning, D
 
