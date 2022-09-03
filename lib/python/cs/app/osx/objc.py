@@ -151,6 +151,31 @@ class Bundle(SingletonMixin):
     except KeyError:
       raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
+@fmtdoc
+class AutoBundles:
+  ''' An object whose attributes autoload `{{prefix}}{{attrname}}`.
+      The default `prefix` is DEFAULT_BUNDLE_ID_PREFIX (`'{DEFAULT_BUNDLE_ID_PREFIX}'`).
+  '''
+
+  def __init__(self, prefix=None):
+    if prefix is None:
+      prefix = DEFAULT_BUNDLE_ID_PREFIX
+    self._prefix = prefix
+
+  def __getattr__(self, attr: str):
+    if attr and attr[0].isalpha():
+      return self[attr]
+    raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
+  def __getitem__(self, bundle_id):
+    if not bundle_id or not bundle_id[0].isalpha():
+      raise KeyError(bundle_id)
+    if '.' not in bundle_id:
+      bundle_id = self._prefix + bundle_id
+    return Bundle(bundle_id)
+
+apple = AutoBundles()
+
 def convertObjCtype(o):
   if o is None:
     return o
