@@ -343,10 +343,13 @@ class SingletonMixin:
       Example:
 
           def __init__(self, x, y):
-              if hasattr(self, 'x'):
+              if 'x' in self.__dict__:
                   return
               self.x = x
               self.y = y
+
+      *Note*: we probe `self.__dict__` above to accomodate classes
+      with a `__getattr__` method.
 
       *Note*: each class registry has a lock,
       which ensures that reuse of an object
