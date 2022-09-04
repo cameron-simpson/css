@@ -10,6 +10,11 @@
 
 set -ue
 
+setx=:
+late_setx='set -x'
+
+[ "x$1" = x-x ] && { setx='set -x' late_setx=:; shift; }
+
 # git clone of git@github.com:Homebrew/brew
 homebrewpath=${CS_HOMEBREW:-$HOME/var/homebrew}
 homebrewpath_git=git@github.com:Homebrew/brew
@@ -39,11 +44,12 @@ brewenv=$(
     "$brewexe" shellenv
 )
 
-set -x
+$setx
 cd "$homebrewpath"
 exec env - \
     "HOMEBREW_BREW_GIT_REMOTE=$homebrewpath" \
     "HOMEBREW_CORE_GIT_REMOTE=$homebrewcore" \
     sh -c "
       $brewenv
+      $late_setx
       exec $qargv"
