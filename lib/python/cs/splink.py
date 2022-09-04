@@ -1055,6 +1055,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       battery = det_data('inverter_ac_power_average_kw')
       battery_drain = -battery.clip(upper=0.0)
       battery_charge = battery.clip(lower=0.0)
+      battery_state_of_charge = det_data('state_of_charge_sample')
       load = det_data('load_ac_power_average_kw')
       figure, (power_ax, usage_ax) = plt.subplots(
           2,
@@ -1088,7 +1089,22 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           stacked=True,
           tz=tz,
       )
+      ax2 = usage_ax.twinx()
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'battery % [state_of_charge_sample]',
+                  battery_state_of_charge,
+                  dict(color='orange'),
+              ),
+          ],
+          ax=ax2,
+          tz=tz,
+      )
       usage_ax.legend()
+      ax2.legend()
       # stack the power sources
       spd.plot(
           start,
@@ -1115,6 +1131,20 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           stacked=True,
           tz=tz,
       )
+      ax2 = power_ax.twinx()
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'battery % [state_of_charge_sample]',
+                  battery_state_of_charge,
+                  dict(color='orange'),
+              ),
+          ],
+          ax=ax2,
+          tz=tz,
+      )
       # overlay the load as a line
       spd.plot(
           start,
@@ -1130,6 +1160,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           tz=tz,
       )
       power_ax.legend()
+      ax2.legend()
     else:
       plot_data = []
       while data_specs:
