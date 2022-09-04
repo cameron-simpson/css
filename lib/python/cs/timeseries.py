@@ -88,7 +88,7 @@ from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
 from cs.context import stackattrs
 from cs.csvutils import csv_import
-from cs.deco import autoparam, cachedmethod, decorator
+from cs.deco import cachedmethod, decorator
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
@@ -802,8 +802,7 @@ def _with_utcoffset(func):
       by computing a `utcoffset` from `stop`, `tz` and `utcoffset`.
   '''
 
-  @autoparam(tz=None, utcoffset=None)
-  def with_utcoffset_wrapper(start, stop, *a, tz, utcoffset, **kw):
+  def with_utcoffset_wrapper(start, stop, *a, tz=None, utcoffset=None, **kw):
     if utcoffset is None:
       if tz is None:
         utcoffset = 0.0
