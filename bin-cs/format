@@ -112,6 +112,11 @@ do
   }
 
   pyformat=${CS_FORMAT_PY:-''}
+  [ -n "$pyformat" ] || {
+    fsfmt='{cs.format.python}'
+    pyformat=$( fstags ls -d -o "$fsfmt" )
+    [ "x$pyformat" = "x$fsfmt" ] && pyformat=yapf
+  }
   if [ "x$type" = xpy ]
   then  type=${type}${pymode}
   fi
@@ -121,7 +126,6 @@ do
     json)$trace json-pprint < "$srcfile" | rewriteif -- "$srcfile" ;;
     php)$trace php-cs-fixer fix -q --rules=@PSR2 "$srcfile" ;;
     py2)
-        [ -n "$pyformat" ] || pyformat=$( fstags ls -d -o '{cs.format.python}' )
         case $pyformat in
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python2 -m yapf --style "$style" -i "$srcfile" ;;
@@ -132,7 +136,6 @@ do
         esac
         ;;
     py3)
-        [ -n "$pyformat" ] || pyformat=$( fstags ls -d -o '{cs.format.python}' )
         case $pyformat in
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python3 -m yapf --style "$style" -i "$srcfile" ;;
