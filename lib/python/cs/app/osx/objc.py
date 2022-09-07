@@ -23,7 +23,7 @@ from Foundation import NSBundle
 
 ##from cs.x import X
 from cs.dateutils import tzinfoHHMM
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, default_params
 from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_call
@@ -214,6 +214,9 @@ def convertNSDateComponents(d):
   month = convertObjCtype(d.month())
   day = convertObjCtype(d.day())
   return datetime(year, month, day)
+
+def cg(func):
+  return default_params(func, cg_conn=apple.CoreGraphics._CGSDefaultConnection)
 
 if __name__ == '__main__':
   hi_services = Bundle('HIServices')
