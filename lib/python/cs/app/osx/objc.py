@@ -78,7 +78,7 @@ class Bundle(SingletonMixin):
   # signatures gleaned from arbitrary sources like
   # https://gist.github.com/RhetTbull/86394ac9c2cc1096e510775dee14ae08
   _additional_functions = {
-      'com.apple.Coregraphics':
+      'com.apple.CoreGraphics':
       dict(
           _CGSDefaultConnection=b"i",
           CGSCopyManagedDisplaySpaces=(
