@@ -177,7 +177,8 @@ class SpacesCommand(BaseCommand):
         space = spaces[space_index]
         space_num = space_index + 1
         print("Space", space_num)
-        print(spaces.get_wp_config(space_index))
+        for k, v in sorted(spaces.get_wp_config(space_index).items()):
+          print(" ", k, "=", str(v).replace("\n", ""))
     else:
       space_index = space_num - 1
       if isdirpath(wp_path):
