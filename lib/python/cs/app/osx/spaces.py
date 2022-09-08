@@ -139,7 +139,8 @@ class SpacesCommand(BaseCommand):
       yield
 
   def cmd_wp(self, argv):
-    ''' Usage: {cmd} [space# [wp-path]]
+    ''' Usage: {cmd} [{{.|space#}} [wp-path]]
+          Set or query the wallpaper for a space.
     '''
     options = self.options
     spaces = options.spaces
@@ -147,16 +148,21 @@ class SpacesCommand(BaseCommand):
     wp_path = None
     if argv:
       with Pfx("space# %r:", argv[0]):
-        try:
-          space_num = int(argv[0])
-        except ValueError:
-          pass
-        else:
+        if argv[0] == '.':
           argv.pop(0)
-          if space_num < 1:
-            raise GetoptError("space# counts from 1")
-          if space_num > len(spaces):
-            raise GetoptError("only %d spaces" % (len(spaces),))
+          space_num = spaces.current_index + 1
+          assert 1 <= space_num <= len(spaces)
+        else:
+          try:
+            space_num = int(argv[0])
+          except ValueError:
+            pass
+          else:
+            argv.pop(0)
+            if space_num < 1:
+              raise GetoptError("space# counts from 1")
+            if space_num > len(spaces):
+              raise GetoptError("only %d spaces" % (len(spaces),))
       if argv:
         with Pfx("wp-path %r", argv[0]):
           wp_path = argv.pop(0)
