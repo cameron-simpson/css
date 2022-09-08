@@ -235,8 +235,8 @@ class POP3(MultiOpenMixin):
         else:
           lines = None
       except Exception as e:  # pylint: disable=broad-except
-        warning("%s: %s", R, e)
         R.exc_info = sys.exc_info
+        warning("%s: %s", R, e)
       else:
         # save a list so that we can erase it in a handler to release memory
         R.result = [etc, lines]
