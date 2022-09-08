@@ -84,6 +84,11 @@ class Spaces:
   def display_uuid(self):
     return self._spaces["Display Identifier"]
 
+  @property
+  def display_id(self):
+    cfuuid = CFUUIDCreateFromString(None, self.display_uuid)
+    return CG.CGSGetDisplayForUUID(cfuuid)
+
 if __name__ == '__main__':
   spaces = Spaces()
   print(spaces.x)
