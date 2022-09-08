@@ -77,6 +77,10 @@ class Spaces:
     return self._spaces["Current Space"]
 
   @property
+  def current_uuid(self):
+    return self.current["uuid"]
+
+  @property
   def display_uuid(self):
     return self._spaces["Display Identifier"]
 
