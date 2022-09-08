@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from getopt import GetoptError
 import os
 from os.path import (
+    abspath,
     exists as existspath,
     isdir as isdirpath,
     join as joinpath,
@@ -138,7 +139,8 @@ class SpacesCommand(BaseCommand):
       yield
 
   def cmd_wp(self, argv):
-    ''' Usage: {cmd} [space# [wp-path]]
+    ''' Usage: {cmd} [{{.|space#}} [wp-path]]
+          Set or query the wallpaper for a space.
     '''
     options = self.options
     spaces = options.spaces
@@ -146,16 +148,21 @@ class SpacesCommand(BaseCommand):
     wp_path = None
     if argv:
       with Pfx("space# %r:", argv[0]):
-        try:
-          space_num = int(argv[0])
-        except ValueError:
-          pass
-        else:
+        if argv[0] == '.':
           argv.pop(0)
-          if space_num < 1:
-            raise GetoptError("space# counts from 1")
-          if space_num > len(spaces):
-            raise GetoptError("only %d spaces" % (len(spaces),))
+          space_num = spaces.current_index + 1
+          assert 1 <= space_num <= len(spaces)
+        else:
+          try:
+            space_num = int(argv[0])
+          except ValueError:
+            pass
+          else:
+            argv.pop(0)
+            if space_num < 1:
+              raise GetoptError("space# counts from 1")
+            if space_num > len(spaces):
+              raise GetoptError("only %d spaces" % (len(spaces),))
       if argv:
         with Pfx("wp-path %r", argv[0]):
           wp_path = argv.pop(0)
@@ -170,7 +177,8 @@ class SpacesCommand(BaseCommand):
         space = spaces[space_index]
         space_num = space_index + 1
         print("Space", space_num)
-        print(spaces.get_wp_config(space_index))
+        for k, v in sorted(spaces.get_wp_config(space_index).items()):
+          print(" ", k, "=", str(v).replace("\n", ""))
     else:
       space_index = space_num - 1
       if isdirpath(wp_path):
@@ -182,12 +190,12 @@ class SpacesCommand(BaseCommand):
           warning("no *.* files in %r", wp_path)
           return 1
         lastname = random.choice(images)
-        imagepath = realpath(joinpath(wp_path, lastname))
+        imagepath = abspath(joinpath(wp_path, lastname))
         wp_config = dict(
             BackgroundColor=(0, 0, 0),
             Change='TimeInterval',
-            ChangePath=realpath(wp_path),
-            NewChangePath=realpath(wp_path),
+            ChangePath=abspath(wp_path),
+            NewChangePath=abspath(wp_path),
             ChangeTime=5,
             DynamicStyle=0,
             ImageFilePath=imagepath,
@@ -197,7 +205,7 @@ class SpacesCommand(BaseCommand):
             Random=1,
         )
       else:
-        wp_config = dict(ImageFilePath=realpath(wp_path),)
+        wp_config = dict(ImageFilePath=abspath(wp_path),)
       spaces.set_wp_config(space_index, wp_config)
 
 if __name__ == '__main__':
