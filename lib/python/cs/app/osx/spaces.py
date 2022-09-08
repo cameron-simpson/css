@@ -226,5 +226,25 @@ class SpacesCommand(BaseCommand):
         wp_config = dict(ImageFilePath=abspath(wp_path),)
       spaces.set_wp_config(space_index, wp_config)
 
+  def cmd_wpm(self, argv):
+    ''' Usage: {cmd} [{{.|space#}}]
+          Monitor the wallpaper settings of a particular space.
+    '''
+    options = self.options
+    spaces = options.spaces
+    if not argv:
+      space_index = spaces.current_index
+    else:
+      space_spec = argv.pop(0)
+      if space_space == '.':
+        space_index = spaces.current_index
+      else:
+        space_num = int(space_spec)
+        space_index = space_num - 1
+    for changes in spaces.monitor_wp_config(space_index=space_index,
+                                            runstate=options.runstate):
+      if changes:
+        print(changes)
+
 if __name__ == '__main__':
   sys.exit(SpacesCommand(sys.argv).run())
