@@ -149,7 +149,9 @@ class Bundle(SingletonMixin):
     try:
       return self._ns[attr]
     except KeyError:
-      raise AttributeError(f'{self.__class__.__name__}.{attr}')
+      raise AttributeError(
+          f'{self.__class__.__name__}:{self._bundle_id}.{attr}'
+      )
 
 @fmtdoc
 class AutoBundles:
