@@ -181,9 +181,4 @@ class SpacesCommand(BaseCommand):
       spaces.set_wp_config(space_index, wp_config)
 
 if __name__ == '__main__':
-  spaces = Spaces()
-  print(spaces.x)
-  print(spaces.display_uuid)
-  print(spaces._spaces)
-  print(spaces.current_index)
-  print(spaces.current)
+  sys.exit(SpacesCommand(sys.argv).run())
