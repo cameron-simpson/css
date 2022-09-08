@@ -11,7 +11,6 @@
 from collections import defaultdict
 from datetime import datetime
 from os.path import isabs as isabspath
-import sys
 
 ##objc_path = '/System/Library/Frameworks/Python.framework/Versions/Current/Extras/lib/python/PyObjC'
 ##if objc_path not in sys.path:
@@ -26,7 +25,7 @@ from cs.dateutils import tzinfoHHMM
 from cs.deco import fmtdoc, default_params
 from cs.logutils import warning
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_call
+from cs.pfx import Pfx, pfx_call
 
 DEFAULT_BUNDLE_ID_PREFIX = 'com.apple.'
 
@@ -222,6 +221,3 @@ def cg(func):
 
 if __name__ == '__main__':
   hi_services = Bundle('HIServices')
-  cg = Bundle('CoreGraphics')
-  cg2 = apple.CoreGraphics
-  assert cg is cg2
