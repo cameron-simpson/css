@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from getopt import GetoptError
 import os
 from os.path import (
+    abspath,
     exists as existspath,
     isdir as isdirpath,
     join as joinpath,
@@ -182,12 +183,12 @@ class SpacesCommand(BaseCommand):
           warning("no *.* files in %r", wp_path)
           return 1
         lastname = random.choice(images)
-        imagepath = realpath(joinpath(wp_path, lastname))
+        imagepath = abspath(joinpath(wp_path, lastname))
         wp_config = dict(
             BackgroundColor=(0, 0, 0),
             Change='TimeInterval',
-            ChangePath=realpath(wp_path),
-            NewChangePath=realpath(wp_path),
+            ChangePath=abspath(wp_path),
+            NewChangePath=abspath(wp_path),
             ChangeTime=5,
             DynamicStyle=0,
             ImageFilePath=imagepath,
@@ -197,7 +198,7 @@ class SpacesCommand(BaseCommand):
             Random=1,
         )
       else:
-        wp_config = dict(ImageFilePath=realpath(wp_path),)
+        wp_config = dict(ImageFilePath=abspath(wp_path),)
       spaces.set_wp_config(space_index, wp_config)
 
 if __name__ == '__main__':
