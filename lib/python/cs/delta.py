@@ -5,7 +5,7 @@
 
 from time import sleep
 
-from icontext import require
+from icontract import require
 
 MISSING = object()
 
@@ -22,7 +22,7 @@ def delta(old, new, keys=None):
       the values are considered not equal.
   '''
   if keys is None:
-    keys = set(old.keys()) + set(new.keys())
+    keys = set(old.keys()) | set(new.keys())
   d = {}
   for k in keys:
     oldv = old.get(k, MISSING)
@@ -61,3 +61,4 @@ def monitor(get_state, keys=None, interval=0.3, runstate=None):
     if runstate is None or not runstate.cancelled:
       new = get_state()
       yield delta(old, new, keys)
+      old = new
