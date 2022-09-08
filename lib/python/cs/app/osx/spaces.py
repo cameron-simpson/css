@@ -89,6 +89,25 @@ class Spaces:
     cfuuid = CFUUIDCreateFromString(None, self.display_uuid)
     return CG.CGSGetDisplayForUUID(cfuuid)
 
+  def get_wp_config(self, space_index: int):
+    space = self[space_index]
+    return HI.DesktopPictureCopyDisplayForSpace(
+        self.display_id, 0, space["uuid"]
+    )
+
+  @typechecked
+  def set_wp_config(self, space_index: int, wp_config: dict):
+    pprint(wp_config)
+    space = self[space_index]
+    pfx_call(
+        HI.DesktopPictureSetDisplayForSpace,
+        self.display_id,
+        wp_config,
+        0,
+        0,
+        space["uuid"],
+    )
+
 if __name__ == '__main__':
   spaces = Spaces()
   print(spaces.x)
