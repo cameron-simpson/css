@@ -108,6 +108,78 @@ class Spaces:
         space["uuid"],
     )
 
+class SpacesCommand(BaseCommand):
+
+  @contextmanager
+  def run_context(self):
+    options = self.options
+    with stackattrs(options, spaces=Spaces()):
+      yield
+
+  def cmd_wp(self, argv):
+    ''' Usage: {cmd} [space# [wp-path]]
+    '''
+    options = self.options
+    spaces = options.spaces
+    space_num = None
+    wp_path = None
+    if argv:
+      with Pfx("space# %r:", argv[0]):
+        try:
+          space_num = int(argv[0])
+        except ValueError:
+          pass
+        else:
+          argv.pop(0)
+          if space_num < 1:
+            raise GetoptError("space# counts from 1")
+          if space_num > len(spaces):
+            raise GetoptError("only %d spaces" % (len(spaces),))
+      if argv:
+        with Pfx("wp-path %r", argv[0]):
+          wp_path = argv.pop(0)
+          if not existspath(wp_path):
+            raise GetoptError("not a file")
+    if argv:
+      raise GetoptError("extra aguments: %r" % (argv,))
+    space_indices = range(len(spaces)
+                          ) if space_num is None else (space_num - 1,)
+    if wp_path is None:
+      for space_index in space_indices:
+        space = spaces[space_index]
+        space_num = space_index + 1
+        print("Space", space_num)
+        print(spaces.get_wp_config(space_index))
+    else:
+      space_index = space_num - 1
+      space = spaces[space_index]
+      if isdirpath(wp_path):
+        images = [
+            filename for filename in os.listdir(wp_path)
+            if not filename.startswith('.') and '.' in filename
+        ]
+        if not images:
+          warning("no *.* files in %r", wp_path)
+          return 1
+        lastname = random.choice(images)
+        imagepath = realpath(joinpath(wp_path, lastname))
+        wp_config = dict(
+            BackgroundColor=(0, 0, 0),
+            Change='TimeInterval',
+            ChangePath=realpath(wp_path),
+            NewChangePath=realpath(wp_path),
+            ChangeTime=5,
+            DynamicStyle=0,
+            ImageFilePath=imagepath,
+            NewImageFilePath=imagepath,
+            LastName=lastname,
+            Placement='SizeToFit',
+            Random=1,
+        )
+      else:
+        wp_config = dict(ImageFilePath=realpath(wp_path),)
+      spaces.set_wp_config(space_index, wp_config)
+
 if __name__ == '__main__':
   spaces = Spaces()
   print(spaces.x)
