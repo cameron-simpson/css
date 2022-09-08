@@ -24,8 +24,9 @@ def main(argv=None):
           warning("stdin is a tty, ignoring")
           continue
         J = json.load(sys.stdin)
+        droptmp_struct(J)
         sort_struct(J)
-        json.dump(J, sys.stdout)
+        json.dump(J, sys.stdout, indent=2)
         print()
       else:
         sort_cfile(path)
@@ -35,14 +36,23 @@ def sort_struct(J):
       J["identities"], key=lambda C: (C.get("name", ""), C["userContextId"])
   )
 
+def droptmp_struct(J):
+  J["identities"] = [
+      identity for identity in J["identities"]
+      if not identity.get("name", "").startswith("tmp")
+  ]
+
 def sort_cfile(filepath):
   ''' Sort the containers file `filepath` in place, leaving a backup.
   '''
   with open(filepath, 'r') as f:
     J = json.load(f)
+  droptmp_struct(J)
   sort_struct(J)
+  print("rewrite", filepath)
   with rewrite_cmgr(filepath, backup_ext=".SAFE") as f:
-    json.dump(J, f, indent=None, separators=(',', ':'))
+    json.dump(J, f, indent=2)
+    print(file=f)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
