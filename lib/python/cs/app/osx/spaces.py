@@ -3,7 +3,28 @@
 ''' Access to the display spaces.
 '''
 
+from contextlib import contextmanager
+from getopt import GetoptError
+import os
+from os.path import (
+    exists as existspath,
+    isdir as isdirpath,
+    join as joinpath,
+    realpath,
+)
+from pprint import pprint
+import random
+import sys
+
 from .objc import apple, cg
+
+from CoreFoundation import CFUUIDCreateFromString
+from typeguard import typechecked
+
+from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_call
 
 CG = apple.CoreGraphics
 HI = apple.HIServices
@@ -152,7 +173,6 @@ class SpacesCommand(BaseCommand):
         print(spaces.get_wp_config(space_index))
     else:
       space_index = space_num - 1
-      space = spaces[space_index]
       if isdirpath(wp_path):
         images = [
             filename for filename in os.listdir(wp_path)
