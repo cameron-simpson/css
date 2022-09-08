@@ -24,6 +24,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.delta import monitor
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 
@@ -128,6 +129,23 @@ class Spaces:
         0,
         0,
         space["uuid"],
+    )
+
+  def monitor_current(self, **kw):
+    ''' Return a `cs.delta.monitor` generator for changes to the
+        "current" space i.e. changes representing a desktop space switch.
+    '''
+    return monitor(lambda: (self.forget(), self.current)[-1], **kw)
+
+  def monitor_wp_config(self, space_index=None, **kw):
+    ''' Return a `cs.delta.monitor` generator for the wallpaper
+        configuration of a specific space (default `self.current_index`
+        at the time of call).
+    '''
+    if space_index is None:
+      space_index = self.current_index
+    return monitor(
+        lambda: (self.forget(), self.get_wp_config(space_index))[-1], **kw
     )
 
 class SpacesCommand(BaseCommand):
