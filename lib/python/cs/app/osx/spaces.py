@@ -6,6 +6,7 @@
 from .objc import apple, cg
 
 CG = apple.CoreGraphics
+HI = apple.HIServices
 
 class Spaces:
   ''' The spaces for a particular display.
