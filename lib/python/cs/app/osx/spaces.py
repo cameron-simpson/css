@@ -43,7 +43,7 @@ class Spaces:
     self.__dict__[attr] = obj
     return obj
 
-  def len(self):
+  def __len__(self):
     return len(self._spaces["Spaces"])
 
   def __getitem__(self, space_index):
