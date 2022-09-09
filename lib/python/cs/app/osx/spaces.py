@@ -11,6 +11,7 @@ from os.path import (
     exists as existspath,
     isdir as isdirpath,
     join as joinpath,
+    realpath,
 )
 from pprint import pprint
 import random
@@ -24,6 +25,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.delta import monitor
+from cs.fs import shortpath
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 
@@ -197,6 +199,7 @@ class SpacesCommand(BaseCommand):
     else:
       space_index = space_num - 1
       if isdirpath(wp_path):
+        wp_path = realpath(wp_path)
         images = [
             filename for filename in os.listdir(wp_path)
             if not filename.startswith('.') and '.' in filename
@@ -205,19 +208,19 @@ class SpacesCommand(BaseCommand):
           warning("no *.* files in %r", wp_path)
           return 1
         lastname = random.choice(images)
-        imagepath = abspath(joinpath(wp_path, lastname))
+        imagepath = joinpath(wp_path, lastname)
         wp_config = dict(
             BackgroundColor=(0, 0, 0),
             Change='TimeInterval',
-            ChangePath=abspath(wp_path),
-            NewChangePath=abspath(wp_path),
+            ChangePath=shortpath(wp_path),
+            NewChangePath=shortpath(wp_path),
             ChangeTime=5,
             DynamicStyle=0,
-            ImageFilePath=imagepath,
-            NewImageFilePath=imagepath,
+            ImageFilePath=shortpath(imagepath),
+            NewImageFilePath=shortpath(imagepath),
             LastName=lastname,
             Placement='SizeToFit',
-            Random=1,
+            Random=True,
         )
       else:
         wp_config = dict(ImageFilePath=abspath(wp_path),)
