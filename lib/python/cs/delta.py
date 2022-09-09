@@ -20,6 +20,16 @@ def delta(old, new, keys=None):
       sentinel object otherwise it is `new[key]`.
       Values are compared using `==`; if that raises `TypeError`
       the values are considered not equal.
+
+      Example:
+
+        >>> d1 = {1: 2, 3: 4, 5: 6}
+        >>> d2 = {1: 2, 3: 44, 7: 8}
+        >>> diff = delta(d1, d2)
+        >>> diff  # doctest: +ELLIPSIS
+        {3: 44, 5: <object object at ...>, 7: 8}
+        >>> diff[5] is MISSING
+        True
   '''
   if keys is None:
     keys = set(old.keys()) | set(new.keys())
