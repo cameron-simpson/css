@@ -24,6 +24,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.delta import monitor
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 
@@ -130,6 +131,23 @@ class Spaces:
         space["uuid"],
     )
 
+  def monitor_current(self, **kw):
+    ''' Return a `cs.delta.monitor` generator for changes to the
+        "current" space i.e. changes representing a desktop space switch.
+    '''
+    return monitor(lambda: (self.forget(), self.current)[-1], **kw)
+
+  def monitor_wp_config(self, space_index=None, **kw):
+    ''' Return a `cs.delta.monitor` generator for the wallpaper
+        configuration of a specific space (default `self.current_index`
+        at the time of call).
+    '''
+    if space_index is None:
+      space_index = self.current_index
+    return monitor(
+        lambda: (self.forget(), self.get_wp_config(space_index))[-1], **kw
+    )
+
 class SpacesCommand(BaseCommand):
 
   @contextmanager
@@ -207,6 +225,26 @@ class SpacesCommand(BaseCommand):
       else:
         wp_config = dict(ImageFilePath=abspath(wp_path),)
       spaces.set_wp_config(space_index, wp_config)
+
+  def cmd_wpm(self, argv):
+    ''' Usage: {cmd} [{{.|space#}}]
+          Monitor the wallpaper settings of a particular space.
+    '''
+    options = self.options
+    spaces = options.spaces
+    if not argv:
+      space_index = spaces.current_index
+    else:
+      space_spec = argv.pop(0)
+      if space_space == '.':
+        space_index = spaces.current_index
+      else:
+        space_num = int(space_spec)
+        space_index = space_num - 1
+    for changes in spaces.monitor_wp_config(space_index=space_index,
+                                            runstate=options.runstate):
+      if changes:
+        print(changes)
 
 if __name__ == '__main__':
   sys.exit(SpacesCommand(sys.argv).run())
