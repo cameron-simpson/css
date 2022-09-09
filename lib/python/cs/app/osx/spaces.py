@@ -11,7 +11,6 @@ from os.path import (
     exists as existspath,
     isdir as isdirpath,
     join as joinpath,
-    realpath,
 )
 from pprint import pprint
 import random
@@ -58,7 +57,6 @@ class Spaces:
     return "X"
 
   def __getattr__(self, attr):
-    X("attr=%r", attr)
     if attr == '_spaces':
       obj = self._load_spaces()
     else:
@@ -192,7 +190,6 @@ class SpacesCommand(BaseCommand):
                           ) if space_num is None else (space_num - 1,)
     if wp_path is None:
       for space_index in space_indices:
-        space = spaces[space_index]
         space_num = space_index + 1
         print("Space", space_num)
         for k, v in sorted(spaces.get_wp_config(space_index).items()):
@@ -236,7 +233,7 @@ class SpacesCommand(BaseCommand):
       space_index = spaces.current_index
     else:
       space_spec = argv.pop(0)
-      if space_space == '.':
+      if space_spec == '.':
         space_index = spaces.current_index
       else:
         space_num = int(space_spec)
