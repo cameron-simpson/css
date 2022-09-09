@@ -7,6 +7,7 @@ enum34
 icontract
 lmdb
 lxml
+matplotlib
 mobi
 mypy
 musicbrainzngs
@@ -16,6 +17,7 @@ pyflakes
 pyicontract-lint
 pylint
 pytest
+python-dateutil
 requests
 sqlalchemy
 tkmacosx

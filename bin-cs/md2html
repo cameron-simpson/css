@@ -12,7 +12,8 @@ pandoc --standalone -f gfm -t html \
       t post_pre_code
       /^<pre><code>/,/<\/code><\/pre>$/{
           s/^/    /
-          s/^    <pre><code>/<pre><code>    /
+          s/^    \(<pre><code>\)/\1    /
+          s/^    \(<\/code><\/pre>\)/\1/
       }
       :post_pre_code
       '
