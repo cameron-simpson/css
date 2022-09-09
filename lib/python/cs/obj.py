@@ -53,7 +53,8 @@ def flavour(obj):
 
 # pylint: disable=too-few-public-methods
 class O(SimpleNamespace):
-  ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`.
+  ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`
+      or use a dataclass.
   '''
 
   callers = set()
