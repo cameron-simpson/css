@@ -280,7 +280,7 @@ class VTCmd(BaseCommand):
             else:
               add_bar_cmgr = nullcontext()
               get_bar_cmgr = nullcontext()
-            with defaults.common_S(S):
+            with defaults(common_S=S):
               with S:
                 with add_bar_cmgr:
                   with get_bar_cmgr:
