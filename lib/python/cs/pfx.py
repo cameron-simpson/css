@@ -124,7 +124,6 @@ class _PfxThreadState(threading.local):
 
   def __init__(self):
     threading.local.__init__(self)
-    self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
     self.trace = None
@@ -261,7 +260,6 @@ class Pfx(object):
     '''
     state = cls._state
     state.append(P)
-    state.raise_needs_prefix = True
     if state.trace:
       state.trace(state.prefix)
 
@@ -274,9 +272,11 @@ class Pfx(object):
   def __exit__(self, exc_type, exc_value, _):
     _state = self._state
     if exc_value is not None:
-      if _state.raise_needs_prefix:
+      try:
+        exc_prefix = exc_value._pfx_prefix
+      except AttributeError:
+        exc_value._pfx_prefix = self._state.prefix
         # prevent outer Pfx wrappers from hacking stuff as well
-        _state.raise_needs_prefix = False
         # now hack the exception attributes
         if not self.prefixify_exception(exc_value):
           True or print(
