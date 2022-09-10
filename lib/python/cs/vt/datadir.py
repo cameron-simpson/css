@@ -1273,43 +1273,47 @@ class PlatonicDir(FilesDir):
         E = FileDirent(filename)
         D[filename] = E
     if new_size > DFstate.scanned_to:
-      with proxy.extend_prefix(" scan %s[%d:%d]" %
-                               (filename, DFstate.scanned_to, new_size)):
-        if DFstate.scanned_to > 0:
-          info("scan from %d", DFstate.scanned_to)
-        blockQ = IterableQueue()
-        R = self.meta_store._defer(
-            lambda B, Q: top_block_for(spliced_blocks(B, Q)), E.block, blockQ
+      if DFstate.scanned_to > 0:
+        info("scan from %d", DFstate.scanned_to)
+      blockQ = IterableQueue()
+      current_block = E.block
+      assert len(current_block) == DFstate.scanned_to, (
+          "DFstate.scanned_to:%s != len(E.block):%s" %
+          (DFstate.scanned_to, len(current_block))
+      )
+      R = self.meta_store._defer(
+          lambda B, Q: top_block_for(spliced_blocks(B, Q)), current_block,
+          blockQ
+      )
+      scan_from = DFstate.scanned_to
+      scan_start = time()
+      scanner = progressbar(
+          DFstate.scanfrom(offset=DFstate.scanned_to),
+          "scan " + rfilepath[:max(16, proxy.width - 60)],
+          position=DFstate.scanned_to,
+          total=new_size,
+          itemlenfunc=lambda t3: t3[2] - t3[0],
+          update_frequency=128,
+          proxy=proxy,
+          units_scale=BINARY_BYTES_SCALE,
+          report_print=True,
+      )
+      for pre_offset, data, post_offset in scanner:
+        hashcode = self.hashclass.from_chunk(data)
+        entry = FileDataIndexEntry(
+            filenum=DFstate.filenum,
+            data_offset=pre_offset,
+            data_length=len(data),
+            flags=0,
         )
-        scan_from = DFstate.scanned_to
-        scan_start = time()
-        scanner = DFstate.scanfrom(offset=DFstate.scanned_to)
-        if defaults.show_progress:
-          scanner = progressbar(
-              DFstate.scanfrom(offset=DFstate.scanned_to),
-              "scan " + rfilepath,
-              position=DFstate.scanned_to,
-              total=new_size,
-              units_scale=BINARY_BYTES_SCALE,
-              itemlenfunc=lambda t3: t3[2] - t3[0],
-              update_frequency=128,
-          )
-        for pre_offset, data, post_offset in scanner:
-          hashcode = self.hashclass.from_chunk(data)
-          entry = FileDataIndexEntry(
-              filenum=DFstate.filenum,
-              data_offset=pre_offset,
-              data_length=len(data),
-              flags=0,
-          )
-          entry_bs = bytes(entry)
-          with self._lock:
-            index[hashcode] = entry_bs
-          B = Block(data=data, hashcode=hashcode, added=True)
-          blockQ.put((pre_offset, B))
-          DFstate.scanned_to = post_offset
-          if self.cancelled or self.flag_scan_disable:
-            break
+        entry_bs = bytes(entry)
+        with self._lock:
+          index[hashcode] = entry_bs
+        B = Block(data=data, hashcode=hashcode, added=True)
+        blockQ.put((pre_offset, B))
+        DFstate.scanned_to = post_offset
+        if self.cancelled or self.flag_scan_disable:
+          break
       blockQ.close()
       try:
         top_block = R()
