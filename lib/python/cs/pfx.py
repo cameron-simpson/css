@@ -371,8 +371,14 @@ class Pfx(object):
         else:
           value = (value0, cls.prefixify(value1))
       elif attr == 'args' and isinstance(e, LookupError):
-        # args[0] is the key, do not fiddle with it
-        continue
+        if (isinstance(value, tuple) and value):
+          value0 = value[0]
+          if value0.startswith("'") and value0.endswith("'"):
+            # args[0] is the key, do not fiddle with it
+            continue
+          value = (cls.prefixify(value0), *value[1:])
+        else:
+          continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
