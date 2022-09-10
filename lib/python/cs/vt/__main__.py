@@ -225,7 +225,8 @@ class VTCmd(BaseCommand):
         # redo these because defaults is already initialised
         with stackattrs(defaults, runstate=runstate,
                         show_progress=show_progress):
-          if cmd in ("config", "dump", "init", "profile", "scan", "test"):
+          if cmd in ("config", "dump", "help", "init", "profile", "scan",
+                     "test"):
             yield
           else:
             # open the default Store
