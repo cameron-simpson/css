@@ -7,7 +7,9 @@ from time import sleep
 
 from icontract import require
 
-MISSING = object()
+from cs.obj import Sentinel
+
+MISSING = Sentinel("MISSING")
 
 def delta(old, new, keys=None):
   ''' Return a mapping representing differences between the mappings
@@ -51,15 +53,25 @@ def delta(old, new, keys=None):
 
 @require(lambda get_state: callable(get_state))
 @require(lambda interval: interval > 0.0)
-def monitor(get_state, keys=None, interval=0.3, runstate=None):
-  ''' A generator yielding `delta(old,new,keys)` at poll intervals
-      of `interval` seconds.
+def monitor(
+    get_state,
+    keys=None,
+    *,
+    ifunchanged=False,
+    interval=0.3,
+    runstate=None,
+):
+  ''' A generator yielding 3-tuples of `(old,new,delta(old,new,keys))`
+      at poll intervals of `interval` seconds.
 
       Parameters:
       * `get_state`: a callable which polls the current state,
         returning a mapping
       * `keys`: an optional iterable of keys of interest;
         if omitted, all the old and new mapping keys are examined
+      * `ifunchanged`: optional flag, default `False`;
+        if true yield a tuple on every poll instead of only when a
+        state change is seen
       * `interval`: an optional interpoll `time.sleep` period,
         default `0.3`s
       * `runstate`: an optional `RunState`, whose `cancelled`
@@ -70,5 +82,7 @@ def monitor(get_state, keys=None, interval=0.3, runstate=None):
     sleep(interval)
     if runstate is None or not runstate.cancelled:
       new = get_state()
-      yield delta(old, new, keys)
+      d = delta(old, new, keys)
+      if ifunchanged or d:
+        yield old, new, d
       old = new

@@ -53,7 +53,8 @@ def flavour(obj):
 
 # pylint: disable=too-few-public-methods
 class O(SimpleNamespace):
-  ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`.
+  ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`
+      or use a dataclass.
   '''
 
   callers = set()
@@ -496,6 +497,37 @@ class SingletonMixin:
               map(lambda ref: ref(), registry.valuerefs())
           )
       )
+
+class Sentinel:
+  ''' A simple class for named sentinels whose `str()` is just the name
+      and whose `==` uses `is`.
+
+      Example:
+
+          >>> from cs.obj import Sentinel
+          >>> MISSING = Sentinel("MISSING")
+          >>> print(MISSING)
+          MISSING
+          >>> other = Sentinel("other")
+          >>> MISSING == other
+          False
+          >>> MISSING == MISSING
+          True
+  '''
+
+  __slots__ = 'name',
+
+  def __init__(self, name):
+    self.name = name
+
+  def __str__(self):
+    return self.name
+
+  def __repr__(self):
+    return "%s(%r)" % (self.__class__.__name__, self.name)
+
+  def __eq__(self, other):
+    return self is other
 
 if __name__ == '__main__':
   import cs.obj_tests

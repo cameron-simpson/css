@@ -156,6 +156,21 @@ class SpacesCommand(BaseCommand):
     with stackattrs(options, spaces=Spaces()):
       yield
 
+  def cmd_monitor(self, argv):
+    ''' Usage: {cmd}
+          Monitor space switches.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    runstate = self.options.runstate
+    spaces = self.options.spaces
+    for old, new, changes in monitor(
+        lambda: (spaces.forget(), dict(index=spaces.current_index))[-1],
+        interval=0.1,
+        runstate=runstate,
+    ):
+      print(old['index'] + 1, '->', new['index'] + 1)
+
   def cmd_wp(self, argv):
     ''' Usage: {cmd} [{{.|space#}} [wp-path]]
           Set or query the wallpaper for a space.
@@ -241,10 +256,11 @@ class SpacesCommand(BaseCommand):
       else:
         space_num = int(space_spec)
         space_index = space_num - 1
-    for changes in spaces.monitor_wp_config(space_index=space_index,
-                                            runstate=options.runstate):
-      if changes:
-        print(changes)
+    for old, new, changes in spaces.monitor_wp_config(
+        space_index=space_index,
+        runstate=options.runstate,
+    ):
+      print(changes)
 
 if __name__ == '__main__':
   sys.exit(SpacesCommand(sys.argv).run())
