@@ -77,8 +77,6 @@ def monitor(
       * `runstate`: an optional `RunState`, whose `cancelled`
         attribute will be polled for loop termination
   '''
-  if interval <= 0.0:
-    raise ValueError("interval:%s mist be >0.0" % (interval,))
   old = get_state()
   while runstate is None or not runstate.cancelled:
     sleep(interval)
