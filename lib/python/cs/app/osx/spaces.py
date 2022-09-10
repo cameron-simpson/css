@@ -238,10 +238,11 @@ class SpacesCommand(BaseCommand):
       else:
         space_num = int(space_spec)
         space_index = space_num - 1
-    for changes in spaces.monitor_wp_config(space_index=space_index,
-                                            runstate=options.runstate):
-      if changes:
-        print(changes)
+    for old, new, changes in spaces.monitor_wp_config(
+        space_index=space_index,
+        runstate=options.runstate,
+    ):
+      print(changes)
 
 if __name__ == '__main__':
   sys.exit(SpacesCommand(sys.argv).run())
