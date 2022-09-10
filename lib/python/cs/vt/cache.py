@@ -368,6 +368,8 @@ class MemoryCacheMapping:
     self.max_data = max_data
     self.used_data = 0
     self.mapping = {}
+    # keep a revision/use counter for hashcodes, used to decide
+    # which hashcodes to purge when self.used_data > self.max_data
     self._ticker = 0
     self._tick = {}
     self._skip_flush = 32
