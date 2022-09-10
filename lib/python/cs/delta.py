@@ -7,7 +7,9 @@ from time import sleep
 
 from icontract import require
 
-MISSING = object()
+from cs.obj import Sentinel
+
+MISSING = Sentinel("MISSING")
 
 def delta(old, new, keys=None):
   ''' Return a mapping representing differences between the mappings
