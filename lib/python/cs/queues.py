@@ -16,6 +16,7 @@ import time
 ##from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import exception, warning, debug
+from cs.obj import Sentinel
 from cs.pfx import Pfx, PfxCallInfo
 from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
@@ -34,6 +35,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.py3',
         'cs.resources',
@@ -47,14 +49,15 @@ class QueueIterator(MultiOpenMixin):
       It does not offer the `.get` or `.get_nowait` methods.
   '''
 
-  sentinel = object()
-
   def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
     self.q = q
     self.name = name
     self.finalise_later = True
+    self.sentinel = Sentinel(
+        "%s:%s:SENTINEL" % (self.__class__.__name__, name)
+    )
     # count of non-sentinel items
     self._item_count = 0
 

@@ -8,11 +8,11 @@
 #     macro index g "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><group-reply>:set editor=\$my_old_editor<enter>" "group reply"
 #     macro index L "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><list-reply>:set editor=\$my_old_editor<enter>" "list reply"
 #
-# and I have the environment variable $MUTTEDIT_EDITOR set to
-# "vim-flowed", which invokes vim with settings which aid with composing
+# and I have the environment variable $MUTTEDIT_EDITOR set to "vim-flowed",
+# which is a script which invokes vim with settings which aid with composing
 # format=flowed email (see RFC3676).
 # - Cameron Simpson <cs@cskk.id.au> 31mar2006
-# 
+#
 
 set -ue
 
@@ -119,6 +119,10 @@ session_name=mutt-$now-$subj
 tmpf=$composedir/muttedit.$$
 ( umask 077; cp -- "$filename" "$tmpf" ) || exit 1
 filename=$tmpf
+
+# mutt -H ignore $text_flowed, supply the header
+bsed '1i\
+Content-Type: text/plain; charset=utf-8; format=flowed' "$filename" || exit 1
 
 set -- \
   rmafter "$filename" \

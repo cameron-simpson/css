@@ -10,7 +10,7 @@ from typing import Optional, TypeVar
 
 from typeguard import typechecked
 
-from cs.gimmicks import warning
+from cs.gimmicks import exception
 from cs.gvutils import gvprint, quote as gvq, DOTNodeMixin
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
@@ -177,7 +177,7 @@ class FSM(DOTNodeMixin):
         try:
           pfx_call(callback, self, transition)
         except Exception as e:  # pylint: disable=broad-except
-          warning("exception from callback %s: %s", callback, e)
+          exception("exception from callback %s: %s", callback, e)
     return new_state
 
   @property

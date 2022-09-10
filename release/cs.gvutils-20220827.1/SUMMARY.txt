@@ -1,0 +1,1 @@
+gvprint: new optional parameter dataurl_encoding to specify the data URL encoding.
