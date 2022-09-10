@@ -280,8 +280,10 @@ class Pfx(object):
         # now hack the exception attributes
         if not self.prefixify_exception(exc_value):
           True or print(
-              "warning: %s: %s:%s: message not prefixed" %
-              (self._state.prefix, type(exc_value).__name__, exc_value),
+              "warning: %s: %s:%s: message not prefixed: dir=%r" % (
+                  self._state.prefix, type(exc_value).__name__, exc_value,
+                  dir(exc_value)
+              ),
               file=sys.stderr
           )
     try:
