@@ -155,6 +155,9 @@ class SpacesCommand(BaseCommand):
       yield
 
   def cmd_monitor(self, argv):
+    ''' Usage: {cmd}
+          Monitor space switches.
+    '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     runstate = self.options.runstate
