@@ -273,7 +273,7 @@ class Pfx(object):
     _state = self._state
     if exc_value is not None:
       try:
-        exc_prefix = exc_value._pfx_prefix
+        exc_value._pfx_prefix
       except AttributeError:
         exc_value._pfx_prefix = self._state.prefix
         # prevent outer Pfx wrappers from hacking stuff as well
