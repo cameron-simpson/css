@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
+from inspect import isclass
 import json
 import re
 from threading import RLock
@@ -1451,3 +1452,71 @@ class PrefixedMappingProxy(RemappedMappingProxy):
     return super().keys(
         select_key=lambda subkey: subkey.startswith(self.prefix)
     )
+
+class TypedKeyMixin:
+  ''' A mixin to check that the keys of a mapping are of a particular type.
+
+      The triggering use case is the constant UUID vs str(UUID) tension
+      in a lot of database code.
+  '''
+
+  def __init__(self, key_type):
+    if not isclass(key_type):
+      raise TypeError("key_type must be a class, got a %s" % (type(key_type)))
+    self.__key_type = key_type
+    print(self.__dict__)
+
+  def __getitem__(self, key):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self._key_type, type(key))
+      )
+    return super().__getitem__(key)
+
+  def __setitem__(self, key, value):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self._key_type, type(key))
+      )
+    return super().__setitem__(self, key, value)
+
+  def __delitem__(self, key):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self._key_type, type(key))
+      )
+    return super().__delitem__(self, key)
+
+  def __contains__(self, key):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self._key_type, type(key))
+      )
+    return super().__contains__(self, key)
+
+class TypedKeyDict(TypedKeyMixin, dict):
+  ''' A `dict` subclass whose keys must be of a particular type.
+  '''
+
+  def __init__(self, key_type, *a, **kw):
+    ''' Initialise the `TypedKeyDict`. The first positional parameter
+        is the type for keys.
+    '''
+    TypedKeyMixin.__init__(self, key_type)
+    dict.__init__(self, *a, **kw)
+    if not all(map(lambda key: type(key) is key_type, self.keys())):
+      raise TypeError("all keys must be of type %s" % (key_type,))
+
+def StrKeyedDict(*a, **kw):
+  ''' Factory to return a `TypedKeyDict` whose keys must be `str`s.
+  '''
+  return TypedKeyDict(str, *a, **kw)
+
+def UUIDKeyedDict(*a, **kw):
+  ''' Factory to return a `TypedKeyDict` whose keys must be `UUID`s.
+  '''
+  return TypedKeyDict(UUID, *a, **kw)
