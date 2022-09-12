@@ -1464,7 +1464,6 @@ class TypedKeyMixin:
     if not isclass(key_type):
       raise TypeError("key_type must be a class, got a %s" % (type(key_type)))
     self.__key_type = key_type
-    print(self.__dict__)
 
   def __getitem__(self, key):
     if type(key) is not self.__key_type:
@@ -1480,7 +1479,7 @@ class TypedKeyMixin:
           "key must be of type %s but was of type %s" %
           (self._key_type, type(key))
       )
-    return super().__setitem__(self, key, value)
+    return super().__setitem__(key, value)
 
   def __delitem__(self, key):
     if type(key) is not self.__key_type:
@@ -1488,7 +1487,7 @@ class TypedKeyMixin:
           "key must be of type %s but was of type %s" %
           (self._key_type, type(key))
       )
-    return super().__delitem__(self, key)
+    return super().__delitem__(key)
 
   def __contains__(self, key):
     if type(key) is not self.__key_type:
@@ -1496,7 +1495,7 @@ class TypedKeyMixin:
           "key must be of type %s but was of type %s" %
           (self._key_type, type(key))
       )
-    return super().__contains__(self, key)
+    return super().__contains__(key)
 
 class TypedKeyDict(TypedKeyMixin, dict):
   ''' A `dict` subclass whose keys must be of a particular type.
