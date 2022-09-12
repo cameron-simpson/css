@@ -1469,7 +1469,7 @@ class TypedKeyMixin:
     if type(key) is not self.__key_type:
       raise TypeError(
           "key must be of type %s but was of type %s" %
-          (self._key_type, type(key))
+          (self.__key_type, type(key))
       )
     return super().__getitem__(key)
 
@@ -1477,7 +1477,7 @@ class TypedKeyMixin:
     if type(key) is not self.__key_type:
       raise TypeError(
           "key must be of type %s but was of type %s" %
-          (self._key_type, type(key))
+          (self.__key_type, type(key))
       )
     return super().__setitem__(key, value)
 
@@ -1485,7 +1485,7 @@ class TypedKeyMixin:
     if type(key) is not self.__key_type:
       raise TypeError(
           "key must be of type %s but was of type %s" %
-          (self._key_type, type(key))
+          (self.__key_type, type(key))
       )
     return super().__delitem__(key)
 
@@ -1493,7 +1493,7 @@ class TypedKeyMixin:
     if type(key) is not self.__key_type:
       raise TypeError(
           "key must be of type %s but was of type %s" %
-          (self._key_type, type(key))
+          (self.__key_type, type(key))
       )
     return super().__contains__(key)
 
