@@ -1542,6 +1542,10 @@ def TypedKeyClass(key_type, superclass, name=None):
   return TypedKeyMapping
 
 StrKeyedDict = TypedKeyClass(str, dict, name='StrKeyedDict')
-UUIDKeyedDict = TypedKeyClass(UUID, dict)
-StrKeyedDefaultDict = TypedKeyClass(str, defaultdict, name='StrKeyedDict')
-UUIDKeyedDefaultDict = TypedKeyClass(UUID, defaultdict)
+UUIDKeyedDict = TypedKeyClass(UUID, dict, name='UUIDKeyedDict')
+StrKeyedDefaultDict = TypedKeyClass(
+    str, defaultdict, name='StrKeyedDefaultDict'
+)
+UUIDKeyedDefaultDict = TypedKeyClass(
+    UUID, defaultdict, name='UUIDKeyedDefaultDict'
+)
