@@ -25,7 +25,7 @@ from threading import RLock
 from uuid import UUID, uuid4
 
 from cs.deco import strable
-from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase
+from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
@@ -1497,25 +1497,35 @@ class TypedKeyMixin:
       )
     return super().__contains__(key)
 
-class TypedKeyDict(TypedKeyMixin, dict):
-  ''' A `dict` subclass whose keys must be of a particular type.
+def TypedKeyClass(key_type, superclass, name=None):
+  ''' Factory to create a new mapping class subclassing
+      `(TypedKeyMixin,superclass)` which checks that keys are of type
+      `key_type`.
   '''
 
-  def __init__(self, key_type, *a, **kw):
-    ''' Initialise the `TypedKeyDict`. The first positional parameter
-        is the type for keys.
-    '''
-    TypedKeyMixin.__init__(self, key_type)
-    dict.__init__(self, *a, **kw)
-    if not all(map(lambda key: type(key) is key_type, self.keys())):
-      raise TypeError("all keys must be of type %s" % (key_type,))
+  class TypedKeyMapping(TypedKeyMixin, superclass):
 
-def StrKeyedDict(*a, **kw):
-  ''' Factory to return a `TypedKeyDict` whose keys must be `str`s.
-  '''
-  return TypedKeyDict(str, *a, **kw)
+    def __init__(self, *a, **kw):
+      ''' Initialise the `TypedKeyDict`. The first positional parameter
+          is the type for keys.
+      '''
+      TypedKeyMixin.__init__(self, key_type)
+      superclass.__init__(self, *a, **kw)
+      if not all(map(lambda key: type(key) is key_type, self.keys())):
+        raise TypeError("all keys must be of type %s" % (key_type,))
 
-def UUIDKeyedDict(*a, **kw):
-  ''' Factory to return a `TypedKeyDict` whose keys must be `UUID`s.
-  '''
-  return TypedKeyDict(UUID, *a, **kw)
+  if name is None:
+    name = f'{key_type.__name__}Typed{superclass.__name__}'
+  TypedKeyMapping.__name__ = name
+  TypedKeyMapping.__doc__ = stripped_dedent(
+      f'''
+      Subclass of `{superclass.__name__}` which ensures that its
+      keys are of type `{key_type.__name__}` using `TypedKeyMixin`.
+      '''
+  )
+  return TypedKeyMapping
+
+StrKeyedDict = TypedKeyClass(str, dict, name='StrKeyedDict')
+UUIDKeyedDict = TypedKeyClass(UUID, dict)
+StrKeyedDefaultDict = TypedKeyClass(str, defaultdict, name='StrKeyedDict')
+UUIDKeyedDefaultDict = TypedKeyClass(UUID, defaultdict)
