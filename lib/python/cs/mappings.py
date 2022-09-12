@@ -1497,6 +1497,22 @@ class TypedKeyMixin:
       )
     return super().__contains__(key)
 
+  def get(self, key, *a):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self.__key_type, type(key))
+      )
+    return super().get(key, *a)
+
+  def setdefault(self, key, *a):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self.__key_type, type(key))
+      )
+    return super().setdefault(key, *a)
+
 def TypedKeyClass(key_type, superclass, name=None):
   ''' Factory to create a new mapping class subclassing
       `(TypedKeyMixin,superclass)` which checks that keys are of type
