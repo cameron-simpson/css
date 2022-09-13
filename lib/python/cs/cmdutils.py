@@ -35,7 +35,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20220429-post'
+__version__ = '20220626-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -396,6 +396,17 @@ class BaseCommand:
         Other keyword arguments are applied to `self.options`
         as attributes.
 
+        The `cmd` and `argv` parameters have some fiddly semantics for convenience.
+        There are 3 basic ways to initialise:
+        * `BaseCommand()`: `argv` comes from `sys.argv`
+          and the value for `cmd` is derived from `argv[0]`
+        * `BaseCommand(argv)`: `argv` is the complete command line
+          including the command name and the value for `cmd` is
+          derived from `argv[0]`
+        * `BaseCommand(argv, cmd=foo)`: `argv` is the command
+          arguments _after_ the command name and `cmd` is set to
+          `foo`
+
         The command line arguments are parsed according to
         the optional `GETOPT_SPEC` class attribute (default `''`).
         If `getopt_spec` is not empty
@@ -420,21 +431,28 @@ class BaseCommand:
     '''
     subcmds = self.subcommands()
     has_subcmds = subcmds and list(subcmds) != ['help']
+    if argv is None:
+      # using sys.argv:
+      # argv0 comes from sys.argv[0], which is discarded
+      argv = list(sys.argv)
+      argv0 = argv.pop(0)
+    else:
+      # argv provided:
+      # if cmd is None, pop argv0 from argv
+      # otherwise set argv0=cmd
+      argv = list(argv)
+      if cmd is None:
+        argv0 = argv.pop(0)
+      else:
+        argv0 = cmd
+    if cmd is None:
+      cmd = basename(argv0)
+    self.cmd = cmd
     options = self.options = self.OPTIONS_CLASS()
     options.runstate_signals = (SIGINT, SIGTERM)
-    if argv is None:
-      argv = list(sys.argv)
-      if cmd is not None:
-        # consume the first argument anyway
-        argv.pop(0)
-    else:
-      argv = list(argv)
-    if cmd is None:
-      cmd = basename(argv.pop(0))
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
-    self.cmd = cmd
     self.loginfo = loginfo
     self.apply_defaults()
     # override the default options
@@ -673,9 +691,16 @@ class BaseCommand:
         Subclasses can override this
         but it is usually easier to override `apply_opt(opt,val)`.
     '''
+    badopts = False
     for opt, val in opts:
       with Pfx(opt if val is None else "%s %r" % (opt, val)):
-        self.apply_opt(opt, val)
+        try:
+          self.apply_opt(opt, val)
+        except GetoptError as e:
+          warning("%s", e)
+          badopts = True
+    if badopts:
+      raise GetoptError("bad options")
 
   # pylint: disable=no-self-use
   def apply_preargv(self, argv):
@@ -705,17 +730,17 @@ class BaseCommand:
         with Pfx("%r", spec):
           if help_text is None and isinstance(spec, str):
             help_text = spec
+          elif unvalidated_message is None and isinstance(spec, str):
+            unvalidated_message = spec
           elif parse is None and callable(spec):
             parse = spec
           elif validate is None and callable(spec):
             validate = spec
-          elif (validate is not None and unvalidated_message is None
-                and isinstance(spec, str)):
-            unvalidated_message = spec
           else:
             raise TypeError(
                 "unexpected argument, expected help_text or parse,"
-                " then optional validate and optional invalid message"
+                " then optional validate and optional invalid message,"
+                " received %s" % (r(spec),)
             )
       if help_text is None:
         help_text = (
@@ -743,11 +768,11 @@ class BaseCommand:
             if not pfx_call(self.validate, value):
               raise ValueError(self.unvalidated_message)
         except ValueError as e:
-          raise GetoptError(": ".join(e.args))  # pylint: disable=raise-missing-from
+          raise GetoptError(str(e))  # pylint: disable=raise-missing-from
       return value
 
   @classmethod
-  def poparg(cls, argv: List[str], *a):
+  def poparg(cls, argv: List[str], *a, unpop_on_error=False):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
         Raises `getopt.GetoptError` on a missing or invalid argument.
@@ -771,6 +796,9 @@ class BaseCommand:
           or return a false value or raise a `ValueError` if invalid
         * `unvalidated_message`: an optional message after `validate`
           for values failing the validation
+        * `unpop_on_error`: optional keyword parameter, default `False`;
+          if true then push the argument back onto the front of `argv`
+          if it fails to parse; `GetoptError` is still raised
 
         Typical use inside a `main` or `cmd_*` method might look like:
 
@@ -801,13 +829,31 @@ class BaseCommand:
             Traceback (most recent call last):
               ...
             getopt.GetoptError: length: missing argument
+            >>> argv = ['-5', 'zz']
+            >>> BaseCommand.poparg(argv, float, "size", lambda f: f>0, "size should be >0")
+            Traceback (most recent call last):
+              ...
+            getopt.GetoptError: size '-5': size should be >0
+            >>> argv  # -5 was still consumed
+            ['zz']
+            >>> BaseCommand.poparg(argv, float, "size2", unpop_on_error=True)
+            Traceback (most recent call last):
+              ...
+            getopt.GetoptError: size2 'zz': float('zz'): could not convert string to float: 'zz'
+            >>> argv  # zz was pushed back
+            ['zz']
     '''
     opt_spec = cls._OptSpec.from_specs(*a)
     with Pfx(opt_spec.help_text):
       if not argv:
         raise GetoptError("missing argument")
       arg0 = argv.pop(0)
-    return opt_spec.parse_value(arg0)
+    try:
+      return opt_spec.parse_value(arg0)
+    except GetoptError:
+      if unpop_on_error:
+        argv.insert(0, arg0)
+      raise
 
   @classmethod
   def popopts(
@@ -830,6 +876,9 @@ class BaseCommand:
 
         The expected options are specified by the keyword parameters
         in `opt_specs`:
+        * options not starting with a letter may be preceeded by an underscore
+          to allow use in the parameter list, for example `_1='once'`
+          for a `-1` option setting the `once` option name
         * a single letter name specifies a short option
           and a multiletter name specifies a long option
         * options requiring an argument have a trailing underscore
@@ -844,14 +893,16 @@ class BaseCommand:
             ...   all=False,
             ...   jobs=1,
             ...   number=0,
+            ...   once=False,
             ...   path=None,
             ...   trace_exec=True,
             ...   verbose=False,
             ...   dry_run=False)
-            >>> argv = ['-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
+            >>> argv = ['-1', '-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
             >>> opt_dict = BaseCommand.popopts(
             ...   argv,
             ...   options,
+            ...   _1='once',
             ...   a='all',
             ...   j_=('jobs',int),
             ...   n='dry_run',
@@ -863,9 +914,9 @@ class BaseCommand:
             ...   verbose=None,
             ... )
             >>> opt_dict
-            {'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
+            {'once': True, 'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
             >>> options
-            namespace(all=False, jobs=4, number=0, path='/foo', trace_exec=True, verbose=True, dry_run=False)
+            namespace(all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=True, verbose=True, dry_run=False)
     '''
     keyfor = {}
     shortopts = ''
@@ -875,6 +926,10 @@ class BaseCommand:
     for opt_name, opt_spec in opt_specs.items():
       with Pfx("opt_spec[%r]=%r", opt_name, opt_spec):
         needs_arg = False
+        if opt_name.startswith('_'):
+          opt_name = opt_name[1:]
+          if is_identifier(opt_name):
+            warning("leading underscore on valid identifier option")
         if opt_name.endswith('_'):
           needs_arg = True
           opt_name = opt_name[:-1]
@@ -969,7 +1024,7 @@ class BaseCommand:
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with upd_context:
-        with stackattrs(self, cmd=self._subcmd):
+        with stackattrs(self, cmd=self._subcmd if self._subcmd else self.cmd):
           with stackattrs(
               options,
               runstate=runstate,
@@ -1030,9 +1085,8 @@ class BaseCommand:
       print(usage.rstrip(), file=sys.stderr)
     return True
 
-  @staticmethod
   @contextmanager
-  def run_context():
+  def run_context(self):
     ''' Stub context manager which surrounds `main` or `cmd_`*subcmd*.
     '''
     # redundant try/finally to remind subclassers of correct structure

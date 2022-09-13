@@ -230,7 +230,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20220430-post'
+__version__ = '20220806-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -948,25 +948,36 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   #############################################################################
   # Edit tags.
 
-  def edit(self, editor=None, verbose=None):
+  def edit(self, editor=None, verbose=None, comments=()):
     ''' Edit this `TagSet`.
     '''
     if editor is None:
       editor = EDITOR
     lines = (
-        ["# Edit TagSet.", "# One tag per line."] +
-        list(map(str, sorted(self)))
+        ["# Edit TagSet.", "# One tag per line."] + [
+            ("# " + comment.replace("\n", "\n# ")).rstrip()
+            for comment in comments
+        ] + list(map(str, sorted(self)))
     )
     new_lines = edit_lines(lines, editor=editor)
     new_values = {}
+    no_discard = False
     for lineno, line in enumerate(new_lines):
       with Pfx("%d: %r", lineno, line):
         line = line.strip()
         if not line or line.startswith('#'):
           continue
-        tag = Tag.from_str(line)
-        new_values[tag.name] = tag.value
-    self.set_from(new_values, verbose=verbose)
+        try:
+          tag = Tag.from_str(line)
+        except ValueError as e:
+          warning("parse error, discarded: %s", line)
+          no_discard = True
+        else:
+          new_values[tag.name] = tag.value
+    if no_discard:
+      self.update(new_values, verbose=True)
+    else:
+      self.set_from(new_values, verbose=verbose)
 
   @classmethod
   @pfx_method
@@ -1488,18 +1499,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         try:
           i = int(nonwhite)
         except ValueError:
-          pass
+          try:
+            f = float(nonwhite)
+          except ValueError:
+            pass
+          else:
+            if str(f) == nonwhite:
+              value = f
         else:
           if str(i) == nonwhite:
             value = i
-          else:
-            try:
-              f = float(nonwhite)
-            except ValueError:
-              pass
-            else:
-              if str(f) == nonwhite:
-                value = f
       if value is None:
         # not a special value, preserve as a string
         value = nonwhite
@@ -1706,6 +1715,20 @@ class TagSetCriterion(ABC):
     ''' Apply this `TagSetCriterion` to a `TagSet`.
     '''
     raise NotImplementedError("match")
+
+  @classmethod
+  @pfx_method
+  def promote(cls, criterion, fallback_parse=None):
+    ''' Promote an object to a criterion.
+        Instances of `cls` are returned unchanged.
+        Instances of s`str` are promoted via `cls.from_str`.
+    '''
+    if not isinstance(criterion, cls):
+      if isinstance(criterion, str):
+        criterion = cls.from_str(criterion, fallback_parse=fallback_parse)
+      else:
+        raise TypeError("cannot promote to %s: %s" % (cls, r(criterion)))
+    return criterion
 
   @classmethod
   @pfx_method
@@ -3172,10 +3195,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       This manages a mapping of `name` => `TagSet`,
       itself a mapping of tag name => tag value.
   '''
-
-  @classmethod
-  def _singleton_key(cls, fspath, **_):
-    return fspath
 
   @typechecked
   def __init__(self, fspath: str, *, ontology=None):

@@ -42,8 +42,9 @@ from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
 from cs.threads import bg as bg_thread
+from cs.upd import print
 
-__version__ = '20220312-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -64,6 +65,7 @@ DISTINFO = {
         'cs.resources',
         'cs.result>=20210407',
         'cs.threads',
+        'cs.upd',
     ],
     'entry_points': {
         'console_scripts': ['pop3 = cs.pop3:main'],
@@ -233,8 +235,8 @@ class POP3(MultiOpenMixin):
         else:
           lines = None
       except Exception as e:  # pylint: disable=broad-except
-        warning("%s: %s", R, e)
         R.exc_info = sys.exc_info
+        warning("%s: %s", R, e)
       else:
         # save a list so that we can erase it in a handler to release memory
         R.result = [etc, lines]

@@ -1,0 +1,6 @@
+BaseCommand: new popopts(argv,...) compact getopt wrapper.
+BaseCommand: new poparg(argv,...) compact validating argument consumer.
+BaseCommand: drop run_argv, provided no utility.
+BaseCommand.run: get the RunState signal list from self.options.runstate_signals.
+BaseCommand.apply_opts: support multiple individual options raising GetoptError, as I hate commands which abort at the first bad option.
+Assorted other small things.

@@ -18,7 +18,7 @@ from cs.py3 import ConfigParser, StringTypes
 from cs.tagset import TagSet
 from cs.threads import locked
 
-__version__ = '20220430-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -218,6 +218,14 @@ class HasConfigIni:
     self.config_ini = config_ini
     self.__section = section
     self._config = None
+
+  def info_dict(self, d=None):
+    ''' Return an informational `dict` containing salient information
+        about this `HasCOnfigIni`, handy for use with `pprint()`.
+    '''
+    if d is None: d = {}
+    d.update(config=self.config_ini, section=self.__section)
+    return d
 
   @property
   def configpath(self):

@@ -1,3 +1,14 @@
+cs.cmdutils: help to include the first sentence of the subcommand usage?
+cs.fsm: better docstrings, suppress FSMSubType docstring somehow
+proxy-peerage: name acls using proxies:ptn passed through the identifier stuff from named_row_tuples - should make for better diffs and more readable configs
+proxy-peerage: host/fqdn pattern: turn into an exact regexp?
+cs.urlutils: drop Python 2 support
+cs.upd: above should do clear-toend-of-screen?
+cs.binary: BinaryMixin.scan_file: CCB.from_file: return the unread buffer bytes to the file? seek if possible, warning if not and some buffered data
+cs.logutils: PfxFormatter: dict args support needed
+Pfx: accept a mode to defer computing the format string, eg for pfx_call et al, to make them nearly free
+@locked_property: replace with @cachedmethod throughout
+@cachedmethod: needs a __lock attribute, then review use throughout
 cs.upd: Upd activation always makes the status line, Upd.insert can never create slot 0
 cs.upd: print to know if inside above(), or above() to enter disabled mode
 cs.iso14496: adapt for mp4 records with padding if short - adjust length field

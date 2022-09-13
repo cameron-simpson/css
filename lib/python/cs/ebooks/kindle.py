@@ -12,7 +12,6 @@ from os.path import (
     isfile as isfilepath,
     join as joinpath,
 )
-from subprocess import run
 import sys
 
 from icontract import require
@@ -40,6 +39,7 @@ from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
+from cs.psutils import run
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -238,7 +238,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
               fmtpath = cbook.formatpath(fmtk)
               if fmtpath and filecmp.cmp(fmtpath, azwpath):
                 # pylint: disable=expression-not-assigned
-                quiet or print(
+                verbose and print(
                     cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
                 )
                 return cbook, False
@@ -570,8 +570,19 @@ class KindleCommand(BaseCommand):
     ''' Set up the default values in `options`.
     '''
     options = self.options
-    options.kindle_path = None
-    options.calibre_path = None
+    try:
+      # pylint: disable=protected-access
+      kindle_path = KindleTree._resolve_fspath(None)
+    except ValueError:
+      kindle_path = None
+    from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
+    try:
+      # pylint: disable=protected-access
+      calibre_path = CalibreTree._resolve_fspath(None)
+    except ValueError:
+      calibre_path = None
+    options.kindle_path = kindle_path
+    options.calibre_path = calibre_path
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -720,22 +731,37 @@ class KindleCommand(BaseCommand):
     print("calibre", self.options.calibre.shortpath)
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd}
-          List the contents of the librayr.
+    ''' Usage: {cmd} [-l]
+          List the contents of the library.
+          -l  Long mode.
     '''
     options = self.options
     kindle = options.kindle
+    options.longmode = False
+    self.popopts(argv, options, l='longmode')
+    longmode = options.longmode
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     print(kindle.fspath)
     for subdir_name, kbook in kindle.items():
-      print(subdir_name, " ".join(map(str, sorted(kbook.tags))))
-      if kbook.type != 'kindle.ebook':
-        print("  type =", kbook.type)
-      if kbook.revision is not None:
-        print("  revision =", kbook.revision)
-      if kbook.sampling:
-        print("  sampling =", kbook.sampling)
+      line1 = [subdir_name]
+      title = kbook.tags.auto.calibre.title
+      if title:
+        line1.append(title)
+      authors = kbook.tags.auto.calibre.authors
+      if authors:
+        line1.append(','.join(authors))
+      print(*line1)
+      if longmode:
+        if kbook.type != 'kindle.ebook':
+          print("  type =", kbook.type)
+        if kbook.revision is not None:
+          print("  revision =", kbook.revision)
+        if kbook.sampling:
+          print("  sampling =", kbook.sampling)
+        for tag in sorted(kbook.tags.as_tags()):
+          if tag.name not in ('calibre.title', 'calibre.authors'):
+            print(" ", tag)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

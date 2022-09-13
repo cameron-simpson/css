@@ -22,7 +22,7 @@ from cs.logutils import warning
 from cs.mappings import named_column_tuples
 from cs.pfx import Pfx
 
-__version__ = '20201228-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'description':
@@ -96,6 +96,7 @@ def csv_import(
     computed=None,
     preprocess=None,
     mixin=None,
+    snake_case=False,
     **kw
 ):
   ''' Read CSV data where the first row contains column headers.
@@ -139,7 +140,8 @@ def csv_import(
       column_names=column_names,
       computed=computed,
       preprocess=preprocess,
-      mixin=mixin
+      mixin=mixin,
+      snake_case=snake_case,
   )
 
 def xl_import(workbook, sheet_name=None, skip_rows=0, **kw):

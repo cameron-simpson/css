@@ -36,15 +36,15 @@ The steps to achieve this are as follows:
 At that point the package is present on the package distribution service.
 To use the package, end users must:
 
-- download one of the package artifacts from the package distribution service
+- download one of the package's build artifacts from the package distribution service
 
 - install it in their Python installation, usually in its `site-packages` directory;
   this install step may involve a build/compile step which, if needed, must
   be described by the package metadata
 
-These 2 steps are typically performed by a tool like [pip](https://pip.pypa.io/en/stable/).
+These last 2 steps are typically performed by a tool like [pip](https://pip.pypa.io/en/stable/).
 
-These steps are described in more detail below.
+The steps above are described in more detail below.
 
 ## The Source Tree
 
@@ -80,7 +80,7 @@ There are several choices available, including but not limited to:
 - [poetry](https://pypi.org/project/poetry/)
 - [hatch](https://github.com/ofek/hatch)
 - [pdm](https://pypi.org/project/pdm/)
-- [whey](https://pypi.org/project/pdm/)
+- [whey](https://pypi.org/project/whey/)
 - [trampolim](https://pypi.org/project/trampolim/)
 
 Here is a table for using `setuptools` (see the [Setuptools documentation](https://setuptools.pypa.io/en/latest/userguide/index.html)):
@@ -154,7 +154,7 @@ The [twine tool](https://pypi.org/project/twine/)
 can upload build artifact files to PyPI for distribution,
 for example with a command like:
 
-    twine upload dist/package-name-version.tar.gz dist/package-name-version-py3-none-any.whlpy3-none-any.whl
+    twine upload dist/package-name-version.tar.gz dist/package-name-version-py3-none-any.whl
 
 Some build tools will also include upload facilities.
 

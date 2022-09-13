@@ -1,0 +1,1 @@
+lib/python/cs/logutils.py: cs.logutils: PfxFormatter.patch_formatter: notice if record.args is not a tuple and do not try to prefix it (for now), also fall back to the original formatting if the new formatting raises an exception

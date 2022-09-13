@@ -16,12 +16,13 @@ import time
 ##from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import exception, warning, debug
+from cs.obj import Sentinel
 from cs.pfx import Pfx, PfxCallInfo
 from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20220317-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'description':
@@ -34,6 +35,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.py3',
         'cs.resources',
@@ -47,14 +49,15 @@ class _QueueIterator(MultiOpenMixin):
       It does not offer the `.get` or `.get_nowait` methods.
   '''
 
-  sentinel = object()
-
   def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
     self.q = q
     self.name = name
     self.finalise_later = True
+    self.sentinel = Sentinel(
+        "%s:%s:SENTINEL" % (self.__class__.__name__, name)
+    )
     # count of non-sentinel items
     self._item_count = 0
 
@@ -420,6 +423,7 @@ class TimerQueue(object):
     assert self.mainThread is not None, "no main thread to join"
     self.mainThread.join()
 
+  # pylint: disable=too-many-statements
   def _main(self):
     ''' The main loop.
 
@@ -526,11 +530,16 @@ class ListQueue:
       except IndexError:
         raise Queue_Empty("list is empty")  # pylint: disable=raise-missing-from
 
-  def put(self, item):
-    ''' Put appends to the queue.
+  def append(self, item):
+    ''' Append an item to the queue, aka `put`.
     '''
     with self._lock:
       self.queued.append(item)
+
+  def put(self, item):
+    ''' Put appends to the queue.
+    '''
+    return self.append(item)
 
   def extend(self, items):
     ''' Convenient/performant queue-lots-of-items.
