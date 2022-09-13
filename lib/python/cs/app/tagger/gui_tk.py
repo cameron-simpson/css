@@ -426,7 +426,7 @@ class _ImageWidget(_Widget):
 
           It is essential that this is queued with `after_idle`.
           If this ran directly during widget construction
-          the `wait_visibility` call would block the follow construction.
+          the `wait_visibility` call would block the following construction.
       '''
       if self._image_for == self._fspath:
         return
@@ -713,6 +713,7 @@ class TagWidget(Frame):
     '''
     self.tagger = tagger
     if alt_values is None:
+      # obtain alternate values from those defined in the ontology
       alt_values = set(tagger.ont_values(tag.name))
     else:
       alt_values = set(alt_values)
@@ -754,7 +755,7 @@ class TagWidget(Frame):
 
         The `Tag` is updated when the widget is withdrawn,
         and if the new value does not match the value in `self.tags`
-        then the correponding `self.tags[tag.name]` is also updated.
+        then the corresponding `self.tags[tag.name]` is also updated.
     '''
     tag = self.tag
     tag_value = tag.value
@@ -987,7 +988,7 @@ class PathView(LabelFrame):
     return self.tagger.fstags[self._fspath]
 
 class ThumbNailScrubber(Frame, _FSPathsMixin):
-  ''' A row of thumbnails for a list of fielsystem paths.
+  ''' A row of thumbnails for a list of filesystem paths.
   '''
 
   THUMB_X = 64
