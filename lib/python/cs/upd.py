@@ -73,9 +73,10 @@ import os
 import sys
 from threading import RLock, Thread
 import time
+from typing import Optional
 
 from cs.context import stackattrs, StackableState
-from cs.deco import decorator
+from cs.deco import decorator, default_params
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
@@ -94,7 +95,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -827,7 +827,7 @@ class Upd(SingletonMixin):
           )
       if proxy is None:
         # create the proxy, which inserts it
-        return UpdProxy(index, self, prefix=txt)
+        return UpdProxy(index=index, upd=self, prefix=txt)
 
       # associate the proxy with self
       assert proxy.upd is None
@@ -1023,6 +1023,11 @@ class Upd(SingletonMixin):
           transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
       )
 
+def uses_upd(func):
+  ''' Decorator for functions accepting an optional `upd=Upd()` parameter.
+  '''
+  return default_params(func, upd=Upd)
+
 class UpdProxy(object):
   ''' A proxy for a status line of a multiline `Upd`.
 
@@ -1050,13 +1055,15 @@ class UpdProxy(object):
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
   }
 
+  @uses_upd
   def __init__(
       self,
-      index=1,
-      upd=None,
-      text=None,
-      prefix=None,
-      suffix=None,
+      text: Optional[str] = None,
+      *,
+      upd: Upd,
+      index: int = 1,
+      prefix: Optional[str] = None,
+      suffix: Optional[str] = None,
       text_auto=None,
   ):
     ''' Initialise a new `UpdProxy` status line.
@@ -1070,8 +1077,6 @@ class UpdProxy(object):
     '''
     self.upd = None
     self.index = None
-    if upd is None:
-      upd = Upd()
     self._prefix = prefix or ''
     self._text = ''
     self._text_auto = text_auto
