@@ -17,6 +17,7 @@ from os.path import (
     isdir as isdirpath,
     join as joinpath,
     realpath,
+    relpath,
     samefile,
 )
 from threading import RLock
@@ -33,6 +34,7 @@ from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
 from cs.threads import locked
+from cs.upd import run_task, print
 
 __version__ = None
 
@@ -142,7 +144,7 @@ class Tagger(FSPathBasedSingleton):
 
   @pfx
   def autoname(self, srcpath):
-    ''' Generate a file basename computed from `srcpath`.
+    ''' Generate a filename computed from `srcpath`.
 
         The format strings used to generate the pathname
         come from the `autoname` configuration tag of this `Tagger`
@@ -356,27 +358,33 @@ class Tagger(FSPathBasedSingleton):
     if missing_tag_names:
       # walk the tree to find the missing tags
       subdirpaths_by_tag = defaultdict(list)
-      for path, dirnames, _ in os.walk(realpath(dirpath)):
-        with Pfx("os.walk @ %r", path):
-          tagged_subdir = fstags[path]
-          if 'skip' in self.tagger_for(tagged_subdir.fspath).conf:
-            # tagger.skip => prune this directory tree from the mapping
-            dirnames[:] = []
-            continue
-          # order the descent
-          dirnames[:] = sorted(
-              dname for dname in dirnames
-              if dname and not dname.startswith('.')
-          )
-          # look for the tags of interest
-          for tag_name in missing_tag_names:
-            try:
-              tag_value = tagged_subdir[tag_name]
-            except KeyError:
-              pass
-            else:
-              bare_tag = Tag(tag_name, tag_value)
-              subdirpaths_by_tag[bare_tag].append(tagged_subdir.fspath)
+      with run_task(
+          "%s.per_tag_auto_file_map(%s): os.walk" %
+          (self, ",".join(tag_names)),
+          report_print=True,
+      ) as proxy:
+        for path, dirnames, _ in os.walk(fspath):
+          proxy.text = relpath(path, fspath)
+          with Pfx("os.walk @ %r", path):
+            tagged_subdir = fstags[path]
+            if 'skip' in self.tagger_for(tagged_subdir.fspath).conf:
+              # tagger.skip => prune this directory tree from the mapping
+              dirnames[:] = []
+              continue
+            # order the descent
+            dirnames[:] = sorted(
+                dname for dname in dirnames
+                if dname and not dname.startswith('.')
+            )
+            # look for the tags of interest
+            for tag_name in missing_tag_names:
+              try:
+                tag_value = tagged_subdir[tag_name]
+              except KeyError:
+                pass
+              else:
+                bare_tag = Tag(tag_name, tag_value)
+                subdirpaths_by_tag[bare_tag].append(tagged_subdir.fspath)
       # make sure each cache exists and gather them up
       for tag_name in missing_tag_names:
         per_tag_cache_key = fspath, tag_name
