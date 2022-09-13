@@ -328,27 +328,30 @@ class Later(MultiOpenMixin):
     self._priority = (0,)
     self._timerQ = None  # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._finished = None
+    self.finished_event = None
 
   @contextmanager
   def startup_shutdown(self):
-    self._finished = Event()
-    global default  # pylint: disable=global-statement
-    with stackattrs(default, current=self):
-      try:
-        yield
-      finally:
-        # Shut down the Later instance:
-        # - close the request queue
-        # - close the TimerQueue if any
-        # - close the worker thread pool
-        # - dispatch a Thread to wait for completion and fire the
-        #   _finished Event
-        if self._timerQ:
-          self._timerQ.close()
-          self._timerQ.join()
-        # queue actions to detect activity completion
-        bg_thread(self._finished.set)
+    with super().startup_shutdown():
+      finished = Event()
+      with stackattrs(self, finished_event=finished):
+        global default  # pylint: disable=global-statement
+        with stackattrs(default, current=self):
+          try:
+            yield
+          finally:
+            # Shut down the Later instance:
+            # - queue the final job to set the finished_event Event
+            # - close the request queue
+            # - close the TimerQueue if any
+            # - close the worker thread pool
+            # - dispatch a Thread to wait for completion and fire the
+            #   finished_event Event
+            # queue final action to mark activity completion
+            self._defer(finished.set)
+            if self._timerQ:
+              self._timerQ.close()
+              self._timerQ.join()
 
   def _try_dispatch(self):
     ''' Try to dispatch the next `LateFunction`.
@@ -370,7 +373,6 @@ class Later(MultiOpenMixin):
           # the LF completes really fast - notify fires immediately
           # in the current thread if the function is already complete).
           LF.notify(self._complete_LF)
-          debug("LATER: dispatch %s", LF)
           LF._dispatch()
       elif self.pending:
         debug("LATER: at capacity, nothing dispatched: %s", self)
@@ -388,16 +390,20 @@ class Later(MultiOpenMixin):
   def finished(self):
     ''' Probe the finishedness.
     '''
-    return self._finished.is_set()
+    return self.finished_event.is_set()
 
-  def wait(self):
-    ''' Wait for the Later to be finished.
+  @pfx_method
+  def wait(self, timeout=None):
+    ''' Wait for the `Later` to be finished.
+        Return the result of `self.finished_event.wait(timeout)`.
     '''
-    f = self._finished
+    f = self.finished_event
     if not f.is_set():
       info("Later.WAIT: %r", self)
-    if not self._finished.wait(5.0):
-      warning("  Later.WAIT TIMED OUT")
+    waited = f.wait(timeout)
+    if not waited:
+      warning("timed out after %fs", timeout)
+    return waited
 
   def __repr__(self):
     return (

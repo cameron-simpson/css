@@ -56,19 +56,24 @@ pfx_makedirs = partial(pfx_call, os.makedirs)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
-def needdir(dirpath, mode=0o777, *, use_makedirs=False):
+def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
   ''' Create the directory `dirpath` if missing.
 
       Parameters:
       * `dirpath`: the required directory path
       * `mode`: the permissions mode, default `0o777`
+      * `log`: log `makedirs` or `mkdir` call
       * `use_makedirs`: optional creation mode, default `False`;
         if true, use `os.makedirs`, otherwise `os.mkdir`
   '''
   if not isdirpath(dirpath):
     if use_makedirs:
+      if log is not None:
+        log("makedirs(%r,0o%3o)", dirpath, mode)
       pfx_makedirs(dirpath, mode)
     else:
+      if log is not None:
+        log("mkdir(%r,0o%3o)", dirpath, mode)
       pfx_mkdir(dirpath, mode)
 
 @decorator
@@ -164,6 +169,9 @@ class HasFSPath:
 
   def __init__(self, fspath):
     self.fspath = fspath
+
+  def __str__(self):
+    return f'{self.__class__.__name__}(fspath={self.shortpath})'
 
   @property
   def shortpath(self):

@@ -148,7 +148,7 @@ def tabpadding(padlen, tabsize=8, offset=0):
 
   return pad
 
-def typed_str(o, use_cls=False, use_repr=False, max_length=None):
+def typed_str(o, use_cls=False, use_repr=False, max_length=32):
   ''' Return "type(o).__name__:str(o)" for some object `o`.
       This is available as both `typed_str` and `s`.
 
@@ -165,12 +165,10 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=None):
           X("foo = %s", s(foo))
   '''
   # pylint: disable=redefined-outer-name
-  s = "%s:%s" % (
-      type(o) if use_cls else type(o).__name__,
-      repr(o) if use_repr else str(o),
-  )
+  o_s = repr(o) if use_repr else str(o)
   if max_length is not None:
-    s = cropped(s, max_length)
+    o_s = cropped(o_s, max_length)
+  s = "%s:%s" % (type(o) if use_cls else type(o).__name__, o_s)
   return s
 
 # convenience alias

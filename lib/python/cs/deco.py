@@ -518,7 +518,7 @@ def OBSOLETE(func, suggestion=None):
           "OBSOLETE call" if suggestion is None else
           ("OBSOLETE (suggest %r) call" % suggestion)
       )
-      fmt = "%s to %s:%d %s(), called from %s:%d %s"
+      fmt = "%s to %s:%d:%s(), called from %s:%d:%s"
       fmtargs = [
           prefix, func.__code__.co_filename, func.__code__.co_firstlineno,
           func.__name__, frame[0], frame[1], frame[2]

@@ -412,8 +412,10 @@ class _Block(Transcriber, ABC):
         that the final Store shutdown of `S2` will wait for outstanding
         operations anyway.
     '''
+    if progress is not None and progress.total is None:
+      progress.total = 0
     with defaults.S:
-      if progress:
+      if progress is not None:
         progress.total += len(self)
       Q.put(self)
       if self.indirect:
@@ -456,7 +458,7 @@ class BlockRecord(BinarySingleValue):
             BS(flags)
               0x01 indirect blockref
               0x02 typed: type follows, otherwise BT_HASHCODE
-              0x04 type flags: per type flags follow type
+              0x04 has type flags: additional per type flags follow type
             BS(span)
             [BS(type)]
             [BS(type_flags)]

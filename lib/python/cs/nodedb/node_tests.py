@@ -6,15 +6,14 @@
 
 import sys
 import unittest
+
 from cs.debug import thread_dump
 from cs.pfx import pfx_method
 from cs.py3 import StringTypes
 from cs.timeutils import sleep
+
 from . import NodeDB, Node
 from .mappingdb import MappingBackend
-
-import cs.x
-cs.x.X_via_tty = True
 
 class TestAll(unittest.TestCase):
   ''' Tests for `cs.nodedb.node`.
