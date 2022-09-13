@@ -120,7 +120,7 @@ def X(msg, *args, **kw):
     fp = sys.stderr
   print(msg, file=fp)
 
-# init X_via_tty (after X() because we use X() for messaging
+# init X_via_tty (after X() because we use X() for messaging)
 env_via_tty = os.environ.get('CS_X_VIA_TTY', '')
 if not env_via_tty:
   X_via_tty = False
@@ -148,29 +148,6 @@ if os.environ.get('CS_X_BUILTIN', ''):
     pass
   else:
     builtins.X = X
-
-def Xtty(msg, *args, **kw):
-  ''' Call `X()` with `X_via_tty` set to `True`.
-
-      *Note*:
-      this is now obsoleted by the `$CS_X_VIA_TTY` environment variable.
-
-      This supports using:
-
-          from cs.x import Xtty as X
-
-      when hacking on tests without the tedious shuffle:
-
-          from cs.x import X
-          import cs.x; cs.x.X_via_tty = True
-
-      which I did _a lot_ to get timely debugging when fixing test failures.
-  '''
-  global X_via_tty  # pylint: disable=global-statement
-  old = X_via_tty
-  X_via_tty = True
-  X(msg, *args, **kw)
-  X_via_tty = old
 
 def Y(msg, *a, **kw):
   ''' Wrapper for `X()` rendering in yellow.

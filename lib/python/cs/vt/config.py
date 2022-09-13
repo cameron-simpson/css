@@ -145,26 +145,26 @@ class Config(SingletonMixin):
       )
     return R()
 
+  @pfx_method
   def _make_clause_store(self, clause_name):
     ''' Instantiate the `Store` associated with `clause_name`.
     '''
-    with Pfx("%s._make_clause_store(%r)", self, clause_name):
-      try:
-        bare_clause = self.map[clause_name]
-      except KeyError:
-        raise KeyError(f"no clause named [{clause_name}]")
-      clause = dict(bare_clause)
-      for discard in 'address', :
-        clause.pop(discard, None)
-      try:
-        store_type = clause.pop('type')
-      except KeyError:
-        raise ValueError("missing type field in clause")
-      store_name = "%s[%s]" % (self, clause_name)
-      S = self.new_Store(
-          store_name, store_type, clause_name=clause_name, **clause
-      )
-      return S
+    try:
+      bare_clause = self.map[clause_name]
+    except KeyError:
+      raise KeyError(f"no clause named [{clause_name}]")
+    clause = dict(bare_clause)
+    for discard in 'address', :
+      clause.pop(discard, None)
+    try:
+      store_type = clause.pop('type')
+    except KeyError:
+      raise ValueError("missing type field in clause")
+    store_name = "%s[%s]" % (self, clause_name)
+    S = self.new_Store(
+        store_name, store_type, clause_name=clause_name, **clause
+    )
+    return S
 
   def get_default(self, param, default=None):
     ''' Fetch a default parameter from the [GLOBALS] clause.
@@ -329,7 +329,6 @@ class Config(SingletonMixin):
       )
     return stores
 
-  @pfx_method(use_str=True)
   def new_Store(
       self, store_name, store_type, *, clause_name, hashclass=None, **params
   ):

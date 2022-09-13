@@ -245,7 +245,7 @@ class Result(FSM):
       raise AttributeError("%s not ready: no .result attribute" % (self,))
     self.collected = True
     if state == self.CANCELLED:
-      raise CancellationError()
+      raise CancellationError
     return self._result
 
   @result.setter
@@ -270,7 +270,7 @@ class Result(FSM):
     self.collected = True
     if state == self.CANCELLED:
       self.collected = True
-      raise CancellationError()
+      raise CancellationError
     return self._exc_info
 
   @exc_info.setter
@@ -541,7 +541,7 @@ class OnDemandResult(Result):
           (self, a, kw)
       )
     with self._lock:
-      if self.state == self.PENDING:
+      if self.is_pending:
         self.run_func(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()
 

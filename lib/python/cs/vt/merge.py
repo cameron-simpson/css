@@ -19,7 +19,12 @@ from .dir import Dir, FileDirent
 from .paths import DirLike
 
 @typechecked
-def merge(target_root: DirLike, source_root: DirLike, runstate: RunState):
+def merge(
+    target_root: DirLike,
+    source_root: DirLike,
+    *,
+    runstate: RunState,
+):
   ''' Merge contents of the DirLike `source_root`
       into the DirLike `target_root`.
 
