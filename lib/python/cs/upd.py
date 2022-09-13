@@ -157,6 +157,15 @@ def pfxprint(*a, **kw):
   from cs.pfx import pfxprint as base_pfxprint
   return base_pfxprint(*a, print_func=print, **kw)
 
+@contextmanager
+def run_task(*a, upd=None, **kw):
+  ''' Top level `run_task` function to call `Upd.run_task`.
+  '''
+  if upd is None:
+    upd = Upd()
+  with upd.run_task(*a, **kw) as proxy:
+    yield proxy
+
 def nl(msg, *a, **kw):
   ''' Write `msg` to `file` (default `sys.stdout`),
       without interfering with the `Upd` instance.
@@ -973,6 +982,7 @@ class Upd(SingletonMixin):
       tick_chars='|/-\\',
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
+        It yields the proxy.
     '''
     if tick_delay is not None:
       if tick_delay <= 0:
