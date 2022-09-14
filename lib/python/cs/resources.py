@@ -12,10 +12,11 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock
 import time
+
 from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
 from cs.logutils import error, warning
 from cs.obj import Proxy
-from cs.pfx import pfx_method
+from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
@@ -164,10 +165,18 @@ class MultiOpenMixin(ContextManagerMixin):
   @contextmanager
   def startup_shutdown(self):
     ''' Default context manager form of startup/shutdown - just
-        call the distinct `.startup()` and `.shutdown()` methods.
+        call the distinct `.startup()` and `.shutdown()` methods
+        if both are present, do nothing if neither use present.
 
-        This supports legacy subclasses of `MultiOpenMixin` which
-        have separate `startup()` and `shutdown()` methods.
+        This supports subclasses always using:
+
+            with super().startup_shutdown():
+
+        as an outer wrapper.
+
+        The `.startup` check is to support legacy subclasses of
+        `MultiOpenMixin` which have separate `startup()` and
+        `shutdown()` methods.
         The preferred approach is a single `startup_shutdwn()`
         context manager overriding this method.
 
@@ -175,32 +184,24 @@ class MultiOpenMixin(ContextManagerMixin):
 
             @contextmanager
             def startup_shutdown(self):
-                ... do some set up ...
-                try:
-                    yield
-                finally:
-                    ... do some tear down ...
+                with super().startup_shutdown():
+                    ... do some set up ...
+                    try:
+                        yield
+                    finally:
+                        ... do some tear down ...
     '''
     try:
       startup = self.startup
     except AttributeError:
-      warning(
-          "MultiOpenMixin.startup_shutdown: no %s.startup" %
-          (type(self).__name__,)
-      )
+      shutdown = None
     else:
+      shutdown = self.shutdown
       startup()
     try:
       yield
     finally:
-      try:
-        shutdown = self.shutdown
-      except AttributeError:
-        warning(
-            "MultiOpenMixin.startup_shutdown: no %s.shutdown" %
-            (type(self).__name__,)
-        )
-      else:
+      if shutdown is not None:
         shutdown()
 
   def open(self, caller_frame=None):
@@ -386,6 +387,26 @@ class MultiOpen(MultiOpenMixin):
     '''
     self.openable.close()
 
+@contextmanager
+def openif(obj):
+  ''' Context manager to open `obj` if it has a `.open` method
+      and also to close it via its `.close` method.
+      This yields `obj.open()` if defined, or `obj` otherwise.
+  '''
+  try:
+    open_method = obj.open
+  except AttributeError:
+    close_method = None
+    opened = obj
+  else:
+    close_method = obj.close
+    opened = pfx_call(open_method)
+  try:
+    yield opened
+  finally:
+    if close_method is not None:
+      pfx_call(close_method)
+
 class Pool(object):
   ''' A generic pool of objects on the premise that reuse is cheaper than recreation.
 
@@ -486,11 +507,12 @@ class RunState(ContextManagerMixin):
         to be called whenever `.cancel` is called.
   '''
 
-  def __init__(self, name=None, signals=None):
+  def __init__(self, name=None, signals=None, handle_signal=None):
     self.name = name
     self._started_from = None
     self._signals = tuple(signals) if signals else ()
     self._sigstack = None
+    self._sighandler = handle_signal or self.handle_signal
     # core state
     self._running = False
     self.cancelled = False
@@ -527,7 +549,8 @@ class RunState(ContextManagerMixin):
         * cancel on exception during run
         * stop
     '''
-    with self.catch_signal(self._signals, call_previous=False) as sigstack:
+    with self.catch_signal(self._signals, call_previous=False,
+                           handle_signal=self._sighandler) as sigstack:
       with stackattrs(self, _sigstack=sigstack):
         self.start(running_ok=True)
         try:
@@ -649,7 +672,13 @@ class RunState(ContextManagerMixin):
     return max(0, stop_time - start_time)
 
   @contextmanager
-  def catch_signal(self, sig, call_previous=False, verbose=False):
+  def catch_signal(
+      self,
+      sig,
+      call_previous=False,
+      verbose=False,
+      handle_signal=None,
+  ):
     ''' Context manager to catch the signal or signals `sig` and
         cancel this `RunState`.
         Restores the previous handlers on exit.
@@ -662,20 +691,21 @@ class RunState(ContextManagerMixin):
         * `verbose`: if true (default `False`),
           issue a `warning` on receipt of a signal
     '''
-
-    def handler(sig, _):
-      ''' `RunState` signal handler: cancel the run state.
-          Warn if `verbose`.
-      '''
-      # pylint: disable=expression-not-assigned
-      verbose and warning("%s: received signal %s, cancelling", self, sig)
-      self.cancel()
-
+    if handle_signal is None:
+      handle_signal = self.handle_signal
     sigs = (sig,) if isinstance(sig, int) else sig
-    sig_hnds = map(lambda signum: (signum, handler), sigs)
+    sig_hnds = map(lambda signum: (signum, handle_signal), sigs)
     with signal_handlers(sig_hnds,
                          call_previous=call_previous) as old_handler_map:
       yield old_handler_map
+
+  def handle_signal(self, sig, _):
+    ''' `RunState` signal handler: cancel the run state.
+        Warn if `verbose`.
+      '''
+    # pylint: disable=expression-not-assigned
+    warning("%s: received signal %s, cancelling", self, sig)
+    self.cancel()
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.

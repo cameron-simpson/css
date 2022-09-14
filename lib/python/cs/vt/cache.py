@@ -7,18 +7,23 @@
 ''' Caching Stores and associated data structures.
 '''
 
-from __future__ import with_statement
 from collections import namedtuple
+from contextlib import contextmanager
 from os.path import isdir as isdirpath
 from tempfile import TemporaryFile
 from threading import Thread
+
 from icontract import require
+
+from cs.context import stackattrs
 from cs.fileutils import RWFileBlockCache, datafrom_fd
 from cs.logutils import error
 from cs.pfx import pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin
 from cs.result import Result
+from cs.threads import bg as bg_thread
+
 from . import defaults, MAX_FILE_SIZE, Lock, RLock
 from .store import _BasicStoreCommon, BasicStoreSync, MappingStore
 
@@ -102,17 +107,16 @@ class FileCacheStore(BasicStoreSync):
       if new_backend:
         new_backend.open()
 
-  @pfx_method
-  def startup(self):
-    super().startup()
-    self.cache.open()
-
-  @pfx_method
-  def shutdown(self):
-    self.cache.close()
-    self.cache = None
-    self.backend = None
-    super().shutdown()
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      self.cache.open()
+      try:
+        yield
+      finally:
+        self.cache.close()
+        self.cache = None
+        self.backend = None
 
   def flush(self):
     ''' Dummy flush operation.
@@ -210,28 +214,25 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     self._lock = Lock()
     self.cachefiles = []
     self._add_cachefile()
-    self._workQ = None
-    self._worker = None
     self.runstate.notify_cancel.add(lambda rs: self.close())
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Startup the proxy.
     '''
-    self._workQ = IterableQueue()
-    self._worker = Thread(name="%s WORKER" % (self,), target=self._work)
-    self._worker.start()
-
-  @pfx_method
-  def shutdown(self):
-    ''' Shut down the cache.
-        Stop the worker, close the file cache.
-    '''
-    self._workQ.close()
-    self._worker.join()
-    if self.cached:
-      error("blocks still in memory cache: %r", self.cached)
-    for cachefile in self.cachefiles:
-      cachefile.close()
+    with super().startup_shutdown():
+      workQ = IterableQueue()
+      worker = bg_thread(self._work, args=(workQ,), name="%s WORKER" % (self,))
+      with stackattrs(self, _workQ=workQ):
+        try:
+          yield
+        finally:
+          workQ.close()
+          worker.join()
+          if self.cached:
+            error("blocks still in memory cache: %r", self.cached)
+          for cachefile in self.cachefiles:
+            cachefile.close()
 
   def _add_cachefile(self):
     cachefile = RWFileBlockCache(dirpath=self.dirpath)
@@ -325,8 +326,8 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     # queue for file cache and backend
     self._workQ.put((h, data, True))
 
-  def _work(self):
-    for h, data, in_backend in self._workQ:
+  def _work(self, workQ):
+    for h, data, in_backend in workQ:
       with self._lock:
         if self._getref(h):
           # already in file cache, therefore already sent to backend
@@ -367,6 +368,8 @@ class MemoryCacheMapping:
     self.max_data = max_data
     self.used_data = 0
     self.mapping = {}
+    # keep a revision/use counter for hashcodes, used to decide
+    # which hashcodes to purge when self.used_data > self.max_data
     self._ticker = 0
     self._tick = {}
     self._skip_flush = 32

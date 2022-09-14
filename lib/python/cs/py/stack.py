@@ -48,11 +48,11 @@ def caller(frame_index=-3):
 
       The default `from_index` value is `-3`.
   '''
+  frs = frames()
   try:
-    raw_frame = frames()[frame_index]
+    return frs[frame_index]
   except IndexError:
     return None
-  return Frame(*raw_frame)
 
 def stack_dump(fp=None, indent=0, Fs=None, skip=None):
   ''' Recite current or supplied stack to `fp`, default `sys.stderr`.

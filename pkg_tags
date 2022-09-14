@@ -31,7 +31,7 @@ cs.context pypi.release="20220619" ok_revision="5a112bcd61dc7138895ba70dad24ca74
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
 cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
-cs.deco pypi.release="20220805" ok_revision=ea9410ad09a23b81a08d942a952fdfe96423a3fb
+cs.deco pypi.release="20220905" ok_revision=ec9e8c1872e9511929ff68f2c702c7472d4f3803 features={"20220905":["ALL","default_params"]}
 cs.distinfo
 cs.ebooks ok_revision="1687329dfb2808f98e083ac7b604603074613b3e" pypi.release="20220805"
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
@@ -43,7 +43,7 @@ cs.fs ok_revision="1fa6299d7ddc225c54ce23ef6d566f752aaf5313" pypi.release="20220
 cs.fsm ok_revision=ff4928e3732f022cfbdba2e44d7038986ae29e9a pypi.release="20220805.1"
 cs.fstags pypi.release="20220606" ok_revision="8d7cf241e48009267aef9fdd7f3676adc6701ab4"
 cs.gimmicks ok_revision="69717a798c9d840f055eb77ace16dff72c95fd15" pypi.release="20220429" features={"20211208":["TimeoutError"],"20220429":["devnull"]}
-cs.gvutils ok_revision="778e2ade9ba7e92fc639ba48673d35fd8810e431" pypi.release="20220805.1" features={"20220805.1":["DOTNodeMixin"]}
+cs.gvutils ok_revision="94eb2f3414cd22715c4ce03489b0a1c5b2bb36a4" pypi.release="20220827.1" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"]}
 cs.html pypi.release=20160828
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
@@ -54,7 +54,7 @@ cs.later pypi.release="20220805" ok_revision="1db5e216793af9e69666d524240d4b891b
 cs.lex pypi.release="20220626" ok_revision="138ffdfea02ee244fe08149aafb996ee264dfa1c" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"]}
 cs.logutils pypi.release="20220531" ok_revision=b00bf7d22f3b049e51068327ee8ffc299136d510 features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
-cs.mappings pypi.release="20220626" ok_revision="071f69ca0d76e6334e52976e9d776c005af35246" features={"20210906":["RemappedMappingProxy"]}
+cs.mappings pypi.release="20220912.4" ok_revision="585f82b1d2287203f63b07bd1d0cd4fced168bca" features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"]}
 cs.mediainfo
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.mplutils ok_revision="27c2312f6145c289342ec8633d57b6a8912eff0e" pypi.release="20220805"

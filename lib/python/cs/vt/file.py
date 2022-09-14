@@ -6,14 +6,16 @@
 ''' Classes to present blocks as file-like objects with write support.
 '''
 
-from __future__ import print_function, absolute_import
+from contextlib import contextmanager
 from io import RawIOBase
 from os import SEEK_SET
 import sys
+
 from cs.fileutils import BackedFile, ReadMixin, datafrom
 from cs.resources import MultiOpenMixin
 from cs.result import bg
 from cs.threads import locked, LockableMixin
+
 from . import defaults, RLock
 from .block import Block, IndirectBlock, RLEBlock
 from .blockify import top_block_for, blockify
@@ -110,17 +112,14 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
         self._file.flush = self.flush
         self._sync_span = None
 
-  def startup(self):
-    ''' Startup actions.
-    '''
-    pass
-
-  def shutdown(self):
-    ''' Close the RWBlockFile, return the top Block.
-    '''
-    B = self.sync()
-    self._reset(None)
-    return B
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      try:
+        yield
+      finally:
+        self.sync()
+        self._reset(None)
 
   def __len__(self):
     f = self._file
