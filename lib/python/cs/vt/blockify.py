@@ -129,13 +129,22 @@ def spliced_blocks(B, new_blocks):
           b'xxaayybbcczz'
   '''
   # note that upto and offset count in the original space of `B`
-  upto = 0  # data span yielded so far
+  upto = 0  # data span from B yielded so far
+  prev_offset = 0
   for offset, newB in new_blocks:
+    # check splice poisition ordering
+    assert offset >= prev_offset, (
+        "new_block offset:%d < prev_offset:%d" % (offset, prev_offset)
+    )
+    prev_offset = offset
     # yield high level Blocks up to offset
     if offset > upto:
       # fill data from upto through to the new offset
-      yield from B.top_blocks(upto, offset)
-      upto = offset
+      for fill_block in B.top_blocks(upto, offset):
+        yield fill_block
+        upto += len(fill_block)
+        assert upto <= offset
+      assert upto == offset
     elif offset < upto:
       raise ValueError(
           "new_blocks: offset=%d,newB=%s: this position has already been passed"
