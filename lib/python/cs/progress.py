@@ -561,33 +561,35 @@ class BaseProgress(object):
         proxy(statusfunc(self, label, width or proxy.width))
 
     update_status(True)
-    for iteration, item in enumerate(it):
-      length = itemlenfunc(item) if itemlenfunc else 1
-      if incfirst:
-        self += length
-        update_status()
-      yield item
-      if not incfirst:
-        self += length
-        update_status()
-      if runstate is not None and runstate.cancelled:
-        break
-    if delete_proxy:
-      proxy.delete()
-    else:
-      update_status(True)
-    if report_print:
-      if isinstance(report_print, bool):
-        report_print = print
-      report_print(
-          label + (
-              ': (cancelled)'
-              if runstate is not None and runstate.cancelled else ':'
-          ), self.format_counter(self.position - start_pos), 'in',
-          transcribe(
-              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
-          )
-      )
+    try:
+      for iteration, item in enumerate(it):
+        length = itemlenfunc(item) if itemlenfunc else 1
+        if incfirst:
+          self += length
+          update_status()
+        yield item
+        if not incfirst:
+          self += length
+          update_status()
+        if runstate is not None and runstate.cancelled:
+          break
+    finally:
+      if delete_proxy:
+        proxy.delete()
+      else:
+        update_status(True)
+      if report_print:
+        if isinstance(report_print, bool):
+          report_print = print
+        report_print(
+            label + (
+                ': (cancelled)'
+                if runstate is not None and runstate.cancelled else ':'
+            ), self.format_counter(self.position - start_pos), 'in',
+            transcribe(
+                self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+            )
+        )
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
