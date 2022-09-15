@@ -996,11 +996,14 @@ class Upd(SingletonMixin):
         Thread(target=_ticker, args=(proxy, _runstate), daemon=True).start()
       proxy.text = '...'
       start_time = time.time()
-      yield proxy
-      end_time = time.time()
-      if _runstate and _runstate is not runstate:
-        # shut down the ticker
-        _runstate.cancel()
+      with _runstate:
+        try:
+          yield proxy
+        finally:
+          end_time = time.time()
+          if _runstate and _runstate is not runstate:
+            # shut down the ticker
+            _runstate.cancel()
     elapsed_time = end_time - start_time
     if report_print:
       if isinstance(report_print, bool):
