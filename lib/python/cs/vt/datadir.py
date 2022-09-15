@@ -1165,8 +1165,8 @@ class PlatonicDir(FilesDir):
     topdir = self.topdir
     # scan for new datafiles
     seen = set()
-    info("scan %s ...", self.datapath)
-    with proxy.extend_prefix(" scan"):
+    info("scan %s ... ", self.datapath)
+    with proxy.extend_prefix("walk "):
       updated = False
       for dirpath, dirnames, filenames in os.walk(self.datapath,
                                                   followlinks=True):
@@ -1179,8 +1179,8 @@ class PlatonicDir(FilesDir):
           break
         rdirpath = relpath(dirpath, self.datapath)
         with Pfx(rdirpath):
-          with (proxy.extend_prefix(" " +
-                                    rdirpath) if filenames else nullcontext()):
+          with (proxy.extend_prefix(f'{rdirpath}/ ')
+                if filenames else nullcontext()):
             # this will be the subdirectories into which to recurse
             pruned_dirnames = []
             for dname in dirnames:
@@ -1224,6 +1224,7 @@ class PlatonicDir(FilesDir):
                 filepath = joinpath(dirpath, filename)
                 if not isfilepath(filepath):
                   continue
+                proxy.text = f'scan {filename!r}'
                 updated |= self._scan_datafile(
                     D, filename, rfilepath, proxy=proxy
                 )
