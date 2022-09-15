@@ -1179,55 +1179,62 @@ class PlatonicDir(FilesDir):
           break
         rdirpath = relpath(dirpath, self.datapath)
         with Pfx(rdirpath):
-          with (proxy.extend_prefix(f'{rdirpath}/ ')
-                if filenames else nullcontext()):
-            # this will be the subdirectories into which to recurse
-            pruned_dirnames = []
-            for dname in dirnames:
-              if self.exclude_dir(joinpath(rdirpath, dname)):
-                # unwanted
-                continue
-              subdirpath = joinpath(dirpath, dname)
-              try:
-                S = os.stat(subdirpath)
-              except OSError as e:
-                # inaccessable
-                warning("stat(%r): %s, skipping", subdirpath, e)
-                continue
-              ino = S.st_dev, S.st_ino
-              if ino in seen:
-                # we have seen this subdir before, probably via a symlink
-                # TODO: preserve symlinks? attach alter ego directly as a Dir?
-                debug(
-                    "seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0],
-                    ino[1]
-                )
-                continue
-              seen.add(ino)
-              pruned_dirnames.append(dname)
-            dirnames[:] = pruned_dirnames
-            with self.meta_store:
-              D = topdir.makedirs(rdirpath, force=True)
-              # prune removed names
-              names = list(D.keys())
-              for name in names:
-                if name not in dirnames and name not in filenames:
-                  info("del %r", name)
-                  del D[name]
-            for filename in filenames:
-              with Pfx(filename):
-                if self.cancelled or self.flag_scan_disable:
-                  break
-                rfilepath = joinpath(rdirpath, filename)
-                if self.exclude_file(rfilepath):
-                  continue
-                filepath = joinpath(dirpath, filename)
-                if not isfilepath(filepath):
-                  continue
-                proxy.text = f'scan {filename!r}'
-                updated |= self._scan_datafile(
-                    D, filename, rfilepath, proxy=proxy
-                )
+          # this will be the subdirectories into which to recurse
+          pruned_dirnames = []
+          for dname in dirnames:
+            if self.exclude_dir(joinpath(rdirpath, dname)):
+              # unwanted
+              continue
+            subdirpath = joinpath(dirpath, dname)
+            try:
+              S = os.stat(subdirpath)
+            except OSError as e:
+              # inaccessable
+              warning("stat(%r): %s, skipping", subdirpath, e)
+              continue
+            ino = S.st_dev, S.st_ino
+            if ino in seen:
+              # we have seen this subdir before, probably via a symlink
+              # TODO: preserve symlinks? attach alter ego directly as a Dir?
+              debug(
+                  "seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0],
+                  ino[1]
+              )
+              continue
+            seen.add(ino)
+            pruned_dirnames.append(dname)
+          dirnames[:] = pruned_dirnames
+          with self.meta_store:
+            D = topdir.makedirs(rdirpath, force=True)
+            # prune removed names
+            names = list(D.keys())
+            for name in names:
+              if name not in dirnames and name not in filenames:
+                info("del %r", name)
+                del D[name]
+          if filenames:
+            with (proxy.extend_prefix(f'{rdirpath}/ ')
+                  if filenames else nullcontext()):
+              for filename in filenames:
+                with Pfx(filename):
+                  if self.cancelled or self.flag_scan_disable:
+                    break
+                  rfilepath = joinpath(rdirpath, filename)
+                  if self.exclude_file(rfilepath):
+                    continue
+                  filepath = joinpath(dirpath, filename)
+                  if not isfilepath(filepath):
+                    continue
+                  proxy.text = f'scan {filename!r}'
+                  try:
+                    updated |= self._scan_datafile(
+                        D, filename, rfilepath, proxy=proxy
+                    )
+                  except Exception as e:
+                    warning(
+                        "exception scanning %s: %s",
+                        shortpath(joinpath(dirpath, filename)), e
+                    )
         # update the archive after updating from a directory
         if updated:
           self.sync_meta()
@@ -1288,17 +1295,19 @@ class PlatonicDir(FilesDir):
       )
       scan_from = DFstate.scanned_to
       scan_start = time()
-      scanner = progressbar(
-          DFstate.scanfrom(offset=DFstate.scanned_to),
-          "scan " + rfilepath[:max(16, proxy.width - 60)],
-          position=DFstate.scanned_to,
-          total=new_size,
-          itemlenfunc=lambda t3: t3[2] - t3[0],
-          update_frequency=128,
-          proxy=proxy,
-          units_scale=BINARY_BYTES_SCALE,
-          report_print=True,
-      )
+      scanner = DFstate.scanfrom(offset=DFstate.scanned_to)
+      if 1:
+        scanner = progressbar(
+            scanner,
+            "scan " + rfilepath[:max(16, proxy.width - 60)],
+            position=DFstate.scanned_to,
+            total=new_size,
+            itemlenfunc=lambda t3: t3[2] - t3[0],
+            update_frequency=256,
+            proxy=proxy,
+            units_scale=BINARY_BYTES_SCALE,
+            report_print=True,
+        )
       for pre_offset, data, post_offset in scanner:
         hashcode = self.hashclass.from_chunk(data)
         entry = FileDataIndexEntry(
