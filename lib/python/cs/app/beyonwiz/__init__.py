@@ -383,11 +383,14 @@ class _Recording(ABC, HasFSTagsMixin):
     )
     if overwrite:
       ff = ff.overwrite_output()
+    ff_args = ff.get_args()
     if doit:
-      print_argv('ffmpeg', *ff.get_args())
+      print_argv('ffmpeg', *ff_args)
+      fstags[dstpath]['ffmpeg.argv'] = ['ffmpeg', *ff_args]
+      fstags.sync()
       ff.run()
     else:
-      print_argv('ffmpeg', *ff.get_args(), fold=True)
+      print_argv('ffmpeg', *ff_args, fold=True)
     return ok
 
   def ffmpeg_metadata(self, dstfmt=None):

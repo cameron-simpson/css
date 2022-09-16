@@ -230,7 +230,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20220606-post'
+__version__ = '20220806-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -3195,10 +3195,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       This manages a mapping of `name` => `TagSet`,
       itself a mapping of tag name => tag value.
   '''
-
-  @classmethod
-  def _singleton_key(cls, fspath, **_):
-    return fspath
 
   @typechecked
   def __init__(self, fspath: str, *, ontology=None):
