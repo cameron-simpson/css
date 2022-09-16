@@ -820,7 +820,9 @@ def _with_utcoffset(func):
       )
     return func(start, stop, *a, utcoffset=utcoffset, **kw)
 
-  with_utcoffset_wrapper.__doc__ += '''
+  with_utcoffset_wrapper.__doc__ = func.get(
+      '__doc__', ''
+  ) + '''
 
     The `utcoffset` or `tz` parameters may be used to provide
     an offset from UTC in seconds for the timestamps _as presented
