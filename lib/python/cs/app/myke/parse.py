@@ -251,7 +251,7 @@ class ModGlob(Modifier):
         else:
           if not self.lax:
             raise ValueError("no matches")
-    return " ".join(globbed)
+    return " ".join(sorted(globbed))
 
 class ModEval(Modifier):
   ''' A modifier which evaluates text as a macro expression.

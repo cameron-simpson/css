@@ -1,0 +1,2 @@
+SPLinkCommand.cmd_plot: new --bare option to strip legends, axes etc from a graph.
+Assorted small internal changes.

@@ -234,10 +234,10 @@ class Upd(SingletonMixin):
           pass
         else:
           for ti_name in (
-              'vi',
-              'vs',  # cursor invisible/visible
-              'cuu1',  # cursor up 1 line
-              'dl1',  # delete 1 line
+              'vi',  # cursor invisible
+              'vs',  # cursor visible
+              'cuu1',  # cursor up one line
+              'dl1',  # delete one line
               'il1',  # insert one line
               'el',  # clear to end of line
           ):
@@ -789,7 +789,6 @@ class Upd(SingletonMixin):
   # pylint: disable=too-many-branches,too-many-statements
   def insert(self, index, txt='', proxy=None):
     ''' Insert a new status line at `index`.
-
         Return the `UpdProxy` for the new status line.
     '''
     if proxy and proxy.upd is not None:
@@ -971,7 +970,7 @@ class Upd(SingletonMixin):
       report_print=False,
       runstate=None,
       tick_delay=0.15,
-      tick_chars='|/-\\'
+      tick_chars='|/-\\',
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
     '''
@@ -1036,10 +1035,20 @@ class UpdProxy(object):
       'index': 'The index of this slot within the parent Upd.',
       '_prefix': 'The fixed leading prefix for this slot, default "".',
       '_text': 'The text following the prefix for this slot, default "".',
+      '_text_auto':
+      'An optional callable to generate the text if _text is empty.',
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
   }
 
-  def __init__(self, index=1, upd=None, text=None, prefix=None, suffix=None):
+  def __init__(
+      self,
+      index=1,
+      upd=None,
+      text=None,
+      prefix=None,
+      suffix=None,
+      text_auto=None,
+  ):
     ''' Initialise a new `UpdProxy` status line.
 
         Parameters:
@@ -1053,10 +1062,11 @@ class UpdProxy(object):
     self.index = None
     if upd is None:
       upd = Upd()
-    upd.insert(index, proxy=self)
     self._prefix = prefix or ''
     self._text = ''
+    self._text_auto = text_auto
     self._suffix = suffix or ''
+    upd.insert(index, proxy=self)
     if text:
       self(text)
 
@@ -1130,7 +1140,7 @@ class UpdProxy(object):
   def text(self):
     ''' The text of this proxy's slot, without the prefix.
     '''
-    return self._text
+    return self._text or ('' if self._auto_text is None else self._auto_text())
 
   @text.setter
   def text(self, txt):
@@ -1158,7 +1168,7 @@ class UpdProxy(object):
 
   @property
   def width(self):
-    ''' The available space for text after `self.prefix`.
+    ''' The available space for text after `self.prefix` and before `self.suffix`.
 
         This is available width for uncropped text,
         intended to support presizing messages such as progress bars.
@@ -1166,8 +1176,12 @@ class UpdProxy(object):
         portion of the text which fits.
     '''
     prefix = self.prefix
+    suffix = self.suffix
     upd = self.upd
-    return (upd.columns if upd else 80) - 1 - (len(prefix) if prefix else 0)
+    return (
+        (upd.columns if upd else 80) - 1 - (len(prefix) if prefix else 0) -
+        (len(suffix) if suffix else 0)
+    )
 
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.

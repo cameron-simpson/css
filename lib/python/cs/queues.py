@@ -16,12 +16,13 @@ import time
 ##from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import exception, warning, debug
+from cs.obj import Sentinel
 from cs.pfx import Pfx, PfxCallInfo
 from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20220605-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'description':
@@ -34,6 +35,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.py3',
         'cs.resources',
@@ -41,13 +43,11 @@ DISTINFO = {
     ],
 }
 
-class _QueueIterator(MultiOpenMixin):
+class QueueIterator(MultiOpenMixin):
   ''' A `QueueIterator` is a wrapper for a `Queue` (or ducktype) which
       presents an iterator interface to collect items.
       It does not offer the `.get` or `.get_nowait` methods.
   '''
-
-  sentinel = object()
 
   def __init__(self, q, name=None):
     if name is None:
@@ -55,6 +55,9 @@ class _QueueIterator(MultiOpenMixin):
     self.q = q
     self.name = name
     self.finalise_later = True
+    self.sentinel = Sentinel(
+        "%s:%s:SENTINEL" % (self.__class__.__name__, name)
+    )
     # count of non-sentinel items
     self._item_count = 0
 
@@ -70,7 +73,7 @@ class _QueueIterator(MultiOpenMixin):
     if self.closed:
       with PfxCallInfo():
         warning("%r.put: all closed: item=%s", self, item)
-      raise ClosedError("_QueueIterator closed")
+      raise ClosedError("QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
     self._item_count += 1
@@ -83,7 +86,7 @@ class _QueueIterator(MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' `MultiOpenMixin` support; putsthe sentinel onto the underlying queue
+    ''' `MultiOpenMixin` support; puts the sentinel onto the underlying queue
         on the final close.
     '''
     yield
@@ -148,12 +151,12 @@ class _QueueIterator(MultiOpenMixin):
 def IterableQueue(capacity=0, name=None):
   ''' Factory to create an iterable `Queue`.
   '''
-  return _QueueIterator(Queue(capacity), name=name).open()
+  return QueueIterator(Queue(capacity), name=name).open()
 
 def IterablePriorityQueue(capacity=0, name=None):
   ''' Factory to create an iterable `PriorityQueue`.
   '''
-  return _QueueIterator(PriorityQueue(capacity), name=name).open()
+  return QueueIterator(PriorityQueue(capacity), name=name).open()
 
 class Channel(object):
   ''' A zero-storage data passage.
@@ -203,7 +206,7 @@ class Channel(object):
     ''' `next(Channel)` calls `Channel.get()`.
     '''
     if self.closed:
-      raise StopIteration()
+      raise StopIteration
     return self.get()
 
   # pylint: disable=consider-using-with
@@ -420,6 +423,7 @@ class TimerQueue(object):
     assert self.mainThread is not None, "no main thread to join"
     self.mainThread.join()
 
+  # pylint: disable=too-many-statements
   def _main(self):
     ''' The main loop.
 
@@ -526,11 +530,16 @@ class ListQueue:
       except IndexError:
         raise Queue_Empty("list is empty")  # pylint: disable=raise-missing-from
 
-  def put(self, item):
-    ''' Put appends to the queue.
+  def append(self, item):
+    ''' Append an item to the queue, aka `put`.
     '''
     with self._lock:
       self.queued.append(item)
+
+  def put(self, item):
+    ''' Put appends to the queue.
+    '''
+    return self.append(item)
 
   def extend(self, items):
     ''' Convenient/performant queue-lots-of-items.

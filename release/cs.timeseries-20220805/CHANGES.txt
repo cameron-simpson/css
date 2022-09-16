@@ -1,0 +1,13 @@
+lib/python/cs/timeseries.py: cs.timeseries: @plotrange: support both methods and functions via a slightly dodgy heuristic
+lib/python/cs/timeseries.py: cs.timeseries: plot_events: reshim using @plotrange
+lib/python/cs/timeseries.py: merge solar ==> default
+lib/python/cs/timeseries.py: cs.splink,cs.timeseries: rename @plotrange to @timerange since it is not inherently associated with plotting
+lib/python/cs/timeseries.py: cs.timeseries: print_figure, save_figure and saved_figure now moved to cs.mplutils
+lib/python/cs/timeseries.py: cs.timeseries: put back __main__ hook, accidentally removed
+lib/python/cs/timeseries.py: cs.timeseries: plot_events: use the utcoffset parameter
+lib/python/cs/timeseries.py: cs.timeseries: update imports, tweak docstrings, clean some lint
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesBaseCommand.cmd_plot: recognise TimeSeriesMapping instead of TimeSeriesDataDir
+lib/python/cs/timeseries.py: cs.timeseries: use cs.mplutils.axes() to support optional figure,axes arguments to the plot functions
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesBaseCommand.cmd_plot: new --bare option for unadorned plots, update usage
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.startup_shutdown: try.finally:flush
+lib/python/cs/timeseries.py: cs.timeseries: update DISTINFO

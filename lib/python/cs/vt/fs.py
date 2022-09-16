@@ -166,19 +166,15 @@ class FileHandle:
     ''' Commit file contents to Store.
         Chooses a scanner based on the Dirent.name.
     '''
-    X("FileHandle.flush: self.E.name=%r", self.E.name)
     mime_type = self.E.meta.mime_type
     if mime_type is None:
       scanner = None
     else:
-      X("look up scanner from mime_type %r", mime_type)
       scanner = scanner_from_mime_type(mime_type)
     if scanner is None:
-      X("look up scanner from filename %r", self.E.name)
       scanner = scanner_from_filename(self.E.name)
     self.E.flush(scanner, dispatch=self.bg)
     ## no touch, already done by any writes
-    X("FileHandle.Flush DONE")
 
 @mapping_transcriber(
     prefix="Ino",

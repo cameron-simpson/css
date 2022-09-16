@@ -85,7 +85,7 @@ def unpfx(s, sep=None):
       (default from `DEFAULT_SEPARATOR`: `{DEFAULT_SEPARATOR!r}`).
 
       This is a simple hack to support reporting error messages
-      which have had a preifx applied,
+      which have had a prefix applied,
       and fails accordingly if the base message itself contains the separator.
   '''
   if sep is None:
@@ -124,7 +124,6 @@ class _PfxThreadState(threading.local):
 
   def __init__(self):
     threading.local.__init__(self)
-    self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
     self.trace = None
@@ -261,7 +260,6 @@ class Pfx(object):
     '''
     state = cls._state
     state.append(P)
-    state.raise_needs_prefix = True
     if state.trace:
       state.trace(state.prefix)
 
@@ -274,14 +272,18 @@ class Pfx(object):
   def __exit__(self, exc_type, exc_value, _):
     _state = self._state
     if exc_value is not None:
-      if _state.raise_needs_prefix:
+      try:
+        exc_value._pfx_prefix
+      except AttributeError:
+        exc_value._pfx_prefix = self._state.prefix
         # prevent outer Pfx wrappers from hacking stuff as well
-        _state.raise_needs_prefix = False
         # now hack the exception attributes
         if not self.prefixify_exception(exc_value):
           True or print(
-              "warning: %s: %s:%s: message not prefixed" %
-              (self._state.prefix, type(exc_value).__name__, exc_value),
+              "warning: %s: %s:%s: message not prefixed: dir=%r" % (
+                  self._state.prefix, type(exc_value).__name__, exc_value,
+                  dir(exc_value)
+              ),
               file=sys.stderr
           )
     try:
@@ -369,8 +371,14 @@ class Pfx(object):
         else:
           value = (value0, cls.prefixify(value1))
       elif attr == 'args' and isinstance(e, LookupError):
-        # args[0] is the key, do not fiddle with it
-        continue
+        if (isinstance(value, tuple) and value):
+          value0 = value[0]
+          if value0.startswith("'") and value0.endswith("'"):
+            # args[0] is the key, do not fiddle with it
+            continue
+          value = (cls.prefixify(value0), *value[1:])
+        else:
+          continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+#
+# pylint: disable=too-many-lines
 
 ''' Assorted utility functions for working with data
     downloaded from Selectronics' SP-LINK programme
-    which communicates with their controllers.
+    which communicates with their solar inverter controllers.
 
     I use this to gather and plot data from my solar inverter.
 '''
@@ -11,9 +13,9 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
 from datetime import datetime
-from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
+from itertools import chain, cycle
 import os
 from os.path import (
     basename,
@@ -29,10 +31,12 @@ from pprint import pprint
 import shlex
 import sys
 import time
+from typing import List
 
 import arrow
 from dateutil.tz import tzlocal
-from matplotlib.figure import Figure
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 from typeguard import typechecked
 
 from cs.context import stackattrs
@@ -42,7 +46,7 @@ from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import s
 from cs.logutils import warning, error
-from cs.mplutils import axes, remove_decorations, print_figure, save_figure
+from cs.mplutils import axes, remove_decorations, print_figure, save_figure, FigureSize
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
@@ -51,16 +55,18 @@ from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
     Epoch,
+    PlotSeries as PS,
     TimeSeriesBaseCommand,
     TimeSeriesDataDir,
     TimespanPolicyYearly,
+    as_datetime64s,
     plot_events,
     timerange,
     tzfor,
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220626-post'
+__version__ = '20220806-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -77,6 +83,7 @@ DISTINFO = {
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
+        'cs.mplutils',
         'cs.pfx',
         'cs.progress',
         'cs.psutils',
@@ -86,7 +93,6 @@ DISTINFO = {
         'cs.timeseries',
         'cs.upd',
         'dateutil',
-        'matplotlib',
         'typeguard',
     ],
     'entry_points': {
@@ -490,18 +496,19 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     '''
     return SQLTags(self.pathto('events.sqlite'))
 
-  def resolve(self, spec):
-    ''' Resolve a field spec into an iterable of `(timeseries,key)`.
+  def resolve(self, *specs):
+    ''' Resolve field specs into an iterable of `(timeseries,key)`.
     '''
-    with Pfx(spec):
-      try:
-        dsname, field_spec = spec.split(':', 1)
-      except ValueError:
-        # just a glob, poll all datasets
-        dsnames = self.TIMESERIES_DATASETS
-        field_spec = spec
-      else:
-        dsnames = dsname,  # pylint: disable=trailing-comma-tuple
+    for spec in specs:
+      with Pfx(spec):
+        try:
+          dsname, field_spec = spec.split(':', 1)
+        except ValueError:
+          # just a glob, poll all datasets
+          dsnames = self.TIMESERIES_DATASETS
+          field_spec = spec
+        else:
+          dsnames = dsname,  # pylint: disable=trailing-comma-tuple
       for dsname in dsnames:
         with Pfx(dsname):
           tsd = getattr(self, dsname)
@@ -521,29 +528,73 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     return tsd.to_csv(start, stop, f, **to_csv_kw)
 
   @timerange
+  @pfx_method
+  @typechecked
+  def plot_data_from_spec(
+      self,
+      start: float,
+      stop: float,
+      data_spec: str,
+      *,
+      utcoffset: float,
+      mode_patterns=None,
+  ) -> List[PS]:
+    ''' Decode `data_spec` into a list of `PlotSeries` instances.
+    '''
+    if mode_patterns is None:
+      mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
+    plot_data = []
+    # key name or pattern
+    patterns = mode_patterns.get(data_spec, data_spec)
+    if isinstance(patterns, str):
+      patterns = [patterns]
+    for pattern in patterns:
+      with Pfx("pattern %r", pattern):
+        for tsd, tsd_key in self.resolve(pattern):
+          ps = PS(
+              tsd_key,
+              tsd[tsd_key].as_pd_series(
+                  start,
+                  stop,
+                  pad=True,
+                  utcoffset=utcoffset,
+              ),
+              {},
+          )
+          ##assert len(ps.series) == 192, "PS(%s[%r]).series: expected 192, got %d" % ( tsd, tsd_key, len(ps.series))
+          plot_data.append(ps)
+    if not plot_data:
+      raise ValueError(
+          "no fields were resolved by data_spec=%r" % (data_spec,)
+      )
+    return plot_data
+
+  # pylint: disable=too-many-branches,too-many-locals
+  @timerange
   def plot(
       self,
       start,
       stop,
+      data_specs,
       *,
       utcoffset,
       figure=None,
       ax=None,
-      key_specs,
-      mode=None,
+      ax_title=None,
+      key_map=None,  # labels from keys
+      color_map=None,  # colors for keys
       event_labels=None,
       mode_patterns=None,
       stacked=False,
       upd=None,
+      runstate=None,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
+
+        `data_specs` is an iterable of `PlotSeries` instances or `str`
+        data specifications.
     '''
-    # DF hack: compute the timezone offset for "stop",
-    # use it to skew the UNIX timestamps so that UTC tick marks and
-    # placements look "local"
-    if figure is None:
-      figure = 14, 8, 100
     ax = axes(figure, ax)
     figure = ax.figure
     if event_labels is None:
@@ -552,40 +603,70 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
     if upd is None:
       upd = Upd()
-    tsd_by_id = {}
-    keys_by_id = defaultdict(list)
-    with Pfx("key_specs"):
-      for key_spec in key_specs:
-        with Pfx(key_spec):
-          if mode is None and key_spec in mode_patterns:
-            mode = key_spec
-          key_spec = mode_patterns.get(key_spec, key_spec)
-          matched = False
-          for tsd, key in self.resolve(key_spec):
-            tsd_by_id[id(tsd)] = tsd
-            keys_by_id[id(tsd)].append(key)
-            matched = True
-          if not matched:
-            warning("no matches")
-    if not tsd_by_id:
+    if key_map is None:
+      key_map = {}
+    if color_map is None:
+      color_map = {}
+    plot_data = list(
+        chain(
+            *(
+                (
+                    self.plot_data_from_spec(
+                        start,
+                        stop,
+                        spec,
+                        utcoffset=utcoffset,
+                        mode_patterns=mode_patterns
+                    ) if isinstance(spec, str) else (spec,)
+                ) for spec in data_specs
+            )
+        )
+    )
+    if not plot_data:
       raise ValueError(
-          "no fields were resolved by key_specs=%r" % (key_specs,)
+          "no fields were resolved by data_specs=%r" % (data_specs,)
       )
-    if mode is None:
-      # scan the keys looking for a match to a mode
-      for keys in keys_by_id.values():
-        for key in keys:
-          for mode_name, mode_glob in mode_patterns.items():
-            if pfx_call(fnmatch, key, mode_glob):
-              mode = mode_name
-              break
-        if mode is not None:
-          break
+    indices = as_datetime64s(
+        self.DetailedData.range(start, stop), utcoffset=utcoffset
+    )
     with upd.run_task("plot"):
-      for tsd_id, tsd in tsd_by_id.items():
-        keys = keys_by_id[tsd_id]
-        tsd.plot(start, stop, keys=keys, utcoffset=utcoffset, ax=ax)
-    ax.set_title(str(self))
+      default_colors = map(
+          lambda prop: prop['color'], cycle(mpl.rcParams['axes.prop_cycle'])
+      )
+      plot_ps = []
+      for ps in plot_data:
+        label, series, extra = ps
+        with Pfx(label):
+          if len(series) != len(indices):
+            # TODO: how to plot the less frequent DailyData?
+            warning(
+                "skipping: %d items in series, expected %d to match the indices",
+                len(series), len(indices)
+            )
+            continue
+          # get the color from extra or the color_map, fall back
+          # to a color from the default palette
+          if 'color' not in extra:
+            color = color_map.get(label)
+            if color is None:
+              color = next(default_colors)
+            extra['color'] = color
+          plot_ps.append(ps)
+      if stacked:
+        pfx_call(
+            ax.stackplot,
+            indices,
+            *map(lambda ps: ps.series, plot_ps),
+            labels=map(lambda ps: key_map.get(ps.label, ps.label), plot_ps),
+            colors=map(lambda ps: ps.extra['color'], plot_ps),
+        )
+      else:
+        for label, series, extra in plot_ps:
+          if runstate and runstate.canclled:
+            break
+          ax.plot(indices, series, label=label, **extra)
+      if ax_title is not None:
+        ax.set_title(ax_title)
     return figure
 
 class SPLinkCommand(TimeSeriesBaseCommand):
@@ -639,12 +720,36 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     else:
       raise RuntimeError("unhandled pre-option")
 
+  @timerange
+  @typechecked
+  def popdata(
+      self,
+      start: float,
+      stop: float,
+      argv: List[str],
+      argname: str = 'data-spec',
+      *,
+      utcoffset: float,
+      **kw
+  ) -> List[PS]:
+    ''' Pop a data specification from the command line,
+        return a list of `PlotSeries` instances derived from it.
+    '''
+    return self.poparg(
+        argv, argname, lambda data_spec: self.options.spd.
+        plot_data_from_spec(start, stop, data_spec, utcoffset=utcoffset),
+        'expected a data specification', **kw
+    )
+
   @contextmanager
   def run_context(self):
-    ''' Define `self.options.spd`.
+    ''' Define `self.options` attributes:
+        * `tz`: the default local timezone
+        * `spd`: the `SPLinkData` instance for `options.spdpath`
     '''
     options = self.options
     fstags = options.fstags
+    options.tz = tzlocal()
     with fstags:
       spd = SPLinkData(options.spdpath)
       with stackattrs(options, spd=spd):
@@ -798,7 +903,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
               with Pfx(rdspath):
                 dstags = fstags[dspath]
                 if not force and dstags.imported:
-                  print("already imported:", short_dspath)
+                  ##print('already imported {short_dspath}')
                   continue
                 if dataset in spd.TIMESERIES_DATASETS:
                   ts = getattr(spd, dataset)
@@ -825,17 +930,19 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                               report_print=True,
                               tick_delay=0.15,
                           ):
+                            # the UNIX timestamp seems to be unique, min sep is 0.3ms
                             seen.update(
-                                (ev.unixtime, ev.event_description)
-                                for ev in db.find()
+                                ev.unixtime
+                                for ev in db.find(_without_tags=True)
                             )
                           print(f'{len(seen)} old events from {db}')
                           if runstate.cancelled:
                             break
+                        # get unseen tags
                         when_tags = [
                             (when, tags)
                             for when, tags in when_tags
-                            if (when, tags['event_description']) not in seen
+                            if when not in seen
                         ]
                         if when_tags:
                           for when, tags in progressbar(
@@ -844,7 +951,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                               update_frequency=16,
                               report_print=True,
                           ):
-                            key = when, tags['event_description']
+                            key = when
                             assert key not in seen
                             tags['dataset'] = dataset
                             db.default_factory(None, unixtime=when, tags=tags)
@@ -903,11 +1010,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             mode            A named graph mode, implying a group of fields.
     '''
     options = self.options
-    options.tz = tzlocal()
     options.bare = False
     options.show_image = False
     options.imgpath = None
-    options.stacked = False
     options.stacked = False
     options.event_labels = None
     self.popopts(
@@ -930,6 +1035,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
         stop = time.time()
+    data_specs = argv if argv else ['POWER']
     bare = options.bare
     force = options.force
     imgpath = options.imgpath
@@ -937,14 +1043,136 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     show_image = options.show_image
     stacked = options.stacked
     event_labels = options.event_labels
-    figure = spd.plot(
-        start,
-        stop,
-        key_specs=argv,
-        tz=tz,
-        event_labels=event_labels,
-        stacked=stacked
+    detailed = spd.DetailedData
+    det_data = lambda field: detailed[field].as_pd_series(
+        start, stop, pad=True, tz=tz
     )
+    if data_specs == ['POWER']:
+      grid = det_data('ac_input_power_average_kw')
+      grid_in = -grid.clip(upper=0.0)
+      grid_out = grid.clip(lower=0.0)
+      pv = det_data('total_ac_coupled_power_average_kw')
+      battery = det_data('inverter_ac_power_average_kw')
+      battery_drain = -battery.clip(upper=0.0)
+      battery_charge = battery.clip(lower=0.0)
+      battery_state_of_charge = det_data('state_of_charge_sample')
+      load = det_data('load_ac_power_average_kw')
+      figure, (power_ax, usage_ax) = plt.subplots(
+          2,
+          1,
+          figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
+          label=f'Power: {spd}',
+      )
+      # stack the power consumption
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'load [load_ac_power_average_kw]',
+                  load,
+                  dict(color='grey'),
+              ),
+              PS(
+                  'battery charge [inverter_ac_power_average_kw]',
+                  battery_charge,
+                  dict(color='blue'),
+              ),
+              PS(
+                  'grid out [ac_input_power_average_kw]',
+                  grid_out,
+                  dict(color='green'),
+              ),
+          ],
+          ax=usage_ax,
+          ax_title="Power Usage",
+          stacked=True,
+          tz=tz,
+      )
+      ax2 = usage_ax.twinx()
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'battery % [state_of_charge_sample]',
+                  battery_state_of_charge,
+                  dict(color='orange'),
+              ),
+          ],
+          ax=ax2,
+          tz=tz,
+      )
+      usage_ax.legend()
+      ax2.legend()
+      # stack the power sources
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'pv [total_ac_coupled_power_average_kw]',
+                  pv,
+                  dict(color='yellow'),
+              ),
+              PS(
+                  'battery drain [-inverter_ac_power_average_kw]',
+                  battery_drain,
+                  dict(color='blue'),
+              ),
+              PS(
+                  'grid in [-ac_input_power_average_kw]',
+                  grid_in,
+                  dict(color='red'),
+              ),
+          ],
+          ax=power_ax,
+          ax_title="Power Supply",
+          stacked=True,
+          tz=tz,
+      )
+      ax2 = power_ax.twinx()
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'battery % [state_of_charge_sample]',
+                  battery_state_of_charge,
+                  dict(color='orange'),
+              ),
+          ],
+          ax=ax2,
+          tz=tz,
+      )
+      # overlay the load as a line
+      spd.plot(
+          start,
+          stop,
+          [
+              PS(
+                  'load [load_ac_power_average_kw]',
+                  load,
+                  dict(color='black'),
+              ),
+          ],
+          ax=power_ax,
+          tz=tz,
+      )
+      power_ax.legend()
+      ax2.legend()
+    else:
+      plot_data = []
+      while data_specs:
+        plot_data.extend(self.popdata(start, stop, data_specs, tz=tz))
+      figure = spd.plot(
+          start,
+          stop,
+          plot_data,
+          tz=tz,
+          event_labels=event_labels,
+          stacked=stacked,
+      )
     if bare:
       remove_decorations(figure)
     if imgpath:

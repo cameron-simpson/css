@@ -31,7 +31,7 @@ from cs.env import envsub
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
-__version__ = '20220530-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -56,19 +56,24 @@ pfx_makedirs = partial(pfx_call, os.makedirs)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
-def needdir(dirpath, mode=0o777, *, use_makedirs=False):
+def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
   ''' Create the directory `dirpath` if missing.
 
       Parameters:
       * `dirpath`: the required directory path
       * `mode`: the permissions mode, default `0o777`
+      * `log`: log `makedirs` or `mkdir` call
       * `use_makedirs`: optional creation mode, default `False`;
         if true, use `os.makedirs`, otherwise `os.mkdir`
   '''
   if not isdirpath(dirpath):
     if use_makedirs:
+      if log is not None:
+        log("makedirs(%r,0o%3o)", dirpath, mode)
       pfx_makedirs(dirpath, mode)
     else:
+      if log is not None:
+        log("mkdir(%r,0o%3o)", dirpath, mode)
       pfx_mkdir(dirpath, mode)
 
 @decorator
@@ -165,6 +170,9 @@ class HasFSPath:
   def __init__(self, fspath):
     self.fspath = fspath
 
+  def __str__(self):
+    return f'{self.__class__.__name__}(fspath={self.shortpath})'
+
   @property
   def shortpath(self):
     ''' The short version of `self.fspath`.
@@ -196,7 +204,13 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         * `envvar`: the environment variable to consult for a default `fspath`;
           the default for this comes from `cls.FSPATH_ENVVAR` if defined
         * `default_attr`: the class attribute containing the default `fspath`
-          if defined and there is not environment variable for `envvar`
+          if defined and there is no environment variable for `envvar`
+
+        The common mode is where each instance might have an arbitrary path,
+        such as a `TagFile`.
+
+        The "class default" mode is intended for things like `CalibreTree`
+        which has the notion of a default location for your Calibre library.
     '''
     if fspath is None:
       # pylint: disable=no-member
@@ -229,13 +243,25 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
     '''
     return cls._resolve_fspath(fspath)
 
-  @typechecked
-  def __init__(self, fspath: Optional[str] = None):
-    if hasattr(self, '_lock'):
-      return
+  ##@typechecked
+  def __init__(self, fspath: Optional[str] = None, lock=None):
+    ''' Initialise the singleton:
+
+        On the first call:
+        - set `.fspath` to `self._resolve_fspath(fspath)`
+        - set `._lock` to `lock` (or `threading.Lock()` if not specified)
+        - return `True`
+        On subsequent calls return `False`.
+
+    '''
+    if '_lock' in self.__dict__:
+      return False
     fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
-    self._lock = Lock()
+    if lock is None:
+      lock = Lock()
+    self._lock = lock
+    return True
 
 DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
 

@@ -16,7 +16,7 @@ import time
 import traceback
 from cs.gimmicks import warning
 
-__version__ = '20220327-post'
+__version__ = '20220905-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -27,6 +27,25 @@ DISTINFO = {
     ],
     'install_requires': ['cs.gimmicks'],
 }
+
+def ALL(func):
+  ''' Include this function's name in its module's `__all__` list.
+
+      Example:
+
+          from cs.deco import ALL
+
+          __all__ = []
+
+          def obscure_function(...):
+              ...
+
+          @ALL
+          def well_known_function(...):
+              ...
+  '''
+  sys.modules[func.__module__].__all__.append(func.__name__)
+  return func
 
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
@@ -102,8 +121,7 @@ def decorator(deco):
           decorated.__name__ = getattr(func, '__name__', str(func))
         except AttributeError:
           pass
-        if not getattr(decorated, '__doc__', None):
-          decorated.__doc__ = getattr(func, '__doc__', '')
+        decorated.__doc__ = getattr(func, '__doc__', None) or ''
         func_module = getattr(func, '__module__', None)
         try:
           decorated.__module__ = func_module
@@ -116,7 +134,7 @@ def decorator(deco):
     # `deco(func, *da, **kw)`.
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
-      decorated.__doc__ = getattr(func, '__doc__', '')
+      decorated.__doc__ = getattr(func, '__doc__', None) or ''
       func_module = getattr(func, '__module__', None)
       try:
         decorated.__module__ = func_module
@@ -478,26 +496,34 @@ def OBSOLETE(func, suggestion=None):
           @OBSOLETE
           def func(...):
 
+      or
+
+          @OBSOLETE("new_func_name")
+          def func(...):
+
       This emits a warning log message before calling the decorated function.
+      Only one warning is emitted per calling location.
   '''
+
+  callers = set()
 
   def wrapped(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
     frame = traceback.extract_stack(None, 2)[0]
     caller = frame[0], frame[1]
-    # pylint: disable=protected-access
-    try:
-      callers = func._OBSOLETE_callers
-    except AttributeError:
-      callers = func._OBSOLETE_callers = set()
     if caller not in callers:
       callers.add(caller)
-      warning(
-          "OBSOLETE call to %s:%d %s(), called from %s:%d %s",
-          func.__code__.co_filename, func.__code__.co_firstlineno,
-          func.__name__, frame[0], frame[1], frame[2]
+      prefix = (
+          "OBSOLETE call" if suggestion is None else
+          ("OBSOLETE (suggest %r) call" % suggestion)
       )
+      fmt = "%s to %s:%d:%s(), called from %s:%d:%s"
+      fmtargs = [
+          prefix, func.__code__.co_filename, func.__code__.co_firstlineno,
+          func.__name__, frame[0], frame[1], frame[2]
+      ]
+      warning(fmt, *fmtargs)
     return func(*args, **kwargs)
 
   funcname = getattr(func, '__name__', str(func))
@@ -703,6 +729,50 @@ def observable_class(property_names, only_unequal=False):
     return cls
 
   return make_observable_class
+
+@decorator
+def default_params(func, _strict=False, **param_defaults):
+  ''' Decorator to provide factory functions for default parameters.
+
+      This decorator accepts the following keyword parameters:
+      * `_strict`: default `False`; if true only replace genuinely
+        missing parameters; if false also replace the traditional
+        `None` placeholder value
+      Other parameters are used for the default factory functions.
+
+      Example use:
+
+          # in your support module
+          uses_ds3 = default_params(ds3client=get_ds3client)
+
+          # calling code which needs a ds3client
+          @uses_ds3
+          def do_something(.., *, ds3client,...):
+              ... make queries using ds3client ...
+
+      This replaces the standard boilerplate and avoids replicating
+      knowledge of the default factory as exhibited in this legacy code:
+
+          def do_something(.., *, ds3client=None,...):
+              if ds3client is None:
+                  ds3client = get_ds3client()
+              ... make queries using ds3client ...
+  '''
+  if not param_defaults:
+    raise ValueError("@default_params(%s): no defaults?" % (func,))
+
+  def defaulted_func(*a, **kw):
+    for param_name, param_default in param_defaults.items():
+      try:
+        v = kw[param_name]
+      except KeyError:
+        kw[param_name] = param_default()
+      else:
+        if v is None and not _strict:
+          kw[param_name] = param_default()
+    return func(*a, **kw)
+
+  return defaulted_func
 
 def _teststuff():
 

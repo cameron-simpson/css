@@ -15,28 +15,28 @@ from cs.lex import (
     get_qstr_or_identifier,
 )
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx
 from .convert import get_integer
 
+@pfx
 def parse_store_specs(s, offset=0):
   ''' Parse the string `s` for a list of Store specifications.
   '''
-  with Pfx("parse_store_specs(%r)", s):
-    store_specs = []
-    while offset < len(s):
+  store_specs = []
+  while offset < len(s):
+    with Pfx("offset %d", offset):
+      store_text, store_type, params, offset = get_store_spec(s, offset)
+      store_specs.append((store_text, store_type, params))
+    if offset < len(s):
       with Pfx("offset %d", offset):
-        store_text, store_type, params, offset = get_store_spec(s, offset)
-        store_specs.append((store_text, store_type, params))
-      if offset < len(s):
-        with Pfx("offset %d", offset):
-          sep = s[offset]
-          offset += 1
-          if sep == ',':
-            continue
-          raise ValueError(
-              "expected comma ',', found unexpected separator: %r" % (sep,)
-          )
-    return store_specs
+        sep = s[offset]
+        offset += 1
+        if sep == ',':
+          continue
+        raise ValueError(
+            "expected comma ',', found unexpected separator: %r" % (sep,)
+        )
+  return store_specs
 
 def get_archive_path_entry(s, offset=0, stopchars=None):
   ''' Parse `[`*clause_name*`]`*ptn*,

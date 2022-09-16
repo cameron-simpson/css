@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 import os
 from os.path import (
     basename,
@@ -25,6 +26,8 @@ from cs.deco import fmtdoc
 from cs.lex import r
 from cs.pfx import pfx_call
 
+__version__ = '20220805-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -32,14 +35,34 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'icontract',
+        'cs.buffer',
+        'cs.deco',
+        'cs.lex',
+        'cs.pfx',
         'matplotlib',
         'typeguard',
     ],
 }
 
-DEFAULT_FIGURE_SIZE = 10, 7
-DEFAULT_FIGURE_DPI = 100
+@dataclass
+class FigureSize:
+  ''' Specifications for a `Figure`'s dimensions.
+  '''
+  DEFAULT_DX = 14
+  DEFAULT_DY = 8
+  DEFAULT_DPI = 100
+  # width in inches
+  dx: Union[int, float]
+  # height in inches
+  dy: Union[int, float]
+  # dots (pixels) per inch
+  dpi: Union[int, float] = DEFAULT_DPI
+
+  def Figure(self, **kw):
+    ''' Return a new `Figure` of this size.
+        It will have no subplots.
+    '''
+    return Figure(figsize=(self.dx, self.dy), dpi=self.dpi, **kw)
 
 @typechecked
 @fmtdoc
@@ -59,28 +82,27 @@ def axes(figure=None, ax=None, **fig_kw) -> Axes:
       sets of axes.
 
       Otherwise a `Figure` is created and a set of axes is selected.
-      The default figure size comes from `DEFAULT_FIGURE_SIZE` (`{DEFAULT_FIGURE_SIZE}`)
-      and the default dpi comes from `DEFAULT_FIGURE_DPI` (`{DEFAULT_FIGURE_DPI}`).
+      The default figure size comes from the `FigureSize` defaults.
+
       The `figure` positional parameter may be supplied
       as a 2-tuple `(fig_dx,fig_dy)` to override the default size
-      or as a 3-tuple `(fig_dx,fig_dy,dpi)` to override the default size and dpi.
+      or as a 3-tuple `(fig_dx,fig_dy,dpi)` to override the default size and dpi,
+      or as a `FigureSze`.
   '''
-  # default Figure dimensions
-  fig_dx, fig_dy = DEFAULT_FIGURE_SIZE
-  dpi = DEFAULT_FIGURE_DPI
+  if ax is None:
+    ax = 0
   if not isinstance(ax, Axes):
-    if isinstance(figure, Figure):
-      ax = figure.axes[0 if ax is None else ax]
-    elif figure is None:
-      if ax is None:
-        # make a figure and choose the Axes from it
-        figure = Figure(figsize=(fig_dx, fig_dy), dpi=dpi, **fig_kw)
-        figure.add_subplot()
-        # pylint: disable=unsubscriptable-object
-        ax = figure.axes[0 if ax is None else ax]
-      else:
-        # Axes already have a Figure
-        figure = ax.figure
+    # we need a figure
+    if figure is None:
+      figure = Figure(
+          figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY),
+          dpi=FigureSize.DEFAULT_DPI,
+          **fig_kw
+      )
+      figure.add_subplot()
+    elif isinstance(figure, FigureSize):
+      figure = figure.Figure(**fig_kw)
+      figure.add_subplot()
     else:
       try:
         fig_dx, fig_dy = figure
@@ -93,11 +115,13 @@ def axes(figure=None, ax=None, **fig_kw) -> Axes:
               "invalid figure:%s, expected Figure or (x,y) or (x,y,dpi)" %
               (r(figure),)
           )
+      else:
+        dpi = FigureSize.DEFAULT_DPI
       # make a figure and choose the Axes from it
       figure = Figure(figsize=(fig_dx, fig_dy), dpi=dpi, **fig_kw)
       figure.add_subplot()
-      # pylint: disable=unsubscriptable-object
-      ax = figure.axes[0 if ax is None else ax]
+    # pylint: disable=unsubscriptable-object
+    ax = figure.axes[ax]
   return ax
 
 @typechecked

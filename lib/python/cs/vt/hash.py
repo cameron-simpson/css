@@ -485,14 +485,6 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
     self[hashcode] = data
     return hashcode
 
-  def startup(self):
-    ''' Dummy method to support unit tests with open/close.
-    '''
-
-  def shutdown(self):
-    ''' Dummy method to support unit tests with open/close.
-    '''
-
 if __name__ == '__main__':
   from .hash_tests import selftest
   selftest(sys.argv)
