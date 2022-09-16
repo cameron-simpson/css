@@ -333,25 +333,24 @@ class Later(MultiOpenMixin):
   @contextmanager
   def startup_shutdown(self):
     with super().startup_shutdown():
-      finished = Event()
-      with stackattrs(self, finished_event=finished):
-        global default  # pylint: disable=global-statement
-        with stackattrs(default, current=self):
-          try:
-            yield
-          finally:
-            # Shut down the Later instance:
-            # - queue the final job to set the finished_event Event
-            # - close the request queue
-            # - close the TimerQueue if any
-            # - close the worker thread pool
-            # - dispatch a Thread to wait for completion and fire the
-            #   finished_event Event
-            # queue final action to mark activity completion
-            self._defer(finished.set)
-            if self._timerQ:
-              self._timerQ.close()
-              self._timerQ.join()
+      self.finished_event = Event()
+      global default  # pylint: disable=global-statement
+      with stackattrs(default, current=self):
+        try:
+          yield
+        finally:
+          # Shut down the Later instance:
+          # - queue the final job to set the finished_event Event
+          # - close the request queue
+          # - close the TimerQueue if any
+          # - close the worker thread pool
+          # - dispatch a Thread to wait for completion and fire the
+          #   finished_event Event
+          # queue final action to mark activity completion
+          self._defer(self.finished_event.set)
+          if self._timerQ:
+            self._timerQ.close()
+            self._timerQ.join()
 
   def _try_dispatch(self):
     ''' Try to dispatch the next `LateFunction`.
@@ -390,7 +389,8 @@ class Later(MultiOpenMixin):
   def finished(self):
     ''' Probe the finishedness.
     '''
-    return self.finished_event.is_set()
+    finished = self.finished_event
+    return finished is not None and finished.is_set()
 
   @pfx_method
   def wait(self, timeout=None):
@@ -398,11 +398,14 @@ class Later(MultiOpenMixin):
         Return the result of `self.finished_event.wait(timeout)`.
     '''
     f = self.finished_event
-    if not f.is_set():
-      info("Later.WAIT: %r", self)
-    waited = f.wait(timeout)
-    if not waited:
-      warning("timed out after %fs", timeout)
+    if f is None:
+      waited = False
+    else:
+      if not f.is_set():
+        info("Later.WAIT: %r", self)
+      waited = f.wait(timeout)
+      if not waited:
+        warning("timed out after %fs", timeout)
     return waited
 
   def __repr__(self):
