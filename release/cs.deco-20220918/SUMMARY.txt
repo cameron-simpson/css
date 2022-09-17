@@ -1,0 +1,3 @@
+@OBSOLETE: tweak message format.
+@default_params: docstring: simplify the example and improve the explaination.
+@default_params: set the __name__ of the wrapper function.
