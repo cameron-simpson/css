@@ -1,0 +1,6 @@
+lib/python/cs/resources.py: cs.resources: docstring improvements
+lib/python/cs/resources.py: cs.resources: MultiOpenMixin.close: report caller of underflow close
+lib/python/cs/resources.py: cs.resources: RunState: new optional handle_signal parameter to override the default method
+lib/python/cs/resources.py: cs.resources: new openif() context manager to open/close an object if it has a .open method
+lib/python/cs/resources.py: cs.resources: MultiOpenMixin.startup_shutdown: be silent for missing (obsolete) .startup, require .shutdown if .startup
+lib/python/cs/resources.py: cs.resources: shift openif context manager

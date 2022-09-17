@@ -1,0 +1,4 @@
+MultiOpenMixin.close: report caller of underflow close.
+RunState: new optional handle_signal parameter to override the default method.
+New openif() context manager to open/close an object if it has a .open method.
+MultiOpenMixin.startup_shutdown: be silent for missing (obsolete) .startup, require .shutdown if .startup.
