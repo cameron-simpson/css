@@ -35,9 +35,10 @@ import ssl
 import sys
 from threading import RLock
 from cs.cmdutils import BaseCommand
+from cs.fs import shortpath
 from cs.lex import cutprefix, cutsuffix
-from cs.logutils import debug, warning, exception
-from cs.pfx import pfx
+from cs.logutils import debug, warning, error, exception
+from cs.pfx import Pfx, pfx
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
@@ -336,16 +337,29 @@ class POP3(MultiOpenMixin):
     '''
 
     def dl_bg_save_result(R):
-      _, lines = R.result
-      R.result[1] = None  # release lines
-      msg_bs = b''.join(
-          map(lambda line: line.encode('iso8859-1') + b'\r\n', lines)
-      )
-      msg = BytesParser().parsebytes(msg_bs)
-      with self._lock:
-        Mkey = maildir.add(msg)
-        deleRs.add(self.client_dele_bg(msg_n))
-      print(f'msg {msg_n}: {len(msg_bs)} octets, saved as {Mkey}, deleted.')
+      with Pfx("MSG %d", msg_n):
+        _, lines = R.result
+        R.result[1] = None  # release lines
+        msg_bs = b''.join(
+            map(lambda line: line.encode('iso8859-1') + b'\r\n', lines)
+        )
+        msg = BytesParser().parsebytes(msg_bs)
+        hdr_from = str(msg.get('from', '<UNKNOWN>'))
+        with Pfx("from %s", hdr_from):
+          try:
+            with self._lock:
+              Mkey = maildir.add(msg)
+          except UnicodeEncodeError as e:
+            error(
+                "cannot save to %s, skipping DELE: %s",
+                shortpath(maildir._path), e
+            )
+          else:
+            print(
+                f'msg {msg_n} from %s: {len(msg_bs)} octets, saved as {Mkey}, deleting'
+            )
+            if deleRs is not None:
+              deleRs.add(self.client_dele_bg(msg_n))
 
     R = self.client_retr_bg(msg_n, notify=dl_bg_save_result)
     return R
@@ -532,8 +546,12 @@ class POP3Command(BaseCommand):
   def cmd_dl(self, argv):
     ''' Collect messages from a POP3 server and deliver to a Maildir.
 
-        Usage: {cmd} [{{ssl,tcp}}:]{{netrc_account|[user@]host[!sni_name][:port]}} maildir
+        Usage: {cmd} [-n] [{{ssl,tcp}}:]{{netrc_account|[user@]host[!sni_name][:port]}} maildir
     '''
+    doit = True
+    if argv and argv[0] == '-n':
+      argv.pop(0)
+      doit = False
     pop_target = argv.pop(0)
     maildir_path = argv.pop(0)
     assert len(argv) == 0
@@ -551,7 +569,7 @@ class POP3Command(BaseCommand):
       with ResultSet() as deleRs:
         with ResultSet() as retrRs:
           for msg_n in msg_uid_map.keys():
-            retrRs.add(pop3.dl_bg(msg_n, M, deleRs))
+            retrRs.add(pop3.dl_bg(msg_n, M, deleRs if doit else None))
           pop3.flush()
           retrRs.wait()
         # now the deleRs are all queued
