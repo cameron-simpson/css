@@ -772,7 +772,19 @@ def default_params(func, _strict=False, **param_defaults):
           kw[param_name] = param_default()
     return func(*a, **kw)
 
-  defaulted_func = func.__name__
+  defaulted_func.__name__ = func.__name__
+  # TODO: get the indent from some aspect of stripped_dedent
+  defaulted_func.__doc__ = '\n      '.join(
+      [
+          getattr(func, '__doc__', ''),
+          '',
+          'This function also accepts the following optional keyword parameters:',
+          *[
+              '* `%s`: default from `%s()`' % (param_name, param_default)
+              for param_name, param_default in sorted(param_defaults.items())
+          ],
+      ]
+  )
   return defaulted_func
 
 def _teststuff():
