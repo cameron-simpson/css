@@ -51,7 +51,7 @@ cs.iso14496 pypi.release="20220606" ok_revision=b98d5cc1c47872fae8a9580a424e115b
 cs.iso8601
 cs.jdson
 cs.later pypi.release="20220805" ok_revision="1db5e216793af9e69666d524240d4b891b90964a"
-cs.lex pypi.release="20220626" ok_revision="138ffdfea02ee244fe08149aafb996ee264dfa1c" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"]}
+cs.lex pypi.release="20220626" ok_revision=be94fd4f84d46125856c79be946957a5344beccb features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"]}
 cs.logutils pypi.release="20220531" ok_revision=b00bf7d22f3b049e51068327ee8ffc299136d510 features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
 cs.mappings pypi.release="20220912.4" ok_revision="585f82b1d2287203f63b07bd1d0cd4fced168bca" features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"]}
