@@ -772,6 +772,7 @@ def default_params(func, _strict=False, **param_defaults):
           kw[param_name] = param_default()
     return func(*a, **kw)
 
+  defaulted_func = func.__name__
   return defaulted_func
 
 def _teststuff():
