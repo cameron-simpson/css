@@ -105,7 +105,7 @@ cs.upd pypi.release="20220619" ok_revision="246d7d3c4b7c95ec059d6986f1430315e3c6
 cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
 cs.wol pypi.release=20171228
-cs.x pypi.release="20211208" ok_revision="0e559c85f5a23d1a9e643f71e202a1f5f7ee134c"
+cs.x pypi.release="20211208" ok_revision="59458d42fa2de1625fa9668eb287175ea1e27030"
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249 pypi.release="20220606"
 dateutil
 icontract
