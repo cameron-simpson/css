@@ -453,16 +453,22 @@ class CSReleaseCommand(BaseCommand):
         filter(None,
                prompt('Any named features with this release').split())
     )
-    if any(map(lambda feature_name: not is_identifier(feature_name) or
-               feature_name.startswith('fix_'), features)):
+    if any(map(
+        lambda feature_name: (not is_dotted_identifier(feature_name) or
+                              feature_name.startswith('fix_')),
+        features,
+    )):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(
         filter(None,
                prompt('Any named bugs fixed with this release').split())
     )
-    if any(map(lambda bug_name: not is_identifier(bug_name) or bug_name.
-               startswith('fix_'), bugfixes)):
+    if any(map(
+        lambda bug_name:
+        (not is_dotted_identifier(bug_name) or bug_name.startswith('fix_')),
+        bugfixes,
+    )):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(map(lambda bug_name: 'fix_' + bug_name, bugfixes))
