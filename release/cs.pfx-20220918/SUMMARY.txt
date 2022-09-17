@@ -1,0 +1,3 @@
+Drop _PfxThreadState.raise_needs_prefix, supplant with more reliable special exception attribute.
+Pfx.__exit__: include more detail in (suppressed) "message not prefixed" message.
+Pfx.__exit__: more elaborate logic for exc_value.args.

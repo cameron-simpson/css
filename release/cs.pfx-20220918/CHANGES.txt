@@ -1,0 +1,5 @@
+lib/python/cs/pfx.py: cs.pfx: fix docstring typo
+lib/python/cs/pfx.py: cs.pfx: drop _PfxThreadState.raise_needs_prefix, supplant with more reliable special exception attribute
+lib/python/cs/pfx.py: cs.pfx: Pfx.__exit__: include more detail in (suppressed) "message not prefixed" message
+lib/python/cs/pfx.py: cs.pfx: Pfx.__exit__: more elaborate logic for exc_value.args
+lib/python/cs/pfx.py: cs.pfx: drop unused variable
