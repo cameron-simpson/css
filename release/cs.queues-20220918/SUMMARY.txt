@@ -1,0 +1,1 @@
+Expose formerly private _QueueIterator as QueueIterator, use a per-queue sentinel from cs.obj.Sentinel.
