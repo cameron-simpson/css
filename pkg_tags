@@ -79,7 +79,7 @@ cs.pyfunc
 cs.queues pypi.release="20220805" ok_revision=e4a22ecc937b9d39dd033b5b62f6c2c574ee0dd0 features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"]}
 cs.range pypi.release=20190102 ok_revision="71250a2041fc87831ffcbbddeaa20316d64d3a5f"
 cs.release
-cs.resources pypi.release="20220429" ok_revision="02bb3a373e3e68746e967279a304efb454d47125" features={"20220429":["catch_signal"]}
+cs.resources pypi.release="20220429" ok_revision="4b000edfa853f5ffe10b4c2ef633f807e8655d8b" features={"20220429":["catch_signal"]}
 cs.result pypi.release="20220805" ok_revision="85aa5983aa41ee3e098b5903f91108ca53e6b1d5" features={"20220311":["tasks"],"20220805":["FSM"]}
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
