@@ -81,9 +81,10 @@ xit=0
 exec 3<"$backups"
 
 lineno=0
-while read -r src mode dsthost etc <&3
+while read -r src0 mode dsthost etc <&3
 do
   lineno=$(( lineno + 1 ))
+  src=$src0
   case "$src" in
     '' | \#* ) continue ;;
   esac
@@ -98,8 +99,8 @@ do
     /*) ;; *) src=$HOME/$src ;;
   esac
   if [ -d "$src/" ]
-  then  suffix=/
-  else  suffix=
+  then  suffix=/ srccd=$src
+  else  suffix=  srccd=$( dirname "$src" )
   fi
   for dsthost in ${dsthost/,/ }
   do
@@ -134,8 +135,8 @@ do
                     ;;
       esac
       if [ $doit ]
-      then  pfx "$src:$dsthost:$dst" $trace incd "$src" "$@"
-      else  echo "$src $mode $dsthost:$dst: $*"
+      then  pfx "$src:$dsthost:$dst" $trace incd "$srccd" "$@"
+      else  echo "$src0 $mode $dsthost:$dst: $*"
       fi
     ) || xit=1
   done
