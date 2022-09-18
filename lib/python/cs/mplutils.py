@@ -26,7 +26,7 @@ from cs.deco import fmtdoc
 from cs.lex import r
 from cs.pfx import pfx_call
 
-__version__ = '20220918'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'keywords': ["python3"],
