@@ -1,0 +1,10 @@
+lib/python/cs/upd.py: cs.upd: UpdProxy: minor __init__ tweak
+lib/python/cs/upd.py: cs.upd: nonsemantic code tweaks
+lib/python/cs/upd.py: cs.upd: UpdProxy: new optional text_auto() callable parameter, used to compute proxy.text if proxy._text is empty
+lib/python/cs/upd.py: cs.upd: UpdProxy.width: account for the suffix
+lib/python/cs/upd.py: cs.upd: new top level `run_task` context manager wrapping `Upd.run_task`
+lib/python/cs/upd.py: cs.upd: drop Python 2 support; new @uses_upd decorator for things accepting an optional upd=Upd(); UpdProxy.__init__: use @uses_upd, make text the only optional positional parameter
+lib/python/cs/upd.py: cs.upd: make all the top level functions accept an optional upd=Upd() parameter
+lib/python/cs/upd.py: cs.upd: Upd.run_task: wrap the yield in a try/finally to manage the RunState
+lib/python/cs/upd.py: cs.upd: Upd.run_task: set default tick_delay=0.3, 0.15 was too fast
+lib/python/cs/upd.py: merge vt ==> default

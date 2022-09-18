@@ -68,7 +68,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20220311-post'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -80,12 +80,11 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.fsm',
-        'cs.logutils',
+        'cs.gimmicks',
         'cs.mappings',
         'cs.pfx',
         'cs.py.func',
         'cs.py3',
-        'cs.resources',
         'cs.seq',
         'cs.threads',
         'icontract',
@@ -246,7 +245,7 @@ class Result(FSM):
       raise AttributeError("%s not ready: no .result attribute" % (self,))
     self.collected = True
     if state == self.CANCELLED:
-      raise CancellationError()
+      raise CancellationError
     return self._result
 
   @result.setter
@@ -271,7 +270,7 @@ class Result(FSM):
     self.collected = True
     if state == self.CANCELLED:
       self.collected = True
-      raise CancellationError()
+      raise CancellationError
     return self._exc_info
 
   @exc_info.setter
@@ -542,7 +541,7 @@ class OnDemandResult(Result):
           (self, a, kw)
       )
     with self._lock:
-      if self.state == self.PENDING:
+      if self.is_pending:
         self.run_func(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()
 

@@ -10,10 +10,27 @@ from typing import Optional, TypeVar
 
 from typeguard import typechecked
 
-from cs.gimmicks import warning
-from cs.gvutils import gvprint, quote as gvq
+from cs.gimmicks import exception
+from cs.gvutils import gvprint, quote as gvq, DOTNodeMixin
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
+
+__version__ = '20220918-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.gimmicks',
+        'cs.gvutils',
+        'cs.lex',
+        'cs.pfx',
+        'typeguard',
+    ],
+}
 
 FSMSubType = TypeVar('FSMSubType', bound='FSM')
 
@@ -33,7 +50,7 @@ FSMTransitionEvent = namedtuple(
     'FSMTransitionEvent', 'old_state new_state event when extra'
 )
 
-class FSM:
+class FSM(DOTNodeMixin):
   ''' Base class for a finite state machine (FSM).
 
       The allowed states and transitions are defined by the class
@@ -160,7 +177,7 @@ class FSM:
         try:
           pfx_call(callback, self, transition)
         except Exception as e:  # pylint: disable=broad-except
-          warning("exception from callback %s: %s", callback, e)
+          exception("exception from callback %s: %s", callback, e)
     return new_state
 
   @property
@@ -170,10 +187,10 @@ class FSM:
     return list(self.FSM_TRANSITIONS[self.fsm_state])
 
   def fsm_callback(self, state, callback):
-    ''' Register a callback for to be called immediately on transition
+    ''' Register a callback to be called immediately on transition
         to `state` as `callback(self,FSMEventTransition)`.
         The special `state` value `FSM.FSM_ANY_STATE` may be supplied
-        to register a callback which fires for every state transation.
+        to register a callback which fires for every state transition.
 
             >>> fsm = FSM('state1',transitions={
             ...   'state1':{'ev_a':'state2'},
@@ -231,6 +248,38 @@ class FSM:
     ''' A DOT syntax description of `self.FSM_TRANSITIONS`.
     '''
     return self.fsm_transitions_as_dot(self.FSM_TRANSITIONS)
+
+  def dot_node_fillcolor(self) -> Optional[str]:
+    ''' The default DOT node `fillcolor`.
+        Return a color name or `None`.
+
+        This implementation looks up `self.fsm_state`
+        in `self.DOT_NODE_FILLCOLOR_PALETTE` if that exists.
+        A default color can be provided with the key `None`
+        in the palette mapping.
+    '''
+    fillcolor = None
+    try:
+      fill_palette = self.DOT_NODE_FILLCOLOR_PALETTE
+    except AttributeError:
+      # no colour palette
+      pass
+    else:
+      try:
+        fillcolor = fill_palette[self.fsm_state]
+      except KeyError:
+        fillcolor = fill_palette.get(None)
+    return fillcolor
+
+  def dot_node_attrs(self):
+    ''' DOT Node attributes.
+    '''
+    attrs = super().dot_node_attrs()
+    fillcolor = self.dot_node_fillcolor()
+    if fillcolor is not None:
+      attrs.update(style='filled')
+      attrs.update(fillcolor=fillcolor)
+    return attrs
 
   def fsm_print(self, file=None, fmt=None, layout=None, **dot_kw):
     ''' Print the state transition diagram to `file`, default `sys.stdout`,

@@ -282,7 +282,7 @@ def twostep(cmgr):
 
       See also the `push_cmgr(obj,attr,cmgr)` function
       and its partner `pop_cmgr(obj,attr)`
-      which form a convenience wrapper for this low level generator.
+      which form a convenient wrapper for this low level generator.
 
       The purpose of `twostep()` is to split any context manager's operation
       across two steps when the set up and tear down phases must operate
@@ -315,7 +315,8 @@ def twostep(cmgr):
           next(cmgr_iter)   # set up
           next(cmgr_iter)   # tear down
 
-      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead):
+      Example use in a class (but really you should use
+      `push_cmgr`/`pop_cmgr` instead):
 
           class SomeClass:
               def __init__(self, foo)

@@ -22,7 +22,7 @@ from cs.logutils import trace, warning
 from cs.pfx import pfx_call
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220626-post'
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -227,7 +227,7 @@ def run(argv, doit=True, logger=None, quiet=True, **subp_options):
       if logger:
         trace("+ %s", shlex.join(argv))
       else:
-        print_argv(*argv)
+        print_argv(*argv, file=sys.stderr)
     cp = pfx_call(subprocess_run, argv, **subp_options)
     if cp.stdout and not quiet:
       builtin_print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
