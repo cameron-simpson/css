@@ -66,7 +66,7 @@ cs.onttags
 cs.packetstream pypi.release="20211208" ok_revision="906f6148d57dfa082d18e6f4b27b8081ee317ba8"
 cs.pfx pypi.release="20220918" ok_revision="8ea225570d5ec658db34f7bc63df458daada463d" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
 cs.pipeline pypi.release="20191007.1" ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
-cs.pop3 ok_revision="0485ea744e650b31af28cade1f7572c225ef1dc3" pypi.release="20220606"
+cs.pop3 ok_revision="1713f6462bb1e42bbbde2b4c6b3473356b8dc33c" pypi.release="20220606"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
 cs.progress pypi.release="20220918" ok_revision=a0784ae7ab4d0598356cfbd4f4a95da7ca285e2f features={"20210803":["progress_runstate"]}
 cs.psutils pypi.release="20220805" ok_revision="8a1f7cc9d7d93f79c39de09c84fa12ae8e1aaa9e" features={"20220429":["signal_handler"],"20220531":["print_argv"]}
