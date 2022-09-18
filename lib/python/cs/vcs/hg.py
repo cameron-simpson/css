@@ -109,7 +109,10 @@ class VCS_Hg(VCS):
     paths = []
     with self._pipefrom(*status_argv) as f:
       for line in f:
-        s, path = line.rstrip().split(' ', 1)
+        line = line.rstrip()
+        if not line:
+          continue
+        s, path = line.split(' ', 1)
         if s != '?':
           paths.append(path)
     return paths

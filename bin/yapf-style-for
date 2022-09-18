@@ -17,7 +17,9 @@ srcfile=$1
 shift
 
 if style_yapf_dir=$(
-    findup -d "$srcfile" -c "test -f \"\$FINDUP_DIR\"'/$yapf_file'"
+    srcdir=$( dirname "$srcfile" )
+    set -ue
+    exec findup -d -C "$srcdir" -P . -c "test -f \"\$FINDUP_DIR\"'/$yapf_file'"
 )
 then  style=$style_yapf_dir/$yapf_file
 else  style=pep8

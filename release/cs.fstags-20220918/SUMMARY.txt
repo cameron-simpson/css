@@ -1,0 +1,6 @@
+FSTagsConfig: add empty .provided dict for config overrides.
+FSTagsConfig: set FSPATH_DEFAULT=RCFILE for use by FSPathBasedSingleton._singleton_key.
+FSTagsConfig: accept optional `physical` parameter to choose `realpath` over `abspath` and new `.physical` property.
+FSTags.__getitem__: use `abspath` or `realpath` depending on `self.config.physical`.
+FSTagsCommand: new -P option for "physical" mode, plumb though to the config and self.options.
+Provide a DEFAULT_FSTAGS instance and an @uses_fstags decorator.

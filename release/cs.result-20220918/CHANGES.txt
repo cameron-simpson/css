@@ -1,0 +1,2 @@
+lib/python/cs/result.py: cs.result: OnDemandResult: update pending check
+lib/python/cs/result.py: cs.*: unparameterised exceptions can be raised with just the class

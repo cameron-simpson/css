@@ -52,7 +52,7 @@ def image_size(path):
         tagged['pil.format'] = im.format
         size = tagged['pil.size'] = im.size
         tagged['mime_type'] = 'image/' + im.format.lower()
-    except UnidentifiedImageError as e:
+    except (UnidentifiedImageError, IsADirectoryError) as e:
       warning("unhandled image: %s", e)
       size = tagged['pil.size'] = None
   if size is not None:

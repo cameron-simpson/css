@@ -14,11 +14,12 @@ from heapq import heappush, heappop
 from inspect import ismethod
 import sys
 from threading import Semaphore, Thread, current_thread, Lock, local as thread_local
+
 from cs.context import stackattrs
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
 from cs.logutils import LogTime, error, warning, debug, exception
-from cs.pfx import Pfx, prefix
+from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
