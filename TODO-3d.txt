@@ -1,0 +1,1 @@
+CameraProxy.zoomOut(node or bounding-box)
