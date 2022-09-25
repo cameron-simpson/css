@@ -2056,8 +2056,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
             ary.tofile(tsf)
         else:
           ary.tofile(tsf)
-      else:
-        ary.tofile(tsf)
     tags = self.fstags[fspath]
     tags['start'] = self.epoch.start
     tags['step'] = self.epoch.step
