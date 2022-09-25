@@ -1658,7 +1658,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
   def __init__(
       self,
       fspath: str,
-      typecode: Optional[str] = None,
+      typecode: Optional[TypeCodeish] = None,
       *,
       epoch: OptionalEpochy = None,
       fill=None,
@@ -1695,6 +1695,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       if typecode is None:
         ok = False
         warning("no typecode supplied and no data file %r", fspath)
+      else:
+        typecode = TypeCode.promote(typecode)
       if epoch is None:
         ok = False
         warning("no epoch supplied and no data file %r", fspath)
@@ -1707,11 +1709,13 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       )
     else:
       # check the header against supplied parameters
-      if typecode is not None and typecode != header.typecode:
-        raise ValueError(
-            "typecode=%r but data file %s has typecode %r" %
-            (typecode, fspath, header.typecode)
-        )
+      if typecode is not None:
+        typecode = TypeCode.promote(typecode)
+        if typecode != header.typecode:
+          raise ValueError(
+              "typecode=%r but data file %s has typecode %r" %
+              (typecode, fspath, header.typecode)
+          )
       if epoch is not None and epoch.step != header.epoch.step:
         raise ValueError(
             "epoch.step=%s but data file %s has epoch.step %s" %
