@@ -1698,13 +1698,22 @@ def atomic_filename(
       with open(filename, 'ab' if exists_ok else 'xb'):
         pass
     yield T
-    if placeholder:
+    mtime = pfx_call(os.stat, T.name).st_mtime
+    try:
+      pfx_call(shutil.copystat, filename, T.name)
+    except FileNotFoundError:
+      pass
+    except OSError as e:
+      warning(
+          "defaut modes not copied from from placeholder %r: %s", filename, e
+      )
+    else:
+      # we make the attribute like the original, now bump the mtime
       try:
-        pfx_call(shutil.copymode, filename, T.name)
-      except OSError as e:
-        warning(
-            "defaut modes not copied from from placeholder %r: %s", filename, e
-        )
+        atime = pfx_call(os.stat, filename).st_atime
+      except FileNotFoundError:
+        atime = mtime
+      pfx_call(os.utime, T.name, (atime, mtime))
     pfx_call(rename, T.name, filename)
 
 class RWFileBlockCache(object):
