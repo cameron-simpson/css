@@ -89,6 +89,7 @@ from cs.configutils import HasConfigIni
 from cs.context import stackattrs
 from cs.csvutils import csv_import
 from cs.deco import cachedmethod, decorator
+from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s, r
@@ -119,6 +120,7 @@ DISTINFO = {
         'cs.context',
         'cs.csvutils',
         'cs.deco',
+        'cs.fileutils>=atomic_filename',
         'cs.fs',
         'cs.fstags',
         'cs.lex',
@@ -2021,14 +2023,8 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
         Concurrent users should avoid using the array during this function.
 
         Note:
-        the default behaviour (`truncate=False`) overwrites the data in place,
-        leaving data beyond the in-memory array untouched.
-        This is more robust against interruptions or errors,
-        or updates by other programmes (beyond the in-memory array).
-        However, if the file is changing endianness or data type
-        (which never happens without deliberate effort)
-        this could leave a mix of data, resulting in nonsense
-        beyond the in-memory array.
+        this uses `atomic_filename` to create a new temporary file
+        which is then renamed onto the original.
     '''
     assert self._array is not None, "array not yet loaded, nothing to save"
     ary = self.array
@@ -2037,14 +2033,15 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       return
     header = self.header
     native_bigendian = NATIVE_BIGENDIANNESS[ary.typecode]
-    with pfx_open(
-        fspath,
-        'wb' if truncate or not existspath(fspath) else 'r+b',
-    ) as tsf:
-      for bs in header.transcribe_flat():
-        tsf.write(bs)
-      if header.bigendian != native_bigendian:
-        with array_byteswapped(ary):
+    with atomic_filename(fspath, exists_ok=True,
+                         prefix=f'.tmp-{basename(fspath)}') as T:
+      with pfx_open(T.name, 'wb') as tsf:
+        for bs in header.transcribe_flat():
+          tsf.write(bs)
+        if header.bigendian != native_bigendian:
+          with array_byteswapped(ary):
+            ary.tofile(tsf)
+        else:
           ary.tofile(tsf)
       else:
         ary.tofile(tsf)
