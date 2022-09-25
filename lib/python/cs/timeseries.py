@@ -171,6 +171,11 @@ class TypeCode(str):
   assert all(map(lambda typecode: typecode in typecodes, BY_CODE.keys()))
 
   def __new__(cls, t):
+    ''' Return a new `TypeCode` instance from `t`, which may be:
+        * a `str`: expected to be an `array` type code
+        * `int`: `array` type code `q` (signed 64 bit)
+        * `float`: `array` type code `d` (double float)
+    '''
     if isinstance(t, str):
       if t not in cls.BY_CODE:
         raise ValueError(
@@ -189,8 +194,14 @@ class TypeCode(str):
     return super().__new__(cls, t)
 
   @classmethod
-  def promote(cls, t):
+  def promote(cls, t: 'TypeCodeish') -> 'TypeCode':
     ''' Promote `t` to a `TypeCode`.
+
+        The follow values of `t` are accepted:
+        * a subclass of `TypeCode`, returned unchanged
+        * a `str`: expected to be an `array` type code
+        * `int`: `array` type code `q` (signed 64 bit)
+        * `float`: `array` type code `d` (double float)
     '''
     if not isinstance(t, cls):
       if isinstance(t, (str, type)):
@@ -221,6 +232,8 @@ class TypeCode(str):
     if self == 'q':
       return 0
     raise RuntimeError('no default fill value for %r' % (self,))
+
+TypeCodeish = Union[(TypeCode, str, *TypeCode.BY_TYPE.keys())]
 
 @typechecked
 def deduce_type_bigendianness(typecode: str) -> bool:
