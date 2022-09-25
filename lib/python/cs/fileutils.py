@@ -37,9 +37,8 @@ from threading import Lock, RLock
 import time
 from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
-from cs.env import envsub
 from cs.filestate import FileState
-from cs.fs import longpath, shortpath
+from cs.fs import shortpath
 from cs.gimmicks import TimeoutError
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
@@ -63,9 +62,8 @@ DISTINFO = {
     'install_requires': [
         'cs.buffer',
         'cs.deco',
-        'cs.env',
         'cs.filestate',
-        'cs.fs>=longpath,shortpath',
+        'cs.fs>=shortpath',
         'cs.gimmicks>=TimeoutError',
         'cs.lex>=20200914',
         'cs.logutils',
