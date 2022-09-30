@@ -39,6 +39,7 @@ which often divert `sys.stderr`.
 '''
 
 from __future__ import print_function
+from io import UnsupportedOperation
 import os
 import os.path
 import sys
@@ -110,14 +111,14 @@ def X(msg, *args, **kw):
       try:
         try:
           f = open(X_via_tty, 'a')
-        except OSError as e:
+        except (OSError, UnsupportedOperation) as e:
           # sometimes you cannot append to a tty (Linux?)
           # so open for readwrite and seek to the end
           # (may also fail on a tty, so ignore the seek error)
           f = open(X_via_tty, 'r+')
           try:
             f.seek(0, os.SEEK_END)
-          except OSError:
+          except (OSError, UnsupportedOperation):
             pass
         with f:
           f.write(msg)

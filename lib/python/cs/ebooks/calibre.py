@@ -1161,7 +1161,6 @@ class CalibreCommand(BaseCommand):
       if sortkey is True:
         sortkey = self.cbook_default_sortkey
       cbooks = sorted(cbooks, key=sortkey)
-    assert not argv
     return cbooks
 
   # pylint: disable=too-many-branches,too-many-locals
