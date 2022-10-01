@@ -260,6 +260,7 @@ class Texture(Eggable):
       wrapv: str = 'repeat',
       minfilter: str = 'linear_mipmap_linear',
       magfilter: str = 'linear',
+      **kw,
   ):
     self.name = name
     self.texture_image = texture_image
@@ -269,6 +270,7 @@ class Texture(Eggable):
         wrapv=wrapv,
         minfilter=minfilter,
         magfilter=magfilter,
+        **kw,
     )
 
   def egg_contents(self):
