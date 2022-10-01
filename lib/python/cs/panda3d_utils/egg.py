@@ -55,6 +55,11 @@ class EggNode(namedtuple('EggNode', 'typename name contents')):
   ''' A representation of an EGG syntactic node.
   '''
 
+  @pfx
+  @typechecked
+  def __new__(cls, typename: str, name: Optional[str], contents: Iterable):
+    return super().__new__(cls, typename, name, contents)
+
   def __str__(self):
     return self.transcribe()
 
