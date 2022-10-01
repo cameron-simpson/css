@@ -175,7 +175,7 @@ class Normal(V3, Eggable):
 class UV(namedtuple('UV', 'u v'), Eggable):
 
   def egg_contents(self):
-    return self.u, self.v
+    return self
 
 class Vertex(Eggable):
 
