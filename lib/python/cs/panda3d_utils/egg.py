@@ -72,22 +72,42 @@ class EggNode(namedtuple('EggNode', 'typename name contents')):
       contents = (self.contents,)
     else:
       try:
-        contents = iter(self.contents)
+        contents = list(self.contents)
       except TypeError:
         contents = (self.contents,)
     for item in contents:
       with Pfx("%r", item):
         item_strs.append(egg_str(item, subindent))
-    if len(item_strs) == 0:
-      content_part = '{}'
-    elif len(item_strs) == 1 and '\n' not in item_strs[0]:
-      content_part = f'{{ {item_strs[0]} }}'
-    elif item_strs:
-      contents_s = ("\n" + subindent).join(item_strs)
-      content_part = f'{{\n{subindent}{contents_s}\n{indent}}}'
+    content_break = "\n" + subindent
+    content_parts = []
+    had_break = False
+    had_breaks = False
+    for item, item_s in zip(contents, item_strs):
+      if had_break or item_s.endswith('}') or '\n' in item_s:
+        # a line break before and after any complex item
+        content_parts.append(content_break)
+        had_break = True
+        had_breaks = True
+      else:
+        # otherwise write things out on one line
+        content_parts.append(" ")
+        had_break = False
+      content_parts.append(item_s)
+    if content_parts:
+      if had_breaks:
+        if content_parts[0] == " ":
+          # if there were breaks, indent the leading item
+          content_parts[0] = content_break
+        # end with a break
+        content_parts.append("\n")
+        content_parts.append(indent)
+      else:
+        # end with a space
+        content_parts.append(" ")
+    content_part = "".join(content_parts)
     return (
-        f'<{self.typename}> {content_part}' if self.name is None else
-        f'<{self.typename}> {quote(self.name)} {content_part}'
+        f'<{self.typename}> {{{content_part}}}' if self.name is None else
+        f'<{self.typename}> {quote(self.name)} {{{content_part}}}'
     )
 
   def from_obj(obj):
