@@ -8,7 +8,7 @@
     As such it contains functions and classes for making
     entities found in Egg files, and for writing these out in Egg syntax.
     The entities are _not_ directly useable by Pada3d itself,
-    they get into panda3d by being wriiten as Egg and loaded.
+    they get into panda3d by being written as Egg and loaded.
 
     The following are provided:
     * `egg_str`: return a `str` with the Egg syntax transcription of an object
