@@ -184,7 +184,9 @@ class NamedVertexPool(dict, Eggable):
     return 'VertexPool'
 
   def egg_contents(self):
-    return [EggNode('Vertex', k, v) for k, v in self.items()]
+    return [
+        EggNode(v.egg_type(), k, v.egg_contents()) for k, v in self.items()
+    ]
 
 class IndexedVertexPool(list, Eggable):
   ''' A subclass of `list` containing vertices.
@@ -196,7 +198,10 @@ class IndexedVertexPool(list, Eggable):
     return 'VertexPool'
 
   def egg_contents(self):
-    return [EggNode('Vertex', i, v) for i, v in enumerate(self, 1)]
+    return [
+        EggNode(v.egg_type(), str(i), v.egg_contents())
+        for i, v in enumerate(self, 1)
+    ]
 
 @typechecked
 def VertexPool(name, vertices: Union[Mapping[str, Any], Iterable]):
