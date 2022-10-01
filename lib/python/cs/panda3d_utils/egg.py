@@ -278,6 +278,30 @@ class Texture(Eggable):
         lambda kv: EggNode('Scalar', kv[0], [kv[1]]), self.attrs.items()
     )
 
+class Polygon(Eggable):
+
+  @typechecked
+  def __init__(
+      self,
+      name: Optional[str],
+      *,
+      rgba: RGBA,
+      tref: Union[str, Texture],
+      vertexref,
+  ):
+    if isinstance(tref, Texture):
+      tname = tref.egg_name()
+      if tname is None:
+        raise ValueError("tref: Texture has no name")
+      tref = tname
+    self.name = name
+    self.rgba = rgba
+    self.tref = tref
+    self.vertexref = vertexref
+
+  def egg_contents(self):
+    return self.rgba, EggNode('TRef', None, [self.tref]), self.vertexref
+
 class Group(list, Eggable):
 
   def __init__(self, name: Optional[str], *a):
