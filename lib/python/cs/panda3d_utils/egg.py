@@ -27,9 +27,11 @@ from typing import Any, Iterable, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.lex import is_identifier, r
+from cs.mappings import StrKeyedDict
 from cs.numeric import intif
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx
 
+@pfx
 def quote(text):
   ''' Quote a piece of text for inclusion in an EGG file.
   '''
@@ -261,12 +263,9 @@ class Group(list, Eggable):
 if __name__ == '__main__':
   vp = VertexPool(
       "named", {
-          "a": (3,),
-          "a b": (3, 4.0, 4.1, 5),
-          '"c"': ('"foo"',),
-          "d": 4,
-          "e": "foo",
           'v': Vertex(1, 2, 3, normal=Normal(4, 5, 6), uv=UV(6, 7)),
+          't': Texture("texture1", "texture1.png"),
       }
   )
   print(vp)
+  print(Group(None, Texture("texture2", "texture2.png")))
