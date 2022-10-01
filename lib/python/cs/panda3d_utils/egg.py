@@ -23,6 +23,7 @@
 
 from collections import namedtuple
 from typing import Any, Iterable, Mapping, Optional, Tuple, Union
+from zlib import compress
 
 from typeguard import typechecked
 
@@ -186,8 +187,13 @@ class Vertex(Eggable):
 
   @typechecked
   def __init__(
-      self, x: float, y: float, z: float, *, normal: Normal, uv: Tuple[float,
-                                                                       float]
+      self,
+      x: float,
+      y: float,
+      z: float,
+      *,
+      normal: Normal,
+      uv: Tuple[float, float],
   ):
     self.x = x
     self.y = y
