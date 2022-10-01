@@ -218,6 +218,37 @@ def VertexPool(name, vertices: Union[Mapping[str, Any], Iterable]):
   vpool.name = name
   return vpool
 
+class Texture(Eggable):
+  ''' An Egg `Texture` definition.
+  '''
+
+  @typechecked
+  def __init__(
+      self,
+      name: str,
+      texture_image: str,
+      *,
+      format: str = 'rgb',
+      wrapu: str = 'repeat',
+      wrapv: str = 'repeat',
+      minfilter: str = 'linear_mipmap_linear',
+      magfilter: str = 'linear',
+  ):
+    self.name = name
+    self.texture_image = texture_image
+    self.attrs = StrKeyedDict(
+        format=format,
+        wrapu=wrapu,
+        wrapv=wrapv,
+        minfilter=minfilter,
+        magfilter=magfilter,
+    )
+
+  def egg_contents(self):
+    return self.texture_image, *map(
+        lambda kv: EggNode('Scalar', kv[0], [kv[1]]), self.attrs.items()
+    )
+
 if __name__ == '__main__':
   vp = VertexPool(
       "named", {
