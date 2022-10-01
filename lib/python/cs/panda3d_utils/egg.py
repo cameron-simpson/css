@@ -171,6 +171,9 @@ class Vertex(Eggable):
   def egg_contents(self):
     return self.x, self.y, self.z, self.normal, self.uv
 
+# alias Vertex as V
+V = Vertex
+
 class NamedVertexPool(dict, Eggable):
   ''' A subclass of `dict` mapping names to vertices.
   '''
