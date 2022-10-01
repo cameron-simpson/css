@@ -249,6 +249,15 @@ class Texture(Eggable):
         lambda kv: EggNode('Scalar', kv[0], [kv[1]]), self.attrs.items()
     )
 
+class Group(list, Eggable):
+
+  def __init__(self, name: Optional[str], *a):
+    self.name = name
+    super().__init__(a)
+
+  def egg_contents(self):
+    return self
+
 if __name__ == '__main__':
   vp = VertexPool(
       "named", {
