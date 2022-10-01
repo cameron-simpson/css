@@ -177,6 +177,11 @@ class UV(namedtuple('UV', 'u v'), Eggable):
   def egg_contents(self):
     return self
 
+class RGBA(namedtuple('RGBA', 'r g b a'), Eggable):
+
+  def egg_contents(self):
+    return self
+
 class Vertex(Eggable):
 
   @typechecked
