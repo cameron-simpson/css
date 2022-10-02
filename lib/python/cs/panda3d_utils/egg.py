@@ -11,12 +11,12 @@
     they get into panda3d by being written as Egg and loaded.
 
     The following are provided:
-    * `egg_str`: return a `str` with the Egg syntax transcription of an object
     * `quote(str)`: return a string quoted correctly for an Egg file
     * `dump`,`dumps`,dumpz`: after the style of `json.dump`, functions
-      to dump objects in egg syntax
-    * `EggNode`: an Egg syntactic object
-    * `Eggable`: a mixin for objects which can be made into `EggNode`s
+      to dump objects in Egg syntax
+    * `Eggable`: a mixin to support objects which can be transcribed in Egg syntax
+    * `Eggable.as_str(obj)`: a class method to transcribe an object in Egg syntax,
+      accepting `Eggable`s, `str`s and numeric values
     * various factories and classes for Egg nodes: `Texture`,
       `Vertex` and so forth
 '''
@@ -32,6 +32,8 @@ from cs.mappings import StrKeyedDict
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx
 
+from cs.x import X
+
 @pfx
 def quote(text):
   ''' Quote a piece of text for inclusion in an Egg file.
@@ -41,109 +43,36 @@ def quote(text):
       ('"' + text.replace('\\', '\\\\').replace('"', '\\"') + '"')
   )
 
-def egg_str(item, indent=""):
-  ''' Present `item` in Egg syntax.
-  '''
-  if isinstance(item, EggNode):
-    return item.transcribe(indent)
-  if isinstance(item, Eggable):
-    return item.EggNode().transcribe(indent)
-  if isinstance(item, str):
-    return quote(item)
-  if isinstance(item, (int, float)):
-    return str(intif(item))
-  raise TypeError("unhandled type for item %s" % (r(item),))
-
-class EggNode(namedtuple('EggNode', 'typename name contents')):
-  ''' A representation of an EGG syntactic node.
-  '''
-
-  @pfx
-  @typechecked
-  def __new__(cls, typename: str, name: Optional[str], contents: Iterable):
-    return super().__new__(cls, typename, name, contents)
-
-  def __str__(self):
-    return self.transcribe()
-
-  def transcribe(self, indent=''):
-    subindent = indent + "  "
-    item_strs = []
-    if isinstance(self.contents, str):
-      contents = (self.contents,)
-    else:
-      try:
-        contents = list(self.contents)
-      except TypeError:
-        contents = (self.contents,)
-    for item in contents:
-      with Pfx("%r", item):
-        item_strs.append(egg_str(item, subindent))
-    content_break = "\n" + subindent
-    content_parts = []
-    had_break = False
-    had_breaks = False
-    for item, item_s in zip(contents, item_strs):
-      if had_break or item_s.endswith('}') or '\n' in item_s:
-        # a line break before and after any complex item
-        content_parts.append(content_break)
-        had_break = True
-        had_breaks = True
-      else:
-        # otherwise write things out on one line
-        content_parts.append(" ")
-        had_break = False
-      content_parts.append(item_s)
-    if content_parts:
-      if had_breaks:
-        if content_parts[0] == " ":
-          # if there were breaks, indent the leading item
-          content_parts[0] = content_break
-        # end with a break
-        content_parts.append("\n")
-        content_parts.append(indent)
-      else:
-        # end with a space
-        content_parts.append(" ")
-    content_part = "".join(content_parts)
-    return (
-        f'<{self.typename}> {{{content_part}}}' if self.name is None else
-        f'<{self.typename}> {quote(self.name)} {{{content_part}}}'
-    )
-
-  def from_obj(obj):
-    egg_args = {}[type(obj)]
-    return EggNode(*egg_args)
-
-def dumps(obj):
-  ''' Return a string containing `obj` in Egg syntax.
-  '''
-  return str(EggNode.from_obj(obj))
-
-def dump(obj, f):
-  ''' Write `obj` to the text file `f` in Egg syntax.
-  '''
-  if isinstance(f, str):
-    with open(f, 'w') as f2:
-      dump(obj, f2)
-  else:
-    f.write(dumps(obj))
-
-def dumpz(obj, f):
-  ''' Write `obj` to the binary file `f` in Egg syntax, zlib compressed.
-  '''
-  if isinstance(f, str):
-    with open(f, 'wb') as f2:
-      dumpz(obj, f2)
-  else:
-    f.write(compress(dumps(obj).encode('utf-8')))
-
 class Eggable:
-  ''' A mixin to support encoding this object as an `EggNode`.
+  ''' A mixin to support encoding this object in Egg syntax.
   '''
 
   def __str__(self):
-    return str(self.EggNode())
+    return "".join(self.egg_transcribe())
+
+  @classmethod
+  def transcribe(cls, item, indent=""):
+    ''' A generator yielding `str`s which transcribe `item` in Egg syntax.
+    '''
+    if isinstance(item, Eggable):
+      yield from item.egg_transcribe(indent)
+    elif isinstance(item, str):
+      yield quote(item)
+    elif isinstance(item, (int, float)):
+      yield str(intif(item))
+    else:
+      raise TypeError(
+          "%s.transcribe: unhandled type for item %s" % (
+              cls.__name__,
+              r(item),
+          )
+      )
+
+  @classmethod
+  def as_str(cls, item, indent=""):
+    ''' Return the `str` representation of `item` in Egg syntax.
+    '''
+    return "".join(cls.transcribe(item, indent=indent))
 
   def egg_name(self):
     ''' Return the name of this Egg node, or `None`.
@@ -159,12 +88,85 @@ class Eggable:
   def egg_contents(self):
     ''' The `EggNode` contents, an iterable.
     '''
-    return list(iter(self))
+    return iter(self)
 
-  def EggNode(self):
-    ''' Return an `EggNode` representing this object.
+  def egg_transcribe(self, indent=''):
+    ''' A generator yielding `str`s which transcribe `self` in Egg syntax.
     '''
-    return EggNode(self.egg_type(), self.egg_name(), self.egg_contents())
+    subindent = indent + "  "
+    item_strs = []
+    content_break = "\n" + subindent
+    content_parts = []
+    had_break = False
+    had_breaks = False
+    for item in self.egg_contents():
+      with Pfx("%r.egg_transcribe: item=%r", type(self), item):
+        item_sv = list(self.transcribe(item, subindent))
+        assert len(item_sv) > 0
+        if (had_break or item_sv[-1].endswith('}')
+            or any(map(lambda item_s: '\n' in item_s, item_sv))):
+          # a line break before and after any complex item
+          content_parts.append(content_break)
+          had_break = True
+          had_breaks = True
+        else:
+          # otherwise write things out on one line
+          content_parts.append(" ")
+          had_break = False
+        content_parts.extend(item_sv)
+    if content_parts:
+      if had_breaks:
+        if content_parts[0] == " ":
+          # if there were breaks, indent the leading item
+          content_parts[0] = content_break
+        # end with a break
+        content_parts.append("\n")
+        content_parts.append(indent)
+      else:
+        # end with a space
+        content_parts.append(" ")
+    yield self.egg_type()
+    name = self.egg_name()
+    if name is not None:
+      yield " " + quote(name)
+    yield " {"
+    yield from content_parts
+    yield "}"
+
+def dumps(obj, indent=""):
+  ''' Return a string containing `obj` in Egg syntax.
+  '''
+  return Eggable.as_str(obj, indent=indent)
+
+def dump(obj, f, indent=""):
+  ''' Write `obj` to the text file `f` in Egg syntax.
+  '''
+  if isinstance(f, str):
+    with open(f, 'w') as f2:
+      dump(obj, f2, indent=indent)
+  else:
+    f.write(dumps(obj, indent=indent))
+
+def dumpz(obj, f, indent=""):
+  ''' Write `obj` to the binary file `f` in Egg syntax, zlib compressed.
+  '''
+  if isinstance(f, str):
+    with open(f, 'wb') as f2:
+      dumpz(obj, f2, indent=indent)
+  else:
+    f.write(compress(dumps(obj, indent=indent).encode('utf-8')))
+
+class EggNode(Eggable, namedtuple('EggNode', 'typename name contents')):
+  ''' A representation of a basic EGG syntactic node.
+  '''
+
+  @pfx
+  @typechecked
+  def __new__(cls, typename: str, name: Optional[str], contents: Iterable):
+    return super().__new__(cls, typename, name, contents)
+
+  def egg_contents(self):
+    return self.contents
 
 # a 3 value vector or point
 V3 = namedtuple('V3', 'x y z')
