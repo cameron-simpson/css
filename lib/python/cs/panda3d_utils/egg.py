@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Panda3d EGG format.
+''' Panda3d Egg format.
 
     Because Panda3d seems to load things from `.egg` files
     and some other compiled formats
@@ -34,7 +34,7 @@ from cs.pfx import Pfx, pfx
 
 @pfx
 def quote(text):
-  ''' Quote a piece of text for inclusion in an EGG file.
+  ''' Quote a piece of text for inclusion in an Egg file.
   '''
   return (
       text if is_identifier(text.replace('-', '_')) else
@@ -42,7 +42,7 @@ def quote(text):
   )
 
 def egg_str(item, indent=""):
-  ''' Present `item` in EGG syntax.
+  ''' Present `item` in Egg syntax.
   '''
   if isinstance(item, EggNode):
     return item.transcribe(indent)
@@ -116,12 +116,12 @@ class EggNode(namedtuple('EggNode', 'typename name contents')):
     return EggNode(*egg_args)
 
 def dumps(obj):
-  ''' Return a string containing `obj` in EGG syntax.
+  ''' Return a string containing `obj` in Egg syntax.
   '''
   return str(EggNode.from_obj(obj))
 
 def dump(obj, f):
-  ''' Write `obj` to the text file `f` in EGG syntax.
+  ''' Write `obj` to the text file `f` in Egg syntax.
   '''
   if isinstance(f, str):
     with open(f, 'w') as f2:
@@ -130,7 +130,7 @@ def dump(obj, f):
     f.write(dumps(obj))
 
 def dumpz(obj, f):
-  ''' Write `obj` to the binary file `f` in EGG syntax, zlib compressed.
+  ''' Write `obj` to the binary file `f` in Egg syntax, zlib compressed.
   '''
   if isinstance(f, str):
     with open(f, 'wb') as f2:
