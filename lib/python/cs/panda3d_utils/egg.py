@@ -235,14 +235,22 @@ def dumpz(obj, f, indent=""):
   else:
     f.write(compress(dumps(obj, indent=indent).encode('utf-8')))
 
-class EggNode(Eggable, namedtuple('EggNode', 'typename name contents')):
-  ''' A representation of a basic EGG syntactic node.
+class EggNode(Eggable):
+  ''' A representation of a basic EGG syntactic node with an explicit type.
   '''
 
   @pfx
   @typechecked
-  def __new__(cls, typename: str, name: Optional[str], contents: Iterable):
-    return super().__new__(cls, typename, name, contents)
+  def __init__(
+      self, typename: str, name: Optional[str], contents: Iterable, **kw
+  ):
+    assert not isinstance(contents, str)  # str is iterable :-(
+    self.typename = typename
+    self.name = name
+    self.contents = contents
+
+  def egg_type(self):
+    return self.typename
 
   def egg_contents(self):
     return self.contents
