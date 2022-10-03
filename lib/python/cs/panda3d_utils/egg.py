@@ -43,8 +43,6 @@ def quote(text):
       ('"' + text.replace('\\', '\\\\').replace('"', '\\"') + '"')
   )
 
-class Eggable:
-  ''' A mixin to support encoding this object in Egg syntax.
 class EggMetaClass(type):
 
   # mapping of ClassName.lower() => ClassName
@@ -65,7 +63,41 @@ class EggMetaClass(type):
       )
       self.egg_classnames_by_lc[class_name_lc] = class_name
 
+class Eggable(metaclass=EggMetaClass):
+  ''' A base class for objects which expect to be transcribed in Egg syntax.
+
+      The usual implementation of an objects is as a dataclass, example:
+
+          @dataclass
+          class UV(Eggable):
+              u: float
+              v: float
+
+      and the default `__iter__` (and therefore `egg_contents`) assume this.
   '''
+
+  def register(self, registry=None):
+    ''' Register this instance in `register` by `self.name`,
+        default `EggMetaClass.egg_instances`.
+    '''
+    assert self.name is not None
+    if registry is None:
+      registry = EggMetaClass.egg_instances
+    instances = registry[id(type(self))]
+    assert self.name not in instances
+    instances[self.name] = self
+
+  @classmethod
+  @typechecked
+  def instance(cls, name: str, registry=None):
+    ''' Return the instance named `name` from `registry`,
+        default `EggMetaClass.egg_instances`.
+    '''
+    assert name is not None
+    if registry is None:
+      registry = EggMetaClass.egg_instances
+    instances = registry[id(cls)]
+    return instances[name]
 
   def __str__(self):
     return "".join(self.egg_transcribe())
