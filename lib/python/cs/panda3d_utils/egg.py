@@ -255,19 +255,23 @@ class EggNode(Eggable):
   def egg_contents(self):
     return self.contents
 
-class Normal(V3, Eggable):
-  ''' The normal to a surface.
-  '''
+@dataclass
+class Normal(DCEggable):
+  x: float
+  y: float
+  z: float
 
-class UV(namedtuple('UV', 'u v'), Eggable):
+@dataclass
+class UV(DCEggable):
+  u: float
+  v: float
 
-  def egg_contents(self):
-    return self
-
-class RGBA(namedtuple('RGBA', 'r g b a'), Eggable):
-
-  def egg_contents(self):
-    return self
+@dataclass
+class RGBA(DCEggable):
+  r: float
+  g: float
+  b: float
+  a: float = 1.0
 
 class Vertex(Eggable):
 
