@@ -146,13 +146,13 @@ class Eggable(metaclass=EggMetaClass):
         continue
       if isinstance(value, (str, int, float)):
         yield EggNode('Scalar', attr, [value])
-      elif value.egg_name().lower() != attr.lower():
-        warning(
-            "iter(%s): value.name does not match attr: attr=%r, value=%s",
-            self, attr, r(value)
-        )
-      else:
+      elif isinstance(value, Eggable):
         yield value
+      else:
+        raise TypeError(
+            "%s.attrs[%r]=%s: not slacar or Eggable" %
+            (self.__class__.__name__, attr, value)
+        )
 
   def egg_transcribe(self, indent=''):
     ''' A generator yielding `str`s which transcribe `self` in Egg syntax.
