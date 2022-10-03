@@ -21,18 +21,18 @@
       `Vertex` and so forth
 '''
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
+from dataclasses import dataclass, field as dataclass_field, fields as dataclass_fields
 from typing import Any, Iterable, Mapping, Optional, Tuple, Union
 from zlib import compress
 
 from typeguard import typechecked
 
 from cs.lex import is_identifier, r
+from cs.logutils import warning
 from cs.mappings import StrKeyedDict
 from cs.numeric import intif
-from cs.pfx import Pfx, pfx
-
-from cs.x import X
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 
 @pfx
 def quote(text):
@@ -57,9 +57,11 @@ class EggMetaClass(type):
     if class_name[0].isupper():
       # record the canonical
       class_name_lc = class_name.lower()
-      assert class_name_lc not in self.egg_classnames_by_lc, \
+      assert class_name_lc not in self.egg_classnames_by_lc, (
           "new class %r: %r already maps to %r" % (
-          class_name, class_name_lc, self.egg_classnames_by_lc[class_name_lc]
+              class_name, class_name_lc,
+              self.egg_classnames_by_lc[class_name_lc]
+          )
       )
       self.egg_classnames_by_lc[class_name_lc] = class_name
 
@@ -137,6 +139,7 @@ class Eggable(metaclass=EggMetaClass):
     '''
     return self.__class__.__name__
 
+  @pfx_method
   def egg_contents(self):
     ''' Generator yielding the `EggNode` contents.
         This base implementation yields the contents of `self.attrs` if present.
@@ -158,7 +161,6 @@ class Eggable(metaclass=EggMetaClass):
     ''' A generator yielding `str`s which transcribe `self` in Egg syntax.
     '''
     subindent = indent + "  "
-    item_strs = []
     content_break = "\n" + subindent
     content_parts = []
     had_break = False
