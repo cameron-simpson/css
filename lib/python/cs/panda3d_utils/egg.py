@@ -197,6 +197,21 @@ class Eggable(metaclass=EggMetaClass):
     yield from content_parts
     yield "}"
 
+class DCEggable(Eggable):
+  ''' `Eggable` superclass for dataclasses.
+  '''
+
+  def egg_contents(self):
+    ''' Generator yielding the `EggNode` contents.
+        This implementation yields the non-`None` field values in order,
+        then the contents of `self.attrs` if present.
+    '''
+    for F in dataclass_fields(self):
+      value = getattr(self, F.name)
+      if value is not None:
+        yield value
+    yield from super().egg_contents()
+
 def dumps(obj, indent=""):
   ''' Return a string containing `obj` in Egg syntax.
   '''
