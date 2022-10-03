@@ -45,6 +45,26 @@ def quote(text):
 
 class Eggable:
   ''' A mixin to support encoding this object in Egg syntax.
+class EggMetaClass(type):
+
+  # mapping of ClassName.lower() => ClassName
+  # possibly to cononicalise attributes
+  # though I'm currently just distinguishing based on Eggable vs str/float
+  egg_classnames_by_lc = {}
+
+  # mapping of id(type(instance))=>instance.name=>instance
+  egg_instances = defaultdict(dict)
+
+  def __init__(self, class_name, bases, namespace, **kwds):
+    if class_name[0].isupper():
+      # record the canonical
+      class_name_lc = class_name.lower()
+      assert class_name_lc not in self.egg_classnames_by_lc, \
+          "new class %r: %r already maps to %r" % (
+          class_name, class_name_lc, self.egg_classnames_by_lc[class_name_lc]
+      )
+      self.egg_classnames_by_lc[class_name_lc] = class_name
+
   '''
 
   def __str__(self):
