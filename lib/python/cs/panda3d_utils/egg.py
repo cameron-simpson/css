@@ -208,7 +208,7 @@ class DCEggable(Eggable):
     '''
     for F in dataclass_fields(self):
       value = getattr(self, F.name)
-      if value is not None:
+      if F.name != 'attrs' and value is not None:
         yield value
     yield from super().egg_contents()
 
