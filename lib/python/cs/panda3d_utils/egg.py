@@ -273,29 +273,13 @@ class RGBA(DCEggable):
   b: float
   a: float = 1.0
 
-class Vertex(Eggable):
-
-  @typechecked
-  def __init__(
-      self,
-      x: float,
-      y: float,
-      z: float,
-      *,
-      normal: Normal,
-      uv: Tuple[float, float],
-  ):
-    self.x = x
-    self.y = y
-    self.z = z
-    self.normal = normal
-    self.uv = uv
-
-  def egg_contents(self):
-    return self.x, self.y, self.z, self.normal, self.uv
-
-# alias Vertex as V
-V = Vertex
+@dataclass
+class Vertex(DCEggable):
+  x: float
+  y: float
+  z: float
+  w: Optional[float] = None
+  attrs: Mapping = dataclass_field(default_factory=dict)
 
 class NamedVertexPool(dict, Eggable):
   ''' A subclass of `dict` mapping names to vertices.
