@@ -310,13 +310,17 @@ class Linker:
         FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
         size = FIs[0].size
         with proxy.extend_prefix(f'size {size} '):
-          for i, FI in enumerate(progressbar(FIs)):
+          for i, FI in enumerate(progressbar(FIs, f'size {size}')):
+            if runstate and runstate.cancelled:
+              break
             # skip FileInfos with no paths
             # this happens when a FileInfo has been assimilated
             if not FI.paths:
               ##warning("SKIP, no paths")
               continue
             for FI2 in FIs[i + 1:]:
+              if runstate and runstate.cancelled:
+                break
               status(FI2.path)
               assert FI.size == FI2.size
               assert FI.mtime >= FI2.mtime
