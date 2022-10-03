@@ -383,20 +383,23 @@ class Group(Eggable):
     return self.items
 
 if __name__ == '__main__':
-  vp = VertexPool(
-      "named", {
-          'v':
-          Vertex(1, 2, 3, normal=Normal(4, 5, 6), uv=UV(6, 7)),
-          't':
-          Texture("texture1", "texture1.png"),
-          'p':
-          Polygon(
-              "polyname",
-              rgba=RGBA(1, 1, 1, 1),
-              tref=Texture("foo", "tpath.png"),
-              vertexref="vertexref",
-          ),
-      }
-  )
-  print(vp)
-  print(Group(None, Texture("texture2", "texture2.png")))
+  for eggable in (
+      Normal(4, 5, 6),
+      UV(6, 7),
+      Vertex(1, 2, 3, attrs=dict(normal=Normal(4, 5, 6), uv=UV(6, 7))),
+      VertexPool(
+          "vpool1",
+          [Vertex(1, 2, 3, attrs=dict(normal=Normal(4, 5, 6), uv=UV(6, 7)))],
+      ),
+      Texture("texture1", "texture1.png"),
+      pfx_call(
+          Polygon,
+          "polyname",
+          "vpool1",
+          rgba=RGBA(1, 1, 1, 1),
+          tref=Texture("foo", "tpath.png"),
+          vertexref="vertexref",
+      ),
+      Group(None, Texture("texture2", "texture2.png")),
+  ):
+    print(eggable)
