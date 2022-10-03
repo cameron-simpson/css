@@ -281,49 +281,24 @@ class Vertex(DCEggable):
   w: Optional[float] = None
   attrs: Mapping = dataclass_field(default_factory=dict)
 
-class NamedVertexPool(dict, Eggable):
-  ''' A subclass of `dict` mapping names to vertices.
-  '''
-
-  def egg_type(self):
-    ''' Return `VertexPool`.
-    '''
-    return 'VertexPool'
-
-  def egg_contents(self):
-    return [
-        EggNode(v.egg_type(), k, v.egg_contents()) for k, v in self.items()
-    ]
-
-class IndexedVertexPool(list, Eggable):
+class VertexPool(Eggable):
   ''' A subclass of `list` containing vertices.
   '''
 
-  def egg_type(self):
-    ''' Return `VertexPool`.
-    '''
-    return 'VertexPool'
+  @typechecked
+  def __init__(self, name: str, vertices: Iterable, *, _registry=None):
+    self.name = name
+    self.vertices = list(vertices)
+    self.register(registry=_registry)
 
-  def egg_contents(self):
-    return [
+  def __len__(self):
+    return len(self.vertices)
+
+  def __iter__(self):
+    return (
         EggNode(v.egg_type(), str(i), v.egg_contents())
-        for i, v in enumerate(self, 1)
-    ]
-
-@typechecked
-def VertexPool(name, vertices: Union[Mapping[str, Any], Iterable]):
-  ''' Factory returning an `IndexedVertexPool` or a `NamedVertexPool`
-      depending on the nature or `vertices`,
-      which may be an iterable of vertices or a mapping.
-  '''
-  try:
-    items = vertices.items
-  except AttributeError:
-    vpool = IndexedVertexPool(vertices)
-  else:
-    vpool = NamedVertexPool(items())
-  vpool.name = name
-  return vpool
+        for i, v in enumerate(self.vertices, 1)
+    )
 
 class Texture(Eggable):
   ''' An Egg `Texture` definition.
