@@ -373,14 +373,14 @@ class Polygon(Eggable):
         ),
     )
 
-class Group(list, Eggable):
+class Group(Eggable):
 
   def __init__(self, name: Optional[str], *a):
     self.name = name
-    super().__init__(a)
+    self.items = list(a)
 
   def egg_contents(self):
-    return self
+    return self.items
 
 if __name__ == '__main__':
   vp = VertexPool(
