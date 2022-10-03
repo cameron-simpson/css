@@ -192,7 +192,7 @@ class FileInfo(object):
     '''
     return self.key == other.key  # pylint: disable=comparison-with-callable
 
-  def assimilate(self, other, dry_run=False):
+  def assimilate(self, other, dry_run=False, runstate=None):
     ''' Link our primary path to all the paths from `other`. Return success.
     '''
     ok = True
@@ -212,6 +212,8 @@ class FileInfo(object):
           return ok
         assert self.same_dev(other)
         for opath in sorted(opaths):
+          if runstate and runstate.cancelled:
+            break
           with Pfx(opath):
             if opath in self.paths:
               warning("already assimilated")
@@ -332,7 +334,7 @@ class Linker:
                 # different content, skip
                 continue
               # FI2 is the younger, keep it
-              FI.assimilate(FI2, dry_run=dry_run)
+              FI.assimilate(FI2, dry_run=dry_run, runstate=runstate)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
