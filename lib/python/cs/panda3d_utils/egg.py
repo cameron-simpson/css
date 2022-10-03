@@ -138,9 +138,21 @@ class Eggable(metaclass=EggMetaClass):
     return self.__class__.__name__
 
   def egg_contents(self):
-    ''' The `EggNode` contents, an iterable.
+    ''' Generator yielding the `EggNode` contents.
+        This base implementation yields the contents of `self.attrs` if present.
     '''
-    return iter(self)
+    for attr, value in getattr(self, 'attrs', {}).items():
+      if value is None:
+        continue
+      if isinstance(value, (str, int, float)):
+        yield EggNode('Scalar', attr, [value])
+      elif value.egg_name().lower() != attr.lower():
+        warning(
+            "iter(%s): value.name does not match attr: attr=%r, value=%s",
+            self, attr, r(value)
+        )
+      else:
+        yield value
 
   def egg_transcribe(self, indent=''):
     ''' A generator yielding `str`s which transcribe `self` in Egg syntax.
