@@ -255,9 +255,6 @@ class EggNode(Eggable):
   def egg_contents(self):
     return self.contents
 
-# a 3 value vector or point
-V3 = namedtuple('V3', 'x y z')
-
 class Normal(V3, Eggable):
   ''' The normal to a surface.
   '''
