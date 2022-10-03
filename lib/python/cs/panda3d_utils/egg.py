@@ -338,24 +338,40 @@ class Polygon(Eggable):
   @typechecked
   def __init__(
       self,
-      name: Optional[str],
-      *,
-      rgba: RGBA,
-      tref: Union[str, Texture],
-      vertexref,
+      name: str,
+      pool: Union[str, VertexPool],
+      *indices,
+      **attrs,
   ):
-    if isinstance(tref, Texture):
-      tname = tref.egg_name()
-      if tname is None:
-        raise ValueError("tref: Texture has no name")
-      tref = tname
+    if isinstance(pool, str):
+      vpool = VertexPool.instance(pool)
+    elif isinstance(pool, VertexPool):
+      vpool = pool
+    else:
+      raise TypeError(
+          "unhandled pool_name type %s, expected str or VertexPool" %
+          (type(pool),)
+      )
+    if not indices:
+      indices = list(range(len(vpool)))
     self.name = name
-    self.rgba = rgba
-    self.tref = tref
-    self.vertexref = vertexref
+    self.vpool = vpool
+    self.name = name
+    self.indices = indices
 
   def egg_contents(self):
-    return self.rgba, EggNode('TRef', None, [self.tref]), self.vertexref
+    yield from super().egg_contents()
+    yield EggNode(
+        'VertexRef',
+        None,
+        (
+            list(
+                self.indices if self
+                .indices else range(1,
+                                    len(self.vpool) + 1)
+            ) + [EggNode('Ref', None, [self.vpool.name])]
+        ),
+    )
 
 class Group(list, Eggable):
 
