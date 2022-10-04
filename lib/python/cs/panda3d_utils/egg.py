@@ -41,6 +41,9 @@ from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.seq import Seq
 from cs.threads import State as ThreadState
 
+
+# the default coordinate system to use in model files
+DEFAULT_COORDINATE_SYSTEM = 'Z-up'
 @pfx
 def quote(text):
   ''' Quote a piece of text for inclusion in an Egg file.
