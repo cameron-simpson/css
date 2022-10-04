@@ -401,10 +401,10 @@ class VertexPool(Eggable):
   '''
 
   @typechecked
-  def __init__(self, name: str, vertices: Iterable, *, _registry=None):
+  def __init__(self, name: str, vertices: Iterable):
     self.name = name
     self.vertices = list(vertices)
-    self.register(registry=_registry)
+    self.register()
 
   def __len__(self):
     return len(self.vertices)
