@@ -8,7 +8,8 @@
     As such it contains functions and classes for making
     entities found in Egg files, and for writing these out in Egg syntax.
     The entities are _not_ directly useable by Pada3d itself,
-    they get into panda3d by being written as Egg and loaded.
+    they get into panda3d by being written as Egg and loaded;
+    see the `load_model` function.
 
     The following are provided:
     * `quote(str)`: return a string quoted correctly for an Egg file
@@ -23,16 +24,22 @@
 
 from collections import defaultdict, namedtuple
 from dataclasses import dataclass, field as dataclass_field, fields as dataclass_fields
+from tempfile import NamedTemporaryFile
 from typing import Any, Iterable, Mapping, Optional, Tuple, Union
 from zlib import compress
 
 from typeguard import typechecked
 
+from cs.context import ContextManagerMixin
+from cs.deco import fmtdoc
+from cs.fileutils import atomic_filename
 from cs.lex import is_identifier, r
 from cs.logutils import warning
 from cs.mappings import StrKeyedDict
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.seq import Seq
+from cs.threads import State as ThreadState
 
 @pfx
 def quote(text):
