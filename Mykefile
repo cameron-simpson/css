@@ -13,7 +13,7 @@ RSYNC_TARGET_PYTHON_ENVVAR = RSYNC_TARGET_PYTHON
 target  = bin
 
 dev = env-dev -d $. -x
-base_python = python3
+base_python = "$${PYTHON_EXE:-python3}"
 venv_dir = $./venv
 venv_requirements = $./venv-requirements.txt
 venv_pip = $(venv_python) -m pip
