@@ -487,6 +487,70 @@ class Group(Eggable):
   def egg_contents(self):
     return self.items
 
+class Model(ContextManagerMixin):
+
+  REFTYPES = {
+      'TRef': Texture,
+  }
+
+  @typechecked
+  def __init__(self, comment: str, *, coordinate_system: Optional[str] = None):
+    if coordinate_system is None:
+      coordinate_system = DEFAULT_COORDINATE_SYSTEM
+    self.comment = comment
+    self.coordinate_system = coordinate_system
+    self._registry = EggRegistry(
+        f'{self.__class__.__name__}:{comment!r}:{id(self)}'
+    )
+    self.items = []
+
+  def __str__(self):
+    return "%s:%r:%r[%d]" % (
+        self.__class__.__name__, self.comment, self.coordinate_system,
+        len(self.items)
+    )
+
+  def __enter_exit__(self):
+    ''' Context manager: push `self._register` as `state.registry`.
+    '''
+    with self._registry:
+      yield self
+
+  @typechecked
+  def append(self, item: Eggable):
+    item.register(self._registry)
+    self.items.append(item)
+
+  def check_eggable(self, item):
+    ''' Check an `Eggable` `item` for consistency.
+    '''
+    typename = item.egg_type()
+    name = item.egg_name()
+    with Pfx("%s.check_item(<%s>%s)", self.__class__.__name__, typename, name
+             or ""):
+      if name is not None:
+        # check the reference in things like <TRef> { texture-name }
+        try:
+          ref_type = self.REFTYPES[item.egg_type()]
+        except KeyError:
+          pass
+        else:
+          ref_name, = item.egg_contents()
+          X("    look up %r in %s", ref_name, ref_type)
+          assert isinstance(ref_name, str)
+          pfx_call(ref_type.instance, ref_name)
+      # check all the contained items
+      for subitem in item.egg_contents():
+        if isinstance(subitem, Eggable):
+          self.check_eggable(subitem)
+
+  @pfx_method
+  def check(self):
+    ''' Check the model for consistency.
+    '''
+    for item in self.items:
+      self.check_eggable(item)
+
 if __name__ == '__main__':
   for eggable in (
       Normal(4, 5, 6),
