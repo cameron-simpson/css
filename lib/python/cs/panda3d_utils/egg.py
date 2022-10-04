@@ -136,27 +136,23 @@ class Eggable(metaclass=EggMetaClass):
   '''
 
   def register(self, registry=None):
-    ''' Register this instance in `register` by `self.name`,
-        default `EggMetaClass.egg_instances`.
+    ''' Register this `instance` in `registry`, default `state.registry`.
+        The same instance may be registered more than once.
     '''
-    assert self.name is not None
     if registry is None:
-      registry = EggMetaClass.egg_instances
-    instances = registry[id(type(self))]
-    assert self.name not in instances
-    instances[self.name] = self
+      registry = state.registry
+    return registry.register(self)
 
   @classmethod
   @typechecked
   def instance(cls, name: str, registry=None):
     ''' Return the instance named `name` from `registry`,
-        default `EggMetaClass.egg_instances`.
+        default `state.registry`.
     '''
     assert name is not None
     if registry is None:
-      registry = EggMetaClass.egg_instances
-    instances = registry[id(cls)]
-    return instances[name]
+      registry = state.registry
+    return registry.instance(cls, name)
 
   def __str__(self):
     return "".join(self.egg_transcribe())
