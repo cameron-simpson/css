@@ -290,6 +290,56 @@ def dumpz(obj, f, indent=""):
   else:
     f.write(compress(dumps(obj, indent=indent).encode('utf-8')))
 
+@fmtdoc
+@typechecked
+def write_model(fspath: str, comment: str, *, coordinate_system=None):
+  ''' Context manager for writing an Egg model file to the path
+      `fspath` which yields an open file for the model contents.
+
+      Parameters:
+      * `fspath`: the filesystem path of the model file to create
+      * `comment`: opening comment for the file
+      * `coordinate_system`: coordinate system for the file,
+       default `{DEFAULT_COORDINATE_SYSTEM!r}` from `DEFAULT_COORDINATE_SYSTEM`
+
+      This uses `atomic_filename` to create the file so it will not
+      exist in the filesystem until it is complete.
+
+      Example use:
+
+          with write_model("my_model.egg", "test model") as f:
+            for nodes in egg_nodes:
+              print(node, file=f)
+  '''
+  if coordinate_system is None:
+    coordinate_system = DEFAULT_COORDINATE_SYSTEM
+  with atomic_filename(fspath) as T:
+    with open(T.name, 'w') as f:
+      print(EggNode('Comment', None, comment), file=f)
+      print(EggNode('CoordinateSystem', None, coordinate_system), file=f)
+      yield f
+
+def load_model(
+    loader, comment: str, egg_nodes: Iterable, *, coordinate_system=None
+):
+  ''' Load an iterable of `Eggable` nodes `egg_nodes` as a model
+      via the supplied loader.
+
+      This transcribes the `egg_nodes` to a temporary Egg file using
+      `write_model` and then calls `loader.load_model(filename)`
+      to load that file, returning the resulting scene.
+
+      Example use:
+
+          scene = load_model(showbase.loader, "my model", egg_nodes)
+  '''
+  with NamedTemporaryFile(suffix='.egg') as T:
+    with write_model(T.name, comment=comment,
+                     coordinate_system=coordinate_system) as f:
+      for node in egg_nodes:
+        print(node, file=f)
+    return loader.loadModel(T.name)
+
 class EggNode(Eggable):
   ''' A representation of a basic EGG syntactic node with an explicit type.
   '''
