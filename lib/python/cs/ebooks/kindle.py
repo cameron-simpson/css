@@ -131,6 +131,13 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
             (self.subdir_name,)
         )
 
+      @property
+      def amazon_url(self):
+        # https://www.amazon.com.au/Wonder-Woman-2016-xx-Liars-ebook/dp/B097KMW2VY/
+        title = self.tags.get('calibre.title',
+                              'title').replace(' ', '-').replace('/', '-')
+        return f'https://www.amazon.com.au/{title}/dp/{self.asin}/'
+
       def listdir(self):
         ''' Return a list of the names inside the subdirectory,
               or an empty list if the subdirectory is not present.
