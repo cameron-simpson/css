@@ -43,6 +43,63 @@ def quote(text):
       ('"' + text.replace('\\', '\\\\').replace('"', '\\"') + '"')
   )
 
+class EggRegistry(defaultdict, ContextManagerMixin):
+  _seq = Seq()
+
+  def __init__(self, name=None):
+    if name is None:
+      name = f'{self.__class__.__name__}{self._seq()}'
+    self.name = name
+    super().__init__(dict)
+
+  def __str__(self):
+    return f'{self.__class__.__name__}({self.name!r})'
+
+  def __repr__(self):
+    return str(self)
+
+  def __enter_exit__(self):
+    with state(registry=self):
+      yield self
+
+  @typechecked
+  def register(self, instance: 'Eggable'):
+    ''' Register this `instance`.
+        The same instance may be registered more than once.
+    '''
+    name = instance.egg_name()
+    egg_cls = type(instance)
+    assert name is not None
+    instances = self[id(egg_cls)]
+    try:
+      existing = instances[name]
+    except KeyError:
+      instances[name] = instance
+    else:
+      if existing is not instance:
+        raise RuntimeError(
+            "%s.register: name %r already registered to %s:%d" %
+            (self, name, instance.__class__.__name__, id(existing))
+        )
+
+  @pfx_method(use_str=True)
+  @typechecked
+  def instance(self, egg_cls, name: str):
+    ''' Return the `egg_cls` instance named `name`.
+    '''
+    instances = self[id(egg_cls)]
+    try:
+      return instances[name]
+    except KeyError:
+      warning(
+          "%s: no %r in instances[id(%s)]: %r", self, name, egg_cls.__name__,
+          instances
+      )
+      raise
+
+# a stackable state
+state = ThreadState(registry=EggRegistry(__file__))
+
 class EggMetaClass(type):
 
   # mapping of ClassName.lower() => ClassName
