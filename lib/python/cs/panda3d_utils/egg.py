@@ -572,3 +572,28 @@ if __name__ == '__main__':
       Group(None, Texture("texture2", "texture2.png")),
   ):
     print(eggable)
+  M = Model("test model")
+  print(M)
+  M.check()
+  with M:
+    normal = Normal(4, 5, 6)
+    uv = UV(6, 7)
+    v = Vertex(1, 2, 3, attrs=dict(normal=normal, uv=uv))
+    vpool = VertexPool(
+        "vpool2",
+        [v, v],
+    )
+    texture = Texture("texture2", "texture2.png")
+    for item in vpool, texture:
+      M.append(item)
+    M.check()
+    M.append(
+        Polygon(
+            "polyname",
+            "vpool2",
+            rgba=RGBA(1, 1, 1, 1),
+            tref=texture,
+            vertexref="vertexref",
+        )
+    )
+    M.check()
