@@ -23,6 +23,7 @@
 '''
 
 from collections import defaultdict, namedtuple
+from contextlib import contextmanager
 from dataclasses import dataclass, field as dataclass_field, fields as dataclass_fields
 from tempfile import NamedTemporaryFile
 from typing import Any, Iterable, Mapping, Optional, Tuple, Union
