@@ -577,6 +577,28 @@ class Model(ContextManagerMixin):
     for item in self.items:
       item.check(registry=self._registry)
 
+  def save(self, fspath, *, skip_check=False):
+    ''' Save this model to the filesystem path `fspath`.
+    '''
+    if not skip_check:
+      self.check()
+    with write_model(fspath, self.comment,
+                     coordinate_system=self.coordinate_system) as f:
+      for item in self.items:
+        print(item, file=f)
+
+  def load(self, loader, *, skip_check=False):
+    ''' Load this model via `loader.loadModel`.
+    '''
+    if not skip_check:
+      self.check()
+    return load_model(
+        loader,
+        self.comment,
+        self.items,
+        coordinate_system=self.coordinate_system
+    )
+
 if __name__ == '__main__':
   for eggable in (
       Normal(4, 5, 6),
