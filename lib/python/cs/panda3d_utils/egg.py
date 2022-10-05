@@ -330,6 +330,7 @@ def dumpz(obj, f, indent=""):
   else:
     f.write(compress(dumps(obj, indent=indent).encode('utf-8')))
 
+@contextmanager
 @fmtdoc
 @typechecked
 def write_model(fspath: str, comment: str, *, coordinate_system=None):
@@ -355,8 +356,8 @@ def write_model(fspath: str, comment: str, *, coordinate_system=None):
     coordinate_system = DEFAULT_COORDINATE_SYSTEM
   with atomic_filename(fspath) as T:
     with open(T.name, 'w') as f:
-      print(EggNode('Comment', None, comment), file=f)
-      print(EggNode('CoordinateSystem', None, coordinate_system), file=f)
+      print(EggNode('Comment', None, [comment]), file=f)
+      print(EggNode('CoordinateSystem', None, [coordinate_system]), file=f)
       yield f
 
 def load_model(
