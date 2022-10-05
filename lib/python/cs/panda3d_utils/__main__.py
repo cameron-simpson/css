@@ -101,7 +101,7 @@ class P3DemoApp(P3dApp):
 
   def __init__(self):
     super().__init__(
-        None,  ## "models/environment",
+        "models/environment",
         scale=(0.25, 0.25, 0.25),
         pos=(-8, 42, 0),
     )
@@ -150,13 +150,6 @@ class P3DemoApp(P3dApp):
     '''
     X("SETUP")
     X("task = %s", r(task))
-    X("  task: %r", dir(task))
-    for attr in sorted(dir(task)):
-      X("  .%s: %s", attr, s(getattr(task, attr)))
-    X(".manager=%s", dir(task.manager))
-    breakpoint()
-    X("MRO = %r", type(self).__mro__)
-    X("%r", dir(self))
     return Task.done
 
   @typechecked
