@@ -738,9 +738,16 @@ def default_params(func, _strict=False, **param_defaults):
       * `_strict`: default `False`; if true only replace genuinely
         missing parameters; if false also replace the traditional
         `None` placeholder value
-      Other parameters are used for the default factory functions.
+      The remaining keyword parameters are factory functions
+      providing the respective default values.
 
-      Example use:
+      Atypical one off direct use:
+
+          @default_params(dbconn=open_default_dbconn,debug=lambda: settings.DB_DEBUG_MODE)
+          def dbquery(query, *, dbconn):
+              dbconn.query(query)
+
+      Typical use as a decorator factory:
 
           # in your support module
           uses_ds3 = default_params(ds3client=get_ds3client)
