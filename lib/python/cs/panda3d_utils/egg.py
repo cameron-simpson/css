@@ -444,8 +444,15 @@ class VertexPool(Eggable):
     return len(self.vertices)
 
   def __iter__(self):
+    ''' Iteration yields the `vertices`.
+    '''
+    return iter(self.vertices)
+
+  def egg_contents(self):
+    ''' The Egg contents are synthetic `vertex` nodes numbered by their position.
+    '''
     return (
-        EggNode(v.egg_type(), str(i), v.egg_contents())
+        EggNode(v.egg_type(), i, v.egg_contents())
         for i, v in enumerate(self.vertices, 1)
     )
 
