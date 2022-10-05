@@ -511,7 +511,7 @@ class Polygon(Eggable):
           (type(pool),)
       )
     if not indices:
-      indices = list(range(len(vpool)))
+      indices = list(range(1, len(vpool) + 1))
     self.name = name
     self.vpool = vpool
     self.name = name
