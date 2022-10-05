@@ -211,8 +211,10 @@ class Eggable(metaclass=EggMetaClass):
 
   @pfx_method
   def egg_contents(self):
-    ''' Generator yielding the `EggNode` contents.
-        This base implementation yields the contents of `self.attrs` if present.
+    ''' Return an iterable of the `Eggable` contents.
+
+        This base implementation is a generator which yields the
+        contents of `self.attrs` if present.
     '''
     for attr, value in getattr(self, 'attrs', {}).items():
       if value is None:
