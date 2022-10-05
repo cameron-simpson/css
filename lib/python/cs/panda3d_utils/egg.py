@@ -533,12 +533,10 @@ class Polygon(Eggable):
 
   @uses_registry
   def check(self, *, registry):
-    X("Polygon.check...")
     with Pfx("%s.check", self.__class__.__name__):
       super().check(registry=registry)
       vpool = self.vpool
       for index in self.indices:
-        X("check index %r", index)
         assert index > 0 and index <= len(vpool), \
             f'index {index} not in range for VertexPool'
 
