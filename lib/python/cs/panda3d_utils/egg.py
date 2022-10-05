@@ -38,12 +38,18 @@ from cs.logutils import warning
 from cs.mappings import StrKeyedDict
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
-from cs.seq import Seq
+from cs.queues import ListQueue
+from cs.seq import Seq, unrepeated
 from cs.threads import State as ThreadState
 
 
 # the default coordinate system to use in model files
 DEFAULT_COORDINATE_SYSTEM = 'Z-up'
+
+# a mapping of reference Egg type names to the class to which it refers,
+# for example 'TRef' => Texture.
+REFTYPES = {}
+
 @pfx
 def quote(text):
   ''' Quote a piece of text for inclusion in an Egg file.
@@ -262,6 +268,30 @@ class Eggable(metaclass=EggMetaClass):
     yield from content_parts
     yield "}"
 
+  @uses_registry
+  def check(self, *, registry):
+    ''' Check an `Eggable` `item` for consistency.
+    '''
+    q = ListQueue([self])
+    for item in unrepeated(q):
+      typename = item.egg_type()
+      name = item.egg_name()
+      with Pfx("<%s>%s.check()", typename, name or ""):
+        if name is not None:
+          # check the reference in things like <TRef> { texture-name }
+          try:
+            ref_type = REFTYPES[typename]
+          except KeyError:
+            pass
+          else:
+            ref_name, = item.egg_contents()
+            assert isinstance(ref_name, str)
+            pfx_call(ref_type.instance, ref_name, registry=registry)
+        # check all the contained items
+        for subitem in item.egg_contents():
+          if isinstance(subitem, Eggable):
+            q.append(subitem)
+
 class DCEggable(Eggable):
   ''' `Eggable` superclass for dataclasses.
   '''
@@ -448,6 +478,8 @@ class Texture(Eggable):
         lambda kv: EggNode('Scalar', kv[0], [kv[1]]), self.attrs.items()
     )
 
+REFTYPES['TRef'] = Texture
+
 class Polygon(Eggable):
 
   @typechecked
@@ -488,6 +520,11 @@ class Polygon(Eggable):
         ),
     )
 
+    @uses_registry
+    def check(self, *, registry):
+      super().check(registry=registry)
+      VertexPool.instance
+
 class Group(Eggable):
 
   def __init__(self, name: Optional[str], *a):
@@ -498,10 +535,6 @@ class Group(Eggable):
     return self.items
 
 class Model(ContextManagerMixin):
-
-  REFTYPES = {
-      'TRef': Texture,
-  }
 
   @typechecked
   def __init__(self, comment: str, *, coordinate_system: Optional[str] = None):
@@ -531,35 +564,12 @@ class Model(ContextManagerMixin):
     item.register(self._registry)
     self.items.append(item)
 
-  def check_eggable(self, item):
-    ''' Check an `Eggable` `item` for consistency.
-    '''
-    typename = item.egg_type()
-    name = item.egg_name()
-    with Pfx("%s.check_item(<%s>%s)", self.__class__.__name__, typename, name
-             or ""):
-      if name is not None:
-        # check the reference in things like <TRef> { texture-name }
-        try:
-          ref_type = self.REFTYPES[item.egg_type()]
-        except KeyError:
-          pass
-        else:
-          ref_name, = item.egg_contents()
-          X("    look up %r in %s", ref_name, ref_type)
-          assert isinstance(ref_name, str)
-          pfx_call(ref_type.instance, ref_name)
-      # check all the contained items
-      for subitem in item.egg_contents():
-        if isinstance(subitem, Eggable):
-          self.check_eggable(subitem)
-
   @pfx_method
   def check(self):
     ''' Check the model for consistency.
     '''
     for item in self.items:
-      self.check_eggable(item)
+      item.check(registry=self._registry)
 
 if __name__ == '__main__':
   for eggable in (
