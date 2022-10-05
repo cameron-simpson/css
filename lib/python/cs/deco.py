@@ -776,7 +776,7 @@ def default_params(func, _strict=False, **param_defaults):
   # TODO: get the indent from some aspect of stripped_dedent
   defaulted_func.__doc__ = '\n      '.join(
       [
-          getattr(func, '__doc__', ''),
+          getattr(func, '__doc__', '') or '',
           '',
           'This function also accepts the following optional keyword parameters:',
           *[
