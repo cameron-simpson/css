@@ -522,8 +522,12 @@ class Polygon(Eggable):
 
     @uses_registry
     def check(self, *, registry):
-      super().check(registry=registry)
-      VertexPool.instance
+      with Pfx("%s.check", self.__class__.__name__):
+        super().check(registry=registry)
+        vpool = self.vpool
+        for index in self.indices:
+          assert index > 0 and index <= len(vpool), \
+              f'index {index} not in range for VertexPool'
 
 class Group(Eggable):
 
