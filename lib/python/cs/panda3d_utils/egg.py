@@ -31,7 +31,7 @@ from zlib import compress
 from typeguard import typechecked
 
 from cs.context import ContextManagerMixin
-from cs.deco import fmtdoc
+from cs.deco import default_params, fmtdoc
 from cs.fileutils import atomic_filename
 from cs.lex import is_identifier, r
 from cs.logutils import warning
@@ -110,6 +110,8 @@ class EggRegistry(defaultdict, ContextManagerMixin):
 # a stackable state
 state = ThreadState(registry=EggRegistry(__file__))
 
+uses_registry = default_params(registry=lambda: state.registry)
+
 class EggMetaClass(type):
 
   # mapping of ClassName.lower() => ClassName
@@ -145,23 +147,21 @@ class Eggable(metaclass=EggMetaClass):
       and the default `__iter__` (and therefore `egg_contents`) assume this.
   '''
 
-  def register(self, registry=None):
+  @uses_registry
+  def register(self, *, registry):
     ''' Register this `instance` in `registry`, default `state.registry`.
         The same instance may be registered more than once.
     '''
-    if registry is None:
-      registry = state.registry
     return registry.register(self)
 
   @classmethod
+  @uses_registry
   @typechecked
-  def instance(cls, name: str, registry=None):
+  def instance(cls, name: str, *, registry):
     ''' Return the instance named `name` from `registry`,
         default `state.registry`.
     '''
     assert name is not None
-    if registry is None:
-      registry = state.registry
     return registry.instance(cls, name)
 
   def __str__(self):
