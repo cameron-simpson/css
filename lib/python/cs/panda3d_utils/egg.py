@@ -485,9 +485,8 @@ class Texture(Eggable):
     )
 
   def egg_contents(self):
-    return self.texture_image, *map(
-        lambda kv: EggNode('Scalar', kv[0], [kv[1]]), self.attrs.items()
-    )
+    yield self.texture_image
+    yield from super().egg_contents()
 
 REFTYPES['TRef'] = Texture
 
