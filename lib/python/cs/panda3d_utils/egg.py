@@ -275,7 +275,7 @@ class Eggable(metaclass=EggMetaClass):
     ''' Check an `Eggable` `item` for consistency.
     '''
     q = ListQueue([self])
-    for item in unrepeated(q):
+    for item in unrepeated(q, signature=id):
       typename = item.egg_type()
       name = item.egg_name()
       with Pfx("<%s>%s.check()", typename, name or ""):
