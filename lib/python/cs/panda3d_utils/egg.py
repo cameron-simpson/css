@@ -260,7 +260,7 @@ class Eggable(metaclass=EggMetaClass):
       else:
         # end with a space
         content_parts.append(" ")
-    yield self.egg_type()
+    yield f'<{self.egg_type()}>'
     name = self.egg_name()
     if name is not None:
       yield " " + quote(name)
