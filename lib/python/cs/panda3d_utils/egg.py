@@ -656,3 +656,4 @@ if __name__ == '__main__':
         )
     )
     M.check()
+    M.save("model-out.egg")
