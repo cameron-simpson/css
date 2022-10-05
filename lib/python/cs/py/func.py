@@ -113,9 +113,9 @@ def trace(
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
     '''
-    # late import so that we can use this in modules we import
-    # pylint: disable=import-outside-toplevel
     if with_pfx:
+      # late import so that we can use this in modules we import
+      # pylint: disable=import-outside-toplevel
       try:
         from cs.pfx import XP as xlog
       except ImportError:
