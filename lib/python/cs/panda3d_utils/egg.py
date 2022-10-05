@@ -567,7 +567,7 @@ class Model(ContextManagerMixin):
 
   @typechecked
   def append(self, item: Eggable):
-    item.register(self._registry)
+    item.register(registry=self._registry)
     self.items.append(item)
 
   @pfx_method
