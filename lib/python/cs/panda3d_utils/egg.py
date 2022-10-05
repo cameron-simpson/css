@@ -350,8 +350,8 @@ def write_model(fspath: str, comment: str, *, coordinate_system=None):
       Example use:
 
           with write_model("my_model.egg", "test model") as f:
-            for nodes in egg_nodes:
-              print(node, file=f)
+              for nodes in egg_nodes:
+                  print(node, file=f)
   '''
   if coordinate_system is None:
     coordinate_system = DEFAULT_COORDINATE_SYSTEM
