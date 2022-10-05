@@ -1,3 +1,4 @@
+iterbar: call back to length_hint if no len as default?
 mklinks: quit on SIGINT
 cs.cmdutils: help to include the first sentence of the subcommand usage?
 cs.fsm: better docstrings, suppress FSMSubType docstring somehow
