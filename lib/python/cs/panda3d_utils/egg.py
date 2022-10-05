@@ -264,7 +264,8 @@ class Eggable(metaclass=EggMetaClass):
     yield f'<{self.egg_type()}>'
     name = self.egg_name()
     if name is not None:
-      yield " " + quote(name)
+      yield " "
+      yield from self.transcribe(name)
     yield " {"
     yield from content_parts
     yield "}"
@@ -389,7 +390,8 @@ class EggNode(Eggable):
   @pfx
   @typechecked
   def __init__(
-      self, typename: str, name: Optional[str], contents: Iterable, **kw
+      self, typename: str, name: Optional[Union[str, int]], contents: Iterable,
+      **kw
   ):
     assert not isinstance(contents, str)  # str is iterable :-(
     self.typename = typename
