@@ -60,7 +60,7 @@ cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b8
 cs.mplutils ok_revision="58ff8b4668fb153629d847388703be4e27ca6b85" pypi.release="20220918" features={"20220918":["FigureSize"]}
 cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783" pypi.release="20211208"
 cs.nodedb pypi.release=20160828
-cs.numeric pypi.release=20190309 ok_revision="59303dd747cbf52f6fdf1777c1f6979d1085156d" features={"20220606":["intif"]}
+cs.numeric pypi.release="20220606" ok_revision="59303dd747cbf52f6fdf1777c1f6979d1085156d" features={"20220606":["intif"]}
 cs.obj pypi.release="20220918" ok_revision=dd0916cd678327c815e379bf8ed00c9ce4332874 features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"]}
 cs.onttags
 cs.packetstream pypi.release="20211208" ok_revision="906f6148d57dfa082d18e6f4b27b8081ee317ba8"
