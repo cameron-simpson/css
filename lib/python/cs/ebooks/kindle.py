@@ -695,7 +695,7 @@ class KindleCommand(BaseCommand):
         if len(cbooks) > 1:
           # pylint: disable=expression-not-assigned
           quiet or print(
-              f"asin {asin}: multiple Calibre books: {cbooks!r}; choosing {cbook}"
+              f"asin {asin}: multiple Calibre books, dbids {[cb.dbid for cb in cbooks]!r}; choosing {cbook}"
           )
         ktags = kbook.tags
         ctags = ktags.subtags('calibre')
