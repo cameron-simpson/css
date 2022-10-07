@@ -1,3 +1,4 @@
+scanbuf2: does it make any sense to use a Py_buffer type?
 FilesDir et al to accept optional index, bypassing indexclass if supplied
 FilesDir et al to accept optional index, bypassing indexclass if supplied
 blocked_chunks_of2 seems SLOWER than blocked_chunks_of - check resulting block sizes and counts, and make other checks
