@@ -7,12 +7,14 @@ from subprocess import PIPE
 from typing import List
 
 from cs.deco import cachedmethod
+from cs.lex import r
 from cs.psutils import run
 
 from .plist import ingest_plist
 
 from cs.x import X
 from pprint import pprint, pformat
+from typeguard import typechecked
 
 def defaults(argv, *, host=None, doit=True, **subp):
   ''' Run the `defaults` command with the arguments `argv`.
@@ -88,6 +90,37 @@ class DomainDefaults:
       return self[key]
     except KeyError:
       return default
+
+  @typechecked
+  def __setitem__(self, key: str, new_value):
+    try:
+      old_value = self[key]
+    except KeyError:
+      pass
+    else:
+      if type(new_value) is not type(old_value):
+        raise TypeError(
+            "%s[%r]=%s: new value is not the same type as old value %s" %
+            (self, key, r(new_value), r(old_value))
+        )
+    t = type(new_value)
+    if t is str:
+      value_args = '-string', new_value
+    elif t is bytes:
+      value_args = '-data', new_value.hex()
+    elif t is bool:
+      value_args = '-bool', str(new_value).lower()
+    # _after_ bool, since bool subclasses int
+    elif isinstance(t, int):
+      value_args = '-int', str(int(new_value))
+    elif isinstance(t, float):
+      value_args = '-float', str(float(new_value))
+    # TODO: date, datetime, append for arrays etc
+    else:
+      raise TypeError(
+          "%s[%r]=%s: unsupported type" % (self, key, r(new_value))
+      )
+    self.run(['write', self.domain, *value_args])
 
 if __name__ == '__main__':
   print(Defaults().domains)
