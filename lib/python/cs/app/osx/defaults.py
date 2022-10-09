@@ -58,6 +58,9 @@ class DomainDefaults:
     self.domain = domain  # TODO: check for valid domain string
     self.defaults = Defaults(host=host)
 
+  def __str__(self):
+    return f'{self.__class__.__name__}({self.domain!r})'
+
   def as_dict(self):
     ''' Return the current defaults as a `dict`.
     '''
