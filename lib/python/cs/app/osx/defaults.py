@@ -30,6 +30,8 @@ def defaults(argv, *, host=None, doit=True, **subp):
   return run(pre_argv + argv, doit=doit, **subp)
 
 class Defaults:
+  ''' A view of the defaults.
+  '''
 
   def __init__(self, host=None):
     self.host = host
@@ -43,16 +45,22 @@ class Defaults:
 
   @property
   def domains(self):
+    ''' Return a list of the domains present in the defaults.
+    '''
     domains_s = self.run(['domains'])
     return sorted(domain.strip() for domain in domains_s.split(','))
 
 class DomainDefaults:
+  ''' A view of the defaults for a particular domain.
+  '''
 
   def __init__(self, domain, host=None):
     self.domain = domain  # TODO: check for valid domain string
     self.defaults = Defaults(host=host)
 
   def as_dict(self):
+    ''' Return the current defaults as a `dict`.
+    '''
     plist = self.defaults.run(['export', self.domain, '-'])
     print(plist)
     d = ingest_plist(plist.encode('utf-8'))
