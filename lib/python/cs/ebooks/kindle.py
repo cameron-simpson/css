@@ -8,6 +8,7 @@ import filecmp
 from getopt import GetoptError
 import os
 from os.path import (
+    expanduser,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -28,9 +29,10 @@ try:
 except ImportError:
   import xml.etree.ElementTree as etree
 
+from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import cachedmethod
+from cs.deco import cachedmethod, fmtdoc
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton, HasFSPath
 from cs.fstags import FSTags
@@ -54,6 +56,35 @@ def main(argv=None):
   '''
   return KindleCommand(argv).run()
 
+KINDLE_LIBRARY_ENVVAR = 'KINDLE_LIBRARY'
+
+KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.kindle.Kindle'
+KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING = 'User Settings.CONTENT_PATH'
+KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
+    '~/Library/Containers/com.amazon.Kindle/Data/Library/'
+    'Application Support/Kindle/My Kindle Content'
+)
+
+@fmtdoc
+def default_kindle_library():
+  ''' Return the default kindle library content path
+        from ${KINDLE_LIBRARY_ENVVAR}.
+        On Darwin, fall back to the Kindle app setting from the
+        defaults domain {KINDLE_APP_OSX_DEFAULTS_DOMAIN!r}
+        setting {KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING!r}.
+        Returns `None` if no default can be found.
+    '''
+  path = os.environ.get(KINDLE_LIBRARY_ENVVAR, None)
+  if path is not None:
+    return path
+  if sys.platform == 'darwin':
+    defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
+    path = defaults.get('User Settings.CONTENT_PATH')
+    if path is None:
+      path = expanduser(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH)
+    return path
+  return None
+
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
 
@@ -61,11 +92,9 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       This is mostly to aid keeping track of state using `cs.fstags`.
   '''
 
-  FSPATH_DEFAULT = (
-      '~/Library/Containers/com.amazon.Kindle/Data/Library/'
-      'Application Support/Kindle/My Kindle Content'
-  )
-  FSPATH_ENVVAR = 'KINDLE_LIBRARY'
+  FSPATH_DEFAULT = default_kindle_library()
+
+  FSPATH_ENVVAR = KINDLE_LIBRARY_ENVVAR
 
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
 
