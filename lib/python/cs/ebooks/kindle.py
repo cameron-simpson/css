@@ -65,6 +65,31 @@ KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
     'Application Support/Kindle/My Kindle Content'
 )
 
+def kindle_content_path_default():
+  ''' Return the default content path for the Kindle application.
+      Currently only knows about Darwin (MacOS).
+  '''
+  if sys.platform == 'darwin':
+    return expanduser(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH)
+  raise RuntimeError(
+      "I do not know the default Kindle content path on platform %r" %
+      (sys.platform,)
+  )
+
+def kindle_content_path():
+  ''' Return the default Kindle content path or `None`.
+      Currently only supports Darwin (MacOS).
+  '''
+  if sys.platform == 'darwin':
+    defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
+    path = defaults.get(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING)
+    if path is None:
+      path = kindle_content_path_default()
+    return path
+  raise RuntimeError(
+      "cannot look up Kindle content path on platform %r" % (sys.platform,)
+  )
+
 @fmtdoc
 def default_kindle_library():
   ''' Return the default kindle library content path
@@ -77,13 +102,7 @@ def default_kindle_library():
   path = os.environ.get(KINDLE_LIBRARY_ENVVAR, None)
   if path is not None:
     return path
-  if sys.platform == 'darwin':
-    defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
-    path = defaults.get('User Settings.CONTENT_PATH')
-    if path is None:
-      path = expanduser(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH)
-    return path
-  return None
+  return kindle_content_path()
 
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
