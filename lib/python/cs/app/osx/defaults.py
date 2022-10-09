@@ -6,6 +6,7 @@
 from subprocess import PIPE
 from typing import List
 
+from cs.deco import cachedmethod
 from cs.psutils import run
 
 from .plist import ingest_plist
@@ -61,14 +62,17 @@ class DomainDefaults:
   def __str__(self):
     return f'{self.__class__.__name__}({self.domain!r})'
 
+  def flush(self):
+    ''' Forget any cached information.
+    '''
+    self._as_dict = None
+
+  @cachedmethod
   def as_dict(self):
     ''' Return the current defaults as a `dict`.
     '''
     plist = self.defaults.run(['export', self.domain, '-'])
-    print(plist)
-    d = ingest_plist(plist.encode('utf-8'))
-    print(d)
-    return d
+    return ingest_plist(plist.encode('utf-8'))
 
 if __name__ == '__main__':
   print(Defaults().domains)
