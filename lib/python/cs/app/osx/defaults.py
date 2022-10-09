@@ -117,7 +117,7 @@ class DomainDefaults:
       raise TypeError(
           "%s[%r]=%s: unsupported type" % (self, key, r(new_value))
       )
-    self.run(['write', self.domain, *value_args])
+    self.defaults.run(['write', self.domain, key, *value_args])
 
 if __name__ == '__main__':
   from pprint import pprint
