@@ -595,7 +595,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     if not isabspath(calcmd):
       calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
     calargv = [calcmd, *calargv]
-    return run(calargv, doit=doit, quiet=quiet, **subp_options)
+    cp = run(calargv, doit=doit, quiet=quiet, **subp_options)
+    if cp.stdout and not quiet:
+      print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
+    return cp
 
   def calibredb(self, dbcmd, *argv, doit=True, quiet=False, **subp_options):
     ''' Run `dbcmd` via the `calibredb` command.
