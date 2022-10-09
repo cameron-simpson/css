@@ -37,12 +37,17 @@ class Defaults:
   def __init__(self, host=None):
     self.host = host
 
-  def run(self, argv, doit=True) -> str:
+  def run(self, argv, doit=True, quiet=False) -> str:
     ''' Run a `defaults` subcommand, return the output decoded from UTF-8.
     '''
     return defaults(
-        argv, host=self.host, doit=doit, stdout=PIPE
-    ).stdout.decode('utf-8')
+        argv,
+        host=self.host,
+        doit=doit,
+        quiet=quiet,
+        stdout=PIPE,
+        encoding='utf-8',
+    ).stdout
 
   @property
   def domains(self):
