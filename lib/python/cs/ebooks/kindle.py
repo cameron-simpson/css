@@ -661,6 +661,28 @@ class KindleCommand(BaseCommand):
         with stackattrs(options, kindle=kt, calibre=cal):
           yield
 
+  def cmd_app_path(self, argv):
+    ''' Usage: {cmd} [content-path]
+          Report or set the content path for the Kindle application.
+    '''
+    if not argv:
+      print(kindle_content_path())
+      return 0
+    content_path = self.poparg(
+        argv,
+        lambda arg: arg,
+        "content-path",
+        lambda path: path == 'DEFAULT' or isdirpath(path),
+        "content-path should be DEFAULT or an existing directory",
+    )
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    if content_path == 'DEFAULT':
+      content_path = kindle_content_path_default()
+    defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
+    defaults[KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING] = content_path
+    return 0
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database prompt.
