@@ -79,6 +79,16 @@ class DomainDefaults:
     plist = self.defaults.run(['export', self.domain, '-'])
     return ingest_plist(plist.encode('utf-8'))
 
+  @typechecked
+  def __getitem__(self, key: str):
+    return self.as_dict()[key]
+
+  def get(self, key: str, default=None):
+    try:
+      return self[key]
+    except KeyError:
+      return default
+
 if __name__ == '__main__':
   print(Defaults().domains)
   pprint(DomainDefaults('com.amazon.Kindle').as_dict())
