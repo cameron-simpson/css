@@ -4,7 +4,6 @@
 '''
 
 from subprocess import PIPE
-from typing import List
 
 from cs.deco import cachedmethod
 from cs.lex import r
@@ -12,8 +11,6 @@ from cs.psutils import run
 
 from .plist import ingest_plist
 
-from cs.x import X
-from pprint import pprint, pformat
 from typeguard import typechecked
 
 def defaults(argv, *, host=None, doit=True, **subp):
@@ -123,5 +120,13 @@ class DomainDefaults:
     self.run(['write', self.domain, *value_args])
 
 if __name__ == '__main__':
+  from pprint import pprint
+  import sys
   print(Defaults().domains)
-  pprint(DomainDefaults('com.amazon.Kindle').as_dict())
+  kdefaults = DomainDefaults('com.amazon.Kindle')
+  args = sys.argv[1:]
+  if args:
+    for k in args:
+      print(k, r(kdefaults[k]))
+  else:
+    pprint(kdefaults.as_dict())
