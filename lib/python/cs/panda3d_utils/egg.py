@@ -451,9 +451,9 @@ class VertexPool(Eggable):
   '''
 
   @typechecked
-  def __init__(self, name: str, vertices: Iterable):
+  def __init__(self, name: str, vertices: Optional[Iterable] = None):
     self.name = name
-    self.vertices = list(vertices)
+    self.vertices = [] if vertices is None else list(vertices)
     self.register()
 
   def __len__(self):
