@@ -41,8 +41,6 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.py.func',
-        'cs.py3',
-        'cs.queues',
         'cs.seq',
     ],
 }
