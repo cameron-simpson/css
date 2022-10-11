@@ -3,39 +3,30 @@
 ''' Tkinter based GUI for a `Tagger`.
 '''
 
-from abc import ABC
-from collections import namedtuple
-from contextlib import contextmanager
-from os.path import (
-    abspath,
-    basename,
-    expanduser,
-)
 import platform
 import sys
-from time import sleep
 import tkinter as tk
-from tkinter import ttk
-from typing import Iterable, List
-from uuid import uuid4
 
 from icontract import require, ensure
-from PIL import Image, ImageTk
 from typeguard import typechecked
 
-from cs.context import stackattrs
-from cs.fileutils import shortpath
-from cs.lex import cutprefix
-from cs.logutils import warning
-from cs.pfx import Pfx, pfx, pfx_method, pfx_call
-from cs.resources import MultiOpenMixin, RunState
+from cs.fs import shortpath, HasFSPath
+from cs.gui_tk import (
+    _Widget,
+    Button,
+    Canvas,
+    EditValueWidget,
+    Frame,
+    ImageWidget,
+    LabelFrame,
+    PathList_Listbox,
+    Scrollbar,
+    ThumbNailScrubber,
+)
+from cs.pfx import Pfx, pfx
 from cs.tagset import Tag, TagSet
 
-from cs.lex import r
-from cs.x import X
-
 from . import Tagger
-from .util import pngfor
 
 is_darwin = platform.system() == "Darwin"
 
@@ -47,33 +38,68 @@ def main(argv=None):
   cmd = argv.pop(0)
   tagger = Tagger('.')
   with Pfx(cmd):
-    with TaggerGUI(tagger, argv) as gui:
-      gui.run()
-
-_app = None
-
-def _render(pause=0):
-  _app.update_idletasks()
-  if pause > 0:
-    sleep(pause)
+    root = tk.Tk()
+    gui = TaggerWidget(root, tagger=tagger, fspaths=argv)
+    gui.mainloop()
 
 # pylint: disable=too-many-instance-attributes
-class TaggerGUI(MultiOpenMixin):
-  ''' A GUI for a `Tagger`.
+class TaggerWidget(_Widget, tk.Frame, HasFSPath):
+  ''' A `Frame` widget for a `Tagger`.
   '''
 
-  def __init__(self, tagger, fspaths=None):
+  WIDGET_FOREGROUND = None
+
+  def __init__(self, parent, *, tagger, fspaths=None):
+    super().__init__(parent)
+    self.grid()
     if fspaths is None:
-      fspaths = ()
-    self._fspaths = fspaths
-    self._fspath = None
+      fspaths = []
     self.tagger = tagger
-    # widget references
-    self.app = None
-    self.pathlist = None
-    self.thumbsview = None
-    self.pathview = None
-    self.thumbscanvas = None
+    self._fspath = None
+    self._fspaths = fspaths
+
+    # callback to define the widget's contents
+    def select_path(_, path):
+      self.fspath = path
+
+    pathlist = self.pathlist = PathList_Listbox(
+        self,
+        self.fspaths,
+        command=select_path,
+    )
+    pathview = self.pathview = PathView(self, tagger=self.tagger)
+
+    thumbscanvas = self.thumbscanvas = Canvas(self)
+
+    thumbsscroll = Scrollbar(
+        self,
+        orient=tk.HORIZONTAL,
+        command=thumbscanvas.xview,
+    )
+    thumbscanvas['xscrollcommand'] = thumbsscroll.set
+
+    thumbsview = self.thumbsview = ThumbNailScrubber(
+        thumbscanvas,
+        self.fspaths,
+        command=select_path,
+    )
+    thumbscanvas.create_window(
+        thumbsscroll.winfo_width() / 2, 0, anchor=tk.N, window=thumbsview
+    )
+
+    pathlist.grid(column=0, row=0, sticky=tk.N + tk.S, rowspan=2)
+    pathview.grid(column=1, row=0, sticky=tk.N + tk.S)
+    thumbscanvas.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
+    thumbsscroll.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
+
+    self.columnconfigure(0, weight=1)
+    self.columnconfigure(1, weight=8)
+    self.columnconfigure(2, weight=1)
+    self.rowconfigure(0, weight=1)
+
+    # let the geometry settle
+    self.grid()
+    self.update_idletasks()
 
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagger)
@@ -426,7 +452,7 @@ class _ImageWidget(_Widget):
 
           It is essential that this is queued with `after_idle`.
           If this ran directly during widget construction
-          the `wait_visibility` call would block the follow construction.
+          the `wait_visibility` call would block the following construction.
       '''
       if self._image_for == self._fspath:
         return
@@ -713,6 +739,7 @@ class TagWidget(Frame):
     '''
     self.tagger = tagger
     if alt_values is None:
+      # obtain alternate values from those defined in the ontology
       alt_values = set(tagger.ont_values(tag.name))
     else:
       alt_values = set(alt_values)
@@ -754,7 +781,7 @@ class TagWidget(Frame):
 
         The `Tag` is updated when the widget is withdrawn,
         and if the new value does not match the value in `self.tags`
-        then the correponding `self.tags[tag.name]` is also updated.
+        then the corresponding `self.tags[tag.name]` is also updated.
     '''
     tag = self.tag
     tag_value = tag.value
@@ -987,7 +1014,7 @@ class PathView(LabelFrame):
     return self.tagger.fstags[self._fspath]
 
 class ThumbNailScrubber(Frame, _FSPathsMixin):
-  ''' A row of thumbnails for a list of fielsystem paths.
+  ''' A row of thumbnails for a list of filesystem paths.
   '''
 
   THUMB_X = 64

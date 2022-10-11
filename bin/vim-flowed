@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run vim with options suiting format=flowed text.
-#       - Cameron Simpson <cs@cskk.id.au> 19apr2014
+# - Cameron Simpson <cs@cskk.id.au> 19apr2014
 #
 # Strip trailing whitespace from header lines to avoid accidents.
 #

@@ -111,7 +111,7 @@ def scan_vtd(bfr):
   with Pfx("scan_vtd"):
 
     def run_parser(bfr):
-      for offset, _, _ in DataRecord.parse_buffer_with_offsets(bfr):
+      for offset, _, _ in DataRecord.scan_with_offsets(bfr):
         bfr.report_offset(offset)
 
     return report_offsets(bfr, run_parser)

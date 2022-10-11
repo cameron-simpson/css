@@ -1161,7 +1161,6 @@ class CalibreCommand(BaseCommand):
       if sortkey is True:
         sortkey = self.cbook_default_sortkey
       cbooks = sorted(cbooks, key=sortkey)
-    assert not argv
     return cbooks
 
   # pylint: disable=too-many-branches,too-many-locals
@@ -1393,9 +1392,13 @@ class CalibreCommand(BaseCommand):
             print("   ", TagSet(identifiers))
           for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
-              fspath = calibre.pathto(subpath)
-              size = pfx_call(os.stat, fspath).st_size
-              print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
+              fspath = cbook.pathto(subpath)
+              try:
+                size = pfx_call(os.stat, fspath).st_size
+              except OSError as e:
+                warning("cannot stat: %s", e)
+              else:
+                print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
     if runstate.cancelled:
       xit = 1
     return xit

@@ -69,12 +69,12 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
-from struct import Struct
+from struct import Struct  # pylint: disable=no-name-in-module
 import sys
 from types import SimpleNamespace
 from cs.buffer import CornuCopyBuffer
 from cs.gimmicks import warning, debug
-from cs.lex import cropped, cropped_repr, typed_str as s
+from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 
@@ -218,6 +218,10 @@ def pt_spec(pt, name=None):
 
 class BinaryMixin:
   ''' Presupplied helper methods for binary objects.
+
+      Naming conventions:
+      - `parse`* methods parse a single instance from a buffer
+      - `scan`* methods are generators yielding successive instances from a buffer
   '''
 
   @pfx_method
@@ -297,7 +301,7 @@ class BinaryMixin:
                   "should be an instance of %s:%s but is %s", (
                       'tuple'
                       if isinstance(basetype, tuple) else basetype.__name__
-                  ), basetype, cropped(s(field), max_length=64)
+                  ), basetype, typed_str(field, max_length=64)
               )
               ok = False
     return ok
@@ -379,7 +383,7 @@ class BinaryMixin:
 
   @classmethod
   def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
-    ''' Wrapper for `scan()` which yields (pre_offset,instance,post_offset)`
+    ''' Wrapper for `scan()` which yields `(pre_offset,instance,post_offset)`
         indicating the start and end offsets of the yielded instances.
         All parameters are as for `scan()`.
     '''
@@ -462,6 +466,7 @@ class AbstractBinary(ABC, BinaryMixin):
       and providing the methods from `BinaryMixin`.
   '''
 
+  # pylint: disable=deprecated-decorator
   @abstractclassmethod
   def parse(cls, bfr):
     ''' Parse an instance of `cls` from the buffer `bfr`.
@@ -1008,7 +1013,7 @@ class BSUInt(BinarySingleValue):
       n = (n << 7) | (b & 0x7f)
     return n, offset
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(n):
     ''' Encode an unsigned int as an entensible byte serialised octet
@@ -1051,7 +1056,7 @@ class BSData(BinarySingleValue):
     data = bfr.take(data_length)
     return data
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(data):
     ''' Transcribe the payload length and then the payload.
@@ -1113,7 +1118,7 @@ class BSSFloat(BinarySingleValue):
     s = BSString.parse_value(bfr)
     return float(s)
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(f):
     ''' Transcribe a float.
@@ -1147,7 +1152,7 @@ class _BinaryMultiValue_Base(SimpleBinary):
       That is done by the `BinaryMultiValue` class factory.
   '''
 
-  def s(self, *, crop_length=64, choose_name=None):
+  def _s(self, *, crop_length=64, choose_name=None):
     ''' Common implementation of `__str__` and `__repr__`.
         Transcribe type and attributes, cropping long values
         and omitting private values.
@@ -1175,8 +1180,8 @@ class _BinaryMultiValue_Base(SimpleBinary):
         )
     )
 
-  __str__ = s
-  ##__repr__ = s
+  __str__ = _s
+  ##__repr__ = _s
 
   @classmethod
   def parse(cls, bfr):
@@ -1436,7 +1441,7 @@ class BinaryUTF8NUL(BinarySingleValue):
         )
     return utf8
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(s):
     ''' Transcribe the `value` in UTF-8 with a terminating NUL.
@@ -1801,7 +1806,7 @@ class UTF8NULField(PacketField):
     bfr.take(1)
     return utf8
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(s):
     ''' Transcribe the `value` in UTF-8 with a terminating NUL.
