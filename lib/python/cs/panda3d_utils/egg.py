@@ -7,7 +7,7 @@
     this module is aimed at writing Egg files.
     As such it contains functions and classes for making
     entities found in Egg files, and for writing these out in Egg syntax.
-    The entities are _not_ directly useable by Pada3d itself,
+    The entities are _not_ directly useable by Panda3d itself,
     they get into panda3d by being written as Egg and loaded;
     see the `load_model` function.
 
@@ -515,7 +515,7 @@ class Polygon(Eggable):
   @typechecked
   def __init__(
       self,
-      name: str,
+      name: Optional[str],
       pool: Union[str, VertexPool],
       *indices,
       **attrs,
