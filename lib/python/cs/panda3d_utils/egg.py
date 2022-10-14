@@ -351,15 +351,19 @@ def dumpz(obj, f, indent=""):
 @contextmanager
 @fmtdoc
 @typechecked
-def write_model(fspath: str, comment: str, *, coordinate_system=None):
+def write_model(
+    fspath: str, comment: str, *, coordinate_system=None, exists_ok=False
+):
   ''' Context manager for writing an Egg model file to the path
       `fspath` which yields an open file for the model contents.
 
       Parameters:
       * `fspath`: the filesystem path of the model file to create
       * `comment`: opening comment for the file
-      * `coordinate_system`: coordinate system for the file,
+      * `coordinate_system`: optional coordinate system for the file,
        default `{DEFAULT_COORDINATE_SYSTEM!r}` from `DEFAULT_COORDINATE_SYSTEM`
+      * `exists_ok`: optional flag passed to `atomic_filename`, default `False`;
+        if true the target `fspath` may already exist and may be overwritten
 
       This uses `atomic_filename` to create the file so it will not
       exist in the filesystem until it is complete.
@@ -372,7 +376,7 @@ def write_model(fspath: str, comment: str, *, coordinate_system=None):
   '''
   if coordinate_system is None:
     coordinate_system = DEFAULT_COORDINATE_SYSTEM
-  with atomic_filename(fspath) as T:
+  with atomic_filename(fspath, exists_ok=exists_ok) as T:
     with open(T.name, 'w') as f:
       print(EggNode('Comment', None, [comment]), file=f)
       print(EggNode('CoordinateSystem', None, [coordinate_system]), file=f)
@@ -601,13 +605,17 @@ class Model(ContextManagerMixin):
     for item in self.items:
       item.check(registry=self._registry)
 
-  def save(self, fspath, *, skip_check=False):
+  def save(self, fspath, *, skip_check=False, exists_ok=False):
     ''' Save this model to the filesystem path `fspath`.
     '''
     if not skip_check:
       self.check()
-    with write_model(fspath, self.comment,
-                     coordinate_system=self.coordinate_system) as f:
+    with write_model(
+        fspath,
+        self.comment,
+        coordinate_system=self.coordinate_system,
+        exists_ok=exists_ok,
+    ) as f:
       for item in self.items:
         print(item, file=f)
 
