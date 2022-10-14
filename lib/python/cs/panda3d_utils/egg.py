@@ -565,6 +565,15 @@ class Group(Eggable):
     self.name = name
     self.items = list(a)
 
+  def __iter__(self):
+    return iter(self.items)
+
+  def append(self, item):
+    self.items.append(item)
+
+  def extend(self, more_items):
+    self.items.extend(more_items)
+
   def egg_contents(self):
     return self.items
 
