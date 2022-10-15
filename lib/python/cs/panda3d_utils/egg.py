@@ -354,7 +354,7 @@ class Eggable(metaclass=EggMetaClass):
           else:
             ref_name, = item.egg_contents()
             assert isinstance(ref_name, str)
-            pfx_call(ref_type.instance, ref_name, registry=registry)
+            pfx_call(ref_type.instance, ref_name)
         # check all the contained items
         for subitem in item.egg_contents():
           if isinstance(subitem, Eggable):
@@ -608,7 +608,7 @@ class Polygon(Eggable):
   @uses_registry
   def check(self, *, registry):
     with Pfx("%s.check", self.__class__.__name__):
-      super().check(registry=registry)
+      super().check()
       vpool = self.vpool
       for index in self.indices:
         assert index > 0 and index <= len(vpool), \
