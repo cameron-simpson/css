@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 
 from cs.cmdutils import BaseCommand
@@ -20,6 +21,7 @@ class M3Command(BaseCommand):
     model = M.EggModel()
     print(model)
     model.save('model-material.egg', exists_ok=True)
+    os.system('pview model-material.egg')
 
 if __name__ == '__main__':
   sys.exit(M3Command(sys.argv).run())
