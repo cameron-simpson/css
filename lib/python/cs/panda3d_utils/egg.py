@@ -336,7 +336,7 @@ class Eggable(metaclass=EggMetaClass):
         if name is not None:
           # check the reference in things like <TRef> { texture-name }
           try:
-            ref_type = REFTYPES[typename]
+            refspec = REFTYPES.by_refname[typename]
           except KeyError:
             pass
           else:
@@ -551,7 +551,7 @@ class Texture(Eggable):
     yield self.texture_image
     yield from super().egg_contents()
 
-REFTYPES['TRef'] = Texture
+REFTYPES.add(RefTypeSpec(type=Texture, refname='TRef'))
 
 class Polygon(Eggable):
 
