@@ -285,7 +285,7 @@ class Material:
     #  requires diffing the adjacent n-cube
     # TODO: fields such as gravity
     # TODO: callables to compute forces?
-    # TODO: maybe fields derives from point sources can serve as
+    # TODO: maybe fields derived from point sources can serve as
     #  proxies for volumes of remote particles, eg centre of mass or
     #  charge etc
     # TODO: charged properties? can they supplant stiffness?
@@ -369,7 +369,7 @@ class Material:
         else:
           raise RuntimeError("unhandled skip_dim %s" % (r(skip_dim),))
         # iterate over the front and rear indices of the orthogonal dimension
-        for c, clockwise in (0, True), (shape[skip_dim] - 1, False):
+        for c, clockwise in (0, False), (shape[skip_dim] - 1, True):
           if runstate and runstate.cancelled:
             return None
           surface_name = f'surface_{alabel}_{blabel}_{clabel}{c}'
@@ -395,8 +395,8 @@ class Material:
             vindices = []
             # polygon vertices in... an order
             # TODO: order based on the direction of the surface
-            for da, db in (((0, 0), (0, 1), (1, 1), (1, 0)) if clockwise else
-                           ((0, 0), (1, 0), (1, 1), (0, 1))):
+            for da, db in (((0, 0), (1, 0), (1, 1), (0, 1)) if clockwise else
+                           ((0, 0), (0, 1), (1, 1), (1, 0))):
               ##print("da =", da, "db =", db)
               abc = a + da, b + db, c
               try:
