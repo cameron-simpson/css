@@ -352,6 +352,7 @@ class Eggable(metaclass=EggMetaClass):
             pass
           else:
             ref_name, = item.egg_contents()
+            ref_type = refspec.type
             assert isinstance(ref_name, str)
             pfx_call(ref_type.instance, ref_name)
         # check all the contained items
