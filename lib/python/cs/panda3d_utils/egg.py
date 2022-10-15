@@ -49,7 +49,22 @@ DEFAULT_COORDINATE_SYSTEM = 'Z-up'
 
 # a mapping of reference Egg type names to the class to which it refers,
 # for example 'TRef' => Texture.
-REFTYPES = {}
+REFTYPES = IndexedMapping(pk='typename')
+
+class RefTypeSpec(namedtuple('RefTypeSpec', 'type refname')):
+
+  @property
+  def typename(self):
+    return self.type.__name__
+
+  def __getitem__(self, index):
+    if isinstance(index, str):
+      try:
+        return getattr(self, index)
+      except AttributeError as e:
+        raise KeyError("no attribute %r" % (index,))
+    else:
+      return super().__getitem__(index)
 
 @pfx
 def quote(text):
@@ -113,6 +128,30 @@ class EggRegistry(defaultdict, ContextManagerMixin):
           instances
       )
       raise
+
+  def ref_for(self, egg_node):
+    ''' Return a reference `EggNode` for an Eggable node `egg_node`,
+        or `None`.
+
+        For example, since `<TRef> { name }` is defined as a reference
+        type for `Texture` nodes, a `Texture("foo","foo_image.png")`
+        would return an `EggNode("TRef",None,"fpp")` if the `Texture`
+        was in this registry.
+    '''
+    name = egg_node.egg_name()
+    if name is None:
+      # cannot make a reference to an unnamed node
+      return None
+    try:
+      refspec = REFTYPES.by_typename[egg_node.egg_type()]
+    except KeyError:
+      # there's no reftype for this type
+      return None
+    instance = self.instance(refspec.type, name)
+    if instance is None:
+      # this is not a known instance
+      return None
+    return EggNode(refspec.refname, None, [name])
 
 # a stackable state
 state = ThreadState(registry=EggRegistry(__file__))
@@ -183,7 +222,11 @@ class Eggable(metaclass=EggMetaClass):
     ''' A generator yielding `str`s which transcribe `item` in Egg syntax.
     '''
     if isinstance(item, Eggable):
-      yield from item.egg_transcribe(indent)
+      ref_node = registry.ref_for(item)
+      if ref_node is None:
+        yield from item.egg_transcribe(indent)
+      else:
+        yield from ref_node.egg_transcribe(indent)
     elif isinstance(item, str):
       yield quote(item)
     elif isinstance(item, (int, float)):
