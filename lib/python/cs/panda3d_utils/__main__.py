@@ -180,7 +180,6 @@ class P3DemoApp(P3dApp):
     X("task = %s", r(task))
     return Task.done
 
-  @typechecked
   def spinCameraTask(self, task):
     ''' Move the camera viewpoint by a step.
         Return `Task.cont` so that we get called again.
