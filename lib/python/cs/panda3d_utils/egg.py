@@ -154,9 +154,19 @@ class EggRegistry(defaultdict, ContextManagerMixin):
     return EggNode(refspec.refname, None, [name])
 
 # a stackable state
-state = ThreadState(registry=EggRegistry(__file__))
+_registry0 = EggRegistry(__file__)
+state = ThreadState(registry=_registry0)
 
-uses_registry = default_params(registry=lambda: state.registry)
+@decorator
+def uses_registry(func):
+
+  @default_params(registry=lambda: state.registry)
+  def with_registry(*a, registry, **kw):
+    assert registry is not _registry0
+    with registry:
+      return func(*a, registry=registry, **kw)
+
+  return with_registry
 
 class EggMetaClass(type):
 
@@ -218,7 +228,8 @@ class Eggable(metaclass=EggMetaClass):
     return "".join(self.egg_transcribe())
 
   @classmethod
-  def transcribe(cls, item, indent=""):
+  @uses_registry
+  def transcribe(cls, item, indent='', *, registry):
     ''' A generator yielding `str`s which transcribe `item` in Egg syntax.
     '''
     if isinstance(item, Eggable):
@@ -281,7 +292,8 @@ class Eggable(metaclass=EggMetaClass):
             (self.__class__.__name__, attr, value)
         )
 
-  def egg_transcribe(self, indent=''):
+  @uses_registry
+  def egg_transcribe(self, indent='', *, registry):
     ''' A generator yielding `str`s which transcribe `self` in Egg syntax.
     '''
     subindent = indent + "  "
