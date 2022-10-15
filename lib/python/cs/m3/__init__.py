@@ -11,6 +11,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.panda3dutils',
         'icontract',
         'numpy',
         'panda3d',
