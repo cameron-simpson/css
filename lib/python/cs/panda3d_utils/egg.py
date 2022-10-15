@@ -26,17 +26,17 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass, field as dataclass_field, fields as dataclass_fields
 from tempfile import NamedTemporaryFile
-from typing import Any, Iterable, Mapping, Optional, Tuple, Union
+from typing import Iterable, Mapping, Optional, Union
 from zlib import compress
 
 from typeguard import typechecked
 
 from cs.context import ContextManagerMixin
-from cs.deco import default_params, fmtdoc
+from cs.deco import decorator, default_params, fmtdoc
 from cs.fileutils import atomic_filename
 from cs.lex import is_identifier, r
 from cs.logutils import warning
-from cs.mappings import StrKeyedDict
+from cs.mappings import IndexedMapping, StrKeyedDict
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.queues import ListQueue
@@ -61,7 +61,7 @@ class RefTypeSpec(namedtuple('RefTypeSpec', 'type refname')):
     if isinstance(index, str):
       try:
         return getattr(self, index)
-      except AttributeError as e:
+      except AttributeError:
         raise KeyError("no attribute %r" % (index,))
     else:
       return super().__getitem__(index)
