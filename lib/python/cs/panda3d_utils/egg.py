@@ -471,6 +471,7 @@ class EggNode(Eggable):
     self.typename = typename
     self.name = name
     self.contents = contents
+    self.attrs = kw
 
   def egg_type(self):
     return self.typename
@@ -588,6 +589,7 @@ class Polygon(Eggable):
     self.name = name
     self.vpool = vpool
     self.name = name
+    self.attrs = attrs
     self.indices = indices
 
   def egg_contents(self):
