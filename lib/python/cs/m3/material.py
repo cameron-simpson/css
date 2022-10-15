@@ -252,7 +252,6 @@ class Material:
     self.data = data
     for pname, pvalue in properties.items():
       data[pname] = np.full(shape, pvalue)
-    pprint(data)
 
   def __str__(self):
     return f'{self.__class__.__name__}(*{self.shape})'
@@ -374,7 +373,6 @@ class Material:
           if runstate and runstate.cancelled:
             return None
           surface_name = f'surface_{alabel}_{blabel}_{clabel}{c}'
-          print("surface_name =", surface_name)
           # a pool of vertices for this surface
           vpool = VertexPool(surface_name)
           vertices = vpool.vertices
@@ -391,11 +389,9 @@ class Material:
             v_by_abc[a, b, c] = v
             vertices.append(v)
             i_by_abc[a, b, c] = len(vertices)
-            X("set i_by_abc[%r,%r,%r]", a, b, c)
           # ranges for enumerating all the polygons
           polygons = []
           for a, b in product(range(a_len - 1), range(b_len - 1)):
-            print("a =", a, "b =", b)
             vindices = []
             # polygon vertices in... an order
             # TODO: order based on the direction of the surface

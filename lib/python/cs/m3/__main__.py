@@ -14,8 +14,6 @@ class M3Command(BaseCommand):
 
   def main(self, argv):
     M = Material(10, 10, 3, mass=1.0)
-    ##print(M.px)
-    print(M.px[0, 0, 0])
     for t in progressbar(range(100), "step"):
       M.step()
     model = M.EggModel()
