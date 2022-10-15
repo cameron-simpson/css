@@ -673,14 +673,16 @@ class Model(ContextManagerMixin):
     '''
     if not skip_check:
       self.check()
-    with write_model(
-        fspath,
-        self.comment,
-        coordinate_system=self.coordinate_system,
-        exists_ok=exists_ok,
-    ) as f:
-      for item in self.items:
-        print(item, file=f)
+    with self._registry:
+      with write_model(
+          fspath,
+          self.comment,
+          coordinate_system=self.coordinate_system,
+          exists_ok=exists_ok,
+      ) as f:
+        with self:
+          for item in self.items:
+            print(item, file=f)
 
   def load(self, loader, *, skip_check=False):
     ''' Load this model via `loader.loadModel`.
