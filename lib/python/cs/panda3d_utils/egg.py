@@ -275,8 +275,9 @@ class Eggable(metaclass=EggMetaClass):
         contents of `self.attrs` if present.
         For each `attr,value` pair in the mapping:
         * ignore entries whose `value` is `None`
-        * yield `str`, `int` or `float` as `<Scalar>` Egg nodes named after `attr`
         * yield `Eggable` instances directly
+        * yield `str`, `int` or `float` as `<Scalar>` Egg nodes named after `attr`
+        * yield `tuples` as `<attr> { *tuple }` eg `UV { 0 1 }`
         Other values raise a `TypeError`.
     '''
     for attr, value in getattr(self, 'attrs', {}).items():
