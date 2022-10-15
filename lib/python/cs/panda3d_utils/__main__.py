@@ -26,6 +26,8 @@ from direct.interval.IntervalGlobal import Sequence
 
 from typeguard import typechecked
 
+from .util import pzread
+
 Numeric = Union[int, float]
 Appish = TypeVar('Appish', bound=ShowBase)
 
@@ -56,6 +58,25 @@ class P3DCommand(BaseCommand):
       X("app.tkRoot = %s", r(app.tkRoot))
       app.run()
     return 0
+
+  def cmd_pzcat(self, argv):
+    ''' Usage: {cmd} *.pz-files...
+          Decompress .pz files and write their content to the standard output.
+    '''
+    if not argv:
+      raise GetoptError("missing *.pz filenames")
+    badopts = False
+    for pzfname in argv:
+      with Pfx(pzfname):
+        if not pzfname.endswith('.pz'):
+          warning("does not end in .pz")
+          badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    for pzfname in argv:
+      with Pfx(pzfname):
+        egg_bs = pzread(pzfname)
+        sys.stdout.write(egg_bs.decode('utf-8'))
 
 class P3dApp(MultiOpenMixin, ShowBase):
 
