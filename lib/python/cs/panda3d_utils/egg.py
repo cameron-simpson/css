@@ -336,8 +336,7 @@ class Eggable(metaclass=EggMetaClass):
     yield from content_parts
     yield "}"
 
-  @uses_registry
-  def check(self, *, registry):
+  def check(self):
     ''' Check an `Eggable` `item` for consistency.
     '''
     q = ListQueue([self])
@@ -605,8 +604,7 @@ class Polygon(Eggable):
         ),
     )
 
-  @uses_registry
-  def check(self, *, registry):
+  def check(self):
     with Pfx("%s.check", self.__class__.__name__):
       super().check()
       vpool = self.vpool
@@ -666,8 +664,9 @@ class Model(ContextManagerMixin):
   def check(self):
     ''' Check the model for consistency.
     '''
-    for item in self.items:
-      item.check(registry=self._registry)
+    with self._registry:
+      for item in self.items:
+        item.check()
 
   def save(self, fspath, *, skip_check=False, exists_ok=False):
     ''' Save this model to the filesystem path `fspath`.
