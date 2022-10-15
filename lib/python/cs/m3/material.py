@@ -9,7 +9,6 @@ import sys
 from types import SimpleNamespace as NS
 from typing import Tuple
 
-from cs.cmdutils import BaseCommand
 from cs.lex import r, s
 from cs.logutils import warning
 from cs.mappings import AttrableMapping
@@ -30,18 +29,6 @@ from icontract import require
 import numpy as np
 import pandas as pd
 from typeguard import typechecked
-
-class MCmd(BaseCommand):
-
-  def main(self, argv):
-    M = Material(10, 10, 3, mass=1.0)
-    ##print(M.px)
-    print(M.px[0, 0, 0])
-    for t in progressbar(range(100), "step"):
-      M.step()
-    model = M.EggModel()
-    print(model)
-    model.save('model-material.egg', exists_ok=True)
 
 def grid(*dimensions):
   ''' Return a list of n-tuples sized by `dimensions`
@@ -428,6 +415,3 @@ class Material:
           M.append(Group(f'Surface {surface_name}', vpool, *polygons))
 
     return M
-
-if __name__ == '__main__':
-  sys.exit(MCmd(sys.argv).run())
