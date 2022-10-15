@@ -282,10 +282,12 @@ class Eggable(metaclass=EggMetaClass):
     for attr, value in getattr(self, 'attrs', {}).items():
       if value is None:
         continue
-      if isinstance(value, (str, int, float)):
-        yield EggNode('Scalar', attr, [value])
-      elif isinstance(value, Eggable):
+      if isinstance(value, Eggable):
         yield value
+      elif isinstance(value, (str, int, float)):
+        yield EggNode('Scalar', attr, [value])
+      elif isinstance(value, tuple):
+        yield EggNode(attr, None, value)
       else:
         raise TypeError(
             "%s.attrs[%r]=%s: not slacar or Eggable" %
