@@ -24,6 +24,7 @@ from cs.panda3d_utils.egg import (
 from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
 from cs.resources import uses_runstate
+from cs.result import CancellationError
 
 from icontract import require
 import numpy as np
@@ -163,6 +164,7 @@ class Material:
       they will overwrite these prefills.
   '''
 
+  @uses_runstate
   @typechecked
   def __init__(
       self,
@@ -171,6 +173,7 @@ class Material:
       _spacing=1.0,
       _steptime=1.0,
       _stiffness=1.0,
+      runstate,
       **properties,
   ):
     ''' Initialise the `Material`.
@@ -197,10 +200,12 @@ class Material:
           `string.ascii_lowercase` so that a 3-space `Material` would
           have the labels `'x','y','z'`.
         * `_spacing`: the initial spacing between particles, default `1.0`
-        * `steptime`: the default iteration time step as the material evolves
+        * `_steptime`: the default iteration time step as the material evolves
         * `_stiffness`: the stiffness of the material, used to
           provide resistance when particles are displaced from their
           default spacing
+        * `runstate`: optional `RunState` to cancel the init,
+          which can take a long time
     '''
     assert len(shape) >= 1
     assert all(map(lambda dim: dim > 0, shape))
@@ -236,6 +241,8 @@ class Material:
     data = {}
     # coordinates - initially all zero for position and velocity
     for i, label in enumerate(_labels):
+      if runstate and runstate.cancelled:
+        raise CancellationError
       with Pfx("i=%d, df[%r]", i, label):
         data[f'p{label}'] = np.zeros(shape)
         data[f'v{label}'] = np.zeros(shape)
@@ -247,10 +254,14 @@ class Material:
         dim,
         dtype=int,
     ) for i, dim in enumerate(shape)]):
+      if runstate and runstate.cancelled:
+        raise CancellationError
       for plabel, coord in zip(plabels, coords):
         data[plabel][coords] = coord
     self.data = data
     for pname, pvalue in properties.items():
+      if runstate and runstate.cancelled:
+        raise CancellationError
       data[pname] = np.full(shape, pvalue)
 
   def __str__(self):
