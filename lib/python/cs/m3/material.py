@@ -372,6 +372,9 @@ class Material:
         for c, clockwise in (0, False), (shape[skip_dim] - 1, True):
           if runstate and runstate.cancelled:
             return None
+          if skip_dim == 1:
+            # the Y axis goes positive away from the viewer, reverse the polarity
+            clockwise = not clockwise
           surface_name = f'surface_{alabel}_{blabel}_{clabel}{c}'
           # a pool of vertices for this surface
           vpool = VertexPool(surface_name)
