@@ -143,15 +143,19 @@ class EggMetaClass(type):
 
 class Eggable(metaclass=EggMetaClass):
   ''' A base class for objects which expect to be transcribed in Egg syntax.
+      Implementations of these objects should provide the following methods:
+      * `egg_name`: return the name of this object, or `None`
+      * `egg_type`: return the Egg node type of this object
+      * `egg_contents`: return an iterable of items contained by this Egg node
 
-      The usual implementation of an objects is as a dataclass, example:
+      A common implementation for Egg nodes is based on a data class,
+      see the `DCEggable` subclass which is oriented to this.
 
-          @dataclass
-          class UV(Eggable):
-              u: float
-              v: float
-
-      and the default `__iter__` (and therefore `egg_contents`) assume this.
+      This base implementation provides the following implementations:
+      * `egg_name`: returns `self.name` or `None` if that is missing
+      * `egg_type`: the class name
+      * `egg_contents`: if there is a `.attrs` mapping attribute,
+        yield its entries, processed as detailed by the method docstring
   '''
 
   @uses_registry
@@ -215,6 +219,11 @@ class Eggable(metaclass=EggMetaClass):
 
         This base implementation is a generator which yields the
         contents of `self.attrs` if present.
+        For each `attr,value` pair in the mapping:
+        * ignore entries whose `value` is `None`
+        * yield `str`, `int` or `float` as `<Scalar>` Egg nodes named after `attr`
+        * yield `Eggable` instances directly
+        Other values raise a `TypeError`.
     '''
     for attr, value in getattr(self, 'attrs', {}).items():
       if value is None:
@@ -297,7 +306,12 @@ class Eggable(metaclass=EggMetaClass):
             q.append(subitem)
 
 class DCEggable(Eggable):
-  ''' `Eggable` superclass for dataclasses.
+  ''' `Eggable` subclass for dataclasses.
+
+       This provides an `egg_contents` method which enumerates the
+       fields in order, except for a field named `attrs` whose
+       contents is yielded last as for the `Eggable.egg_contents`
+       method.
   '''
 
   def egg_contents(self):
@@ -437,9 +451,9 @@ class VertexPool(Eggable):
   '''
 
   @typechecked
-  def __init__(self, name: str, vertices: Iterable):
+  def __init__(self, name: str, vertices: Optional[Iterable] = None):
     self.name = name
-    self.vertices = list(vertices)
+    self.vertices = [] if vertices is None else list(vertices)
     self.register()
 
   def __len__(self):

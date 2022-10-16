@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from getopt import GetoptError
 from math import pi, sin, cos
+from os.path import abspath
 import sys
 from tkinter import Tk, Button, Toplevel
 from typing import Callable, Optional, Tuple, TypeVar, Union
@@ -41,12 +42,16 @@ class P3DCommand(BaseCommand):
       yield
 
   def cmd_demo(self, argv):
-    ''' Usage: {cmd}
+    ''' Usage: {cmd} [environment.egg]
     '''
+    if argv:
+      env_egg_path = abspath(argv.pop(0))
+    else:
+      env_egg_path = None
     if argv:
       raise GetoptError("extra arguments: %s" % argv)
     options = self.options
-    with P3DemoApp() as app:
+    with P3DemoApp(env_egg_path) as app:
       X("app=%s", r(app))
       X("app.tkRoot = %s", r(app.tkRoot))
       app.run()
@@ -99,9 +104,11 @@ class P3dApp(MultiOpenMixin, ShowBase):
 
 class P3DemoApp(P3dApp):
 
-  def __init__(self):
+  def __init__(self, envpath=None):
+    if envpath is None:
+      envpath = "models/environment"
     super().__init__(
-        "models/environment",
+        envpath,
         scale=(0.25, 0.25, 0.25),
         pos=(-8, 42, 0),
     )
