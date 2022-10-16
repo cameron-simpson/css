@@ -482,7 +482,7 @@ def cachedmethod(
       return value
 
   ##  Doesn't work, has no access to self. :-(
-  ##  # provide a .flush() function to clear the cached value
+  ##  TODO: provide a .flush() function to clear the cached value
   ##  cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
 
   return cachedmethod_wrapper
