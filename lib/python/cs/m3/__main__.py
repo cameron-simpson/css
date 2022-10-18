@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 import os
+from os.path import basename
 import sys
 
 from cs.cmdutils import BaseCommand
+from cs.panda3d_utils.egg import Texture
 from cs.progress import progressbar
 
 from .material import Material
@@ -13,10 +15,12 @@ class M3Command(BaseCommand):
   '''
 
   def main(self, argv):
-    M = Material(5, 5, 2, mass=1.0)
+    xy_s, texture_path = argv
+    xy = int(xy_s)
+    M = Material(xy, xy, 2, mass=1.0)
     for t in progressbar(range(100), "step"):
       M.step()
-    model = M.EggModel()
+    model = M.EggModel(texture=Texture(basename(texture_path), texture_path))
     print(model)
     model.save('model-material.egg', exists_ok=True)
     os.system('pview model-material.egg')
