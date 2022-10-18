@@ -514,9 +514,14 @@ class VertexPool(Eggable):
   '''
 
   @typechecked
-  def __init__(self, name: str, vertices: Optional[Iterable] = None):
+  def __init__(
+      self, name: str, vertices: Optional[Iterable] = None, *, keyfn=None
+  ):
+    if keyfn is None:
+      keyfn = self.default_vertex_keyfn
     self.name = name
-    self.vertices = [] if vertices is None else list(vertices)
+    self._by_vkey: Mapping[Hashable, (int, Vertex)] = {}
+    self.keyfn = keyfn
     self.register()
 
   def __len__(self):
@@ -530,10 +535,37 @@ class VertexPool(Eggable):
   def egg_contents(self):
     ''' The Egg contents are synthetic `vertex` nodes numbered by their position.
     '''
-    return (
+    yield from (
         EggNode(v.egg_type(), i, v.egg_contents())
-        for i, v in enumerate(self.vertices, 1)
+        for i, v in sorted(self._by_vkey.values(), key=lambda iv: iv[0])
     )
+
+  def default_vertex_keyfn(self, v: Vertex) -> Hashable:
+    ''' The default key function for a `Vertex`,
+        returning a 4-tuple of `(x,y,z,w)` from the `Vertex`,
+        ignoring the texture or other attributes.
+    '''
+    return v.x, v.y, v.z, v.w
+
+  def vertex_index(self, v: Vertex) -> int:
+    ''' Return the index of this `Vertex`.
+        If the vertex key `self.vertex_keyfn(v)` is unknown,
+        store `v` in the vertex map as the reference `Vertex`.
+    '''
+    vmap = self._by_vkey
+    vkey = self.keyfn(v)
+    try:
+      index, _ = vmap[vkey]
+    except KeyError:
+      index = len(vmap) + 1
+      assert vkey not in vmap
+      assert index not in [i for i, v in self._by_vkey.values()]
+      X("VPOOL %s: new Vertex %s index %d", self.name, v, index)
+      vmap[vkey] = (index, v)
+    return index
+
+  def vertex_by_index(self, index: int) -> Vertex:
+    return self.vertex_map[index]
 
 class Texture(Eggable):
   ''' An Egg `Texture` definition.
