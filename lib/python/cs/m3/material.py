@@ -7,7 +7,7 @@ from pprint import pformat, pprint
 import string
 import sys
 from types import SimpleNamespace as NS
-from typing import Tuple
+from typing import Optional, Tuple
 
 from cs.lex import r, s
 from cs.logutils import warning
@@ -21,6 +21,7 @@ from cs.panda3d_utils.egg import (
     Vertex,
     VertexPool,
 )
+from cs.panda3d_utils.geom import Surface
 from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
 from cs.resources import uses_runstate
@@ -335,6 +336,77 @@ class Material:
       data[f'p{label}'] += data[f'v{label}'] * dt
       # update the velocities in response to forces
       data[f'v{label}'] += f / inertia * dt
+
+  @typechecked
+  def Surface(
+      self,
+      slice_dim: int,
+      slice_index: int,
+      *,
+      clockwise: Optional[bool] = None,
+      texture: Texture,
+  ):
+    ''' Create a `Surface` by slicing the `Material` along the
+        dimension `slice_dim` at index `slice_index` using `Polygon`s
+        of the specified `clockwise`ness.
+    '''
+    # infer a default clockwiseness
+    # we got widddershins at index 0, clockwise otherwise
+    # except for the Y-axis whose direction means we reverse this
+    if clockwise is None:
+      clockwise = slice_index > 0
+      if slice_dim == 1:
+        # the Y axis goes positive away from the viewer, reverse the polarity
+        clockwise = not clockwise
+    # deduce the dimensions comprising the surface
+    # i.e. those which are not the slice dimension
+    dims = 0, 1, 2
+    abdims = [dim for dim in dims if dim != slice_dim]
+    a_dim = abdims[0]
+    b_dim = abdims[1]
+    shape = self.shape
+    a_len = shape[a_dim]
+    b_len = shape[b_dim]
+    # dimension labels in surface selection order
+    labels = self.labels
+    alabel = self.labels[a_dim]
+    blabel = self.labels[b_dim]
+    clabel = self.labels[slice_dim]
+    # dimension spacial position labels for x,y,z
+    labelx, labely, labelz, *_ = labels
+    data = self.data
+    datax = data[f'p{labelx}']
+    datay = data[f'p{labely}']
+    dataz = data[f'p{labelz}']
+    # function to compute a Series index from a, b, c
+    if slice_dim == 0:
+      abc_fn = lambda a, b, c: (c, a, b)
+    elif slice_dim == 1:
+      abc_fn = lambda a, b, c: (a, c, b)
+    elif slice_dim == 2:
+      abc_fn = lambda a, b, c: (a, b, c)
+    else:
+      raise RuntimeError("unhandled slice_dim %s" % (r(slice_dim),))
+    c = slice_index
+    surface = Surface(f'surface_{alabel}_{blabel}_{clabel}{c}')
+    # enumerate all the polygons
+    polygons = []
+    for a, b in product(range(a_len - 1), range(b_len - 1)):
+      vertices = []
+      for da, db in (((0, 0), (1, 0), (1, 1), (0, 1)) if clockwise else
+                     ((0, 0), (0, 1), (1, 1), (1, 0))):
+        ##print("da =", da, "db =", db)
+        abc_index = abc_fn(a + da, b + db, c)
+        vertices.append(
+            Vertex(
+                datax[abc_index],
+                datay[abc_index],
+                dataz[abc_index],
+                attrs=dict(UV=(a / a_len, b / b_len))
+            )
+        )
+      surface.add_polygon(*vertices, Texture=texture)
+    return surface
 
   @uses_runstate
   def EggModel(self, *, runstate):
