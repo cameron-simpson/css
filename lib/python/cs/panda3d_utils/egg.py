@@ -559,8 +559,6 @@ class VertexPool(Eggable):
     except KeyError:
       index = len(vmap) + 1
       assert vkey not in vmap
-      assert index not in [i for i, v in self._by_vkey.values()]
-      X("VPOOL %s: new Vertex %s index %d", self.name, v, index)
       vmap[vkey] = (index, v)
     return index
 
