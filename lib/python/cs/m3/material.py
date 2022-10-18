@@ -431,6 +431,36 @@ class Material:
       dataz = data[f'p{labelz}']
       # iterate over the dimensions orthogonal to the surface
       for skip_dim in dims:
+        for c in 0, :  ##shape[skip_dim] - 1:
+          if runstate and runstate.cancelled:
+            return None
+          surface = self.Surface(skip_dim, c, texture=texture)
+          M.append(surface.EggNode())
+    return M
+
+  @uses_runstate
+  def EggModel_OLD(self, *, runstate):
+    ''' Return a `cs.panda3dutils.egg.Model` derived from this material.
+    '''
+    rgba = RGBA(1, 1, 1, 1)
+    M = Model(str(self))
+    with M:
+      texture = Texture("crack", expanduser('~/im/wp/crack-1920.png'))
+      M.append(texture)
+      data = self.data
+      labels = self.labels
+      shape = self.shape
+      spacing = self.spacing
+      # generate surfaces for each surface of the material
+      # requires at least 3 dimensions
+      dims = 0, 1, 2
+      labelx, labely, labelz, *_ = labels
+      # the Serieses for positional data
+      datax = data[f'p{labelx}']
+      datay = data[f'p{labely}']
+      dataz = data[f'p{labelz}']
+      # iterate over the dimensions orthogonal to the surface
+      for skip_dim in dims:
         if runstate and runstate.cancelled:
           return None
         # deduce the dimensions comprising the surface
@@ -495,5 +525,4 @@ class Material:
               vindices.append(vi)
             polygons.append(Polygon(None, vpool, *vindices, Texture=texture))
           M.append(Group(f'Surface {surface_name}', vpool, *polygons))
-
     return M
