@@ -305,7 +305,6 @@ class Material:
     # TODO: torsional effects from deformation instead of stretch
     # TODO: maybe there are no torsional effects, instead torsion
     #   emerges from forcing neighbours closer together
-    shape = self.shape
     data = self.data
     label = self.labels[axis]
     ##print("axis,label", axis, label)
@@ -495,11 +494,11 @@ class Material:
           i_by_abc = {}  # a,b,c => Vertex pool index
           v_by_abc = {}  # a,b,c => Vertex
           for a, b in product(range(a_len), range(b_len)):
-            xyz = abc_fn(a, b, c)
+            abc_index = abc_fn(a, b, c)
             v = Vertex(
-                datax[xyz],
-                datay[xyz],
-                dataz[xyz],
+                datax[abc_index],
+                datay[abc_index],
+                dataz[abc_index],
                 attrs=dict(UV=(a / a_len, b / b_len))
             )
             v_by_abc[a, b, c] = v
