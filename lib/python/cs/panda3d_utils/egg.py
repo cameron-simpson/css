@@ -26,7 +26,7 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass, field as dataclass_field, fields as dataclass_fields
 from tempfile import NamedTemporaryFile
-from typing import Iterable, Mapping, Optional, Union
+from typing import Callable, Hashable, Iterable, Mapping, Optional, Union
 from zlib import compress
 
 from typeguard import typechecked
@@ -305,7 +305,7 @@ class Eggable(metaclass=EggMetaClass):
     had_break = False
     had_breaks = False
     for item in self.egg_contents():
-      with Pfx("%r.egg_transcribe: item=%r", type(self), item):
+      with Pfx("<%s>.egg_transcribe: item=%r", self.egg_type(), item):
         item_sv = list(self.transcribe(item, subindent))
         assert len(item_sv) > 0
         if (had_break or item_sv[-1].endswith('}')
