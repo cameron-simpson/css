@@ -409,13 +409,13 @@ class Material:
     return surface
 
   @uses_runstate
-  def EggModel(self, *, runstate):
+  @typechecked
+  def EggModel(self, *, runstate, texture: Texture) -> Model:
     ''' Return a `cs.panda3dutils.egg.Model` derived from this material.
     '''
     rgba = RGBA(1, 1, 1, 1)
     M = Model(str(self))
     with M:
-      texture = Texture("crack", expanduser('~/im/wp/crack-1920.png'))
       M.append(texture)
       data = self.data
       labels = self.labels
@@ -431,7 +431,7 @@ class Material:
       dataz = data[f'p{labelz}']
       # iterate over the dimensions orthogonal to the surface
       for skip_dim in dims:
-        for c in 0, :  ##shape[skip_dim] - 1:
+        for c in 0, shape[skip_dim] - 1:
           if runstate and runstate.cancelled:
             return None
           surface = self.Surface(skip_dim, c, texture=texture)
