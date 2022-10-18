@@ -364,8 +364,8 @@ class Material:
     a_dim = abdims[0]
     b_dim = abdims[1]
     shape = self.shape
-    a_len = shape[a_dim]
-    b_len = shape[b_dim]
+    a_len = shape[a_dim] - 1
+    b_len = shape[b_dim] - 1
     # dimension labels in surface selection order
     labels = self.labels
     alabel = self.labels[a_dim]
@@ -389,19 +389,20 @@ class Material:
     c = slice_index
     surface = Surface(f'surface_{alabel}_{blabel}_{clabel}{c}')
     # enumerate all the polygons
-    polygons = []
-    for a, b in product(range(a_len - 1), range(b_len - 1)):
+    for a, b in product(range(a_len), range(b_len)):
       vertices = []
       for da, db in (((0, 0), (1, 0), (1, 1), (0, 1)) if clockwise else
                      ((0, 0), (0, 1), (1, 1), (1, 0))):
         ##print("da =", da, "db =", db)
-        abc_index = abc_fn(a + da, b + db, c)
+        va = a + da
+        vb = b + db
+        abc_index = abc_fn(va, vb, c)
         vertices.append(
             Vertex(
                 datax[abc_index],
                 datay[abc_index],
                 dataz[abc_index],
-                attrs=dict(UV=(a / a_len, b / b_len))
+                attrs=dict(UV=(va / a_len, vb / b_len))
             )
         )
       surface.add_polygon(*vertices, Texture=texture)
