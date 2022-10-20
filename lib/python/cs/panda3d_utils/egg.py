@@ -732,7 +732,10 @@ class Model(ContextManagerMixin):
       ) as f:
         with self:
           for item in self.items:
-            print(item, file=f)
+            for s in item.egg_transcribe(indent='  '):
+              f.write(s)
+            f.write('\n')
+            ##print(item, file=f)
 
   def load(self, loader, *, skip_check=False):
     ''' Load this model via `loader.loadModel`.
