@@ -25,6 +25,7 @@
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass, field as dataclass_field, fields as dataclass_fields
+from random import randint
 from tempfile import NamedTemporaryFile
 from typing import Callable, Hashable, Iterable, Mapping, Optional, Union
 from zlib import compress
@@ -500,6 +501,18 @@ class RGBA(DCEggable):
   g: float
   b: float
   a: float = 1.0
+
+  @classmethod
+  def random(cls, r=None, g=None, b=None, a=None):
+    if r is None:
+      r = randint(0, 255)
+    if g is None:
+      g = randint(0, 255)
+    if b is None:
+      b = randint(0, 255)
+    if a is None:
+      a = randint(0, 255)
+    return cls(r, g, b, a)
 
 @dataclass
 class Vertex(DCEggable):
