@@ -441,6 +441,7 @@ def write_model(
       print(EggNode('CoordinateSystem', None, [coordinate_system]), file=f)
       yield f
 
+# TODO: make a Model and transcribe it
 def load_model(
     loader, comment: str, egg_nodes: Iterable, *, coordinate_system=None
 ):
