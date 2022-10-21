@@ -409,7 +409,11 @@ def dumpz(obj, f, indent=""):
 
 # TODO: make a Model and transcribe it
 def load_model(
-    loader, comment: str, egg_nodes: Iterable, *, coordinate_system=None
+    loader,
+    comment: str,
+    egg_nodes: Iterable[Eggable],
+    *,
+    coordinate_system=None
 ):
   ''' Load an iterable of `Eggable` nodes `egg_nodes` as a model
       via the supplied loader.
@@ -422,11 +426,10 @@ def load_model(
 
           scene = load_model(showbase.loader, "my model", egg_nodes)
   '''
+  M = Model(comment, coordinate_system=coordinate_system)
+  M.extend(egg_nodes)
   with NamedTemporaryFile(suffix='.egg') as T:
-    with write_model(T.name, comment=comment,
-                     coordinate_system=coordinate_system) as f:
-      for node in egg_nodes:
-        print(node, file=f)
+    M.save(T.name, exists_ok=True)
     return loader.loadModel(T.name)
 
 class EggNode(Eggable):
