@@ -707,8 +707,17 @@ class Model(ContextManagerMixin):
 
   @typechecked
   def append(self, item: Eggable):
+    ''' Append `item` to the model.
+    '''
     item.register(registry=self._registry)
     self.items.append(item)
+
+  @typechecked
+  def extend(self, items: Iterable[Eggable]):
+    ''' Extend the model with `items`, an iterable of `Eggable`s.
+    '''
+    for item in items:
+      self.append(item)
 
   @pfx_method
   def check(self):
