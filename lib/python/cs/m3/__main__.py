@@ -34,7 +34,7 @@ class M3Command(BaseCommand):
       model = M.EggModel(texture=texture)
     print(model)
     model.save('model-material.egg', exists_ok=True)
-    os.system('pview model-material.egg')
+    os.system('pview -c model-material.egg')
 
 if __name__ == '__main__':
   sys.exit(M3Command(sys.argv).run())
