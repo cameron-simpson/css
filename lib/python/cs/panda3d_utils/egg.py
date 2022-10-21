@@ -407,40 +407,6 @@ def dumpz(obj, f, indent=""):
   else:
     f.write(compress(dumps(obj, indent=indent).encode('utf-8')))
 
-@contextmanager
-@fmtdoc
-@typechecked
-def write_model(
-    fspath: str, comment: str, *, coordinate_system=None, exists_ok=False
-):
-  ''' Context manager for writing an Egg model file to the path
-      `fspath` which yields an open file for the model contents.
-
-      Parameters:
-      * `fspath`: the filesystem path of the model file to create
-      * `comment`: opening comment for the file
-      * `coordinate_system`: optional coordinate system for the file,
-       default `{DEFAULT_COORDINATE_SYSTEM!r}` from `DEFAULT_COORDINATE_SYSTEM`
-      * `exists_ok`: optional flag passed to `atomic_filename`, default `False`;
-        if true the target `fspath` may already exist and may be overwritten
-
-      This uses `atomic_filename` to create the file so it will not
-      exist in the filesystem until it is complete.
-
-      Example use:
-
-          with write_model("my_model.egg", "test model") as f:
-              for nodes in egg_nodes:
-                  print(node, file=f)
-  '''
-  if coordinate_system is None:
-    coordinate_system = DEFAULT_COORDINATE_SYSTEM
-  with atomic_filename(fspath, exists_ok=exists_ok) as T:
-    with open(T.name, 'w') as f:
-      print(EggNode('Comment', None, [comment]), file=f)
-      print(EggNode('CoordinateSystem', None, [coordinate_system]), file=f)
-      yield f
-
 # TODO: make a Model and transcribe it
 def load_model(
     loader, comment: str, egg_nodes: Iterable, *, coordinate_system=None
@@ -733,18 +699,19 @@ class Model(ContextManagerMixin):
     if not skip_check:
       self.check()
     with self._registry:
-      with write_model(
-          fspath,
-          self.comment,
-          coordinate_system=self.coordinate_system,
-          exists_ok=exists_ok,
-      ) as f:
-        with self:
-          for item in self.items:
-            for s in item.egg_transcribe(indent='  '):
-              f.write(s)
-            f.write('\n')
-            ##print(item, file=f)
+      with atomic_filename(fspath, exists_ok=exists_ok) as T:
+        with open(T.name, 'w') as f:
+          with self:
+            print(EggNode('Comment', None, [self.comment]), file=f)
+            print(
+                EggNode('CoordinateSystem', None, [self.coordinate_system]),
+                file=f
+            )
+            for item in self.items:
+              for s in item.egg_transcribe(indent='  '):
+                f.write(s)
+              f.write('\n')
+              ##print(item, file=f)
 
   def load(self, loader, *, skip_check=False):
     ''' Load this model via `loader.loadModel`.
