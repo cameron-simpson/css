@@ -92,8 +92,23 @@ class BlockedError(TaskError):
     self.blocking_task = blocking_task
 
 class BaseTask(FSM, RunStateMixin):
+  ''' A base class subclassing `cs.fsm.FSM` with a `RunStateMixin`.
 
-  def __init__(self, state=None, runstate=None):
+      Note that this class and the `FSM` base class does not provide
+      a `FSM_DEFAULT_STATE` attribute; a default `state` value of
+      `None` will leave `.fsm_state` _unset_.
+
+      This behaviour is is chosen mostly to support subclasses
+      with unusual behaviour, particularly Django's `Model` class
+      whose `refresh_from_db` method seems to not refresh fields
+      which already exist, and setting `.fsm_state` from a
+      `FSM_DEFAULT_STATE` class attribute thus breaks this method.
+      Subclasses of this class and `Model` should _not_ provide a
+      `FSM_DEFAULT_STATE` attribute, instead relying on the field
+      definition to provide this default in the usual way.
+  '''
+
+  def __init__(self, *, state=None, runstate=None):
     FSM.__init__(self, state)
     RunStateMixin.__init__(self, runstate)
 
@@ -322,7 +337,7 @@ class Task(FSM, RunStateMixin):
         This allows the function called by the `Task` to access the
         task, typically to poll its `.runstate` attribute.
         This is a `Thread` local value.
-        '''
+    '''
     return cls._state.current_task  # pylint: disable=no-member
 
   @typechecked
