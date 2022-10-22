@@ -155,6 +155,12 @@ class FSM(DOTNodeMixin):
       ) from e
     return sga(attr)
 
+  @property
+  def fsm_history(self):
+    ''' History property wrapping private attribute.
+        This aids subclassing where the history is not a local attribute.
+    '''
+    return self._fsm_history
 
   def fsm_event_is_allowed(self, event):
     ''' Test whether `event` is permitted in the current state.
