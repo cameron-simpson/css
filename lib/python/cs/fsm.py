@@ -72,7 +72,8 @@ class FSM(DOTNodeMixin):
 
   def __init__(self, state=None, *, history=None, lock=None, transitions=None):
     ''' Initialise the `FSM` from:
-        * `state`: optional initial state, default `self.FSM_DEFAULT_STATE`
+        * `state`: optional _positional_ parameter for the initial state,
+          default `self.FSM_DEFAULT_STATE`
         * `history`: an optional object to record state transition
           history, default `None`; if not `None` this should be an
           iterable object with a `.append(entry)` method such as a
@@ -83,22 +84,39 @@ class FSM(DOTNodeMixin):
           the default is a `Lock`, which is enough for `FSM` private use
         * `transitions`: optional *state*->*event*->*state* mapping;
           if provided, this will override the class `FSM_TRANSITIONS` mapping
+
+        Note that the `FSM` base class does not provide a
+        `FSM_DEFAULT_STATE` attribute; a default `state` value of
+        `None` will leave `.fsm_state` _unset_.
+
+        This behaviour is is chosen mostly to support subclasses
+        with unusual behaviour, particularly Django's `Model` class
+        whose `refresh_from_db` method seems to not refresh fields
+        which already exist, and setting `.fsm_state` from a
+        `FSM_DEFAULT_STATE` class attribute thus breaks this method.
+        Subclasses of this class and `Model` should _not_ provide a
+        `FSM_DEFAULT_STATE` attribute, instead relying on the field
+        definition to provide this default in the usual way.
     '''
     if state is None:
-      state = self.FSM_DEFAULT_STATE
+      try:
+        state = self.FSM_DEFAULT_STATE
+      except AttributeError:
+        pass
     if lock is None:
       lock = Lock()
     if transitions is not None:
       self.FSM_TRANSITIONS = transitions
-    if state not in self.FSM_TRANSITIONS:
-      raise ValueError(
-          "invalid initial state %r, expected one of %r" % (
-              state,
-              sorted(self.FSM_TRANSITIONS.keys()),
-          )
-      )
-    self.fsm_state = state
-    self.fsm_history = history
+    if state is not None:
+      if state not in self.FSM_TRANSITIONS:
+        raise ValueError(
+            "invalid initial state %r, expected one of %r" % (
+                state,
+                sorted(self.FSM_TRANSITIONS.keys()),
+            )
+        )
+      self.fsm_state = state
+    self._fsm_history = history
     self.__lock = lock
     self.__callbacks = defaultdict(list)
 
