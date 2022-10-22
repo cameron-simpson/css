@@ -136,22 +136,28 @@ class FSM(DOTNodeMixin):
     if not attr.startswith('_'):
       if attr in self.FSM_TRANSITIONS:
         return attr
-      in_state = cutprefix(attr, 'is_')
-      if in_state is not attr:
-        # relies on upper case state names
-        return self.fsm_state == in_state.upper()
       try:
-        statedef = self.FSM_TRANSITIONS[self.fsm_state]
-      except KeyError:
+        state = self.fsm_state
+      except AttributeError:
         pass
       else:
-        if attr in statedef:
-          return lambda **kw: self.fsm_event(attr, **kw)
+        in_state = cutprefix(attr, 'is_')
+        if in_state is not attr:
+          # relies on upper case state names
+          return state == in_state.upper()
+        FSM_TRANSITIONS = self.FSM_TRANSITIONS
+        try:
+          statedef = FSM_TRANSITIONS[state]
+        except KeyError:
+          pass
+        else:
+          if attr in statedef:
+            return lambda **kw: self.fsm_event(attr, **kw)
     try:
       sga = super().__getattr__
     except AttributeError as e:
       raise AttributeError(
-          "no %s.%s attribute" % (type(self).__name__, attr)
+          "no %s.%s attribute" % (self.__class__.__name__, attr)
       ) from e
     return sga(attr)
 
