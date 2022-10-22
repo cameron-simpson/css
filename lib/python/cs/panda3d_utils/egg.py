@@ -414,24 +414,17 @@ def load_model(
     comment: str,
     egg_nodes: Iterable[Eggable],
     *,
-    coordinate_system=None
+    coordinate_system=None,
+    skip_check=False,
 ):
   ''' Load an iterable of `Eggable` nodes `egg_nodes` as a model
       via the supplied loader.
 
-      This transcribes the `egg_nodes` to a temporary Egg file using
-      `write_model` and then calls `loader.load_model(filename)`
-      to load that file, returning the resulting scene.
-
-      Example use:
-
-          scene = load_model(showbase.loader, "my model", egg_nodes)
+      This constructs a `Model` and calls its `.load()` method.
   '''
   M = Model(comment, coordinate_system=coordinate_system)
   M.extend(egg_nodes)
-  with NamedTemporaryFile(suffix='.egg') as T:
-    M.save(T.name, exists_ok=True)
-    return loader.loadModel(T.name)
+  return M.load(loader, skip_check=skip_check)
 
 class EggNode(Eggable):
   ''' A representation of a basic EGG syntactic node with an explicit type.
@@ -720,14 +713,9 @@ class Model(ContextManagerMixin):
   def load(self, loader, *, skip_check=False):
     ''' Load this model via `loader.loadModel`.
     '''
-    if not skip_check:
-      self.check()
-    return load_model(
-        loader,
-        self.comment,
-        self.items,
-        coordinate_system=self.coordinate_system
-    )
+    with NamedTemporaryFile(suffix='.egg') as T:
+      M.save(T.name, exists_ok=True)
+      return loader.loadModel(T.name)
 
   def view(
       self, *, centre=True, lighting=False, skip_check=False, quiet=False
