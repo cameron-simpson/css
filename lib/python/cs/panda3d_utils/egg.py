@@ -40,6 +40,7 @@ from cs.logutils import warning
 from cs.mappings import IndexedMapping, StrKeyedDict
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.psutils import run
 from cs.queues import ListQueue
 from cs.seq import Seq, unrepeated
 from cs.threads import State as ThreadState
@@ -727,6 +728,20 @@ class Model(ContextManagerMixin):
         self.items,
         coordinate_system=self.coordinate_system
     )
+
+  def view(
+      self, *, centre=True, lighting=False, skip_check=False, quiet=False
+  ):
+    ''' Quick view of the `Model` using `pview`.
+    '''
+    pview_opts = []
+    if centre:
+      pview_opts.append('-c')
+    if lighting:
+      pview_opts.append('-L')
+    with NamedTemporaryFile(suffix='.egg') as T:
+      self.save(T.name, skip_check=skip_check, exists_ok=True)
+      run(['pview', *pview_opts, T.name], quiet=quiet)
 
 if __name__ == '__main__':
   for eggable in (
