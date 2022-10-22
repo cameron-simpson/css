@@ -133,19 +133,20 @@ class FSM(DOTNodeMixin):
           is an event name for the current state
         Fall back to the superclass `__getattr__`.
     '''
-    if attr in self.FSM_TRANSITIONS:
-      return attr
-    in_state = cutprefix(attr, 'is_')
-    if in_state is not attr:
-      # relies on upper case state names
-      return self.fsm_state == in_state.upper()
-    try:
-      statedef = self.FSM_TRANSITIONS[self.fsm_state]
-    except KeyError:
-      pass
-    else:
-      if attr in statedef:
-        return lambda **kw: self.fsm_event(attr, **kw)
+    if not attr.startswith('_'):
+      if attr in self.FSM_TRANSITIONS:
+        return attr
+      in_state = cutprefix(attr, 'is_')
+      if in_state is not attr:
+        # relies on upper case state names
+        return self.fsm_state == in_state.upper()
+      try:
+        statedef = self.FSM_TRANSITIONS[self.fsm_state]
+      except KeyError:
+        pass
+      else:
+        if attr in statedef:
+          return lambda **kw: self.fsm_event(attr, **kw)
     try:
       sga = super().__getattr__
     except AttributeError as e:
