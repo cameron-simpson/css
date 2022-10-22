@@ -245,7 +245,7 @@ class FSM(DOTNodeMixin):
 
   def fsm_callback_discard(self, state, callback):
     ''' Deregister a callback for `state`.
-        '''
+    '''
     with self.__lock:
       self.__callbacks[state] = [
           cb for cb in self.__callbacks[state] if cb != callback
@@ -307,7 +307,7 @@ class FSM(DOTNodeMixin):
 
   def dot_node_attrs(self):
     ''' DOT Node attributes.
-        '''
+    '''
     attrs = super().dot_node_attrs()
     fillcolor = self.dot_node_fillcolor()
     if fillcolor is not None:
