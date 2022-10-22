@@ -101,12 +101,7 @@ class CancellationError(Exception):
     elif not isinstance(message, StringTypes):
       message = "cancelled: %s" % (message,)
     Exception.__init__(self, message)
-
-  @property
-  def message(self):
-    ''' The cancellation message.
-    '''
-    return self.args[0]
+    self.message = message
 
 # pylint: disable=too-many-instance-attributes
 class Result(FSM):
