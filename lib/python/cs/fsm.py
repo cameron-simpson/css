@@ -155,6 +155,13 @@ class FSM(DOTNodeMixin):
       ) from e
     return sga(attr)
 
+
+  def fsm_event_is_allowed(self, event):
+    ''' Test whether `event` is permitted in the current state.
+        This can be handy as a pretest.
+    '''
+    return event in self.FSM_TRANSITIONS[self.fsm_state]
+
   def fsm_event(self, event, **extra):
     ''' Transition the FSM from the current state to a new state based on `event`.
         Call any callbacks associated with the new state.
