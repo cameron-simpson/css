@@ -814,7 +814,7 @@ class Model(ContextManagerMixin):
   ):
     ''' Quick view of the `Model` using `pview`.
     '''
-    pview_opts = []
+    pview_opts = ['-l']
     if centre:
       pview_opts.append('-c')
     if lighting:
