@@ -115,8 +115,7 @@ def pyramid(
     sides: int,
     base_length: float = 1.0,
     aspect=1.0,
-    *,
-    texture: Texture
+    **poly_attrs,
 ) -> Surface:
   ''' A pyramid with `sides` faces (excepting the base)
       and a height of `base_length*aspect`.
@@ -145,7 +144,7 @@ def pyramid(
     assert v1 is not v1_
     assert v1.attrs is not v1_.attrs
     v1.attrs.update(UV=(1.0, 0.0))
-    surface.add_polygon(apex, v1, v0, Texture=texture)
+    surface.add_polygon(apex, v1, v0, **poly_attrs)
   base_vs = [copy(v) for v in corner_vs]
   for i, v in enumerate(base_vs):
     v.attrs.update(
@@ -154,15 +153,13 @@ def pyramid(
             (cos(corner_angles[i]) + 1.0) / 2
         )
     )
-  surface.add_polygon(*base_vs, Texture=texture)
+  surface.add_polygon(*base_vs, **poly_attrs)
   return surface
 
 @typechecked
 @require(lambda sides: sides >= 3)
 @require(lambda base_length: base_length > 0.0)
-def equilateral_pyramid(
-    sides: int, base_length: float = 1.0, *, texture: Texture
-):
+def equilateral_pyramid(sides: int, base_length: float = 1.0, **poly_attrs):
   ''' A pyramid with `sides` faces (excepting the base)
       whose faces are equilateral triangles.
       With 3 `sides` the base is also an equilateral triangle.
@@ -184,4 +181,4 @@ def equilateral_pyramid(
   dc = base_length * sin(theta_bc)
   h = sqrt(base_length**2 - dc**2)
   aspect = h / base_length
-  return pyramid(sides, base_length, aspect, texture=texture)
+  return pyramid(sides, base_length, aspect, **poly_attrs)
