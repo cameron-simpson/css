@@ -2,7 +2,7 @@
 
 from copy import copy
 from dataclasses import dataclass, field
-from math import pi, sin, cos
+from math import pi, sin, cos, sqrt
 from random import randint
 from typing import Any, Callable, Hashable, List, Mapping, Optional, Tuple
 
@@ -41,7 +41,7 @@ def sphere_coords(longitude: float,
                   latitude: float,
                   radius: float = 1.0) -> Tuple[float, float, float]:
   ''' Return the coordinates of a point on the surphace of a sphere
-  in world coordinates.
+      in world coordinates.
   '''
   lat_cos = cos(latitude)
   xyz = (
@@ -155,3 +155,28 @@ def pyramid(
     )
   surface.add_polygon(*base_vs, Texture=texture)
   return surface
+
+@typechecked
+@require(lambda sides: sides >= 3)
+@require(lambda base_length: base_length > 0.0)
+def equilateral_pyramid(
+    sides: int, base_length: float = 1.0, *, texture: Texture
+):
+  # h: height
+  # dc: distance from base corner to base centre
+  # right angle using rising edge
+  # base_length ** 2 = h ** 2 + dc ** 2
+  # h ** 2 = base_length ** 2 - dc ** 2
+  # dn: distance normal to base edge to base centre
+  # right angle using base edge
+  # dc ** 2 = (base_length / 2) ** 2 + dn ** 2
+  # h = base_length * aspect
+  # base corner theta wrt radius
+  theta_bc = (pi - (pi * 2 / sides)) / 2
+  if theta_bc * 2 > pi / 2:
+    raise ValueError("theta_bc * 2 > pi / 2")
+  dn = base_length * cos(theta_bc)
+  dc = base_length * sin(theta_bc)
+  h = sqrt(base_length**2 - dc**2)
+  aspect = h / base_length
+  return pyramid(sides, base_length, aspect, texture=texture)
