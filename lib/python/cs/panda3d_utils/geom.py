@@ -9,7 +9,7 @@ from icontract import require
 import numpy as np
 from typeguard import typechecked
 
-from .egg import Group, Polygon, RGBA, Texture, Vertex, VertexPool
+from .egg import Group, Model, Polygon, RGBA, Texture, Vertex, VertexPool
 
 class Surface:
   ''' A surface definition consisting of a list of `Polygon`s
@@ -36,7 +36,9 @@ class Surface:
     '''
     return Group(self.name, self.vpool, *self.polygons)
 
-def sphere_coords(longitude: float, latitude: float, radius: float = 1.0):
+def sphere_coords(longitude: float,
+                  latitude: float,
+                  radius: float = 1.0) -> Tuple[float, float, float]:
   ''' Return the coordinates of a point on the surphace of a sphere
   in world coordinates.
   '''
