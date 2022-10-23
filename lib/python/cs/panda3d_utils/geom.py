@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from copy import copy
 from dataclasses import dataclass, field
 from math import pi, sin, cos
 from random import randint
@@ -104,4 +105,53 @@ def sphere(
           ##RGBA=RGBA.random(),
           Texture=texture,
       )
+  return surface
+
+@typechecked
+@require(lambda sides: sides >= 3)
+@require(lambda base_length: base_length > 0.0)
+@require(lambda aspect: aspect > 0.0)
+def pyramid(
+    sides: int,
+    base_length: float = 1.0,
+    aspect=1.0,
+    *,
+    texture: Texture
+) -> Surface:
+  ''' A Pyramid with `sides`
+  '''
+  surface = Surface(f'pyramid({sides:d},{base_length:f})')
+  height = base_length * aspect
+  apex = Vertex(0, 0, height, attrs=dict(UV=(0.5, 1.0)))
+  base_angle = 2 * pi / sides
+  # base_length=2*(radius*sin(base_angle/2))
+  radius = base_length / sin(base_angle / 2) / 2
+  corner_angles = np.linspace(0.0, 2 * pi, num=sides + 1)
+  corner_vs = [
+      Vertex(
+          radius * sin(corner_angle),
+          radius * cos(corner_angle),
+          0.0,
+          attrs=dict(UV=(0.0, 0.0))
+      ) for i, corner_angle in enumerate(corner_angles[:-1])
+  ]
+  assert len(corner_vs) == sides
+  for i, corner_angle in enumerate(corner_angles[:-1]):
+    corner_angle2 = corner_angles[(i + 1) % sides]
+    v0 = corner_vs[i]
+    v1_ = corner_vs[(i + 1) % sides]
+    v1 = copy(v1_)
+    assert v1 is not v1_
+    assert v1.attrs is not v1_.attrs
+    v1.attrs.update(UV=(1.0, 0.0))
+    surface.add_polygon(apex, v0, v1, Texture=texture)
+  base_vs = [copy(v) for v in reversed(corner_vs)]
+  for i, v in enumerate(base_vs):
+    v.attrs.update(
+        UV=(
+            (sin(corner_angles[i]) + 1.0) / 2,
+            (cos(corner_angles[i]) + 1.0) / 2
+        )
+    )
+  surface.add_polygon(*base_vs, Texture=texture)
   return surface
