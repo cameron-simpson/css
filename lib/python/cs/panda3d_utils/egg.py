@@ -487,17 +487,36 @@ class EggNode(Eggable):
 
 @dataclass
 class Normal(DCEggable):
+  POSITIONAL = True
+  x: float
+  y: float
+  z: float
+
+@dataclass
+class BiNormal(DCEggable):
+  POSITIONAL = True
+  x: float
+  y: float
+  z: float
+
+@dataclass
+class Tangent(DCEggable):
+  POSITIONAL = True
   x: float
   y: float
   z: float
 
 @dataclass
 class UV(DCEggable):
+  POSITIONAL = True
   u: float
   v: float
+  Tangent: Optional[Tangent] = None
+  BiNormal: Optional[BiNormal] = None
 
 @dataclass
 class RGBA(DCEggable):
+  POSITIONAL = True
   r: float
   g: float
   b: float
@@ -517,10 +536,15 @@ class RGBA(DCEggable):
 
 @dataclass
 class Vertex(DCEggable):
+  POSITIONAL = 'x', 'y', 'z', 'w'
   x: float
   y: float
   z: float
   w: Optional[float] = None
+  Dxyz: Optional[Dxyz] = None
+  Normal: Optional[Normal] = None
+  RGBA: Optional[RGBA] = None
+  UV: Optional[UV] = None
   attrs: Mapping = dataclass_field(default_factory=dict)
 
   def __copy__(self):
