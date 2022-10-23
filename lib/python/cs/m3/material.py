@@ -410,13 +410,14 @@ class Material:
 
   @uses_runstate
   @typechecked
-  def EggModel(self, *, runstate, texture: Texture) -> Model:
+  def EggModel(self, *, model=None, runstate, texture: Texture) -> Model:
     ''' Return a `cs.panda3dutils.egg.Model` derived from this material.
     '''
     rgba = RGBA(1, 1, 1, 1)
-    M = Model(str(self))
-    with M:
-      M.append(texture)
+    if model is None:
+      mode = Model(str(self))
+    with model:
+      model.append(texture)
       data = self.data
       labels = self.labels
       shape = self.shape
@@ -435,5 +436,5 @@ class Material:
           if runstate and runstate.cancelled:
             return None
           surface = self.Surface(skip_dim, c, texture=texture)
-          M.append(surface.EggNode())
-    return M
+          model.append(surface.EggNode())
+    return model
