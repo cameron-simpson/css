@@ -118,7 +118,8 @@ def pyramid(
     *,
     texture: Texture
 ) -> Surface:
-  ''' A Pyramid with `sides`
+  ''' A pyramid with `sides` faces (excepting the base)
+      and a height of `base_length*aspect`.
   '''
   surface = Surface(f'pyramid({sides:d},{base_length:f})')
   height = base_length * aspect
@@ -162,6 +163,10 @@ def pyramid(
 def equilateral_pyramid(
     sides: int, base_length: float = 1.0, *, texture: Texture
 ):
+  ''' A pyramid with `sides` faces (excepting the base)
+      whose faces are equilateral triangles.
+      With 3 `sides` the base is also an equilateral triangle.
+  '''
   # h: height
   # dc: distance from base corner to base centre
   # right angle using rising edge
