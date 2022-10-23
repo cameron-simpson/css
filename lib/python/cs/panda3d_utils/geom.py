@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from math import pi, sin, cos
 from random import randint
-from typing import Any, Callable, Hashable, List, Mapping, Optional
+from typing import Any, Callable, Hashable, List, Mapping, Optional, Tuple
 
 from icontract import require
 import numpy as np
