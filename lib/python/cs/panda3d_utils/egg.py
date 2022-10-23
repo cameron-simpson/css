@@ -374,15 +374,52 @@ class DCEggable(Eggable):
        method.
   '''
 
+  def egg_name(self):
+    ''' The Egg has a name if it has a `.name` which is not `None`.
+    '''
+    return getattr(self, 'name', None)
+
   def egg_contents(self):
     ''' Generator yielding the `EggNode` contents.
         This implementation yields the non-`None` field values in order,
         then the contents of `self.attrs` if present.
     '''
-    for F in dataclass_fields(self):
-      value = getattr(self, F.name)
-      if F.name != 'attrs' and value is not None:
+    # yield positional fields in order
+    positional_fields = getattr(self.__class__, 'POSITIONAL', ())
+    if isinstance(positional_fields, bool):
+      all_positional = positional_fields
+      positional_fields = (
+          tuple(
+              F.name
+              for F in dataclass_fields(self)
+              if F.name not in ('attrs', 'name')
+          ) if all_positional else ()
+      )
+    assert 'name' not in positional_fields and 'attrs' not in positional_fields
+    none_field_name = None
+    for field_name in positional_fields:
+      value = getattr(self, field_name)
+      if value is None:
+        if none_field_name is None:
+          none_field_name = field_name
+      else:
+        if none_field_name is not None:
+          raise ValueError(
+              "None positional field %r is followed by non-None positional field %r:%s"
+              % (none_field_name, field_name, r(value))
+          )
         yield value
+    for F in dataclass_fields(self):
+      field_name = F.name
+      if field_name in ('attrs', 'name') or field_name in positional_fields:
+        continue
+      value = getattr(self, field_name)
+      if value is not None:
+        if isinstance(value, (str, int, float)):
+          yield EggNode('Scalar', field_name, [value])
+        else:
+          yield EggNode(field_name, None, value)
+    # yield named attrs if present
     yield from super().egg_contents()
 
 def dumps(obj, indent=""):
