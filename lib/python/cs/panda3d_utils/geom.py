@@ -144,8 +144,8 @@ def pyramid(
     assert v1 is not v1_
     assert v1.attrs is not v1_.attrs
     v1.attrs.update(UV=(1.0, 0.0))
-    surface.add_polygon(apex, v0, v1, Texture=texture)
-  base_vs = [copy(v) for v in reversed(corner_vs)]
+    surface.add_polygon(apex, v1, v0, Texture=texture)
+  base_vs = [copy(v) for v in corner_vs]
   for i, v in enumerate(base_vs):
     v.attrs.update(
         UV=(
