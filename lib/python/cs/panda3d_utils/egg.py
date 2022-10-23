@@ -644,6 +644,30 @@ class Texture(Eggable):
 
 REFTYPES.add(RefTypeSpec(type=Texture, refname='TRef'))
 
+@dataclass
+class Material(DCEggable):
+  name: str
+  diffr: Optional[float] = None
+  diffg: Optional[float] = None
+  diffb: Optional[float] = None
+  diffa: Optional[float] = None
+  ambr: Optional[float] = None
+  ambg: Optional[float] = None
+  ambb: Optional[float] = None
+  amba: Optional[float] = None
+  emitr: Optional[float] = None
+  emitg: Optional[float] = None
+  emitb: Optional[float] = None
+  emita: Optional[float] = None
+  specr: Optional[float] = None
+  specg: Optional[float] = None
+  specb: Optional[float] = None
+  speca: Optional[float] = None
+  shininess: Optional[float] = None
+  local: Optional[bool] = False
+
+REFTYPES.add(RefTypeSpec(type=Material, refname='MRef'))
+
 class Polygon(Eggable):
 
   @typechecked
