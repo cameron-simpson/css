@@ -486,6 +486,13 @@ class Vertex(DCEggable):
   w: Optional[float] = None
   attrs: Mapping = dataclass_field(default_factory=dict)
 
+  def __copy__(self):
+    ''' Shallow copy: copy the coordinates, make a new shallow dict for the `attrs`.
+    '''
+    return self.__class__(
+        x=self.x, y=self.y, z=self.z, w=self.w, attrs=dict(self.attrs)
+    )
+
 class VertexPool(Eggable):
   ''' A subclass of `list` containing vertices.
   '''
