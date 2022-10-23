@@ -526,10 +526,10 @@ class VertexPool(Eggable):
 
   def default_vertex_keyfn(self, v: Vertex) -> Hashable:
     ''' The default key function for a `Vertex`,
-        returning a 4-tuple of `(x,y,z,w)` from the `Vertex`,
-        ignoring the texture or other attributes.
+        returning a 5-tuple of `(x,y,z,w,attrs)` from the `Vertex`,
+        where the `attrs` part is a tuple of `sorted(v.attrs.items())`.
     '''
-    return v.x, v.y, v.z, v.w
+    return v.x, v.y, v.z, v.w, tuple(sorted(v.attrs.items()))
 
   def vertex_index(self, v: Vertex) -> int:
     ''' Return the index of this `Vertex`.
