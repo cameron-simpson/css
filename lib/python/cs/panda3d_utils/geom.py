@@ -63,10 +63,8 @@ def sphere(
   surface = Surface(f'sphere({radius:f}x{steps:d})')
   vertex_fn = lambda i, longitude, j, latitude: Vertex(
       *sphere_coords(longitude, latitude, radius),
-      attrs=dict(
-          ##RGBA=RGBA.random(),
-          UV=(i / steps / 2, j / steps),
-      )
+      UV=(i / steps / 2, j / steps),
+      ##RGBA=RGBA.random(),
   )
   longitudes = np.linspace(0, 2 * pi, num=steps * 2 + 1)
   X("longitudes = %r", longitudes)
@@ -132,7 +130,7 @@ def pyramid(
           radius * sin(corner_angle),
           radius * cos(corner_angle),
           0.0,
-          attrs=dict(UV=(0.0, 0.0))
+          UV=(0.0, 0.0),
       ) for i, corner_angle in enumerate(corner_angles[:-1])
   ]
   assert len(corner_vs) == sides
@@ -147,11 +145,8 @@ def pyramid(
     surface.add_polygon(apex, v1, v0, **poly_attrs)
   base_vs = [copy(v) for v in corner_vs]
   for i, v in enumerate(base_vs):
-    v.attrs.update(
-        UV=(
-            (sin(corner_angles[i]) + 1.0) / 2,
-            (cos(corner_angles[i]) + 1.0) / 2
-        )
+    v.UV = (
+        (sin(corner_angles[i]) + 1.0) / 2, (cos(corner_angles[i]) + 1.0) / 2
     )
   surface.add_polygon(*base_vs, **poly_attrs)
   return surface
