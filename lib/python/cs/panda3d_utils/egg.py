@@ -821,7 +821,8 @@ class Model(ContextManagerMixin):
       pview_opts.append('-L')
     with NamedTemporaryFile(suffix='.egg') as T:
       self.save(T.name, skip_check=skip_check, exists_ok=True)
-      run(['pview', *pview_opts, T.name], quiet=quiet)
+      run(['cat', T.name])
+      run(['pview', *pview_opts, T.name])
 
 if __name__ == '__main__':
   for eggable in (
