@@ -427,6 +427,31 @@ class Result(FSM):
       if self.fsm_state in (self.CANCELLED, self.DONE):
         notifier(self)
 
+def in_thread(func):
+  ''' Decorator to evaluate `func` in a separate `Thread`.
+      Return or exception is as for the original function.
+
+      This exists to step out of the current `Thread's` thread
+      local context, such as a database transaction associated
+      with Django's implicit per-`Thread` database context.
+  '''
+
+  def run_in_thread(*a, **kw):
+    ''' Create a `Result`, fulfil it by running `func(*a,**kw)`
+        in a separate `Thread`, return the function result (or exception).
+    '''
+    desc_fmt, desc_fmt_args = func_a_kw_fmt(func, *a, **kw)
+    R = Result(name=desc_fmt % tuple(desc_fmt_args))
+    return R.run_func_in_thread(func, *a, **kw)
+
+  return run_in_thread
+
+def call_in_thread(func, *a, **kw):
+  ''' Run `func(*a,**kw)` in a separate `Thread` via the `@in_thread` decorator.
+      Return or exception is as for the original function.
+  '''
+  return in_thread(func)(*a, **kw)
+
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
 
