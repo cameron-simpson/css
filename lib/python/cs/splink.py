@@ -985,8 +985,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] start-time [stop-time] {{mode|[dataset:]{{glob|field}}}}...
+    ''' Usage: {cmd} [-e event,...] [-f] [-o imagepath] [--show] [start-time [stop-time] {{mode|[dataset:]{{glob|field}}}}...]
           Plot the data from specified fields for the specified time range.
+          If there is no start-time a time of 5 (the preceeding 5 days) is assumed.
+          If there are no data specs a mode of POWER is assumed.
           Options:
             --bare          Strip axes and padding from the plot.
             -e events,...   Display the specified events.
@@ -1027,7 +1029,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         tz_=('tz', tzfor),
     )
     tz = options.tz
-    # mandatory start time
+    # start time
+    if not argv:
+      argv = ['5']
     start = self.poptime(argv, 'start-time')
     # check for optional stop-time, default now
     if argv:
@@ -1035,6 +1039,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = self.poptime(argv, 'stop-time', unpop_on_error=True)
       except GetoptError:
         stop = time.time()
+    else:
+      stop = time.time()
     data_specs = argv if argv else ['POWER']
     bare = options.bare
     force = options.force
