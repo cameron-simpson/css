@@ -63,7 +63,7 @@ from cs.fsm import FSM
 from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
 from cs.pfx import pfx_method
-from cs.py.func import funcname
+from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
