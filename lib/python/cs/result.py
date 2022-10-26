@@ -291,9 +291,7 @@ class Result(FSM):
         self.exc_info = sys.exc_info()
 
   def run_func(self, func, *a, **kw):
-    ''' Have the `Result` run `func(*a,**kw)` and store its return value as
-        `self.result`.
-        If `func` raises an exception, store it as `self.exc_info`.
+    ''' Fulfil the `Result` by running `func(*a,**kw)`.
     '''
     self.fsm_event('dispatch')
     try:
@@ -317,6 +315,18 @@ class Result(FSM):
     return bg_thread(
         self.run_func, name=self.name, args=[func] + list(a), kwargs=kw
     )
+
+  def run_func_in_thread(self, func, *a, **kw):
+    ''' Fulfil the `Result` by running `func(*a,**kw)`
+        in a separate `Thread`.
+
+        This exists to step out of the current `Thread's` thread
+        local context, such as a database transaction associated
+        with Django's implicit per-`Thread` database context.
+    '''
+    T = self.bg(func, *a, **kw)
+    T.join()
+    return self()
 
   @require(
       lambda self: self.fsm_state in
