@@ -7,7 +7,7 @@ import sys
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.panda3d_utils.egg import Model, Material, Texture
+from cs.panda3d_utils.egg import Model, Material, Texture, Transform, Translate
 from cs.panda3d_utils.geom import equilateral_pyramid, pyramid, sphere
 from cs.progress import progressbar
 
@@ -53,6 +53,19 @@ class M3Command(BaseCommand):
     for t in progressbar(range(100), "step"):
       M.step()
     M.EggModel(model=model)
+
+  def cmd_sol(self, argv):
+    xy_s, = argv
+    xy = int(xy_s)
+    options = self.options
+    model = options.model
+    sol = sphere(xy * 8, 20, material=options.material)
+    model.append(sol.EggNode())
+    terra = sphere(xy, 20, texture=options.texture)
+    txlate = Translate(100, 0, 0)
+    txform = Transform(Translate=txlate)
+    tnode = terra.EggNode(transform=txform)
+    model.append(tnode)
 
   def cmd_pyramid(self, argv):
     xy_s, = argv
