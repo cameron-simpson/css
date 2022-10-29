@@ -537,6 +537,81 @@ class RGBA(DCEggable):
     return cls(r, g, b, a)
 
 @dataclass
+class Translate(DCEggable):
+  POSITIONAL = True
+  x: float
+  y: float
+  z: float
+
+@dataclass
+class RotX(DCEggable):
+  POSITIONAL = True
+  degrees: float
+
+@dataclass
+class RotY(DCEggable):
+  POSITIONAL = True
+  degrees: float
+
+@dataclass
+class RotZ(DCEggable):
+  POSITIONAL = True
+  degrees: float
+
+@dataclass
+class Rotate(DCEggable):
+  POSITIONAL = True
+  degrees: float
+  x: float
+  y: float
+  z: float
+
+@dataclass
+class Scale1(DCEggable):
+  POSITIONAL = True
+  egg_name = lambda _: 'Scale'
+  s: float
+
+@dataclass
+class Scale3(DCEggable):
+  POSITIONAL = True
+  egg_name = lambda _: 'Scale'
+  x: float
+  y: float
+  z: float
+
+@dataclass
+class Matrix4(DCEggable):
+  POSITIONAL = True
+  aa: float
+  ab: float
+  ac: float
+  ad: float
+  ba: float
+  bb: float
+  bc: float
+  bd: float
+  ca: float
+  cb: float
+  cc: float
+  cd: float
+  da: float
+  db: float
+  dc: float
+  dd: float
+
+@dataclass
+class Transform(DCEggable):
+  Translate: Optional[Translate] = None
+  RotX: Optional[RotX] = None
+  RotY: Optional[RotY] = None
+  RotZ: Optional[RotZ] = None
+  Rotate: Optional[Rotate] = None
+  Scale1: Optional[Scale1] = None
+  Scale3: Optional[Scale3] = None
+  Matrix4: Optional[Matrix4] = None
+
+@dataclass
 class Vertex(DCEggable):
   POSITIONAL = 'x', 'y', 'z', 'w'
   x: float
