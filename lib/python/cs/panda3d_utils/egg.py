@@ -417,6 +417,8 @@ class DCEggable(Eggable):
       if value is not None:
         if isinstance(value, (str, int, float)):
           yield EggNode('Scalar', field_name, [value])
+        elif isinstance(value, Eggable):
+          yield value
         else:
           yield EggNode(field_name, None, value)
     # yield named attrs if present
