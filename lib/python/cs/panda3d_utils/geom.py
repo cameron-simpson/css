@@ -32,10 +32,16 @@ class Surface:
     vindices = [vifn(v) for v in vertices]
     self.polygons.append(Polygon(None, self.vpool, *vindices, **polygon_attrs))
 
-  def EggNode(self):
+  @typechecked
+  def EggNode(self, transform: Optional[Transform] = None):
     ''' Return a `<Group>` defining this `Surface`.
     '''
-    return Group(self.name, self.vpool, *self.polygons)
+    nodes = []
+    if transform:
+      nodes.append(transform)
+    nodes.append(self.vpool)
+    nodes.extend(self.polygons)
+    return Group(self.name, *nodes)
 
 def sphere_coords(longitude: float,
                   latitude: float,
