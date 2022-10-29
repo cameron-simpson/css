@@ -10,7 +10,16 @@ from icontract import require
 import numpy as np
 from typeguard import typechecked
 
-from .egg import Group, Model, Polygon, RGBA, Texture, Vertex, VertexPool
+from .egg import (
+    Group,
+    Model,
+    Polygon,
+    RGBA,
+    Texture,
+    Transform,
+    Vertex,
+    VertexPool,
+)
 
 class Surface:
   ''' A surface definition consisting of a list of `Polygon`s
