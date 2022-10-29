@@ -16,6 +16,7 @@
     * `dump`,`dumps`,dumpz`: after the style of `json.dump`, functions
       to dump objects in Egg syntax
     * `Eggable`: a mixin to support objects which can be transcribed in Egg syntax
+    * `DCEggable`: an `Eggable` based on a dataclass
     * `Eggable.as_str(obj)`: a class method to transcribe an object in Egg syntax,
       accepting `Eggable`s, `str`s and numeric values
     * various factories and classes for Egg nodes: `Texture`,
