@@ -60,9 +60,7 @@ def sphere_coords(longitude: float,
 
 @typechecked
 @require(lambda radius: radius > 0)
-def sphere(
-    radius: float = 1.0, steps: int = 8, *, texture: Texture
-) -> Surface:
+def sphere(radius: float = 1.0, steps: int = 8, **poly_attrs) -> Surface:
   ''' Lay out texture onto a sphere where the texture is a Mercator
       projection.
   '''
@@ -107,7 +105,7 @@ def sphere(
       surface.add_polygon(
           *vs,
           ##RGBA=RGBA.random(),
-          Texture=texture,
+          **poly_attrs
       )
   return surface
 
