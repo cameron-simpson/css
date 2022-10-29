@@ -64,7 +64,6 @@ def sphere_coords(longitude: float,
       cos(longitude) * lat_cos * radius,
       sin(latitude) * radius,
   )
-  X("    sphere coords(%f,%f) => %r", longitude, latitude, xyz)
   return xyz
 
 @typechecked
@@ -80,15 +79,11 @@ def sphere(radius: float = 1.0, steps: int = 8, **poly_attrs) -> Surface:
       ##RGBA=RGBA.random(),
   )
   longitudes = np.linspace(0, 2 * pi, num=steps * 2 + 1)
-  X("longitudes = %r", longitudes)
   latitudes = np.linspace(-pi / 2, pi / 2, num=steps + 1)
-  X("latitudes = %r", latitudes)
   for i, longitude in enumerate(longitudes[:-1]):
     long2 = longitudes[i + 1]
-    X("long %f..%f", longitude, long2)
     for j, latitude in enumerate(latitudes[:-1]):
       lat2 = latitudes[j + 1]
-      X("  lat %f..%f", latitude, lat2)
       if j == 0:
         # triangle from the pole
         vs = (
