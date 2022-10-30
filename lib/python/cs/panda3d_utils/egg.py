@@ -840,6 +840,13 @@ class Group(Eggable):
   def egg_contents(self):
     return self.items
 
+class Instance(Group):
+  ''' An `<Instance>` is like a `<Group>` but with local coordinates.
+
+      The docs are unforthcoming, and I'm hoping the coords are
+      thus pretransform rather than posttransform.
+  '''
+
 class Model(ContextManagerMixin):
 
   @typechecked
