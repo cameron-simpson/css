@@ -588,9 +588,19 @@ class RotZ(DCEggable):
 class Rotate(DCEggable):
   POSITIONAL = True
   degrees: float
-  x: float
-  y: float
-  z: float
+  x: Optional[float] = None
+  y: Optional[float] = None
+  z: Optional[float] = None
+
+  @classmethod
+  def promote(cls, rotate):
+    ''' Promote `rotate` to a `Rotate` instance.
+    '''
+    if isinstance(rotate, (int, float)):
+      rotate = cls(rotate)
+    else:
+      rotate = super().promote(rotate)
+    return rotate
 
 @dataclass
 class Scale1(DCEggable):
