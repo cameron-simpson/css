@@ -4,7 +4,9 @@ from copy import copy
 from dataclasses import dataclass, field
 from math import pi, sin, cos, sqrt
 from random import randint
-from typing import Any, Callable, Hashable, List, Mapping, Optional, Tuple
+from typing import (
+    Any, Callable, Hashable, List, Mapping, Optional, Tuple, Union
+)
 
 from icontract import require
 import numpy as np
@@ -12,11 +14,16 @@ from typeguard import typechecked
 
 from .egg import (
     Group,
+    Instance,
     Model,
     Polygon,
     RGBA,
+    Rotate,
+    Scale1,
+    Scale3,
     Texture,
     Transform,
+    Translate,
     Vertex,
     VertexPool,
 )
@@ -42,15 +49,39 @@ class Surface:
     self.polygons.append(Polygon(None, self.vpool, *vindices, **polygon_attrs))
 
   @typechecked
-  def EggNode(self, transform: Optional[Transform] = None):
+  def EggNode(
+      self,
+      *transforms,
+      rotate: Optional[Union[Rotate, float, Tuple[float, float, float,
+                                                  float]]] = None,
+      scale: Optional[Union[Scale1, float]] = None,
+      scale3: Optional[Union[Scale3, Tuple[float, float, float]]] = None,
+      translate: Optional[Union[Translate, Tuple[float, float, float]]] = None,
+  ):
     ''' Return a `<Group>` defining this `Surface`.
     '''
+    if scale is not None and scale3 is not None:
+      raise ValueError("only one of scale and scale3 may be specified")
     nodes = []
+    transform = Transform(transforms)
+    transforms = list(transforms)
+    if rotate is not None:
+      rotate = Rotate.promote(rotate)
+      transform.append(rotate)
+    if scale is not None:
+      scale = Scale1.promote(scale)
+      transform.append(scale)
+    if scale3 is not None:
+      scale3 = Scale3.promote(scale3)
+      transform.append(scale3)
+    if translate is not None:
+      translate = Translate.promote(translate)
+      transform.append(translate)
     if transform:
       nodes.append(transform)
     nodes.append(self.vpool)
     nodes.extend(self.polygons)
-    return Group(self.name, *nodes)
+    return Instance(self.name, *nodes)
 
 def sphere_coords(longitude: float,
                   latitude: float,
