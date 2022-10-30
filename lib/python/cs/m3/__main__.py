@@ -62,9 +62,7 @@ class M3Command(BaseCommand):
     sol = sphere(xy * 8, 20, material=options.material)
     model.append(sol.EggNode())
     terra = sphere(xy, 20, texture=options.texture)
-    txlate = Translate(100, 0, 0)
-    txform = Transform(Translate=txlate)
-    tnode = terra.EggNode(transform=txform)
+    tnode = terra.EggNode(translate=(100, 0, 0))
     model.append(tnode)
 
   def cmd_pyramid(self, argv):
