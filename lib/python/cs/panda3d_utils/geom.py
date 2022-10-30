@@ -86,7 +86,7 @@ class Surface:
 def sphere_coords(longitude: float,
                   latitude: float,
                   radius: float = 1.0) -> Tuple[float, float, float]:
-  ''' Return the coordinates of a point on the surphace of a sphere
+  ''' Return the coordinates of a point on the surface of a sphere
       in world coordinates.
   '''
   lat_cos = cos(latitude)
