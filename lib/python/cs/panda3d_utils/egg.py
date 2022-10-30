@@ -366,6 +366,16 @@ class Eggable(metaclass=EggMetaClass):
           if isinstance(subitem, Eggable):
             q.append(subitem)
 
+class EggableList(list, Eggable):
+  ''' An `Eggable` which is just a list of items, such as `<Transform>`.
+  '''
+
+  def __str__(self):
+    return Eggable.__str__(self)
+
+  def egg_contents(self):
+    return iter(self)
+
 class DCEggable(Eggable):
   ''' `Eggable` subclass for dataclasses.
 
