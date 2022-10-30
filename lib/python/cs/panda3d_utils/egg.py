@@ -385,6 +385,21 @@ class DCEggable(Eggable):
        method.
   '''
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to `cls`. Return the promoted object.
+    '''
+    if not isinstance(obj, cls):
+      if isinstance(obj, (list, tuple)):
+        obj = cls(*obj)
+      elif isinstance(obj, dict):
+        obj = cls(**obj)
+      else:
+        raise TypeError(
+            "%s.promote: do not know how to promote %s" % (cls, r(obj))
+        )
+    return obj
+
   def egg_name(self):
     ''' The Egg has a name if it has a `.name` which is not `None`.
     '''
