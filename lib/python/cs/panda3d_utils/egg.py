@@ -611,16 +611,8 @@ class Matrix4(DCEggable):
   dc: float
   dd: float
 
-@dataclass
-class Transform(DCEggable):
-  Translate: Optional[Translate] = None
-  RotX: Optional[RotX] = None
-  RotY: Optional[RotY] = None
-  RotZ: Optional[RotZ] = None
-  Rotate: Optional[Rotate] = None
-  Scale1: Optional[Scale1] = None
-  Scale3: Optional[Scale3] = None
-  Matrix4: Optional[Matrix4] = None
+class Transform(EggableList):
+  pass
 
 @dataclass
 class Vertex(DCEggable):
