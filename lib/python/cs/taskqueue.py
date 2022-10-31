@@ -76,7 +76,7 @@ class TaskError(FSMError):
 
   # pylint: disable=redefined-outer-name
   @typechecked
-  def __init__(self, msg: str, task: 'TaskSubType'):
+  def __init__(self, msg: str, task: 'BaseTaskSubType'):
     super().__init__(msg, task)
 
 class BlockedError(TaskError):
@@ -86,7 +86,7 @@ class BlockedError(TaskError):
   # pylint: disable=redefined-outer-name
   @typechecked
   def __init__(
-      self, msg: str, task: 'TaskSubType', blocking_task: 'TaskSubType'
+      self, msg: str, task: 'BaseTaskSubType', blocking_task: 'BaseTaskSubType'
   ):
     super().__init__(msg, task)
     self.blocking_task = blocking_task
@@ -167,6 +167,8 @@ class BaseTask(FSM, RunStateMixin):
     ''' The default DOT node label.
     '''
     return f'{self.name}\n{self.fsm_state}'
+
+BaseTaskSubType = TypeVar('BaseTaskSubType', bound=BaseTask)
 
 # pylint: disable=too-many-instance-attributes
 class Task(FSM, RunStateMixin):
