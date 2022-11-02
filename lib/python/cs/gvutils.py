@@ -271,6 +271,7 @@ class DOTNodeMixin:
     if label is None:
       label = self.dot_node_label()
     attrs = dict(self.dot_node_attrs())
+    attrs.update(label=label)
     attrs.update(node_attrs)
     if not attrs:
       return quote(label)
