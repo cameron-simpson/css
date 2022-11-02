@@ -289,27 +289,12 @@ class FSM(DOTNodeMixin):
     '''
     return self.fsm_transitions_as_dot(self.FSM_TRANSITIONS)
 
-  def dot_node_fillcolor(self) -> Optional[str]:
-    ''' The default DOT node `fillcolor`.
-        Return a color name or `None`.
-
-        This implementation looks up `self.fsm_state`
-        in `self.DOT_NODE_FILLCOLOR_PALETTE` if that exists.
-        A default color can be provided with the key `None`
-        in the palette mapping.
+  @property
+  def dot_node_palette_key(self):
+    ''' Default palette index is `self.fsm_state`,
+        overriding `DOTNodeMixin.dot_node_palette_key`.
     '''
-    fillcolor = None
-    try:
-      fill_palette = self.DOT_NODE_FILLCOLOR_PALETTE
-    except AttributeError:
-      # no colour palette
-      pass
-    else:
-      try:
-        fillcolor = fill_palette[self.fsm_state]
-      except KeyError:
-        fillcolor = fill_palette.get(None)
-    return fillcolor
+    return self.fsm_state
 
   def dot_node_attrs(self):
     ''' DOT Node attributes.
