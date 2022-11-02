@@ -218,7 +218,7 @@ class DOTNodeMixin:
       nodes in a DOT graph description.
   '''
 
-  DOT_NODE_COLOR_PALETTE = {}
+  DOT_NODE_FONTCOLOR_PALETTE = {}
   DOT_NODE_FILLCOLOR_PALETTE = {}
 
   def __getattr__(self, attr: str):
@@ -284,7 +284,15 @@ class DOTNodeMixin:
   def dot_node_attrs(self) -> Mapping[str, str]:
     ''' The default DOT node attributes.
     '''
-    return dict(style='solid')
+    attrs = dict(style='solid')
+    fontcolor = self.dot_node_fontcolor
+    if fontcolor is not None:
+      attrs.update(fontcolor=fontcolor)
+    fillcolor = self.dot_node_fillcolor
+    if fillcolor is not None:
+      attrs.update(style='filled')
+      attrs.update(fillcolor=fillcolor)
+    return attrs
 
   def dot_node_label(self) -> str:
     ''' The default node label.

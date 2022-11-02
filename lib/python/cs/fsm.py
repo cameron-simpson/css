@@ -296,19 +296,6 @@ class FSM(DOTNodeMixin):
     '''
     return self.fsm_state
 
-  def dot_node_attrs(self):
-    ''' DOT Node attributes.
-    '''
-    attrs = super().dot_node_attrs()
-    color = self.dot_node_color
-    if color is not None:
-      attrs.update(color=color)
-    fillcolor = self.dot_node_fillcolor
-    if fillcolor is not None:
-      attrs.update(style='filled')
-      attrs.update(fillcolor=fillcolor)
-    return attrs
-
   def fsm_print(self, file=None, fmt=None, layout=None, **dot_kw):
     ''' Print the state transition diagram to `file`, default `sys.stdout`,
         in format `fmt` using the engine specified by `layout`, default `'dot'`.
