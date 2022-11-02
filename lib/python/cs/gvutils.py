@@ -33,7 +33,10 @@ def quote(s):
   '''
   if s.isalnum() or s.replace('_', '').isalnum():
     return s
-  return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+  return (
+      '"' + s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n') +
+      '"'
+  )
 
 # special value to capture the output of gvprint as binary data
 GVCAPTURE = object()
