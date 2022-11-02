@@ -300,7 +300,10 @@ class FSM(DOTNodeMixin):
     ''' DOT Node attributes.
     '''
     attrs = super().dot_node_attrs()
-    fillcolor = self.dot_node_fillcolor()
+    color = self.dot_node_color
+    if color is not None:
+      attrs.update(color=color)
+    fillcolor = self.dot_node_fillcolor
     if fillcolor is not None:
       attrs.update(style='filled')
       attrs.update(fillcolor=fillcolor)
