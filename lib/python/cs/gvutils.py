@@ -214,6 +214,12 @@ class DOTNodeMixin:
       nodes in a DOT graph description.
   '''
 
+
+  @property
+  def dot_node_id(self):
+    ''' An id for this DOT node.
+    '''
+    return str(id(self))
   def dot_node(self, label=None, **node_attrs) -> str:
     ''' A DOT syntax node definition for `self`.
     '''
@@ -224,7 +230,7 @@ class DOTNodeMixin:
     attrs_s = ','.join(
         f'{quote(attr)}={quote(value)}' for attr, value in attrs.items()
     )
-    return f'{quote(label)}[{attrs_s}]'
+    return f'{quote(self.dot_node_id)}[{attrs_s}]'
 
   # pylint: disable=no-self-use
   def dot_node_attrs(self) -> Mapping[str, str]:
