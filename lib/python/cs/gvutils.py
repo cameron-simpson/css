@@ -227,6 +227,8 @@ class DOTNodeMixin:
       label = self.dot_node_label()
     attrs = dict(self.dot_node_attrs())
     attrs.update(node_attrs)
+    if not attrs:
+      return quote(label)
     attrs_s = ','.join(
         f'{quote(attr)}={quote(value)}' for attr, value in attrs.items()
     )
