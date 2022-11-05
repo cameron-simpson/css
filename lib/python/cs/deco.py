@@ -824,6 +824,13 @@ def promote(func, params=None, types=None):
 
   '''
   sig = signature(func)
+  if params is not None:
+    for param_name in params:
+      if param_name not in sig.parameters:
+        raise ValueError(
+            "@promote(%r,params=%r): no %r parameter in signature (sig.parameters=%r)"
+            % (func, params, param_name, dict(sig.parameters))
+        )
   promotions = {}  # mapping of arg->(type,promote)
   for param_name, param in sig.parameters.items():
     if params is not None and param_name not in params:
