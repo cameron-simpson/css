@@ -1,3 +1,4 @@
+an @promote decorator to scan types in func sig and call type.promote
 progressbar/iterbar: check out len and length_hint as defaults for total
 iterbar: call back to length_hint if no len as default?
 mklinks: quit on SIGINT
