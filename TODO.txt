@@ -1,3 +1,4 @@
+@promote: optional promote[param_name]->callable mapping
 @promote: accept ints in params to identify positional parameters?
 an @promote decorator to scan types in func sig and call type.promote
 progressbar/iterbar: check out len and length_hint as defaults for total
