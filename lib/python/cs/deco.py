@@ -795,13 +795,6 @@ def default_params(func, _strict=False, **param_defaults):
   )
   return defaulted_func
 
-def _teststuff():
-
-  @contextdecorator
-  def tracecall(func, a, kw):
-    print("call %s(*%r,**%r)" % (func, a, kw))
-    yield 9
-    print("return from %s(*%r,**%r)" % (func, a, kw))
 @decorator
 def promote(func, params=None, types=None):
   ''' A decorator to promote argument values automaticaly in annotated functions.
@@ -810,10 +803,6 @@ def promote(func, params=None, types=None):
       value not of the type of the annotation, the `.promote` method
       will be called to promote the value to the expected type.
 
-  @tracecall
-  def f(*a, **kw):
-    print("hello from f: a=%r, kw=%r" % (a, kw))
-    return "V"
       The decorator accepts optional parameters:
       * `params`: if supplied, only parameters in this list will
         be promoted
@@ -822,14 +811,6 @@ def promote(func, params=None, types=None):
 
       Example:
 
-  @tracecall
-  def g(r):
-    yield from range(r)
-
-  @tracecall(provide_context=True)
-  def f2(ctxt, *a, **kw):
-    print("hello from f2: ctxt=%s, a=%r, kw=%r" % (ctxt, a, kw))
-    return "V2"
           >>> from cs.timeseries import Epoch
           >>> from typeguard import typechecked
           >>>
@@ -841,19 +822,6 @@ def promote(func, params=None, types=None):
           >>> f([1,2,3], epoch=12.0)
           epoch = <class 'cs.timeseries.Epoch'> Epoch(start=0, step=12)
 
-  v = f("abc", y=1)
-  print("v =", v)
-  v = f2("abc2", y=1)
-  print("v2 =", v)
-  gg = g(9)
-  for i in gg:
-    print("i =", i)
-  sys.exit(1)
-
-  # pylint: disable=too-few-public-methods
-  class Foo:
-    ''' Dummy class.
-    '''
   '''
   sig = signature(func)
   promotions = {}  # mapping of arg->(type,promote)
@@ -876,11 +844,6 @@ def promote(func, params=None, types=None):
     warning("@promote(%s): no promotable parameters", func)
     return func
 
-    @cachedmethod(poll_delay=2)
-    def x(self, arg):
-      ''' Dummy `x` method.
-      '''
-      return str(self) + str(arg)
   def promoting_func(*a, **kw):
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
@@ -895,17 +858,4 @@ def promote(func, params=None, types=None):
       arg_mapping[param_name] = arg_value
     return func(*bound_args.args, **bound_args.kwargs)
 
-  F = Foo()
-  y = F.x(1)
-  print("F.x() ==>", y)
-  y = F.x(1)
-  print("F.x() ==>", y)
-  y = F.x(2)
-  print("F.x() ==>", y)
-  time.sleep(3)
-  y = F.x(3)
-  print("F.x() ==>", y)
-
-if __name__ == '__main__':
-  _teststuff()
   return promoting_func
