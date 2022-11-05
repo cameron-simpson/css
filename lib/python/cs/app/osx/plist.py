@@ -171,6 +171,7 @@ def ingest_plist_dict(pd):
   if pd.tag != 'dict':
     raise ValueError("not a <dict>: %r" % (pd,))
   d = PListDict()
+  key = None
   for i, e in enumerate(pd):
     if i % 2 == 0:
       if e.tag == 'key':

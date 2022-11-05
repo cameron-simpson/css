@@ -595,7 +595,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     if not isabspath(calcmd):
       calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
     calargv = [calcmd, *calargv]
-    return run(calargv, doit=doit, quiet=quiet, **subp_options)
+    cp = run(calargv, doit=doit, quiet=quiet, **subp_options)
+    if cp.stdout and not quiet:
+      print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
+    return cp
 
   def calibredb(self, dbcmd, *argv, doit=True, quiet=False, **subp_options):
     ''' Run `dbcmd` via the `calibredb` command.
@@ -1286,9 +1289,12 @@ class CalibreCommand(BaseCommand):
     quiet = options.quiet
     runstate = options.runstate
     verbose = options.verbose
-    cbooks = self.popbooks(argv or list(self.DEFAULT_LINKTO_SELECTORS))
-    with UpdProxy(prefix='linkto: ') as proxy:
-      for cbook in unrepeated(cbooks):
+    cbooks = sorted(
+        set(self.popbooks(argv or list(self.DEFAULT_LINKTO_SELECTORS))),
+        key=lambda cbook: cbook.title.lower()
+    )
+    for cbook in progressbar(cbooks, "linkto"):
+      with UpdProxy(prefix='linkto: ') as proxy:
         if runstate.cancelled:
           break
         proxy.text = str(cbook)
@@ -1314,7 +1320,7 @@ class CalibreCommand(BaseCommand):
               if force:
                 warning("dst already exists, will be replaced: %s", dstpath)
               else:
-                warning("dst already exists, skipped: %s", dstpath)
+                ##warning("dst already exists, skipped: %s", dstpath)
                 continue
             if existspath(dstpath):
               (verbose or not doit) and print("unlink", shortpath(dstpath))
@@ -1392,9 +1398,13 @@ class CalibreCommand(BaseCommand):
             print("   ", TagSet(identifiers))
           for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
-              fspath = calibre.pathto(subpath)
-              size = pfx_call(os.stat, fspath).st_size
-              print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
+              fspath = cbook.pathto(subpath)
+              try:
+                size = pfx_call(os.stat, fspath).st_size
+              except OSError as e:
+                warning("cannot stat: %s", e)
+              else:
+                print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
     if runstate.cancelled:
       xit = 1
     return xit
