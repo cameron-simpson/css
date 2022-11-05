@@ -10,10 +10,11 @@ Assorted decorator functions.
 
 from collections import defaultdict
 from contextlib import contextmanager
-from inspect import isgeneratorfunction
+from inspect import isgeneratorfunction, signature, Parameter
 import sys
 import time
 import traceback
+
 from cs.gimmicks import warning
 
 __version__ = '20220918.1-post'
@@ -801,11 +802,25 @@ def _teststuff():
     print("call %s(*%r,**%r)" % (func, a, kw))
     yield 9
     print("return from %s(*%r,**%r)" % (func, a, kw))
+@decorator
+def promote(func, params=None, types=None):
+  ''' A decorator to promote argument values automaticaly in annotated functions.
+      For any parameter with a type annotation, if that type has a
+      `.promote(value)` method and the function is called with a
+      value not of the type of the annotation, the `.promote` method
+      will be called to promote the value to the expected type.
 
   @tracecall
   def f(*a, **kw):
     print("hello from f: a=%r, kw=%r" % (a, kw))
     return "V"
+      The decorator accepts optional parameters:
+      * `params`: if supplied, only parameters in this list will
+        be promoted
+      * `types`: if supplied, only types in this list will be
+        considered for promotion
+
+      Example:
 
   @tracecall
   def g(r):
@@ -815,6 +830,16 @@ def _teststuff():
   def f2(ctxt, *a, **kw):
     print("hello from f2: ctxt=%s, a=%r, kw=%r" % (ctxt, a, kw))
     return "V2"
+          >>> from cs.timeseries import Epoch
+          >>> from typeguard import typechecked
+          >>>
+          >>> @promote
+          ... @typechecked
+          ... def f(data, epoch:Epoch=None):
+          ...     print("epoch =", type(epoch), epoch)
+          ...
+          >>> f([1,2,3], epoch=12.0)
+          epoch = <class 'cs.timeseries.Epoch'> Epoch(start=0, step=12)
 
   v = f("abc", y=1)
   print("v =", v)
@@ -829,12 +854,46 @@ def _teststuff():
   class Foo:
     ''' Dummy class.
     '''
+  '''
+  sig = signature(func)
+  promotions = {}  # mapping of arg->(type,promote)
+  for param_name, param in sig.parameters.items():
+    if params is not None and param_name not in params:
+      continue
+    annotation = param.annotation
+    if annotation is Parameter.empty:
+      continue
+    if types is not None and annotation not in types:
+      continue
+    try:
+      promote_method = annotation.promote
+    except AttributeError:
+      continue
+    if not callable(promote_method):
+      continue
+    promotions[param_name] = (annotation, promote_method)
+  if not promotions:
+    warning("@promote(%s): no promotable parameters", func)
+    return func
 
     @cachedmethod(poll_delay=2)
     def x(self, arg):
       ''' Dummy `x` method.
       '''
       return str(self) + str(arg)
+  def promoting_func(*a, **kw):
+    bound_args = sig.bind(*a, **kw)
+    arg_mapping = bound_args.arguments
+    for param_name, (annotation, promote_method) in promotions.items():
+      try:
+        arg_value = arg_mapping[param_name]
+      except KeyError:
+        continue
+      if isinstance(param_name, annotation):
+        continue
+      arg_value = promote_method(arg_value)
+      arg_mapping[param_name] = arg_value
+    return func(*bound_args.args, **bound_args.kwargs)
 
   F = Foo()
   y = F.x(1)
@@ -849,3 +908,4 @@ def _teststuff():
 
 if __name__ == '__main__':
   _teststuff()
+  return promoting_func
