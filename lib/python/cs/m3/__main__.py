@@ -87,8 +87,8 @@ class M3Command(BaseCommand):
     surface = equilateral_pyramid(
         3,
         xy,
-        material=options.material,
-        ##texture=options.texture,
+        ##material=options.material,
+        texture=options.texture,
     )
     model.append(surface.EggNode())
 
