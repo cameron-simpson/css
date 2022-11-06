@@ -666,6 +666,24 @@ class Vertex(DCEggable):
   UV: Optional[UV] = None
   attrs: Mapping = dataclass_field(default_factory=dict)
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to `Vertex`.
+
+        A 3-tuple or 4-tuple will be promoted to an unadorned `Vertex`.
+    '''
+    if not isinstance(obj, cls):
+      if isinstance(obj, tuple):
+        if len(obj) not in (3, 4):
+          raise ValueError(
+              "cannot promote %d-tuple to %s, require 3 or 4 members" %
+              (len(obj), cls.__name__)
+          )
+        obj = cls(*obj)
+      else:
+        obj = super().promote(obj)
+    return obj
+
   def __copy__(self):
     ''' Shallow copy: copy the coordinates, make a new shallow dict for the `attrs`.
     '''
