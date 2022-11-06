@@ -141,6 +141,65 @@ def sphere(radius: float = 1.0, steps: int = 8, **poly_attrs) -> Surface:
       )
   return surface
 
+def torus_coords(
+    longitude: float,
+    latitude: float,
+    radius1: float,
+    radius2: float,
+) -> Tuple[float, float, float]:
+  ''' Return the coordinates of a point on the surface of a torus
+      in world coordinates.
+  '''
+  lat_sin = sin(latitude)
+  lat_cos = cos(latitude)
+  long_sin = sin(longitude)
+  long_cos = cos(longitude)
+  x = long_cos * (radius1 + radius2 * lat_cos)
+  y = radius2 * lat_sin
+  z = long_sin * (radius1 + radius2 * lat_cos)
+  return x, y, z
+
+@typechecked
+@require(lambda radius1: radius1 > 0)
+@require(lambda radius2: radius2 > 0)
+def torus(
+    radius1: float = 1.0,
+    radius2: float = 1.0,
+    *,
+    steps1: int = 8,
+    steps2: int = 8,
+    long_tiles=4,
+    lat_tiles=4,
+    **poly_attrs,
+) -> Surface:
+  ''' Create a toroidal `Surface`.
+  '''
+  surface = Surface(f'torus({radius1:f}x{radius2:f}@{steps1:d}x{steps2:d})')
+  vertex_fn = lambda i, longitude, j, latitude: Vertex(
+      *torus_coords(longitude, latitude, radius1, radius2),
+      UV=(i * long_tiles / steps1 % 1.0, j * lat_tiles / steps2 % 1.0),
+      ##RGBA=RGBA.random(),
+  )
+  longitudes = np.linspace(0, 2 * pi, num=steps1 * 2 + 1)
+  latitudes = np.linspace(-2 * pi / 2, 2 * pi / 2, num=steps2 * 2 + 1)
+  for i, longitude in enumerate(longitudes[:-1]):
+    long2 = longitudes[i + 1]
+    for j, latitude in enumerate(latitudes[:-1]):
+      lat2 = latitudes[j + 1]
+      # rectangle
+      vs = (
+          vertex_fn(i, longitude, j, latitude),
+          vertex_fn(i, longitude, j + 1, lat2),
+          vertex_fn(i + 1, long2, j + 1, lat2),
+          vertex_fn(i + 1, long2, j, latitude),
+      )
+      surface.add_polygon(
+          *vs,
+          ##RGBA=RGBA.random(),
+          **poly_attrs
+      )
+  return surface
+
 @typechecked
 @require(lambda sides: sides >= 3)
 @require(lambda base_length: base_length > 0.0)
