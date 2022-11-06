@@ -88,7 +88,7 @@ from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
 from cs.context import stackattrs
 from cs.csvutils import csv_import
-from cs.deco import cachedmethod, decorator
+from cs.deco import cachedmethod, decorator, promote
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
@@ -119,7 +119,7 @@ DISTINFO = {
         'cs.configutils>=HasConfigIni',
         'cs.context',
         'cs.csvutils',
-        'cs.deco',
+        'cs.deco>=promote_optional',
         'cs.fileutils>=atomic_filename',
         'cs.fs',
         'cs.fstags',
@@ -1654,13 +1654,14 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @promote
   @typechecked
   def __init__(
       self,
       fspath: str,
-      typecode: Optional[TypeCodeish] = None,
+      typecode: Optional[TypeCode] = None,
       *,
-      epoch: OptionalEpochy = None,
+      epoch: Optional[Epoch] = None,
       fill=None,
       fstags=None,
   ):
@@ -1682,7 +1683,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           if unspecified, fill with `0` for `'q'`
           and `float('nan')` for `'d'`
     '''
-    epoch = Epoch.promote(epoch)
     HasFSPath.__init__(self, fspath)
     if fstags is None:
       fstags = FSTags()
@@ -1695,8 +1695,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       if typecode is None:
         ok = False
         warning("no typecode supplied and no data file %r", fspath)
-      else:
-        typecode = TypeCode.promote(typecode)
       if epoch is None:
         ok = False
         warning("no epoch supplied and no data file %r", fspath)
@@ -2241,11 +2239,11 @@ class TimespanPolicy(DBC, HasEpochMixin):
 
   FACTORIES = {}
 
+  @promote
   @typechecked
-  def __init__(self, epoch: Epochy):
+  def __init__(self, epoch: Epoch):
     ''' Initialise the policy.
     '''
-    epoch = Epoch.promote(epoch)
     self.name = type(self).name
     self.epoch = epoch
 
@@ -2254,9 +2252,10 @@ class TimespanPolicy(DBC, HasEpochMixin):
 
   # pylint: disable=keyword-arg-before-vararg
   @classmethod
+  @promote
   @typechecked
   def from_name(
-      cls, policy_name: str, epoch: OptionalEpochy = None, **policy_kw
+      cls, policy_name: str, epoch: Optional[Epoch] = None, **policy_kw
   ):
     ''' Factory method to return a new `TimespanPolicy` instance
         from the policy name,
@@ -2267,15 +2266,15 @@ class TimespanPolicy(DBC, HasEpochMixin):
           "TimespanPolicy.from_name is not meaningful from a subclass (%s)" %
           (cls.__name__,)
       )
-    epoch = Epoch.promote(epoch)
     policy = cls.FACTORIES[policy_name](epoch=epoch, **policy_kw)
     assert epoch is None or policy.epoch == epoch
     return policy
 
   @classmethod
   @pfx_method
+  @promote
   @typechecked
-  def promote(cls, policy, epoch: OptionalEpochy = None, **policy_kw):
+  def promote(cls, policy, epoch: Optional[Epoch] = None, **policy_kw):
     ''' Factory to promote `policy` to a `TimespanPolicy` instance.
 
         The supplied `policy` may be:
@@ -2289,7 +2288,6 @@ class TimespanPolicy(DBC, HasEpochMixin):
           (cls.__name__,)
       )
     if not isinstance(policy, TimespanPolicy):
-      epoch = Epoch.promote(epoch)
       if epoch is None:
         raise ValueError("epoch may not be None if promotion is required")
       if isinstance(policy, str):
@@ -2434,8 +2432,9 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
   # this definition is mostly to happy linters
   ARROW_SHIFT_PARAMS = None
 
+  @promote
   @typechecked
-  def __init__(self, epoch: Epochy, *, tz: Optional[str] = None):
+  def __init__(self, epoch: Epoch, *, tz: Optional[str] = None):
     super().__init__(epoch)
     if tz is None:
       tz = get_default_timezone_name()
@@ -2930,12 +2929,13 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @promote
   @typechecked
   def __init__(
       self,
       fspath,
       *,
-      epoch: OptionalEpochy = None,
+      epoch: Optional[Epoch] = None,
       policy=None,  # :TimespanPolicy
       tz: Optional[str] = None,
       fstags: Optional[FSTags] = None,
@@ -2949,7 +2949,6 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
     if not isdirpath(fspath):
       # new data dir, create it and save config
       pfx_call(needdir, fspath)
-      epoch = Epoch.promote(epoch)
       config.start = epoch.start
       config.step = epoch.step
     else:
@@ -2960,7 +2959,6 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       if epoch is None:
         epoch = Epoch(cfg_start, cfg_step)
       else:
-        epoch = Epoch.promote(epoch)
         if cfg_start is not None and cfg_start != epoch.start:
           raise ValueError(
               "config.start:%s != epoch,start:%s" %
@@ -3115,13 +3113,14 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       which dictates which partition holds the datum for a UNIX time.
   '''
 
+  @promote
   @typechecked
   def __init__(
       self,
       dirpath: str,
-      typecode: str,
+      typecode: Optional[TypeCode] = None,
       *,
-      epoch: OptionalEpochy = None,
+      epoch: Optional[Epoch] = None,
       policy,  # :TimespanPolicy,
       fstags: Optional[FSTags] = None,
   ):
@@ -3153,15 +3152,12 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         when a `TimeSeriesPartitioned` is made by a `TimeSeriesDataDir`
         instance it sets these flags.
     '''
-    epoch = Epoch.promote(epoch)
     policy = TimespanPolicy.promote(policy, epoch)
     HasFSPath.__init__(self, dirpath)
     if fstags is None:
       fstags = FSTags()
     if typecode is None:
       typecode = TypeCode(self.tags.typecode)
-    else:
-      typecode = TypeCode.promote(typecode)
     policy = TimespanPolicy.promote(policy, epoch=epoch)
     assert isinstance(policy, ArrowBasedTimespanPolicy)
     TimeSeries.__init__(self, policy.epoch, typecode)
@@ -3445,16 +3441,16 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         **plot_kw
     )
 
+@promote
 @typechecked
 def timeseries_from_path(
-    tspath: str, epoch: OptionalEpochy = None, typecode=None
+    tspath: str, epoch: Optional[Epoch] = None, typecode=None
 ):
   ''' Turn a time series filesystem path into a time series:
       * a file: a `TimeSeriesFile`
       * a directory holding `.csts` files: a `TimeSeriesPartitioned`
       * a directory: a `TimeSeriesDataDir`
   '''
-  epoch = Epoch.promote(epoch)
   if isfilepath(tspath):
     if not tspath.endswith(TimeSeriesFile.DOTEXT):
       raise ValueError(
