@@ -10,7 +10,8 @@ from typing import Callable, Optional, Tuple, TypeVar, Union
 
 from cs.cmdutils import BaseCommand
 from cs.context import ContextManagerMixin, stackattrs
-from cs.pfx import Pfx, pfx_call
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 
 from cs.py.func import trace
@@ -26,7 +27,9 @@ from direct.interval.IntervalGlobal import Sequence
 
 from typeguard import typechecked
 
-from .util import pzread
+from .egg import Material, Model, PointLight, RGBA
+from .geom import torus
+from .io import pzread
 
 Numeric = Union[int, float]
 Appish = TypeVar('Appish', bound=ShowBase)
