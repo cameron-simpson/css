@@ -696,15 +696,15 @@ class VertexPool(Eggable):
   '''
 
   @typechecked
-  def __init__(
-      self, name: str, vertices: Optional[Iterable] = None, *, keyfn=None
-  ):
+  def __init__(self, name: str, *vertices, keyfn=None):
     if keyfn is None:
       keyfn = self.default_vertex_keyfn
     self.name = name
     self._by_vkey: Mapping[Hashable, (int, Vertex)] = {}
     self.keyfn = keyfn
     self.register()
+    for v in vertices:
+      self.vertex_index(v)
 
   def __len__(self):
     return len(self.vertices)
