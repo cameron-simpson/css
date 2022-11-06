@@ -7,8 +7,16 @@ import sys
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.panda3d_utils.egg import Model, Material, Texture, Transform, Translate
-from cs.panda3d_utils.geom import equilateral_pyramid, pyramid, sphere
+from cs.panda3d_utils.egg import (
+    Model,
+    Material,
+    PointLight,
+    RGBA,
+    Texture,
+    Transform,
+    Translate,
+)
+from cs.panda3d_utils.geom import equilateral_pyramid, pyramid, sphere, torus
 from cs.progress import progressbar
 
 from .material import Material as M3Material
@@ -23,16 +31,21 @@ class M3Command(BaseCommand):
     texture = Texture(basename(texture_path), texture_path)
     material = Material(
         name="test-mat",
+        diffr=100,
+        diffg=100,
+        diffb=100,
+        diffa=100,
         emitr=0,
-        emitg=100,
-        emitb=50,
-        #ambr=40,
-        #ambg=0,
-        #ambb=0,
-        shininess=5,
+        emitg=0,
+        emitb=100,
+        ##ambr=40,
+        ##ambg=0,
+        ##ambb=0,
+        ##amba=0.5,
         specr=0.5,
         specg=50,
         specb=0.5,
+        shininess=100,
     )
     with Model(self.cmd) as model:
       model.append(material)
