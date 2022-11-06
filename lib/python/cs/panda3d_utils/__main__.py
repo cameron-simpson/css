@@ -111,6 +111,18 @@ class P3dApp(MultiOpenMixin, ShowBase):
       self.scene.setScale(*scale)
       self.scene.setPos(pos)
 
+  @pfx_method
+  def add_model(self, modelref, **lm_kwargs):
+    if isinstance(modelref, str):
+      # filename
+      return self.loader.loadModel(modelref, **lm_kwargs)
+    if isinstance(modelref, Model):
+      with modelref.saved() as eggpath:
+        return self.loader.loadModel(eggpath, **lm_kwargs)
+    raise TypeError(
+        f'do not know how to loadModel from type {modelref.__class__.__name__}'
+    )
+
   @typechecked
   def add_task(
       self,
