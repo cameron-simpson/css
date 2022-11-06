@@ -14,6 +14,7 @@ from inspect import isgeneratorfunction, signature, Parameter
 import sys
 import time
 import traceback
+import typing
 
 from cs.gimmicks import warning
 
@@ -838,6 +839,13 @@ def promote(func, params=None, types=None):
     annotation = param.annotation
     if annotation is Parameter.empty:
       continue
+    # recognise optional parameters and use their primary type
+    if param.default is not Parameter.empty:
+      anno_origin = typing.get_origin(annotation)
+      anno_args = typing.get_args(annotation)
+      if (anno_origin is typing.Union and len(anno_args) == 2
+          and anno_args[-1] is type(None)):
+        annotation, _ = anno_args
     if types is not None and annotation not in types:
       continue
     try:
