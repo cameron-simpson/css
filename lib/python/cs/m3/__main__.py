@@ -88,5 +88,33 @@ class M3Command(BaseCommand):
     surface = sphere(xy, 40, texture=texture)
     model.append(surface.EggNode())
 
+  def cmd_torus(self, argv):
+    ''' Usage: {cmd} radius1 radius2'''
+    radius1_s, radius2_s = argv
+    radius1 = float(radius1_s)
+    radius2 = float(radius2_s)
+    options = self.options
+    model = options.model
+    material = options.material
+    texture = options.texture
+    surface = torus(
+        radius1,
+        radius2,
+        steps1=12,
+        steps2=12,
+        material=material,
+        ##texture=texture,
+    )
+    model.append(surface.EggNode())
+    model.append(
+        PointLight(
+            "light0",
+            surface.vpool,
+            (100, 100, 100),
+            thick=10,
+            RGBA=RGBA(300, 0, 0),
+        )
+    )
+
 if __name__ == '__main__':
   sys.exit(M3Command(sys.argv).run())
