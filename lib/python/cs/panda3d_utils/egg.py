@@ -973,12 +973,21 @@ class Model(ContextManagerMixin):
               f.write('\n')
               ##print(item, file=f)
 
+  @contextmanager
+  def saved(self, suffix='.egg', **tempfile_kw):
+    ''' Context manager to save the `Model` to a `.egg` file
+        temporarily, yielding the filename.
+        Keyword parameters are passed to `NamedTemporaryFile`.
+    '''
+    with NamedTemporaryFile(suffix=suffix, **tempfile_kw) as T:
+      self.save(T.name, exists_ok=True)
+      yield T.name
+
   def load(self, loader, *, skip_check=False):
     ''' Load this model via `loader.loadModel`.
     '''
-    with NamedTemporaryFile(suffix='.egg') as T:
-      M.save(T.name, exists_ok=True)
-      return loader.loadModel(T.name)
+    with self.saved() as eggpath:
+      return loader.loadModel(eggpath)
 
   def view(
       self, *, centre=True, lighting=False, skip_check=False, quiet=False
