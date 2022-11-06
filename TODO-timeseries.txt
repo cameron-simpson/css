@@ -1,3 +1,5 @@
+events: partitioned timeseries for measurements, sqltags for the nonmeasurement events
+  event from sqltags, find closest measurements of interest
 standardise the sqltags for events metadata
 events partitioned timeseries
 events timeseries with timestamp/value pairs

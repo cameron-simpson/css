@@ -68,7 +68,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20220805-post'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -356,8 +356,7 @@ class Result(FSM):
   @pfx_method
   def join(self):
     ''' Calling the `.join()` method waits for the function to run to
-        completion and returns a tuple as for the `WorkerThreadPool`'s
-        `.dispatch()` return queue, a tuple of `(result,exc_info)`.
+        completion and returns a tuple of `(result,exc_info)`.
 
         On completion the sequence `(result,None)` is returned.
         If an exception occurred computing the result the sequence

@@ -14,14 +14,16 @@ from threading import Condition, Lock, RLock
 import time
 
 from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
+from cs.deco import default_params
 from cs.logutils import error, warning
 from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
+from cs.threads import State as ThreadState
 
-__version__ = '20220429-post'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -507,6 +509,8 @@ class RunState(ContextManagerMixin):
         to be called whenever `.cancel` is called.
   '''
 
+  current = ThreadState(runstate=None)
+
   def __init__(self, name=None, signals=None, handle_signal=None):
     self.name = name
     self._started_from = None
@@ -543,23 +547,25 @@ class RunState(ContextManagerMixin):
 
   def __enter_exit__(self):
     ''' The `__enter__`/`__exit__` generator function:
+        * push this RunState as RunState.current.runstate
         * catch signals
         * start
         * `yield self` => run
         * cancel on exception during run
         * stop
     '''
-    with self.catch_signal(self._signals, call_previous=False,
-                           handle_signal=self._sighandler) as sigstack:
-      with stackattrs(self, _sigstack=sigstack):
-        self.start(running_ok=True)
-        try:
-          yield self
-        except Exception:
-          self.cancel()
-          raise
-        finally:
-          self.stop()
+    with type(self).current(runstate=self):
+      with self.catch_signal(self._signals, call_previous=False,
+                             handle_signal=self._sighandler) as sigstack:
+        with stackattrs(self, _sigstack=sigstack):
+          self.start(running_ok=True)
+          try:
+            yield self
+          except Exception:
+            self.cancel()
+            raise
+          finally:
+            self.stop()
 
   @prop
   def state(self):
@@ -706,6 +712,8 @@ class RunState(ContextManagerMixin):
     # pylint: disable=expression-not-assigned
     warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
+
+uses_runstate = default_params(runstate=lambda: RunState.current.runstate)
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
