@@ -1264,9 +1264,6 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
         )
     return epochy
 
-Epochy = Union[Epoch, Tuple[Numeric, Numeric], Numeric]
-OptionalEpochy = Optional[Epochy]
-
 class HasEpochMixin(TimeStepsMixin):
   ''' A `TimeStepsMixin` with `.start` and `.step` derived from `self.epoch`.
   '''
