@@ -232,6 +232,20 @@ class Eggable(metaclass=EggMetaClass):
 
   @classmethod
   @uses_registry
+  def promote(cls, obj, *, registry):
+    ''' Promote `obj` to an instance of `cls`.
+
+        This implementation promotes `str` to the named `Eggable`.
+    '''
+    if not isinstance(obj, cls):
+      if isinstance(obj, str):
+        obj = cls.instance(obj, registry=registry)
+      else:
+        raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
+    return obj
+
+  @classmethod
+  @uses_registry
   def transcribe(cls, item, indent='', *, registry):
     ''' A generator yielding `str`s which transcribe `item` in Egg syntax.
     '''
