@@ -47,13 +47,55 @@ class P3DCommand(BaseCommand):
     ''' Usage: {cmd} [environment.egg]
     '''
     if argv:
-      env_egg_path = abspath(argv.pop(0))
+      model_spec = argv.pop(0)
     else:
-      env_egg_path = None
+      model_spec = None
     if argv:
       raise GetoptError("extra arguments: %s" % argv)
+    if model_spec == 'torus':
+      material = Material(
+          name="test-mat",
+          diffr=100,
+          diffg=100,
+          diffb=100,
+          diffa=100,
+          emitr=0,
+          emitg=0,
+          emitb=100,
+          ##ambr=40,
+          ##ambg=0,
+          ##ambb=0,
+          ##amba=0.5,
+          specr=0.5,
+          specg=50,
+          specb=0.5,
+          shininess=100,
+      )
+      with Model("demo") as model:
+        model.append(material)
+        surface = torus(
+            10,  ##radius1,
+            2,  ##radius2,
+            steps1=12,
+            steps2=12,
+            material=material,
+            ##texture=texture,
+        )
+        model.append(surface.EggNode())
+        model.append(
+            PointLight(
+                "light0",
+                surface.vpool,
+                (100, 100, 100),
+                thick=10,
+                RGBA=RGBA(300, 0, 0),
+            )
+        )
+      scene = model
+    else:
+      scene = model_spec
     options = self.options
-    with P3DemoApp(env_egg_path) as app:
+    with P3DemoApp(scene) as app:
       X("app=%s", r(app))
       X("app.tkRoot = %s", r(app.tkRoot))
       app.run()
@@ -86,7 +128,7 @@ class P3dApp(MultiOpenMixin, ShowBase):
   @typechecked
   def __init__(
       self,
-      scene: Optional[Union[str]] = None,  # TODO: add scene type
+      scene: Optional[Union[str, Model]] = None,  # TODO: add scene type
       *,
       scale: Optional[Tuple[Numeric, Numeric, Numeric]] = None,
       pos: Optional[Tuple[Numeric, Numeric, Numeric]] = None
@@ -102,8 +144,7 @@ class P3dApp(MultiOpenMixin, ShowBase):
       self.scene = None
     else:
       self.scene = (
-          pfx_call(self.loader.loadModel, scene)
-          if isinstance(scene, str) else scene
+          self.add_model(scene) if isinstance(scene, (str, Model)) else scene
       )
       # Reparent the model to render.
       self.scene.reparentTo(self.render)
