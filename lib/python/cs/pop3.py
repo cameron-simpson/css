@@ -356,7 +356,7 @@ class POP3(MultiOpenMixin):
             )
           else:
             print(
-                f'msg {msg_n} from %s: {len(msg_bs)} octets, saved as {Mkey}, deleting'
+                f'msg {msg_n} from {hdr_from}: {len(msg_bs)} octets, saved as {Mkey}, deleting'
             )
             if deleRs is not None:
               deleRs.add(self.client_dele_bg(msg_n))

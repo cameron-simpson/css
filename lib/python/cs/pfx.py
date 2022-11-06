@@ -373,7 +373,8 @@ class Pfx(object):
       elif attr == 'args' and isinstance(e, LookupError):
         if (isinstance(value, tuple) and value):
           value0 = value[0]
-          if value0.startswith("'") and value0.endswith("'"):
+          if (isinstance(value0, str) and value0.startswith("'")
+              and value0.endswith("'")):
             # args[0] is the key, do not fiddle with it
             continue
           value = (cls.prefixify(value0), *value[1:])
@@ -421,10 +422,10 @@ class Pfx(object):
 
   def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
-        within a surrounding Pfx context with the current mark string.
+        within a surrounding `Pfx` context with the current mark string.
 
         This is intended for deferred call facilities like
-        WorkerThreadPool, Later, and futures.
+        `Later` and `futures`.
     '''
     pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
 

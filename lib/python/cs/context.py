@@ -70,7 +70,7 @@ def stackattrs(o, **attr_values):
   ''' Context manager to push new values for the attributes of `o`
       and to restore them afterward.
       Returns a `dict` containing a mapping of the previous attribute values.
-      Attributes not present are not present in the mapping.
+      Attributes not present are not present in returned mapping.
 
       Restoration includes deleting attributes which were not present
       initially.
@@ -79,6 +79,8 @@ def stackattrs(o, **attr_values):
       without having to pass it through the call stack.
 
       See `stackkeys` for a flavour of this for mappings.
+
+      See `cs.context.StackableState` for a convenient wrapper class.
 
       Example of fiddling a programme's "verbose" mode:
 

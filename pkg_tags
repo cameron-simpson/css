@@ -31,7 +31,7 @@ cs.context pypi.release="20220619" ok_revision=a279be29f0d9ca6e631d0329e571e112b
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
 cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
-cs.deco pypi.release="20220918.1" ok_revision=b2119d5990189f0d39a3fb53a158974482d641e7 features={"20220905":["ALL","default_params"]}
+cs.deco pypi.release="20221106.1" ok_revision="91a12c71170014038957aea85c8a676d770863b9" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"]}
 cs.distinfo
 cs.ebooks ok_revision="1687329dfb2808f98e083ac7b604603074613b3e" pypi.release="20220805"
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
@@ -60,7 +60,7 @@ cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b8
 cs.mplutils ok_revision="58ff8b4668fb153629d847388703be4e27ca6b85" pypi.release="20220918" features={"20220918":["FigureSize"]}
 cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783" pypi.release="20211208"
 cs.nodedb pypi.release=20160828
-cs.numeric pypi.release=20190309 ok_revision="59303dd747cbf52f6fdf1777c1f6979d1085156d" features={"20220606":["intif"]}
+cs.numeric pypi.release="20220606" ok_revision="59303dd747cbf52f6fdf1777c1f6979d1085156d" features={"20220606":["intif"]}
 cs.obj pypi.release="20220918" ok_revision=dd0916cd678327c815e379bf8ed00c9ce4332874 features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"]}
 cs.onttags
 cs.packetstream pypi.release="20211208" ok_revision="906f6148d57dfa082d18e6f4b27b8081ee317ba8"
@@ -115,3 +115,4 @@ numpy
 os.path
 sqlalchemy
 typeguard
+youtube_dl

@@ -5,7 +5,8 @@
 #
 
 sedf=$(
-    awk '/^[1-9]/ {print(length($1),$0)}' /etc/hosts \
+    sort -u /etc/hosts \
+    | awk '/^[1-9]/ {print(length($1),$0)}' \
     | sort -rn \
     | while read len ip name etc
       do
