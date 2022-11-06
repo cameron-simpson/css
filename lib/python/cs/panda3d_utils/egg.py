@@ -746,6 +746,43 @@ class VertexPool(Eggable):
   def vertex_by_index(self, index: int) -> Vertex:
     return self.vertex_map[index]
 
+class PointLight(Eggable):
+
+  @promote
+  @typechecked
+  def __init__(
+      self,
+      name: str,
+      vpool: VertexPool,
+      *vertices,
+      **attrs,
+  ):
+    self.name = name
+    self.vpool = vpool
+    self.attrs = attrs
+    self.indices = [
+        (v if isinstance(v, int) else vpool.vertex_index(v)) for v in vertices
+    ]
+
+  def add_vertex(self, v: Union[Vertex, tuple, int]):
+    self.indices.append(
+        v if isinstance(v, int) else self.vpool.vertex_index(v)
+    )
+
+  def egg_contents(self):
+    yield from super().egg_contents()
+    yield EggNode(
+        'VertexRef',
+        None,
+        (
+            list(
+                self.indices if self
+                .indices else range(1,
+                                    len(self.vpool) + 1)
+            ) + [EggNode('Ref', None, [self.vpool.name])]
+        ),
+    )
+
 class Texture(Eggable):
   ''' An Egg `Texture` definition.
   '''
