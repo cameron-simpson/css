@@ -856,7 +856,6 @@ class Polygon(Eggable):
       indices = list(range(1, len(vpool) + 1))
     self.name = name
     self.vpool = vpool
-    self.name = name
     self.attrs = attrs
     self.indices = indices
 
