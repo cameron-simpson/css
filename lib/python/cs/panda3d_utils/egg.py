@@ -34,7 +34,7 @@ from zlib import compress
 from typeguard import typechecked
 
 from cs.context import ContextManagerMixin
-from cs.deco import decorator, default_params, fmtdoc
+from cs.deco import decorator, default_params, fmtdoc, promote
 from cs.fileutils import atomic_filename
 from cs.lex import is_identifier, r
 from cs.logutils import warning
@@ -409,9 +409,7 @@ class DCEggable(Eggable):
       elif isinstance(obj, dict):
         obj = cls(**obj)
       else:
-        raise TypeError(
-            "%s.promote: do not know how to promote %s" % (cls, r(obj))
-        )
+        obj = super().promote(obj)
     return obj
 
   def egg_name(self):
@@ -729,8 +727,9 @@ class VertexPool(Eggable):
     '''
     return v.x, v.y, v.z, v.w, tuple(sorted(v.attrs.items()))
 
+  @promote
   def vertex_index(self, v: Vertex) -> int:
-    ''' Return the index of this `Vertex`.
+    ''' Return the index of the `Vertex` `v`.
         If the vertex key `self.vertex_keyfn(v)` is unknown,
         store `v` in the vertex map as the reference `Vertex`.
     '''
@@ -807,23 +806,15 @@ REFTYPES.add(RefTypeSpec(type=Material, refname='MRef'))
 
 class Polygon(Eggable):
 
+  @promote
   @typechecked
   def __init__(
       self,
       name: Optional[str],
-      pool: Union[str, VertexPool],
+      vpool: VertexPool,
       *indices,
       **attrs,
   ):
-    if isinstance(pool, str):
-      vpool = VertexPool.instance(pool)
-    elif isinstance(pool, VertexPool):
-      vpool = pool
-    else:
-      raise TypeError(
-          "unhandled pool_name type %s, expected str or VertexPool" %
-          (type(pool),)
-      )
     if not indices:
       indices = list(range(1, len(vpool) + 1))
     self.name = name
