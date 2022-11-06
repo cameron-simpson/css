@@ -12,6 +12,7 @@ from icontract import require
 import numpy as np
 from typeguard import typechecked
 
+from cs.deco import promote
 from .egg import (
     Group,
     Instance,
@@ -48,15 +49,15 @@ class Surface:
     vindices = [vifn(v) for v in vertices]
     self.polygons.append(Polygon(None, self.vpool, *vindices, **polygon_attrs))
 
+  @promote
   @typechecked
   def EggNode(
       self,
       *transforms,
-      rotate: Optional[Union[Rotate, float, Tuple[float, float, float,
-                                                  float]]] = None,
-      scale: Optional[Union[Scale1, float]] = None,
-      scale3: Optional[Union[Scale3, Tuple[float, float, float]]] = None,
-      translate: Optional[Union[Translate, Tuple[float, float, float]]] = None,
+      rotate: Optional[Rotate] = None,
+      scale: Optional[Scale1] = None,
+      scale3: Optional[Scale3] = None,
+      translate: Optional[Translate] = None,
   ):
     ''' Return a `<Group>` defining this `Surface`.
     '''
@@ -66,16 +67,12 @@ class Surface:
     transform = Transform(transforms)
     transforms = list(transforms)
     if rotate is not None:
-      rotate = Rotate.promote(rotate)
       transform.append(rotate)
     if scale is not None:
-      scale = Scale1.promote(scale)
       transform.append(scale)
     if scale3 is not None:
-      scale3 = Scale3.promote(scale3)
       transform.append(scale3)
     if translate is not None:
-      translate = Translate.promote(translate)
       transform.append(translate)
     if transform:
       nodes.append(transform)
