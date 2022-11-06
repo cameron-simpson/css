@@ -37,14 +37,18 @@ class Surface:
   @typechecked
   def __init__(self, name, vpool: Optional[VertexPool] = None):
     if vpool is None:
-      vpool = VertexPool(name, [])
+      vpool = VertexPool(name)
     self.name = name
     self.vpool = vpool
     self.polygons = []
 
   def add_polygon(self, *vertices, **polygon_attrs):
-    ''' Create and add a new `Polygon` to the surfac.
+    ''' Create and add a new `Polygon` to the `Surface`.
     '''
+    if len(vertices) < 3:
+      raise ValueError(
+          "need at least 3 vertices, but only received %d" % (len(vertices),)
+      )
     vifn = self.vpool.vertex_index
     vindices = [vifn(v) for v in vertices]
     self.polygons.append(Polygon(None, self.vpool, *vindices, **polygon_attrs))
@@ -97,8 +101,8 @@ def sphere_coords(longitude: float,
 @typechecked
 @require(lambda radius: radius > 0)
 def sphere(radius: float = 1.0, steps: int = 8, **poly_attrs) -> Surface:
-  ''' Lay out texture onto a sphere where the texture is a Mercator
-      projection.
+  ''' Create a spherical `Surface`.
+      Any texture is used as a Mercator projection.
   '''
   surface = Surface(f'sphere({radius:f}x{steps:d})')
   vertex_fn = lambda i, longitude, j, latitude: Vertex(
