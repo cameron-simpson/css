@@ -216,8 +216,8 @@ case "$op" in
                           continue
                         }
                         case "$mode" in
-                          cp) $trace cp -a "$srcpath" "$clonedir/$subdir/" ;;
-                          sym)$trace ln -s "$srcpath" "$clonedir/$subdir/" ;;
+                          cp) $trace cp -a "$srcpath" "$clonedir/$subdir/" || : ;;
+                          sym)$trace ln -s "$srcpath" "$clonedir/$subdir/" || : ;;
                           *)  echo "$context: mode=$mode: unimplemented mode, skipping" >&2 ;;
                         esac
                       done
@@ -234,8 +234,8 @@ case "$op" in
                     incd "$clonedir" pwd >&3
                     ;;
       # current diff
-      diff,git)     git diff ${1+"$@"} ;;
-      diff,hg)      hg diff ${1+"$@"} ;;
+      diff,git)     git ${VCS_GIT_DIFF:-"diff"} ${1+"$@"} ;;
+      diff,hg)      hg ${VCS_HG_DIFF:-"diff"} ${1+"$@"} ;;
       dl,git | download,git)
                     git fetch $git_q --all ${1+"$@"} ;;
       dl,hg | download,hg)

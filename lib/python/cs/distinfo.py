@@ -50,6 +50,7 @@ from cs.lex import (
     is_identifier,
 )
 from cs.logutils import error, warning, info, status, trace
+from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
 import cs.psutils
 from cs.py.doc import module_doc
@@ -452,16 +453,22 @@ class CSReleaseCommand(BaseCommand):
         filter(None,
                prompt('Any named features with this release').split())
     )
-    if any(map(lambda feature_name: not is_identifier(feature_name) or
-               feature_name.startswith('fix_'), features)):
+    if any(map(
+        lambda feature_name: (not is_dotted_identifier(feature_name) or
+                              feature_name.startswith('fix_')),
+        features,
+    )):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(
         filter(None,
                prompt('Any named bugs fixed with this release').split())
     )
-    if any(map(lambda bug_name: not is_identifier(bug_name) or bug_name.
-               startswith('fix_'), bugfixes)):
+    if any(map(
+        lambda bug_name:
+        (not is_dotted_identifier(bug_name) or bug_name.startswith('fix_')),
+        bugfixes,
+    )):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(map(lambda bug_name: 'fix_' + bug_name, bugfixes))
@@ -768,7 +775,7 @@ def ask(message, fin=None, fout=None):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output file object of a command.
   '''
-  P = cs.psutils.pipefrom(argv, trace=False, **kw)
+  P = cs.psutils.pipefrom(argv, **kw)
   yield P.stdout
   if P.wait() != 0:
     pipecmd = ' '.join(argv)
@@ -997,9 +1004,10 @@ class Module:
       release_version = tags.get('pypi.release')
       if release_version is None:
         raise ValueError("no pypi.release")
+    release_version = intif(float(release_version))
     release_set = set()
     for version, feature_set in sorted(self.release_feature_set()):
-      if version > release_version:
+      if intif(float(version)) > release_version:
         break
       release_set = feature_set
     return release_set
@@ -1301,7 +1309,7 @@ class Module:
         "project": projspec,
         "build-system": {
             "requires": [
-                "setuptools >= 61.0",
+                "setuptools >= 61.2",
                 'trove-classifiers',
                 "wheel",
             ],

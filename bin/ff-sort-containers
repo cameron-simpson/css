@@ -5,22 +5,54 @@
 
 import json
 import sys
+
 from cs.fileutils import rewrite_cmgr
+from cs.logutils import setup_logging, warning
+from cs.pfx import Pfx
+
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
+  cmd = argv.pop(0)
+  setup_logging(cmd)
+  if not argv:
+    argv = ['-']
+  for path in argv:
+    with Pfx(path):
+      if path == '-':
+        if sys.stdin.isatty():
+          warning("stdin is a tty, ignoring")
+          continue
+        J = json.load(sys.stdin)
+        droptmp_struct(J)
+        sort_struct(J)
+        json.dump(J, sys.stdout, indent=2)
+        print()
+      else:
+        sort_cfile(path)
 
 def sort_struct(J):
   J["identities"] = sorted(
-      J["identities"], key=lambda C: (C.get("name",""), C["userContextId"])
+      J["identities"], key=lambda C: (C.get("name", ""), C["userContextId"])
   )
+
+def droptmp_struct(J):
+  J["identities"] = [
+      identity for identity in J["identities"]
+      if not identity.get("name", "").startswith("tmp")
+  ]
 
 def sort_cfile(filepath):
   ''' Sort the containers file `filepath` in place, leaving a backup.
   '''
   with open(filepath, 'r') as f:
-    J = json.loads(f.read())
+    J = json.load(f)
+  droptmp_struct(J)
   sort_struct(J)
+  print("rewrite", filepath)
   with rewrite_cmgr(filepath, backup_ext=".SAFE") as f:
-    json.dump(J, f, indent=None, separators=(',', ':'))
+    json.dump(J, f, indent=2)
+    print(file=f)
 
 if __name__ == '__main__':
-  filepath, = sys.argv[1:]
-  sort_cfile(filepath)
+  sys.exit(main(sys.argv))
