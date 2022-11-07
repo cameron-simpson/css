@@ -1,3 +1,4 @@
+use sqltags for the msgiddb
 write a folder transition diagram using FSM
 mailfiler needed 2 ctrl-c to exit
 support renaming headers in a cascade, example for googlegroups dkim, shuffle From to x-from-ggroups, shuffle x-original-from to from
