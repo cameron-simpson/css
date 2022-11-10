@@ -444,6 +444,8 @@ def in_thread(func):
     R = Result(name=desc_fmt % tuple(desc_fmt_args))
     return R.run_func_in_thread(func, *a, **kw)
 
+  # expose a reference to the original function
+  run_in_thread.direct = func
   return run_in_thread
 
 def call_in_thread(func, *a, **kw):
