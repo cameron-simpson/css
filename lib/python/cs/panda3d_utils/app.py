@@ -1,5 +1,19 @@
 #!/usr/bin/envpython3
 
+from typing import Callable, Optional, Tuple, TypeVar, Union
+
+from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.resources import MultiOpenMixin
+
+from cs.lex import r, s
+from cs.x import X
+
+from direct.showbase.ShowBase import ShowBase
+from direct.task import Task
+from typeguard import typechecked
+
+from .egg import Model
+
 class P3DApp(MultiOpenMixin, ShowBase):
 
   DEFAULT_SCALE = 1.0, 1.0, 1.0
@@ -10,8 +24,8 @@ class P3DApp(MultiOpenMixin, ShowBase):
       self,
       scene: Optional[Union[str, Model]] = None,  # TODO: add scene type
       *,
-      scale: Optional[Tuple[Numeric, Numeric, Numeric]] = None,
-      pos: Optional[Tuple[Numeric, Numeric, Numeric]] = None
+      scale: Optional[Tuple[float, float, float]] = None,
+      pos: Optional[Tuple[float, float, float]] = None
   ):
     if scale is None:
       scale = self.DEFAULT_SCALE
