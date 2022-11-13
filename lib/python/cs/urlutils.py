@@ -82,23 +82,8 @@ def isURL(U):
   '''
   return isinstance(U, _URL)
 
-def URL(U, referer, **kw):
-  ''' Factory function to return a _URL object from a URL string.
-      Handing it a _URL object returns the object.
-  '''
-  if not isURL(U):
-    U = _URL(U)
-    U._init(referer, **kw)
-  else:
-    if U.referer is None and referer is not None:
-      U.referer = referer
-    else:
-      pass
-  return U
-
-class _URL(unicode):
-  ''' Utility class to do simple stuff to URLs.
-      Subclasses `unicode` (Python 3 `str`).
+class URL(str):
+  ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
   def _init(self, referer=None, user_agent=None, opener=None):
@@ -122,6 +107,32 @@ class _URL(unicode):
     self.flush()
     self.retry_timeout = 3
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to an instance of `cls`.
+        Instances of `cls` are passed through unchanged.
+        `str` if promoted to `cls(obj)`.
+        `(url,referer)` is promoted to `cls(url,referer=referer)`.
+    '''
+    if isinstance(obj, URL):
+      return obj
+    if isinstance(obj, str):
+      return cls(obj)
+    try:
+      url, referer = obj
+    except (ValueError, TypeError):
+      raise TypeError(
+          "%s.promote: cannot convert to URL: %s" % (cls.__name__, r(obj))
+      )
+    else:
+      if isinstance(url, cls):
+        obj = url if referer is None else cls(url, referer=referer)
+      else:
+        obj = cls.promote(url) if referer is None else cls(
+            url, referer=referer
+        )
+    return boj
+
   def __getattr__(self, attr):
     ''' Ad hoc attributes.
         Upper case attributes named "FOO" parse the text and find the (sole) node named "foo".
@@ -136,7 +147,11 @@ class _URL(unicode):
       node, = nodes
       return node
     # look up method on equivalent Unicode string
-    return getattr(unicode(self), attr)
+    try:
+      sga = super().__getattr__
+    except AttributeError:
+      raise AttributeError(f'{self.__class__.__name__}.{attr}')
+    return sga(attr)
 
   def flush(self):
     ''' Forget all cached content.
@@ -223,7 +238,7 @@ class _URL(unicode):
           if final_url == self:
             final_url = self
           else:
-            final_url = URL(final_url, self)
+            final_url = URL(final_url, referer=self)
           self.final_url = final_url
           self._content = opened_url.read()
           self._parsed = None
@@ -450,7 +465,7 @@ class _URL(unicode):
 
   @property
   def parent(self):
-    return URL(urljoin(self, self.dirname), self)
+    return URL(urljoin(self, self.dirname), referer=self)
 
   @property
   def basename(self):
@@ -479,7 +494,7 @@ class _URL(unicode):
         pass
       else:
         if base:
-          return URL(base, self)
+          return URL(base, referer=self)
     return self
 
   @property
@@ -492,7 +507,7 @@ class _URL(unicode):
   def resolve(self, base):
     ''' Resolve this URL with respect to a base URL.
     '''
-    return URL(urljoin(base, self), base)
+    return URL(urljoin(base, self), referer=base)
 
   def normalised(self):
     ''' Return a normalised URL where "." and ".." components have been processed.
@@ -522,7 +537,7 @@ class _URL(unicode):
         normURL += ';' + self.paras
       if self.fragment:
         normURL += '#' + self.fragment
-      U = URL(normURL, self.referer)
+      U = URL(normURL, referer=self.referer)
     return U
 
   def hrefs(self, absolute=False):
@@ -535,7 +550,9 @@ class _URL(unicode):
       except KeyError:
         debug("no href, skip %r", A)
         continue
-      yield URL((urljoin(self.baseurl, href) if absolute else href), self)
+      yield URL(
+          (urljoin(self.baseurl, href) if absolute else href), referer=self
+      )
 
   def srcs(self, *a, **kw):
     ''' All 'src=' values from the content HTML.
@@ -551,7 +568,9 @@ class _URL(unicode):
       except KeyError:
         debug("no src, skip %r", A)
         continue
-      yield URL((urljoin(self.baseurl, src) if absolute else src), self)
+      yield URL(
+          (urljoin(self.baseurl, src) if absolute else src), referer=self
+      )
 
   def savepath(self, rootdir):
     ''' Compute a local filesystem save pathname for this URL.
@@ -661,7 +680,7 @@ class _URL(unicode):
               except ValueError:
                 pass
               else:
-                subU = URL(subU, U)
+                subU = URL(subU, referer=U)
               heappush(todo, subU)
 
   def default_limit(self):
@@ -672,7 +691,7 @@ class _URL(unicode):
 class URLLimit(namedtuple('URLLimit', 'scheme hostname port subpath')):
 
   def ok(self, U):
-    U = URL(U, None)
+    U = URL(U)
     return (
         U.scheme == self.scheme and U.hostname == self.hostname
         and U.port == self.port and U.path.startswith(self.subpath)
@@ -754,7 +773,7 @@ class URLs(object):
 
   @can_skip_url_errs
   def map(self, func, mode=None):
-    return type(self)([func(url) for url in self.urls], self.context, mode)
+    return URLS([func(url) for url in self.urls], self.context, mode)
 
   @can_skip_url_errs
   def hrefs(self, absolute=True, mode=None):
@@ -764,7 +783,7 @@ class URLs(object):
         chain(
             *[
                 pfx_iter(url,
-                         URL(url, None).hrefs(absolute=absolute))
+                         URL(url).hrefs(absolute=absolute))
                 for url in self.urls
             ]
         ), self.context, mode
@@ -778,8 +797,7 @@ class URLs(object):
         chain(
             *[
                 pfx_iter(url,
-                         URL(url, None).srcs(absolute=absolute))
-                for url in self.urls
+                         URL(url).srcs(absolute=absolute)) for url in self.urls
             ]
         ), self.context, mode
     )
