@@ -1,18 +1,15 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # URL related utility functions and classes.
-#       - Cameron Simpson <cs@cskk.id.au> 26dec2011
+# - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
-
-from __future__ import with_statement, print_function
 
 DISTINFO = {
     'description':
     "convenience functions for working with URLs",
-    'keywords': ["python2", "python3"],
+    'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -68,7 +65,6 @@ except ImportError:
 from cs.lex import parseUC_sAttr
 from cs.logutils import debug, error, warning, exception
 from cs.pfx import Pfx, pfx_iter
-from cs.py3 import unicode
 from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked
 from cs.xml import etree  # ElementTree
