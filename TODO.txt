@@ -1,4 +1,3 @@
-use requests for the cs.urlutils URL class
 use the new Task and TaskQueue when they're ready
 @promote: make @strable wrap this, using params=[0],promote[0]=open
 @promote: optional promote[param_name]->callable mapping
@@ -61,7 +60,6 @@ cs.mp3: parse tags? pull names etc from cs.id3
 progress/upd: fixed with trailing units, eg %2d
 run-backups: single file: src type desthost[:dstpath?] [options...]
 cs.pfx: can we hang the prefixes on the current frame? would solve the generator issue (NO, WE CANNOT)
-cs.logutils,pilfer: drop D_mode and the D function
 cs.upd: what to do when the number of status lines exceeds the terminal height?
 try to strip out use of cs.py3.bytes
 replace @locked_property with @property @locked @cachedmethod throughout to placate linters, then @OBSOLETE @locked_property
