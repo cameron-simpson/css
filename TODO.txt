@@ -1,3 +1,4 @@
+use requests for the cs.urlutils URL class
 use the new Task and TaskQueue when they're ready
 parser for /etc/terminal-colors.d
 BaseCommand: if getopterror from subcommand, show only the help for that subcommand instead of whole usage
