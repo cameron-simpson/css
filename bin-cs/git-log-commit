@@ -13,7 +13,9 @@ git log -r '@^..@' \
   unhdr \
   | {
     read -r headline
-    wdbase=$( basename "$(pwd)" )
-    buglog -- "$wdbase $headline [$revision]" </dev/null
+    wd=$( pwd )
+    wdbase=$( basename "$wd" )
+    dlog log "wd=$wd" vcs.type=git "vcs.revision=$revision" \
+             "$wdbase $headline"
   }
 }

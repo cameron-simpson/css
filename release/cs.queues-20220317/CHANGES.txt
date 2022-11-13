@@ -1,0 +1,3 @@
+lib/python/cs/queues.py: cs.queues: docstring updates
+lib/python/cs/queues.py: cs.queues: more docstring updates
+lib/python/cs/queues.py: cs.queues: add missing import, minor tidyup

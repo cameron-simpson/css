@@ -18,13 +18,13 @@ from tempfile import mkstemp
 from threading import RLock
 import time
 from cs.filestate import FileState
+from cs.gimmicks import TimeoutError
 from cs.lex import as_lines
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.range import Range
-from cs.timeutils import TimeoutError
 
-__version__ = '20201228-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':
@@ -37,11 +37,11 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.filestate',
+        'cs.gimmicks>=TimeoutError',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
         'cs.range',
-        'cs.timeutils',
     ],
 }
 

@@ -3,7 +3,8 @@
 # Playon facilities. - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Playon facilities.
+''' PlayOn facilities, primarily access to the download API.
+    Includes a nice command line tool.
 '''
 
 from collections import defaultdict
@@ -23,8 +24,10 @@ import sys
 from threading import RLock, Semaphore
 import time
 from urllib.parse import unquote as unpercent
+
 import requests
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
@@ -41,6 +44,8 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
+__version__ = '20220311-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -50,6 +55,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: Utilities",
     ],
+    'entry_points': {
+        'console_scripts': ['playon = cs.app.playon:main'],
+    },
     'install_requires': [
         'cs.cmdutils',
         'cs.context',
@@ -66,6 +74,8 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'requests',
+        'typeguard',
     ],
 }
 
@@ -81,7 +91,8 @@ DEFAULT_FILENAME_FORMAT = (
 DEFAULT_DL_PARALLELISM = 2
 
 def main(argv=None):
-  ''' Playon command line mode.
+  ''' Playon command line mode;
+      see the `PlayOnCommand` class below.
   '''
   return PlayOnCommand(argv).run()
 
@@ -238,7 +249,7 @@ class PlayOnCommand(BaseCommand):
             if no_download:
               recording.ls()
             else:
-              sem.acquire()
+              sem.acquire()  # pylint: disable=consider-using-with
               Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
 
     if Rs:
@@ -257,9 +268,16 @@ class PlayOnCommand(BaseCommand):
         or if all records are expired.
     '''
     recordings = set(sqltags.recordings())
-    if (any(map(lambda recording: not recording.is_expired() and recording.
-                is_stale(max_age=max_age), recordings))
-        or all(map(lambda recording: recording.is_expired(), recordings))):
+    need_refresh = (
+        # any current recordings whose state is stale
+        any(
+            not recording.is_expired() and recording.is_stale(max_age=max_age)
+            for recording in recordings
+        ) or
+        # no recording is current
+        not all(recording.is_expired() for recording in recordings)
+    )
+    if need_refresh:
       print("refresh queue and recordings...")
       Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
       for T in Ts:
@@ -392,7 +410,8 @@ class Recording(SQLTagSet):
 
   @format_attribute
   def resolution(self):
-    ''' The recording resultion derived from the quality.
+    ''' The recording resolution derived from the quality
+        via the `Recording.RECORDING_QUALITY` mapping.
     '''
     quality = self.get('playon.Quality')
     return self.RECORDING_QUALITY.get(quality, quality)
@@ -406,7 +425,7 @@ class Recording(SQLTagSet):
   @format_attribute
   def nice_name(self):
     ''' A nice name for the recording: the PlayOn series and name,
-        omitting the series if None.
+        omitting the series if `None`.
     '''
     playon_tags = self.subtags('playon')
     citation = playon_tags.Name
@@ -451,24 +470,26 @@ class Recording(SQLTagSet):
   @format_attribute
   def is_expired(self):
     ''' Test whether this recording is expired,
-        should imply no longer available for download.
+        which implies that it is no longer available for download.
     '''
     expires = self.get('playon.Expires')
     if not expires:
-      return False
+      return True
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
   @format_attribute
   def is_stale(self, max_age=None):
     ''' Test whether this entry is stale
-        i.e. the time since `self.last_updated` exceeds `max_age` seconds,
-        default from `self.STALE_AGE`.
+        i.e. the time since `self.last_updated` exceeds `max_age` seconds
+        (default from `self.STALE_AGE`).
+        Note that expired recordings are never stale
+        because they can no longer be queried from the API.
     '''
+    if max_age is None:
+      max_age = self.STALE_AGE
     if self.is_expired():
       # expired recording will never become unstale
       return False
-    if max_age is None:
-      max_age = self.STALE_AGE
     if max_age <= 0:
       return True
     last_updated = self.last_updated
@@ -848,6 +869,7 @@ class PlayOnAPI(MultiOpenMixin):
       for entry in entries:
         entry_id = entry['ID']
         with Pfx(entry_id):
+          # pylint: disable=use-dict-literal
           for field, conv in sorted(dict(
               ##Created=self.from_playon_date,
               ##Expires=self.from_playon_date,

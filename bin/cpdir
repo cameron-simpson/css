@@ -10,7 +10,7 @@ cmd=$( basename "$0" ) || exit 1
 trace=
 [ -t 2 ] && trace=set-x
 
-bsize=20
+bsize=2048      # 1MB=2048x512, was 20
 [ $# -gt 0 ] && [ "x$1" = x-b ] && { bsize=$2; shift; shift; }
 
 bsize_bs=$( expr 512 \* "$bsize" )

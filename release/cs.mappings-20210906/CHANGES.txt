@@ -1,0 +1,3 @@
+lib/python/cs/mappings.py: cs.mappings: new RemappedMappingProxy with general subkey(key) and key(subkey) methods; refactor PrefixedMappingProxy as a subclass of RemappedMappingProxy
+lib/python/cs/mappings.py: merge default ==> tagsets
+lib/python/cs/mappings.py: cs.mappings: RemappedMappingProxy: add some doctests

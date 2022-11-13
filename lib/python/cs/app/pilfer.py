@@ -599,7 +599,7 @@ class Pilfer:
         raise ValueError("no pipe specification named %r" % (pipe_name,))
     if name is None:
       name = "pipe_from_spec:%s" % (spec,)
-    with Pfx("%s", spec):
+    with Pfx(spec):
       pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
       if errors:
         for err in errors:

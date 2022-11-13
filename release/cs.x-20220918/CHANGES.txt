@@ -1,0 +1,3 @@
+lib/python/cs/x.py: cs.x: fix comment grammar
+lib/python/cs/x.py: cs.x: drop Xtty(), obsolete
+lib/python/cs/x.py: cs.x: X: special handling for unseeking output files - I've had a Linux system moan about opening /dev/tty for append

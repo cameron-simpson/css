@@ -1,0 +1,2 @@
+Packet.__eq__: only test .rq_type if .is_request.
+Update tests for changes.

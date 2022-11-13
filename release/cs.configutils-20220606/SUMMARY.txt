@@ -1,0 +1,1 @@
+HasConfigIni: new info_dict() method (name subject to change) to return a descriptive dict, part of a new scheme I'm trying out to report summary data from commands.

@@ -1,0 +1,2 @@
+Bugfix for SQLTagsORM.search(mode='entity').
+SQLTags.find: new _without_tags=False parameter to allow fast searches omitting the entity tags.

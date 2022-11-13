@@ -8,23 +8,22 @@
 '''
 
 from __future__ import with_statement
-from collections import defaultdict, deque, namedtuple
+from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from heapq import heappush, heappop
 from inspect import ismethod
 import sys
-from threading import Semaphore, Thread, current_thread, Lock, local as thread_local
+from threading import Semaphore, Thread, Lock, local as thread_local
+
 from cs.context import stackattrs
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.logutils import LogTime, error, warning, debug, exception
-from cs.pfx import Pfx, prefix
+from cs.logutils import LogTime, error, warning
+from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
-from cs.py3 import raise3
-from cs.queues import IterableQueue, MultiOpenMixin, not_closed
-from cs.seq import seq, Seq
+from cs.seq import Seq
 
-__version__ = '20210306-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':
@@ -42,8 +41,6 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.py.func',
-        'cs.py3',
-        'cs.queues',
         'cs.seq',
     ],
 }
@@ -117,7 +114,8 @@ def bg(
   if kwargs is None:
     kwargs = {}
 
-  thread_prefix = prefix() + ': ' + name
+  ##thread_prefix = prefix() + ': ' + name
+  thread_prefix = name
 
   def thread_body():
     with Pfx(thread_prefix):
@@ -131,183 +129,6 @@ def bg(
   if not no_start:
     T.start()
   return T
-
-WTPoolEntry = namedtuple('WTPoolEntry', 'thread queue')
-
-class WorkerThreadPool(MultiOpenMixin):
-  ''' A pool of worker threads to run functions.
-  '''
-
-  def __init__(self, name=None, max_spare=4):
-    ''' Initialise the WorkerThreadPool.
-
-        Parameters:
-        * `name`: optional name for the pool
-        * `max_spare`: maximum size of each idle pool (daemon and non-daemon)
-    '''
-    if name is None:
-      name = "WorkerThreadPool-%d" % (seq(),)
-    if max_spare < 1:
-      raise ValueError("max_spare(%s) must be >= 1" % (max_spare,))
-    MultiOpenMixin.__init__(self)
-    self.name = name
-    self.max_spare = max_spare
-    self.idle_fg = deque()  # nondaemon Threads
-    self.idle_daemon = deque()  # daemon Threads
-    self.all = set()
-    self._lock = Lock()
-
-  def __str__(self):
-    return "WorkerThreadPool:%s" % (self.name,)
-
-  __repr__ = __str__
-
-  def startup(self):
-    ''' Start the pool.
-    '''
-
-  def shutdown(self):
-    ''' Shut down the pool.
-
-        Close all the request queues.
-
-        Note: does not wait for all Threads to complete; call .join after close.
-    '''
-    with self._lock:
-      all_entries = list(self.all)
-    for entry in all_entries:
-      entry.queue.close()
-
-  def join(self):
-    ''' Wait for all outstanding Threads to complete.
-    '''
-    with self._lock:
-      all_entries = list(self.all)
-    for entry in all_entries:
-      T = entry.thread
-      if T is not current_thread():
-        T.join()
-
-  @not_closed
-  def dispatch(self, func, retq=None, deliver=None, pfx=None, daemon=None):
-    ''' Dispatch the callable `func` in a separate thread.
-
-        On completion the result is the sequence
-        `func_result, None, None, None`.
-        On an exception the result is the sequence
-        `None, exec_type, exc_value, exc_traceback`.
-
-        If `retq` is not None, the result is .put() on retq.
-        If `deliver` is not None, deliver(result) is called.
-        If the parameter `pfx` is not None, submit pfx.partial(func);
-        see the cs.logutils.Pfx.partial method for details.
-        If `daemon` is not None, set the .daemon attribute of the Thread to `daemon`.
-
-        TODO: high water mark for idle Threads.
-    '''
-    if self.closed:
-      raise ValueError("%s: closed, but dispatch() called" % (self,))
-    if pfx is not None:
-      func = pfx.partial(func)
-    if daemon is None:
-      daemon = current_thread().daemon
-    idle = self.idle_daemon if daemon else self.idle_fg
-    with self._lock:
-      debug("dispatch: idle = %s", idle)
-      if idle:
-        # use an idle thread
-        entry = idle.pop()
-        debug("dispatch: reuse %s", entry)
-      else:
-        debug("dispatch: need new thread")
-        # no available threads - make one
-        Targs = []
-        T = Thread(
-            target=self._handler,
-            args=Targs,
-            name=("%s:worker" % (self.name,))
-        )
-        T.daemon = daemon
-        Q = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
-        entry = WTPoolEntry(T, Q)
-        self.all.add(entry)
-        Targs.append(entry)
-        debug("%s: start new worker thread (daemon=%s)", self, T.daemon)
-        T.start()
-      entry.queue.put((func, retq, deliver))
-
-  @logexc
-  def _handler(self, entry):
-    ''' The code run by each handler thread.
-
-        Read a function `func`, return queue `retq` and delivery
-        function `deliver` from the function queue.
-        Run func().
-
-        On completion the result is the sequence:
-          func_result, None
-        On an exception the result is the sequence:
-          None, exc_info
-
-        If retq is not None, the result is .put() on retq.
-        If deliver is not None, deliver(result) is called.
-        If both are None and an exception occurred, it gets raised.
-    '''
-    T, Q = entry
-    idle = self.idle_daemon if T.daemon else self.idle_fg
-    for func, retq, deliver in Q:
-      oname = T.name
-      T.name = "%s:RUNNING:%s" % (oname, func)
-      result, exc_info = None, None
-      try:
-        debug("%s: worker thread: running task...", self)
-        result = func()
-        debug("%s: worker thread: ran task: result = %s", self, result)
-      except Exception:  # pylint: disable=broad-except
-        exc_info = sys.exc_info()
-        log_func = (
-            exception
-            if isinstance(exc_info[1],
-                          (TypeError, NameError, AttributeError)) else debug
-        )
-        log_func(
-            "%s: worker thread: ran task: exception! %r", self, sys.exc_info()
-        )
-        # don't let exceptions go unhandled
-        # if nobody is watching, raise the exception and don't return
-        # this handler to the pool
-        if retq is None and deliver is None:
-          error("%s: worker thread: reraise exception", self)
-          raise3(*exc_info)
-        debug("%s: worker thread: set result = (None, exc_info)", self)
-      T.name = oname
-      func = None  # release func+args
-      reuse = False and (len(idle) < self.max_spare)
-      if reuse:
-        # make available for another task
-        with self._lock:
-          idle.append(entry)
-        ##D("_handler released thread: idle = %s", idle)
-      # deliver result
-      result_info = result, exc_info
-      if retq is not None:
-        debug("%s: worker thread: %r.put(%s)...", self, retq, result_info)
-        retq.put(result_info)
-        debug("%s: worker thread: %r.put(%s) done", self, retq, result_info)
-        retq = None
-      if deliver is not None:
-        debug("%s: worker thread: deliver %s...", self, result_info)
-        deliver(result_info)
-        debug("%s: worker thread: delivery done", self)
-        deliver = None
-      # forget stuff
-      result = None
-      exc_info = None
-      result_info = None
-      if not reuse:
-        self.all.remove(entry)
-        break
-      debug("%s: worker thread: proceed to next function...", self)
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.

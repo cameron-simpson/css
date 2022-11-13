@@ -18,7 +18,7 @@ from weakref import WeakValueDictionary
 from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
-__version__ = '20210717-post'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -53,7 +53,8 @@ def flavour(obj):
 
 # pylint: disable=too-few-public-methods
 class O(SimpleNamespace):
-  ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`.
+  ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`
+      or use a dataclass.
   '''
 
   callers = set()
@@ -328,7 +329,7 @@ class SingletonMixin:
   ''' A mixin turning a subclass into a singleton factory.
 
       *Note*: this mixin overrides `object.__new__`
-      and may not play well with other classes which oeverride `__new__`.
+      and may not play well with other classes which override `__new__`.
 
       *Warning*: because of the mechanics of `__new__`,
       the instance's `__init__` method will always be called
@@ -338,15 +339,18 @@ class SingletonMixin:
       even for an already initialised
       and probably subsequently modified object.
 
-      One approach might be to access some attribute,
+      My suggested approach is to access some attribute,
       and preemptively return if it already exists.
       Example:
 
           def __init__(self, x, y):
-              if hasattr(self, 'x'):
+              if 'x' in self.__dict__:
                   return
               self.x = x
               self.y = y
+
+      *Note*: we probe `self.__dict__` above to accomodate classes
+      with a `__getattr__` method.
 
       *Note*: each class registry has a lock,
       which ensures that reuse of an object
@@ -372,8 +376,8 @@ class SingletonMixin:
 
           class Pool(SingletonMixin):
 
-              @staticmethod
-              def _singleton_key(foo, bah=3):
+              @classmethod
+              def _singleton_key(cls, foo, bah=3):
                   return foo, bah
 
               def __init__(self, foo, bah=3):
@@ -437,8 +441,19 @@ class SingletonMixin:
       # reuse an existing instance or make a new one
       registry = cls._singleton_get_registry()
       with registry._singleton_lock:
-        _, instance = singleton(registry, okey, factory, (), {})
+        is_new, instance = singleton(registry, okey, factory, (), {})
+        if is_new:
+          instance._SingletonMixin_key = okey
+        else:
+          assert instance._SingletonMixin_key == okey
     return instance
+
+  # default hash and equality methods
+  def __hash__(self):
+    return hash(self._SingletonMixin_key)
+
+  def __eq__(self, other):
+    return self is other
 
   @classmethod
   def singleton_also_by(cls, also_key, key):
@@ -482,6 +497,37 @@ class SingletonMixin:
               map(lambda ref: ref(), registry.valuerefs())
           )
       )
+
+class Sentinel:
+  ''' A simple class for named sentinels whose `str()` is just the name
+      and whose `==` uses `is`.
+
+      Example:
+
+          >>> from cs.obj import Sentinel
+          >>> MISSING = Sentinel("MISSING")
+          >>> print(MISSING)
+          MISSING
+          >>> other = Sentinel("other")
+          >>> MISSING == other
+          False
+          >>> MISSING == MISSING
+          True
+  '''
+
+  __slots__ = 'name',
+
+  def __init__(self, name):
+    self.name = name
+
+  def __str__(self):
+    return self.name
+
+  def __repr__(self):
+    return "%s(%r)" % (self.__class__.__name__, self.name)
+
+  def __eq__(self, other):
+    return self is other
 
 if __name__ == '__main__':
   import cs.obj_tests

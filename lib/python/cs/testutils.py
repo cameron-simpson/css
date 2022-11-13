@@ -8,7 +8,22 @@
 '''
 
 from itertools import product
+from cs.context import push_cmgr, pop_cmgr
 from cs.deco import decorator
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 4 - Beta",
+        "Environment :: Console",
+        "Programming Language :: Python :: 3",
+        "Topic :: Software Development :: Testing :: Unit",
+    ],
+    'install_requires': [
+        'cs.context',
+        'cs.deco',
+    ],
+}
 
 @decorator
 def product_test(test_method, **params):
@@ -34,6 +49,10 @@ def product_test(test_method, **params):
           )
 
       whose test suite then just decorates each method with `@multitest`:
+
+          @multitest
+          def test000IndexEntry(self):
+              ....
 
       Note that because there must be setup and teardown for each product,
       the TestCase class may well have empty `setUp` and `tearDown` methods
@@ -61,3 +80,20 @@ def product_test(test_method, **params):
           self.product_teardown()
 
   return product_method
+
+class SetupTeardownMixin:
+  ''' A mixin to support a single `setupTeardown()` context manager method.
+  '''
+
+  def setUp(self):
+    ''' Run `super().setUp()` then the set up step of `self.setupTeardown()`.
+    '''
+    super().setUp()
+    push_cmgr(self, '_SetupTeardownMixin__tearDown', self.setupTeardown())
+
+  def tearDown(self):
+    ''' Run the tear down step of `self.setupTeardown()`,
+        then `super().tearDown()`.
+    '''
+    pop_cmgr(self, '_SetupTeardownMixin__tearDown')
+    super().tearDown()

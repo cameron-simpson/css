@@ -1,0 +1,2 @@
+lib/python/cs/configutils.py: cs.configutils: new HasConfigIni mixin for classes keeping some configuration in a .ini config file section
+lib/python/cs/configutils.py: cs.configutils: docstring updates, DISTINFO tweak

@@ -6,6 +6,8 @@ Gimmicks and hacks to make some of my other modules more robust and
 less demanding of others.
 '''
 
+# pylint: disable=wrong-import-position
+
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import
 except ImportError:
@@ -17,7 +19,15 @@ except ImportError:
     '''
     yield None
 
+import os
+import subprocess
+try:
+  DEVNULL = subprocess.DEVNULL
+except AttributeError:
+  DEVNULL = open(os.devnull, 'wb')  # pylint: disable=consider-using-with
+
 import sys
+
 try:
   from types import SimpleNamespace  # pylint: disable=unused-import
 except ImportError:
@@ -38,7 +48,37 @@ except ImportError:
           )
       )
 
-__version__ = '20210306-post'
+try:
+  # pylint: disable=redefined-builtin,self-assigning-variable
+  TimeoutError = TimeoutError
+except NameError:
+  try:
+    import builtins
+  except ImportError:
+    TimeoutError = None  # pylint: disable=redefined-builtin
+  else:
+    try:
+      TimeoutError = builtins.TimeoutError
+    except AttributeError:
+      TimeoutError = None
+
+  if TimeoutError is None:
+
+    class TimeoutError(Exception):
+      ''' A TimeoutError.
+      '''
+
+      def __init__(self, message, timeout=None):
+        if timeout is None:
+          msg = "%s: timeout exceeded" % (message,)
+        else:
+          msg = "%s: timeout exceeded (%ss)" % (
+              message,
+              timeout,
+          )
+        Exception.__init__(self, msg)
+
+__version__ = '20220429-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

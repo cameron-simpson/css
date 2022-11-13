@@ -1,0 +1,3 @@
+New TypedKeyClass class factory.
+Redo StrKeyedDict and UUIDKeyedDict using TypedKeyClass.
+New StrKeyedDefaultDict and UUIDKeyedDefaultDict convenience classes.

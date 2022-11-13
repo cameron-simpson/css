@@ -492,6 +492,7 @@ case "$op" in
           esac
         fi
         matched=1
+        [ -n "$shcmd" ] || shcmd='exec $SHELL'
         do_tmux has-session -t "$session_name" 2>/dev/null \
         || do_tmux new-session -d -s "$session_name" "set -x; $shcmd" \
         || xit=1

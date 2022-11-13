@@ -101,13 +101,13 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   def new_class(
       cls, hashname: str, hashenum: int, *, hashfunc: callable, hashlen: int
   ):
-    ''' Factory t create, register and return a new `HashCode` subclass.
+    ''' Factory to create, register and return a new `HashCode` subclass.
     '''
 
     class hashclass(HashCode):
       ''' `HashCode` subclass.
       '''
-      __slotes__ = ()
+      __slots__ = ()
       HASHNAME = hashname
       HASHFUNC = hashfunc
       HASHLEN = hashlen
@@ -484,14 +484,6 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
     hashcode = self.hashclass.from_chunk(data)
     self[hashcode] = data
     return hashcode
-
-  def startup(self):
-    ''' Dummy method to support unit tests with open/close.
-    '''
-
-  def shutdown(self):
-    ''' Dummy method to support unit tests with open/close.
-    '''
 
 if __name__ == '__main__':
   from .hash_tests import selftest

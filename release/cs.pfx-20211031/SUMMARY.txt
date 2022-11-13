@@ -1,0 +1,1 @@
+Pfx.prefixify_exception: skip attributes which are None.

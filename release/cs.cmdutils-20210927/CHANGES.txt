@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: usage fine tuning: show only the per subcommand usage for in-subcommand GetoptError, show terse usage when the subcommand cannot be recognised
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: support -h, -help, --help
