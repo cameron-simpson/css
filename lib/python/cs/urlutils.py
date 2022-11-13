@@ -86,7 +86,7 @@ class URL(str):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
-  def _init(self, referer=None, user_agent=None, opener=None):
+  def _init(self, *, referer=None, user_agent=None, opener=None):
     ''' Initialise the _URL.
         `s`: the string defining the URL.
         `referer`: the referring URL.
