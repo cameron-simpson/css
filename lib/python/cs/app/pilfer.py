@@ -24,9 +24,12 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
+
 from icontract import require
+
 from cs.app.flag import PolledFlags
 from cs.cmdutils import BaseCommand
+from cs.deco import promote
 from cs.debug import ifdebug
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
@@ -382,8 +385,9 @@ def notNone(v, name="value"):
     raise ValueError("%s is None" % (name,))
   return True
 
-def url_xml_find(U, match):
-  for found in url_io(URL(U, None).xml_find_all, (), match):
+@promote
+def url_xml_find(U:URL, match):
+  for found in url_io(U.xml_find_all, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
 class Pilfer:
@@ -662,7 +666,8 @@ class Pilfer:
   def save_dir(self):
     return self.user_vars.get('save_dir', '.')
 
-  def save_url(self, U, saveas=None, dir=None, overwrite=False, **kw):
+  @promote
+  def save_url(self, U:URL, saveas=None, dir=None, overwrite=False, **kw):
     ''' Save the contents of the URL `U`.
     '''
     debug(
@@ -670,7 +675,6 @@ class Pilfer:
         dir, overwrite, kw
     )
     with Pfx("save_url(%s)", U):
-      U = URL(U, None)
       save_dir = self.save_dir
       if saveas is None:
         saveas = os.path.join(save_dir, U.basename)
@@ -742,18 +746,18 @@ class FormatMapping(object):
   '''
 
   def __init__(self, P, U=None, factory=None):
-    ''' Initialise this FormatMapping from a Pilfer `P`.
-	The optional parameter `U` (default from `P._`) is the
-	object whose attributes are exposed for format strings,
-	though P.user_vars preempt them.
-	The optional parameter `factory` is used to promote the
-	value `U` to a useful type; it calls URL(U, None) by default.
+    ''' Initialise this `FormatMapping` from a Pilfer `P`.
+        The optional parameter `U` (default from `P._`) is the
+        object whose attributes are exposed for format strings,
+        though `P.user_vars` preempt them.
+        The optional parameter `factory` is used to promote the
+        value `U` to a useful type; it calls `URL.promote` by default.
     '''
     self.pilfer = P
     if U is None:
       U = P._
     if factory is None:
-      factory = lambda x: URL(x, None)
+      factory = URL.promote
     self.url = factory(U)
 
   def _ok_attrkey(self, k):
@@ -868,8 +872,8 @@ def url_delay(U, delay, *a):
   sleep(float(delay))
   return U
 
-def url_query(U, *a):
-  U = URL(U, None)
+@promote
+def url_query(U:URL, *a):
   if not a:
     return U.query
   qsmap = dict(
@@ -908,18 +912,20 @@ def url_io_iter(I):
       yield item
 
 @yields_str
-def url_hrefs(U):
+@promote
+def url_hrefs(U:URL):
   ''' Yield the HREFs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
-  return url_io_iter(URL(U, None).hrefs(absolute=True))
+  return url_io_iter(U.hrefs(absolute=True))
 
 @yields_str
-def url_srcs(U):
+@promote
+def url_srcs(U:URL):
   ''' Yield the SRCs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
-  return url_io_iter(URL(U, None).srcs(absolute=True))
+  return url_io_iter(U.srcs(absolute=True))
 
 # actions that work on the whole list of in-play URLs
 # these return Pilfers
