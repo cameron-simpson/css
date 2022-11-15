@@ -419,12 +419,16 @@ class SvcD(FlaggedMixin, object):
     self.sig_func = sig_func
 
   def __str__(self):
-    if self.name is None:
+    name = getattr(self, 'name', None)
+    if name is None:
       return self.__class__.__name__
     return self.__class__.__name__ + ':' + self.name
 
   def __repr__(self):
-    return str(self) + repr(self.argv)
+    argv = getattr(self, 'argv', None)
+    if argv is None:
+      return str(self)
+    return str(self) + repr(argv)
 
   def dbg(self, msg, *a):
     ''' Log a debug message if not tracing.
