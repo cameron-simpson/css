@@ -15,10 +15,9 @@ for arbitrary commands providing a service:
 
 * process id (pid) files for both svcd and the service command
 * filesystem visible status (command running, service enabled)
-  via `cs.app.flag <https://pypi.org/project/cs.app.flag/>`_
+  via `cs.app.flag`
 * command restart if the command exits
-* command control (stop, restart, disable)
-  via `cs.app.flag <https://pypi.org/project/cs.app.flag/>`_
+* command control (stop, restart, disable) via `cs.app.flag`
 * test function to monitor for service viability;
   if the test function fails, do not run the service.
   This typically monitors something like
@@ -37,10 +36,9 @@ and a small collection of other personal services.
 I have convenient shell commands to look up service status
 and to start/stop/restart services.
 
-See `cs.app.portfwd <https://pypi.org/project/cs.app.portfwd/>`_
-which I use to manage my ssh tunnels;
+See `cs.app.portfwd` which I use to manage my `ssh` tunnels;
 it is a single Python programme
-running multiple ssh commands, each via its own SvcD instance.
+running multiple `ssh` commands, each via its own `SvcD` instance.
 '''
 
 from __future__ import print_function
@@ -318,10 +316,10 @@ def main(argv=None):
 _Popen_lock = Lock()
 
 def LockedPopen(*a, **kw):
-  ''' Serialise the Popen calls.
+  ''' Serialise the `Popen` calls.
 
-      My long term multithreaded SvcD programmes sometimes coredump.
-      My working theory is that Popen, maybe only on MacOS, is
+      My long term multithreaded `SvcD` programmes sometimes coredumps.
+      My working theory is that `Popen`, maybe only on MacOS, is
       slightly not multithead safe. This function exists to test
       that theory.
   '''
@@ -431,14 +429,14 @@ class SvcD(FlaggedMixin, object):
     return str(self) + repr(argv)
 
   def dbg(self, msg, *a):
-    ''' Log a debug message if not tracing.
+    ''' Log a debug message if tracing.
     '''
     if not self.trace:
       return
     debug("%s: " + msg, self, *a)
 
   def test(self):
-    ''' Test whther the service should run.
+    ''' Test whether the service should run.
 
         In order:
         * `True` if the override flag is true.
@@ -521,7 +519,7 @@ class SvcD(FlaggedMixin, object):
 
   def _kill_subproc(self):
     ''' Kill the subprocess and return its exit code.
-        Sends SIGTERM, then SIGKILL if the process does not die promptly.
+        Sends `SIGTERM`, then `SIGKILL` if the process does not die promptly.
     '''
     self.subp.terminate()
     final_time = now() + KILL_TIME
@@ -602,7 +600,7 @@ class SvcD(FlaggedMixin, object):
 
       T = Thread(name=str(self) + ':monitor', target=monitor)
       if self.flag_stop:
-        warning("clear flag %s before starting thread", self.flagname_stop)
+        warning("clearing flag %s before starting thread", self.flagname_stop)
         self.flag_stop = False
       T.start()
       self.monitor = T
