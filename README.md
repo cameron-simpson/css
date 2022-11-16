@@ -1,7 +1,7 @@
 This a mirror of my personal kit,
 containing thousands of scripts and hundreds of Python modules
 and assorted other code.
-- Cameron Simpson &lt;<cs@cskk.id.au>&gt;, <a rel="me" href="https://aus.social/@cs">Mastodon:&commat;cs&commat;aus.social</a>, <a href="https://pypi.org/user/cameron.simpson/">PyPI:cameron-simpson</a>
+- Cameron Simpson &lt;<cs@cskk.id.au>&gt;, <a rel="me" href="https://aus.social/@cs">Mastodon:&commat;&zwj;cs&zwj;&commat;&zwj;aus.social</a>, <a href="https://pypi.org/user/cameron.simpson/">PyPI:cameron-simpson</a>
 
 Some relevant links:
 * PyPI.org:
