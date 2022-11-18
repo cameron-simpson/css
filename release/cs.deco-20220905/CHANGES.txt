@@ -1,0 +1,6 @@
+lib/python/cs/deco.py: cs.deco: new @ALL decorator to include a function in __all__
+lib/python/cs/deco.py: cs.deco: @decorator: make sure __doc__ in the decoration is a str
+lib/python/cs/deco.py: cs.deco: new @autoparam(func,param=default,...) decorator, reduces boilerplate
+lib/python/cs/deco.py: cs.deco: @ALL: return the original function
+lib/python/cs/deco.py: cs.deco: new @default_params decorator for making decorators which provide default argument values from callables
+lib/python/cs/deco.py: cs.deco: replace @autoparam with @default_params, slightly better semantics

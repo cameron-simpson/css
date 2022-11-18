@@ -1,3 +1,27 @@
+Because class containing a bool and an explaintion, start using in the SvcD test function and elsewhere
+@promote: make @strable wrap this, using params=[0],promote[0]=open
+@promote: optional promote[param_name]->callable mapping
+@promote: accept ints in params to identify positional parameters?
+an @promote decorator to scan types in func sig and call type.promote
+progressbar/iterbar: check out len and length_hint as defaults for total
+iterbar: call back to length_hint if no len as default?
+mklinks: quit on SIGINT
+cs.cmdutils: help to include the first sentence of the subcommand usage?
+cs.fsm: better docstrings, suppress FSMSubType docstring somehow
+proxy-peerage: name acls using proxies:ptn passed through the identifier stuff from named_row_tuples - should make for better diffs and more readable configs
+proxy-peerage: host/fqdn pattern: turn into an exact regexp?
+cs.urlutils: drop Python 2 support
+cs.upd: above should do clear-toend-of-screen?
+cs.binary: BinaryMixin.scan_file: CCB.from_file: return the unread buffer bytes to the file? seek if possible, warning if not and some buffered data
+cs.logutils: PfxFormatter: dict args support needed
+Pfx: accept a mode to defer computing the format string, eg for pfx_call et al, to make them nearly free
+@locked_property: replace with @cachedmethod throughout
+@cachedmethod: needs a __lock attribute, then review use throughout
+cs.upd: Upd activation always makes the status line, Upd.insert can never create slot 0
+cs.upd: print to know if inside above(), or above() to enter disabled mode
+cs.iso14496: adapt for mp4 records with padding if short - adjust length field
+cs.binary: a safe packet view into a file, based off the binary offset/length whihc can save via a safe sized buffer
+cs.units: make decompose return an object which proxies to the list but is formattable and has a nice __str__, supporting print(bytes_geek(nbytes)) etc
 cs.edit: use subprocess.run check=True
 cs.app.maildb: port to BaseCommand
 BaseCommand: move most of __init__ into run-context along with setup_logging context manager use

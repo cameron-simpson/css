@@ -75,6 +75,7 @@ set -x
   for d in $repodirs*
   do
     [ -d "$d/" ] || continue
+    dbase=$( basename "$d" )
     ( cd "$d"
       if [ -d ".git/" ]
       then  git log '--format=tformat:%ci %ae %s %d' "--since=$start" "--until=$end"
@@ -83,7 +84,7 @@ set -x
       else
         echo "$d: NO VCS" >&2
       fi
-    )
+    ) | sed "s/^[^ ][^ ]* [^ ][^ ]*/& $dbase/" || :
   done \
   | awk -v "email=$EMAIL" '$4 == email { $3=""; $4=""; print}'
 ) \

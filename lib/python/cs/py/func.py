@@ -11,10 +11,11 @@ Convenience facilities related to Python functions.
 from functools import partial
 from pprint import pformat
 from cs.deco import decorator
+from cs.py.stack import caller
 from cs.py3 import unicode, raise_from
 from cs.x import X
 
-__version__ = '20220311.1-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -25,6 +26,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.py.stack',
         'cs.py3',
         'cs.x',
     ],
@@ -92,10 +94,18 @@ def callif(doit, func, *a, **kw):
   modes['print'](fmt % tuple(av))
   return None
 
+_trace_indent = ""
+
 @decorator
 # pylint: disable=too-many-arguments
 def trace(
-    func, call=True, retval=False, exception=False, pfx=False, pprint=False
+    func,
+    call=True,
+    retval=False,
+    exception=False,
+    use_pformat=False,
+    with_caller=False,
+    with_pfx=False,
 ):
   ''' Decorator to report the call and return of a function.
   '''
@@ -105,30 +115,38 @@ def trace(
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
     '''
-    # late import so that we can use this in modules we import
-    # pylint: disable=import-outside-toplevel
-    if pfx:
+    global _trace_indent
+    if with_pfx:
+      # late import so that we can use this in modules we import
+      # pylint: disable=import-outside-toplevel
       try:
         from cs.pfx import XP as xlog
       except ImportError:
         xlog = X
     else:
       xlog = X
+    log_cite = citation
+    if with_caller:
+      log_cite = log_cite + "from[%s]" % (caller(),)
     if call:
-      fmt, av = func_a_kw_fmt(citation, *a, **kw)
-      xlog("CALL " + fmt, *av)
+      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
+      xlog("%sCALL " + fmt, _trace_indent, *av)
+    old_indent = _trace_indent
+    _trace_indent += '  '
     try:
       result = func(*a, **kw)
     except Exception as e:
       if exception:
-        xlog("CALL %s RAISE %r", citation, e)
+        xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
+      _trace_indent = old_indent
       raise
     else:
       if retval:
         xlog(
-            "CALL %s RETURN %s", citation,
-            (pformat if pprint else repr)(result)
+            "%sCALL %s RETURN %s", _trace_indent, log_cite,
+            (pformat if use_pformat else repr)(result)
         )
+      _trace_indent = old_indent
       return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)

@@ -50,6 +50,7 @@ from cs.lex import (
     is_identifier,
 )
 from cs.logutils import error, warning, info, status, trace
+from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
 import cs.psutils
 from cs.py.doc import module_doc
@@ -452,16 +453,22 @@ class CSReleaseCommand(BaseCommand):
         filter(None,
                prompt('Any named features with this release').split())
     )
-    if any(map(lambda feature_name: not is_identifier(feature_name) or
-               feature_name.startswith('fix_'), features)):
+    if any(map(
+        lambda feature_name: (not is_dotted_identifier(feature_name) or
+                              feature_name.startswith('fix_')),
+        features,
+    )):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(
         filter(None,
                prompt('Any named bugs fixed with this release').split())
     )
-    if any(map(lambda bug_name: not is_identifier(bug_name) or bug_name.
-               startswith('fix_'), bugfixes)):
+    if any(map(
+        lambda bug_name:
+        (not is_dotted_identifier(bug_name) or bug_name.startswith('fix_')),
+        bugfixes,
+    )):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(map(lambda bug_name: 'fix_' + bug_name, bugfixes))
@@ -669,8 +676,13 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
         or *module_name*{`=`,`>=`}*version*
         satisfying the versions and features in `self.requirements`.
     '''
+    pkg = self.modules[self.module_name]
     if self.op is None:
-      return self.module_name
+      pkg_pypi_version = pkg.latest_pypi_version
+      return (
+          f'{self.module_name}>={pkg_pypi_version}'
+          if pkg_pypi_version else self.module_name
+      )
     release_versions = set()
     feature_set = set()
     for requirement in self.requirements:
@@ -682,7 +694,6 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
           # not a bare identifier, presume release version
           release_versions.add(requirement)
     if feature_set:
-      pkg = self.modules[self.module_name]
       release_version = pkg.release_with_features(feature_set)
       if release_version is None:
         raise ValueError(
@@ -764,7 +775,7 @@ def ask(message, fin=None, fout=None):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output file object of a command.
   '''
-  P = cs.psutils.pipefrom(argv, trace=False, **kw)
+  P = cs.psutils.pipefrom(argv, **kw)
   yield P.stdout
   if P.wait() != 0:
     pipecmd = ' '.join(argv)
@@ -800,8 +811,6 @@ class Modules(defaultdict):
     with Pfx(requirement_spec):
       mrq = ModuleRequirement.from_requirement(requirement_spec, modules=self)
       requirement = mrq.resolve()
-      if requirement != requirement_spec:
-        warning("RESOLVE %r => %r", requirement_spec, requirement)
       return requirement
 
 # pylint: disable=too-many-public-methods
@@ -995,9 +1004,10 @@ class Module:
       release_version = tags.get('pypi.release')
       if release_version is None:
         raise ValueError("no pypi.release")
+    release_version = intif(float(release_version))
     release_set = set()
     for version, feature_set in sorted(self.release_feature_set()):
-      if version > release_version:
+      if intif(float(version)) > release_version:
         break
       release_set = feature_set
     return release_set
@@ -1160,7 +1170,7 @@ class Module:
     if pypi_package_name is None:
       pypi_package_name = self.name
     if pypi_package_version is None:
-      pypi_package_version = self.latest.version
+      pypi_package_version = self.latest.version if self.latest else None
 
     # prepare core distinfo
     dinfo = dict(DISTINFO_DEFAULTS)
@@ -1271,7 +1281,6 @@ class Module:
       dinfo = dict(dinfo)
     projspec = dict(
         name=dinfo.pop('name'),
-        version=dinfo.pop('version'),
         description=dinfo.pop('description'),
         authors=[
             dict(name=dinfo.pop('author'), email=dinfo.pop('author_email'))
@@ -1282,13 +1291,25 @@ class Module:
         urls={'URL': dinfo.pop('url')},
         classifiers=dinfo.pop('classifiers'),
     )
+    version = dinfo.pop('version', None)
+    if version:
+      projspec['version'] = version
     if 'extra_requires' in dinfo:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
+    dinfo_entry_points = dinfo.pop('entry_points', {})
+    if dinfo_entry_points:
+      entry_points = {}
+      console_scripts = dinfo_entry_points.pop('console_scripts', [])
+      if console_scripts:
+        projspec['scripts'] = console_scripts
+      gui_scripts = dinfo_entry_points.pop('gui_scripts', [])
+      if gui_scripts:
+        projspec['gui-scripts'] = gui_scripts
     pyproject = {
         "project": projspec,
         "build-system": {
             "requires": [
-                "setuptools >= 40.9.0",
+                "setuptools >= 61.2",
                 'trove-classifiers',
                 "wheel",
             ],
@@ -1641,7 +1662,8 @@ class Module:
           old_import_names = set(distinfo_requires_names) - set(import_names)
           problems.append(
               (
-                  "DISTINFO[install_requires=%r] != direct_imports=%r\n"
+                  "DISTINFO[install_requires]=%r"
+                  "  != direct_imports=%r\n"
                   "  new imports %r\n"
                   "  removed imports %r"
               ) % (

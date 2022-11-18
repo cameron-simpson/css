@@ -48,5 +48,5 @@ done
     done &
     pids="$pids $!"
   done
-  wait
+  wait || :
 )

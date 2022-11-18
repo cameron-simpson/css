@@ -105,7 +105,7 @@ def main(argv, stdin=None):
     opts = ()
 
   for opt, val in opts:
-    with Pfx("%s", opt):
+    with Pfx(opt):
       if opt == '-c':
         P.rcs[0:0] = load_pilferrcs(val)
       elif opt == '-F':
@@ -621,7 +621,7 @@ class Pilfer(NS):
         raise ValueError("no pipe specification named %r" % (pipe_name,))
     if name is None:
       name = "pipe_from_spec:%s" % (spec,)
-    with Pfx("%s", spec):
+    with Pfx(spec):
       pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
       if errors:
         for err in errors:
@@ -994,14 +994,14 @@ one_test = {
     'reject_re':
     lambda P, regexp: not regexp.search(P._),
     'same_domain':
-    lambda P: notNone(P._.referer, "%r.referer" % (P._,)
-                      ) and P._.domain == P._.referer.domain,
+    lambda P: notNone(P._.referer, "%r.referer" %
+                      (P._,)) and P._.domain == P._.referer.domain,
     'same_hostname':
-    lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.hostname == P
-    ._.referer.hostname,
+    lambda P: notNone(P._.referer, "%r.referer" %
+                      (P._,)) and P._.hostname == P._.referer.hostname,
     'same_scheme':
-    lambda P: notNone(P._.referer, "%r.referer" % (P._,)
-                      ) and P._.scheme == P._.referer.scheme,
+    lambda P: notNone(P._.referer, "%r.referer" %
+                      (P._,)) and P._.scheme == P._.referer.scheme,
     'select_re':
     lambda P, regexp: regexp.search(P._),
 }

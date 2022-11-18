@@ -1,0 +1,2 @@
+New signal_handler(sig,handler,call_previous=False) context manager to push a signal handler.
+New signal_handlers() context manager to stack handlers for multiple signals.

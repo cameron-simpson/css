@@ -1,0 +1,2 @@
+lib/python/cs/pop3.py: cs.pop3: POP3._client_response_worker: set R.exc_info before the warning
+lib/python/cs/pop3.py: cs.pop3: emit error instead of stack trace for messages which cannot be saved (and do not delete); POP3Command.cmd_dl: new -n (no action) option

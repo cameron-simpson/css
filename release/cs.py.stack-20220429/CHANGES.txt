@@ -1,0 +1,1 @@
+lib/python/cs/py/stack.py: cs.py.stack: caller: return None if the stack index is out of range

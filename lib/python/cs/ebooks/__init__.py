@@ -2,22 +2,11 @@
 
 ''' Utilities and command line for working with EBooks.
     Basic support for talking to Apple Books, Calibre, Kindle, Mobi.
+
+    These form the basis of my personal Kindle and Calibre workflow.
 '''
 
-import os
-from os.path import (
-    expanduser,
-    isabs as isabspath,
-    join as joinpath,
-    realpath,
-)
-from threading import Lock
-from typing import Optional
-
-from icontract import require
-from typeguard import typechecked
-
-from cs.obj import SingletonMixin
+__version__ = '20220805-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -26,21 +15,30 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.app.oxs.plist',
+        'cs.app.osx.plist',
         'cs.cmdutils',
         'cs.context',
         'cs.deco',
         'cs.fileutils',
+        'cs.fs',
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
+        'cs.numeric',
         'cs.obj',
         'cs.pfx',
+        'cs.progress',
+        'cs.psutils',
         'cs.resources',
+        'cs.seq',
         'cs.sqlalchemy_utils',
         'cs.tagset',
         'cs.threads',
         'cs.units',
+        'cs.upd',
+        'icontract',
         'mobi',
+        'sqlalchemy',
+        'typeguard',
     ],
 }
