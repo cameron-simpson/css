@@ -29,7 +29,7 @@ from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.x import X
 
-__version__ = '20211208-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -174,7 +174,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
   elif isinstance(logger, str):
     logger = logging.getLogger(logger)
   if log_level is None:
-    log_level = loginfo.level
+    log_level = getattr(loginfo, 'level', logging.WARNING)
   for text in traceback.format_list(stack):
     for line in text.splitlines():
       logger.log(log_level, line.rstrip())

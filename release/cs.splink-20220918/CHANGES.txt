@@ -1,0 +1,19 @@
+lib/python/cs/splink.py: cs.splink: SPLinkData.plot: rename `key_specs` keyword parameter to mandatory posiitional `data_specs` parameter, rework the data preparation as a queue, accept patterns/keys/(key,series)
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: collection `data_specs=argv` overtly, minor tidyups
+lib/python/cs/splink.py: cs.split: SPLinkCommand: define `options.tz` in `run_context`
+lib/python/cs/splink.py: cs.splink: update imports, plumb runstate
+lib/python/cs/splink.py: cs.splink: SPLinkData.resolve: accept multiple specification strings
+lib/python/cs/splink.py: cs.splink: SPLinkData: new plot_data_from_spec(start,stop,data_spec,...) method to return a list of PlotSeries instances
+lib/python/cs/splink.py: cs.splink: SPLinkCommand: new popdata() method to pop and decode a data specification from the command line
+lib/python/cs/splink.py: cs.splink: SPLinkData.splot: use self.plot_data_from_spec to convert data_specs to plot data, drop "mode" inference (unused)
+lib/python/cs/splink.py: cs.splink: SPLinkData.plot: drop mode param (unused), process plot data and annotate with style, call Axes.plot or Axes.stackplot instead of DataFrame.plot
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: make pseudo-data "POWER" the default and special case a stack plot for "POWER"
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: fix data spec argument parsing
+lib/python/cs/splink.py: cs.splink: tidy imports, tweak docstrings
+lib/python/cs/splink.py: cs.splink: SPLinkData.plot: axes() now has a better default size, drop our own default size
+lib/python/cs/splink.py: cs.splink: SPLinkData.splot: new optional ax_title parameter to specify a title for the axes
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: POWER: update default size, overlay<F7> the load on the power sources as a line, update colours
+lib/python/cs/splink.py: cs.splink: clean lint, remove debugging
+lib/python/cs/splink.py: merge solar ==> default: further solar power plotting improvements
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: POWER: mark in the battery state of charge
+lib/python/cs/splink.py: merge solar ==> default: show battery state of charge on POWER plots

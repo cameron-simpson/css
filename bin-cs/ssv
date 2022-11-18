@@ -1,0 +1,53 @@
+#!/bin/sh
+
+set -ue
+
+ssdir=
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-d dirpath] video-file
+  -d dirpath    Specify directory path for screenshots.
+  video-file    The video file to play."
+
+badopts=
+
+if [ $# -gt 0 ] && [ "x$1" = x-d ]
+then
+  ssdir=$2
+  shift; shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing video-file" >&2
+  badopts=1
+else
+  vfpath=$1; shift
+  [ -s "$vfpath" ] || {
+    echo "$cmd: video-file not present: $vfpath" >&2
+    badopts=1
+  }
+  vfbase=$( basename "$vfpath" )
+  vfpfx=$( expr "x$vfbase" : 'x\(.*\)\..*' )
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$ssdir" ] || {
+  ssdir=$(ssdir)/$vfpfx--shots
+}
+
+[ -d "$ssdir/" ] || set-x mkdir "$ssdir" || exit 1
+
+umask 077
+
+set -x
+exec mpv \
+  "--screenshot-directory=$ssdir" \
+  "--screenshot-format=png" \
+  "--screenshot-template=%F--%P" \
+  "--screenshot-sw=yes" \
+  "--msg-level=all=warn" \
+  "$vfpath"
