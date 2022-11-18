@@ -23,7 +23,7 @@ from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
 
-__version__ = '20211208-post'
+__version__ = '20221118'
 
 DISTINFO = {
     'description':
