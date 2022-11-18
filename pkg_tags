@@ -64,14 +64,14 @@ cs.numeric pypi.release="20220606" ok_revision="59303dd747cbf52f6fdf1777c1f6979d
 cs.obj pypi.release="20220918" ok_revision=dd0916cd678327c815e379bf8ed00c9ce4332874 features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"]}
 cs.onttags
 cs.packetstream pypi.release="20211208" ok_revision="906f6148d57dfa082d18e6f4b27b8081ee317ba8"
-cs.pfx pypi.release="20220918" ok_revision="8ea225570d5ec658db34f7bc63df458daada463d" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
+cs.pfx pypi.release="20220918" ok_revision="718c6ae72f8afbfb59c71a6d62600a343dfe9111" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
 cs.pipeline pypi.release="20191007.1" ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
 cs.pop3 ok_revision="1713f6462bb1e42bbbde2b4c6b3473356b8dc33c" pypi.release="20220918"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
 cs.progress pypi.release="20220918" ok_revision=a0784ae7ab4d0598356cfbd4f4a95da7ca285e2f features={"20210803":["progress_runstate"]}
 cs.psutils pypi.release="20220805" ok_revision="8a1f7cc9d7d93f79c39de09c84fa12ae8e1aaa9e" features={"20220429":["signal_handler"],"20220531":["print_argv"]}
 cs.py.doc pypi.release="20220311" ok_revision="5f879c6cede60f3878cfe95e303a529b273f306f"
-cs.py.func pypi.release="20221118" ok_revision=b107e7e4b61a9487ff3c12f5ed3bc24dc1000372 features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"]}
+cs.py.func pypi.release="20220619" ok_revision=b107e7e4b61a9487ff3c12f5ed3bc24dc1000372 features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"]}
 cs.py.modules pypi.release="20220606" ok_revision="47871444e5c52d21dde402b72b4c5b1e71d38ee9" features={"20220606":["import_extra"]}
 cs.py.stack pypi.release="20220918" ok_revision=e6f8eeb64d1b0179955564df7164e2502130adb5
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"
