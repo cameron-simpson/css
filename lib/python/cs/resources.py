@@ -34,12 +34,14 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
+        'cs.deco',
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
         'cs.psutils',
         'cs.py.func',
         'cs.py.stack',
+        'cs.threads',
     ],
 }
 

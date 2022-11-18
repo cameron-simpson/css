@@ -59,6 +59,8 @@ from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 from cs.py3 import DEVNULL
 from cs.sh import quotecmd
 
+from cs.py.func import trace
+
 __version__ = '20210316-post'
 
 DISTINFO = {
@@ -339,6 +341,7 @@ class SvcD(FlaggedMixin, object):
   ''' A process based service.
   '''
 
+  @trace
   def __init__(
       self,
       argv,
@@ -433,8 +436,9 @@ class SvcD(FlaggedMixin, object):
     '''
     if not self.trace:
       return
-    debug("%s: " + msg, self, *a)
+    trace("%s: " + msg, self, *a)
 
+  @trace
   def test(self):
     ''' Test whether the service should run.
 
