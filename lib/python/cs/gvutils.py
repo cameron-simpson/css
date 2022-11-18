@@ -75,7 +75,7 @@ def gvprint(
       Example:
 
           data_url = gvprint('digraph FOO {A->B}', file=GVDATAURL, fmt='svg')
-    '''
+  '''
   if file is None:
     file = sys.stdout
   if isinstance(file, str):
