@@ -30,7 +30,7 @@ cs.configutils pypi.release="20220606" ok_revision="646d06810607e97ae0aaefbcce18
 cs.context pypi.release="20221118" ok_revision="90129cb3c119a2bbe2bcb66c319c3ae2782daebb" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"]}
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
-cs.debug pypi.release="20211208" ok_revision="32e79edcf8c727f9b6e5525f67de22cf1774a21e"
+cs.debug pypi.release="20221118" ok_revision="32e79edcf8c727f9b6e5525f67de22cf1774a21e"
 cs.deco pypi.release="20221106.1" ok_revision="91a12c71170014038957aea85c8a676d770863b9" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"]}
 cs.distinfo
 cs.ebooks ok_revision="1687329dfb2808f98e083ac7b604603074613b3e" pypi.release="20220805"
