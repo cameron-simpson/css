@@ -15,6 +15,8 @@ from threading import Thread
 from typing import Mapping
 from urllib.parse import quote as urlquote
 
+from cs.lex import cutprefix, cutsuffix
+
 __version__ = '20220827.1-post'
 
 DISTINFO = {
@@ -23,7 +25,9 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': [
+        'cs.lex',
+    ],
 }
 
 def quote(s):
@@ -33,7 +37,10 @@ def quote(s):
   '''
   if s.isalnum() or s.replace('_', '').isalnum():
     return s
-  return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+  return (
+      '"' + s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n') +
+      '"'
+  )
 
 # special value to capture the output of gvprint as binary data
 GVCAPTURE = object()
@@ -211,23 +218,81 @@ class DOTNodeMixin:
       nodes in a DOT graph description.
   '''
 
+  DOT_NODE_FONTCOLOR_PALETTE = {}
+  DOT_NODE_FILLCOLOR_PALETTE = {}
+
+  def __getattr__(self, attr: str):
+    ''' Recognise various `dot_node_*` attributes.
+
+        `dot_node_*color` is an attribute derives from `self.DOT_NODE_COLOR_*PALETTE`.
+    '''
+    dot_node_suffix = cutprefix(attr, 'dot_node_')
+    if dot_node_suffix is not attr:
+      # dot_node_*
+      colourname = cutsuffix(dot_node_suffix, 'color')
+      if colourname is not dot_node_suffix:
+        # dot_node_*color
+        palette_name = f'DOT_NODE_{colourname.upper()}COLOR_PALETTE'
+        try:
+          palette = getattr(self, palette_name)
+        except AttributeError:
+          # no colour palette
+          pass
+        else:
+          try:
+            colour = palette[self.dot_node_palette_key]
+          except KeyError:
+            colour = palette.get(None)
+          return colour
+    try:
+      sga = super().__getattr__
+    except AttributeError as e:
+      raise AttributeError(
+          "no %s.%s attribute" % (self.__class__.__name__, attr)
+      ) from e
+    return sga(attr)
+
+  @property
+  def dot_node_id(self):
+    ''' An id for this DOT node.
+    '''
+    return str(id(self))
+
+  @property
+  def dot_node_palette_key(self):
+    ''' Default palette index is `self.fsm_state`,
+        overriding `DOTNodeMixin.dot_node_palette_key`.
+    '''
+    return self.dot_node_id
+
   def dot_node(self, label=None, **node_attrs) -> str:
     ''' A DOT syntax node definition for `self`.
     '''
     if label is None:
       label = self.dot_node_label()
     attrs = dict(self.dot_node_attrs())
+    attrs.update(label=label)
     attrs.update(node_attrs)
+    if not attrs:
+      return quote(label)
     attrs_s = ','.join(
         f'{quote(attr)}={quote(value)}' for attr, value in attrs.items()
     )
-    return f'{quote(label)}[{attrs_s}]'
+    return f'{quote(self.dot_node_id)}[{attrs_s}]'
 
   # pylint: disable=no-self-use
   def dot_node_attrs(self) -> Mapping[str, str]:
     ''' The default DOT node attributes.
     '''
-    return dict(style='solid')
+    attrs = dict(style='solid')
+    fontcolor = self.dot_node_fontcolor
+    if fontcolor is not None:
+      attrs.update(fontcolor=fontcolor)
+    fillcolor = self.dot_node_fillcolor
+    if fillcolor is not None:
+      attrs.update(style='filled')
+      attrs.update(fillcolor=fillcolor)
+    return attrs
 
   def dot_node_label(self) -> str:
     ''' The default node label.
