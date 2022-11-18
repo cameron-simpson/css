@@ -30,7 +30,7 @@ cs.configutils pypi.release="20220606" ok_revision="646d06810607e97ae0aaefbcce18
 cs.context pypi.release="20221118" ok_revision="90129cb3c119a2bbe2bcb66c319c3ae2782daebb" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"]}
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
-cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
+cs.debug pypi.release="20211208" ok_revision="32e79edcf8c727f9b6e5525f67de22cf1774a21e"
 cs.deco pypi.release="20221106.1" ok_revision="91a12c71170014038957aea85c8a676d770863b9" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"]}
 cs.distinfo
 cs.ebooks ok_revision="1687329dfb2808f98e083ac7b604603074613b3e" pypi.release="20220805"
@@ -80,39 +80,15 @@ cs.queues pypi.release="20220918" ok_revision=cfd997ab5b95e945f865b656e33db7bc86
 cs.range pypi.release=20190102 ok_revision="71250a2041fc87831ffcbbddeaa20316d64d3a5f"
 cs.release
 cs.resources pypi.release="20220918" ok_revision="4b000edfa853f5ffe10b4c2ef633f807e8655d8b" features={"20220429":["catch_signal"],"20220918":["openif"]}
-cs.result pypi.release="20221118" ok_revision=aee8d8133eeb4e8aacd79682f8e5fcd12f2bc268 features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"]}
+cs.result pypi.release="20220918" ok_revision=aee8d8133eeb4e8aacd79682f8e5fcd12f2bc268 features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"]}
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
-cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e75882d2 features={"20210913":["unrepeated"],"20210924":["greedy"],"20220530":["Seq_call"]}
-cs.serialise pypi.release="20210316.2" ok_revision="3bf522faeba630b0135e21effd096b14b589142a"
-cs.sh pypi.release="20210316" ok_revision="41bb35a582f79767acefff34c2653f18dacd130c"
-cs.sharedfile pypi.release="20211208" ok_revision="0d538c2f2ed900fb3418c429c22d28efddeb5144"
-cs.socketutils pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
-cs.splink ok_revision="5158118a59c1ac2ef78a7881cfb168b1acb71c0b" pypi.release="20220918"
-cs.sqlalchemy
-cs.sqlalchemy_release
-cs.sqlalchemy_utils pypi.release="20220606" ok_revision="0e1f27997a7bda9798a5047b279d40df8d6113df" features={"20220606":["RelationProxy"]}
-cs.sqltags ok_revision="8beb9be7a2af049cc43ac09b481d49ba5c49322c" pypi.release="20220806" features={"20220806":["SQLTags_find_without_tags"]}
-cs.tagset pypi.release="20220806" ok_revision="89dc8b592909e1cde044f1ca68ecb18f0c23bc2c" features={"20210428":["fix_tagset_missed_in_place_value_modifications"]}
-cs.tagsset
-cs.taskqueue ok_revision="34c722e980134ed58ece73060c692c610b596b63" pypi.release="20220805"
-cs.threads pypi.release="20221118" ok_revision="4af78d303590fa91ffc2c7b67f96bab898895caf"
-cs.timeseries ok_revision="74c92340fccaf80e40f1bcd40957f51bc751d1e9" pypi.release="20220918" features={"20220918":["PlotSeries"]}
-cs.timeutils pypi.release="20211208" ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
-cs.tty pypi.release="20210316" ok_revision="62e7c17f710e13db7893ea64324ef77bca01d6ec"
-cs.units pypi.release="20220311" ok_revision="8dcc9126e735454e3e888690cda70854e9bccfa8"
-cs.upd pypi.release="20220918" ok_revision=ee1a16d1c51608afab90e6c7e6f6ab5907ae7786 features={"20200517":["multiline"],"20210428.4":["fix_stdout_not_tty_setupterm"],"20220429":["pfxprint"],"20220530":["run_task"],"20220605":["run_task"],"20220918":["uses_upd"]}
-cs.urlutils pypi.release=20191004
-cs.vt pypi.release=20190309
-cs.wol pypi.release=20171228
-cs.x pypi.release="20221118" ok_revision=a9995de5ebb9b936ee8e394a170a644b07773424
-cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249 pypi.release="20220606"
-dateutil
-icontract
-matplotlib
-mobi
-numpy
-os.path
-sqlalchemy
-typeguard
-youtube_dl
+cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e75882d2 featu
+cs.sh
+cs.tagset
+cs.threads
+cs.tty
+cs.units
+cs.upd
+cs.x
+cs.xml
