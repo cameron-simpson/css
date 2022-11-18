@@ -17,8 +17,7 @@ from subprocess import PIPE, Popen, run as subprocess_run
 import sys
 import time
 
-from cs.gimmicks import DEVNULL
-from cs.logutils import trace, warning
+from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
@@ -33,7 +32,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.gimmicks>=devnull',
-        'cs.logutils',
         'cs.pfx',
         'cs.upd',
     ],
