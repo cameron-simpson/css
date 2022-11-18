@@ -145,9 +145,7 @@ class BaseTask(FSM, RunStateMixin):
       digraph.append(f'  {nodedef};')
       blocking = sorted(qtask.blocking, key=lambda t: t.name)
       for subt in blocking:
-        digraph.append(
-            f'  {gvq(qtask.dot_node_label())}->{gvq(subt.dot_node_label())};'
-        )
+        digraph.append(f'  {gvq(qtask.dot_node_id)}->{gvq(subt.dot_node_id)};')
       if follow_blocking:
         q.extend(blocking)
     digraph.append('}')
