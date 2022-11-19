@@ -210,8 +210,14 @@ def gvdata(dot_s, **kw):
 def gvdataurl(dot_s, **kw):
   ''' Convenience wrapper for `gvprint` which returns the binary image data
       as a `data:` URL.
+
+def gvsvg(dot_s, **kw):
+  ''' Convenience wrapper for `gvprint` which returns an SVG string.
   '''
   return gvprint(dot_s, file=GVDATAURL, **kw)
+  svg = gvdata(dot_s, fmt='svg', **kw).decode('utf-8')
+  svg = svg[svg.find('<svg'):].rstrip()  # trim header and tail
+  return svg
 
 class DOTNodeMixin:
   ''' A mixin providing methods for things which can be drawn as
