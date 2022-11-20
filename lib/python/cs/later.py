@@ -354,7 +354,7 @@ class Later(MultiOpenMixin):
           # - dispatch a Thread to wait for completion and fire the
           #   finished_event Event
           # queue final action to mark activity completion
-          self.defer(self.finished_event.set)
+          self.defer(self.finished_event.set, force=True)
           if self._timerQ:
             self._timerQ.close()
             self._timerQ.join()
