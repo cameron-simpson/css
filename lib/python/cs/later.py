@@ -838,12 +838,17 @@ class Later(MultiOpenMixin):
         R.exc_info = sys.exc_info()
       else:
         iteration_counter_v[0] += 1
+        if greedy:
+          # now queue another iteration to run ahead of tasks from
+          # the .put(item) below
+          self._defer(iterate_once)
         # put the item onto the output queue
         # this may itself defer various tasks (eg in a pipeline)
         debug("L.defer_iterable: iterate_once: %s.put(%r)", outQ, item)
         outQ.put(item)
-        # now queue another iteration to run after those defered tasks
-        self._defer(iterate_once)
+        if not greedy:
+          # now queue another iteration to run after those defered tasks
+          self._defer(iterate_once)
 
     iterate_once.__name__ = "%s:next(iter(%s))" % (
         funcname(iterate_once), getattr(it, '__name__', repr(it))
