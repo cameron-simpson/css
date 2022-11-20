@@ -206,7 +206,7 @@ class PilferCommand(BaseCommand):
       )
       X("MAIN: RUN PIPELINE...")
       with pipe:
-        for U in urls(url, stdin=sys.stdin, cmd=options.cmd):
+        for U in urls(url, stdin=sys.stdin, cmd=self.cmd):
           X("MAIN: PUT %r", U)
           pipe.put(P.copy_with_vars(_=U))
       X("MAIN: RUN PIPELINE: ALL ITEMS .put")
@@ -352,10 +352,10 @@ def argv_pipefuncs(argv, action_map, do_trace):
       # terminate this pipeline with a function to spawn subpipelines
       # using the tail of the action list from this point
       if not argv:
-        errors.append("no actions after %r" % (per,))
+        errors.append("no actions after %r" % (action,))
       else:
         tail_argv = list(argv)
-        name = "per:[%s]" % (','.join(argv))
+        name = "%s:[%s]" % (action, ','.join(argv))
         pipespec = PipeSpec(name, argv)
 
         def per(P):
