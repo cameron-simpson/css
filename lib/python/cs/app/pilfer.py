@@ -399,11 +399,10 @@ class Pilfer:
       * `user_vars`: mapping of user variables for arbitrary use.
   '''
 
-  def __init__(self):
+  def __init__(self, item=None):
     self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
-    self.user_vars = {'save_dir': '.'}
-    self._ = None
+    self.user_vars = {'_': item, 'save_dir': '.'}
     self.flush_print = False
     self.do_trace = False
     self.flags = PolledFlags()
