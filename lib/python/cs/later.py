@@ -229,8 +229,8 @@ class LateFunction(Result):
     ''' Resubmit this function for later execution.
     '''
     # TODO: put the retry logic in Later notify func, resubmit with delay from there
-    self.later._submit(
-        self.func, delay=self.retry_delay, name=self.name, LF=self
+    self.later.submit(
+        self.func, force=True, delay=self.retry_delay, name=self.name, LF=self
     )
 
   def _dispatch(self):
@@ -347,7 +347,7 @@ class Later(MultiOpenMixin):
           # - dispatch a Thread to wait for completion and fire the
           #   finished_event Event
           # queue final action to mark activity completion
-          self._defer(self.finished_event.set)
+          self.defer(self.finished_event.set)
           if self._timerQ:
             self._timerQ.close()
             self._timerQ.join()
@@ -500,15 +500,25 @@ class Later(MultiOpenMixin):
       kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.debug(*a, **kw)
 
-  @property
-  def submittable(self):
-    ''' May new tasks be submitted?
-        This normally tracks "not self.closed", but running tasks
-        are wrapped in a thread local override to permit them to
-        submit further related tasks.
+  def is_submittable(self) -> bool:
+    ''' Test whether this `Later` is accepting new submissions.
     '''
     return not self.closed
 
+  @decorator
+  def submittable(method):
+    ''' Decorator requiring the `Later` to be submittable unless `force` is true.
+    '''
+    citation = funccite(method)
+
+    def submittable_method(self, *a, force=False, **kw):
+      if not force and not self.is_submittable():
+        raise RuntimeError("%s: %s: not submittable" % (self, citation))
+      return method(self, *a, **kw)
+
+    return submittable_method
+
+  @submittable
   def bg(self, func, *a, **kw):
     ''' Queue a function to run right now,
         ignoring the `Later`'s capacity and priority system.
@@ -534,8 +544,6 @@ class Later(MultiOpenMixin):
         thus requiring an an hoc increase to the required capacity
         to avoid deadlock.
     '''
-    if not self.submittable:
-      raise RuntimeError("%s.bg(...) but not self.submittable" % (self,))
     name = None
     if isinstance(func, str):
       name = func
@@ -554,8 +562,17 @@ class Later(MultiOpenMixin):
     return _Late_context_manager(self, **kwargs)
 
   # pylint: disable=too-many-arguments
+  @submittable
   def submit(
-      self, func, priority=None, delay=None, when=None, name=None, pfx=None
+      self,
+      func,
+      priority=None,
+      delay=None,
+      when=None,
+      name=None,
+      pfx=None,
+      LF=None,
+      retry_delay=None
   ):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding `LateFunction` for result collection.
@@ -578,24 +595,6 @@ class Later(MultiOpenMixin):
         If the parameter `LF` is not None, construct a new `LateFunction` to
           track function completion.
     '''
-    if not self.submittable:
-      raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
-    return self._submit(
-        func, priority=priority, delay=delay, when=when, name=name, pfx=pfx
-    )
-
-  # pylint: disable=too-many-arguments
-  def _submit(
-      self,
-      func,
-      priority=None,
-      delay=None,
-      when=None,
-      name=None,
-      pfx=None,
-      LF=None,
-      retry_delay=None
-  ):
     if delay is not None and when is not None:
       raise ValueError(
           "you can't specify both delay= and when= (%s, %s)" % (delay, when)
@@ -673,6 +672,7 @@ class Later(MultiOpenMixin):
     for _ in self.complete(until_idle=until_idle):
       pass
 
+  @submittable
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
         default priority with the specified arguments `*a` and `**kw`.
@@ -687,11 +687,6 @@ class Later(MultiOpenMixin):
 
             submit(functools.partial(func, *a, **kw), **params)
     '''
-    if not self.submittable:
-      raise RuntimeError("%s.defer(...) but not self.submittable" % (self,))
-    return self._defer(func, *a, **kw)
-
-  def _defer(self, func, *a, **kw):
     # snapshot the arguments as supplied
     # note; a shallow snapshot
     if a:
@@ -708,7 +703,7 @@ class Later(MultiOpenMixin):
       func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = self._submit(func, **params)
+    LF = self.submit(func, force=True, **params)
     return LF
 
   def with_result_of(self, callable1, func, *a, **kw):
@@ -723,6 +718,7 @@ class Later(MultiOpenMixin):
 
     return then()
 
+  @submittable
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
         Return a `Result` for collection of the result of `func`.
@@ -758,11 +754,6 @@ class Later(MultiOpenMixin):
         See the retry method for a convenience method that uses the
         above pattern in a repeating style.
     '''
-    if not self.submittable:
-      raise RuntimeError("%s.after(...) but not self.submittable" % (self,))
-    return self._after(LFs, R, func, *a, **kw)
-
-  def _after(self, LFs, R, func, *a, **kw):
     if not isinstance(LFs, list):
       LFs = list(LFs)
     if R is None:
@@ -783,7 +774,16 @@ class Later(MultiOpenMixin):
     )
     return after(LFs, None, lambda: self._defer(_after_put_func))
 
-  def defer_iterable(self, it, outQ, test_ready=None):
+  @submittable
+  @typechecked
+  def defer_iterable(
+      self,
+      it: Iterable,
+      outQ,
+      *,
+      greedy: bool = False,
+      test_ready: Optional[Callable[[], bool]] = None
+  ):
     ''' Submit an iterable `it` for asynchronous stepwise iteration
         to return results via the queue `outQ`.
         Return a `Result` for final synchronisation.
@@ -803,13 +803,6 @@ class Later(MultiOpenMixin):
           is presently permitted; iteration will be deferred until
           the callable returns a true value.
     '''
-    if not self.submittable:
-      raise RuntimeError(
-          "%s.defer_iterable(...) but not self.submittable" % (self,)
-      )
-    return self._defer_iterable(it, outQ=outQ, test_ready=test_ready)
-
-  def _defer_iterable(self, it, outQ, test_ready=None):
     iterate = partial(next, iter(it))
     R = Result()
     iterationss = [0]
