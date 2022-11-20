@@ -37,14 +37,17 @@ import logging
 import sys
 from threading import Lock, Thread, Event
 import time
+from typing import Callable, Iterable, Optional
+
+from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import OBSOLETE
+from cs.deco import OBSOLETE, decorator
 from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import error, warning, info, debug, ifdebug, exception, D
-from cs.pfx import pfx_method
-from cs.py.func import funcname
+from cs.pfx import pfx, pfx_method
+from cs.py.func import funccite, funcname
 from cs.queues import IterableQueue, TimerQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, report, after
@@ -71,6 +74,7 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
+        'typeguard',
     ],
 }
 
@@ -557,7 +561,7 @@ class Later(MultiOpenMixin):
 
   def ready(self, **kwargs):
     ''' Awful name.
-        Return a context manager to block until the Later provides a timeslot.
+        Return a context manager to block until the `Later` provides a timeslot.
     '''
     return _Late_context_manager(self, **kwargs)
 
@@ -785,8 +789,13 @@ class Later(MultiOpenMixin):
       test_ready: Optional[Callable[[], bool]] = None
   ):
     ''' Submit an iterable `it` for asynchronous stepwise iteration
-        to return results via the queue `outQ`.
+        to put results onto the queue `outQ`.
         Return a `Result` for final synchronisation.
+
+        This prepares a function to perform a single iteration of
+        `it`, call `outQ.put(result)` with the result, and to queue
+        itself again until the iterator is exhausted.
+        That function is queued.
 
         Parameters:
         * `it`: the iterable for for asynchronous stepwise iteration
