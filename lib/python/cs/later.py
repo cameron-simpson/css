@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # pylint: disable=too-many-lines
 #
@@ -41,7 +41,6 @@ from typing import Callable, Iterable, Optional
 
 from typeguard import typechecked
 
-from cs.context import stackattrs
 from cs.deco import OBSOLETE, decorator
 from cs.excutils import logexc
 import cs.logutils
@@ -52,7 +51,7 @@ from cs.queues import IterableQueue, TimerQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, report, after
 from cs.seq import seq
-from cs.threads import bg as bg_thread, State as ThreadState
+from cs.threads import State as ThreadState
 
 __version__ = '20220918-post'
 
@@ -63,7 +62,6 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context',
         'cs.deco',
         'cs.excutils',
         'cs.logutils',
@@ -86,7 +84,7 @@ def defer(func, *a, **kw):
   ''' Queue a function using the current default Later.
       Return the `LateFunction`.
   '''
-  return default.current.defer(func, *a, **kw)
+  return default.current.defer(func, *a, **kw)  # pylint: disable=no-member
 
 class RetryError(Exception):
   ''' Exception raised by functions which should be resubmitted to the queue.
@@ -119,7 +117,13 @@ class _Late_context_manager(object):
 
   # pylint: disable=too-many-arguments
   def __init__(
-      self, L, priority=None, delay=None, when=None, name=None, pfx=None
+      self,
+      L,
+      priority=None,
+      delay=None,
+      when=None,
+      name=None,
+      pfx=None,  # pylint: disable=redefined-outer-name
   ):
     self.later = L
     self.parameters = {
@@ -130,9 +134,9 @@ class _Late_context_manager(object):
         'pfx': pfx,
     }
     self.commence = Lock()
-    self.commence.acquire()
+    self.commence.acquire()  # pylint: disable=consider-using-with
     self.completed = Lock()
-    self.commence.acquire()
+    self.commence.acquire()  # pylint: disable=consider-using-with
 
   def __enter__(self):
     ''' Entry handler: submit a placeholder function to the queue,
@@ -148,20 +152,20 @@ class _Late_context_manager(object):
           `__exit__` releases that lock permitting the placeholder to return
           and release the `Later` resource.
       '''
-      self.commence.release()
-      self.completed.acquire()
+      self.commence.release()  # pylint: disable=consider-using-with
+      self.completed.acquire()  # pylint: disable=consider-using-with
       return "run done"
 
     # queue the placeholder function and wait for it to execute
     self.latefunc = self.later.submit(run, **self.parameters)
-    self.commence.acquire()
+    self.commence.acquire()  # pylint: disable=consider-using-with
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
     ''' Exit handler: release the "completed" lock; the placeholder
         function is blocking on this, and will return on its release.
     '''
-    self.completed.release()
+    self.completed.release()  # pylint: disable=consider-using-with
     if exc_type is not None:
       return False
     W = self.latefunc.wait()
@@ -338,8 +342,7 @@ class Later(MultiOpenMixin):
   def startup_shutdown(self):
     with super().startup_shutdown():
       self.finished_event = Event()
-      global default  # pylint: disable=global-statement
-      with stackattrs(default, current=self):
+      with default(current=self):
         try:
           yield
         finally:
@@ -376,7 +379,7 @@ class Later(MultiOpenMixin):
           # the LF completes really fast - notify fires immediately
           # in the current thread if the function is already complete).
           LF.notify(self._complete_LF)
-          LF._dispatch()
+          LF._dispatch()  # pylint: disable=protected-access
       elif self.pending:
         debug("LATER: at capacity, nothing dispatched: %s", self)
     return LF
@@ -509,6 +512,7 @@ class Later(MultiOpenMixin):
     '''
     return not self.closed
 
+  @staticmethod
   @decorator
   def submittable(method):
     ''' Decorator requiring the `Later` to be submittable unless `force` is true.
@@ -556,7 +560,7 @@ class Later(MultiOpenMixin):
     if a or kw:
       func = partial(func, *a, **kw)
     LF = LateFunction(func, name=name)
-    LF._dispatch()
+    LF._dispatch()  # pylint: disable=protected-access
     return LF
 
   def ready(self, **kwargs):
@@ -574,7 +578,7 @@ class Later(MultiOpenMixin):
       delay=None,
       when=None,
       name=None,
-      pfx=None,
+      pfx=None,  # pylint: disable=redefined-outer-name
       LF=None,
       retry_delay=None
   ):
@@ -707,7 +711,7 @@ class Later(MultiOpenMixin):
       func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = self.submit(func, force=True, **params)
+    LF = self.submit(func, force=True, **params)  # pylint: disable=unexpected-keyword-arg
     return LF
 
   def with_result_of(self, callable1, func, *a, **kw):
@@ -776,7 +780,7 @@ class Later(MultiOpenMixin):
     _after_put_func.__name__ = "%s._after(%r)[func=%s]" % (
         self, LFs, funcname(func)
     )
-    return after(LFs, None, lambda: self._defer(_after_put_func))
+    return after(LFs, None, lambda: self.defer(_after_put_func))
 
   @submittable
   @typechecked
@@ -841,19 +845,19 @@ class Later(MultiOpenMixin):
         if greedy:
           # now queue another iteration to run ahead of tasks from
           # the .put(item) below
-          self._defer(iterate_once)
+          self.defer(iterate_once)
         # put the item onto the output queue
         # this may itself defer various tasks (eg in a pipeline)
         debug("L.defer_iterable: iterate_once: %s.put(%r)", outQ, item)
         outQ.put(item)
         if not greedy:
           # now queue another iteration to run after those defered tasks
-          self._defer(iterate_once)
+          self.defer(iterate_once)
 
     iterate_once.__name__ = "%s:next(iter(%s))" % (
         funcname(iterate_once), getattr(it, '__name__', repr(it))
     )
-    self._defer(iterate_once)
+    self.defer(pfx(iterate_once))
     return R
 
   @contextmanager
@@ -999,7 +1003,7 @@ class LatePool(object):
       priority=None,
       delay=None,
       when=None,
-      pfx=None,
+      pfx=None,  # pylint: disable=redefined-outer-name
       block=False
   ):
     ''' Initialise the `LatePool`.
@@ -1012,7 +1016,7 @@ class LatePool(object):
           before leaving __exit__.
     '''
     if L is None:
-      L = default.current
+      L = default.current  # pylint: disable=no-member
     self.later = L
     self.parameters = {
         'priority': priority,
