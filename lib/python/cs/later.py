@@ -814,7 +814,7 @@ class Later(MultiOpenMixin):
     '''
     iterate = partial(next, iter(it))
     R = Result()
-    iterationss = [0]
+    iteration_counter_v = [0]
 
     @logexc
     def iterate_once():
@@ -829,7 +829,7 @@ class Later(MultiOpenMixin):
         item = iterate()
       except StopIteration:
         outQ.close()
-        R.result = iterationss[0]
+        R.result = iteration_counter_v[0]
       except Exception as e:  # pylint: disable=broad-except
         exception(
             "defer_iterable: iterate_once: exception during iteration: %s", e
@@ -837,7 +837,7 @@ class Later(MultiOpenMixin):
         outQ.close()
         R.exc_info = sys.exc_info()
       else:
-        iterationss[0] += 1
+        iteration_counter_v[0] += 1
         # put the item onto the output queue
         # this may itself defer various tasks (eg in a pipeline)
         debug("L.defer_iterable: iterate_once: %s.put(%r)", outQ, item)
