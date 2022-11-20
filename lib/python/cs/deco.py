@@ -117,6 +117,10 @@ def decorator(deco):
       da = tuple(da[1:])
       # decorate func
       decorated = deco(func, *da, **dkw)
+      # catch mucked decorators which forget to return the new function
+      assert decorated is not None, (
+          "deco:%r(func:%r,...) -> None" % (deco, func)
+      )
       if decorated is not func:
         # we got a wrapper function back, pretty up the returned wrapper
         try:
