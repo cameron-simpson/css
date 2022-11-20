@@ -386,7 +386,7 @@ def notNone(v, name="value"):
   return True
 
 @promote
-def url_xml_find(U:URL, match):
+def url_xml_find(U: URL, match):
   for found in url_io(U.xml_find_all, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
@@ -455,9 +455,9 @@ class Pilfer:
 
   @property
   def url(self):
-    ''' self._ as a URL object.
+    ''' `self._` as a `URL` object.
     '''
-    return URL(self._, None)
+    return URL.promote(self._)
 
   def test_flags(self):
     ''' Evaluate the flags conjunction.
@@ -652,7 +652,8 @@ class Pilfer:
     self.user_vars.update(kw)
 
   def copy_with_vars(self, **kw):
-    ''' Make a copy of `self` with copied .user_vars, update the vars and return the copied Pilfer.
+    ''' Make a copy of `self` with copied .user_vars, update the
+        vars and return the copied Pilfer.
     '''
     P = self.copy('user_vars')
     P.set_user_vars(**kw)
@@ -674,7 +675,7 @@ class Pilfer:
     return self.user_vars.get('save_dir', '.')
 
   @promote
-  def save_url(self, U:URL, saveas=None, dir=None, overwrite=False, **kw):
+  def save_url(self, U: URL, saveas=None, dir=None, overwrite=False, **kw):
     ''' Save the contents of the URL `U`.
     '''
     debug(
@@ -880,7 +881,7 @@ def url_delay(U, delay, *a):
   return U
 
 @promote
-def url_query(U:URL, *a):
+def url_query(U: URL, *a):
   if not a:
     return U.query
   qsmap = dict(
@@ -920,7 +921,7 @@ def url_io_iter(I):
 
 @yields_str
 @promote
-def url_hrefs(U:URL):
+def url_hrefs(U: URL):
   ''' Yield the HREFs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
@@ -928,7 +929,7 @@ def url_hrefs(U:URL):
 
 @yields_str
 @promote
-def url_srcs(U:URL):
+def url_srcs(U: URL):
   ''' Yield the SRCs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
@@ -1060,9 +1061,9 @@ def pilferifysel(func):
 
 def parse_action(action, do_trace):
   ''' Accept a string `action` and return an _Action subclass
-      instance or a (sig, function) tuple.
+      instance or a `(sig,function)` tuple.
 
-      This is primarily used by action_func below, but also called
+      This is used primarily by `action_func` below, but also called
       by subparses such as selectors applied to the values of named
       variables.
       Selectors return booleans, all other functions return or yield Pilfers.
@@ -1281,13 +1282,13 @@ def parse_action(action, do_trace):
       else:
         raise ValueError("unknown s///x modifier: %r" % (modchar,))
     debug(
-        "s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp,
+        "s: regexp=%r, repl_format=%r, repl_all=%s, repl_icase=%s", regexp,
         repl_format, repl_all, repl_icase
     )
 
     def substitute(P):
       ''' Perform a regexp substitution on the source string.
-          `replacement` is a format string for the replacement text
+          `repl_format` is a format string for the replacement text
           using the str.format method.
           The matched groups from the regexp take the positional arguments 1..n,
           with 0 used for the whole matched string.
@@ -1296,8 +1297,8 @@ def parse_action(action, do_trace):
       '''
       src = P._
       debug(
-          "SUBSTITUTE: src=%r, regexp=%r, replacement=%r, replace_all=%s)...",
-          src, regexp.pattern, replacement, replace_all
+          "SUBSTITUTE: src=%r, regexp=%r, repl_format=%r, repl_all=%s)...",
+          src, regexp.pattern, repl_format, repl_all
       )
       strs = []
       offset = 0
@@ -1310,9 +1311,9 @@ def parse_action(action, do_trace):
         # save the unmatched section
         strs.append(src[offset:m.start()])
         # save the matched section with replacements
-        strs.append(replacement.format(*repl_args, **repl_kw))
+        strs.append(repl_format.format(*repl_args, **repl_kw))
         offset = m.end()
-        if not replace_all:
+        if not repl_all:
           break
       # save the final unmatched section
       strs.append(src[offset:])
