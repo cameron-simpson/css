@@ -422,6 +422,14 @@ class Pilfer:
 
   __repr__ = __str__
 
+  @classmethod
+  def promote(cls, P):
+    '''Promote anything to a `Pilfer`.
+    '''
+    if not isinstance(P, cls):
+      P = cls(P)
+    return P
+
   def copy(self, *a, **kw):
     ''' Convenience function to shallow copy this Pilfer with modifications.
     '''
