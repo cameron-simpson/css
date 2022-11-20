@@ -127,7 +127,11 @@ def decorator(deco):
           decorated.__name__ = getattr(func, '__name__', str(func))
         except AttributeError:
           pass
-        decorated.__doc__ = getattr(func, '__doc__', None) or ''
+        doc = getattr(func, '__doc__', None) or ''
+        try:
+          decorated.__doc__ = doc
+        except AttributeError:
+          warning("cannot set __doc__ on %r", decorated)
         func_module = getattr(func, '__module__', None)
         try:
           decorated.__module__ = func_module
