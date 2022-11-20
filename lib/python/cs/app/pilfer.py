@@ -160,7 +160,7 @@ class PilferCommand(BaseCommand):
     # Load any named pipeline definitions on the command line.
     argv_offset = 0
     while argv and argv[argv_offset].endswith(':{'):
-      spec, argv_offset = cls.get_argv_pipespec(argv, argv_offset)
+      spec, argv_offset = self.get_argv_pipespec(argv, argv_offset)
       try:
         rc.add_pipespec(spec)
       except KeyError as e:
