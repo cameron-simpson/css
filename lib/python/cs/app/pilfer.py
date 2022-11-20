@@ -1012,7 +1012,7 @@ def Action(action_text, do_trace):
   except TypeError:
     action = parsed
   else:
-    action = ActionFunction(action_text, sig, lambda: function)
+    action = ActionFunction(action_text, sig, function)
   return action
 
 def pilferify11(func):
