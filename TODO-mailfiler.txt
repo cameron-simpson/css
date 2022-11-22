@@ -1,3 +1,4 @@
+|...& for asynchronous pipe commands, support in alert action
 use sqltags for the msgiddb
 write a folder transition diagram using FSM
 mailfiler needed 2 ctrl-c to exit
