@@ -1,4 +1,4 @@
-use the new Task and TaskQueue when they're ready
+"Because" class containing a bool and an explaintion, start using in the SvcD test function and elsewhere
 @promote: make @strable wrap this, using params=[0],promote[0]=open
 @promote: optional promote[param_name]->callable mapping
 @promote: accept ints in params to identify positional parameters?

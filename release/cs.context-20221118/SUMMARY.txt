@@ -1,0 +1,1 @@
+stackattrs: improve docstring.
