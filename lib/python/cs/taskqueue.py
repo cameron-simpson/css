@@ -15,7 +15,7 @@ from typeguard import typechecked
 
 from cs.deco import decorator
 from cs.fsm import FSM, FSMError
-from cs.gvutils import quote as gvq, gvprint
+from cs.gvutils import quote as gvq, gvprint, gvsvg
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import funcname
@@ -145,13 +145,18 @@ class BaseTask(FSM, RunStateMixin):
       digraph.append(f'  {nodedef};')
       blocking = sorted(qtask.blocking, key=lambda t: t.name)
       for subt in blocking:
-        digraph.append(
-            f'  {gvq(qtask.dot_node_label())}->{gvq(subt.dot_node_label())};'
-        )
+        digraph.append(f'  {gvq(qtask.dot_node_id)}->{gvq(subt.dot_node_id)};')
       if follow_blocking:
         q.extend(blocking)
     digraph.append('}')
     return sep.join(digraph)
+
+  @classmethod
+  def tasks_as_svg(cls, tasks, name=None, **kw):
+    ''' Return an SVG diagram of the iterable `tasks`.
+        This takes the same parameters as `tasks_as_dot`.
+    '''
+    return gvsvg(cls.tasks_as_dot(tasks, name=name, **kw))
 
   def as_dot(self, name=None, **kw):
     ''' Return a DOT syntax digraph starting at this `Task`.

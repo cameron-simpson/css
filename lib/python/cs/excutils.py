@@ -190,7 +190,7 @@ def transmute(func, exc_from, exc_to=None):
 def unattributable(func):
   ''' Decorator to transmute `AttributeError` into a `RuntimeError`.
   '''
-  return transmute(AttributeError, RuntimeError)(func)
+  return transmute(func, AttributeError, RuntimeError)
 
 def safe_property(func):
   ''' Substitute for @property which lets AttributeErrors escape as RuntimeErrors.
