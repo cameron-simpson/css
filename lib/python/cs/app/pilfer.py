@@ -1426,19 +1426,21 @@ def parse_action(action, do_trace):
         if not isinstance(Ps, list):
           Ps = list(Ps)
         if Ps:
-          mfunc = Ps[0].import_module_func(grok_module, grok_funcname)
+          mfunc = pfx_call(
+              Ps[0].import_module_func, grok_module, grok_funcname
+          )
           if mfunc is None:
-            error("import fails")
+            error("import fails: %s.%s", grok_module, grok_funcname)
           else:
             try:
-              var_mapping = mfunc(Ps, *args, **kwargs)
-            except Exception:
-              exception("call")
+              var_mapping = pfx_call(mfunc, Ps, *args, **kwargs)
+            except Exception as e:
+              exception("call %s.%s: %s", grok_module, grok_funcname, e)
             else:
               if var_mapping:
                 Ps = [P.copy('user_vars') for P in Ps]
-              for P in Ps:
-                P.set_user_vars(**var_mapping)
+                for P in Ps:
+                  P.set_user_vars(**var_mapping)
         return Ps
 
       return FUNC_ONE_TO_MANY, grokall
