@@ -3,6 +3,7 @@
 ''' Function pipelines mediated by queues and a Later.
 '''
 
+from enum import Enum, auto as auto_enum, unique as unique_enum
 from icontract import require
 from cs.later import DEFAULT_RETRY_DELAY
 from cs.logutils import debug, error
@@ -32,12 +33,18 @@ DISTINFO = {
     ],
 }
 
-# function signature designators, used with Later.pipeline()
-FUNC_ONE_TO_MANY = 0  # one to many: functor returns iterable
-FUNC_ONE_TO_ONE = 1  # one to one: functor returns value
-FUNC_SELECTOR = 2  # many to many, yielding item or nothing
-FUNC_MANY_TO_MANY = 3  # functor accepts all items at once
-FUNC_PIPELINE = 4  # functor is actually a pipeline, put items to it and collect asynchronously
+@unique_enum
+class StageType(Enum):
+  # func(item) returns an iterable
+  ONE_TO_MANY = auto_enum()
+  # func(item) returns a single item
+  ONE_TO_ONE = auto_enum()
+  # func(item) returns a Boolean, item is passed on or dropped
+  SELECTOR = auto_enum()
+  # func(items) returns an iterable, consuming all the incoming items
+  MANY_TO_MANY = auto_enum()
+  # a pipeline in a pipeline, a streaming many to many
+  PIPELINE = auto_enum()
 
 @pfx
 @require(lambda later: later.submittable)
@@ -68,7 +75,7 @@ def pipeline(later, actions, inputs=None, outQ=None, name=None):
                   [
                     ls,
                     filter_ls,
-                    ( FUNC_MANY_TO_MANY, lambda items: sorted(list(items)) ),
+                    ( StageType.MANY_TO_MANY, lambda items: sorted(list(items)) ),
                   ],
                   ('.', '..', '../..'),
                  )
@@ -256,11 +263,11 @@ class Pipeline(MultiOpenMixin):
               funcname(functor),
           )
       )
-      if func_sig == FUNC_ONE_TO_MANY:
+      if func_sig == StageType.ONE_TO_MANY:
         PQ = _PipelineStageOneToMany(pq_name, self, functor, RHQ)
-      elif func_sig == FUNC_ONE_TO_ONE:
+      elif func_sig == StageType.ONE_TO_ONE:
         PQ = _PipelineStageOneToOne(pq_name, self, functor, RHQ)
-      elif func_sig == FUNC_SELECTOR:
+      elif func_sig == StageType.SELECTOR:
 
         select_by = functor
 
@@ -269,9 +276,9 @@ class Pipeline(MultiOpenMixin):
             yield item
 
         PQ = _PipelineStageOneToMany(pq_name, self, selector, RHQ)
-      elif func_sig == FUNC_MANY_TO_MANY:
+      elif func_sig == StageType.MANY_TO_MANY:
         PQ = _PipelineStageManyToMany(pq_name, self, functor, RHQ)
-      elif func_sig == FUNC_PIPELINE:
+      elif func_sig == StageType.PIPELINE:
         PQ = _PipelineStagePipeline(pq_name, self, functor, RHQ)
       else:
         raise RuntimeError(
