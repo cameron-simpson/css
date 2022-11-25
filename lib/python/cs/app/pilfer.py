@@ -17,6 +17,7 @@ from subprocess import Popen, PIPE
 import sys
 from threading import Lock, RLock, Thread
 from time import sleep
+from typing import Iterable
 from urllib.parse import quote, unquote
 from urllib.error import HTTPError, URLError
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
@@ -26,6 +27,7 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 
 from icontract import require
+from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
 from cs.cmdutils import BaseCommand
@@ -49,7 +51,7 @@ from cs.pipeline import (
     pipeline, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR,
     FUNC_MANY_TO_MANY, FUNC_PIPELINE
 )
-from cs.py.func import (funcname, yields_type, returns_type, yields_str)
+from cs.py.func import funcname
 from cs.py.modules import import_module_name
 from cs.queues import NullQueue
 from cs.resources import MultiOpenMixin
@@ -286,8 +288,8 @@ class PilferCommand(BaseCommand):
       argv_offset += 1
       return spec, argv_offset
 
-@yields_str
-def urls(url, stdin=None, cmd=None):
+@typechecked
+def urls(url, stdin=None, cmd=None) -> Iterable[str]:
   ''' Generator to yield input URLs.
   '''
   if stdin is None:
@@ -733,16 +735,6 @@ class Pilfer:
       P = cls(P)
     return P
 
-def yields_Pilfer(func):
-  ''' Decorator for generators which should yield Pilfers.
-  '''
-  return yields_type(func, Pilfer)
-
-def returns_Pilfer(func):
-  ''' Decorator for functions which should return Pilfers.
-  '''
-  return returns_type(func, Pilfer)
-
 class FormatArgument(str):
 
   @property
@@ -859,7 +851,6 @@ def has_exts(U, suffixes, case_sensitive=False):
         break
   return ok
 
-@yields_str
 def with_exts(urls, suffixes, case_sensitive=False):
   for U in urls:
     ok = False
@@ -921,17 +912,17 @@ def url_io_iter(I):
     else:
       yield item
 
-@yields_str
 @promote
-def url_hrefs(U: URL):
+@typechecked
+def url_hrefs(U: URL) -> Iterable[URL]:
   ''' Yield the HREFs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
   return url_io_iter(U.hrefs(absolute=True))
 
-@yields_str
 @promote
-def url_srcs(U: URL):
+@typechecked
+def url_srcs(U: URL) -> Iterable[URL]:
   ''' Yield the SRCs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
@@ -1398,8 +1389,8 @@ def parse_action(action, do_trace):
       raise ValueError("unparsed content after args: %r", action[offset:])
     if name == "grok":
 
-      @returns_Pilfer
-      def grok(P):
+      @typechecked
+      def grok(P: Pilfer) -> Pilfer:
         ''' Grok performs a user-specified analysis on the supplied Pilfer state `P`.
             (The current value, often an URL, is `P._`.)
             Import `func_name` from module `module_name`.
@@ -1423,9 +1414,9 @@ def parse_action(action, do_trace):
       return FUNC_ONE_TO_ONE, grok
     elif name == "grokall":
 
-      @yields_Pilfer
-      def grokall(Ps):
-        ''' Grokall performs a user-specified analysis on the items.
+      @typechecked
+      def grokall(Ps: Iterable[Pilfer]) -> Iterable[Pilfer]:
+        ''' Grokall performs a user-specified analysis on the `Pilfer` items `Ps`.
             Import `func_name` from module `module_name`.
             Call `func_name( Ps, *a, **kw ).
             Receive a mapping of variable names to values in return,
@@ -1884,8 +1875,8 @@ def action_shcmd(shcmd):
   '''
   shcmd = shcmd.strip()
 
-  @yields_str
-  def function(P):
+  @typechecked
+  def function(P) -> Iterable[str]:
     U = P._
     uv = P.user_vars
     try:
@@ -1923,8 +1914,8 @@ def action_pipecmd(shcmd):
   '''
   shcmd = shcmd.strip()
 
-  @yields_str
-  def function(items):
+  @typechecked
+  def function(items) -> Iterable[str]:
     if not isinstance(items, list):
       items = list(items)
     if not items:
