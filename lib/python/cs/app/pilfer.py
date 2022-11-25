@@ -422,14 +422,6 @@ class Pilfer:
 
   __repr__ = __str__
 
-  @classmethod
-  def promote(cls, P):
-    '''Promote anything to a `Pilfer`.
-    '''
-    if not isinstance(P, cls):
-      P = cls(P)
-    return P
-
   def copy(self, *a, **kw):
     ''' Convenience function to shallow copy this Pilfer with modifications.
     '''
@@ -730,6 +722,16 @@ class Pilfer:
     if not raw:
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
+
+  # Note: this method is _last_ because otherwise it it shadows the
+  # @promote decorator, used on earlier methods.
+  @classmethod
+  def promote(cls, P):
+    '''Promote anything to a `Pilfer`.
+    '''
+    if not isinstance(P, cls):
+      P = cls(P)
+    return P
 
 def yields_Pilfer(func):
   ''' Decorator for generators which should yield Pilfers.
