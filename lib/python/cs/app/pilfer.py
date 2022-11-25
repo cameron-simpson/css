@@ -47,10 +47,7 @@ from cs.mappings import MappingChain, SeenSet
 from cs.obj import copy as obj_copy
 import cs.pfx
 from cs.pfx import Pfx
-from cs.pipeline import (
-    pipeline, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR,
-    FUNC_MANY_TO_MANY, FUNC_PIPELINE
-)
+from cs.pipeline import pipeline, StageType
 from cs.py.func import funcname
 from cs.py.modules import import_module_name
 from cs.queues import NullQueue
@@ -371,7 +368,7 @@ def argv_pipefuncs(argv, action_map, do_trace):
             for P2 in pipe.outQ:
               yield P2
 
-        pipe_funcs.append((FUNC_ONE_TO_MANY, per))
+        pipe_funcs.append((StageType.ONE_TO_MANY, per))
       argv = []
       continue
     try:
@@ -1094,9 +1091,9 @@ def parse_action(action, do_trace):
             P = P.copy_with_vars(**varmap)
           yield P
 
-      return FUNC_ONE_TO_MANY, named_re_match
+      return StageType.ONE_TO_MANY, named_re_match
     else:
-      return FUNC_SELECTOR, lambda P: regexp.search(P._)
+      return StageType.SELECTOR, lambda P: regexp.search(P._)
 
   # select URLs not matching regexp
   # -/regexp/
@@ -1110,12 +1107,12 @@ def parse_action(action, do_trace):
       raise ValueError(
           "named groups may not be used in regexp rejection patterns"
       )
-    return FUNC_SELECTOR, lambda P: not regexp.search(P._)
+    return StageType.SELECTOR, lambda P: not regexp.search(P._)
 
   # parent
   # ..
   if action == '..':
-    return FUNC_ONE_TO_ONE, pilferify11(lambda P: P._.parent)
+    return StageType.ONE_TO_ONE, pilferify11(lambda P: P._.parent)
 
   # select URLs ending in particular extensions
   if action.startswith('.'):
@@ -1124,7 +1121,9 @@ def parse_action(action, do_trace):
     else:
       exts, case = action[1:], True
     exts = exts.split(',')
-    return FUNC_SELECTOR, lambda P: has_exts(P._, exts, case_sensitive=case)
+    return StageType.SELECTOR, lambda P: has_exts(
+        P._, exts, case_sensitive=case
+    )
 
   # select URLs not ending in particular extensions
   if action.startswith('-.'):
@@ -1133,7 +1132,7 @@ def parse_action(action, do_trace):
     else:
       exts, case = action[2:], True
     exts = exts.split(',')
-    return FUNC_SELECTOR, lambda P: not has_exts(
+    return StageType.SELECTOR, lambda P: not has_exts(
         P._, exts, case_sensitive=case
     )
 
@@ -1163,7 +1162,7 @@ def parse_action(action, do_trace):
       cmp_value = M.format(text)
       return vvalue == cmp_value
 
-    return FUNC_SELECTOR, compare
+    return StageType.SELECTOR, compare
 
   # uncomparison
   # name!=
@@ -1181,7 +1180,7 @@ def parse_action(action, do_trace):
       cmp_value = M.format(text)
       return vvalue != cmp_value
 
-    return FUNC_SELECTOR, uncompare
+    return StageType.SELECTOR, uncompare
 
   # contains
   # varname(value,value,...)
@@ -1208,7 +1207,7 @@ def parse_action(action, do_trace):
           return True
       return False
 
-    return FUNC_SELECTOR, in_list
+    return StageType.SELECTOR, in_list
 
   # assignment
   # varname=
@@ -1221,13 +1220,13 @@ def parse_action(action, do_trace):
       P2 = P.copy_with_vars(**{param: param_value})
       return P2
 
-    return FUNC_ONE_TO_ONE, assign
+    return StageType.ONE_TO_ONE, assign
 
   # test of variable value
   # varname~selector
   if action.startswith('~', offset):
     selector = Action(action[offset + 1:])
-    if selector.sig != FUNC_SELECTOR:
+    if selector.sig != StageType.SELECTOR:
       raise ValueError(
           "expected selector function but found: %s" % (selector,)
       )
@@ -1242,7 +1241,7 @@ def parse_action(action, do_trace):
         return False
       return selector(P, vvalue)
 
-    return FUNC_SELECTOR, do_test
+    return StageType.SELECTOR, do_test
 
   if name == 's':
     # s/this/that/
@@ -1316,7 +1315,7 @@ def parse_action(action, do_trace):
         result = URL(result, src.referer)
       return result
 
-    return FUNC_ONE_TO_ONE, substitute
+    return StageType.ONE_TO_ONE, substitute
 
   if name in ("copy", "divert", "pipe"):
     # copy:pipe_name[:selector]
@@ -1336,7 +1335,7 @@ def parse_action(action, do_trace):
             (marker, action[offset])
         )
       selector = Action(action[offset + 1:])
-      if selector.sig != FUNC_SELECTOR:
+      if selector.sig != StageType.SELECTOR:
         raise ValueError(
             "expected selector function but found: %s" % (selector,)
         )
@@ -1348,7 +1347,7 @@ def parse_action(action, do_trace):
           pipe.put(P)
         return P
 
-      return FUNC_ONE_TO_ONE, copy
+      return StageType.ONE_TO_ONE, copy
     elif name == 'divert':
 
       def divert(self, P):
@@ -1358,7 +1357,7 @@ def parse_action(action, do_trace):
         else:
           yield P
 
-      return FUNC_ONE_TO_MANY, divert
+      return StageType.ONE_TO_MANY, divert
     elif name == 'pipe':
       return ActionPipeTo(action0, pipe_name)
     else:
@@ -1411,7 +1410,7 @@ def parse_action(action, do_trace):
             P.set_user_vars(**var_mapping)
         return P
 
-      return FUNC_ONE_TO_ONE, grok
+      return StageType.ONE_TO_ONE, grok
     elif name == "grokall":
 
       @typechecked
@@ -1443,7 +1442,7 @@ def parse_action(action, do_trace):
                   P.set_user_vars(**var_mapping)
         return Ps
 
-      return FUNC_ONE_TO_MANY, grokall
+      return StageType.ONE_TO_MANY, grokall
     else:
       raise RuntimeError("unhandled action %r", name)
 
@@ -1471,7 +1470,7 @@ def parse_action(action, do_trace):
         for value in value_list:
           yield P.copy_with_vars(**{varname: value})
 
-      return FUNC_ONE_TO_MANY, for_specific
+      return StageType.ONE_TO_MANY, for_specific
     if marker == ':':
       # for:varname:{start}..{stop}
       start, stop = action[offset + 1:].split('..', 1)
@@ -1484,7 +1483,7 @@ def parse_action(action, do_trace):
         for value in range(istart, istop + 1):
           yield P.copy_with_vars(**{varname: str(value)})
 
-      return FUNC_ONE_TO_MANY, for_range
+      return StageType.ONE_TO_MANY, for_range
     raise ValueError("unrecognised marker after varname: %r", marker)
 
   if name in ('see', 'seen', 'unseen'):
@@ -1508,7 +1507,7 @@ def parse_action(action, do_trace):
         if not value:
           value = '{_}'
     if name == 'see':
-      func_sig = FUNC_ONE_TO_ONE
+      func_sig = StageType.ONE_TO_ONE
 
       def see(P):
         U = P._
@@ -1517,7 +1516,7 @@ def parse_action(action, do_trace):
           P.see(see_value, seenset)
         return P
 
-      return FUNC_ONE_TO_ONE, see
+      return StageType.ONE_TO_ONE, see
     if name == 'seen':
 
       def seen(P):
@@ -1525,7 +1524,7 @@ def parse_action(action, do_trace):
         see_value = P.format_string(value, U)
         return any([P.seen(see_value, seenset) for seenset in seensets])
 
-      return FUNC_SELECTOR, seen
+      return StageType.SELECTOR, seen
     if name == 'unseen':
 
       def unseen(P):
@@ -1533,7 +1532,7 @@ def parse_action(action, do_trace):
         see_value = P.format_string(value, U)
         return not any([P.seen(see_value, seenset) for seenset in seensets])
 
-      return FUNC_SELECTOR, unseen
+      return StageType.SELECTOR, unseen
     raise RuntimeError("unsupported action %r", name)
 
   if name == 'unique':
@@ -1546,7 +1545,7 @@ def parse_action(action, do_trace):
         seen.add(value)
         yield P
 
-    return FUNC_ONE_TO_MANY, unique
+    return StageType.ONE_TO_MANY, unique
 
   if action == 'first':
     is_first = [True]
@@ -1556,14 +1555,14 @@ def parse_action(action, do_trace):
         is_first[0] = False
         return True
 
-    return FUNC_SELECTOR, first
+    return StageType.SELECTOR, first
 
   if action == 'new_save_dir':
     # create a new directory based on {save_dir} and update save_dir to match
     def new_save_dir(P):
       return P.copy_with_vars(save_dir=new_dir(P.save_dir))
 
-    return FUNC_ONE_TO_ONE, new_save_dir
+    return StageType.ONE_TO_ONE, new_save_dir
 
   # some other function: gather arguments and then look up function by name in mappings
   if offset < len(action):
@@ -1580,26 +1579,26 @@ def parse_action(action, do_trace):
 
   if name in many_to_many:
     # many-to-many functions get passed straight in
-    sig = FUNC_MANY_TO_MANY
+    sig = StageType.MANY_TO_MANY
     func = many_to_many[name]
   elif name in one_to_many:
-    sig = FUNC_ONE_TO_MANY
+    sig = StageType.ONE_TO_MANY
     func = one_to_many[name]
   elif name in one_to_one:
     func = one_to_one[name]
-    sig = FUNC_ONE_TO_ONE
+    sig = StageType.ONE_TO_ONE
   elif name in one_test:
     func = one_test[name]
-    sig = FUNC_SELECTOR
+    sig = StageType.SELECTOR
   else:
     raise ValueError("unknown action")
 
   # pretty up lambda descriptions
   if func.__name__ == '<lambda>':
     func.__name__ = '<lambda %r>' % (name,)
-  if sig == FUNC_ONE_TO_ONE:
+  if sig == StageType.ONE_TO_ONE:
     func = pilferify11(func)
-  elif sig == FUNC_ONE_TO_MANY:
+  elif sig == StageType.ONE_TO_MANY:
     func = pilferify1m(func)
 
   if args or kwargs:
@@ -1708,7 +1707,7 @@ class ActionFunction(_Action):
 class ActionPipeTo(_Action):
 
   def __init__(self, action0, pipespec):
-    _Action.__init__(self, action0, FUNC_PIPELINE)
+    super().__init__(action0, StageType.PIPELINE)
     self.pipespec = pipespec
 
   class _OnDemandPipeline(MultiOpenMixin):
@@ -1744,7 +1743,7 @@ class ActionPipeTo(_Action):
 class ActionShellFilter(_Action):
 
   def __init__(self, action0, shcmd, args, kwargs):
-    _Action.__init__(action0, FUNC_PIPELINE, args, kwargs)
+    super().__init__(action0, StageType.PIPELINE, args, kwargs)
     self.shcmd = shcmd
 
   # TODO: substitute parameters into shcmd
@@ -1812,7 +1811,7 @@ class ShellProcFilter(MultiOpenMixin):
 class ActionShellCommand(_Action):
 
   def __init__(self, action0, shcmd, args, kwargs):
-    _Action.__init__(action0, FUNC_PIPELINE, args, kwargs)
+    super().__init__(action0, StageType.PIPELINE, args, kwargs)
     self.shcmd = shcmd
 
   # TODO: substitute parameters into shcmd
@@ -1909,7 +1908,7 @@ def action_shcmd(shcmd):
         if xit != 0:
           warning("exit code = %d", xit)
 
-  return function, FUNC_ONE_TO_MANY
+  return function, StageType.ONE_TO_MANY
 
 def action_pipecmd(shcmd):
   ''' Return (function, func_sig) for pipeline through a shell command.
@@ -1961,7 +1960,7 @@ def action_pipecmd(shcmd):
         if xit != 0:
           warning("exit code = %d", xit)
 
-  return function, FUNC_MANY_TO_MANY
+  return function, StageType.MANY_TO_MANY
 
 class PipeSpec(namedtuple('PipeSpec', 'name argv')):
   ''' A pipeline specification: a name and list of actions.
