@@ -831,6 +831,33 @@ def promote(func, params=None, types=None):
           >>> f([1,2,3], epoch=12.0)
           epoch = <class 'cs.timeseries.Epoch'> Epoch(start=0, step=12)
 
+      *Note*: one issue with this is due to the conflict in name
+      between this decorator and the method it looks for in a class.
+      The `promote` _method_ must appear after any methods in the
+      class which are decorated with `@promote`, otherwise the the
+      decorator method supplants the name `promote` making it
+      unavailable as the decorater.
+
+      Failing example:
+
+          class Foo:
+              @classmethod
+              def promote(cls, obj):
+                  ... return promoted obj ...
+              @promote
+              def method(self, param:Type, ...):
+                  ...
+
+      Working example:
+
+          class Foo:
+              @promote
+              def method(self, param:Type, ...):
+                  ...
+              # promote method as the final method of the class
+              @classmethod
+              def promote(cls, obj):
+                  ... return promoted obj ...
   '''
   sig = signature(func)
   if params is not None:
