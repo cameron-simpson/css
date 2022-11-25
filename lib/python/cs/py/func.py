@@ -110,7 +110,7 @@ def trace(
     func,
     call=True,
     retval=False,
-    exception=False,
+    exception=True,
     use_pformat=False,
     with_caller=False,
     with_pfx=False,
