@@ -1,3 +1,4 @@
+sort tags in .fstags files
 autotag: findup to locate tagging rules?
 fstags to return TaggedEntities, TaggedPath to subclass TagSetMixin and rename to FSTagSet
 bring the jsonable hook from cs.app.beyonwiz in house for subclassing

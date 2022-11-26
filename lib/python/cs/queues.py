@@ -9,8 +9,8 @@
 
 from contextlib import contextmanager
 from functools import partial
-from threading import Timer, Lock, RLock, Thread
 import sys
+from threading import Timer, Lock, RLock, Thread
 import time
 
 ##from cs.debug import Lock, RLock, Thread
@@ -22,7 +22,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20220805-post'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'description':
@@ -160,7 +160,7 @@ def IterablePriorityQueue(capacity=0, name=None):
 
 class Channel(object):
   ''' A zero-storage data passage.
-      Unlike a `Queue(1)`, `put()` blocks waiting for the matching `get()`.
+      Unlike a `Queue`, `put(item)` blocks waiting for the matching `get()`.
   '''
 
   # pylint: disable=consider-using-with
@@ -273,7 +273,6 @@ class PushQueue(MultiOpenMixin):
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
     self.name = name
     self._lock = RLock()
-    MultiOpenMixin.__init__(self)
     self.functor = functor
     self.outQ = outQ
 
@@ -282,6 +281,13 @@ class PushQueue(MultiOpenMixin):
 
   def __repr__(self):
     return "<%s outQ=%s>" % (self, self.outQ)
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the output queue.
+    '''
+    with self.outQ:
+      yield
 
   @not_closed
   def put(self, item):
@@ -296,16 +302,6 @@ class PushQueue(MultiOpenMixin):
     with outQ:
       for computed in functor(item):
         outQ.put(computed)
-
-  def startup(self):
-    ''' Start up.
-    '''
-
-  def shutdown(self):
-    ''' shutdown() is called by MultiOpenMixin._close() to close
-        the outQ for real.
-    '''
-    self.outQ.close()
 
 class NullQueue(MultiOpenMixin):
   ''' A queue-like object that discards its inputs.

@@ -69,13 +69,15 @@ from __future__ import with_statement, print_function
 import atexit
 from builtins import print as builtin_print
 from contextlib import contextmanager
+from functools import partial
 import os
 import sys
 from threading import RLock, Thread
 import time
+from typing import Optional
 
 from cs.context import stackattrs, StackableState
-from cs.deco import decorator
+from cs.deco import decorator, default_params
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
@@ -88,13 +90,12 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20220619-post'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -115,58 +116,6 @@ def _cleanup():
     U.shutdown()
 
 atexit.register(_cleanup)
-
-# A couple of convenience functions.
-
-def out(msg, *a, **outkw):
-  ''' Update the status line of the default `Upd` instance.
-      Parameters are as for `Upd.out()`.
-  '''
-  return Upd().out(msg, *a, **outkw)
-
-# pylint: disable=redefined-builtin
-def print(*a, **kw):
-  ''' Wrapper for the builtin print function
-      to call it inside `Upd.above()` and enforce a flush.
-
-      The function supports an addition parameter beyond the builtin print:
-      * `upd`: the `Upd` instance to use, default `Upd()`
-
-      Programmes integrating `cs.upd` with use of the builtin `print`
-      function should use this at import time:
-
-          from cs.upd import print
-  '''
-  upd = kw.pop('upd', None)
-  if upd is None:
-    upd = Upd()
-  end = kw.get('end', '\n')
-  kw['flush'] = True
-  with upd.above(need_newline=not end.endswith('\n')):
-    builtin_print(*a, **kw)
-
-def pfxprint(*a, **kw):
-  ''' Wrapper for `cs.pfx.pfxprint` to pass `print_func=cs.upd.print`.
-
-      Programmes integrating `cs.upd` with use of the `cs.pfx.pfxprint`
-      function should use this at import time:
-
-          from cs.upd import pfxprint
-  '''
-  # pylint: disable=import-outside-toplevel
-  from cs.pfx import pfxprint as base_pfxprint
-  return base_pfxprint(*a, print_func=print, **kw)
-
-def nl(msg, *a, **kw):
-  ''' Write `msg` to `file` (default `sys.stdout`),
-      without interfering with the `Upd` instance.
-      This is a thin shim for `Upd.print`.
-  '''
-  if a:
-    msg = msg % a
-  if 'file' not in kw:
-    kw['file'] = sys.stderr
-  print(msg, **kw)
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
 class Upd(SingletonMixin):
@@ -818,7 +767,7 @@ class Upd(SingletonMixin):
           )
       if proxy is None:
         # create the proxy, which inserts it
-        return UpdProxy(index, self, prefix=txt)
+        return UpdProxy(index=index, upd=self, prefix=txt)
 
       # associate the proxy with self
       assert proxy.upd is None
@@ -973,6 +922,7 @@ class Upd(SingletonMixin):
       tick_chars='|/-\\',
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
+        It yields the proxy.
     '''
     if tick_delay is not None:
       if tick_delay <= 0:
@@ -1016,6 +966,69 @@ class Upd(SingletonMixin):
           transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
       )
 
+def uses_upd(func):
+  ''' Decorator for functions accepting an optional `upd=Upd()` parameter.
+  '''
+  return default_params(func, upd=Upd)
+
+@uses_upd
+def out(msg, *a, upd, **outkw):
+  ''' Update the status line of the default `Upd` instance.
+      Parameters are as for `Upd.out()`.
+  '''
+  return upd.out(msg, *a, **outkw)
+
+# pylint: disable=redefined-builtin
+@uses_upd
+def print(*a, upd, end='\n', **kw):
+  ''' Wrapper for the builtin print function
+      to call it inside `Upd.above()` and enforce a flush.
+
+      The function supports an addition parameter beyond the builtin print:
+      * `upd`: the `Upd` instance to use, default `Upd()`
+
+      Programmes integrating `cs.upd` with use of the builtin `print`
+      function should use this at import time:
+
+          from cs.upd import print
+  '''
+  kw['flush'] = True
+  with upd.above(need_newline=not end.endswith('\n')):
+    builtin_print(*a, **kw)
+
+@uses_upd
+def pfxprint(*a, upd, **kw):
+  ''' Wrapper for `cs.pfx.pfxprint` to pass `print_func=cs.upd.print`.
+
+      Programmes integrating `cs.upd` with use of the `cs.pfx.pfxprint`
+      function should use this at import time:
+
+          from cs.upd import pfxprint
+  '''
+  # pylint: disable=import-outside-toplevel
+  from cs.pfx import pfxprint as base_pfxprint
+  return base_pfxprint(*a, print_func=partial(print, upd=upd), **kw)
+
+@contextmanager
+@uses_upd
+def run_task(*a, upd, **kw):
+  ''' Top level `run_task` function to call `Upd.run_task`.
+  '''
+  with upd.run_task(*a, **kw) as proxy:
+    yield proxy
+
+@uses_upd
+def nl(msg, *a, upd, **kw):
+  ''' Write `msg` to `file` (default `sys.stdout`),
+      without interfering with the `Upd` instance.
+      This is a thin shim for `Upd.print`.
+  '''
+  if a:
+    msg = msg % a
+  if 'file' not in kw:
+    kw['file'] = sys.stderr
+  print(msg, upd=upd, **kw)
+
 class UpdProxy(object):
   ''' A proxy for a status line of a multiline `Upd`.
 
@@ -1043,13 +1056,15 @@ class UpdProxy(object):
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
   }
 
+  @uses_upd
   def __init__(
       self,
-      index=1,
-      upd=None,
-      text=None,
-      prefix=None,
-      suffix=None,
+      text: Optional[str] = None,
+      *,
+      upd: Upd,
+      index: int = 1,
+      prefix: Optional[str] = None,
+      suffix: Optional[str] = None,
       text_auto=None,
   ):
     ''' Initialise a new `UpdProxy` status line.
@@ -1063,8 +1078,6 @@ class UpdProxy(object):
     '''
     self.upd = None
     self.index = None
-    if upd is None:
-      upd = Upd()
     self._prefix = prefix or ''
     self._text = ''
     self._text_auto = text_auto

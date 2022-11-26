@@ -10,12 +10,14 @@ Convenience facilities related to Python functions.
 
 from functools import partial
 from pprint import pformat
+
 from cs.deco import decorator
 from cs.py.stack import caller
 from cs.py3 import unicode, raise_from
+
 from cs.x import X
 
-__version__ = '20220619-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -53,7 +55,13 @@ def funccite(func):
     code = func.__code__
   except AttributeError:
     return "%s[no.__code__]" % (repr(func),)
-  return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
+  try:
+    from cs.fs import shortpath
+  except ImportError:
+    shortpath = lambda p: p
+  return "%s[%s:%d]" % (
+      funcname(func), shortpath(code.co_filename), code.co_firstlineno
+  )
 
 def func_a_kw_fmt(func, *a, **kw):
   ''' Prepare a percent-format string and associated argument list
@@ -94,13 +102,15 @@ def callif(doit, func, *a, **kw):
   modes['print'](fmt % tuple(av))
   return None
 
+_trace_indent = ""
+
 @decorator
 # pylint: disable=too-many-arguments
 def trace(
     func,
     call=True,
     retval=False,
-    exception=False,
+    exception=True,
     use_pformat=False,
     with_caller=False,
     with_pfx=False,
@@ -113,9 +123,10 @@ def trace(
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
     '''
-    # late import so that we can use this in modules we import
-    # pylint: disable=import-outside-toplevel
+    global _trace_indent
     if with_pfx:
+      # late import so that we can use this in modules we import
+      # pylint: disable=import-outside-toplevel
       try:
         from cs.pfx import XP as xlog
       except ImportError:
@@ -127,19 +138,23 @@ def trace(
       log_cite = log_cite + "from[%s]" % (caller(),)
     if call:
       fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("CALL " + fmt, *av)
+      xlog("%sCALL " + fmt, _trace_indent, *av)
+    old_indent = _trace_indent
+    _trace_indent += '  '
     try:
       result = func(*a, **kw)
     except Exception as e:
       if exception:
-        xlog("CALL %s RAISE %r", log_cite, e)
+        xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
+      _trace_indent = old_indent
       raise
     else:
       if retval:
         xlog(
-            "CALL %s RETURN %s", log_cite,
+            "%sCALL %s RETURN %s", _trace_indent, log_cite,
             (pformat if use_pformat else repr)(result)
         )
+      _trace_indent = old_indent
       return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
