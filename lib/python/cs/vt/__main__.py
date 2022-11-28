@@ -713,7 +713,12 @@ class VTCmd(BaseCommand):
           first = False
         else:
           print()
-        D, offset = parse(path)
+        try:
+          D, offset = parse(path)
+        except ValueError as e:
+          warning("parse error: %s", e)
+          xit = 1
+          continue
         if offset < len(path):
           warning("unparsed text: %r, skipping", path[offset:])
           xit = 1
