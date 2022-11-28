@@ -1269,7 +1269,7 @@ class PlatonicDir(FilesDir):
     if new_size is None:
       # skip non files
       debug("SKIP non-file")
-      return
+      return updated
     try:
       E = D[filename]
     except KeyError:
@@ -1289,7 +1289,8 @@ class PlatonicDir(FilesDir):
           "DFstate.scanned_to:%s != len(E.block):%s" %
           (DFstate.scanned_to, len(current_block))
       )
-      R = self.meta_store._defer(
+      # splice the newly scanned data into the existing data
+      top_block_result = self.meta_store._defer(
           lambda B, Q: top_block_for(spliced_blocks(B, Q)), current_block,
           blockQ
       )
@@ -1324,9 +1325,10 @@ class PlatonicDir(FilesDir):
         DFstate.scanned_to = post_offset
         if self.cancelled or self.flag_scan_disable:
           break
+      # now collect the top block of the spliced data
       blockQ.close()
       try:
-        top_block = R()
+        top_block = top_block_result()
       except MissingHashcodeError as e:
         error("missing data, forcing rescan: %s", e)
         DFstate.scanned_to = 0
