@@ -520,7 +520,7 @@ class VTCmd(BaseCommand):
         if path.endswith('.vtd'):
           print(path)
           try:
-            fd = os.open(path, os.O_RDONLY)
+            fd = pfx_call(os.open, path, os.O_RDONLY)
           except OSError as e:
             warning("open: %s", e)
             xit = 1
@@ -588,11 +588,9 @@ class VTCmd(BaseCommand):
         TODO: hook into vt.merge.
     '''
     options = self.options
-    options.update(
-        delete=False,
-        overlay=False,
-        whole_read=False,
-    )
+    options.delete = False
+    options.overlay = False
+    options.whole_read = False
     options.popopts(argv, D='delete', o='overlay', W='whole_read')
     if not argv:
       raise GetoptError("missing srcpath")
