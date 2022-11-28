@@ -11,7 +11,6 @@ Convenience facilities for managing exceptions.
 import sys
 import traceback
 from cs.deco import decorator
-from cs.logutils import error
 from cs.py.func import funcname
 
 __version__ = '20210123-post'
@@ -25,7 +24,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.logutils', 'cs.py.func'],
+    'install_requires': ['cs.deco', 'cs.gimmicks', 'cs.py.func'],
 }
 
 if sys.hexversion >= 0x03000000:
@@ -78,7 +77,7 @@ def noexc(func):
   '''
 
   def noexc_wrapper(*args, **kwargs):
-    from cs.logutils import exception
+    from cs.gimmicks import exception
     from cs.x import X
     try:
       return func(*args, **kwargs)
@@ -295,7 +294,7 @@ def exc_fold(func, exc_types=None, exc_return=False):
     try:
       return func(*a, **kw)
     except exc_types as e:
-      error("%s", e)
+      from cs.gimmicks import error
       return exc_return
 
   wrapped.__name__ = (
