@@ -40,14 +40,13 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.context import StackableState
 from cs.fstags import FSTags, rpaths
 from cs.lex import get_identifier, get_decimal_value, cropped_repr
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
 from cs.py.func import prop
 from cs.tagset import TagSet, Tag
-from cs.threads import locked_property
+from cs.threads import locked_property, State as ThreadState
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
@@ -66,7 +65,6 @@ DISTINFO = {
         'cs.binary',
         'cs.buffer',
         'cs.cmdutils',
-        'cs.context',
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
@@ -79,7 +77,7 @@ DISTINFO = {
     ],
 }
 
-PARSE_MODE = StackableState(copy_boxes=False, discard_data=False)
+PARSE_MODE = ThreadState(copy_boxes=False, discard_data=False)
 
 def main(argv=None):
   ''' Command line mode.
@@ -2523,7 +2521,8 @@ class ILSTBoxBody(ContainerBoxBody):
       }
   }
 
-  # pylint: disable=attribute-defined-outside-init,too-many-locals,too-many-statements
+  # pylint: disable=attribute-defined-outside-init,too-many-locals
+  # pylint: disable=too-many-statements,too-many-branches
   def parse_fields(self, bfr):
     super().parse_fields(bfr)
     self.tags = TagSet()
@@ -2704,9 +2703,7 @@ def parse(o):
     bfr = CornuCopyBuffer.from_file(o)
   over_box = OverBox.parse(bfr)
   if bfr.bufs:
-    warning(
-        "unparsed data in bfr: %r", list(map(lambda bs: len(bs), bfr.bufs))
-    )
+    warning("unparsed data in bfr: %r", list(map(len, bfr.bufs)))
   if fd is not None:
     os.close(fd)
   return over_box
