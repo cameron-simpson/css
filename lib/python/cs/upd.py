@@ -76,11 +76,12 @@ from threading import RLock, Thread
 import time
 from typing import Optional
 
-from cs.context import stackattrs, StackableState
+from cs.context import stackattrs
 from cs.deco import decorator, default_params
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
+from cs.threads import State as ThreadState
 from cs.tty import ttysize
 from cs.units import transcribe, TIME_SCALE
 
@@ -99,11 +100,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context>=stackable_state',
+        'cs.context',
         'cs.deco',
         'cs.gimmicks',
         'cs.lex',
         'cs.obj>=20210122',
+        'cs.threads',
         'cs.tty',
         'cs.units',
     ],
@@ -1227,7 +1229,7 @@ class UpdProxy(object):
       return upd.insert(index, txt)
 
 # pylint: disable=too-few-public-methods
-class _UpdState(StackableState):
+class _UpdState(ThreadState):
 
   def __getattr__(self, attr):
     if attr == 'upd':
