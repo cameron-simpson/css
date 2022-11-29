@@ -49,8 +49,8 @@ DISTINFO = {
 RFC5322_DATE_TIME = '%a, %d %b %Y %H:%M:%S %z'
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
-def shortpath(path, environ=None):
-  return _shortpath(path, environ=environ, prefixes=SHORTPATH_PREFIXES)
+def shortpath(path):
+  return _shortpath(path, prefixes=SHORTPATH_PREFIXES)
 
 def Message(msgfile, headersonly=False):
   ''' Factory function to accept a file or filename and return an email.message.Message.
