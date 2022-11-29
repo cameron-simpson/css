@@ -151,6 +151,7 @@ def make_maildir(path):
       raise
     made.append(subdirpath)
 
+# pylint: disable=too-many-public-methods
 class Maildir(mailbox.Maildir):
   ''' A faster Maildir interface.
       Trust os.listdir, don't fsync, etc.
@@ -359,8 +360,9 @@ class Maildir(mailbox.Maildir):
     return len(self.items())
 
   def clear(self):
-    for key in self.keys():
-      del self[key]
+    raise RuntimeError("I do not want to do this")
+    ##for key in self.keys():
+    ##  del self[key]
 
   def pop(self, key, *args):
     try:
@@ -442,12 +444,6 @@ class Maildir(mailbox.Maildir):
     '''
     for key in self.iterkeys():
       return key, self.get_headers(key)
-
-  def lock(self):
-    self._lock.acquire()
-
-  def unlock(self):
-    self._lock.release()
 
   def close(self):
     pass
