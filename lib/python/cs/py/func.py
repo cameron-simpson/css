@@ -69,7 +69,10 @@ def func_a_kw_fmt(func, *a, **kw):
       Return `format,args`.
 
       The `func` argument can also be a string,
-      presumably a prepared description of `func` such as `funccite(func)`.
+      typically a prepared description of `func` such as `funccite(func)`.
+
+      *Note*: the returned `args` is a `list` for easy incorporation
+      into further arguments.  The `%` operator requires a `tuple`.
   '''
   av = [
       func if isinstance(func, str) else getattr(func, '__name__', str(func))
@@ -85,7 +88,7 @@ def func_a_kw(func, *a, **kw):
   ''' Return a string representing a call to `func(*a,**kw)`.
   '''
   fmt, args = func_a_kw_fmt(func, *a, **kw)
-  return fmt % args
+  return fmt % tuple(args)
 
 def callif(doit, func, *a, **kw):
   ''' Call `func(*a,**kw)` if `doit` is true
