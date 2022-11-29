@@ -23,7 +23,7 @@ from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 from cs.threads import State as ThreadState
 
-__version__ = '20220918-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -34,12 +34,14 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
+        'cs.deco',
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
         'cs.psutils',
         'cs.py.func',
         'cs.py.stack',
+        'cs.threads',
     ],
 }
 

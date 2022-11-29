@@ -10,12 +10,14 @@ Convenience facilities related to Python functions.
 
 from functools import partial
 from pprint import pformat
+
 from cs.deco import decorator
 from cs.py.stack import caller
 from cs.py3 import unicode, raise_from
+
 from cs.x import X
 
-__version__ = '20220619-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -53,7 +55,13 @@ def funccite(func):
     code = func.__code__
   except AttributeError:
     return "%s[no.__code__]" % (repr(func),)
-  return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
+  try:
+    from cs.fs import shortpath
+  except ImportError:
+    shortpath = lambda p: p
+  return "%s[%s:%d]" % (
+      funcname(func), shortpath(code.co_filename), code.co_firstlineno
+  )
 
 def func_a_kw_fmt(func, *a, **kw):
   ''' Prepare a percent-format string and associated argument list
@@ -102,7 +110,7 @@ def trace(
     func,
     call=True,
     retval=False,
-    exception=False,
+    exception=True,
     use_pformat=False,
     with_caller=False,
     with_pfx=False,
