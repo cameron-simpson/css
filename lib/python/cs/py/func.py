@@ -81,6 +81,12 @@ def func_a_kw_fmt(func, *a, **kw):
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
 
+def func_a_kw(func, *a, **kw):
+  ''' Return a string representing a call to `func(*a,**kw)`.
+  '''
+  fmt, args = func_a_kw_fmt(func, *a, **kw)
+  return fmt % args
+
 def callif(doit, func, *a, **kw):
   ''' Call `func(*a,**kw)` if `doit` is true
       otherwise just print it out.
