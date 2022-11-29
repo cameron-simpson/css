@@ -395,9 +395,7 @@ class MailFiler(NS):
   def maildir_from_folderspec(self, folderspec):
     ''' Return the Maildir from `folderspec`.
     '''
-    return Pathname(
-        longpath(folderspec, None, ((self.maildir_path + '/', '+'),))
-    )
+    return Pathname(longpath(folderspec, ((self.maildir_path + '/', '+'),)))
 
   def maildir_watcher(self, folderspec):
     ''' Return the singleton WatchedMaildir indicated by the `folderspec`.
