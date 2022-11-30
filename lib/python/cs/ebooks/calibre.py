@@ -1146,7 +1146,7 @@ class CalibreCommand(BaseCommand):
         cbook.dbid,
     )
 
-  def popbooks(self, argv, once=False, sortkey=None):
+  def popbooks(self, argv, once=False, sortkey=None, reverse=False):
     ''' Consume `argv` as book specifications and return a list of matching books.
 
         If `once` is true (default `False`) consume only the first argument.
@@ -1163,7 +1163,7 @@ class CalibreCommand(BaseCommand):
     if sortkey is not None and sortkey is not False:
       if sortkey is True:
         sortkey = self.cbook_default_sortkey
-      cbooks = sorted(cbooks, key=sortkey)
+      cbooks = sorted(cbooks, key=sortkey, reverse=reverse)
     return cbooks
 
   # pylint: disable=too-many-branches,too-many-locals
@@ -1345,11 +1345,25 @@ class CalibreCommand(BaseCommand):
           List the contents of the Calibre library.
           -l            Long mode, listing book details over several lines.
           -o ls_format  Output format for use in a single line book listing.
+          -r            Reverse the listing order.
+          -t            Order listing by timestamp.
     '''
     options = self.options
     options.longmode = False  # pylint: disable=attribute-defined-outside-init
     options.ls_format = None
-    options.popopts(argv, l='longmode', o_='ls_format')
+    options.sort_reverse = False
+    options.sort_timestamp = False
+    options.popopts(
+        argv,
+        l='longmode',
+        o_='ls_format',
+        r='sort_reverse',
+        t='sort_timestamp',
+    )
+    if options.sort_timestamp:
+      cbook_sort_key = lambda cbook: cbook.timestamp
+    else:
+      cbook_sort_key = self.cbook_default_sortkey
     longmode = options.longmode
     ls_format = options.ls_format
     calibre = options.calibre
@@ -1357,12 +1371,16 @@ class CalibreCommand(BaseCommand):
     cbooks = []
     if argv:
       try:
-        cbooks = self.popbooks(argv, sortkey=True)
+        cbooks = self.popbooks(
+            argv, sortkey=cbook_sort_key, reverse=options.sort_reverse
+        )
       except ValueError as e:
         raise GetoptError("invalid book specifiers: %s") from e
     else:
       calibre.preload()
-      cbooks = sorted(calibre, key=self.cbook_default_sortkey)
+      cbooks = sorted(
+          calibre, key=cbook_sort_key, reverse=options.sort_reverse
+      )
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
