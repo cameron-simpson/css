@@ -430,6 +430,33 @@ class Result(FSM):
       self.collected = True
       notifier(self)
 
+  def post_notify(self, post_func) -> "Result":
+    ''' Return a secondary `Result` which processes the result of `self`.
+
+        After the `self` completes, call `post_func(retval)` where
+        `retval` is the result of `self`, and use that to complete
+        the secondary `Result`.
+
+        Example:
+
+            # submit packet to data stream
+            R = submit_packet()
+            # arrange that when the response is received, decode the response
+            R2 = R.post_notify(lambda response: decode(response))
+            # collect decoded response
+            decoded = R2()
+
+        If the `Result` has already completed this will happen immediately.
+    '''
+    post_R = Result(f'POST_RESULT[{self.name}]')
+
+    def notifier(preR):
+      retval = preR()
+      post_R.run_func(post_func, retval)
+
+    self.notify(notifier)
+    return post_R
+
 def in_thread(func):
   ''' Decorator to evaluate `func` in a separate `Thread`.
       Return or exception is as for the original function.
