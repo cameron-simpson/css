@@ -433,7 +433,7 @@ class PacketConnection(object):
     return R
 
   @not_closed
-  def do(self, *a, **kw):
+  def do(self, rq_type, flags=0, payload=b'', decode_response=None, channel=0):
     ''' Synchronous request.
         Submits the request, then calls the `Result` returned from the request.
     '''
