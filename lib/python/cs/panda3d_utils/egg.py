@@ -7,7 +7,7 @@
     this module is aimed at writing Egg files.
     As such it contains functions and classes for making
     entities found in Egg files, and for writing these out in Egg syntax.
-    The entities are _not_ directly useable by Pada3d itself,
+    The entities are _not_ directly useable by Panda3d itself,
     they get into panda3d by being written as Egg and loaded;
     see the `load_model` function.
 
@@ -16,6 +16,7 @@
     * `dump`,`dumps`,dumpz`: after the style of `json.dump`, functions
       to dump objects in Egg syntax
     * `Eggable`: a mixin to support objects which can be transcribed in Egg syntax
+    * `DCEggable`: an `Eggable` based on a dataclass
     * `Eggable.as_str(obj)`: a class method to transcribe an object in Egg syntax,
       accepting `Eggable`s, `str`s and numeric values
     * various factories and classes for Egg nodes: `Texture`,
@@ -25,20 +26,22 @@
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass, field as dataclass_field, fields as dataclass_fields
+from random import randint
 from tempfile import NamedTemporaryFile
-from typing import Any, Iterable, Mapping, Optional, Tuple, Union
+from typing import Callable, Hashable, Iterable, Mapping, Optional, Union
 from zlib import compress
 
 from typeguard import typechecked
 
 from cs.context import ContextManagerMixin
-from cs.deco import default_params, fmtdoc
+from cs.deco import decorator, default_params, fmtdoc, promote
 from cs.fileutils import atomic_filename
 from cs.lex import is_identifier, r
 from cs.logutils import warning
-from cs.mappings import StrKeyedDict
+from cs.mappings import IndexedMapping, StrKeyedDict
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.psutils import run
 from cs.queues import ListQueue
 from cs.seq import Seq, unrepeated
 from cs.threads import State as ThreadState
@@ -49,7 +52,22 @@ DEFAULT_COORDINATE_SYSTEM = 'Z-up'
 
 # a mapping of reference Egg type names to the class to which it refers,
 # for example 'TRef' => Texture.
-REFTYPES = {}
+REFTYPES = IndexedMapping(pk='typename')
+
+class RefTypeSpec(namedtuple('RefTypeSpec', 'type refname')):
+
+  @property
+  def typename(self):
+    return self.type.__name__
+
+  def __getitem__(self, index):
+    if isinstance(index, str):
+      try:
+        return getattr(self, index)
+      except AttributeError:
+        raise KeyError("no attribute %r" % (index,))
+    else:
+      return super().__getitem__(index)
 
 @pfx
 def quote(text):
@@ -114,10 +132,44 @@ class EggRegistry(defaultdict, ContextManagerMixin):
       )
       raise
 
-# a stackable state
-state = ThreadState(registry=EggRegistry(__file__))
+  def ref_for(self, egg_node):
+    ''' Return a reference `EggNode` for an Eggable node `egg_node`,
+        or `None`.
 
-uses_registry = default_params(registry=lambda: state.registry)
+        For example, since `<TRef> { name }` is defined as a reference
+        type for `Texture` nodes, a `Texture("foo","foo_image.png")`
+        would return an `EggNode("TRef",None,"fpp")` if the `Texture`
+        was in this registry.
+    '''
+    name = egg_node.egg_name()
+    if name is None:
+      # cannot make a reference to an unnamed node
+      return None
+    try:
+      refspec = REFTYPES.by_typename[egg_node.egg_type()]
+    except KeyError:
+      # there's no reftype for this type
+      return None
+    instance = self.instance(refspec.type, name)
+    if instance is None:
+      # this is not a known instance
+      return None
+    return EggNode(refspec.refname, None, [name])
+
+# a stackable state
+_registry0 = EggRegistry(__file__)
+state = ThreadState(registry=_registry0)
+
+@decorator
+def uses_registry(func):
+
+  @default_params(registry=lambda: state.registry)
+  def with_registry(*a, registry, **kw):
+    assert registry is not _registry0
+    with registry:
+      return func(*a, registry=registry, **kw)
+
+  return with_registry
 
 class EggMetaClass(type):
 
@@ -179,11 +231,30 @@ class Eggable(metaclass=EggMetaClass):
     return "".join(self.egg_transcribe())
 
   @classmethod
-  def transcribe(cls, item, indent=""):
+  @uses_registry
+  def promote(cls, obj, *, registry):
+    ''' Promote `obj` to an instance of `cls`.
+
+        This implementation promotes `str` to the named `Eggable`.
+    '''
+    if not isinstance(obj, cls):
+      if isinstance(obj, str):
+        obj = cls.instance(obj, registry=registry)
+      else:
+        raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
+    return obj
+
+  @classmethod
+  @uses_registry
+  def transcribe(cls, item, indent='', *, registry):
     ''' A generator yielding `str`s which transcribe `item` in Egg syntax.
     '''
     if isinstance(item, Eggable):
-      yield from item.egg_transcribe(indent)
+      ref_node = registry.ref_for(item)
+      if ref_node is None:
+        yield from item.egg_transcribe(indent)
+      else:
+        yield from ref_node.egg_transcribe(indent)
     elif isinstance(item, str):
       yield quote(item)
     elif isinstance(item, (int, float)):
@@ -221,24 +292,28 @@ class Eggable(metaclass=EggMetaClass):
         contents of `self.attrs` if present.
         For each `attr,value` pair in the mapping:
         * ignore entries whose `value` is `None`
-        * yield `str`, `int` or `float` as `<Scalar>` Egg nodes named after `attr`
         * yield `Eggable` instances directly
+        * yield `str`, `int` or `float` as `<Scalar>` Egg nodes named after `attr`
+        * yield `tuples` as `<attr> { *tuple }` eg `UV { 0 1 }`
         Other values raise a `TypeError`.
     '''
     for attr, value in getattr(self, 'attrs', {}).items():
       if value is None:
         continue
-      if isinstance(value, (str, int, float)):
-        yield EggNode('Scalar', attr, [value])
-      elif isinstance(value, Eggable):
+      if isinstance(value, Eggable):
         yield value
+      elif isinstance(value, (str, int, float)):
+        yield EggNode('Scalar', attr, [value])
+      elif isinstance(value, tuple):
+        yield EggNode(attr, None, value)
       else:
         raise TypeError(
             "%s.attrs[%r]=%s: not slacar or Eggable" %
             (self.__class__.__name__, attr, value)
         )
 
-  def egg_transcribe(self, indent=''):
+  @uses_registry
+  def egg_transcribe(self, indent='', *, registry):
     ''' A generator yielding `str`s which transcribe `self` in Egg syntax.
     '''
     subindent = indent + "  "
@@ -247,7 +322,7 @@ class Eggable(metaclass=EggMetaClass):
     had_break = False
     had_breaks = False
     for item in self.egg_contents():
-      with Pfx("%r.egg_transcribe: item=%r", type(self), item):
+      with Pfx("<%s>.egg_transcribe: item=%r", self.egg_type(), item):
         item_sv = list(self.transcribe(item, subindent))
         assert len(item_sv) > 0
         if (had_break or item_sv[-1].endswith('}')
@@ -281,8 +356,7 @@ class Eggable(metaclass=EggMetaClass):
     yield from content_parts
     yield "}"
 
-  @uses_registry
-  def check(self, *, registry):
+  def check(self):
     ''' Check an `Eggable` `item` for consistency.
     '''
     q = ListQueue([self])
@@ -293,17 +367,28 @@ class Eggable(metaclass=EggMetaClass):
         if name is not None:
           # check the reference in things like <TRef> { texture-name }
           try:
-            ref_type = REFTYPES[typename]
+            refspec = REFTYPES.by_refname[typename]
           except KeyError:
             pass
           else:
             ref_name, = item.egg_contents()
+            ref_type = refspec.type
             assert isinstance(ref_name, str)
-            pfx_call(ref_type.instance, ref_name, registry=registry)
+            pfx_call(ref_type.instance, ref_name)
         # check all the contained items
         for subitem in item.egg_contents():
           if isinstance(subitem, Eggable):
             q.append(subitem)
+
+class EggableList(list, Eggable):
+  ''' An `Eggable` which is just a list of items, such as `<Transform>`.
+  '''
+
+  def __str__(self):
+    return Eggable.__str__(self)
+
+  def egg_contents(self):
+    return iter(self)
 
 class DCEggable(Eggable):
   ''' `Eggable` subclass for dataclasses.
@@ -314,15 +399,67 @@ class DCEggable(Eggable):
        method.
   '''
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to `cls`. Return the promoted object.
+    '''
+    if not isinstance(obj, cls):
+      if isinstance(obj, (list, tuple)):
+        obj = cls(*obj)
+      elif isinstance(obj, dict):
+        obj = cls(**obj)
+      else:
+        obj = super().promote(obj)
+    return obj
+
+  def egg_name(self):
+    ''' The Egg has a name if it has a `.name` which is not `None`.
+    '''
+    return getattr(self, 'name', None)
+
   def egg_contents(self):
     ''' Generator yielding the `EggNode` contents.
         This implementation yields the non-`None` field values in order,
         then the contents of `self.attrs` if present.
     '''
-    for F in dataclass_fields(self):
-      value = getattr(self, F.name)
-      if F.name != 'attrs' and value is not None:
+    # yield positional fields in order
+    positional_fields = getattr(self.__class__, 'POSITIONAL', ())
+    if isinstance(positional_fields, bool):
+      all_positional = positional_fields
+      positional_fields = (
+          tuple(
+              F.name
+              for F in dataclass_fields(self)
+              if F.name not in ('attrs', 'name')
+          ) if all_positional else ()
+      )
+    assert 'name' not in positional_fields and 'attrs' not in positional_fields
+    none_field_name = None
+    for field_name in positional_fields:
+      value = getattr(self, field_name)
+      if value is None:
+        if none_field_name is None:
+          none_field_name = field_name
+      else:
+        if none_field_name is not None:
+          raise ValueError(
+              "None positional field %r is followed by non-None positional field %r:%s"
+              % (none_field_name, field_name, r(value))
+          )
         yield value
+    for F in dataclass_fields(self):
+      field_name = F.name
+      if field_name in ('attrs', 'name') or field_name in positional_fields:
+        continue
+      value = getattr(self, field_name)
+      if value is not None:
+        if isinstance(value, (str, int, float)):
+          yield EggNode('Scalar', field_name, [value])
+        elif isinstance(value, Eggable):
+          yield value
+        else:
+          yield EggNode(field_name, None, value)
+    # yield named attrs if present
     yield from super().egg_contents()
 
 def dumps(obj, indent=""):
@@ -348,56 +485,23 @@ def dumpz(obj, f, indent=""):
   else:
     f.write(compress(dumps(obj, indent=indent).encode('utf-8')))
 
-@contextmanager
-@fmtdoc
-@typechecked
-def write_model(fspath: str, comment: str, *, coordinate_system=None):
-  ''' Context manager for writing an Egg model file to the path
-      `fspath` which yields an open file for the model contents.
-
-      Parameters:
-      * `fspath`: the filesystem path of the model file to create
-      * `comment`: opening comment for the file
-      * `coordinate_system`: coordinate system for the file,
-       default `{DEFAULT_COORDINATE_SYSTEM!r}` from `DEFAULT_COORDINATE_SYSTEM`
-
-      This uses `atomic_filename` to create the file so it will not
-      exist in the filesystem until it is complete.
-
-      Example use:
-
-          with write_model("my_model.egg", "test model") as f:
-              for nodes in egg_nodes:
-                  print(node, file=f)
-  '''
-  if coordinate_system is None:
-    coordinate_system = DEFAULT_COORDINATE_SYSTEM
-  with atomic_filename(fspath) as T:
-    with open(T.name, 'w') as f:
-      print(EggNode('Comment', None, [comment]), file=f)
-      print(EggNode('CoordinateSystem', None, [coordinate_system]), file=f)
-      yield f
-
+# TODO: make a Model and transcribe it
 def load_model(
-    loader, comment: str, egg_nodes: Iterable, *, coordinate_system=None
+    loader,
+    comment: str,
+    egg_nodes: Iterable[Eggable],
+    *,
+    coordinate_system=None,
+    skip_check=False,
 ):
   ''' Load an iterable of `Eggable` nodes `egg_nodes` as a model
       via the supplied loader.
 
-      This transcribes the `egg_nodes` to a temporary Egg file using
-      `write_model` and then calls `loader.load_model(filename)`
-      to load that file, returning the resulting scene.
-
-      Example use:
-
-          scene = load_model(showbase.loader, "my model", egg_nodes)
+      This constructs a `Model` and calls its `.load()` method.
   '''
-  with NamedTemporaryFile(suffix='.egg') as T:
-    with write_model(T.name, comment=comment,
-                     coordinate_system=coordinate_system) as f:
-      for node in egg_nodes:
-        print(node, file=f)
-    return loader.loadModel(T.name)
+  M = Model(comment, coordinate_system=coordinate_system)
+  M.extend(egg_nodes)
+  return M.load(loader, skip_check=skip_check)
 
 class EggNode(Eggable):
   ''' A representation of a basic EGG syntactic node with an explicit type.
@@ -413,6 +517,7 @@ class EggNode(Eggable):
     self.typename = typename
     self.name = name
     self.contents = contents
+    self.attrs = kw
 
   def egg_type(self):
     return self.typename
@@ -422,39 +527,182 @@ class EggNode(Eggable):
 
 @dataclass
 class Normal(DCEggable):
+  POSITIONAL = True
+  x: float
+  y: float
+  z: float
+
+@dataclass
+class BiNormal(DCEggable):
+  POSITIONAL = True
+  x: float
+  y: float
+  z: float
+
+@dataclass
+class Tangent(DCEggable):
+  POSITIONAL = True
   x: float
   y: float
   z: float
 
 @dataclass
 class UV(DCEggable):
+  POSITIONAL = True
   u: float
   v: float
+  Tangent: Optional[Tangent] = None
+  BiNormal: Optional[BiNormal] = None
 
 @dataclass
 class RGBA(DCEggable):
+  POSITIONAL = True
   r: float
   g: float
   b: float
   a: float = 1.0
 
+  @classmethod
+  def random(cls, r=None, g=None, b=None, a=None):
+    if r is None:
+      r = randint(0, 255)
+    if g is None:
+      g = randint(0, 255)
+    if b is None:
+      b = randint(0, 255)
+    if a is None:
+      a = randint(0, 255)
+    return cls(r, g, b, a)
+
+@dataclass
+class Translate(DCEggable):
+  POSITIONAL = True
+  x: float
+  y: float
+  z: float
+
+@dataclass
+class RotX(DCEggable):
+  POSITIONAL = True
+  degrees: float
+
+@dataclass
+class RotY(DCEggable):
+  POSITIONAL = True
+  degrees: float
+
+@dataclass
+class RotZ(DCEggable):
+  POSITIONAL = True
+  degrees: float
+
+@dataclass
+class Rotate(DCEggable):
+  POSITIONAL = True
+  degrees: float
+  x: Optional[float] = None
+  y: Optional[float] = None
+  z: Optional[float] = None
+
+  @classmethod
+  def promote(cls, rotate):
+    ''' Promote `rotate` to a `Rotate` instance.
+    '''
+    if isinstance(rotate, (int, float)):
+      rotate = cls(rotate)
+    else:
+      rotate = super().promote(rotate)
+    return rotate
+
+@dataclass
+class Scale1(DCEggable):
+  POSITIONAL = True
+  egg_name = lambda _: 'Scale'
+  s: float
+
+@dataclass
+class Scale3(DCEggable):
+  POSITIONAL = True
+  egg_name = lambda _: 'Scale'
+  x: float
+  y: float
+  z: float
+
+@dataclass
+class Matrix4(DCEggable):
+  POSITIONAL = True
+  aa: float
+  ab: float
+  ac: float
+  ad: float
+  ba: float
+  bb: float
+  bc: float
+  bd: float
+  ca: float
+  cb: float
+  cc: float
+  cd: float
+  da: float
+  db: float
+  dc: float
+  dd: float
+
+class Transform(EggableList):
+  pass
+
 @dataclass
 class Vertex(DCEggable):
+  POSITIONAL = 'x', 'y', 'z', 'w'
   x: float
   y: float
   z: float
   w: Optional[float] = None
+  Dxyz: Optional[Dxyz] = None
+  Normal: Optional[Normal] = None
+  RGBA: Optional[RGBA] = None
+  UV: Optional[UV] = None
   attrs: Mapping = dataclass_field(default_factory=dict)
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to `Vertex`.
+
+        A 3-tuple or 4-tuple will be promoted to an unadorned `Vertex`.
+    '''
+    if not isinstance(obj, cls):
+      if isinstance(obj, tuple):
+        if len(obj) not in (3, 4):
+          raise ValueError(
+              "cannot promote %d-tuple to %s, require 3 or 4 members" %
+              (len(obj), cls.__name__)
+          )
+        obj = cls(*obj)
+      else:
+        obj = super().promote(obj)
+    return obj
+
+  def __copy__(self):
+    ''' Shallow copy: copy the coordinates, make a new shallow dict for the `attrs`.
+    '''
+    return self.__class__(
+        x=self.x, y=self.y, z=self.z, w=self.w, attrs=dict(self.attrs)
+    )
 
 class VertexPool(Eggable):
   ''' A subclass of `list` containing vertices.
   '''
 
   @typechecked
-  def __init__(self, name: str, vertices: Optional[Iterable] = None):
+  def __init__(self, name: str, *vertices, keyfn=None):
+    if keyfn is None:
+      keyfn = self.default_vertex_keyfn
     self.name = name
-    self.vertices = [] if vertices is None else list(vertices)
+    self._by_vkey: Mapping[Hashable, (int, Vertex)] = {}
+    self.keyfn = keyfn
     self.register()
+    for v in vertices:
+      self.vertex_index(v)
 
   def __len__(self):
     return len(self.vertices)
@@ -467,9 +715,72 @@ class VertexPool(Eggable):
   def egg_contents(self):
     ''' The Egg contents are synthetic `vertex` nodes numbered by their position.
     '''
-    return (
+    yield from (
         EggNode(v.egg_type(), i, v.egg_contents())
-        for i, v in enumerate(self.vertices, 1)
+        for i, v in sorted(self._by_vkey.values(), key=lambda iv: iv[0])
+    )
+
+  def default_vertex_keyfn(self, v: Vertex) -> Hashable:
+    ''' The default key function for a `Vertex`,
+        returning a 5-tuple of `(x,y,z,w,attrs)` from the `Vertex`,
+        where the `attrs` part is a tuple of `sorted(v.attrs.items())`.
+    '''
+    return v.x, v.y, v.z, v.w, tuple(sorted(v.attrs.items()))
+
+  @promote
+  def vertex_index(self, v: Vertex) -> int:
+    ''' Return the index of the `Vertex` `v`.
+        If the vertex key `self.vertex_keyfn(v)` is unknown,
+        store `v` in the vertex map as the reference `Vertex`.
+    '''
+    vmap = self._by_vkey
+    vkey = self.keyfn(v)
+    try:
+      index, _ = vmap[vkey]
+    except KeyError:
+      index = len(vmap) + 1
+      assert vkey not in vmap
+      vmap[vkey] = (index, v)
+    return index
+
+  def vertex_by_index(self, index: int) -> Vertex:
+    return self.vertex_map[index]
+
+class PointLight(Eggable):
+
+  @promote
+  @typechecked
+  def __init__(
+      self,
+      name: str,
+      vpool: VertexPool,
+      *vertices,
+      **attrs,
+  ):
+    self.name = name
+    self.vpool = vpool
+    self.attrs = attrs
+    self.indices = [
+        (v if isinstance(v, int) else vpool.vertex_index(v)) for v in vertices
+    ]
+
+  def add_vertex(self, v: Union[Vertex, tuple, int]):
+    self.indices.append(
+        v if isinstance(v, int) else self.vpool.vertex_index(v)
+    )
+
+  def egg_contents(self):
+    yield from super().egg_contents()
+    yield EggNode(
+        'VertexRef',
+        None,
+        (
+            list(
+                self.indices if self
+                .indices else range(1,
+                                    len(self.vpool) + 1)
+            ) + [EggNode('Ref', None, [self.vpool.name])]
+        ),
     )
 
 class Texture(Eggable):
@@ -504,32 +815,48 @@ class Texture(Eggable):
     yield self.texture_image
     yield from super().egg_contents()
 
-REFTYPES['TRef'] = Texture
+REFTYPES.add(RefTypeSpec(type=Texture, refname='TRef'))
+
+@dataclass
+class Material(DCEggable):
+  name: str
+  diffr: Optional[float] = None
+  diffg: Optional[float] = None
+  diffb: Optional[float] = None
+  diffa: Optional[float] = None
+  ambr: Optional[float] = None
+  ambg: Optional[float] = None
+  ambb: Optional[float] = None
+  amba: Optional[float] = None
+  emitr: Optional[float] = None
+  emitg: Optional[float] = None
+  emitb: Optional[float] = None
+  emita: Optional[float] = None
+  specr: Optional[float] = None
+  specg: Optional[float] = None
+  specb: Optional[float] = None
+  speca: Optional[float] = None
+  shininess: Optional[float] = None
+  local: Optional[bool] = False
+
+REFTYPES.add(RefTypeSpec(type=Material, refname='MRef'))
 
 class Polygon(Eggable):
 
+  @promote
   @typechecked
   def __init__(
       self,
-      name: str,
-      pool: Union[str, VertexPool],
+      name: Optional[str],
+      vpool: VertexPool,
       *indices,
       **attrs,
   ):
-    if isinstance(pool, str):
-      vpool = VertexPool.instance(pool)
-    elif isinstance(pool, VertexPool):
-      vpool = pool
-    else:
-      raise TypeError(
-          "unhandled pool_name type %s, expected str or VertexPool" %
-          (type(pool),)
-      )
     if not indices:
       indices = list(range(1, len(vpool) + 1))
     self.name = name
     self.vpool = vpool
-    self.name = name
+    self.attrs = attrs
     self.indices = indices
 
   def egg_contents(self):
@@ -546,10 +873,9 @@ class Polygon(Eggable):
         ),
     )
 
-  @uses_registry
-  def check(self, *, registry):
+  def check(self):
     with Pfx("%s.check", self.__class__.__name__):
-      super().check(registry=registry)
+      super().check()
       vpool = self.vpool
       for index in self.indices:
         assert index > 0 and index <= len(vpool), \
@@ -561,8 +887,24 @@ class Group(Eggable):
     self.name = name
     self.items = list(a)
 
+  def __iter__(self):
+    return iter(self.items)
+
+  def append(self, item):
+    self.items.append(item)
+
+  def extend(self, more_items):
+    self.items.extend(more_items)
+
   def egg_contents(self):
     return self.items
+
+class Instance(Group):
+  ''' An `<Instance>` is like a `<Group>` but with local coordinates.
+
+      The docs are unforthcoming, and I'm hoping the coords are
+      thus pretransform rather than posttransform.
+  '''
 
 class Model(ContextManagerMixin):
 
@@ -591,37 +933,76 @@ class Model(ContextManagerMixin):
 
   @typechecked
   def append(self, item: Eggable):
+    ''' Append `item` to the model.
+    '''
     item.register(registry=self._registry)
     self.items.append(item)
+
+  @typechecked
+  def extend(self, items: Iterable[Eggable]):
+    ''' Extend the model with `items`, an iterable of `Eggable`s.
+    '''
+    for item in items:
+      self.append(item)
 
   @pfx_method
   def check(self):
     ''' Check the model for consistency.
     '''
-    for item in self.items:
-      item.check(registry=self._registry)
+    with self._registry:
+      for item in self.items:
+        item.check()
 
-  def save(self, fspath, *, skip_check=False):
+  def save(self, fspath, *, skip_check=False, exists_ok=False):
     ''' Save this model to the filesystem path `fspath`.
     '''
     if not skip_check:
       self.check()
-    with write_model(fspath, self.comment,
-                     coordinate_system=self.coordinate_system) as f:
-      for item in self.items:
-        print(item, file=f)
+    with self._registry:
+      with atomic_filename(fspath, exists_ok=exists_ok) as T:
+        with open(T.name, 'w') as f:
+          with self:
+            print(EggNode('Comment', None, [self.comment]), file=f)
+            print(
+                EggNode('CoordinateSystem', None, [self.coordinate_system]),
+                file=f
+            )
+            for item in self.items:
+              for s in item.egg_transcribe(indent='  '):
+                f.write(s)
+              f.write('\n')
+              ##print(item, file=f)
+
+  @contextmanager
+  def saved(self, suffix='.egg', **tempfile_kw):
+    ''' Context manager to save the `Model` to a `.egg` file
+        temporarily, yielding the filename.
+        Keyword parameters are passed to `NamedTemporaryFile`.
+    '''
+    with NamedTemporaryFile(suffix=suffix, **tempfile_kw) as T:
+      self.save(T.name, exists_ok=True)
+      yield T.name
 
   def load(self, loader, *, skip_check=False):
     ''' Load this model via `loader.loadModel`.
     '''
-    if not skip_check:
-      self.check()
-    return load_model(
-        loader,
-        self.comment,
-        self.items,
-        coordinate_system=self.coordinate_system
-    )
+    with self.saved() as eggpath:
+      return loader.loadModel(eggpath)
+
+  def view(
+      self, *, centre=True, lighting=False, skip_check=False, quiet=False
+  ):
+    ''' Quick view of the `Model` using `pview`.
+    '''
+    pview_opts = ['-l']
+    if centre:
+      pview_opts.append('-c')
+    if lighting:
+      pview_opts.append('-L')
+    with NamedTemporaryFile(suffix='.egg') as T:
+      self.save(T.name, skip_check=skip_check, exists_ok=True)
+      run(['cat', T.name])
+      run(['pview', *pview_opts, T.name])
 
 if __name__ == '__main__':
   for eggable in (
