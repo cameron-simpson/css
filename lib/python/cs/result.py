@@ -347,6 +347,7 @@ class Result(FSM):
       if state in (self.PENDING, self.RUNNING, self.CANCELLED):
         self._result = result  # pylint: disable=attribute-defined-outside-init
         self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+        self._get_lock.release()
         if state != self.CANCELLED:
           self.fsm_event('complete')
       elif state == self.DONE:
@@ -362,7 +363,6 @@ class Result(FSM):
             "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE)"
             % (self, self.fsm_state)
         )
-      self._get_lock.release()
 
   @pfx_method
   def join(self):
