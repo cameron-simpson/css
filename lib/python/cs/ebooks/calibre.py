@@ -1280,6 +1280,7 @@ class CalibreCommand(BaseCommand):
     doit = options.doit
     first_format = options.first_format
     force = options.force
+    calibre = options.calibre
     formats = options.formats
     if isinstance(formats, str):
       # pylint: disable=no-member
@@ -1289,6 +1290,9 @@ class CalibreCommand(BaseCommand):
     quiet = options.quiet
     runstate = options.runstate
     verbose = options.verbose
+    quiet or print(
+        "linkto", calibre.shortpath, "=>", shortpath(options.linkto_dirpath)
+    )
     cbooks = sorted(
         set(self.popbooks(argv or list(self.DEFAULT_LINKTO_SELECTORS))),
         key=lambda cbook: cbook.title.lower()
@@ -1505,6 +1509,7 @@ class CalibreCommand(BaseCommand):
     quiet = options.quiet
     verbose = options.verbose
     other_library = options.calibre_other
+    quiet or print("pull", other_library.shortpath, "=>", calibre.shortpath)
     with Pfx(other_library.shortpath):
       with other_library:
         if other_library is calibre:
