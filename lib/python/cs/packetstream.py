@@ -418,7 +418,7 @@ class PacketConnection(object):
     # reserve type 0 for end-of-requests
     rq_type += 1
     tag = self._new_tag()
-    R = Result()
+    R = Result(f'{self.name}:{tag}')
     self._pending_add(channel, tag, Request_State(decode_response, R))
     self._queue_packet(
         Packet(
