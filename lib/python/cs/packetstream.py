@@ -384,8 +384,13 @@ class PacketConnection(object):
   @not_closed
   # pylint: disable=too-many-arguments
   def request(
-      self, rq_type, flags=0, payload=b'', decode_response=None, channel=0
-  ):
+      self,
+      rq_type,
+      flags=0,
+      payload=b'',
+      decode_response=None,
+      channel=0
+  ) -> Result:
     ''' Compose and dispatch a new request, returns a `Result`.
 
         Allocates a new tag, a Result to deliver the response, and
@@ -432,7 +437,13 @@ class PacketConnection(object):
     ''' Synchronous request.
         Submits the request, then calls the `Result` returned from the request.
     '''
-    return self.request(*a, **kw)()
+    return self.request(
+        rq_type,
+        flags=flags,
+        payload=payload,
+        decode_response=decode_response,
+        channel=channel
+    )()
 
   @logexc
   # pylint: disable=too-many-arguments
@@ -474,7 +485,7 @@ class PacketConnection(object):
       with post_condition(("_recv is None", lambda: self._recv is None)):
         while True:
           try:
-            XX(b'<')
+            ##XX(b'<')
             packet = Packet.parse(self._recv)
           except EOFError:
             break
@@ -566,7 +577,7 @@ class PacketConnection(object):
         Write every packet directly to self._send.
         Flush whenever the queue is empty.
     '''
-    XX = self.tick
+    ##XX = self.tick
     ##with Pfx("%s._send", self):
     with PrePfx("_SEND [%s]", self):
       with post_condition(("_send is None", lambda: self._send is None)):
@@ -579,21 +590,21 @@ class PacketConnection(object):
             raise RuntimeError("second send of %s" % (P,))
           self.__sent.add(sig)
           try:
-            XX(b'>')
+            ##XX(b'>')
             for bs in P.transcribe_flat():
               fp.write(bs)
             if Q.empty():
               # no immediately ready further packets: flush the output buffer
               if grace > 0:
                 # allow a little time for further Packets to queue
-                XX(b'Sg')
+                ##XX(b'Sg')
                 sleep(grace)
                 if Q.empty():
                   # still nothing
-                  XX(b'F')
+                  ##XX(b'F')
                   fp.flush()
               else:
-                XX(b'F')
+                ##XX(b'F')
                 fp.flush()
           except OSError as e:
             if e.errno == errno.EPIPE:
@@ -601,7 +612,7 @@ class PacketConnection(object):
               break
             raise
         try:
-          XX(b'>EOF')
+          ##XX(b'>EOF')
           for bs in self.EOF_Packet.transcribe_flat():
             fp.write(bs)
           fp.close()
