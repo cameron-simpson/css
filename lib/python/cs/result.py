@@ -406,10 +406,10 @@ class Result(FSM):
     return result
 
   def notify(self, notifier):
-    ''' After the function completes, call `notifier(self)`.
+    ''' After the `Result` completes, call `notifier(self)`.
 
-        If the function has already completed this will happen immediately.
-        example: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
+        If the `Result` has already completed this will happen immediately.
+        If you'd rather `self` got put on some queue `Q`, supply `Q.put`.
     '''
 
     # TODO: adjust all users of .notify() to use fsm_callback and
