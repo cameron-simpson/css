@@ -424,8 +424,11 @@ class Result(FSM):
     with self._lock:
       self.fsm_callback('CANCELLED', callback)
       self.fsm_callback('DONE', callback)
-      if self.fsm_state in (self.CANCELLED, self.DONE):
-        notifier(self)
+      state = self.fsm_state
+    # already cancelled or done? call the notifier immediately
+    if state in (self.CANCELLED, self.DONE):
+      self.collected = True
+      notifier(self)
 
 def in_thread(func):
   ''' Decorator to evaluate `func` in a separate `Thread`.
