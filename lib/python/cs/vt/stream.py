@@ -15,7 +15,7 @@ from functools import lru_cache
 from subprocess import Popen, PIPE
 from threading import Lock
 import time
-from typing import Optional
+from typing import Optional, Tuple
 
 from icontract import require
 from typeguard import typechecked
@@ -33,7 +33,7 @@ from cs.packetstream import PacketConnection
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.resources import ClosedError
-from cs.result import CancellationError
+from cs.result import CancellationError, Result
 from cs.threads import locked
 from .archive import BaseArchive, ArchiveEntry
 from .dir import _Dirent
@@ -237,31 +237,46 @@ class StreamStore(BasicStoreSync):
     if conn:
       conn.join()
 
-  def do(self, rq):
-    ''' Wrapper for `self._conn.do` to catch and report failed autoconnection.
-        Raises `StoreError` on protocol failure or not `ok` responses.
-        Returns `(flags,payload)` otherwise.
+  def do_bg(self, rq) -> Result:
+    ''' Wrapper for `self._conn.request` to catch and report failed autoconnection.
+        Raises `StoreError` on `ClosedError` or `CancellationError`.
     '''
     conn = self.connection()
     if conn is None:
       raise StoreError("no connection")
     try:
-      retval = conn.do(rq.RQTYPE, getattr(rq, 'packet_flags', 0), bytes(rq))
+      submitted = conn.request(
+          rq.RQTYPE, getattr(rq, 'packet_flags', 0), bytes(rq)
+      )
     except ClosedError as e:
       self._conn = None
       raise StoreError("connection closed: %s" % (e,), request=rq) from e
     except CancellationError as e:
       raise StoreError("request cancelled: %s" % (e,), request=rq) from e
-    else:
-      if retval is None:
+
+    def decode_response(response):
+      ''' Decode the response returned by from the connection.
+      '''
+      if response is None:
         raise StoreError("NO RESPONSE", request=rq)
-      ok, flags, payload = retval
+      ok, flags, payload = response
       if not ok:
         raise StoreError(
             "NOT OK response", request=rq, flags=flags, payload=payload
         )
       return flags, payload
-    raise RuntimeError("NOTREACHED")
+
+    return submitted.post_notify(decode_response)
+
+  @typechecked
+  def do(self, rq) -> Tuple[int, bytes]:
+    ''' Synchronous interface to `self._conn.request`
+        In addition to the exceptions raised by `self.do_bg()`
+        this method raises `StoreError` if the response is not ok.
+        Otherwise it returns a `(flags,payload)` tuple
+        and the caller can assume the request was ok.
+    '''
+    return self.do_bg(rq)()
 
   @staticmethod
   def decode_request(rq_type, flags, payload):
@@ -301,7 +316,7 @@ class StreamStore(BasicStoreSync):
       warning("unparsed bytes after BSUInt(length): %r", payload[offset:])
     return length
 
-  def add(self, data):
+  def add(self, data: bytes):
     h = self.hash(data)
     if self.mode_addif:
       if self.contains(h):
