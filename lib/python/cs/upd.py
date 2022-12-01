@@ -544,7 +544,7 @@ class Upd(SingletonMixin):
     )
     return txts
 
-  def out(self, txt, *a, slot=0, raw_text=False, redraw=False):
+  def out(self, txt, *a, slot=0, raw_text=False, redraw=False) -> str:
     ''' Update the status line at `slot` to `txt`.
         Return the previous status line content.
 
@@ -567,7 +567,11 @@ class Upd(SingletonMixin):
       slots = self._slot_text
       if slot == 0 and not slots:
         self.insert(0)
-      oldtxt = slots[slot]
+      try:
+        oldtxt = slots[slot]
+      except IndexError as e:
+        warning("%s.out(slot=%d): %s, ignoring %r", self, slot, e, txt)
+        return ''
       if self._disabled or self._backend is None:
         slots[slot] = txt
       else:
