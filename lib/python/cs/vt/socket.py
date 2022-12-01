@@ -262,15 +262,10 @@ class UNIXSocketStoreServer(_SocketStoreServer):
         self,
         socket_server=_UNIXSocketServer(self, self.socket_path),
     ):
-      from cs.x import X
-      X("1: socket_server=%r", self.socket_server)
       try:
         with super().startup_shutdown():
-          X("1a: socket_server=%r", self.socket_server)
           yield
-          X("1b: socket_server=%r", self.socket_server)
       finally:
-        X("2: socket_server=%r", self.socket_server)
         self.socket_server.shutdown()
         os.remove(self.socket_path)
 
