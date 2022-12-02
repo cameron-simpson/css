@@ -260,7 +260,7 @@ class PacketConnection(object):
 
         Parameters:
         * `immediately`: optional flag, default `False`;
-          if true, d not wait for outstanding requests
+          if true, do not wait for outstanding requests
     '''
     with self._lock:
       if self.closed:
