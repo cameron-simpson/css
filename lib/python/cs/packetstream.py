@@ -255,11 +255,12 @@ class PacketConnection(object):
     return "PacketConnection[%s]" % (self.name,)
 
   @pfx_method
-  def shutdown(self, block=False):
-    ''' Shut down the PacketConnection, optionally blocking for outstanding requests.
+  def shutdown(self, immediately=False):
+    ''' Shut down the `PacketConnection`.
 
         Parameters:
-        `block`: block for outstanding requests, default False.
+        * `immediately`: optional flag, default `False`;
+          if true, d not wait for outstanding requests
     '''
     with self._lock:
       if self.closed:
@@ -280,7 +281,7 @@ class PacketConnection(object):
     # requests will get them as they come in, and in theory a network
     # disconnect might leave the receiver hanging anyway
     self._later.close()
-    if block:
+    if not immediately:
       self._later.wait()
 
   def join(self):
