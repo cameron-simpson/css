@@ -742,14 +742,17 @@ class Upd(SingletonMixin):
     return True
 
   # pylint: disable=too-many-branches,too-many-statements
-  def insert(self, index, txt='', proxy=None):
+  def insert(self, index, txt='', proxy=None, **proxy_kw):
     ''' Insert a new status line at `index`.
         Return the `UpdProxy` for the new status line.
     '''
-    if proxy and proxy.upd is not None:
-      raise ValueError(
-          "proxy %s already associated with an Upd: %s" % (proxy, self)
-      )
+    if proxy:
+      if proxy.upd is not None:
+        raise ValueError(
+            "proxy %s already associated with an Upd: %s" % (proxy, self)
+        )
+      if proxy_kw:
+        raise ValueError("cannot supply both a proxy and **proxy_kw")
     slots = self._slot_text
     proxies = self._proxies
     txts = []
@@ -773,7 +776,7 @@ class Upd(SingletonMixin):
           )
       if proxy is None:
         # create the proxy, which inserts it
-        return UpdProxy(index=index, upd=self, prefix=txt)
+        return UpdProxy(index=index, upd=self, prefix=txt, **proxy_kw)
 
       # associate the proxy with self
       assert proxy.upd is None
