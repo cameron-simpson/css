@@ -1063,6 +1063,8 @@ class UpdProxy(object):
       '_text_auto':
       'An optional callable to generate the text if _text is empty.',
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
+      '_update_period': 'Update time interval.',
+      'last_update': 'Time of last update.',
   }
 
   @uses_upd
@@ -1075,6 +1077,7 @@ class UpdProxy(object):
       prefix: Optional[str] = None,
       suffix: Optional[str] = None,
       text_auto=None,
+      update_period: Optional[float] = None,
   ):
     ''' Initialise a new `UpdProxy` status line.
 
@@ -1091,6 +1094,9 @@ class UpdProxy(object):
     self._text = ''
     self._text_auto = text_auto
     self._suffix = suffix or ''
+    self._update_period = update_period
+    if update_period:
+      self.last_update = time.time()
     upd.insert(index, proxy=self)
     if text:
       self(text)
@@ -1117,15 +1123,23 @@ class UpdProxy(object):
 
   def _update(self):
     upd = self.upd
-    if upd is not None:
-      with upd._lock:  # pylint: disable=protected-access
-        index = self.index
-        if index is not None:
-          txt = upd.normalise(self._prefix + self._text + self._suffix)
-          overflow = len(txt) - upd.columns + 1
-          if overflow > 0:
-            txt = '<' + txt[overflow + 1:]
-          self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+    if upd is None:
+      return
+    update_period = self._update_period
+    if update_period:
+      now = time.time()
+      if now - self.last_update < update_period:
+        return
+    with upd._lock:  # pylint: disable=protected-access
+      index = self.index
+      if index is not None:
+        txt = upd.normalise(self._prefix + self._text + self._suffix)
+        overflow = len(txt) - upd.columns + 1
+        if overflow > 0:
+          txt = '<' + txt[overflow + 1:]
+        self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+    if update_period:
+      self.last_update = now
 
   def reset(self):
     ''' Clear the proxy: set both the prefix and text to `''`.
