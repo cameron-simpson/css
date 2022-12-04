@@ -1,0 +1,4 @@
+lib/python/cs/edit.py: cs.edit: tweak docstring
+lib/python/cs/edit.py: cs.edit: docstring improvements
+lib/python/cs/edit.py: cs.edit: new edit_obj to edit an object, usually in JSON format
+lib/python/cs/edit.py: cs.edit: edit_obj: include a final newline in the file to be edited

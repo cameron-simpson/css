@@ -4,22 +4,25 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Queue-like items: iterable queues and channels.
+''' Queue-like items: iterable queues, channels, etc.
 '''
 
-import sys
+from contextlib import contextmanager
 from functools import partial
+import sys
 from threading import Timer, Lock, RLock, Thread
 import time
+
 ##from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import exception, warning, debug
+from cs.obj import Sentinel
 from cs.pfx import Pfx, PfxCallInfo
 from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20211116-post'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'description':
@@ -32,6 +35,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.py3',
         'cs.resources',
@@ -39,13 +43,11 @@ DISTINFO = {
     ],
 }
 
-class _QueueIterator(MultiOpenMixin):
-  ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
+class QueueIterator(MultiOpenMixin):
+  ''' A `QueueIterator` is a wrapper for a `Queue` (or ducktype) which
       presents an iterator interface to collect items.
-      It does not offer the .get or .get_nowait methods.
+      It does not offer the `.get` or `.get_nowait` methods.
   '''
-
-  sentinel = object()
 
   def __init__(self, q, name=None):
     if name is None:
@@ -53,6 +55,9 @@ class _QueueIterator(MultiOpenMixin):
     self.q = q
     self.name = name
     self.finalise_later = True
+    self.sentinel = Sentinel(
+        "%s:%s:SENTINEL" % (self.__class__.__name__, name)
+    )
     # count of non-sentinel items
     self._item_count = 0
 
@@ -68,25 +73,23 @@ class _QueueIterator(MultiOpenMixin):
     if self.closed:
       with PfxCallInfo():
         warning("%r.put: all closed: item=%s", self, item)
-      raise ClosedError("_QueueIterator closed")
+      raise ClosedError("QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
     self._item_count += 1
     return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
-    ''' Direct call to self.q.put() with no checks.
+    ''' Direct call to `self.q.put()` with no checks.
     '''
     return self.q.put(item, *args, **kw)
 
-  def startup(self):
-    ''' Required MultiOpenMixin method.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' `MultiOpenMixin` support; puts the sentinel onto the underlying queue
+        on the final close.
     '''
-
-  def shutdown(self):
-    ''' Support method for MultiOpenMixin.shutdown.
-        Queue the sentinel object so that calls to .get() from .__next__ do not block.
-    '''
+    yield
     self._put(self.sentinel)
 
   def __iter__(self):
@@ -96,7 +99,7 @@ class _QueueIterator(MultiOpenMixin):
 
   def __next__(self):
     ''' Return the next item from the queue.
-        If the queue is closed, raise StopIteration.
+        If the queue is closed, raise `StopIteration`.
     '''
     q = self.q
     try:
@@ -122,7 +125,7 @@ class _QueueIterator(MultiOpenMixin):
   next = __next__
 
   def _get(self):
-    ''' Calls the inner queue's .get via .__next__; can break other users' iterators.
+    ''' Calls the inner queue's `.get` via `.__next__`; can break other users' iterators.
     '''
     try:
       return next(self)
@@ -141,23 +144,23 @@ class _QueueIterator(MultiOpenMixin):
     self.q.task_done()
 
   def join(self):
-    ''' Wait for the Queue items to complete.
+    ''' Wait for the queue items to complete.
     '''
     self.q.join()
 
 def IterableQueue(capacity=0, name=None):
-  ''' Factory to create an iterable Queue.
+  ''' Factory to create an iterable `Queue`.
   '''
-  return _QueueIterator(Queue(capacity), name=name).open()
+  return QueueIterator(Queue(capacity), name=name).open()
 
 def IterablePriorityQueue(capacity=0, name=None):
-  ''' Factory to create an iterable PriorityQueue.
+  ''' Factory to create an iterable `PriorityQueue`.
   '''
-  return _QueueIterator(PriorityQueue(capacity), name=name).open()
+  return QueueIterator(PriorityQueue(capacity), name=name).open()
 
 class Channel(object):
   ''' A zero-storage data passage.
-      Unlike a Queue(1), put() blocks waiting for the matching get().
+      Unlike a `Queue`, `put(item)` blocks waiting for the matching `get()`.
   '''
 
   # pylint: disable=consider-using-with
@@ -186,9 +189,9 @@ class Channel(object):
     return "%s[%s]" % (type(self).__name__, state)
 
   def __call__(self, *a):
-    ''' Call the Channel.
-        With no arguments, do a .get().
-        With an argument, do a .put().
+    ''' Call the `Channel`.
+        With no arguments, do a `.get()`.
+        With an argument, do a `.put()`.
     '''
     if a:
       return self.put(*a)
@@ -203,14 +206,14 @@ class Channel(object):
     ''' `next(Channel)` calls `Channel.get()`.
     '''
     if self.closed:
-      raise StopIteration()
+      raise StopIteration
     return self.get()
 
   # pylint: disable=consider-using-with
   @not_closed
   def get(self):
-    ''' Read a value from the Channel.
-        Blocks until someone put()s to the Channel.
+    ''' Read a value from the `Channel`.
+        Blocks until someone `put()`s to the `Channel`.
     '''
     # allow a writer to proceed
     self.__writable.release()
@@ -223,8 +226,8 @@ class Channel(object):
   # pylint: disable=attribute-defined-outside-init,consider-using-with
   @not_closed
   def put(self, value):
-    ''' Write a value to the Channel.
-        Blocks until a corresponding get() occurs.
+    ''' Write a value to the `Channel`.
+        Blocks until a corresponding `get()` occurs.
     '''
     # block until there is a matching .get()
     self.__writable.acquire()
@@ -233,7 +236,7 @@ class Channel(object):
     self.__readable.release()
 
   def close(self):
-    ''' Close the Channel, preventing further puts.
+    ''' Close the `Channel`, preventing further `put()`s.
     '''
     if self.closed:
       warning("%s: .close() of closed Channel" % (self,))
@@ -241,29 +244,35 @@ class Channel(object):
       self.closed = True
 
 class PushQueue(MultiOpenMixin):
-  ''' A puttable object which looks like an iterable Queue.
+  ''' A puttable object which looks like an iterable `Queue`.
 
-      Calling .put(item) calls `func_push` supplied at initialisation
-      to trigger a function on data arrival, whose processing is mediated
-      queued via a Later for delivery to the output queue.
+      In this base class,
+      calling `.put(item)` calls `functor` supplied at initialisation
+      to trigger a function on data arrival
+      whose iterable of results are put onto the output queue.
+
+      As an example, the `cs.pipeline.Pipeline` class
+      uses subclasses of `PushQueue` for each pipeline stage,
+      overriding the `.put(item)` method
+      to mediate the call of `functor` through `cs.later.Later`
+      as resource controlled concurrency.
   '''
 
   def __init__(self, name, functor, outQ):
-    ''' Initialise the PushQueue with the Later `L`, the callable `functor`
+    ''' Initialise the PushQueue with the callable `functor`
         and the output queue `outQ`.
 
         Parameters:
         * `functor` is a one-to-many function which accepts a single
           item of input and returns an iterable of outputs; it may be a
-          generator. These outputs are passed to outQ.put individually as
+          generator. These outputs are passed to `outQ.put` individually as
           received.
-        * `outQ` is a MultiOpenMixin which accepts via its .put() method.
+        * `outQ` is a `MultiOpenMixin` which accepts via its `.put()` method.
     '''
     if name is None:
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
     self.name = name
     self._lock = RLock()
-    MultiOpenMixin.__init__(self)
     self.functor = functor
     self.outQ = outQ
 
@@ -273,13 +282,20 @@ class PushQueue(MultiOpenMixin):
   def __repr__(self):
     return "<%s outQ=%s>" % (self, self.outQ)
 
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the output queue.
+    '''
+    with self.outQ:
+      yield
+
   @not_closed
   def put(self, item):
-    ''' Receive a new item.
-        If self.is_iterable then presume that self.func_push returns
-        an iterator and submit self.func_push(item) to defer_iterable.
-        Otherwise, defer self.func_push(item) and after completion,
-        queue its results to outQ.
+    ''' Receive a new `item`, put the results of `functor(item)` onto `self.outQ`.
+
+        Subclasses might override this method, for example to process
+        the result of `functor` differently, or to queue the call
+        to `functor(item)` via some taks system.
     '''
     outQ = self.outQ
     functor = self.functor
@@ -287,28 +303,18 @@ class PushQueue(MultiOpenMixin):
       for computed in functor(item):
         outQ.put(computed)
 
-  def startup(self):
-    ''' Start up.
-    '''
-
-  def shutdown(self):
-    ''' shutdown() is called by MultiOpenMixin._close() to close
-        the outQ for real.
-    '''
-    self.outQ.close()
-
 class NullQueue(MultiOpenMixin):
   ''' A queue-like object that discards its inputs.
-      Calls to .get() raise Queue_Empty.
+      Calls to `.get()` raise `Queue_Empty`.
   '''
 
   def __init__(self, blocking=False, name=None):
-    ''' Initialise the NullQueue.
+    ''' Initialise the `NullQueue`.
 
         Parameters:
-        * `blocking`: if true, calls to .get() block until .shutdown().
-          Default: False.
-        * `name`: a name for this NullQueue.
+        * `blocking`: optional; if true, calls to `.get()` block until
+          `.shutdown()`; default: `False`.
+        * `name`: optional name for this `NullQueue`.
     '''
     if name is None:
       name = "%s%d" % (self.__class__.__name__, seq())
@@ -324,12 +330,12 @@ class NullQueue(MultiOpenMixin):
     return "<%s blocking=%s>" % (self, self.blocking)
 
   def put(self, item):
-    ''' Put a value onto the Queue; it is discarded.
+    ''' Put a value onto the queue; it is discarded.
     '''
 
   def get(self):
-    ''' Get the next value. Always raises Queue_Empty.
-        If .blocking, delay until .shutdown().
+    ''' Get the next value. Always raises `Queue_Empty`.
+        If `.blocking,` delay until `.shutdown()`.
     '''
     if self.blocking:
       self.join()
@@ -377,9 +383,9 @@ class TimerQueue(object):
     return self.name
 
   def close(self, cancel=False):
-    ''' Close the TimerQueue. This forbids further job submissions.
+    ''' Close the `TimerQueue`. This forbids further job submissions.
         If `cancel` is supplied and true, cancel all pending jobs.
-        Note: it is still necessary to call TimerQueue.join() to
+        Note: it is still necessary to call `TimerQueue.join()` to
         wait for all pending jobs.
     '''
     self.closed = True
@@ -402,7 +408,7 @@ class TimerQueue(object):
 
   def add(self, when, func):
     ''' Queue a new job to be called at 'when'.
-        'func' is the job function, typically made with functools.partial.
+        'func' is the job function, typically made with `functools.partial`.
     '''
     assert not self.closed, "add() on closed TimerQueue"
     self.Q.put((when, seq(), func))
@@ -413,17 +419,19 @@ class TimerQueue(object):
     assert self.mainThread is not None, "no main thread to join"
     self.mainThread.join()
 
+  # pylint: disable=too-many-statements
   def _main(self):
-    ''' Main loop:
+    ''' The main loop.
+
         Pull requests off the queue; they will come off in time order,
         so we always get the most urgent item.
         If we're already delayed waiting for a previous request,
-          halt that request's timer and compare it with the new job; push the
-          later request back onto the queue and proceed with the more urgent
-          one.
+        halt that request's timer and compare it with the new job; push the
+        later request back onto the queue and proceed with the more urgent
+        one.
         If it should run now, run it.
-        Otherwise start a Timer to run it later.
-        The loop continues processing items until the TimerQueue is closed.
+        Otherwise start a `Timer` to run it later.
+        The loop continues processing items until the `TimerQueue` is closed.
     '''
     with Pfx("TimerQueue._main()"):
       assert not self.mainRunning, "main loop already active"
@@ -518,15 +526,25 @@ class ListQueue:
       except IndexError:
         raise Queue_Empty("list is empty")  # pylint: disable=raise-missing-from
 
-  def put(self, item):
-    ''' Put appends to the queue.
+  def append(self, item):
+    ''' Append an item to the queue, aka `put`.
     '''
     with self._lock:
       self.queued.append(item)
 
+  def put(self, item):
+    ''' Put appends to the queue.
+    '''
+    return self.append(item)
+
   def extend(self, items):
     ''' Convenient/performant queue-lots-of-items.
     '''
+    if isinstance(items, str):
+      raise TypeError(
+          "extend expects an iterable and str is explicitly disallowed, rejecting %r"
+          % (repr(items),)
+      )
     with self._lock:
       self.queued.extend(items)
 
@@ -540,6 +558,11 @@ class ListQueue:
     ''' Insert `items` at `offset` (default `0`, the front of the queue).
     '''
     if not isinstance(items, (list, tuple)):
+      if isinstance(items, str):
+        raise TypeError(
+            "prepend expects an iterable and str is explicitly disallowed, rejecting %r"
+            % (repr(items),)
+        )
       items = list(items)
     with self._lock:
       self.queued[offset:offset] = items

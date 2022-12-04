@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# My current command to create HTML from MarkDown.
+# I use this to make HTML for my mutt email using the
+# $send_multipart_alternative setting.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+pandoc --standalone -f gfm -t html \
+| sed '
+      s/^\(<pre><code>\)\(.*<\/code><\/pre>\)$/\1    \2/
+      t post_pre_code
+      /^<pre><code>/,/<\/code><\/pre>$/{
+          s/^/    /
+          s/^    \(<pre><code>\)/\1    /
+          s/^    \(<\/code><\/pre>\)/\1/
+      }
+      :post_pre_code
+      '

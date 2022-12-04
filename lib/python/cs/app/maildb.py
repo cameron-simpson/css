@@ -189,8 +189,10 @@ def main(argv=None, stdin=None):
                   xit = 1
             # generate other aliases automatically to aid mutt's reverse_alias=yes behaviour
             if mutt_aliases:
-              nonames_group = MDB.address_groups.get('noaliasname')
-              noname_addrs = set(nonames_group) if nonames_group else ()
+              noname_addrs = (
+                  set(MDB.address_groups.get('noaliasname', ())) |
+                  set(MDB.address_groups.get('polyname', ()))
+              )
               alias_names = set(abbrevs.keys())
               auto_aliases = {}
               As = sorted(MDB.ADDRESSes, key=lambda a: a.name)

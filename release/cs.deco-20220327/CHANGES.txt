@@ -1,0 +1,11 @@
+lib/python/cs/deco.py: cs.deco: @cachedmethod: more paranoid access to the revision attribute
+lib/python/cs/deco.py: cs.deco: update docstring for @decorator, small logic tweak for clarity, small comment updates
+lib/python/cs/deco.py: Release information for cs.deco-20220227.
+lib/python/cs/deco.py: cs.deco: @cachedmethod: annotate the method with a .flush() function; rename the internal wrapper function for clarity
+lib/python/cs/deco.py: cs.deco: disable @cachedmethod.flush, cannot work
+lib/python/cs/deco.py: cs.deco: clean some lint
+lib/python/cs/deco.py: cs.deco: @cachedmethod: change the meaning of poll_delay=None to mean "never goes stale" as I had thought it already did
+lib/python/cs/deco.py: merge default ==> ebooks
+lib/python/cs/deco.py: merge ebooks ==> default: various fixes for cs.cmdutils, more progress on the cs.ebooks package
+lib/python/cs/deco.py: Release information for cs.deco-20220311.
+lib/python/cs/deco.py: cs.deco: @cachedmethod: bugfix poll time check

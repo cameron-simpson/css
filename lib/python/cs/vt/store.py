@@ -9,24 +9,30 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from fnmatch import fnmatch
 from functools import partial
 import sys
-from threading import Semaphore
+from threading import Semaphore, Thread
+from typing import Tuple
+
 from icontract import require
+from typeguard import typechecked
+
+from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import warning, error, info
-from cs.pfx import Pfx
-from cs.progress import Progress
-from cs.py.func import prop, funcname
-from cs.queues import Channel, IterableQueue
-from cs.resources import MultiOpenMixin, RunStateMixin, RunState
+from cs.pfx import Pfx, pfx, pfx_method
+from cs.progress import Progress, progressbar
+from cs.py.func import prop
+from cs.queues import Channel, IterableQueue, QueueIterator
+from cs.resources import MultiOpenMixin, openif, RunStateMixin, RunState
 from cs.result import report, bg as bg_result
 from cs.seq import Seq
 from cs.threads import bg as bg_thread
+
 from . import defaults, Lock, RLock
 from .datadir import DataDir, RawDataDir, PlatonicDir
 from .hash import (
@@ -91,6 +97,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   _seq = Seq()
 
+  @pfx_method
   @fmtdoc
   def __init__(self, name, capacity=None, hashclass=None, runstate=None):
     ''' Initialise the Store.
@@ -105,36 +112,35 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
         * `runstate`: a `cs.resources.RunState` for external control;
           if not supplied one is allocated
     '''
-    with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
-      if not isinstance(name, str):
-        raise TypeError(
-            "initial `name` argument must be a str, got %s" % (type(name),)
-        )
-      if name is None:
-        name = "%s%d" % (type(self).__name__, next(self._seq()))
-      if hashclass is None:
-        hashclass = DEFAULT_HASHCLASS
-      elif isinstance(hashclass, str):
-        hashclass = HASHCLASS_BY_NAME[hashclass]
-      assert issubclass(hashclass, HashCode)
-      if capacity is None:
-        capacity = 4
-      if runstate is None:
-        runstate = RunState(name)
-      RunStateMixin.__init__(self, runstate=runstate)
-      self._str_attrs = {}
-      self.name = name
-      self._capacity = capacity
-      self.__funcQ = None
-      self.hashclass = hashclass
-      self._config = None
-      self.logfp = None
-      self.mountdir = None
-      self.readonly = False
-      self.writeonly = False
-      self._archives = {}
-      self._blockmapdir = None
-      self.block_cache = None
+    if not isinstance(name, str):
+      raise TypeError(
+          "initial `name` argument must be a str, got %s" % (type(name),)
+      )
+    if name is None:
+      name = "%s%d" % (type(self).__name__, next(self._seq()))
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
+    elif isinstance(hashclass, str):
+      hashclass = HASHCLASS_BY_NAME[hashclass]
+    assert issubclass(hashclass, HashCode)
+    if capacity is None:
+      capacity = 4
+    if runstate is None:
+      runstate = RunState(name)
+    RunStateMixin.__init__(self, runstate=runstate)
+    self._str_attrs = {}
+    self.name = name
+    self._capacity = capacity
+    self.later = None
+    self.hashclass = hashclass
+    self._config = None
+    self.logfp = None
+    self.mountdir = None
+    self.readonly = False
+    self.writeonly = False
+    self._archives = {}
+    self._blockmapdir = None
+    self.block_cache = None
 
   def init(self):
     ''' Method provided to support "vt init".
@@ -239,24 +245,23 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   ## MultiOpenMixin methods.
   ##
 
-  def startup(self):
-    ''' Start the Store.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' `MultiOpenMixin.startup_shutdown` hook.
     '''
-    self.runstate.start()
-    self.__funcQ = Later(
-        self._capacity, name="%s:Later(__funcQ)" % (self.name,)
-    )
-    self.__funcQ.open()
-
-  def shutdown(self):
-    ''' Called by final MultiOpenMixin.close().
-    '''
-    self.runstate.cancel()
-    L = self.__funcQ
-    L.close()
-    L.wait()
-    del self.__funcQ
-    self.runstate.stop()
+    with super().startup_shutdown():
+      runstate = self.runstate
+      L = Later(self._capacity, name=self.name)
+      with L:
+        with stackattrs(self, later=L):
+          with runstate:
+            try:
+              yield
+            finally:
+              self.runstate.cancel()
+        # obtain this before the Later forgets it
+        finished = L.finished_event
+      finished.wait()
 
   #############################
   ## Function dispatch methods.
@@ -268,14 +273,11 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     self.open()
 
-    def with_self():
-      with self:
+    def closing_self():
+      with closing(self):
         return func(*args, **kwargs)
 
-    with_self.__name__ = "with_self:" + funcname(func)
-    LF = self.__funcQ.defer(with_self)
-    LF.notify(lambda LF: self.close())
-    return LF
+    return self.later.defer(closing_self)
 
   ##########################################################################
   # Core Store methods, all abstract.
@@ -283,50 +285,50 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   def add(self, data):
     ''' Add the `data` to the Store, return its hashcode.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def add_bg(self, data):
     ''' Dispatch the add request in the background, return a `Result`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   # pylint: disable=unused-argument
   def get(self, h, default=None):
     ''' Fetch the data for hashcode `h` from the Store, or `None`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def get_bg(self, h):
     ''' Dispatch the get request in the background, return a `Result`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def contains(self, h):
     ''' Test whether the hashcode `h` is present in the Store.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def contains_bg(self, h):
     ''' Dispatch the contains request in the background, return a `Result`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def flush(self):
     ''' Flush outstanding tasks to the next lowest abstraction.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @abstractmethod
   def flush_bg(self):
     ''' Dispatch the flush request in the background, return a `Result`.
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   ##########################################################################
   # Archive support.
@@ -365,23 +367,27 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     self._blockmapdir = dirpath
 
+  @typechecked
   @require(lambda capacity: capacity >= 1)
-  def pushto(self, dstS, *, capacity=64, progress=None):
-    ''' Allocate a Queue for Blocks to push from this Store to another Store `dstS`.
-        Return `(Q,T)` where `Q` is the new Queue and `T` is the
-        Thread processing the Queue.
+  def pushto(self,
+             dstS,
+             *,
+             capacity: int = 64,
+             progress=None) -> Tuple[QueueIterator, Thread]:
+    ''' Allocate a `QueueIterator` for Blocks to push from this
+        Store to another Store `dstS`.
+        Return `(Q,T)` where `Q` is the new `QueueIterator` and `T` is the
+        `Thread` processing the queue.
 
         Parameters:
         * `dstS`: the secondary Store to receive Blocks.
         * `capacity`: the Queue capacity, arbitrary default `64`.
         * `progress`: an optional `Progress` counting submitted and completed data bytes.
 
-        Once called, the caller can then .put Blocks onto the Queue.
+        Once called, the caller can then `.put` Blocks onto the queue.
         When finished, call Q.close() to indicate end of Blocks and
         T.join() to wait for the processing completion.
     '''
-    sem = Semaphore(capacity)
-    ##sem = Semaphore(1)
     name = "%s.pushto(%s)" % (self.name, dstS.name)
     with Pfx(name):
       Q = IterableQueue(capacity=capacity, name=name)
@@ -390,90 +396,48 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       dstS.open()
       T = bg_thread(
           lambda: (
-              self.push_blocks(name, Q, srcS, dstS, sem, progress),
+              self._push_blocks(name, Q, srcS, dstS, progress),
               srcS.close(),
               dstS.close(),
           )
       )
       return Q, T
 
-  @staticmethod
-  def push_blocks(name, blocks, srcS, dstS, sem, progress):
+  @pfx_method
+  def _push_blocks(self, name, blocks, srcS, dstS, progress):
     ''' This is a worker function which pushes Blocks or bytes from
         the supplied iterable `blocks` to the second Store.
 
         Parameters:
         * `name`: name for this worker instance
-        * `blocks`: an iterable of Blocks or bytes-like objects;
-          each item may also be a tuple of `(block-or-bytes,length)`
-          in which case the supplied length will be used for progress reporting
-          instead of the default length
+        * `blocks`: an iterable of `HashCode`s or Blocks or bytes-like objects
+        * `srcS`: the source Store from which to obtain block data
+        * `dstS`: the target Store to which to push Blocks
     '''
-    with Pfx("%s: worker", name):
-      lock = Lock()
-      with srcS:
-        pending_blocks = {}  # mapping of Result to Block
-        for block in blocks:
-          if type(block) is tuple:
-            try:
-              block1, length = block
-            except TypeError as e:
-              error(
-                  "cannot unpack %s into Block and length: %s", type(block), e
-              )
-              continue
-            else:
-              block = block1
+    lock = Lock()
+    with srcS:
+      for item in progressbar(blocks, f'{self.name}.pushto',
+                              update_frequency=64):
+        if isinstance(item, HashCode):
+          h = item
+          if h in dstS:
+            continue
+          data = srcS[h]
+          dstS.add_bg(data)
+        else:
+          # a Block?
+          try:
+            h = item.hashcode
+          except AttributeError:
+            # just data
+            data = item
+            dstS.add(data)
           else:
-            length = None
-          sem.acquire()
-          # worker function to add a block conditionally
-
-          @logexc
-          def add_block(srcS, dstS, block, length, progress):
-            # add block content if not already present in dstS
-            try:
-              h = block.hashcode
-            except AttributeError:
-              # presume bytes-like or unStored Block type
-              try:
-                h = srcS.hash(block)
-              except TypeError:
-                warning("ignore object of type %s", type(block))
-                return
-              if h not in dstS:
-                dstS[h] = block
-            else:
-              # get the hashcode, only get the data if required
-              h = block.hashcode
-              if h not in dstS:
-                dstS[h] = block.get_direct_data()
-            if progress:
-              if length is None:
-                length = len(block)
-              progress += length
-
-          addR = bg_result(add_block, srcS, dstS, block, length, progress)
-          with lock:
-            pending_blocks[addR] = block
-
-          # cleanup function
-          @logexc
-          def after_add_block(addR):
-            ''' Forget that `addR` is pending.
-                This will be called after `addR` completes.
-            '''
-            with lock:
-              pending_blocks.pop(addR)
-            sem.release()
-
-          addR.notify(after_add_block)
-        with lock:
-          outstanding = list(pending_blocks.keys())
-        if outstanding:
-          info("PUSHQ: %d outstanding, waiting...", len(outstanding))
-          for R in outstanding:
-            R.join()
+            # Block
+            if h in dstS:
+              continue
+            data = item.data
+            dstS.add_bg(data)
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations
@@ -522,29 +486,17 @@ class MappingStore(BasicStoreSync):
   '''
 
   def __init__(self, name, mapping, **kw):
-    BasicStoreSync.__init__(self, name, **kw)
+    super().__init__(name, **kw)
     self.mapping = mapping
     self._str_attrs.update(mapping=type(mapping).__name__)
 
-  def startup(self):
-    super().startup()
-    mapping = self.mapping
-    try:
-      openmap = mapping.open
-    except AttributeError:
-      pass
-    else:
-      openmap()
-
-  def shutdown(self):
-    mapping = self.mapping
-    try:
-      closemap = mapping.close
-    except AttributeError:
-      pass
-    else:
-      closemap()
-    super().shutdown()
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close `self.mapping` (if supported).
+    '''
+    with super().startup_shutdown():
+      with openif(self.mapping):
+        yield
 
   def add(self, data):
     ''' Add `data` to the mapping, indexed as `hashclass(data)`.
@@ -600,6 +552,13 @@ class MappingStore(BasicStoreSync):
     ''' Proxy to `self.mapping.get`.
     '''
     return self.mapping.get(h, default)
+
+  def pushto_queue(self, Q, runstate=None, progress=None):
+    ''' Push all the keys to the queue.
+    '''
+    for h in progressbar(self.keys(), f'{self.name}', update_frequency=64):
+      Q.put(h)
+    return True
 
 class ProxyStore(BasicStoreSync):
   ''' A Store managing various subsidiary Stores.
@@ -720,19 +679,20 @@ class ProxyStore(BasicStoreSync):
     for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
       S.init()
 
-  def startup(self):
-    super().startup()
-    for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
-      S.open()
-    for S, _ in self.archive_path:
-      S.open()
-
-  def shutdown(self):
-    for S, _ in self.archive_path:
-      S.close()
-    for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
-      S.close()
-    super().shutdown()
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
+        S.open()
+      for S, _ in self.archive_path:
+        S.open()
+      try:
+        yield
+      finally:
+        for S, _ in self.archive_path:
+          S.close()
+        for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
+          S.close()
 
   def __len__(self):
     ''' The size of the store is the sum of the read stores.
@@ -957,19 +917,15 @@ class DataDirStore(MappingStore):
         indexclass=indexclass,
         rollover=rollover
     )
-    MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
+    super().__init__(name, self._datadir, hashclass=hashclass, **kw)
 
-  def startup(self):
-    ''' Startup: open the internal DataDir.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the internal `DataDir`.
     '''
-    super().startup()
-    self._datadir.open()
-
-  def shutdown(self):
-    ''' Shutdown: close the internal DataDir.
-    '''
-    self._datadir.close()
-    super().shutdown()
+    with super().startup_shutdown():
+      with self._datadir:
+        yield
 
   def init(self):
     ''' Init the supporting data dir.
@@ -1047,17 +1003,13 @@ class _PlatonicStore(MappingStore):
   def init(self):
     self._datadir.initdir()
 
-  def startup(self, **kw):
-    ''' Startup: open the internal DataDir.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the internal `DataDir`.
     '''
-    self._datadir.open()
-    super().startup(**kw)
-
-  def shutdown(self):
-    ''' Shutdown: close the internal DataDir.
-    '''
-    super().shutdown()
-    self._datadir.close()
+    with super().startup_shutdown():
+      with self._datadir:
+        yield
 
   def get_Archive(self, name=None, missing_ok=False):
     ''' PlatonicStore Archives are associated with the internal DataDir.

@@ -9,10 +9,15 @@ Convenience facilities related to Python functions.
 '''
 
 from functools import partial
+from pprint import pformat
+
 from cs.deco import decorator
+from cs.py.stack import caller
 from cs.py3 import unicode, raise_from
 
-__version__ = '20210913-post'
+from cs.x import X
+
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -23,6 +28,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.py.stack',
         'cs.py3',
         'cs.x',
     ],
@@ -49,7 +55,13 @@ def funccite(func):
     code = func.__code__
   except AttributeError:
     return "%s[no.__code__]" % (repr(func),)
-  return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
+  try:
+    from cs.fs import shortpath
+  except ImportError:
+    shortpath = lambda p: p
+  return "%s[%s:%d]" % (
+      funcname(func), shortpath(code.co_filename), code.co_firstlineno
+  )
 
 def func_a_kw_fmt(func, *a, **kw):
   ''' Prepare a percent-format string and associated argument list
@@ -69,8 +81,40 @@ def func_a_kw_fmt(func, *a, **kw):
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
 
+def callif(doit, func, *a, **kw):
+  ''' Call `func(*a,**kw)` if `doit` is true
+      otherwise just print it out.
+
+      The parameter `func` may be preceeded optionally by a `dict`
+      containing modes. The current modes are:
+      * `'print'`: the print function, default the builtin `print`
+  '''
+  if isinstance(func, dict):
+    modes = func
+    a = list(a)
+    func = a.pop(0)
+  else:
+    modes = {}
+  modes.setdefault('print', print)
+  if doit:
+    return func(*a, **kw)
+  fmt, av = func_a_kw_fmt(func, *a, **kw)
+  modes['print'](fmt % tuple(av))
+  return None
+
+_trace_indent = ""
+
 @decorator
-def trace(func, call=True, retval=False, exception=False, pfx=False):
+# pylint: disable=too-many-arguments
+def trace(
+    func,
+    call=True,
+    retval=False,
+    exception=True,
+    use_pformat=False,
+    with_caller=False,
+    with_pfx=False,
+):
   ''' Decorator to report the call and return of a function.
   '''
 
@@ -79,27 +123,39 @@ def trace(func, call=True, retval=False, exception=False, pfx=False):
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
     '''
-    # late import so that we can use this in modules we import
-    if pfx:
+    global _trace_indent
+    if with_pfx:
+      # late import so that we can use this in modules we import
+      # pylint: disable=import-outside-toplevel
       try:
         from cs.pfx import XP as xlog
       except ImportError:
-        from cs.x import X as xlog
+        xlog = X
     else:
-      from cs.x import X as xlog
+      xlog = X
+    log_cite = citation
+    if with_caller:
+      log_cite = log_cite + "from[%s]" % (caller(),)
     if call:
-      fmt, av = func_a_kw_fmt(citation, *a, **kw)
-      xlog("CALL " + fmt, *av)
+      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
+      xlog("%sCALL " + fmt, _trace_indent, *av)
+    old_indent = _trace_indent
+    _trace_indent += '  '
     try:
-      retval = func(*a, **kw)
+      result = func(*a, **kw)
     except Exception as e:
       if exception:
-        xlog("CALL %s RAISE %r", citation, e)
+        xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
+      _trace_indent = old_indent
       raise
     else:
       if retval:
-        xlog("CALL %s RETURN %r", citation, retval)
-      return retval
+        xlog(
+            "%sCALL %s RETURN %s", _trace_indent, log_cite,
+            (pformat if use_pformat else repr)(result)
+        )
+      _trace_indent = old_indent
+      return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
   traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
@@ -133,6 +189,7 @@ def prop(func):
       into RuntimeErrors.
   '''
 
+  # pylint: disable=inconsistent-return-statements
   def prop_wrapper(*a, **kw):
     try:
       return func(*a, **kw)

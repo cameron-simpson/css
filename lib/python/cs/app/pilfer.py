@@ -4,13 +4,12 @@
 #       - Cameron Simpson <cs@cskk.id.au> 07jul2010
 #
 
-from __future__ import with_statement, print_function
-from collections import defaultdict
-from configutils import ConfigParser
+from collections import namedtuple
+from configparser import ConfigParser
 import os
 import os.path
 import errno
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import re
 import shlex
 from string import Formatter, whitespace
@@ -18,7 +17,7 @@ from subprocess import Popen, PIPE
 import sys
 from threading import Lock, RLock, Thread
 from time import sleep
-from types import SimpleNamespace as NS
+from typing import Iterable
 from urllib.parse import quote, unquote
 from urllib.error import HTTPError, URLError
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
@@ -26,21 +25,24 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
+
 from icontract import require
+from typeguard import typechecked
+
 from cs.app.flag import PolledFlags
-from cs.debug import thread_dump, ifdebug
+from cs.cmdutils import BaseCommand
+from cs.deco import promote
+from cs.debug import ifdebug
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.fileutils import mkdirn
 from cs.later import Later, RetryError
 from cs.lex import (
-    get_dotted_identifier, get_identifier, is_identifier, get_other_chars,
-    get_qstr
+    cutprefix, cutsuffix, get_dotted_identifier, get_identifier, is_identifier,
+    get_other_chars, get_qstr
 )
 import cs.logutils
-from cs.logutils import (
-    setup_logging, logTo, debug, error, warning, exception, trace, D
-)
+from cs.logutils import (debug, error, warning, exception, trace, D)
 from cs.mappings import MappingChain, SeenSet
 from cs.obj import copy as obj_copy
 import cs.pfx
@@ -49,7 +51,7 @@ from cs.pipeline import (
     pipeline, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR,
     FUNC_MANY_TO_MANY, FUNC_PIPELINE
 )
-from cs.py.func import (funcname, yields_type, returns_type, yields_str)
+from cs.py.func import funcname
 from cs.py.modules import import_module_name
 from cs.queues import NullQueue
 from cs.resources import MultiOpenMixin
@@ -58,258 +60,236 @@ from cs.threads import locked
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 from cs.x import X
 
+def main(argv=None):
+  ''' Pilfer command line function.
+  '''
+  return PilferCommand(argv).run()
+
 # parallelism of jobs
 DEFAULT_JOBS = 4
 
 # default flag status probe
 DEFAULT_FLAGS_CONJUNCTION = '!PILFER_DISABLE'
 
-usage = '''Usage: %s [options...] op [args...]
-  %s url URL actions...
-      URL may be "-" to read URLs from standard input.
-  Options:
-    -c config
-        Load rc file.
-    -F flag-conjunction
-        Space separated list of flag or !flag to satisfy as a conjunction.
-    -j jobs
-	How many jobs (actions: URL fetches, minor computations)
-	to run at a time.
-        Default: %d
-    -q  Quiet. Don't recite surviving URLs at the end.
-    -u  Unbuffered. Flush print actions as they occur.
-    -x  Trace execution.'''
+class PilferCommand(BaseCommand):
 
-def main(argv, stdin=None):
-  if stdin is None:
-    stdin = sys.stdin
-  argv = list(argv)
-  xit = 0
-  argv0 = argv.pop(0)
-  cmd = os.path.basename(argv0)
-  setup_logging(cmd)
-  logTo('.pilfer.log')
+  GETOPT_SPEC = 'c:F:j:qux'
 
-  P = Pilfer()
-  quiet = False
-  jobs = DEFAULT_JOBS
-  flagnames = DEFAULT_FLAGS_CONJUNCTION
+  USAGE_FORMAT = '''Usage: {cmd} [options...] op [args...]
+    Options:
+      -c config
+          Load rc file.
+      -F flag-conjunction
+          Space separated list of flag or !flag to satisfy as a conjunction.
+      -j jobs
+      How many jobs (actions: URL fetches, minor computations)
+      to run at a time.
+          Default: ''' + str(
+      DEFAULT_JOBS
+  ) + '''
+      -q  Quiet. Don't recite surviving URLs at the end.
+      -u  Unbuffered. Flush print actions as they occur.
+      -x  Trace execution.'''
 
-  badopts = False
+  def apply_defaults(self):
+    options = self.options
+    options.pilfer = Pilfer()
+    options.quiet = False
+    options.jobs = DEFAULT_JOBS
+    options.flagnames = DEFAULT_FLAGS_CONJUNCTION
 
-  try:
-    opts, argv = getopt(argv, 'c:F:j:qux')
-  except GetoptError as e:
-    warning("%s", e)
-    badopts = True
-    opts = ()
-
-  for opt, val in opts:
-    with Pfx("%s", opt):
-      if opt == '-c':
-        P.rcs[0:0] = load_pilferrcs(val)
-      elif opt == '-F':
-        flagnames = val
-      elif opt == '-j':
-        jobs = int(val)
-      elif opt == '-q':
-        quiet = True
-      elif opt == '-u':
-        P.flush_print = True
-      elif opt == '-x':
-        P.do_trace = True
-      else:
-        raise NotImplementedError("unimplemented option")
-
-  # break the flags into separate words and syntax check
-  flagnames = flagnames.split()
-  for flagname in flagnames:
-    if flagname.startswith('!'):
-      flag_ok = is_identifier(flagname, 1)
-    else:
-      flag_ok = is_identifier(flagname)
-    if not flag_ok:
-      error('invalid flag specifier: %r', flagname)
-      badopts = True
-
-  dflt_rc = os.environ.get('PILFERRC')
-  if dflt_rc is None:
-    dflt_rc = envsub('$HOME/.pilferrc')
-  if dflt_rc:
-    with Pfx("$PILFERRC: %s", dflt_rc):
-      P.rcs.extend(load_pilferrcs(dflt_rc))
-
-  if not argv:
-    error("missing op")
-    badopts = True
-  else:
-    op = argv.pop(0)
-    if op.startswith('http://') or op.startswith('https://'):
-      # push the URL back and infer missing "url" op word
-      argv.insert(0, op)
-      op = 'url'
-    with Pfx(op):
-      if op == 'url':
-        if not argv:
-          error("missing URL")
-          badopts = True
+  def apply_opts(self, opts):
+    options = self.options
+    badopts = False
+    P = options.pilfer
+    for opt, val in opts:
+      with Pfx("%s", opt):
+        if opt == '-c':
+          P.rcs[0:0] = load_pilferrcs(val)
+        elif opt == '-F':
+          options.flagnames = val
+        elif opt == '-j':
+          options.jobs = int(val)
+        elif opt == '-q':
+          options.quiet = True
+        elif opt == '-u':
+          P.flush_print = True
+        elif opt == '-x':
+          P.do_trace = True
         else:
-          url = argv.pop(0)
+          raise NotImplementedError("unimplemented option")
+    # sanity check the flagnames
+    for raw_flagname in options.flagnames.split():
+      with Pfx(raw_flagname):
+        flagname = cutprefix(raw_flagname, '!')
+        if not is_identifier(flagname):
+          error('invalid flag specifier')
+          badopts = True
+    if badopts:
+      raise GetoptError("invalid options")
+    dflt_rc = os.environ.get('PILFERRC')
+    if dflt_rc is None:
+      dflt_rc = envsub('$HOME/.pilferrc')
+    if dflt_rc:
+      with Pfx("$PILFERRC: %s", dflt_rc):
+        P.rcs.extend(load_pilferrcs(dflt_rc))
 
-          # prepare a blank PilferRC and supply as first in chain for this Pilfer
-          rc = PilferRC(None)
-          P.rcs.insert(0, rc)
+  @staticmethod
+  def hack_postopts_argv(argv, options):
+    ''' Infer "url" subcommand if the first argument looks like an URL.
+    '''
+    if argv:
+      op = argv[0]
+      if op.startswith('http://') or op.startswith('https://'):
+        # push the URL back and infer missing "url" op word
+        argv.insert(0, 'url')
+    return argv
 
-          # Load any named pipeline definitions on the command line.
-          #
-          # A pipeline specification is specified by a leading argument
-          # of the form "pipe_name:{", followed by arguments defining
-          # functions for the pipeline, and a terminating argument of the
-          # form "}".
-          #
-          # Return `(spec, argv2, errors)` where `spec` is a PipeSpec
-          # embodying the specification, `argv2` is the list of arguments
-          # after the specification and `errors` is a list of error
-          # messages encountered parsing the function arguments.
-          #
-          # If the leading argument does not commence a function specification
-          # then `spec` will be None and `argv2` will be `argv`.
-          #
-          # Note: this syntax works well with traditional Bourne shells.
-          # Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
-          # sensible behaviour. Bash users may be out of luck.
-          #
-          while len(argv) and argv[0].endswith(':{'):
-            openarg = argv.pop(0)
-            with Pfx(openarg):
-              pipe_name = openarg[:-2]
-              argv2 = []
-              end_pos = None
-              for pos, arg in enumerate(argv):
-                if arg == '}':
-                  end_pos = pos
-                  break
-              if end_pos is None:
-                error("no closing '}'")
-                badopts = True
-                argv = []
-              else:
-                spec = PipeSpec(pipe_name, argv[:end_pos])
-                try:
-                  rc.add_pipespec(spec)
-                except KeyError as e:
-                  error("add pipe: %s", e)
-                  badopts = True
-                argv = argv[end_pos + 1:]
+  def cmd_url(self, argv):
+    ''' Usage: {cmd} URL [pipeline-defns..]
+          URL may be "-" to read URLs from standard input.
+    '''
+    options = self.options
+    P = options.pilfer
+    if not argv:
+      raise GetoptError("missing URL")
+    url = argv.pop(0)
 
-          # now load the main pipeline
-          if not argv:
-            error("missing main pipeline")
-            badopts = True
-          else:
-            main_spec = PipeSpec(None, argv)
+    # prepare a blank PilferRC and supply as first in chain for this Pilfer
+    rc = PilferRC(None)
+    P.rcs.insert(0, rc)
 
-          # gather up the remaining definition as the running pipeline
-          pipe_funcs, errors = argv_pipefuncs(argv, P.action_map, P.do_trace)
+    # Load any named pipeline definitions on the command line.
+    argv_offset = 0
+    while argv and argv[argv_offset].endswith(':{'):
+      spec, argv_offset = self.get_argv_pipespec(argv, argv_offset)
+      try:
+        rc.add_pipespec(spec)
+      except KeyError as e:
+        raise GetoptError("add pipe: %s", e)
 
-          # report accumulated errors and set badopts
-          if errors:
-            for err in errors:
-              error(err)
-            badopts = True
-          if not badopts:
-            LTR = Later(jobs)
-            P.flagnames = flagnames
-            if cs.logutils.D_mode or ifdebug():
-              # poll the status of the Later regularly
-              def pinger(L):
-                while True:
-                  D(
-                      "PINGER: L: quiescing=%s, state=%r: %s", L._quiescing,
-                      L._state, L
-                  )
-                  sleep(2)
+    # now load the main pipeline
+    if not argv:
+      raise GetoptError("missing main pipeline")
 
-              ping = Thread(target=pinger, args=(LTR,))
-              ping.daemon = True
-              ping.start()
-            with LTR as L:
-              P.later = L
-              # construct the pipeline
-              pipeline = pipeline(
-                  L,
-                  pipe_funcs,
-                  name="MAIN",
-                  outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
-                                 blocking=True).open(),
-              )
-              X("MAIN: RUN PIPELINE...")
-              with pipeline:
-                for U in urls(url, stdin=stdin, cmd=cmd):
-                  X("MAIN: PUT %r", U)
-                  pipeline.put(P.copy_with_vars(_=U))
-              X("MAIN: RUN PIPELINE: ALL ITEMS .put")
-              # wait for main pipeline to drain
-              LTR.state("drain main pipeline")
-              for item in pipeline.outQ:
-                warning("main pipeline output: escaped: %r", item)
-              # At this point everything has been dispatched from the input queue
-              # and the only remaining activity is in actions in the diversions.
-              # As long as there are such actions, the Later will be busy.
-              # In fact, even after the Later first quiesces there may
-              # be stalled diversions waiting for EOF in order to process
-              # their "func_final" actions. Releasing these may pass
-              # tasks to other diversions.
-              # Therefore we iterate:
-              #  - wait for the Later to quiesce
-              #  - [missing] topologically sort the diversions
-              #  - pick the [most-ancestor-like] diversion that is busy
-              #    or exit loop if they are all idle
-              #  - close the div
-              #  - wait for that div to drain
-              #  - repeat
-              # drain all the divserions, choosing the busy ones first
-              divnames = P.open_diversion_names
-              while divnames:
-                busy_name = None
-                for divname in divnames:
-                  div = P.diversion(divname)
-                  if div._busy:
-                    busy_name = divname
-                    break
-                # nothing busy? pick the first one arbitrarily
-                if not busy_name:
-                  busy_name = divnames[0]
-                busy_div = P.diversion(busy_name)
-                LTR.state("CLOSE DIV %s", busy_div)
-                busy_div.close(enforce_final_close=True)
-                outQ = busy_div.outQ
-                D("DRAIN DIV %s", busy_div)
-                LTR.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)
-                for item in outQ:
-                  # diversions are supposed to discard their outputs
-                  error("%s: RECEIVED %r", busy_div, item)
-                LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
-                divnames = P.open_diversion_names
-              LTR.state("quiescing")
-              L.wait_outstanding(until_idle=True)
-              # Now the diversions should have completed and closed.
-            # out of the context manager, the Later should be shut down
-            LTR.state("WAIT...")
-            L.wait()
-            LTR.state("WAITED")
-      else:
-        error("unsupported op")
-        badopts = True
+    # TODO: main_spec never used?
+    main_spec = PipeSpec(None, argv)
 
-  if badopts:
-    print(usage % (cmd, cmd, DEFAULT_JOBS), file=sys.stderr)
-    xit = 2
+    # gather up the remaining definition as the running pipeline
+    pipe_funcs, errors = argv_pipefuncs(argv, P.action_map, P.do_trace)
 
-  return xit
+    # report accumulated errors and set badopts
+    if errors:
+      for err in errors:
+        error(err)
+      raise GetoptError("invalid main pipeline")
 
-@yields_str
-def urls(url, stdin=None, cmd=None):
+    LTR = Later(options.jobs)
+    P.flagnames = options.flagnames.split()
+    if cs.logutils.D_mode or ifdebug():
+      # poll the status of the Later regularly
+      def pinger(L):
+        while True:
+          D("PINGER: L: quiescing=%s, state=%r: %s", L._quiescing, L._state, L)
+          sleep(2)
+
+      ping = Thread(target=pinger, args=(LTR,))
+      ping.daemon = True
+      ping.start()
+
+    with LTR as L:
+      P.later = L
+      # construct the pipeline
+      pipe = pipeline(
+          L,
+          pipe_funcs,
+          name="MAIN",
+          outQ=NullQueue(name="MAIN_PIPELINE_END_NQ", blocking=True).open(),
+      )
+      X("MAIN: RUN PIPELINE...")
+      with pipe:
+        for U in urls(url, stdin=sys.stdin, cmd=self.cmd):
+          X("MAIN: PUT %r", U)
+          pipe.put(P.copy_with_vars(_=U))
+      X("MAIN: RUN PIPELINE: ALL ITEMS .put")
+      # wait for main pipeline to drain
+      LTR.state("drain main pipeline")
+      for item in pipe.outQ:
+        warning("main pipeline output: escaped: %r", item)
+      # At this point everything has been dispatched from the input queue
+      # and the only remaining activity is in actions in the diversions.
+      # As long as there are such actions, the Later will be busy.
+      # In fact, even after the Later first quiesces there may
+      # be stalled diversions waiting for EOF in order to process
+      # their "func_final" actions. Releasing these may pass
+      # tasks to other diversions.
+      # Therefore we iterate:
+      #  - wait for the Later to quiesce
+      #  - [missing] topologically sort the diversions
+      #  - pick the [most-ancestor-like] diversion that is busy
+      #    or exit loop if they are all idle
+      #  - close the div
+      #  - wait for that div to drain
+      #  - repeat
+      # drain all the diversions, choosing the busy ones first
+      divnames = P.open_diversion_names
+      while divnames:
+        busy_name = None
+        for divname in divnames:
+          div = P.diversion(divname)
+          if div._busy:
+            busy_name = divname
+            break
+        # nothing busy? pick the first one arbitrarily
+        if not busy_name:
+          busy_name = divnames[0]
+        busy_div = P.diversion(busy_name)
+        LTR.state("CLOSE DIV %s", busy_div)
+        busy_div.close(enforce_final_close=True)
+        outQ = busy_div.outQ
+        D("DRAIN DIV %s", busy_div)
+        LTR.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)
+        for item in outQ:
+          # diversions are supposed to discard their outputs
+          error("%s: RECEIVED %r", busy_div, item)
+        LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
+        divnames = P.open_diversion_names
+      LTR.state("quiescing")
+      L.wait_outstanding(until_idle=True)
+      # Now the diversions should have completed and closed.
+    # out of the context manager, the Later should be shut down
+    LTR.state("WAIT...")
+    L.wait()
+    LTR.state("WAITED")
+
+  @staticmethod
+  def get_argv_pipespec(argv, argv_offset=0):
+    ''' Parse a pipeline specification from the argument list `argv`.
+        Return `(PipeSpec,new_argv_offset)`.
+
+        A pipeline specification is specified by a leading argument of the
+        form `'pipe_name:{'`, followed by arguments defining functions for the
+        pipeline, and a terminating argument of the form `'}'`.
+
+        Note: this syntax works well with traditional Bourne shells.
+        Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
+        sensible behaviour. Bash users may be out of luck.
+    '''
+    start_arg = argv[argv_offset]
+    pipe_name = cutsuffix(start_arg, ':{')
+    if pipe_name is start_arg:
+      raise ValueError("expected \"pipe_name:{\", got: %r" % (start_arg,))
+    with Pfx(start_arg):
+      argv_offset += 1
+      spec_offset = argv_offset
+      while argv[argv_offset] != '}':
+        argv_offset += 1
+      spec = PipeSpec(pipe_name, argv[spec_offset:argv_offset])
+      argv_offset += 1
+      return spec, argv_offset
+
+@typechecked
+def urls(url, stdin=None, cmd=None) -> Iterable[str]:
   ''' Generator to yield input URLs.
   '''
   if stdin is None:
@@ -374,21 +354,21 @@ def argv_pipefuncs(argv, action_map, do_trace):
       # terminate this pipeline with a function to spawn subpipelines
       # using the tail of the action list from this point
       if not argv:
-        errors.append("no actions after %r" % (per,))
+        errors.append("no actions after %r" % (action,))
       else:
         tail_argv = list(argv)
-        name = "per:[%s]" % (','.join(argv))
+        name = "%s:[%s]" % (action, ','.join(argv))
         pipespec = PipeSpec(name, argv)
 
         def per(P):
-          pipeline = pipeline(
+          pipe = pipeline(
               P.later,
               pipespec.actions,
               inputs=(P,),
               name="%s(%s)" % (name, P)
           )
           with P.later.release():
-            for P2 in pipeline.outQ:
+            for P2 in pipe.outQ:
               yield P2
 
         pipe_funcs.append((FUNC_ONE_TO_MANY, per))
@@ -407,23 +387,24 @@ def notNone(v, name="value"):
     raise ValueError("%s is None" % (name,))
   return True
 
-def url_xml_find(U, match):
-  for found in url_io(URL(U, None).xml_find_all, (), match):
+@promote
+def url_xml_find(U: URL, match):
+  for found in url_io(U.xml_find_all, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
-class Pilfer(NS):
+class Pilfer:
   ''' State for the pilfer app.
-      Notable attribute include:
-        .flush_print    Flush output after print(), default False.
-        .user_agent     Specify user-agent string, default None.
-        .user_vars      Mapping of user variables for arbitrary use.
+
+      Notable attributes include:
+      * `flush_print`: flush output after print(), default `False`.
+      * `user_agent`: specify user-agent string, default `None`.
+      * `user_vars`: mapping of user variables for arbitrary use.
   '''
 
-  def __init__(self, *a, **kw):
+  def __init__(self, item=None):
     self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
-    self.user_vars = {'save_dir': '.'}
-    self._ = None
+    self.user_vars = {'_': item, 'save_dir': '.'}
     self.flush_print = False
     self.do_trace = False
     self.flags = PolledFlags()
@@ -437,7 +418,6 @@ class Pilfer(NS):
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     self.opener.add_handler(HTTPCookieProcessor())
-    super().__init__(**kw)
 
   def __str__(self):
     return "%s[%s]" % (self._name, self._)
@@ -469,12 +449,13 @@ class Pilfer(NS):
 
   @property
   def url(self):
-    ''' self._ as a URL object.
+    ''' `self._` as a `URL` object.
     '''
-    return URL(self._, None)
+    return URL.promote(self._)
 
   def test_flags(self):
     ''' Evaluate the flags conjunction.
+
         Installs the tested names into the status dictionary as side effect.
         Note that it deliberately probes all flags instead of stopping
         at the first false condition.
@@ -512,12 +493,14 @@ class Pilfer(NS):
     return seen[name]
 
   def seen(self, url, seenset='_'):
-    ''' Test if the named `url` has been seen. Default seetset is '_'.
+    ''' Test if the named `url` has been seen.
+        The default seenset is named `'_'`.
     '''
     return url in self.seenset(seenset)
 
   def see(self, url, seenset='_'):
-    ''' Mark a `url` as seen. Default seetset is '_'.
+    ''' Mark a `url` as seen.
+        The default seenset is named `'_'`.
     '''
     self.seenset(seenset).add(url)
 
@@ -621,7 +604,7 @@ class Pilfer(NS):
         raise ValueError("no pipe specification named %r" % (pipe_name,))
     if name is None:
       name = "pipe_from_spec:%s" % (spec,)
-    with Pfx("%s", spec):
+    with Pfx(spec):
       pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
       if errors:
         for err in errors:
@@ -656,14 +639,15 @@ class Pilfer(NS):
       if self.flush_print:
         file.flush()
 
-  @require(lambda kw: all(isinstance(v, str) for v in kw.values()))
+  @require(lambda kw: all(isinstance(v, str) for v in kw))
   def set_user_vars(self, **kw):
     ''' Update self.user_vars from the keyword arguments.
     '''
     self.user_vars.update(kw)
 
   def copy_with_vars(self, **kw):
-    ''' Make a copy of `self` with copied .user_vars, update the vars and return the copied Pilfer.
+    ''' Make a copy of `self` with copied .user_vars, update the
+        vars and return the copied Pilfer.
     '''
     P = self.copy('user_vars')
     P.set_user_vars(**kw)
@@ -684,7 +668,8 @@ class Pilfer(NS):
   def save_dir(self):
     return self.user_vars.get('save_dir', '.')
 
-  def save_url(self, U, saveas=None, dir=None, overwrite=False, **kw):
+  @promote
+  def save_url(self, U: URL, saveas=None, dir=None, overwrite=False, **kw):
     ''' Save the contents of the URL `U`.
     '''
     debug(
@@ -692,7 +677,6 @@ class Pilfer(NS):
         dir, overwrite, kw
     )
     with Pfx("save_url(%s)", U):
-      U = URL(U, None)
       save_dir = self.save_dir
       if saveas is None:
         saveas = os.path.join(save_dir, U.basename)
@@ -741,15 +725,15 @@ class Pilfer(NS):
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
 
-def yields_Pilfer(func):
-  ''' Decorator for generators which should yield Pilfers.
-  '''
-  return yields_type(func, Pilfer)
-
-def returns_Pilfer(func):
-  ''' Decorator for functions which should return Pilfers.
-  '''
-  return returns_type(func, Pilfer)
+  # Note: this method is _last_ because otherwise it it shadows the
+  # @promote decorator, used on earlier methods.
+  @classmethod
+  def promote(cls, P):
+    '''Promote anything to a `Pilfer`.
+    '''
+    if not isinstance(P, cls):
+      P = cls(P)
+    return P
 
 class FormatArgument(str):
 
@@ -764,18 +748,18 @@ class FormatMapping(object):
   '''
 
   def __init__(self, P, U=None, factory=None):
-    ''' Initialise this FormatMapping from a Pilfer `P`.
-	The optional parameter `U` (default from `P._`) is the
-	object whose attributes are exposed for format strings,
-	though P.user_vars preempt them.
-	The optional parameter `factory` is used to promote the
-	value `U` to a useful type; it calls URL(U, None) by default.
+    ''' Initialise this `FormatMapping` from a Pilfer `P`.
+        The optional parameter `U` (default from `P._`) is the
+        object whose attributes are exposed for format strings,
+        though `P.user_vars` preempt them.
+        The optional parameter `factory` is used to promote the
+        value `U` to a useful type; it calls `URL.promote` by default.
     '''
     self.pilfer = P
     if U is None:
       U = P._
     if factory is None:
-      factory = lambda x: URL(x, None)
+      factory = URL.promote
     self.url = factory(U)
 
   def _ok_attrkey(self, k):
@@ -867,7 +851,6 @@ def has_exts(U, suffixes, case_sensitive=False):
         break
   return ok
 
-@yields_str
 def with_exts(urls, suffixes, case_sensitive=False):
   for U in urls:
     ok = False
@@ -890,8 +873,8 @@ def url_delay(U, delay, *a):
   sleep(float(delay))
   return U
 
-def url_query(U, *a):
-  U = URL(U, None)
+@promote
+def url_query(U: URL, *a):
   if not a:
     return U.query
   qsmap = dict(
@@ -929,27 +912,31 @@ def url_io_iter(I):
     else:
       yield item
 
-@yields_str
-def url_hrefs(U):
+@promote
+@typechecked
+def url_hrefs(U: URL) -> Iterable[URL]:
   ''' Yield the HREFs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
-  return url_io_iter(URL(U, None).hrefs(absolute=True))
+  return url_io_iter(U.hrefs(absolute=True))
 
-@yields_str
-def url_srcs(U):
+@promote
+@typechecked
+def url_srcs(U: URL) -> Iterable[URL]:
   ''' Yield the SRCs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
-  return url_io_iter(URL(U, None).srcs(absolute=True))
+  return url_io_iter(U.srcs(absolute=True))
 
 # actions that work on the whole list of in-play URLs
 # these return Pilfers
 many_to_many = {
-      'sort':         lambda Ps, key=lambda P: P._, reverse=False: \
-                        sorted(Ps, key=key, reverse=reverse),
-      'last':         lambda Ps: Ps[-1:],
-    }
+    'sort':
+    lambda Ps, key=lambda P: P._, reverse=False:
+    sorted(Ps, key=key, reverse=reverse),
+    'last':
+    lambda Ps: Ps[-1:],
+}
 
 # actions that work on individual Pilfer instances, returning multiple strings
 one_to_many = {
@@ -994,14 +981,14 @@ one_test = {
     'reject_re':
     lambda P, regexp: not regexp.search(P._),
     'same_domain':
-    lambda P: notNone(P._.referer, "%r.referer" % (P._,)
-                      ) and P._.domain == P._.referer.domain,
+    lambda P: notNone(P._.referer, "%r.referer" %
+                      (P._,)) and P._.domain == P._.referer.domain,
     'same_hostname':
-    lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.hostname == P
-    ._.referer.hostname,
+    lambda P: notNone(P._.referer, "%r.referer" %
+                      (P._,)) and P._.hostname == P._.referer.hostname,
     'same_scheme':
-    lambda P: notNone(P._.referer, "%r.referer" % (P._,)
-                      ) and P._.scheme == P._.referer.scheme,
+    lambda P: notNone(P._.referer, "%r.referer" %
+                      (P._,)) and P._.scheme == P._.referer.scheme,
     'select_re':
     lambda P, regexp: regexp.search(P._),
 }
@@ -1018,7 +1005,7 @@ def Action(action_text, do_trace):
   except TypeError:
     action = parsed
   else:
-    action = ActionFunction(action_text, sig, lambda: function)
+    action = ActionFunction(action_text, sig, function)
   return action
 
 def pilferify11(func):
@@ -1066,8 +1053,10 @@ def pilferifysel(func):
   return pf
 
 def parse_action(action, do_trace):
-  ''' Accept a string `action` and return an _Action subclass instance or a (sig, function) tuple.
-      This is primarily used by action_func below, but also called
+  ''' Accept a string `action` and return an _Action subclass
+      instance or a `(sig,function)` tuple.
+
+      This is used primarily by `action_func` below, but also called
       by subparses such as selectors applied to the values of named
       variables.
       Selectors return booleans, all other functions return or yield Pilfers.
@@ -1286,13 +1275,13 @@ def parse_action(action, do_trace):
       else:
         raise ValueError("unknown s///x modifier: %r" % (modchar,))
     debug(
-        "s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp,
+        "s: regexp=%r, repl_format=%r, repl_all=%s, repl_icase=%s", regexp,
         repl_format, repl_all, repl_icase
     )
 
     def substitute(P):
       ''' Perform a regexp substitution on the source string.
-          `replacement` is a format string for the replacement text
+          `repl_format` is a format string for the replacement text
           using the str.format method.
           The matched groups from the regexp take the positional arguments 1..n,
           with 0 used for the whole matched string.
@@ -1301,8 +1290,8 @@ def parse_action(action, do_trace):
       '''
       src = P._
       debug(
-          "SUBSTITUTE: src=%r, regexp=%r, replacement=%r, replace_all=%s)...",
-          src, regexp.pattern, replacement, replace_all
+          "SUBSTITUTE: src=%r, regexp=%r, repl_format=%r, repl_all=%s)...",
+          src, regexp.pattern, repl_format, repl_all
       )
       strs = []
       offset = 0
@@ -1315,9 +1304,9 @@ def parse_action(action, do_trace):
         # save the unmatched section
         strs.append(src[offset:m.start()])
         # save the matched section with replacements
-        strs.append(replacement.format(*repl_args, **repl_kw))
+        strs.append(repl_format.format(*repl_args, **repl_kw))
         offset = m.end()
-        if not replace_all:
+        if not repl_all:
           break
       # save the final unmatched section
       strs.append(src[offset:])
@@ -1400,8 +1389,8 @@ def parse_action(action, do_trace):
       raise ValueError("unparsed content after args: %r", action[offset:])
     if name == "grok":
 
-      @returns_Pilfer
-      def grok(P):
+      @typechecked
+      def grok(P: Pilfer) -> Pilfer:
         ''' Grok performs a user-specified analysis on the supplied Pilfer state `P`.
             (The current value, often an URL, is `P._`.)
             Import `func_name` from module `module_name`.
@@ -1425,9 +1414,9 @@ def parse_action(action, do_trace):
       return FUNC_ONE_TO_ONE, grok
     elif name == "grokall":
 
-      @yields_Pilfer
-      def grokall(Ps):
-        ''' Grokall performs a user-specified analysis on the items.
+      @typechecked
+      def grokall(Ps: Iterable[Pilfer]) -> Iterable[Pilfer]:
+        ''' Grokall performs a user-specified analysis on the `Pilfer` items `Ps`.
             Import `func_name` from module `module_name`.
             Call `func_name( Ps, *a, **kw ).
             Receive a mapping of variable names to values in return,
@@ -1437,19 +1426,21 @@ def parse_action(action, do_trace):
         if not isinstance(Ps, list):
           Ps = list(Ps)
         if Ps:
-          mfunc = Ps[0].import_module_func(grok_module, grok_funcname)
+          mfunc = pfx_call(
+              Ps[0].import_module_func, grok_module, grok_funcname
+          )
           if mfunc is None:
-            error("import fails")
+            error("import fails: %s.%s", grok_module, grok_funcname)
           else:
             try:
-              var_mapping = mfunc(Ps, *args, **kwargs)
-            except Exception:
-              exception("call")
+              var_mapping = pfx_call(mfunc, Ps, *args, **kwargs)
+            except Exception as e:
+              exception("call %s.%s: %s", grok_module, grok_funcname, e)
             else:
               if var_mapping:
                 Ps = [P.copy('user_vars') for P in Ps]
-              for P in Ps:
-                P.set_user_vars(**var_mapping)
+                for P in Ps:
+                  P.set_user_vars(**var_mapping)
         return Ps
 
       return FUNC_ONE_TO_MANY, grokall
@@ -1623,8 +1614,11 @@ def parse_action(action, do_trace):
   return sig, func
 
 def parse_action_args(action, offset, delim=None):
-  ''' Parse [[kw=]arg[,[kw=]arg...] from `action` at `offset`, return (args, kwargs, offset).
-     An arg is a quoted string or a sequence of nonwhitespace excluding `delim` and comma.
+  ''' Parse `[[kw=]arg[,[kw=]arg...]` from `action` at `offset`,
+     return `(args,kwargs,offset)`.
+
+     An `arg` is a quoted string or a sequence of nonwhitespace
+     excluding `delim` and comma.
   '''
   other_chars = ',' + whitespace
   if delim is not None:
@@ -1652,11 +1646,12 @@ def parse_action_args(action, offset, delim=None):
   return args, kwargs, offset
 
 def retriable(func):
-  ''' A decorator for a function to probe the Pilfer flags and raise RetryError if unsatisfied.
+  ''' A decorator for a function to probe the `Pilfer` flags
+      and raise `RetryError` if unsatisfied.
   '''
 
   def retry_func(P, *a, **kw):
-    ''' Call func after testing flags.
+    ''' Call `func` after testing `P.test_flags()`.
     '''
     if not P.test_flags():
       raise RetryError('flag conjunction fails: %s' % (' '.join(P.flagnames)))
@@ -1665,7 +1660,7 @@ def retriable(func):
   retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
   return retry_func
 
-class _Action(NS):
+class _Action:
 
   def __init__(self, srctext, sig):
     self.srctext = srctext
@@ -1764,8 +1759,12 @@ class ShellProcFilter(MultiOpenMixin):
 
   def __init__(self, shcmd, outQ):
     ''' Set up a subprocess running `shcmd`.
-        `no_flush`: do not flush input lines for the subprocess, block buffer instead.
-        `discard`: discard .put items, close subprocess stdin immediately after startup.
+
+        Parameters:
+        * `no_flush`: do not flush input lines for the subprocess,
+          block buffer instead
+        * `discard`: discard .put items, close subprocess stdin
+          immediately after startup
     '''
     MultiOpenMixin.__init__(self)
     self.shcmd = shcmd
@@ -1777,7 +1776,7 @@ class ShellProcFilter(MultiOpenMixin):
     self.shproc = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
 
     def copy_out(fp, outQ):
-      ''' Copy lines from the shell output, put new Pilfers onto the outQ.
+      ''' Copy lines from the shell output, put new `Pilfer`s onto the `outQ`.
       '''
       for line in fp:
         if not line.endswith('\n'):
@@ -1878,8 +1877,8 @@ def action_shcmd(shcmd):
   '''
   shcmd = shcmd.strip()
 
-  @yields_str
-  def function(P):
+  @typechecked
+  def function(P) -> Iterable[str]:
     U = P._
     uv = P.user_vars
     try:
@@ -1917,8 +1916,8 @@ def action_pipecmd(shcmd):
   '''
   shcmd = shcmd.strip()
 
-  @yields_str
-  def function(items):
+  @typechecked
+  def function(items) -> Iterable[str]:
     if not isinstance(items, list):
       items = list(items)
     if not items:
@@ -1964,7 +1963,7 @@ def action_pipecmd(shcmd):
 
   return function, FUNC_MANY_TO_MANY
 
-class PipeSpec(NS):
+class PipeSpec(namedtuple('PipeSpec', 'name argv')):
   ''' A pipeline specification: a name and list of actions.
   '''
 
@@ -1976,6 +1975,7 @@ class PipeSpec(NS):
   @logexc
   def pipe_funcs(self, L, action_map, do_trace):
     ''' Compute a list of functions to implement a pipeline.
+
         It is important that this list is constructed anew for each
         new pipeline instance because many of the functions rely
         on closures to track state.
@@ -1985,8 +1985,9 @@ class PipeSpec(NS):
     return pipe_funcs, errors
 
 def load_pilferrcs(pathname):
-  ''' Load PilferRC instances from the supplied `pathname`, recursing if this is a directory.
-      Return a list of the PilferRC instances obtained.
+  ''' Load `PilferRC` instances from the supplied `pathname`,
+      recursing if this is a directory.
+      Return a list of the `PilferRC` instances obtained.
   '''
   rcs = []
   with Pfx(pathname):
@@ -2010,12 +2011,12 @@ def load_pilferrcs(pathname):
       warning("neither a file nor a directory, ignoring")
   return rcs
 
-class PilferRC(NS):
+class PilferRC:
 
   def __init__(self, filename):
-    ''' Initialise the PilferRC instance. Load values from `filename` if not None.
+    ''' Initialise the `PilferRC` instance.
+        Load values from `filename` if not `None`.
     '''
-    super().__init__()
     self.filename = filename
     self._lock = Lock()
     self.defaults = {}
@@ -2025,9 +2026,13 @@ class PilferRC(NS):
     if filename is not None:
       self.loadrc(filename)
 
+  def __str__(self):
+    return type(self).__name__ + '(' + repr(self.filename) + ')'
+
   @locked
   def add_pipespec(self, spec, pipe_name=None):
-    ''' Add a PipeSpec to this Pilfer's collection, optionally with a different `pipe_name`.
+    ''' Add a `PipeSpec` to this `Pilfer`'s collection,
+        optionally with a different `pipe_name`.
     '''
     if pipe_name is None:
       pipe_name = spec.name
@@ -2042,8 +2047,8 @@ class PilferRC(NS):
     trace("load %s", filename)
     with Pfx(filename):
       cfg = ConfigParser()
-      with open(filename) as fp:
-        cfg.readfp(fp)
+      with open(filename) as f:
+        cfg.read_file(f)
       self.defaults.update(cfg.defaults().items())
       if cfg.has_section('actions'):
         for action_name in cfg.options('actions'):
