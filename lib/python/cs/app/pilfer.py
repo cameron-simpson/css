@@ -222,7 +222,7 @@ class PilferCommand(BaseCommand):
       # tasks to other diversions.
       # Therefore we iterate:
       #  - wait for the Later to quiesce
-      #  - [missing] topologically sort the diversions
+      #  - TODO: topologically sort the diversions
       #  - pick the [most-ancestor-like] diversion that is busy
       #    or exit loop if they are all idle
       #  - close the div
@@ -422,7 +422,7 @@ class Pilfer:
   __repr__ = __str__
 
   def copy(self, *a, **kw):
-    ''' Convenience function to shallow copy this Pilfer with modifications.
+    ''' Convenience function to shallow copy this `Pilfer` with modifications.
     '''
     return obj_copy(self, *a, **kw)
 
@@ -1720,7 +1720,6 @@ class ActionPipeTo(BaseAction):
   class _OnDemandPipeline(MultiOpenMixin):
 
     def __init__(self, pipespec, L):
-      MultiOpenMixin.__init__(self)
       self.pipespec = pipespec
       self.later = L
       self._Q = None
@@ -1772,7 +1771,6 @@ class ShellProcFilter(MultiOpenMixin):
         * `discard`: discard .put items, close subprocess stdin
           immediately after startup
     '''
-    MultiOpenMixin.__init__(self)
     self.shcmd = shcmd
     self.shproc = None
     self.outQ = outQ
@@ -1835,7 +1833,6 @@ class ShellProcCommand(MultiOpenMixin):
     ''' Set up a subprocess running `shcmd`.
         `discard`: discard .put items, close subprocess stdin immediately after startup.
     '''
-    MultiOpenMixin.__init__(self)
     self.shcmd = shcmd
     self.shproc = None
     self.outQ = outQ
