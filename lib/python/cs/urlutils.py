@@ -95,6 +95,19 @@ class URL(SingletonMixin):
       self._lock = trace_func(RLock)()
       self._parts = None
       self._info = None
+      self.flush()
+
+  def __str__(self):
+    return f'{self.__class__.__name__}({self.url_s})'
+
+  def flush(self):
+    ''' Forget all cached content.
+    '''
+    for val_attr in ['_' + attr for attr in 'GET HEAD parsed'.split()]:
+      try:
+        delattr(self, val_attr)
+      except AttributeError:
+        pass
 
   @classmethod
   def promote(cls, obj):
