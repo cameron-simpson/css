@@ -136,33 +136,18 @@ class URL(SingletonMixin):
     # look up method on equivalent Unicode string
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
+  @contextmanager
+  def session(session=None):
+    ''' Context manager yielding a `requests.Session`.
+    '''
+    if session is None:
+      with requests.Session() as session:
+        with self.session(session=session):
+          yield session
+    else:
+      with self.context(session=session):
+        yield session
 
-  def _response(self, method):
-    rq = self._request(method)
-    opener = self.opener
-    retries = self.retry_timeout
-    with Pfx("open(%s)", rq):
-      while retries > 0:
-        now = time.time()
-        open = opener.open
-        try:
-          opened_url = open(rq)
-        except OSError as e:
-          if e.errno == errno.ETIMEDOUT:
-            elapsed = time.time() - now
-            warning("open %s: %s; elapsed=%gs", self, e, elapsed)
-            if retries > 0:
-              retries -= 1
-              continue
-          raise
-        except HTTPError as e:
-          warning("open %s: %s", self, e)
-          raise
-        else:
-          # success, exit retry loop
-          break
-    self._info = opened_url.info()
-    return opened_url
   @locked
   @cachedmethod
   def GET(self):
