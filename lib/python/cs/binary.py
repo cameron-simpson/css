@@ -1301,41 +1301,42 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
         which parses a run length encoded data chunk;
         this is a `BinarySingleValue` so we store its `bytes` value directly.
 
-          >>> class BMV(BinaryMultiValue("BMV", {
-          ...         'n1': (UInt8.parse_value, UInt8.transcribe_value),
-          ...         'n2': UInt8,
-          ...         'n3': UInt8,
-          ...         'nd': ('>H4s', 'short bs'),
-          ...         'data1': (
-          ...             BSData.parse_value,
-          ...             BSData.transcribe_value,
-          ...         ),
-          ...         'data2': BSData,
-          ... })):
-          ...     pass
-          >>> BMV.FIELD_ORDER
-          ['n1', 'n2', 'n3', 'nd', 'data1', 'data2']
-          >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
-          >>> bmv.n1  #doctest: +ELLIPSIS
-          17
-          >>> bmv.n2
-          34
-          >>> bmv  #doctest: +ELLIPSIS
-          BMV(n1=17, n2=34, n3=119, nd=nd_1_short__bs(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
-          >>> bmv.nd  #doctest: +ELLIPSIS
-          nd_1_short__bs(short=33154, bs=b'zyxw')
-          >>> bmv.nd.bs
-          b'zyxw'
-          >>> bytes(bmv.nd)
-          b'\x81\x82zyxw'
-          >>> bmv.data1
-          b'AB'
-          >>> bmv.data2
-          b'DEFG'
-          >>> bytes(bmv)
-          b'\\x11"w\\x81\\x82zyxw\\x02AB\\x04DEFG'
-          >>> list(bmv.transcribe_flat())
-          [b'\\x11', b'"', b'w', b'\\x81\\x82zyxw', b'\\x02', b'AB', b'\\x04', b'DEFG']
+            >>> class BMV(BinaryMultiValue("BMV", {
+            ...         'n1': (UInt8.parse_value, UInt8.transcribe_value),
+            ...         'n2': UInt8,
+            ...         'n3': UInt8,
+            ...         'nd': ('>H4s', 'short bs'),
+            ...         'data1': (
+            ...             BSData.parse_value,
+            ...             BSData.transcribe_value,
+            ...         ),
+            ...         'data2': BSData,
+            ... })):
+            ...     pass
+            >>> BMV.FIELD_ORDER
+            ['n1', 'n2', 'n3', 'nd', 'data1', 'data2']
+            >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
+            >>> bmv.n1  #doctest: +ELLIPSIS
+            17
+            >>> bmv.n2
+            34
+            >>> bmv  #doctest: +ELLIPSIS
+            BMV(n1=17, n2=34, n3=119, nd=nd_1_short__bs(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
+            >>> bmv.nd  #doctest: +ELLIPSIS
+            nd_1_short__bs(short=33154, bs=b'zyxw')
+            >>> bmv.nd.bs
+            b'zyxw'
+            >>> bytes(bmv.nd)
+            b'\x81\x82zyxw'
+            >>> bmv.data1
+            b'AB'
+            >>> bmv.data2
+            b'DEFG'
+            >>> bytes(bmv)
+            b'\\x11"w\\x81\\x82zyxw\\x02AB\\x04DEFG'
+            >>> list(bmv.transcribe_flat())
+            [b'\\x11', b'"', b'w', b'\\x81\\x82zyxw', b'\\x02', b'AB', b'\\x04', b'DEFG']
+
   '''  # pylint: disable=line-too-long
   with Pfx("BinaryMultiValue(%r,...)", class_name):
     if field_order is None:
