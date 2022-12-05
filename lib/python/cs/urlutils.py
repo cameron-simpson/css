@@ -249,22 +249,25 @@ class URL(SingletonMixin):
   def parsed(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
-    content = self.content
-    if self.content_type == 'text/html':
-      parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
-    else:
-      parser_names = ('lxml', 'xml')
     try:
-      P = BeautifulSoup(content.decode('utf-8', 'replace'), 'html5lib')
-      ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
-    except Exception as e:
-      exception(
-          "%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e
-      )
-      with open("cs.urlutils-unparsed.html", "wb") as bs:
-        bs.write(self.content)
+      text = self.text
+      if self.content_type == 'text/html':
+        parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
+      else:
+        parser_names = ('lxml', 'xml')
+      try:
+        P = BeautifulSoup(text, 'html5lib')
+        ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
+      except Exception as e:
+        exception(
+            "%s: .parsed: BeautifulSoup(text,html5lib) fails: %s", self, e
+        )
+        with open("cs.urlutils-unparsed.html", "wb") as bs:
+          bs.write(self.content)
+        raise
+      return P
+    except:
       raise
-    return P
 
   def feedparsed(self):
     ''' A parse of the content via the feedparser module.
