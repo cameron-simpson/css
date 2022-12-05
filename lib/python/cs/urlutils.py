@@ -21,19 +21,19 @@ DISTINFO = {
         'cs.logutils',
         'cs.rfc2616',
         'cs.threads',
-        'cs.py3',
         'cs.obj',
         'cs.xml',
     ],
 }
 
+from collections import namedtuple
+from contextlib import contextmanager
+from heapq import heappush, heappop
+from itertools import chain
+import errno
 import os
 import os.path
 import sys
-from collections import namedtuple
-import errno
-from heapq import heappush, heappop
-from itertools import chain
 import time
 
 from netrc import netrc
@@ -48,7 +48,9 @@ from urllib.parse import urlparse, urljoin, quote as urlquote
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 import lxml
 import requests
+from typeguard import typechecked
 
+from cs.deco import cachedmethod, promote
 from cs.excutils import logexc, safe_property
 from cs.lex import parseUC_sAttr
 from cs.logutils import debug, error, warning, exception
@@ -122,8 +124,10 @@ class URL(SingletonMixin):
 
   def __getattr__(self, attr):
     ''' Ad hoc attributes.
-        Upper case attributes named "FOO" parse the text and find the (sole) node named "foo".
-        Upper case attributes named "FOOs" parse the text and find all the nodes named "foo".
+        Upper case attributes named "FOO" parse the text and find
+        the (sole) node named "foo".
+        Upper case attributes named "FOOs" parse the text and find
+        all the nodes named "foo".
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
