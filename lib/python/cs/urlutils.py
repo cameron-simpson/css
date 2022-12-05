@@ -55,6 +55,7 @@ from cs.pfx import Pfx, pfx_iter
 from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked
 from cs.xml import etree  # ElementTree
+from cs.threads import locked_property, State as ThreadState
 
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader
@@ -81,18 +82,20 @@ class URL(str):
                   "css" if no referer.
         `opener`: urllib2 opener object, inherited from `referer` if unspecified,
                   made at need if no referer.
+  # Thread local stackable class state
+  context = ThreadState(
+      referer=None,
+      user_agent=None,
+      opener=None,
+      retry_delay=3,
+  )
+
     '''
-    if referer is not None:
-      referer = URL(referer, None)
-    self.referer = referer
-    self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
-    self._opener = opener
     self._parts = None
     self._info = None
     self.flush()
     self._lock = RLock()
     self.flush()
-    self.retry_timeout = 3
 
   @classmethod
   def promote(cls, obj):
@@ -151,17 +154,6 @@ class URL(str):
     self._parsed = None
     self._xml = None
     self._fetch_exception = None
-
-  @property
-  def opener(self):
-    if self._opener is None:
-      if self.referer is not None and self.referer._opener is not None:
-        self._opener = self.referer._opener
-      else:
-        o = build_opener()
-        o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
-        self._opener = o
-    return self._opener
 
   def _request(self, method):
 
