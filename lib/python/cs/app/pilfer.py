@@ -994,7 +994,7 @@ one_test = {
 re_GROK = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
 def Action(action_text, do_trace):
-  ''' Wrapper for parse_action: parse an action text and promote (sig, function) into an _Action.
+  ''' Wrapper for parse_action: parse an action text and promote (sig, function) into an BaseAction.
   '''
   parsed = parse_action(action_text, do_trace)
   try:
@@ -1050,7 +1050,7 @@ def pilferifysel(func):
   return pf
 
 def parse_action(action, do_trace):
-  ''' Accept a string `action` and return an _Action subclass
+  ''' Accept a string `action` and return an BaseAction subclass
       instance or a `(sig,function)` tuple.
 
       This is used primarily by `action_func` below, but also called
@@ -1659,14 +1659,21 @@ def retriable(func):
   retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
   return retry_func
 
-class _Action:
+class BaseAction:
+  ''' The base class for all actions.
 
-  def __init__(self, srctext, sig):
+      Each instance has the following attributes:
+      * `srctext`: the text defining the action
+      * `sig`: the action's function signature
+  '''
+
+  @typechecked
+  def __init__(self, srctext: str, sig: StageType):
     self.srctext = srctext
     self.sig = sig
 
   def __str__(self):
-    s = "Action(%s:%r" % (self.variety, self.srctext)
+    s = "%s(%s:%r" % (self.__class__.__name__, self.sig, self.srctext)
     if self.args:
       s += ",args=%r" % (self.args,)
     if self.kwargs:
@@ -1675,7 +1682,7 @@ class _Action:
     return s
 
   def __call__(self, P):
-    ''' Calling an _Action with an item creates a functor and passes the item to it.
+    ''' Calling an BaseAction with an item creates a functor and passes the item to it.
     '''
     return self.functor()(P, *self.args, **self.kwargs)
 
@@ -1694,17 +1701,17 @@ class _Action:
       return "PIPELINE"
     return "UNKNOWN(%d)" % (sig,)
 
-class ActionFunction(_Action):
+class ActionFunction(BaseAction):
 
   def __init__(self, action0, sig, func):
-    _Action.__init__(self, action0, sig)
+    super().__init__(action0, sig)
     # stash a retriable version of the function
     self.func = retriable(func)
 
   def functor(self, L):
     return self.func
 
-class ActionPipeTo(_Action):
+class ActionPipeTo(BaseAction):
 
   def __init__(self, action0, pipespec):
     super().__init__(action0, StageType.PIPELINE)
@@ -1740,7 +1747,7 @@ class ActionPipeTo(_Action):
     X("ActionPipeTo: create _OnDemandPipeline(%s)", self.pipespec)
     return self._OnDemandPipeline(self.pipespec, L)
 
-class ActionShellFilter(_Action):
+class ActionShellFilter(BaseAction):
 
   def __init__(self, action0, shcmd, args, kwargs):
     super().__init__(action0, StageType.PIPELINE, args, kwargs)
@@ -1808,7 +1815,7 @@ class ShellProcFilter(MultiOpenMixin):
         error("exit %d from: %r", xit, self.shcmd)
     self.shproc.stdin.close()
 
-class ActionShellCommand(_Action):
+class ActionShellCommand(BaseAction):
 
   def __init__(self, action0, shcmd, args, kwargs):
     super().__init__(action0, StageType.PIPELINE, args, kwargs)
