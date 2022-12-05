@@ -680,7 +680,7 @@ class URLs(object):
   def hrefs(self, absolute=True, mode=None):
     ''' Return an iterable of the `hrefs=` URLs from the content.
     '''
-    return type(self)(
+    return URLs(
         chain(
             *[
                 pfx_iter(url,
@@ -694,7 +694,7 @@ class URLs(object):
   def srcs(self, absolute=True, mode=None):
     ''' Return an iterable of the `src=` URLs from the content.
     '''
-    return type(self)(
+    return URLs(
         chain(
             *[
                 pfx_iter(url,
