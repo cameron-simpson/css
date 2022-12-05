@@ -47,10 +47,12 @@ from urllib.parse import urlparse, urljoin, quote as urlquote
 
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 import lxml
+import requests
 
 from cs.excutils import logexc, safe_property
 from cs.lex import parseUC_sAttr
 from cs.logutils import debug, error, warning, exception
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_iter
 from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked
@@ -65,23 +67,10 @@ from cs.threads import locked_property, State as ThreadState
 ##  return putheader0(self, header, *values)
 ##HTTPConnection.putheader = my_putheader
 
-def isURL(U):
-  ''' Test if an object `U` is an URL instance.
-  '''
-  return isinstance(U, _URL)
-
-class URL(str):
-  ''' Utility class to do simple stuff to URLs, subclasses `str`.
+class URL(SingletonMixin):
+  ''' Utility class to do simple stuff to URLs.
   '''
 
-  def _init(self, *, referer=None, user_agent=None, opener=None):
-    ''' Initialise the _URL.
-        `s`: the string defining the URL.
-        `referer`: the referring URL.
-        `user_agent`: User-Agent string, inherited from `referer` if unspecified,
-                  "css" if no referer.
-        `opener`: urllib2 opener object, inherited from `referer` if unspecified,
-                  made at need if no referer.
   # Thread local stackable class state
   context = ThreadState(
       referer=None,
@@ -90,12 +79,22 @@ class URL(str):
       retry_delay=3,
   )
 
+  @classmethod
+  def _singleton_key(cls, url_s: str):
+    return url_s
+
+  @promote
+  @typechecked
+  def __init__(self, url_s: str):
+    ''' Initialise the `URL` from the URL string `url_s`..
     '''
-    self._parts = None
-    self._info = None
-    self.flush()
-    self._lock = RLock()
-    self.flush()
+    if hasattr(self, 'url_s'):
+      assert url_s == self.url_s
+    else:
+      self.url_s = url_s
+      self._lock = trace_func(RLock)()
+      self._parts = None
+      self._info = None
 
   @classmethod
   def promote(cls, obj):
@@ -104,24 +103,9 @@ class URL(str):
         `str` if promoted to `cls(obj)`.
         `(url,referer)` is promoted to `cls(url,referer=referer)`.
     '''
-    if isinstance(obj, URL):
-      return obj
-    if isinstance(obj, str):
-      return cls(obj)
-    try:
-      url, referer = obj
-    except (ValueError, TypeError):
-      raise TypeError(
-          "%s.promote: cannot convert to URL: %s" % (cls.__name__, r(obj))
-      )
-    else:
-      if isinstance(url, cls):
-        obj = url if referer is None else cls(url, referer=referer)
-      else:
-        obj = cls.promote(url) if referer is None else cls(
-            url, referer=referer
-        )
-    return boj
+    if not isinstance(obj, URL):
+      obj = cls(obj)
+    return obj
 
   def __getattr__(self, attr):
     ''' Ad hoc attributes.
@@ -137,41 +121,8 @@ class URL(str):
       node, = nodes
       return node
     # look up method on equivalent Unicode string
-    try:
-      sga = super().__getattr__
-    except AttributeError:
-      raise AttributeError(f'{self.__class__.__name__}.{attr}')
-    return sga(attr)
+    raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
-  def flush(self):
-    ''' Forget all cached content.
-    '''
-    # Note: _content is the raw bytes returns from the URL read().
-    #       _parsed is a BeautifulSoup parse of the _content decoded as utf-8.
-    #       _xml is an Elementtree parse of the _content decoded as utf-8.
-    self._content = None
-    self._info = None
-    self._parsed = None
-    self._xml = None
-    self._fetch_exception = None
-
-  def _request(self, method):
-
-    class MyRequest(Request):
-
-      def get_method(self):
-        return method
-
-    hdrs = {}
-    if self.referer:
-      hdrs['Referer'] = urlquote(self.referer, encoding='utf-8', safe=':/;#')
-    hdrs['User-Agent'
-         ] = self.user_agent if self.user_agent else os.environ.get(
-             'USER_AGENT', 'css'
-         )
-    rqurl = urlquote(self, encoding='utf-8', safe=':/;#')
-    rq = MyRequest(rqurl, None, hdrs)
-    return rq
 
   def _response(self, method):
     rq = self._request(method)
@@ -199,103 +150,68 @@ class URL(str):
           break
     self._info = opened_url.info()
     return opened_url
-
-  def _fetch(self):
-    ''' Fetch the URL content.
-        If there is an HTTPError, report the error, flush the
-        content, set self._fetch_exception.
-        This means that that accessing the self.content property
-        will always attempt a fetch, but return None on error.
+  @locked
+  @cachedmethod
+  def GET(self):
+    ''' Return the `requests.Response` object from a `GET` of this URL.
+        This may be a cached response.
     '''
-    with Pfx("_fetch(%s)", self):
-      try:
-        with self._response('GET') as opened_url:
-          opened_url = self._response('GET')
-          self.opened_url = opened_url
-          # URL post redirection
-          final_url = opened_url.geturl()
-          if final_url == self:
-            final_url = self
-          else:
-            final_url = URL(final_url, referer=self)
-          self.final_url = final_url
-          self._content = opened_url.read()
-          self._parsed = None
-      except HTTPError as e:
-        error("error with GET: %s", e)
-        self.flush()
-        self._fetch_exception = e
+    return requests.get(self.url_s)
 
-  # present GET action publicly
-  GET = _fetch
-
-  def exists(self):
-    ''' Test if this URL exists, return Boolean.
+  @locked
+  @cachedmethod
+  def HEAD(self):
+    ''' Return the `requests.Response` object from a `HEAD` of this URL.
+        This may be a cached response.
     '''
-    if self._info is not None:
-      return True
+    return requests.get(self.url_s)
+
+  def exists(self) -> bool:
+    ''' Test if this URL exists.
+    '''
     try:
       self.HEAD()
     except HTTPError as e:
       if e.code == 404:
         return False
       raise
-    else:
-      return True
+    return True
 
-  def HEAD(self):
-    opened_url = self._response('HEAD')
-    opened_url.read()
-    return opened_url
-
-  def get_content(self, onerror=None):
-    ''' Probe URL for content to avoid exceptions later.
-        Use, and save as .content, `onerror` in the case of HTTPError.
-    '''
-    try:
-      content = self.content
-    except (HTTPError, URLError, socket.error) as e:
-      error("%s.get_content: %s", self, e)
-      content = onerror
-    self._content = content
-    return content
-
-  @property
-  @locked
+  @safe_property
   def content(self):
     ''' The URL content as a string.
     '''
-    self._fetch()
-    return self._content
+    return self.GET().context
+
+  @safe_property
+  def text(self):
+    ''' The URL content as a string.
+    '''
+    return self.GET().text
+
+  @safe_property
+  @locked
+  def headers(self):
+    ''' A `requests.Response` headers mapping.
+    '''
+    r = self.HEAD()
+    return r.headers
 
   @safe_property
   def content_type(self):
     ''' The URL content MIME type.
     '''
-    if self._info is None:
-      self.HEAD()
-    try:
-      ctype = self._info.get_content_type()
-    except AttributeError as e:
-      warning(
-          "%r.content_type: self._info.get_content_type() raises %s", self, e
-      )
-      ctype = None
-    return ctype
+    return self.headers['content-type']
 
   @safe_property
   def content_length(self):
     ''' The value of the Content-Length: header or `None`.
     '''
     try:
-      if self._info is None:
-        self.HEAD()
-      value = self._info['Content-Length']
-      if value is not None:
-        value = int(value.strip())
-      return value
-    except AttributeError as e:
-      raise RuntimeError("%s" % (e,)) from e
+      length_s = self.headers['content-length']
+    except KeyError:
+      return None
+    return int(length_s)
 
   @safe_property
   def last_modified(self):
@@ -331,6 +247,7 @@ class URL(str):
 
   @safe_property
   @locked
+  @cachedmethod
   def parsed(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
