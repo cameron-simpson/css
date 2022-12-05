@@ -72,6 +72,8 @@ from collections import namedtuple
 from struct import Struct  # pylint: disable=no-name-in-module
 import sys
 from types import SimpleNamespace
+from typing import List, Union
+
 from cs.buffer import CornuCopyBuffer
 from cs.gimmicks import warning, debug
 from cs.lex import cropped, cropped_repr, typed_str
@@ -87,8 +89,13 @@ DISTINFO = {
         "Environment :: Console",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.buffer', 'cs.gimmicks', 'cs.lex', 'cs.pfx', 'cs.seq'],
+    'install_requires': [
+        'cs.buffer',
+        'cs.gimmicks',
+        'cs.lex',
+        'cs.pfx',
+        'cs.seq',
+    ],
     'python_requires':
     '>=3.6',
 }
@@ -711,7 +718,9 @@ class BinaryListValues(AbstractBinary):
 
 _binary_multi_struct_classes = {}
 
-def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
+def BinaryMultiStruct(
+    class_name: str, struct_format: str, field_names: Union[str, List[str]]
+):
   ''' A class factory for `AbstractBinary` `namedtuple` subclasses
       built around complex `struct` formats.
 
