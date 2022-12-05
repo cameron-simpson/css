@@ -1010,7 +1010,7 @@ class BaseCommand:
         then this may be provided by the `run_context()`
         context manager method.
     '''
-    # short circuit if we've already complainted about bad invocation
+    # short circuit if we've already complained about bad invocation
     if self._printed_usage:
       return 2
     options = self.options
