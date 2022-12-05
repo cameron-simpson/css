@@ -13,6 +13,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'html5lib',
+        'lxml',
         'beautifulsoup4',
         'cs.excutils',
         'cs.lex',
@@ -38,29 +40,13 @@ from netrc import netrc
 import socket
 from string import whitespace
 from threading import RLock
-try:
-  from urllib.request import Request, HTTPError, URLError, \
+from urllib.request import Request, HTTPError, URLError, \
             HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
             build_opener
-  from urllib.parse import urlparse, urljoin, quote as urlquote
-except ImportError:
-  from urllib2 import Request, HTTPError, URLError, \
-      HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
-      build_opener
-  from urlparse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, quote as urlquote
 
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
-try:
-  import lxml
-except ImportError:
-  try:
-    if sys.stderr.isatty():
-      print(
-          "%s: warning: cannot import lxml for use with bs4" % (__file__,),
-          file=sys.stderr
-      )
-  except AttributeError:
-    pass
+import lxml
 
 from cs.lex import parseUC_sAttr
 from cs.logutils import debug, error, warning, exception
