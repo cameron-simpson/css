@@ -80,7 +80,7 @@ from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 
-__version__ = '20220605-post'
+__version__ = '20221206'
 
 DISTINFO = {
     'keywords': ["python3"],
