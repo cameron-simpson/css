@@ -58,7 +58,7 @@ from threading import Lock, RLock
 
 from icontract import require
 
-from cs.deco import OBSOLETE
+from cs.deco import OBSOLETE, decorator
 from cs.fsm import FSM
 from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
@@ -102,6 +102,20 @@ class CancellationError(Exception):
       message = "cancelled: %s" % (message,)
     Exception.__init__(self, message)
     self.message = message
+
+@decorator
+def not_cancelled(method):
+  ''' A decorator for methods to raise `CancellationError` if `self.cancelled`.
+  '''
+
+  def if_not_cancelled(self, *a, **kw):
+    if self.cancelled:
+      raise CancellationError(
+          f'{self}.cancelled, not calling {funcname(method)}'
+      )
+    return method(self, *a, **kw)
+
+  return if_not_cancelled
 
 # pylint: disable=too-many-instance-attributes
 class Result(FSM):
