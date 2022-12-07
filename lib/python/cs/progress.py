@@ -639,11 +639,11 @@ class Progress(BaseProgress):
       self,
       name: Optional[str] = None,
       *,
-      position: Optional[int] = None,
-      start: Optional[int] = None,
+      position: Optional[float] = None,
+      start: Optional[float] = None,
       start_time: Optional[float] = None,
       throughput_window: Optional[int] = None,
-      total: Optional[int] = None,
+      total: Optional[float] = None,
       units_scale=None,
   ):
     ''' Initialise the Progesss object.
