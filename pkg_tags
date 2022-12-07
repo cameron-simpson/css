@@ -87,7 +87,7 @@ cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e7588
 cs.sh
 cs.tagset
 cs.taskqueue
-cs.threads
+cs.threads ok_revision=ded132e5e6a3f13965847056336404df73007dd8
 cs.tty
 cs.units
 cs.upd
