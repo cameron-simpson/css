@@ -28,7 +28,6 @@ DISTINFO = {
         'cs.deco',
         'cs.py.stack',
         'cs.py3',
-        'cs.x',
     ],
 }
 
