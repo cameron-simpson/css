@@ -25,7 +25,7 @@ from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, State as ThreadState
 
-__version__ = '20220805-post'
+__version__ = '20221207'
 
 DISTINFO = {
     'keywords': ["python3"],
