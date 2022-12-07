@@ -33,7 +33,7 @@ from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from typeguard import typechecked
 
-__version__ = '20221207'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
