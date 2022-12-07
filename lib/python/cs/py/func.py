@@ -14,6 +14,7 @@ from pprint import pformat
 from cs.deco import decorator
 from cs.py.stack import caller
 from cs.py3 import unicode, raise_from
+from cs.x import X
 
 __version__ = '20221118-post'
 
@@ -28,6 +29,7 @@ DISTINFO = {
         'cs.deco',
         'cs.py.stack',
         'cs.py3',
+        'cs.x',
     ],
 }
 
@@ -53,9 +55,9 @@ def funccite(func):
   except AttributeError:
     return "%s[no.__code__]" % (repr(func),)
   try:
-    from cs.fs import shortpath
+    from cs.fs import shortpath  # pylint: disable=import-outside-toplevel
   except ImportError:
-    shortpath = lambda p: p
+    shortpath = lambda p: p  # pylint: disable=unnecessary-lambda-assignment
   return "%s[%s:%d]" % (
       funcname(func),
       shortpath(code.co_filename),
@@ -131,7 +133,7 @@ def trace(
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
     '''
-    global _trace_indent
+    global _trace_indent  # pylint: disable=global-statement
     if with_pfx:
       # late import so that we can use this in modules we import
       # pylint: disable=import-outside-toplevel
