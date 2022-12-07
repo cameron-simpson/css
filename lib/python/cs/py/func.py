@@ -16,7 +16,7 @@ from cs.py.stack import caller
 from cs.py3 import unicode, raise_from
 from cs.x import X
 
-__version__ = '20221207'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
