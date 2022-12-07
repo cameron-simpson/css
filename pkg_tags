@@ -31,7 +31,7 @@ cs.context pypi.release="20221118" ok_revision="90129cb3c119a2bbe2bcb66c319c3ae2
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
 cs.debug pypi.release="20221118" ok_revision="32e79edcf8c727f9b6e5525f67de22cf1774a21e"
-cs.deco pypi.release="20221207" ok_revision="354959381511870d5cadecb9fdb9534fdc700f97" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"]}
+cs.deco pypi.release="20221106.1" ok_revision="354959381511870d5cadecb9fdb9534fdc700f97" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"]}
 cs.distinfo
 cs.ebooks ok_revision="1687329dfb2808f98e083ac7b604603074613b3e" pypi.release="20220805"
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
@@ -43,7 +43,7 @@ cs.fs ok_revision="135853b5b9f284493079459bf6327f96becaf81e" pypi.release="20220
 cs.fsm ok_revision=ef0fb0ddccdc43e16ca922726cbf2adfb7eebff4 pypi.release="20221118"
 cs.fstags pypi.release="20220918" ok_revision=d92f4f21891c74b8e865d360a693741934dca15c features={"20220918":["uses_fstags"]}
 cs.gimmicks ok_revision="69717a798c9d840f055eb77ace16dff72c95fd15" pypi.release="20220429" features={"20211208":["TimeoutError"],"20220429":["devnull"]}
-cs.gvutils ok_revision="7da46500e678c9258e668beb4007c5d1297bbd24" pypi.release="20221118" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"]}
+cs.gvutils ok_revision=a2f35c4da8b7e797f4f62a274bf5e1ccb3b6d65d pypi.release="20221207" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"],"20221207":["gvsvg"]}
 cs.html pypi.release=20160828
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
