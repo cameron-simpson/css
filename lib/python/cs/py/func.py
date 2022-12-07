@@ -15,8 +15,6 @@ from cs.deco import decorator
 from cs.py.stack import caller
 from cs.py3 import unicode, raise_from
 
-from cs.x import X
-
 __version__ = '20221118-post'
 
 DISTINFO = {
@@ -60,7 +58,9 @@ def funccite(func):
   except ImportError:
     shortpath = lambda p: p
   return "%s[%s:%d]" % (
-      funcname(func), shortpath(code.co_filename), code.co_firstlineno
+      funcname(func),
+      shortpath(code.co_filename),
+      code.co_firstlineno,
   )
 
 def func_a_kw_fmt(func, *a, **kw):
@@ -69,7 +69,10 @@ def func_a_kw_fmt(func, *a, **kw):
       Return `format,args`.
 
       The `func` argument can also be a string,
-      presumably a prepared description of `func` such as `funccite(func)`.
+      typically a prepared description of `func` such as `funccite(func)`.
+
+      *Note*: the returned `args` is a `list` for easy incorporation
+      into further arguments.  The `%` operator requires a `tuple`.
   '''
   av = [
       func if isinstance(func, str) else getattr(func, '__name__', str(func))
@@ -80,6 +83,12 @@ def func_a_kw_fmt(func, *a, **kw):
   for kv in kw.items():
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
+
+def func_a_kw(func, *a, **kw):
+  ''' Return a string representing a call to `func(*a,**kw)`.
+  '''
+  fmt, args = func_a_kw_fmt(func, *a, **kw)
+  return fmt % tuple(args)
 
 def callif(doit, func, *a, **kw):
   ''' Call `func(*a,**kw)` if `doit` is true
@@ -151,8 +160,10 @@ def trace(
     else:
       if retval:
         xlog(
-            "%sCALL %s RETURN %s", _trace_indent, log_cite,
-            (pformat if use_pformat else repr)(result)
+            "%sCALL %s RETURN %s",
+            _trace_indent,
+            log_cite,
+            (pformat if use_pformat else repr)(result),
         )
       _trace_indent = old_indent
       return result
@@ -204,7 +215,7 @@ def derived_property(
     original_revision_name='_revision',
     lock_name='_lock',
     property_name=None,
-    unset_object=None
+    unset_object=None,
 ):
   ''' A property which must be recomputed
       if the reference revision (attached to self)
@@ -263,8 +274,9 @@ def yields_type(func, basetype):
         )
       yield item
 
-  check_yields_type.__name__ = (
-      'check_yields_type[%s,basetype=%s]' % (citation, basetype)
+  check_yields_type.__name__ = 'check_yields_type[%s,basetype=%s]' % (
+      citation,
+      basetype,
   )
   return check_yields_type
 
@@ -282,8 +294,9 @@ def returns_type(func, basetype):
       )
     return retval
 
-  check_returns_type.__name__ = (
-      'check_returns_type[%s,basetype=%s]' % (citation, basetype)
+  check_returns_type.__name__ = 'check_returns_type[%s,basetype=%s]' % (
+      citation,
+      basetype,
   )
   return check_returns_type
 

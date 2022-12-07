@@ -95,13 +95,21 @@ class CancellationError(Exception):
   ''' Raised when accessing `result` or `exc_info` after cancellation.
   '''
 
-  def __init__(self, message=None):
+  def __init__(self, message=None, **kw):
+    ''' Initialise the `CancellationError`.
+
+        The optional `message` parameter (default `"cancelled"`)
+        is set as the `message` attribute.
+        Other keyword parameters set their matching attributes.
+    '''
     if message is None:
       message = "cancelled"
     elif not isinstance(message, StringTypes):
       message = "cancelled: %s" % (message,)
     Exception.__init__(self, message)
     self.message = message
+    for k, v in kw.items():
+      setattr(self, k, v)
 
 # pylint: disable=too-many-instance-attributes
 class Result(FSM):
