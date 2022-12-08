@@ -29,12 +29,13 @@ def main(argv=None):
           warning("stdin is a tty, ignoring")
           continue
         J = json.load(sys.stdin)
-        droptmp_struct(J)
+        if droptmp:
+          droptmp_struct(J)
         sort_struct(J)
         json.dump(J, sys.stdout, indent=2)
         print()
       else:
-        sort_cfile(path)
+        sort_cfile(path, droptmp=droptmp)
 
 def sort_struct(J):
   ''' Sort container names in place.
