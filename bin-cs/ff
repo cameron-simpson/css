@@ -11,7 +11,7 @@ ffcontainers=$HOME/p/FIREFOX/containers.json
 umask 077
 cd
 if [ -s "$ffcontainers" ]
-then  ff-sort-containers "$HOME/p/FIREFOX/containers.json"
+then  ff-sort-containers "$ffcontainers"
 else  echo "$0: warning: no $ffcontainers" >&2
 fi
 "$ffexe" -foreground &
