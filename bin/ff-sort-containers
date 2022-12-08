@@ -11,12 +11,17 @@ from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 
 def main(argv=None):
+  ''' Usage: [{containers.json|-}...]
+        Sort the named container files in place, or recite sorted
+        contents to stdout for "-".
+  '''
   if argv is None:
     argv = sys.argv
   cmd = argv.pop(0)
   setup_logging(cmd)
   if not argv:
     argv = ['-']
+  droptmp = True
   for path in argv:
     with Pfx(path):
       if path == '-':
@@ -32,22 +37,27 @@ def main(argv=None):
         sort_cfile(path)
 
 def sort_struct(J):
+  ''' Sort container names in place.
+  '''
   J["identities"] = sorted(
       J["identities"], key=lambda C: (C.get("name", ""), C["userContextId"])
   )
 
-def droptmp_struct(J):
+def droptmp_struct(J, prefix="tmp"):
+  ''' Drop temporary container names.
+  '''
   J["identities"] = [
       identity for identity in J["identities"]
-      if not identity.get("name", "").startswith("tmp")
+      if not identity.get("name", "").startswith(prefix)
   ]
 
-def sort_cfile(filepath):
+def sort_cfile(filepath, droptmp=False):
   ''' Sort the containers file `filepath` in place, leaving a backup.
   '''
   with open(filepath, 'r') as f:
     J = json.load(f)
-  droptmp_struct(J)
+  if droptmp:
+    droptmp_struct(J)
   sort_struct(J)
   print("rewrite", filepath)
   with rewrite_cmgr(filepath, backup_ext=".SAFE") as f:
