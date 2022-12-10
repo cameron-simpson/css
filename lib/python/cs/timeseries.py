@@ -2447,7 +2447,7 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
     return arrow.Arrow.fromtimestamp(when, tzinfo=self.tz)
 
   # pylint: disable=no-self-use
-  def partition_format_cononical(self, txt):
+  def partition_format_canonical(self, txt):
     ''' Modify the formatted text derived from `self.PARTITION_FORMAT`.
 
         The driving example is the 'weekly' policy, which uses
@@ -2463,7 +2463,7 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
     ''' Compute the partition name from an `Arrow` instance.
     '''
     name = a.format(self.PARTITION_FORMAT)
-    post_fn = self.partition_format_cononical
+    post_fn = self.partition_format_canonical
     if post_fn is not None:
       name = post_fn(name)
     return name
@@ -2491,7 +2491,7 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
         * get an `Arrow` instance in the policy timezone from the
           UNIX time `when`
         * format that instance using `self.PARTITION_FORMAT`,
-          modified by `self.partition_format_cononical`
+          modified by `self.partition_format_canonical`
         * parse that string into a new `Arrow` instance which is
           the raw start time
         * compute the raw end time as `calendar_start.shift(**self.ARROW_SHIFT_PARAMS)`
@@ -2534,10 +2534,10 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
 
       if post_format is not None:
 
-        def partition_format_cononical(self, txt):
+        def partition_format_canonical(self, txt):
           return post_format(txt)
 
-        partition_format_cononical.__doc__ = cls.partition_format_cononical.__doc__
+        partition_format_canonical.__doc__ = cls.partition_format_canonical.__doc__
 
     _Policy.__name__ = f'{names[0].title()}{cls.__name__}'
     _Policy.__doc__ = (

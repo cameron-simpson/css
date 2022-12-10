@@ -68,7 +68,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20221118-post'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -95,13 +95,21 @@ class CancellationError(Exception):
   ''' Raised when accessing `result` or `exc_info` after cancellation.
   '''
 
-  def __init__(self, message=None):
+  def __init__(self, message=None, **kw):
+    ''' Initialise the `CancellationError`.
+
+        The optional `message` parameter (default `"cancelled"`)
+        is set as the `message` attribute.
+        Other keyword parameters set their matching attributes.
+    '''
     if message is None:
       message = "cancelled"
     elif not isinstance(message, StringTypes):
       message = "cancelled: %s" % (message,)
     Exception.__init__(self, message)
     self.message = message
+    for k, v in kw.items():
+      setattr(self, k, v)
 
 # pylint: disable=too-many-instance-attributes
 class Result(FSM):
