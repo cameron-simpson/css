@@ -14,9 +14,11 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import fmtdoc
 from cs.logutils import warning, exception
 from cs.pfx import Pfx, pfx
+from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.seq import tee
 from cs.threads import bg as bg_thread
+from cs.units import BINARY_BYTES_SCALE
 
 from . import defaults
 from .block import Block, IndirectBlock
@@ -93,12 +95,22 @@ def indirect_blocks(blocks):
       block = IndirectBlock.from_subblocks(subblocks)
     yield block
 
-def blockify(chunks, scanner=None, min_block=None, max_block=None):
+def blockify(
+    chunks, *, chunks_name=None, scanner=None, min_block=None, max_block=None
+):
   ''' Wrapper for `blocked_chunks_of` which yields `Block`s
       from the data from `chunks`.
   '''
-  for chunk in blocked_chunks_of2(chunks, scanner=scanner, min_block=min_block,
-                                  max_block=max_block):
+  if chunks_name is None:
+    chunks_name = chunks.__class__.__name__
+  for chunk in progressbar(
+      blocked_chunks_of2(chunks, scanner=scanner, min_block=min_block,
+                         max_block=max_block),
+      label=f'blockify({chunks_name})',
+      itemlenfunc=len,
+      units_scale=BINARY_BYTES_SCALE,
+      update_frequency=32,
+  ):
     yield Block(data=chunk)
 
 def block_from_chunks(bfr, **kw):
