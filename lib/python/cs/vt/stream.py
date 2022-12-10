@@ -78,6 +78,7 @@ class StreamStore(BasicStoreSync):
       local_store=None,
       exports=None,
       capacity=None,
+      sync=False,
       **kw
   ):
     ''' Initialise the `StreamStore`.
@@ -103,6 +104,10 @@ class StreamStore(BasicStoreSync):
           For a file descriptor sending is done via an `os.dup()` of
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
+        * `sync`: optional flag, default `False`;
+          if true a `.add()` will block until acknowledged by the far end;
+          if false a `.add()` will queue the add packet and return
+          the hashcode immediately
 
         Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
@@ -111,6 +116,7 @@ class StreamStore(BasicStoreSync):
     super().__init__('StreamStore:%s' % (name,), capacity=capacity, **kw)
     self._lock = Lock()
     self.mode_addif = addif
+    self.mode_sync = sync
     self._local_store = local_store
     self.exports = exports
     # parameters controlling connection hysteresis
@@ -322,18 +328,21 @@ class StreamStore(BasicStoreSync):
       if self.contains(h):
         return h
     rq = AddRequest(data=data, hashenum=self.hashclass.HASHENUM)
-    flags, payload = self.do(rq)
-    h2, offset = hash_decode(payload)
-    if offset != len(payload):
-      raise StoreError(
-          "extra payload data after hashcode: %r" % (payload[offset:],)
-      )
-    assert flags == 0
-    if h != h2:
-      raise RuntimeError(
-          "precomputed hash %s:%s != hash from .add %s:%s" %
-          (type(h), h, type(h2), h2)
-      )
+    if self.mode_sync:
+      flags, payload = self.do(rq)
+      h2, offset = hash_decode(payload)
+      if offset != len(payload):
+        raise StoreError(
+            "extra payload data after hashcode: %r" % (payload[offset:],)
+        )
+      assert flags == 0
+      if h != h2:
+        raise RuntimeError(
+            "precomputed hash %s:%s != hash from .add %s:%s" %
+            (type(h), h, type(h2), h2)
+        )
+    else:
+      self.do_bg(rq)
     return h
 
   def get(self, h, default=None):
