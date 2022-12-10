@@ -20,11 +20,13 @@ from cs.later import Later
 from cs.logutils import debug, warning, error, exception
 from cs.pfx import Pfx, PrePfx, pfx_method
 from cs.predicate import post_condition
+from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
 from cs.result import Result
 from cs.seq import seq, Seq
 from cs.threads import locked, bg as bg_thread
+from cs.units import BINARY_BYTES_SCALE
 
 def tick_fd_2(bs):
   ''' A low level tick function to write a short binary tick
@@ -157,7 +159,9 @@ class PacketConnection(object):
       request_handler=None,
       name=None,
       packet_grace=None,
-      tick=None
+      tick=None,
+      recv_len_func=None,
+      send_len_func=None,
   ):
     ''' Initialise the PacketConnection.
 
@@ -166,6 +170,9 @@ class PacketConnection(object):
           If this is an `int` it is taken to be an OS file descriptor,
           otherwise it should be a `cs.buffer.CornuCopyBuffer`
           or a file like object with a `read1` or `read` method.
+        * `recv_len_func`: optional function to compute the data
+          length of a received packet; the default watches the offset
+          on the receive stream
         * `send`: outbound binary stream.
           If this is an `int` it is taken to be an OS file descriptor,
           otherwise it should be a file like object with `.write(bytes)`
@@ -173,6 +180,9 @@ class PacketConnection(object):
           For a file descriptor sending is done via an os.dup() of
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
+        * `send_len_func`: optional function to compute the data
+          length of a sent packet; the default watches the offset
+          on the send stream
         * `packet_grace`:
           default pause in the packet sending worker
           to allow another packet to be queued
@@ -217,6 +227,30 @@ class PacketConnection(object):
         tick = tick_fd_2
       else:
         tick = lambda bs: None
+    self._recv_last_offset = 0
+    if recv_len_func is None:
+
+      def recv_len_func(pk):
+        ''' The default length of a packet is the length of the _recv.offset change.
+        '''
+        new_offset = self._recv.offset
+        length = new_offset - self._recv_last_offset
+        self._recv_last_offset = new_offset
+        return length
+
+    self._recv_len_func = recv_len_func
+    self._send_last_offset = 0
+    if send_len_func is None:
+
+      def send_len_func(pk):
+        ''' The default length of a packet is the length of the _send.offset change.
+        '''
+        new_offset = self._send.offset
+        length = new_offset - self._send_last_offset
+        self._send_last_offset = new_offset
+        return length
+
+    self._send_len_func = send_len_func
     self.packet_grace = packet_grace
     self.request_handler = request_handler
     self.tick = tick
@@ -482,95 +516,92 @@ class PacketConnection(object):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
     XX = self.tick
-    with PrePfx("_RECEIVE [%s]", self):
-      with post_condition(("_recv is None", lambda: self._recv is None)):
-        while True:
-          try:
-            ##XX(b'<')
-            packet = Packet.parse(self._recv)
-          except EOFError:
-            break
-          if packet == self.EOF_Packet:
-            break
-          channel = packet.channel
-          tag = packet.tag
-          flags = packet.flags
-          payload = packet.payload
-          if packet.is_request:
-            # request from upstream client
-            with Pfx("request[%d:%d]", channel, tag):
-              if self.closed:
-                debug("rejecting request: closed")
-                # NB: no rejection packet sent since sender also closed
-              elif self.request_handler is None:
-                self._reject(channel, tag, "no request handler")
-              else:
-                requests = self._channel_request_tags
-                if channel not in requests:
-                  # unknown channel
-                  self._reject(channel, tag, "unknown channel %d")
-                elif tag in self._channel_request_tags[channel]:
-                  self._reject(
-                      channel, tag,
-                      "channel %d: tag already in use: %d" % (channel, tag)
-                  )
-                else:
-                  # payload for requests is the request enum and data
-                  rq_type = packet.rq_type
-                  if rq_type == 0:
-                    # magic EOF rq_type - must be malformed (!=EOF_Packet)
-                    error("malformed EOF packet received: %s", packet)
-                    break
-                  # normalise rq_type
-                  rq_type -= 1
-                  requests[channel].add(tag)
-                  # queue the work function and track it
-                  LF = self._later.defer(
-                      self._run_request, channel, tag, self.request_handler,
-                      rq_type, flags, payload
-                  )
-                  self._running.add(LF)
-                  LF.notify(self._running.remove)
+    for packet in progressbar(
+        Packet.scan(self._recv),
+        label=f'<= {self.name}',
+        units_scale=BINARY_BYTES_SCALE,
+        itemlenfunc=self._recv_len_func,
+        update_frequency=32,
+    ):
+      if packet == self.EOF_Packet:
+        break
+      channel = packet.channel
+      tag = packet.tag
+      flags = packet.flags
+      payload = packet.payload
+      if packet.is_request:
+        # request from upstream client
+        with Pfx("request[%d:%d]", channel, tag):
+          if self.closed:
+            debug("rejecting request: closed")
+            # NB: no rejection packet sent since sender also closed
+          elif self.request_handler is None:
+            self._reject(channel, tag, "no request handler")
           else:
-            with Pfx("response[%d:%d]", channel, tag):
-              # response: get state of matching pending request, remove state
-              try:
-                rq_state = self._pending_pop(channel, tag)
-              except ValueError as e:
-                # no such pending pair - response to unknown request
-                error(
-                    "%d.%d: response to unknown request: %s", channel, tag, e
-                )
+            requests = self._channel_request_tags
+            if channel not in requests:
+              # unknown channel
+              self._reject(channel, tag, "unknown channel %d")
+            elif tag in self._channel_request_tags[channel]:
+              self._reject(
+                  channel, tag,
+                  "channel %d: tag already in use: %d" % (channel, tag)
+              )
+            else:
+              # payload for requests is the request enum and data
+              rq_type = packet.rq_type
+              if rq_type == 0:
+                # magic EOF rq_type - must be malformed (!=EOF_Packet)
+                error("malformed EOF packet received: %s", packet)
+                break
+              # normalise rq_type
+              rq_type -= 1
+              requests[channel].add(tag)
+              # queue the work function and track it
+              LF = self._later.defer(
+                  self._run_request, channel, tag, self.request_handler,
+                  rq_type, flags, payload
+              )
+              self._running.add(LF)
+              LF.notify(self._running.remove)
+      else:
+        with Pfx("response[%d:%d]", channel, tag):
+          # response: get state of matching pending request, remove state
+          try:
+            rq_state = self._pending_pop(channel, tag)
+          except ValueError as e:
+            # no such pending pair - response to unknown request
+            error("%d.%d: response to unknown request: %s", channel, tag, e)
+          else:
+            decode_response, R = rq_state
+            # first flag is "ok"
+            ok = (flags & 0x01) != 0
+            flags >>= 1
+            payload = packet.payload
+            if ok:
+              # successful reply
+              # return (True, flags, decoded-response)
+              if decode_response is None:
+                # return payload bytes unchanged
+                R.result = (True, flags, payload)
               else:
-                decode_response, R = rq_state
-                # first flag is "ok"
-                ok = (flags & 0x01) != 0
-                flags >>= 1
-                payload = packet.payload
-                if ok:
-                  # successful reply
-                  # return (True, flags, decoded-response)
-                  if decode_response is None:
-                    # return payload bytes unchanged
-                    R.result = (True, flags, payload)
-                  else:
-                    # decode payload
-                    try:
-                      result = decode_response(flags, payload)
-                    except Exception:  # pylint: disable=broad-except
-                      R.exc_info = sys.exc_info()
-                    else:
-                      R.result = (True, flags, result)
+                # decode payload
+                try:
+                  result = decode_response(flags, payload)
+                except Exception:  # pylint: disable=broad-except
+                  R.exc_info = sys.exc_info()
                 else:
-                  # unsuccessful: return (False, other-flags, payload-bytes)
-                  R.result = (False, flags, payload)
-        # end of received packets: cancel any outstanding requests
-        self._pending_cancel()
-        # alert any listeners of receive EOF
-        for notify in self.notify_recv_eof:
-          notify(self)
-        self._recv = None
-        self.shutdown()
+                  R.result = (True, flags, result)
+            else:
+              # unsuccessful: return (False, other-flags, payload-bytes)
+              R.result = (False, flags, payload)
+    # end of received packets: cancel any outstanding requests
+    self._pending_cancel()
+    # alert any listeners of receive EOF
+    for notify in self.notify_recv_eof:
+      notify(self)
+    self._recv = None
+    self.shutdown()
 
   # pylint: disable=too-many-branches
   def _send_loop(self):
@@ -585,7 +616,13 @@ class PacketConnection(object):
         fp = self._send
         Q = self._sendQ
         grace = self.packet_grace
-        for P in Q:
+        for P in progressbar(
+            Q,
+            label=f'=> {self.name}',
+            units_scale=BINARY_BYTES_SCALE,
+            itemlenfunc=len,
+            update_frequency=32,
+        ):
           sig = (P.channel, P.tag, P.is_request)
           if sig in self.__sent:
             raise RuntimeError("second send of %s" % (P,))
