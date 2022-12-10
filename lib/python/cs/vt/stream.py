@@ -217,7 +217,7 @@ class StreamStore(BasicStoreSync):
         recv,
         send,
         self._handle_request,
-        name='PacketConnection:' + self.name,
+        name=self.name,
         packet_grace=0,
         tick=True
     )
@@ -507,7 +507,7 @@ class StreamStore(BasicStoreSync):
     return StreamStoreArchive(self, archive_name)
 
 class StreamStoreArchive(BaseArchive):
-  ''' An Archive associates with this StreamStore.
+  ''' An `Archive` associated with a `StreamStore`.
 
       Its methods proxy requests to the archive name at the remote end.
   '''
