@@ -29,7 +29,7 @@ from cs.units import (
     TIME_SCALE,
     UNSCALED_SCALE,
 )
-from cs.upd import Upd, print # pylint: disable=redefined-builtin
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from typeguard import typechecked
 
@@ -328,9 +328,9 @@ class BaseProgress(object):
       # how much room for an arrow? we would like:
       # "label: left arrow right"
       arrow_width = width - len(left) - len(right) - len(label) - 2
-      if label:              # allow for ': ' separator after label
+      if label:  # allow for ': ' separator after label
         arrow_width -= 2
-      if arrow_width < 1:    # no room for an arrow
+      if arrow_width < 1:  # no room for an arrow
         arrow_field = ':'
       else:
         arrow_field = ' ' + self.arrow(arrow_width) + ' '
@@ -341,13 +341,15 @@ class BaseProgress(object):
         prefix = label + ': '
       elif label_width == len(label) + 1:
         prefix = label + ':'
-      elif label_width <= 0: # label_width<=len(label): need to crop the label
-        prefix = ''          # no room
-      elif label_width == 1: # just indicate the crop
+      elif label_width <= 0:  # label_width<=len(label): need to crop the label
+        # no room
+        prefix = ''
+      elif label_width == 1:  # just indicate the crop
         prefix = '<'
-      elif label_width == 2: # just indicate the crop
+      elif label_width == 2:  # just indicate the crop
         prefix = '<:'
-      else:                  # crop as "<tail-of-label:"
+      else:
+        # crop as "<tail-of-label:"
         prefix = '<' + label[-label_width + 2:] + ':'
     else:
       prefix = ''
@@ -686,7 +688,7 @@ class Progress(BaseProgress):
     for notify in list(self.notify_update):
       try:
         notify(self, datum)
-      except Exception as e: # pylint: disable=broad-except
+      except Exception as e:  # pylint: disable=broad-except
         exception("%s: notify_update %s: %s", self, notify, e)
 
   @property
@@ -933,7 +935,7 @@ class OverProgress(BaseProgress):
     for notify in notifiers:
       try:
         notify(self, None)
-      except Exception as e: # pylint: disable=broad-except
+      except Exception as e:  # pylint: disable=broad-except
         exception("%s: notify_update %s: %s", self, notify, e)
 
   # pylint: disable=unused-argument
@@ -1124,7 +1126,7 @@ def selftest(argv):
   with open(__file__) as f:
     for _ in P.iterbar(f):
       time.sleep(0.005)
-  from cs.debug import selftest as runtests # pylint: disable=import-outside-toplevel
+  from cs.debug import selftest as runtests  # pylint: disable=import-outside-toplevel
   runtests('cs.progress_tests')
 
 if __name__ == '__main__':
