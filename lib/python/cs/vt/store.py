@@ -738,7 +738,7 @@ class ProxyStore(BasicStoreSync):
   def add(self, data):
     ''' Add a data chunk to the save Stores.
         This queues all the saves in the background and returns the
-        hashcode received.
+        first hashcode received.
     '''
     ch = Channel()
     self._defer(self._bg_add, data, ch)
