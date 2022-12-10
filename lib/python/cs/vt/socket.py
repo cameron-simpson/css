@@ -176,7 +176,7 @@ class TCPStoreServer(_SocketStoreServer):
   def startup_shutdown(self):
     with stackattrs(
         self,
-        socket_server=_TCPServer(self, bind_addr),
+        socket_server=_TCPServer(self, self.bind_addr),
     ):
       try:
         with super().startup_shutdown():
