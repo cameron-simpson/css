@@ -12,7 +12,10 @@ import errno
 import os
 import sys
 from time import sleep
-from threading import Lock
+from threading import Lock, current_thread
+
+from icontract import ensure
+
 from cs.binary import SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
@@ -45,7 +48,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         "Topic :: System :: Networking",
     ],
@@ -302,9 +304,6 @@ class PacketConnection(object):
         return
       # prevent further request submission either local or remote
       self.closed = True
-    ps = self._pending_states()
-    if ps:
-      warning("PENDING STATES AT SHUTDOWN: %r", ps)
     # wait for completion of requests we're performing
     for LF in list(self._running):
       LF.join()
@@ -317,6 +316,11 @@ class PacketConnection(object):
     self._later.close()
     if not immediately:
       self._later.wait()
+      if self._recv_thread is not current_thread():
+        self.join()
+    ps = self._pending_states()
+    if ps:
+      warning("PENDING STATES AT SHUTDOWN: %r", ps)
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
@@ -512,6 +516,8 @@ class PacketConnection(object):
       self._channel_request_tags[channel].remove(tag)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  @pfx_method
+  @ensure(lambda self: self._recv is None)
   def _receive_loop(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
