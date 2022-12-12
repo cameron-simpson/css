@@ -10,7 +10,6 @@ Assorted decorator functions.
 
 from collections import defaultdict
 from contextlib import contextmanager
-from functools import update_wrapper
 from inspect import isgeneratorfunction, signature, Parameter
 import sys
 import time
@@ -111,15 +110,11 @@ def decorator(deco):
     )
     if decorated is not func:
       # we got a wrapper function back, pretty up the returned wrapper
-      from cs.x import X
-      X(
-          "decorate(func=%r): decorated=%r : %r", func, decorated,
-          dir(decorated)
-      )
       # try functools.update_wrapper, otherwise do stuff by hand
       try:
+        from functools import update_wrapper  # pylint: disable=import-outside-toplevel
         update_wrapper(decorated, func)
-      except AttributeError:
+      except (AttributeError, ImportError):
         try:
           decorated.__name__ = getattr(func, '__name__', str(func))
         except AttributeError:
