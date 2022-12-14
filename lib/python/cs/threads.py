@@ -23,7 +23,7 @@ from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
 
-__version__ = '20221118-post'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'description':
@@ -165,7 +165,7 @@ class AdjustableSemaphore(object):
     if not blocking:
       return self.__sem.acquire(blocking)
     with self.__lock:
-      self.__sem.acquire(blocking)
+      self.__sem.acquire(blocking)  # pylint: disable=consider-using-with
     return True
 
   def adjust(self, newvalue):
@@ -196,7 +196,7 @@ class AdjustableSemaphore(object):
         while delta < 0:
           with LogTime("AdjustableSemaphore(%s): acquire excess capacity",
                        self.__name):
-            self.__sem.acquire(True)
+            self.__sem.acquire(True)  # pylint: disable=consider-using-with
           delta += 1
       self.__value = newvalue
 
@@ -293,7 +293,7 @@ class LockableMixin(object):
     self._lock.acquire()
 
   # pylint: disable=unused-argument
-  def __exit(self, exc_type, exc_value, traceback):
+  def __exit__(self, exc_type, exc_value, traceback):
     self._lock.release()
 
   @property
@@ -327,6 +327,7 @@ class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
            type(self.lock).__name__, id(self.lock),
            str(self.priority_lock))
 
+# pylint: disable=too-many-instance-attributes
 class PriorityLock(object):
   ''' A priority based mutex which is acquired by and released to waiters
       in priority order.

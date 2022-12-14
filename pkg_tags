@@ -20,7 +20,7 @@ cs.app.svcd pypi.release="20210316" ok_revision=ef88e3114c7f2dc23e8e794046d469b5
 cs.app.tagger
 cs.app.ydl pypi.release="20220318" ok_revision=c3034b39089e541de85a33496e6cb57d48b0436f
 cs.asynchron pypi.release=20160828
-cs.binary pypi.release="20220605" ok_revision="5b8dd0af2c1074c960e7dc2003fdcf3b21773e4b"
+cs.binary pypi.release="20221206" ok_revision="8f058d1f9004d17dd1c05ac1864e7b86981a8a4d"
 cs.buffe
 cs.buffer pypi.release="20210316" ok_revision="5400b0ac672f77b4b461bb330fc511bc282fb95a"
 cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
@@ -31,19 +31,19 @@ cs.context pypi.release="20221118" ok_revision="90129cb3c119a2bbe2bcb66c319c3ae2
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
 cs.debug pypi.release="20221118" ok_revision="32e79edcf8c727f9b6e5525f67de22cf1774a21e"
-cs.deco pypi.release="20221106.1" ok_revision="91a12c71170014038957aea85c8a676d770863b9" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"]}
+cs.deco pypi.release="20221214" ok_revision="31ad1bf3a52693bd811f4cac01b181fea5a8e307" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"]}
 cs.distinfo
 cs.ebooks ok_revision="1687329dfb2808f98e083ac7b604603074613b3e" pypi.release="20220805"
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
-cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
+cs.excutils pypi.release="20221207" ok_revision="2034e80c680d2adb25b9bf48ba8819ebfca37ff0"
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20221118" ok_revision=be925b0bc6d06d74b397a1f63e76fe7b7a42367f features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
 cs.fs ok_revision="135853b5b9f284493079459bf6327f96becaf81e" pypi.release="20220918" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
 cs.fsm ok_revision=ef0fb0ddccdc43e16ca922726cbf2adfb7eebff4 pypi.release="20221118"
 cs.fstags pypi.release="20220918" ok_revision=d92f4f21891c74b8e865d360a693741934dca15c features={"20220918":["uses_fstags"]}
 cs.gimmicks ok_revision="69717a798c9d840f055eb77ace16dff72c95fd15" pypi.release="20220429" features={"20211208":["TimeoutError"],"20220429":["devnull"]}
-cs.gvutils ok_revision="7da46500e678c9258e668beb4007c5d1297bbd24" pypi.release="20221118" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"]}
+cs.gvutils ok_revision=a2f35c4da8b7e797f4f62a274bf5e1ccb3b6d65d pypi.release="20221207" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"],"20221207":["gvsvg"]}
 cs.html pypi.release=20160828
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
@@ -68,27 +68,30 @@ cs.pfx pypi.release="20221118" ok_revision="718c6ae72f8afbfb59c71a6d62600a343dfe
 cs.pipeline pypi.release="20191007.1" ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
 cs.pop3 ok_revision="1713f6462bb1e42bbbde2b4c6b3473356b8dc33c" pypi.release="20220918"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
-cs.progress pypi.release="20220918" ok_revision=a0784ae7ab4d0598356cfbd4f4a95da7ca285e2f features={"20210803":["progress_runstate"]}
+cs.progress pypi.release="20221207" ok_revision="383ab73b224c05503b2cb3b668667c5c749d2eac" features={"20210803":["progress_runstate"]}
 cs.psutils pypi.release="20221118" ok_revision="5dcc3398f65dd06945dbbdaea664d7bfd629f737" features={"20220429":["signal_handler"],"20220531":["print_argv"]}
 cs.py.doc pypi.release="20220311" ok_revision="5f879c6cede60f3878cfe95e303a529b273f306f"
-cs.py.func pypi.release="20220619" ok_revision=b107e7e4b61a9487ff3c12f5ed3bc24dc1000372 features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"]}
+cs.py.func pypi.release="20221207" ok_revision=a52db371f829cc455d1a6e273893ed01595ac1a1 features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
 cs.py.modules pypi.release="20220606" ok_revision="47871444e5c52d21dde402b72b4c5b1e71d38ee9" features={"20220606":["import_extra"]}
 cs.py.stack pypi.release="20220918" ok_revision=e6f8eeb64d1b0179955564df7164e2502130adb5
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"
 cs.pyfunc
-cs.queues pypi.release="20220918" ok_revision=cfd997ab5b95e945f865b656e33db7bc865c1965 features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"],"20220918":["QueueIterator"]}
+cs.queues pypi.release="20221207" ok_revision="1c85b248f7aa3f50e041414f8d7500d3f977449e" features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"],"20220918":["QueueIterator"]}
 cs.range pypi.release=20190102 ok_revision="71250a2041fc87831ffcbbddeaa20316d64d3a5f"
 cs.release
 cs.resources pypi.release="20221118" ok_revision="32c98df02cc8f1b82c12d55f17943488bf83c04b" features={"20220429":["catch_signal"],"20220918":["openif"]}
-cs.result pypi.release="20220918" ok_revision=aee8d8133eeb4e8aacd79682f8e5fcd12f2bc268 features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"]}
+cs.result pypi.release="20221207" ok_revision="2649159d4e688e353040e112bd4cdc2aa2975323" features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"]}
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e75882d2 featu
 cs.sh
 cs.tagset
-cs.threads
+cs.taskqueue ok_revision="3124b308e9599978d77d3cd7e4c8f769400803e1" features={"20221207":["BaseTask"]} pypi.release="20221207"
+cs.threads ok_revision=ded132e5e6a3f13965847056336404df73007dd8 pypi.release="20221207"
 cs.tty
 cs.units
 cs.upd
 cs.x
 cs.xml
+icontract
+typeguard

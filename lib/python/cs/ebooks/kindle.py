@@ -713,6 +713,7 @@ class KindleCommand(BaseCommand):
     verbose = options.verbose
     asins = argv or sorted(kindle.asins())
     xit = 0
+    quiet or print("export", kindle.shortpath, "=>", calibre.shortpath)
     for asin in progressbar(asins, f"export to {calibre}"):
       if runstate.cancelled:
         break
