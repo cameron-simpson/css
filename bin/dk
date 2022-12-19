@@ -6,6 +6,7 @@
 set -ue
 
 : ${DK_APP_USER:='appuser'}
+: ${DK_COMPOSE_CMD:='docker compose'} ## or docker-compose on older machines
 : ${DK_COMPOSE_YML:='docker-compose.yml'}
 : ${DK_CP_PREFIX:='.'}
 : ${DK_ENVVARS:=''}
@@ -22,7 +23,7 @@ docker_exec_opts=-i
 cmd=$0
 usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
   -f docker-compose.yml
-    Specify docker-compose YAML file.
+    Specify $DK_COMPOSE_CMD YAML file.
     Default from \$DK_COMPOSE_YML: $DK_COMPOSE_YML
   -i Passed to \"docker exec\", for commands which use that.
   -n name
@@ -31,7 +32,7 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
   @name
     Shorthand for \"-n name\".
 
-  Most ops are passed to docker or docker-compose, but the following
+  Most ops are passed to docker or $DK_COMPOSE_CMD, but the following
   are specially handled:
     cp [name:]path [name:]path
       Passed to \"docker cp\".
@@ -49,7 +50,7 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       Load a postgresql dump from standard input into \$DK_PSQL_DBNAME
       ($DK_PSQL_DBNAME) in service \$DK_PSQL_SERVICE ($DK_PSQL_SERVICE).
     logs
-      Passed to docker-compose -f \$DK_PRIMARY_SERVICE.
+      Passed to $DK_COMPOSE_CMD -f \$DK_PRIMARY_SERVICE.
     rsh name command...
       Run command inside \"name\" in an rsh/ssh compatible way, to
       support use as a drop in for commands which themselves can use
@@ -65,7 +66,7 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
     sshd
       Invoke an inet-mode sshd inside the container.
     try [name [command...]]
-      Shorthand for \"docker-compose run --rm name command...\".
+      Shorthand for \"$DK_COMPOSE_CMD run --rm name command...\".
       The default name comes from \$DK_PRIMARY_SERVICE ($DK_PRIMARY_SERVICE).
       The default command is bash.
     update
@@ -76,7 +77,7 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       The nonroot username inside the container.
       Presently used by the \"ssh\" op.
     DK_COMPOSE_YML
-      The docker-compose filename, default docker-compose.yml.
+      The $DK_COMPOSE_CMD filename, default docker-compose.yml.
       If not present in the current directory it will be sought in an ancestor.
     DK_CP_PREFIX
       The in-container path prefix for relative \"dk cp\" paths.
@@ -310,7 +311,7 @@ case "$op" in
       fi
       [ $# - gt 0 ] || set -- bash
       set -x
-      docker-compose run --rm "$service" "$@"
+      $DK_COMPOSE_CMD run --rm "$service" "$@"
       ;;
   update)
       set -ex
@@ -329,4 +330,4 @@ esac
 
 
 set -x
-exec docker-compose $docker_compose_opts -f "$DK_COMPOSE_YML" "$op" ${1+"$@"}
+exec $DK_COMPOSE_CMD $docker_compose_opts -f "$DK_COMPOSE_YML" "$op" ${1+"$@"}
