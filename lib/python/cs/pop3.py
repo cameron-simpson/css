@@ -24,6 +24,7 @@
 '''
 
 from collections import namedtuple
+from contextlib import contextmanager
 from email.parser import BytesParser
 from mailbox import Maildir
 from netrc import netrc
@@ -34,11 +35,12 @@ from socket import create_connection
 import ssl
 import sys
 from threading import RLock
+
 from cs.cmdutils import BaseCommand
 from cs.fs import shortpath
 from cs.lex import cutprefix, cutsuffix
 from cs.logutils import debug, warning, error, exception
-from cs.pfx import Pfx, pfx
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
@@ -93,8 +95,8 @@ class POP3(MultiOpenMixin):
     self.sendf = None
     self._lock = RLock()
 
-  @pfx
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Connect to the server and log in.
     '''
     self._sock = self.conn_spec.connect()
@@ -106,45 +108,42 @@ class POP3(MultiOpenMixin):
     self._client_worker = bg_thread(
         self._client_response_worker, args=(self._result_queue,)
     )
-    return self
-
-  @pfx
-  def shutdown(self):
-    ''' Quit and disconnect.
-    '''
-    logmsg = debug
-    logmsg("send client QUIT")
     try:
-      quitR = self.client_quit_bg()
-      logmsg("flush QUIT")
-      self.flush()
-      logmsg("join QUIT")
-      quitR.join()
-    except Exception as e:  # pylint: disable=broad-except
-      exception("client quit: %s", e)
-      logmsg = warning
-    if self._result_queue:
-      logmsg("close result queue")
-      self._result_queue.close()
-      self._result_queue = None
-    if self._client_worker:
-      logmsg("join client worker")
-      self._client_worker.join()
-      self._client_worker = None
-    logmsg("close sendf")
-    self.sendf.close()
-    self.sendf = None
-    logmsg("check for uncollected server responses")
-    bs = self.recvf.read()
-    if bs:
-      warning("received %d bytes from the server at shutdown", len(bs))
-    logmsg("close recvf")
-    self.recvf.close()
-    self.recvf = None
-    logmsg("close socket")
-    self._sock.close()
-    self._sock = None
-    logmsg("shutdown complete")
+      yield
+    finally:
+      logmsg = debug
+      logmsg("send client QUIT")
+      try:
+        quitR = self.client_quit_bg()
+        logmsg("flush QUIT")
+        self.flush()
+        logmsg("join QUIT")
+        quitR.join()
+      except Exception as e:  # pylint: disable=broad-except
+        exception("client quit: %s", e)
+        logmsg = warning
+      if self._result_queue:
+        logmsg("close result queue")
+        self._result_queue.close()
+        self._result_queue = None
+      if self._client_worker:
+        logmsg("join client worker")
+        self._client_worker.join()
+        self._client_worker = None
+      logmsg("close sendf")
+      self.sendf.close()
+      self.sendf = None
+      logmsg("check for uncollected server responses")
+      bs = self.recvf.read()
+      if bs:
+        warning("received %d bytes from the server at shutdown", len(bs))
+      logmsg("close recvf")
+      self.recvf.close()
+      self.recvf = None
+      logmsg("close socket")
+      self._sock.close()
+      self._sock = None
+      logmsg("shutdown complete")
 
   def readline(self):
     ''' Read a CRLF terminated line from `self.recvf`.
@@ -479,7 +478,7 @@ class ConnectionSpec(namedtuple('ConnectionSpec',
   def connect(self):
     ''' Connect according to this `ConnectionSpec`, return the `socket`.
     '''
-    sock = create_connection((self.host, self.port))
+    sock = pfx_call(create_connection, (self.host, self.port))
     if self.ssl:
       context = ssl.create_default_context()
       sock = context.wrap_socket(sock, server_hostname=self.sni_host)
@@ -554,29 +553,36 @@ class POP3Command(BaseCommand):
       doit = False
     pop_target = argv.pop(0)
     maildir_path = argv.pop(0)
-    assert len(argv) == 0
-    if not isdirpath(maildir_path):
-      raise ValueError("maildir %s: not a directory" % (maildir_path,))
-    M = Maildir(maildir_path)
-    with POP3(pop_target) as pop3:
-      msg_uid_map = dict(pop3.client_uidl())
-      print(
-          f'{len(msg_uid_map)} message',
-          ('' if len(msg_uid_map) == 1 else 's'),
-          ('.' if len(msg_uid_map) == 0 else ':'),
-          sep=''
-      )
-      with ResultSet() as deleRs:
-        with ResultSet() as retrRs:
-          for msg_n in msg_uid_map.keys():
-            retrRs.add(pop3.dl_bg(msg_n, M, deleRs if doit else None))
-          pop3.flush()
-          retrRs.wait()
-        # now the deleRs are all queued
-        pop3.flush()
-        if deleRs:
-          print("wait for DELEs...")
-          deleRs.wait()
+    if argv:
+      raise GetoptError("extra arguments after maildir: %r", argv)
+    with Pfx("maildir %r", maildir_path):
+      if not isdirpath(maildir_path):
+        raise GetoptError("not a directory")
+      M = Maildir(maildir_path)
+    with Pfx(pop_target):
+      try:
+        with POP3(pop_target) as pop3:
+          msg_uid_map = dict(pop3.client_uidl())
+          print(
+              f'{len(msg_uid_map)} message',
+              ('' if len(msg_uid_map) == 1 else 's'),
+              ('.' if len(msg_uid_map) == 0 else ':'),
+              sep=''
+          )
+          with ResultSet() as deleRs:
+            with ResultSet() as retrRs:
+              for msg_n in msg_uid_map.keys():
+                retrRs.add(pop3.dl_bg(msg_n, M, deleRs if doit else None))
+              pop3.flush()
+              retrRs.wait()
+            # now the deleRs are all queued
+            pop3.flush()
+            if deleRs:
+              print("wait for DELEs...")
+              deleRs.wait()
+      except ConnectionRefusedError as e:
+        error("connection refused: %s", e)
+        return 1
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
