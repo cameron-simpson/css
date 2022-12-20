@@ -143,8 +143,8 @@ resolve_shortname(){
     return 2
   }
   case "$1" in
-    *_*) echo "$1" ;;
-    *)  echo "${base}_${1}_1" ;;
+    *[_-]*) echo "$1" ;;
+    *)  echo "${base}_${1}_1" | sed 's/_/-/g' ;;
   esac
 }
 
