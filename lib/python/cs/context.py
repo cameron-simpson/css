@@ -15,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20220227-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -70,7 +70,7 @@ def stackattrs(o, **attr_values):
   ''' Context manager to push new values for the attributes of `o`
       and to restore them afterward.
       Returns a `dict` containing a mapping of the previous attribute values.
-      Attributes not present are not present in the mapping.
+      Attributes not present are not present in returned mapping.
 
       Restoration includes deleting attributes which were not present
       initially.
@@ -79,6 +79,8 @@ def stackattrs(o, **attr_values):
       without having to pass it through the call stack.
 
       See `stackkeys` for a flavour of this for mappings.
+
+      See `cs.context.StackableState` for a convenient wrapper class.
 
       Example of fiddling a programme's "verbose" mode:
 
@@ -282,7 +284,7 @@ def twostep(cmgr):
 
       See also the `push_cmgr(obj,attr,cmgr)` function
       and its partner `pop_cmgr(obj,attr)`
-      which form a convenience wrapper for this low level generator.
+      which form a convenient wrapper for this low level generator.
 
       The purpose of `twostep()` is to split any context manager's operation
       across two steps when the set up and tear down phases must operate
@@ -315,7 +317,8 @@ def twostep(cmgr):
           next(cmgr_iter)   # set up
           next(cmgr_iter)   # tear down
 
-      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead):
+      Example use in a class (but really you should use
+      `push_cmgr`/`pop_cmgr` instead):
 
           class SomeClass:
               def __init__(self, foo)
@@ -385,7 +388,14 @@ def setup_cmgr(cmgr):
   '''
   cmgr_twostep = twostep(cmgr)
   next(cmgr_twostep)
-  return lambda: next(cmgr_twostep)
+
+  def next2():
+    try:
+      next(cmgr_twostep)
+    except StopIteration:
+      pass
+
+  return next2
 
 def push_cmgr(o, attr, cmgr):
   ''' A convenience wrapper for `twostep(cmgr)`
@@ -472,7 +482,7 @@ class ContextManagerMixin:
               def __enter_exit__(self):
                   ... do some setup here ...
                   # Returning self is common, but might be any relevant value.
-                  # Note that ifyou want `self`, you can just use a bare yield
+                  # Note that if you want `self`, you can just use a bare yield
                   # and ContextManagerMixin will provide `self` as the default.
                   enter_result = self
                   exit_result = False
@@ -512,18 +522,17 @@ class ContextManagerMixin:
     eegen, pushed = self._ContextManagerMixin__state
     popattrs(self, ('_ContextManagerMixin__state',), pushed)
     # return to the generator to run the __exit__ phase
-    try:
-      if exc_type:
-        exit_result = eegen.throw(exc_type, exc_value, traceback)
-      else:
-        exit_result = next(eegen)
-    except StopIteration:
-      # there was no optional extra yield
-      exit_result = None
+    if exc_type:
+      exit_result = eegen.throw(exc_type, exc_value, traceback)
     else:
-      if exit_result:
-        # exception handled, conceal it from the super method
-        exc_type, exc_value, traceback = None, None, None
+      try:
+        exit_result = next(eegen)
+      except StopIteration:
+        # there was no optional extra yield
+        exit_result = None
+    if exit_result:
+      # exception handled, conceal it from the super method
+      exc_type, exc_value, traceback = None, None, None
     try:
       super_exit = super().__exit__
     except AttributeError:

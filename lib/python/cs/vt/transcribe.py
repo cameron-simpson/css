@@ -84,7 +84,7 @@ class Transcriber(ABC):
         * `T`: the Transcribe context
         * `fp`: the output file
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @staticmethod
   @abstractmethod
@@ -99,7 +99,7 @@ class Transcriber(ABC):
         * `stopchar`: the end of object marker, usually '}'
         * `prefix`: the active prefix
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
 class UUIDTranscriber:
   ''' A transcriber for uuid.UUID instances.

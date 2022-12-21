@@ -1,0 +1,2 @@
+lib/python/cs/lex.py: cs.lex: drop cs.py3, we already use pathlib so there is not Python 2 any more
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: promote None to FStr(None); FormatableMixin.format_as: pfx_call context for the _format_as() call; fix docstring typo

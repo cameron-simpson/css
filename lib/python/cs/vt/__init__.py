@@ -79,6 +79,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.progress',
         'cs.py.func',
+        'cs.py.modules',
         'cs.py.stack',
         'cs.queues',
         'cs.range',
@@ -103,6 +104,7 @@ DISTINFO = {
     },
     'extras_requires': {
         'FUSE': ['llfuse'],
+        'plotting': ['cs.mplutils'],
     },
 }
 

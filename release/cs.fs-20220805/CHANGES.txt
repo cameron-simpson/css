@@ -1,0 +1,1 @@
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton: docstring update

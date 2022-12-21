@@ -1,0 +1,1 @@
+BaseCommand.run: remove the Upd bodge, too annoying, now fixed in cs.upd I believe.

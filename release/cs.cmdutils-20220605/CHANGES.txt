@@ -1,0 +1,29 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new popopts(argv,...) compact getopt wrapper
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popopts: allow y=-dry_run for options indicating False
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popopts: bugfix in place update of argv
+lib/python/cs/cmdutils.py: cs.cmdutils: drop BaseCommand.run_argv, provided no utility
+lib/python/cs/cmdutils.py: cs.cmdutils: new BaseCommandOptions default class for BaseCommand.options
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring update
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: get the RunState signal list form self.options.runstate_signals
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions: prefill .force=False
+lib/python/cs/cmdutils.py: cs.cmdutils: new BaseCommandOptions.popopts(argv,**opt_specs) convenience method
+lib/python/cs/cmdutils.py: cs.cmdutils: rename BaseCommand.popargv to poparg; adjust callers elsewhere
+lib/python/cs/cmdutils.py: cs.*: replace Pfx("%s",foo) with Pfx(foo)
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popopts: accept leading underscore for nonalpha options eg _1='once'
+lib/python/cs/cmdutils.py: cs.cmdutils: improve error message, small autoformat
+lib/python/cs/cmdutils.py: merge default ==> solar
+lib/python/cs/cmdutils.py: cs.cmdutils: better validating message
+lib/python/cs/cmdutils.py: merge timeseries ==> solar
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popopts: warn about unnecessary leading underscore on option parameter name
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: make into an instance method to match typical use in subclasses
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: bodge to set up the Upd status line, works around an outstanding cs.upd bug
+lib/python/cs/cmdutils.py: merge timeseries ==> default
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.apply_opts: support multiple individual options raising GetoptError, as I hate commands which abort at the first bad option
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: small reordering so that self.cmd exists before the options are initialised
+lib/python/cs/cmdutils.py: merge default => myke
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: clarify the cmd/argv logic and clean it up
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: bugfix value of self.cmd when there are no subcommands, just a main
+lib/python/cs/cmdutils.py: cs.cmdutils: remove debug
+lib/python/cs/cmdutils.py: cs.cmdutils: remove debug, improve docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: improve docstring again
+lib/python/cs/cmdutils.py: merge timeseries ==> default

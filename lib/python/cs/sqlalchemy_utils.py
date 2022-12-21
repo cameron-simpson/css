@@ -29,9 +29,7 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-from cs.x import X
-
-__version__ = '20220311-post'
+__version__ = '20220606-post'
 
 DISTINFO = {
     'description':
@@ -297,13 +295,10 @@ class ORM(MultiOpenMixin, ABC):
       self._engine = None
       self._sessionmaker_raw = None
     self.db_url = db_url
-    self.engine_keywords = {}
     self.engine_keywords = dict(
         case_sensitive=True,
-        echo=(
-            bool(os.environ.get('DEBUG'))
-            or 'echo' in os.environ.get('SQLTAGS_MODES', '').split(',')
-        ),  # 'debug'
+        echo='SQL' in map(str.upper,
+                          os.environ.get('DEBUG', '').split(',')),
     )
     if is_sqlite:
       # do not pool these connects and disable the Thread check

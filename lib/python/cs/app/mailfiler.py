@@ -37,7 +37,7 @@ from datetime import datetime, timezone
 from email import message_from_file
 from email.header import decode_header, make_header
 from email.utils import getaddresses
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import logging
 import os
 import os.path
@@ -58,7 +58,8 @@ import cs.env
 from cs.env import envsub
 from cs.excutils import LogExceptions
 from cs.filestate import FileState
-from cs.fileutils import abspath_from_file, longpath, Pathname
+from cs.fileutils import abspath_from_file, Pathname
+from cs.fs import longpath
 import cs.lex
 from cs.lex import (
     get_white, get_nonwhite, skipwhite, get_other_chars, get_qstr,
@@ -72,8 +73,7 @@ from cs.mailutils import (
     ismaildir, make_maildir
 )
 from cs.obj import singleton
-from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop
+from cs.pfx import Pfx
 from cs.py.modules import import_module_name
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
@@ -296,6 +296,11 @@ class MailFiler(NS):
     self._maildir_watchers = {}
     self._rules_pattern = None
 
+  def __str__(self):
+    return "%s(config_path=%s,..,rules_pattern=%r)" % (
+        type(self).__name__, shortpath(self.config_path), self.rules_pattern
+    )
+
   @property
   def cfg(self):
     ''' The [DEFAULT] configuration section.
@@ -390,9 +395,7 @@ class MailFiler(NS):
   def maildir_from_folderspec(self, folderspec):
     ''' Return the Maildir from `folderspec`.
     '''
-    return Pathname(
-        longpath(folderspec, None, ((self.maildir_path + '/', '+'),))
-    )
+    return Pathname(longpath(folderspec, ((self.maildir_path + '/', '+'),)))
 
   def maildir_watcher(self, folderspec):
     ''' Return the singleton WatchedMaildir indicated by the `folderspec`.
