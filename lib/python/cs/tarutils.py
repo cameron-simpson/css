@@ -56,19 +56,18 @@ def _watch_filenames(filenames: Iterable[str], chdirpath: str):
         if diff < 0:
           warning("%r: file shrank! %d => %d", ofilename, osize, S.st_size)
       yield ofilename, diff
+      ofilename = None
     try:
       S = lstat(filename)
     except FileNotFoundError:
-      size = 0
+      continue
     except OSError as e:
       # pretend the size is 0
       warning("%r: stat: %s", filename, e)
-      osize = 0
-    else:
-      if S_ISREG(S.st_mode):
-        size = S.st_size
-      else:
-        size = 0
+      continue
+    if not S_ISREG(S.st_mode):
+      continue
+    size = S.st_size
     yield filename, size
     ofilename = filename
     osize = size
@@ -83,13 +82,13 @@ def _watch_filenames(filenames: Iterable[str], chdirpath: str):
       warning("lstat(%r): %s", ofilename, e)
       diff = 0
     else:
-      if S_ISREG(S.st_mode):
+      if not S_ISREG(S.st_mode):
+        warning("%r: no longer a file? S=%s", ofilename, S)
+      else:
         diff = S.st_size - osize
         if diff < 0:
           warning("%r: file shrank! %d => %d", ofilename, osize, S.st_size)
-      else:
-        diff = 0
-    yield ofilename, diff
+        yield ofilename, diff
 
 def _read_tar_stdout_filenames(f, filenames_q):
   for line in f:
