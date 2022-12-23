@@ -149,7 +149,9 @@ class QueueIterator(MultiOpenMixin):
     self.q.join()
 
 def IterableQueue(capacity=0, name=None):
-  ''' Factory to create an iterable `Queue`.
+  ''' Factory to create an iterable queue.
+      Note that the returned queue is already open
+      and needs a close.
   '''
   return QueueIterator(Queue(capacity), name=name).open()
 
