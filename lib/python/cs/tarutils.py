@@ -7,7 +7,12 @@
 '''
 
 from os import mkdir, lstat
-from os.path import exists as existspath, isdir as isdirpath
+from os.path import (
+    exists as existspath,
+    join as joinpath,
+    isabs as isabspath,
+    isdir as isdirpath,
+)
 from stat import S_ISREG
 from subprocess import Popen, DEVNULL, PIPE
 from threading import Thread
