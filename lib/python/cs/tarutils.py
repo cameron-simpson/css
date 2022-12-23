@@ -25,7 +25,7 @@ TAR_EXE = 'tar'
 DEFAULT_BCOUNT = 2048
 
 # pylint: disable=too-many-branches
-def _watch_filenames(filenames: Iterable[str],):
+def _watch_filenames(filenames: Iterable[str], chdirpath: str):
   ''' Consumer of `filenames`, an iterable of filenames,
       yielding `(filename,diff)` being a 2-tuple of
       filename and incremental bytes consumed at this point.
@@ -41,6 +41,8 @@ def _watch_filenames(filenames: Iterable[str],):
   ofilename = None
   osize = None
   for filename in filenames:
+    if not isabspath(filename) and chdirpath != '.':
+      filename = joinpath(chdirpath, filename)
     if ofilename is not None:
       # check final size of previous file
       try:
@@ -155,7 +157,7 @@ def traced_untar(
     filename = None
     diff = 0
     for filename, diff in progressbar(
-        _watch_filenames(filenames_q),
+        _watch_filenames(filenames_q, chdirpath),
         label=label,
         itemlenfunc=lambda f_d: diff,
         upd=upd,
@@ -223,7 +225,9 @@ def traced_cpdir(
   if not isdirpath(srcdirpath):
     raise ValueError(f'not a directory: {srcdirpath!r}')
   pfx_call(mkdir, dstdirpath)
-  tarP = tar(srcdirpath, output=PIPE, tar_exe=tar_exe, bcount=bcount)
+  tarP = tar(
+      '.', chdirpath=srcdirpath, output=PIPE, tar_exe=tar_exe, bcount=bcount
+  )
   untar_returncode = traced_untar(
       tarP.stdout,
       chdirpath=dstdirpath,
