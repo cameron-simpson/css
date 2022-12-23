@@ -19,6 +19,7 @@ from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.progress import progressbar
 from cs.queues import IterableQueue
+from cs.units import BINARY_BYTES_SCALE
 from cs.upd import uses_upd  # pylint: disable=redefined-builtin
 
 TAR_EXE = 'tar'
@@ -161,6 +162,7 @@ def traced_untar(
         itemlenfunc=lambda f_d: diff,
         upd=upd,
         report_print=True,
+        units_scale=BINARY_BYTES_SCALE,
     ):
       filename_proxy.text = filename
   return P.wait()
