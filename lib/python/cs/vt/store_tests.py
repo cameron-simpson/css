@@ -217,9 +217,10 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
   def tearDown(self):
     if self.S is not None:
       self.S.close()
-    Ts = threading.enumerate()
+    Ts = [T for T in threading.enumerate() if not T.daemon]
     if len(Ts) > 1:
-      thread_dump(Ts=Ts, fp=open('/dev/tty', 'w'))
+      with open('/dev/tty', 'w') as tty:
+        thread_dump(Ts=Ts, fp=tty)
 
   @multitest
   def test00empty(self):

@@ -1,0 +1,1 @@
+Add DEVNULL symbol, needed before Python 3.3.

@@ -1,0 +1,1 @@
+lib/python/cs/numeric.py: cs.ebooks.calibre,cs.numeric: move intif into cs.numeric

@@ -37,8 +37,8 @@ from threading import Lock, RLock
 import time
 from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
-from cs.env import envsub
 from cs.filestate import FileState
+from cs.fs import shortpath
 from cs.gimmicks import TimeoutError
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
@@ -50,7 +50,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20211208-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -62,8 +62,8 @@ DISTINFO = {
     'install_requires': [
         'cs.buffer',
         'cs.deco',
-        'cs.env',
         'cs.filestate',
+        'cs.fs>=shortpath',
         'cs.gimmicks>=TimeoutError',
         'cs.lex>=20200914',
         'cs.logutils',
@@ -891,39 +891,6 @@ def findup(path, test, first=False):
   if first:
     yield None
 
-DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
-
-def shortpath(path, environ=None, prefixes=None):
-  ''' Return `path` with the first matching leading prefix replaced.
-
-      Parameters:
-      * `environ`: environment mapping if not os.environ
-      * `prefixes`: iterable of `(prefix,subst)` to consider for replacement;
-        each `prefix` is subject to environment variable
-        substitution before consideration
-        The default considers "$HOME/" for replacement by "~/".
-  '''
-  if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
-  for prefix, subst in prefixes:
-    prefix = envsub(prefix, environ)
-    if path.startswith(prefix):
-      return subst + path[len(prefix):]
-  return path
-
-def longpath(path, environ=None, prefixes=None):
-  ''' Return `path` with prefixes and environment variables substituted.
-      The converse of `shortpath()`.
-  '''
-  if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
-  for prefix, subst in prefixes:
-    if path.startswith(subst):
-      path = prefix + path[len(subst):]
-      break
-  path = envsub(path, environ)
-  return path
-
 def common_path_prefix(*paths):
   ''' Return the common path prefix of the `paths`.
 
@@ -1729,13 +1696,22 @@ def atomic_filename(
       with open(filename, 'ab' if exists_ok else 'xb'):
         pass
     yield T
-    if placeholder:
+    mtime = pfx_call(os.stat, T.name).st_mtime
+    try:
+      pfx_call(shutil.copystat, filename, T.name)
+    except FileNotFoundError:
+      pass
+    except OSError as e:
+      warning(
+          "defaut modes not copied from from placeholder %r: %s", filename, e
+      )
+    else:
+      # we make the attribute like the original, now bump the mtime
       try:
-        pfx_call(shutil.copymode, filename, T.name)
-      except OSError as e:
-        warning(
-            "defaut modes not copied from from placeholder %r: %s", filename, e
-        )
+        atime = pfx_call(os.stat, filename).st_atime
+      except FileNotFoundError:
+        atime = mtime
+      pfx_call(os.utime, T.name, (atime, mtime))
     pfx_call(rename, T.name, filename)
 
 class RWFileBlockCache(object):

@@ -73,6 +73,11 @@ from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 DEFAULT_JOB_MAX = 16
 
+def main(argv=None):
+  ''' The `cloudbackup` command line mode.
+  '''
+  return CloudBackupCommand(argv).run()
+
 class CloudBackupCommand(BaseCommand):
   ''' A main programme instance.
   '''
@@ -248,7 +253,7 @@ class CloudBackupCommand(BaseCommand):
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
     with UpdProxy() as proxy:
-      proxy.prefix = f"{options.cmd} {backup_root_dirpath} => {backup_name}"
+      proxy.prefix = f"{self.cmd} {backup_root_dirpath} => {backup_name}"
       options.cloud_backup.init()
       backup = options.cloud_backup.run_backup(
           options.cloud_area,
@@ -2000,4 +2005,4 @@ class FileBackupState(UUIDedDict):
     return AttrableMapping(backups[0])
 
 if __name__ == '__main__':
-  sys.exit(CloudBackupCommand.run_argv(sys.argv))
+  sys.exit(main(sys.argv))

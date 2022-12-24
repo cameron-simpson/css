@@ -9,6 +9,8 @@ from collections import namedtuple
 import sys
 from traceback import extract_stack
 
+__version__ = '20220918-post'
+
 DISTINFO = {
     'description':
     "Convenience functions for the python execution stack.",
@@ -37,6 +39,7 @@ def frames():
 
 def caller(frame_index=-3):
   ''' Return the `Frame` of the caller's caller.
+      Returns `None` if `frame_index` is out of range.
 
       Useful `frame_index` values:
       * `-1`: caller, this function
@@ -45,7 +48,11 @@ def caller(frame_index=-3):
 
       The default `from_index` value is `-3`.
   '''
-  return Frame(*frames()[frame_index])
+  frs = frames()
+  try:
+    return frs[frame_index]
+  except IndexError:
+    return None
 
 def stack_dump(fp=None, indent=0, Fs=None, skip=None):
   ''' Recite current or supplied stack to `fp`, default `sys.stderr`.

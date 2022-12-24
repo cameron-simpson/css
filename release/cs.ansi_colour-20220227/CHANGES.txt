@@ -1,0 +1,1 @@
+lib/python/cs/ansi_colour.py: cs.ansi_colour: new TerminalColors class parsing /etc/terminal-colors.d and honouring $*_COLORS; new colour_escape(code) to make the escape sequence for a colour code; new COLOUR_CODES mapping of known colour names

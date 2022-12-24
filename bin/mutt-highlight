@@ -1,15 +1,39 @@
-#!/bin/sh -ue
+#!/bin/sh
 #
 # Use ANSI sequences to highlight unindented text as *bold* or _underline_.
 # Tries not to underline identifiers containing underlines.
 #   - Cameron Simpson <cs@cskk.id.au> 01sep2015
 #
 
+set -ue
+
 LC_ALL=C
 export LC_ALL
 
+underline='[4;m'
+bright='[1;m'
+cyan='[36;m'
+default='[0;m'
+
 exec /usr/bin/sed '
+  # Discourse flavoured quoted text
+  /^\[quote=".*"\]$/,/^\[\/quote\]$/{
+    # highlight author name
+    /^\[quote=".*"\]$/{
+      s/"\([^,]*\),/"'"$bright"'\1'"$default"',/
+      b disco_end
+    }
+    /^\[\/quote\]/b disco_end
+    s/^/> /
+    ##s/.*/'"$cyan"'&'"$default"'/
+    :disco_end
+  }
+
+  # highlight unindented lines
   /^[^ 	]/{
-    s/\*\([^* ][^*]*[^* ]\)\*/*[1;m\1[0;m*/g
-    s/\([ 	]\)_\([^_ ][^_]*[^_ ]\)_\([ 	]\)/\1_[4;m\2[0;m_\3/g
-  }' ${1+"$@"}
+    # *bright*
+    s/\*\([^* ][^*]*[^* ]\)\*/*'"$bright"'\1'"$default"'*/g
+    # _underline_, except in variable names
+    s/\([ 	]\)_\([^_ ][^_]*[^_ ]\)_\([ 	]\)/\1_'"$underline"'\2'"$default"'_\3/g
+  }
+' ${1+"$@"}

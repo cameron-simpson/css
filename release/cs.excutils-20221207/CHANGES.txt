@@ -1,0 +1,2 @@
+lib/python/cs/excutils.py: cs.excutils: @unattributable: bugfix decorator construction to accomodate callable() @decorator precheck
+lib/python/cs/excutils.py: cs.excutils: clean lint
