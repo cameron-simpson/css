@@ -32,8 +32,10 @@ import sys
 from textwrap import dedent
 from threading import Lock
 
+from dateutil.tz import tzlocal
 from typeguard import typechecked
 
+from cs.dateutils import unixtime2datetime, UTC
 from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -49,11 +51,13 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
         'cs.seq>=20200914',
+        'dateutil',
         'typeguard',
     ],
 }
@@ -1856,6 +1860,32 @@ class FStr(FormatableMixin, str):
     ''' Convert to a Windows filesystem `pathlib.Path`.
     '''
     return PureWindowsPath(self)
+
+class FNumericMixin(FormatableMixin):
+  ''' A `FormatableMixin` subclass.
+  '''
+
+  @format_attribute
+  def utctime(self):
+    ''' Treat this as a UNIX timestamp and return a UTC `datetime`.
+    '''
+    return unixtime2datetime(self, tz=UTC)
+
+  @format_attribute
+  def localtime(self):
+    ''' Treat this as a UNIX timestamp and return a localtime `datetime`.
+    '''
+    return unixtime2datetime(self, tz=tzlocal())
+
+@has_format_attributes
+class FFloat(FNumericMixin, float):
+  ''' Formattable `float`.
+  '''
+
+@has_format_attributes
+class FInt(FNumericMixin, int):
+  ''' Formattable `int`.
+  '''
 
 if __name__ == '__main__':
   import cs.lex_tests
