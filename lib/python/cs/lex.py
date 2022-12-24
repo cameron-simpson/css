@@ -701,7 +701,7 @@ def get_sloshed_text(
         )
       special_starts.add(special[0])
       special_seqs.append(special)
-    special_starts = u''.join(special_starts)
+    special_starts = ''.join(special_starts)
     special_seqs = sorted(special_seqs, key=lambda s: -len(s))
   chunks = []
   slen = len(s)
@@ -1012,7 +1012,7 @@ def as_lines(chunks, partials=None):
   '''
   if partials is None:
     partials = []
-  if any(['\n' in p for p in partials]):
+  if any('\n' in p for p in partials):
     raise ValueError("newline in partials: %r" % (partials,))
   for chunk in chunks:
     pos = 0
@@ -1227,7 +1227,7 @@ def snakecase(camelcased):
   '''
   strs = []
   was_lower = False
-  for i, c in enumerate(camelcased):
+  for _, c in enumerate(camelcased):
     if c.isupper():
       c = c.lower()
       if was_lower:
@@ -1487,14 +1487,14 @@ class FormatableFormatter(Formatter):
 
   # pylint: disable=arguments-differ
   @pfx_method
-  def get_field(self, field_name, a, kw):
+  def get_field(self, field_name, args, kwargs):
     ''' Get the object referenced by the field text `field_name`.
         Raises `KeyError` for an unknown `field_name`.
     '''
-    assert not a
-    with Pfx("field_name=%r: kw=%r", field_name, kw):
+    assert not args
+    with Pfx("field_name=%r: kwargs=%r", field_name, kwargs):
       arg_name, offset = self.get_arg_name(field_name)
-      arg_value, _ = self.get_value(arg_name, a, kw)
+      arg_value, _ = self.get_value(arg_name, args, kwargs)
       # resolve the rest of the field
       subfield = self.get_subfield(arg_value, field_name[offset:])
       return subfield, field_name
@@ -1528,15 +1528,15 @@ class FormatableFormatter(Formatter):
       value = fmt.format(value=value)
     return value
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   @pfx_method
-  def get_value(self, arg_name, a, kw):
+  def get_value(self, arg_name, args, kwargs):
     ''' Get the object with index `arg_name`.
 
-        This default implementation returns `(kw[arg_name],arg_name)`.
+        This default implementation returns `(kwargs[arg_name],arg_name)`.
     '''
-    assert not a
-    return kw[arg_name], arg_name
+    assert not args
+    return kwargs[arg_name], arg_name
 
   @classmethod
   def get_format_subspecs(cls, format_spec):
