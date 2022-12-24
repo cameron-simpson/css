@@ -1357,7 +1357,7 @@ def format_attribute(method):
   return method
 
 @decorator
-def has_format_attributes(cls, inherit=False):
+def has_format_attributes(cls, inherit=()):
   ''' Class decorator to walk this class for direct methods
       marked as for use in format strings
       and to include them in `cls.format_attributes()`.
@@ -1376,8 +1376,8 @@ def has_format_attributes(cls, inherit=False):
   if inherit:
     if inherit is True:
       classes = cls.__mro__
-    elif isclass(inherit):
-      classes = inherit,
+    elif isinstance(inherit, type):
+      classes = (inherit,)
     else:
       classes = inherit
     for superclass in classes:
