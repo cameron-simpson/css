@@ -1015,27 +1015,9 @@ class BaseCommand:
       return 2
     options = self.options
     try:
-      try:
-        runstate = options.runstate
-      except AttributeError:
-        runstate = options.runstate = RunState(
-            self.cmd,
-            signals=options.runstate_signals,
-            handle_signal=getattr(self, 'handle_signal', None),
-        )
-      upd = getattr(options, 'upd', self.loginfo.upd)
-      upd_context = nullcontext() if upd is None else upd
-      with upd_context:
-        with stackattrs(self, cmd=self._subcmd if self._subcmd else self.cmd):
-          with stackattrs(
-              options,
-              runstate=runstate,
-              upd=upd,
-          ):
-            with stackattrs(options, **kw_options):
-              with options.runstate:
-                with self.run_context():
-                  return self._run(self._subcmd, self, self._argv)
+      with stackattrs(options, **kw_options):
+        with self.run_context():
+          return self._run(self._subcmd, self, self._argv)
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
@@ -1093,7 +1075,26 @@ class BaseCommand:
     '''
     # redundant try/finally to remind subclassers of correct structure
     try:
-      yield
+      options = self.options
+      try:
+        runstate = options.runstate
+      except AttributeError:
+        runstate = RunState(
+            self.cmd,
+            signals=options.runstate_signals,
+            handle_signal=getattr(self, 'handle_signal', None),
+        )
+      upd = getattr(options, 'upd', self.loginfo.upd)
+      upd_context = nullcontext() if upd is None else upd
+      with upd_context:
+        with stackattrs(self, cmd=self._subcmd or self.cmd):
+          with stackattrs(
+              options,
+              runstate=runstate,
+              upd=upd,
+          ):
+            with options.runstate:
+              yield
     finally:
       pass
 
