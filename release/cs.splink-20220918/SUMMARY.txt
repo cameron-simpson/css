@@ -1,0 +1,8 @@
+SPLinkData.plot: rename `key_specs` keyword parameter to mandatory posiitional `data_specs` parameter.
+SPLinkData.resolve: accept multiple specification strings.
+New SPLinkData.plot_data_from_spec(start,stop,data_spec,...) method to return a list of PlotSeries instances.
+SPLinkData.plot: drop mode param (unused).
+SPLinkData.plot: process plot data and annotate with style, call Axes.plot or Axes.stackplot instead of DataFrame.plot.
+SPLinkData.plot: axes() now has a better default size, drop our own default size.
+SPLinkData.plot: new optional ax_title parameter to specify a title for the axes.
+SPLinkCommand.cmd_plot: make pseudo-data "POWER" the default and special case a stack plot for "POWER".

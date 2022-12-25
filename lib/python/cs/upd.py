@@ -90,7 +90,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20220619-post'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -736,7 +736,7 @@ class Upd(SingletonMixin):
     return True
 
   # pylint: disable=too-many-branches,too-many-statements
-  def insert(self, index, txt='', proxy=None):
+  def insert(self, index, txt='', proxy=None) -> "UpdProxy":
     ''' Insert a new status line at `index`.
         Return the `UpdProxy` for the new status line.
     '''
@@ -918,7 +918,7 @@ class Upd(SingletonMixin):
       label: str,
       report_print=False,
       runstate=None,
-      tick_delay=0.15,
+      tick_delay=0.3,
       tick_chars='|/-\\',
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
@@ -946,11 +946,14 @@ class Upd(SingletonMixin):
         Thread(target=_ticker, args=(proxy, _runstate), daemon=True).start()
       proxy.text = '...'
       start_time = time.time()
-      yield proxy
-      end_time = time.time()
-      if _runstate and _runstate is not runstate:
-        # shut down the ticker
-        _runstate.cancel()
+      with _runstate:
+        try:
+          yield proxy
+        finally:
+          end_time = time.time()
+          if _runstate and _runstate is not runstate:
+            # shut down the ticker
+            _runstate.cancel()
     elapsed_time = end_time - start_time
     if report_print:
       if isinstance(report_print, bool):

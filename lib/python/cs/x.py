@@ -39,12 +39,13 @@ which often divert `sys.stderr`.
 '''
 
 from __future__ import print_function
+from io import UnsupportedOperation
 import os
 import os.path
 import sys
 from cs.ansi_colour import colourise
 
-__version__ = '20211208-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -108,11 +109,28 @@ def X(msg, *args, **kw):
     if X_via_tty:
       # NB: ignores any kwargs
       try:
-        with open(X_via_tty, 'a') as f:
+        try:
+          f = open(X_via_tty, 'a')
+        except (OSError, UnsupportedOperation) as e:
+          # sometimes you cannot append to a tty (Linux?)
+          # so open for readwrite and seek to the end
+          # (may also fail on a tty, so ignore the seek error)
+          f = open(X_via_tty, 'r+')
+          try:
+            f.seek(0, os.SEEK_END)
+          except (OSError, UnsupportedOperation):
+            pass
+        with f:
           f.write(msg)
           f.write('\n')
       except (IOError, OSError) as e:
-        X("X: cannot append to %r: %s", X_via_tty, e, file=sys.stderr)
+        X(
+            "X: cannot append to %r: %s:%s",
+            X_via_tty,
+            type(e),
+            e,
+            file=sys.stderr
+        )
         X(msg, file=sys.stderr)
       return
     if X_discard:

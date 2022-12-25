@@ -102,7 +102,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import fmtdoc
+from cs.deco import default_params, fmtdoc
 from cs.fileutils import crop_name, findup, shortpath
 from cs.fs import HasFSPath, FSPathBasedSingleton
 from cs.lex import (
@@ -128,7 +128,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20220606-post'
+__version__ = '20220918-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1502,7 +1502,7 @@ class HasFSTagsMixin:
     '''
     _fstags = self.__dict__.get('_fstags')
     if _fstags is None:
-      _fstags = self.__dict__['_fstags'] = FSTags()
+      _fstags = self.__dict__['_fstags'] = DEFAULT_FSTAGS
     return _fstags
 
   @fstags.setter
@@ -1988,6 +1988,12 @@ class FSTagsConfig(FSPathBasedSingleton):
     ''' Set the tags filename.
     '''
     self.config['general']['tagsfile'] = tagsfile_basename
+
+# A default general purpose FSTags instance.
+DEFAULT_FSTAGS = FSTags()
+
+# A decorator for functions expecting an fstags parameter.
+uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
 
 def get_xattr_value(fspath, xattr_name):
   ''' Read the extended attribute `xattr_name` of `fspath`.

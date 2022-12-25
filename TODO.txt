@@ -1,3 +1,12 @@
+frename needs to be a mode of fstags to move the tags
+"Because" class containing a bool and an explaintion, start using in the SvcD test function and elsewhere
+@promote: make @strable wrap this, using params=[0],promote[0]=open
+@promote: optional promote[param_name]->callable mapping
+@promote: accept ints in params to identify positional parameters?
+an @promote decorator to scan types in func sig and call type.promote
+progressbar/iterbar: check out len and length_hint as defaults for total
+iterbar: call back to length_hint if no len as default?
+mklinks: quit on SIGINT
 cs.cmdutils: help to include the first sentence of the subcommand usage?
 cs.fsm: better docstrings, suppress FSMSubType docstring somehow
 proxy-peerage: name acls using proxies:ptn passed through the identifier stuff from named_row_tuples - should make for better diffs and more readable configs
@@ -52,7 +61,6 @@ cs.mp3: parse tags? pull names etc from cs.id3
 progress/upd: fixed with trailing units, eg %2d
 run-backups: single file: src type desthost[:dstpath?] [options...]
 cs.pfx: can we hang the prefixes on the current frame? would solve the generator issue (NO, WE CANNOT)
-cs.logutils,pilfer: drop D_mode and the D function
 cs.upd: what to do when the number of status lines exceeds the terminal height?
 try to strip out use of cs.py3.bytes
 replace @locked_property with @property @locked @cachedmethod throughout to placate linters, then @OBSOLETE @locked_property

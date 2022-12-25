@@ -33,7 +33,7 @@ from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from typeguard import typechecked
 
-__version__ = '20211208-post'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -244,7 +244,7 @@ class BaseProgress(object):
       arrow += ' ' * (width - len(arrow))
     return arrow
 
-  def format_counter(self, value, scale=None, max_parts=2, sep=','):
+  def format_counter(self, value, scale=None, max_parts=2, sep=',', **kw):
     ''' Format `value` accoridng to `scale` and `max_parts`
         using `cs.units.transcribe`.
     '''
@@ -252,7 +252,7 @@ class BaseProgress(object):
       scale = self.units_scale
     if scale is None:
       return str(value)
-    return transcribe(value, scale, max_parts=max_parts, sep=sep)
+    return transcribe(value, scale, max_parts=max_parts, sep=sep, **kw)
 
   def text_pos_of_total(
       self, fmt=None, fmt_pos=None, fmt_total=None, pos_first=False
@@ -561,33 +561,35 @@ class BaseProgress(object):
         proxy(statusfunc(self, label, width or proxy.width))
 
     update_status(True)
-    for iteration, item in enumerate(it):
-      length = itemlenfunc(item) if itemlenfunc else 1
-      if incfirst:
-        self += length
-        update_status()
-      yield item
-      if not incfirst:
-        self += length
-        update_status()
-      if runstate is not None and runstate.cancelled:
-        break
-    if delete_proxy:
-      proxy.delete()
-    else:
-      update_status(True)
-    if report_print:
-      if isinstance(report_print, bool):
-        report_print = print
-      report_print(
-          label + (
-              ': (cancelled)'
-              if runstate is not None and runstate.cancelled else ':'
-          ), self.format_counter(self.position - start_pos), 'in',
-          transcribe(
-              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
-          )
-      )
+    try:
+      for iteration, item in enumerate(it):
+        length = itemlenfunc(item) if itemlenfunc else 1
+        if incfirst:
+          self += length
+          update_status()
+        yield item
+        if not incfirst:
+          self += length
+          update_status()
+        if runstate is not None and runstate.cancelled:
+          break
+    finally:
+      if delete_proxy:
+        proxy.delete()
+      else:
+        update_status(True)
+      if report_print:
+        if isinstance(report_print, bool):
+          report_print = print
+        report_print(
+            label + (
+                ': (cancelled)'
+                if runstate is not None and runstate.cancelled else ':'
+            ), self.format_counter(self.position - start_pos), 'in',
+            transcribe(
+                self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+            )
+        )
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
@@ -637,11 +639,11 @@ class Progress(BaseProgress):
       self,
       name: Optional[str] = None,
       *,
-      position: Optional[int] = None,
-      start: Optional[int] = None,
+      position: Optional[float] = None,
+      start: Optional[float] = None,
       start_time: Optional[float] = None,
       throughput_window: Optional[int] = None,
-      total: Optional[int] = None,
+      total: Optional[float] = None,
       units_scale=None,
   ):
     ''' Initialise the Progesss object.

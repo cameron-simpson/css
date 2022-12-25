@@ -8,6 +8,7 @@ import filecmp
 from getopt import GetoptError
 import os
 from os.path import (
+    expanduser,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -28,9 +29,10 @@ try:
 except ImportError:
   import xml.etree.ElementTree as etree
 
+from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import cachedmethod
+from cs.deco import cachedmethod, fmtdoc
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton, HasFSPath
 from cs.fstags import FSTags
@@ -54,6 +56,54 @@ def main(argv=None):
   '''
   return KindleCommand(argv).run()
 
+KINDLE_LIBRARY_ENVVAR = 'KINDLE_LIBRARY'
+
+KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.kindle.Kindle'
+KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING = 'User Settings.CONTENT_PATH'
+KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
+    '~/Library/Containers/com.amazon.Kindle/Data/Library/'
+    'Application Support/Kindle/My Kindle Content'
+)
+
+def kindle_content_path_default():
+  ''' Return the default content path for the Kindle application.
+      Currently only knows about Darwin (MacOS).
+  '''
+  if sys.platform == 'darwin':
+    return expanduser(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH)
+  raise RuntimeError(
+      "I do not know the default Kindle content path on platform %r" %
+      (sys.platform,)
+  )
+
+def kindle_content_path():
+  ''' Return the default Kindle content path or `None`.
+      Currently only supports Darwin (MacOS).
+  '''
+  if sys.platform == 'darwin':
+    defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
+    path = defaults.get(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING)
+    if path is None:
+      path = kindle_content_path_default()
+    return path
+  raise RuntimeError(
+      "cannot look up Kindle content path on platform %r" % (sys.platform,)
+  )
+
+@fmtdoc
+def default_kindle_library():
+  ''' Return the default kindle library content path
+        from ${KINDLE_LIBRARY_ENVVAR}.
+        On Darwin, fall back to the Kindle app setting from the
+        defaults domain {KINDLE_APP_OSX_DEFAULTS_DOMAIN!r}
+        setting {KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING!r}.
+        Returns `None` if no default can be found.
+    '''
+  path = os.environ.get(KINDLE_LIBRARY_ENVVAR, None)
+  if path is not None:
+    return path
+  return kindle_content_path()
+
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
 
@@ -61,11 +111,9 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       This is mostly to aid keeping track of state using `cs.fstags`.
   '''
 
-  FSPATH_DEFAULT = (
-      '~/Library/Containers/com.amazon.Kindle/Data/Library/'
-      'Application Support/Kindle/My Kindle Content'
-  )
-  FSPATH_ENVVAR = 'KINDLE_LIBRARY'
+  FSPATH_DEFAULT = default_kindle_library()
+
+  FSPATH_ENVVAR = KINDLE_LIBRARY_ENVVAR
 
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
 
@@ -130,6 +178,13 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
             "subdir_name %r does not end with _EBOK or _BSP" %
             (self.subdir_name,)
         )
+
+      @property
+      def amazon_url(self):
+        # https://www.amazon.com.au/Wonder-Woman-2016-xx-Liars-ebook/dp/B097KMW2VY/
+        title = self.tags.get('calibre.title',
+                              'title').replace(' ', '-').replace('/', '-')
+        return f'https://www.amazon.com.au/{title}/dp/{self.asin}/'
 
       def listdir(self):
         ''' Return a list of the names inside the subdirectory,
@@ -606,6 +661,28 @@ class KindleCommand(BaseCommand):
         with stackattrs(options, kindle=kt, calibre=cal):
           yield
 
+  def cmd_app_path(self, argv):
+    ''' Usage: {cmd} [content-path]
+          Report or set the content path for the Kindle application.
+    '''
+    if not argv:
+      print(kindle_content_path())
+      return 0
+    content_path = self.poparg(
+        argv,
+        lambda arg: arg,
+        "content-path",
+        lambda path: path == 'DEFAULT' or isdirpath(path),
+        "content-path should be DEFAULT or an existing directory",
+    )
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    if content_path == 'DEFAULT':
+      content_path = kindle_content_path_default()
+    defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
+    defaults[KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING] = content_path
+    return 0
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database prompt.
@@ -636,6 +713,7 @@ class KindleCommand(BaseCommand):
     verbose = options.verbose
     asins = argv or sorted(kindle.asins())
     xit = 0
+    quiet or print("export", kindle.shortpath, "=>", calibre.shortpath)
     for asin in progressbar(asins, f"export to {calibre}"):
       if runstate.cancelled:
         break
@@ -688,7 +766,7 @@ class KindleCommand(BaseCommand):
         if len(cbooks) > 1:
           # pylint: disable=expression-not-assigned
           quiet or print(
-              f"asin {asin}: multiple Calibre books: {cbooks!r}; choosing {cbook}"
+              f"asin {asin}: multiple Calibre books, dbids {[cb.dbid for cb in cbooks]!r}; choosing {cbook}"
           )
         ktags = kbook.tags
         ctags = ktags.subtags('calibre')

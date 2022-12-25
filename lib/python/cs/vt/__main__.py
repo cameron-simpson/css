@@ -40,11 +40,18 @@ from cs.lex import hexify, get_identifier
 from cs.logutils import (exception, error, warning, track, info, debug, logTo)
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar, Progress
+from cs.py.modules import import_extra
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print
 
-from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
+from . import (
+    common,
+    defaults,
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_CONFIG_ENVVAR,
+    DISTINFO,
+)
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
     blocked_chunks_of,
@@ -1276,15 +1283,29 @@ class VTCmd(BaseCommand):
           if argv:
             raise GetoptError("extra arguments after filename: %r" % (argv,))
           scanner = scanner_from_filename(filename)
-          size_counts = defaultdict(int)
-          with open(filename, 'rb') as fp:
-            for chunk in blocked_chunks_of2(file_data(fp, None), scanner):
-              print(len(chunk), str(chunk[:16]))
-              size_counts[len(chunk)] += 1
-          for size, count in sorted(size_counts.items()):
-            print(size, count)
-        return 0
-      raise GetoptError("unrecognised subcommand")
+          with open(filename, 'rb') as f:
+            total_size = os.fstat(f.fileno()).st_size
+            sizes = [
+                len(chunk) for chunk in progressbar(
+                    blocked_chunks_of2(file_data(f, None), scanner=scanner),
+                    f"blocked_chunks_of2({shortpath(filename)})",
+                    units_scale=BINARY_BYTES_SCALE,
+                    update_frequency=64,
+                    itemlenfunc=len,
+                    total=total_size,
+                )
+            ]
+        try:
+          mplutils = import_extra('cs.mplutils', DISTINFO)
+        except ImportError as e:
+          warning("import cs.mplutils: %s", e)
+          print(len(sizes), "distinct sizes")
+        else:
+          ax = mplutils.axes()
+          ax.hist(sizes, 128)
+          mplutils.print_figure(ax)
+          return 0
+    raise GetoptError("unrecognised subcommand")
 
   def cmd_unpack(self, argv):
     ''' Usage: {cmd} archive.vt [unpacked]

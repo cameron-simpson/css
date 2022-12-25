@@ -595,7 +595,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     if not isabspath(calcmd):
       calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
     calargv = [calcmd, *calargv]
-    return run(calargv, doit=doit, quiet=quiet, **subp_options)
+    cp = run(calargv, doit=doit, quiet=quiet, **subp_options)
+    if cp.stdout and not quiet:
+      print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
+    return cp
 
   def calibredb(self, dbcmd, *argv, doit=True, quiet=False, **subp_options):
     ''' Run `dbcmd` via the `calibredb` command.
@@ -1143,7 +1146,7 @@ class CalibreCommand(BaseCommand):
         cbook.dbid,
     )
 
-  def popbooks(self, argv, once=False, sortkey=None):
+  def popbooks(self, argv, once=False, sortkey=None, reverse=False):
     ''' Consume `argv` as book specifications and return a list of matching books.
 
         If `once` is true (default `False`) consume only the first argument.
@@ -1160,8 +1163,7 @@ class CalibreCommand(BaseCommand):
     if sortkey is not None and sortkey is not False:
       if sortkey is True:
         sortkey = self.cbook_default_sortkey
-      cbooks = sorted(cbooks, key=sortkey)
-    assert not argv
+      cbooks = sorted(cbooks, key=sortkey, reverse=reverse)
     return cbooks
 
   # pylint: disable=too-many-branches,too-many-locals
@@ -1278,6 +1280,7 @@ class CalibreCommand(BaseCommand):
     doit = options.doit
     first_format = options.first_format
     force = options.force
+    calibre = options.calibre
     formats = options.formats
     if isinstance(formats, str):
       # pylint: disable=no-member
@@ -1287,9 +1290,15 @@ class CalibreCommand(BaseCommand):
     quiet = options.quiet
     runstate = options.runstate
     verbose = options.verbose
-    cbooks = self.popbooks(argv or list(self.DEFAULT_LINKTO_SELECTORS))
-    with UpdProxy(prefix='linkto: ') as proxy:
-      for cbook in unrepeated(cbooks):
+    quiet or print(
+        "linkto", calibre.shortpath, "=>", shortpath(options.linkto_dirpath)
+    )
+    cbooks = sorted(
+        set(self.popbooks(argv or list(self.DEFAULT_LINKTO_SELECTORS))),
+        key=lambda cbook: cbook.title.lower()
+    )
+    for cbook in progressbar(cbooks, "linkto"):
+      with UpdProxy(prefix='linkto: ') as proxy:
         if runstate.cancelled:
           break
         proxy.text = str(cbook)
@@ -1315,7 +1324,7 @@ class CalibreCommand(BaseCommand):
               if force:
                 warning("dst already exists, will be replaced: %s", dstpath)
               else:
-                warning("dst already exists, skipped: %s", dstpath)
+                ##warning("dst already exists, skipped: %s", dstpath)
                 continue
             if existspath(dstpath):
               (verbose or not doit) and print("unlink", shortpath(dstpath))
@@ -1336,11 +1345,25 @@ class CalibreCommand(BaseCommand):
           List the contents of the Calibre library.
           -l            Long mode, listing book details over several lines.
           -o ls_format  Output format for use in a single line book listing.
+          -r            Reverse the listing order.
+          -t            Order listing by timestamp.
     '''
     options = self.options
     options.longmode = False  # pylint: disable=attribute-defined-outside-init
     options.ls_format = None
-    options.popopts(argv, l='longmode', o_='ls_format')
+    options.sort_reverse = False
+    options.sort_timestamp = False
+    options.popopts(
+        argv,
+        l='longmode',
+        o_='ls_format',
+        r='sort_reverse',
+        t='sort_timestamp',
+    )
+    if options.sort_timestamp:
+      cbook_sort_key = lambda cbook: cbook.timestamp
+    else:
+      cbook_sort_key = self.cbook_default_sortkey
     longmode = options.longmode
     ls_format = options.ls_format
     calibre = options.calibre
@@ -1348,12 +1371,16 @@ class CalibreCommand(BaseCommand):
     cbooks = []
     if argv:
       try:
-        cbooks = self.popbooks(argv, sortkey=True)
+        cbooks = self.popbooks(
+            argv, sortkey=cbook_sort_key, reverse=options.sort_reverse
+        )
       except ValueError as e:
         raise GetoptError("invalid book specifiers: %s") from e
     else:
       calibre.preload()
-      cbooks = sorted(calibre, key=self.cbook_default_sortkey)
+      cbooks = sorted(
+          calibre, key=cbook_sort_key, reverse=options.sort_reverse
+      )
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
@@ -1393,9 +1420,13 @@ class CalibreCommand(BaseCommand):
             print("   ", TagSet(identifiers))
           for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
-              fspath = calibre.pathto(subpath)
-              size = pfx_call(os.stat, fspath).st_size
-              print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
+              fspath = cbook.pathto(subpath)
+              try:
+                size = pfx_call(os.stat, fspath).st_size
+              except OSError as e:
+                warning("cannot stat: %s", e)
+              else:
+                print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
     if runstate.cancelled:
       xit = 1
     return xit
@@ -1496,6 +1527,7 @@ class CalibreCommand(BaseCommand):
     quiet = options.quiet
     verbose = options.verbose
     other_library = options.calibre_other
+    quiet or print("pull", other_library.shortpath, "=>", calibre.shortpath)
     with Pfx(other_library.shortpath):
       with other_library:
         if other_library is calibre:

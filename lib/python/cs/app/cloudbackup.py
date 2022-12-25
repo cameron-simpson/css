@@ -253,7 +253,7 @@ class CloudBackupCommand(BaseCommand):
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
     with UpdProxy() as proxy:
-      proxy.prefix = f"{options.cmd} {backup_root_dirpath} => {backup_name}"
+      proxy.prefix = f"{self.cmd} {backup_root_dirpath} => {backup_name}"
       options.cloud_backup.init()
       backup = options.cloud_backup.run_backup(
           options.cloud_area,
