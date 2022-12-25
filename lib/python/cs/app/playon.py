@@ -642,7 +642,7 @@ class PlayOnAPI(MultiOpenMixin):
     self._password = password
     self._login_state = None
     self._jwt = None
-    self._cookies = {}
+    self._cookies = requests.cookies.RequestsCookieJar()
     self._storage = defaultdict(str)
     self.sqltags = sqltags
     self._fstags = FSTags()
@@ -745,8 +745,7 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.sqltags[download_id]
 
-  @staticmethod
-  def suburl_request(base_url, method, suburl):
+  def suburl_request(self, base_url, method, suburl):
     ''' Return a curried `requests` method
         to fetch `API_BASE/suburl`.
     '''
@@ -759,6 +758,7 @@ class PlayOnAPI(MultiOpenMixin):
         }[method],
         url,
         auth=_RequestsNoAuth(),
+        cookies=self._cookies,
     )
     return rqm
 
