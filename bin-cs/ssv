@@ -2,7 +2,8 @@
 
 set -ue
 
-ssdir=
+: "${SSV_DIR:=$HOME/im/screencaps}"
+export SSV_DIR
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-d dirpath] video-file
@@ -13,7 +14,7 @@ badopts=
 
 if [ $# -gt 0 ] && [ "x$1" = x-d ]
 then
-  ssdir=$2
+  SSV_DIR=$2
   shift; shift
 fi
 
@@ -35,17 +36,15 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$ssdir" ] || {
-  ssdir=$(ssdir)/$vfpfx--shots
-}
+sssubdir=${SSV_DIR:-$(ssdir)}/$vfpfx--shots
 
-[ -d "$ssdir/" ] || set-x mkdir "$ssdir" || exit 1
+[ -d "$sssubdir/" ] || set-x mkdir "$sssubdir" || exit 1
 
 umask 077
 
 set -x
 exec mpv \
-  "--screenshot-directory=$ssdir" \
+  "--screenshot-directory=$sssubdir" \
   "--screenshot-format=png" \
   "--screenshot-template=%F--%P" \
   "--screenshot-sw=yes" \

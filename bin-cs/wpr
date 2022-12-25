@@ -6,6 +6,11 @@
 
 set -ue
 
+set -x
+: "${SSV_DIR=$HOME/im/screencaps}"
+: "${WPDIR:=$HOME/im/wp}"
+: "${WPPATH:=$WPDIR:$SSV_DIR}"
+
 cmd=$( basename "$0" )
 usage="Usage: $cmd word"
 
@@ -25,11 +30,18 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-rd=$HOME/im/wp/$word/random
+rd=$HOME/var/im/wp/$word/random
 
 set -x
-[ -d "$rd" ] || set-x mkdir "$rd"
+[ -d "$rd" ] || set-x mkdir -p "$rd"
 cd "$rd"
 rm -f ./*.png
-ln -s $( find ~/im/screencaps/*"$word"*/ -type f -name \*.png | shuffle | sed 128q ) .
+pngs=$(
+  for wpsrcdir in ${WPPATH/:/ }
+  do
+    find "$wpsrcdir"/*"$word"* -type f -name \*.png || :
+  done | shuffle | sed 128q
+)
+[ -n "$pngs" ] || { echo "$cmd: nothing found" >&2; exit 1; }
+ln -s $pngs .
 spaces wp . "$rd"

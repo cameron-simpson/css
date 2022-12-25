@@ -3359,7 +3359,7 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       return tagsets, unparsed
 
   @classmethod
-  def tags_line(cls, name, tags, extra_types=None):
+  def tags_line(cls, name, tags, extra_types=None, prune=False):
     ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
     if extra_types is None:
@@ -3375,11 +3375,16 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
               cls.__name__, name, tags, tag.value
           )
         continue
+      if prune and isinstance(tag.value,
+                              (list, tuple, dict)) and not tag.value:
+        continue
       fields.append(str(tag))
     return ' '.join(fields)
 
   @classmethod
-  def save_tagsets(cls, filepath, tagsets, unparsed, extra_types=None):
+  def save_tagsets(
+      cls, filepath, tagsets, unparsed, extra_types=None, prune=False
+  ):
     ''' Save `tagsets` and `unparsed` to `filepath`.
 
         This method will create the required intermediate directories
@@ -3407,7 +3412,11 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
             for name, tags in name_tags:
               if not tags:
                 continue
-              f.write(cls.tags_line(name, tags, extra_types=extra_types))
+              f.write(
+                  cls.tags_line(
+                      name, tags, extra_types=extra_types, prune=prune
+                  )
+              )
               f.write('\n')
         except OSError as e:
           error("save(%r) fails: %s", filepath, e)
