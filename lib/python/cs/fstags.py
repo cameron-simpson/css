@@ -1639,10 +1639,10 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     '''
     return self.fstags.tagfile_for(self.fspath)
 
-  def save(self):
+  def save(self, prune=True):
     ''' Update the associated `FSTagsTagFile`.
     '''
-    self.tagfile.save()
+    self.tagfile.save(prune=prune)
 
   def merged_tags(self):
     ''' Compute the cumulative tags for this path as a new `TagSet`
