@@ -10,12 +10,13 @@ Convenience facilities related to Python functions.
 
 from functools import partial
 from pprint import pformat
+
 from cs.deco import decorator
 from cs.py.stack import caller
 from cs.py3 import unicode, raise_from
 from cs.x import X
 
-__version__ = '20221118-post'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -53,7 +54,15 @@ def funccite(func):
     code = func.__code__
   except AttributeError:
     return "%s[no.__code__]" % (repr(func),)
-  return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
+  try:
+    from cs.fs import shortpath  # pylint: disable=import-outside-toplevel
+  except ImportError:
+    shortpath = lambda p: p  # pylint: disable=unnecessary-lambda-assignment
+  return "%s[%s:%d]" % (
+      funcname(func),
+      shortpath(code.co_filename),
+      code.co_firstlineno,
+  )
 
 def func_a_kw_fmt(func, *a, **kw):
   ''' Prepare a percent-format string and associated argument list
@@ -61,7 +70,10 @@ def func_a_kw_fmt(func, *a, **kw):
       Return `format,args`.
 
       The `func` argument can also be a string,
-      presumably a prepared description of `func` such as `funccite(func)`.
+      typically a prepared description of `func` such as `funccite(func)`.
+
+      *Note*: the returned `args` is a `list` for easy incorporation
+      into further arguments.  The `%` operator requires a `tuple`.
   '''
   av = [
       func if isinstance(func, str) else getattr(func, '__name__', str(func))
@@ -72,6 +84,12 @@ def func_a_kw_fmt(func, *a, **kw):
   for kv in kw.items():
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
+
+def func_a_kw(func, *a, **kw):
+  ''' Return a string representing a call to `func(*a,**kw)`.
+  '''
+  fmt, args = func_a_kw_fmt(func, *a, **kw)
+  return fmt % tuple(args)
 
 def callif(doit, func, *a, **kw):
   ''' Call `func(*a,**kw)` if `doit` is true
@@ -102,7 +120,7 @@ def trace(
     func,
     call=True,
     retval=False,
-    exception=False,
+    exception=True,
     use_pformat=False,
     with_caller=False,
     with_pfx=False,
@@ -115,7 +133,7 @@ def trace(
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
     '''
-    global _trace_indent
+    global _trace_indent  # pylint: disable=global-statement
     if with_pfx:
       # late import so that we can use this in modules we import
       # pylint: disable=import-outside-toplevel
@@ -143,8 +161,10 @@ def trace(
     else:
       if retval:
         xlog(
-            "%sCALL %s RETURN %s", _trace_indent, log_cite,
-            (pformat if use_pformat else repr)(result)
+            "%sCALL %s RETURN %s",
+            _trace_indent,
+            log_cite,
+            (pformat if use_pformat else repr)(result),
         )
       _trace_indent = old_indent
       return result
@@ -196,7 +216,7 @@ def derived_property(
     original_revision_name='_revision',
     lock_name='_lock',
     property_name=None,
-    unset_object=None
+    unset_object=None,
 ):
   ''' A property which must be recomputed
       if the reference revision (attached to self)
@@ -255,8 +275,9 @@ def yields_type(func, basetype):
         )
       yield item
 
-  check_yields_type.__name__ = (
-      'check_yields_type[%s,basetype=%s]' % (citation, basetype)
+  check_yields_type.__name__ = 'check_yields_type[%s,basetype=%s]' % (
+      citation,
+      basetype,
   )
   return check_yields_type
 
@@ -274,8 +295,9 @@ def returns_type(func, basetype):
       )
     return retval
 
-  check_returns_type.__name__ = (
-      'check_returns_type[%s,basetype=%s]' % (citation, basetype)
+  check_returns_type.__name__ = 'check_returns_type[%s,basetype=%s]' % (
+      citation,
+      basetype,
   )
   return check_returns_type
 

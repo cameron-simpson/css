@@ -288,7 +288,7 @@ class Portfwd(FlaggedMixin):
         group_name=self.group_name,
         flags=self.flags,
         trace=trace,
-        sig_func=self.ssh_options,
+        sig_func=self.get_ssh_options,
         test_func=self.test_func,
         test_flags={
             'PORTFWD_DISABLE': False,
@@ -343,13 +343,13 @@ class Portfwd(FlaggedMixin):
       argv.extend(['--', self.target])
     return argv
 
-  def ssh_options(self):
+  def get_ssh_options(self):
     ''' Return a defaultdict(list) of `{option: values}`
         representing the ssh configuration.
     '''
-    with Pfx("ssh_options(%r)", self.target):
+    with Pfx("get_ssh_options(%r)", self.target):
       argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
-      P = pipefrom(argv)
+      P = pipefrom(argv, quiet=not self.verbose)
       options = defaultdict(list)
       parsed = [line.strip().split(None, 1) for line in P.stdout]
       retcode = P.wait()
@@ -383,7 +383,7 @@ class Portfwd(FlaggedMixin):
 
         Initially remove local socket paths.
     '''
-    options = self.ssh_options()
+    options = self.get_ssh_options()
     for localforward in options['localforward']:
       local, remote = localforward.split(None, 1)
       if '/' in local:

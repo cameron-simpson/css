@@ -17,7 +17,7 @@ from urllib.parse import quote as urlquote
 
 from cs.lex import cutprefix, cutsuffix
 
-__version__ = '20221118-post'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -75,7 +75,7 @@ def gvprint(
       Example:
 
           data_url = gvprint('digraph FOO {A->B}', file=GVDATAURL, fmt='svg')
-    '''
+  '''
   if file is None:
     file = sys.stdout
   if isinstance(file, str):
@@ -212,6 +212,13 @@ def gvdataurl(dot_s, **kw):
       as a `data:` URL.
   '''
   return gvprint(dot_s, file=GVDATAURL, **kw)
+
+def gvsvg(dot_s, **kw):
+  ''' Convenience wrapper for `gvprint` which returns an SVG string.
+  '''
+  svg = gvdata(dot_s, fmt='svg', **kw).decode('utf-8')
+  svg = svg[svg.find('<svg'):].rstrip()  # trim header and tail
+  return svg
 
 class DOTNodeMixin:
   ''' A mixin providing methods for things which can be drawn as

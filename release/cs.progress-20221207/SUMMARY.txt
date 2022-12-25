@@ -1,0 +1,2 @@
+BaseProgress.format_counter: accept arbitrary keyword arguments to pass to cs.units.transcribe.
+Progress.__init__: accept floats instead of just ints.

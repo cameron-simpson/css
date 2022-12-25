@@ -32,6 +32,11 @@ from cs.pfx import Pfx, pfx_call
 CG = apple.CoreGraphics
 HI = apple.HIServices
 
+def main(argv=None):
+  ''' cs.app.osx.spaces command line mode.
+  '''
+  return SpacesCommand(sys.argv).run()
+
 class Spaces:
   ''' The spaces for a particular display.
   '''
@@ -263,4 +268,4 @@ class SpacesCommand(BaseCommand):
       print(changes)
 
 if __name__ == '__main__':
-  sys.exit(SpacesCommand(sys.argv).run())
+  sys.exit(main(sys.argv))

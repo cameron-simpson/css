@@ -736,7 +736,7 @@ class Upd(SingletonMixin):
     return True
 
   # pylint: disable=too-many-branches,too-many-statements
-  def insert(self, index, txt='', proxy=None):
+  def insert(self, index, txt='', proxy=None) -> "UpdProxy":
     ''' Insert a new status line at `index`.
         Return the `UpdProxy` for the new status line.
     '''
