@@ -106,7 +106,7 @@ _logging_functions = _logging_map()
 # Pull logging functions from cs.logutils if available, otherwise logging.
 # This defers the cs.logutils import, breaking circular imports.
 def _logging_stub(func_name, *a, **kw):
-  logging_function = _logging_functions(func_name)
+  logging_function = _logging_functions[func_name]
   if (sys.version_info.major, sys.version_info.minor) >= (3, 8):
     stacklevel = kw.pop('stacklevel', 1)
     kw['stacklevel'] = stacklevel + 1
