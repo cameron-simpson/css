@@ -5,7 +5,6 @@ r'''
 Assorted process and subprocess management functions.
 '''
 
-from builtins import print as builtin_print
 from contextlib import contextmanager
 import errno
 import io
@@ -19,7 +18,6 @@ import time
 
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20221118-post'
 
@@ -33,7 +31,6 @@ DISTINFO = {
     'install_requires': [
         'cs.gimmicks>=devnull',
         'cs.pfx',
-        'cs.upd',
     ],
 }
 
@@ -217,19 +214,17 @@ def run(argv, doit=True, logger=None, quiet=True, **subp_options):
       if logger:
         trace("skip: %s", shlex.join(argv))
       else:
-        with Upd().above():
-          print_argv(*argv, fold=True)
+        print_argv(*argv, fold=True)
     return None
-  with Upd().above():
-    if not quiet:
-      if logger:
-        trace("+ %s", shlex.join(argv))
-      else:
-        print_argv(*argv, indent="+ ", file=sys.stderr)
-    cp = pfx_call(subprocess_run, argv, **subp_options)
-    if cp.stderr:
-      builtin_print(" stderr:")
-      builtin_print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
+  if not quiet:
+    if logger:
+      trace("+ %s", shlex.join(argv))
+    else:
+      print_argv(*argv, indent="+ ", file=sys.stderr)
+  cp = pfx_call(subprocess_run, argv, **subp_options)
+  if cp.stderr:
+    print(" stderr:")
+    print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
   if cp.returncode != 0:
     warning(
         "run fails, exit code %s from %s",
