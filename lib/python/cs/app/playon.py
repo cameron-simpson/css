@@ -776,7 +776,7 @@ class PlayOnAPI(MultiOpenMixin):
         Parameters:
         * `suburl`: the API subURL designating the endpoint.
         * `_method`: optional HTTP method, default `'GET'`.
-        * `headers`: hreaders to accompany the request;
+        * `headers`: headers to accompany the request;
           default `{'Authorization':self.jwt}`.
         Other keyword arguments are passed to the `requests` method
         used to perform the HTTP call.
@@ -785,8 +785,15 @@ class PlayOnAPI(MultiOpenMixin):
       _base_url = self.API_BASE
     if headers is None:
       headers = dict(Authorization=self.jwt)
-    rqm = self.suburl_request(_base_url, _method, suburl)
-    result = rqm(headers=headers, **kw).json()
+    with Upd().run_task(f'{_method} {_base_url}/{suburl}'):
+      rqm = self.suburl_request(_base_url, _method, suburl)
+      basic_result = rqm(headers=headers, **kw)
+    basic_result.raise_for_status()
+    try:
+      result = basic_result.json()
+    except JSONDecodeError as e:
+      warning("basic result is not JSON: %s\n%r", e, basic_result)
+      raise
     if raw:
       return result
     ok = result.get('success')
