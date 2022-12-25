@@ -1071,7 +1071,19 @@ class BaseCommand:
 
   @contextmanager
   def run_context(self):
-    ''' Stub context manager which surrounds `main` or `cmd_`*subcmd*.
+    ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
+
+        This default does several things, and subclasses should
+        override it like this:
+
+            @contextmanager
+            def run_context(self):
+              with super().run_context():
+                try:
+                  ... subclass context setup ...
+                    yield
+                finally:
+                  ... any unconditional cleanup ...
     '''
     # redundant try/finally to remind subclassers of correct structure
     try:
