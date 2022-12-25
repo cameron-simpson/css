@@ -157,9 +157,10 @@ class SpacesCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    options = self.options
-    with stackattrs(options, spaces=Spaces()):
-      yield
+    with super().run_context():
+      options = self.options
+      with stackattrs(options, spaces=Spaces()):
+        yield
 
   def cmd_monitor(self, argv):
     ''' Usage: {cmd}

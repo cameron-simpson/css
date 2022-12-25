@@ -152,18 +152,26 @@ class PlayOnCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
-    options = self.options
-    sqltags = PlayOnSQLTags()
-    api = PlayOnAPI(options.user, options.password, sqltags)
-    with sqltags:
-      with stackattrs(options, api=api, sqltags=sqltags):
-        with api:
-          # preload all the recordings from the db
-          list(sqltags.recordings())
-          # if there are unexpired stale entries or no unexpired entries,
-          # refresh them
-          self._refresh_sqltags_data(api, sqltags)
-          yield
+    with super().run_context():
+      print("RC0")
+      options = self.options
+      sqltags = PlayOnSQLTags()
+      print("RC1")
+      api = PlayOnAPI(options.user, options.password, sqltags)
+      print("RC2")
+      with sqltags:
+        with stackattrs(options, api=api, sqltags=sqltags):
+          with api:
+            # preload all the recordings from the db
+            ##print("RC PRELOAD")
+            ##list(sqltags.recordings())
+            # if there are unexpired stale entries or no unexpired entries,
+            # refresh them
+            print("RF REFRESH RECORDINGS")
+            self._refresh_sqltags_data(api, sqltags)
+            print("RC YIELD")
+            yield
+      print("RC9")
 
   def cmd_account(self, argv):
     ''' Usage: {cmd}

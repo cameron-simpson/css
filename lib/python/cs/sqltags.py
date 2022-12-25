@@ -1931,12 +1931,13 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    options = self.options
-    db_url = options.db_url
-    sqltags = self.TAGSETS_CLASS(db_url)
-    with sqltags:
-      with stackattrs(options, sqltags=sqltags, verbose=True):
-        yield
+    with super().run_context():
+      options = self.options
+      db_url = options.db_url
+      sqltags = self.TAGSETS_CLASS(db_url)
+      with sqltags:
+        with stackattrs(options, sqltags=sqltags, verbose=True):
+          yield
 
   @classmethod
   def parse_tagset_criterion(cls, arg, tag_based_test_class=None):

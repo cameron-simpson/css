@@ -3450,8 +3450,9 @@ class TagsOntologyCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    with self.options.ontology:
-      yield
+    with super().run_context():
+      with self.options.ontology:
+        yield
 
   def cmd_edit(self, argv):
     ''' Usage: {cmd} [{{/name-regexp | entity-name}}]
