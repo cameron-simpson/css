@@ -154,12 +154,9 @@ class PlayOnCommand(BaseCommand):
     ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
     with super().run_context():
-      print("RC0")
       options = self.options
       sqltags = PlayOnSQLTags()
-      print("RC1")
       api = PlayOnAPI(options.user, options.password, sqltags)
-      print("RC2")
       with sqltags:
         with stackattrs(options, api=api, sqltags=sqltags):
           with api:
@@ -168,11 +165,8 @@ class PlayOnCommand(BaseCommand):
             ##list(sqltags.recordings())
             # if there are unexpired stale entries or no unexpired entries,
             # refresh them
-            print("RF REFRESH RECORDINGS")
             self._refresh_sqltags_data(api, sqltags)
-            print("RC YIELD")
             yield
-      print("RC9")
 
   def cmd_account(self, argv):
     ''' Usage: {cmd}
@@ -210,7 +204,6 @@ class PlayOnCommand(BaseCommand):
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     api = self.options.api
-    X("login")
     lstate = api.login_state
     pprint(lstate)
     result = api.cdsurl_data(suburl)
@@ -298,7 +291,7 @@ class PlayOnCommand(BaseCommand):
         dl_id = R.extra['dl_id']
         recording = sqltags[dl_id]
         if not R():
-          print("FAILED", dl_id)
+          warning("FAILED download of %d", dl_id)
           xit = 1
 
     return xit
