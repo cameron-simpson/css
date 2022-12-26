@@ -83,9 +83,6 @@ DISTINFO = {
     },
 }
 
-TEST_RATE = 7  # frequency of polling of test condition
-KILL_TIME = 5  # how long to wait for a terminated process to exit
-RESTART_DELAY = 3  # delay be restart of an exited process
 
 USAGE = '''Usage:
   {cmd} disable names...
@@ -175,7 +172,7 @@ def main(argv=None):
     quiet = False
     sig_shcmd = None
     test_shcmd = None
-    test_rate = TEST_RATE
+    test_rate = SvcD.TEST_RATE
     uid = os.geteuid()
     username = getpwuid(uid).pw_name
     run_uid = uid
@@ -339,6 +336,10 @@ class SvcD(FlaggedMixin, object):
   ''' A process based service.
   '''
 
+  TEST_RATE = 7  # frequency of polling of test condition
+  KILL_TIME = 5  # how long to wait for a terminated process to exit
+  RESTART_DELAY = 3  # delay be restart of an exited process
+
   def __init__(
       self,
       *argv,
@@ -372,9 +373,9 @@ class SvcD(FlaggedMixin, object):
           be monitored at test time; truthy flags must be true and
           untruthy flags must be false
         * `test_func`: test function with must return true if the comannd can run
-        * `test_rate`: frequency of tests, default TEST_RATE
+        * `test_rate`: frequency of tests, default SvcD.TEST_RATE
         * `restart_delay`: delay before start of an exiting command,
-          default RESTART_DELAY
+          default SvcD.RESTART_DELAY
         * `once`: if true, run the command only once
         * `quiet`: if true, do not issue alerts
         * `trace`: trace actions, default False
@@ -394,9 +395,9 @@ class SvcD(FlaggedMixin, object):
     if test_flags is None:
       test_flags = {}
     if test_rate is None:
-      test_rate = TEST_RATE
+      test_rate = self.TEST_RATE
     if restart_delay is None:
-      restart_delay = RESTART_DELAY
+      restart_delay = self.RESTART_DELAY
     FlaggedMixin.__init__(self, flags=flags)
     self.argv = argv
     self.name = name
@@ -522,7 +523,7 @@ class SvcD(FlaggedMixin, object):
         Sends `SIGTERM`, then `SIGKILL` if the process does not die promptly.
     '''
     self.subp.terminate()
-    final_time = now() + KILL_TIME
+    final_time = now() + self.KILL_TIME
     while self.probe() and now() < final_time:
       sleep(1)
     if self.probe():
