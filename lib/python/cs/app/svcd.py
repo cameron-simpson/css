@@ -341,7 +341,7 @@ class SvcD(FlaggedMixin, object):
 
   def __init__(
       self,
-      argv,
+      *argv,
       name=None,
       environ=None,
       flags=None,
