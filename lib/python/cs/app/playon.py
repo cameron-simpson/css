@@ -369,6 +369,12 @@ class PlayOnCommand(BaseCommand):
     '''
     return self._list(argv, self.options, ['available'], self.LS_FORMAT)
 
+  def cmd_poll(self, argv):
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    pprint(api.notifications())
+
   def cmd_queue(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List queued recordings.
