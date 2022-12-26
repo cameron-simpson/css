@@ -56,6 +56,7 @@ from cs.app.flag import Flags, FlaggedMixin
 from cs.cmdutils import BaseCommand
 from cs.env import VARRUN
 from cs.gimmicks import DEVNULL
+from cs.lex import cutsuffix
 from cs.logutils import warning, info, debug, exception
 from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import (
@@ -120,6 +121,19 @@ class SvcDCommand(BaseCommand):
     for name in argv:
       with Pfx(name):
         SvcD(name=name).enable()
+
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd}
+          List known services.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    flags = Flags()
+    for flagname in sorted(flags):
+      flag_prefix = cutsuffix(flagname, '_RUNNING')
+      if flag_prefix is not flagname:
+        flag = flags[flagname]
+        print(flag_prefix.lower(), "running" if flag else "stopped")
 
   def cmd_restart(self, argv):
     ''' {cmd} restart names...
