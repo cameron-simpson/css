@@ -320,9 +320,8 @@ def LockedPopen(*a, **kw):
       slightly not multithead safe. This function exists to test
       that theory.
   '''
-  global _Popen_lock
   with _Popen_lock:
-    P = Popen(*a, **kw)
+    P = Popen(*a, **kw)  # pylint: disable=consider-using-with
   return P
 
 def callproc(*a, **kw):
