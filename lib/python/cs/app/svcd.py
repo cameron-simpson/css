@@ -83,86 +83,84 @@ DISTINFO = {
     },
 }
 
+def main(argv=None):
+  ''' svcd command line.
+  '''
+  return SvcDCommand(argv).run()
 
-USAGE = '''Usage:
-  {cmd} disable names...
+class SvcDCommand(BaseCommand):
+  ''' Implementation of `SvcD` command line mode.
+  '''
+
+  def disable(self, argv):
+    ''' {cmd} disable names...
           For each name set the flag {{NAME}}_DISABLE, causing the matching
           svcd to shut down its daemon process.
-  {cmd} enable names
-          For each name clear the flag {{NAME}}_DISABLE, allowing the matching
-          svcd to start up its daemon process.
-  {cmd} restart names...
-          For each name set the flag {{NAME}}_RESTART, causing the matching
-          svcd to shut down and then restart its daemon process.
-  {cmd} stop names...
-          For each name set the flag {{NAME}}_STOP, causing the the
-          montior thread to kill the daemon process and exit.
-  {cmd} [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [args...]
-    -1    Run command only once.
-    -l    Use lock \"svcd-<name>\" to prevent multiple instances of this svcd.
-    -F [!]flag,...
-          Flags to include in the run test. Flags with a leading
-          exclaimation point (!) must test false, others true.
-    -L lockname
-          Use lock \"lockname\" to prevent multiple instances of this svcd.
-    -n name
-          Specify a name for this svcd.
-          Also create a subprocess pid file at {VARRUN}/name.pid for the command.
-          This also causes svcd to consult the flags {{NAME}}_OVERRIDE
-          and {{NAME}}_DISABLE and {{NAME}}_RESTART.
-    -p svcd-pidfile
-          Specify {cmd} pid file instead of default.
-    -P subp-pidfile
-          Specify {cmd} subprocess pid file instead of default.
-    -q    Quiet. Do not issue alerts.
-    -s sigcmd
-          Run the signature shell command \"sigcmd\" whose output is
-          used to check for changed circumstances requiring the service
-          to restart.
-    -t testcmd
-          Run the test shell command \"testcmd\" periodically to
-          govern whether the command should be active.
-    -T testrate
-          Interval between test polls in seconds. Default: {TEST_RATE}
-    -u username
-          Run command as the specified username.
-    -U username
-          Run test and related commands as the specified username.
-    -x    Trace execution.'''
-
-def main(argv=None):
-  ''' Command line main programme.
-  '''
-  if argv is None:
-    argv = sys.argv
-  cmd = basename(argv.pop(0))
-  usage = USAGE.format(cmd=cmd, TEST_RATE=TEST_RATE, VARRUN=VARRUN)
-  setup_logging(cmd)
-  badopts = False
-  try:
+    '''
     if not argv:
       raise GetoptError("missing arguments")
-    arg0 = argv[0]
-    if arg0 == 'disable':
-      argv.pop(0)
-      for name in argv:
-        SvcD([], name=name).disable()
-      return 0
-    if arg0 == 'enable':
-      argv.pop(0)
-      for name in argv:
-        SvcD([], name=name).enable()
-      return 0
-    if arg0 == 'restart':
-      argv.pop(0)
-      for name in argv:
-        SvcD([], name=name).restart()
-      return 0
-    if arg0 == 'stop':
-      argv.pop(0)
-      for name in argv:
-        SvcD([], name=name).stop()
-      return 0
+    for name in argv:
+      with Pfx(name):
+        SvcD(name=name).disable()
+
+  def cmd_enable(self, argv):
+    ''' {cmd} enable names
+          For each name clear the flag {{NAME}}_DISABLE, allowing the matching
+          svcd to start up its daemon process.
+    '''
+    if not argv:
+      raise GetoptError("missing arguments")
+    for name in argv:
+      with Pfx(name):
+        SvcD(name=name).enable()
+
+  def cmd_restart(self, argv):
+    ''' {cmd} restart names...
+          For each name set the flag {{NAME}}_RESTART, causing the matching
+          svcd to shut down and then restart its daemon process.
+    '''
+    if not argv:
+      raise GetoptError("missing arguments")
+    for name in argv:
+      with Pfx(name):
+        SvcD(name=name).restart()
+
+  def cmd_run(self, argv):
+    ''' Usage: {cmd} [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [args...]
+          Run a daemon command.
+          -1    Run command only once.
+          -l    Use lock \"svcd-<name>\" to prevent multiple instances of this svcd.
+          -F [!]flag,...
+                Flags to include in the run test. Flags with a leading
+                exclaimation point (!) must test false, others true.
+          -L lockname
+                Use lock \"lockname\" to prevent multiple instances of this svcd.
+          -n name
+                Specify a name for this svcd.
+                Also create a subprocess pid file at {VARRUN}/name.pid for the command.
+                This also causes svcd to consult the flags {{NAME}}_OVERRIDE
+                and {{NAME}}_DISABLE and {{NAME}}_RESTART.
+          -p svcd-pidfile
+                Specify {cmd} pid file instead of default.
+          -P subp-pidfile
+                Specify {cmd} subprocess pid file instead of default.
+          -q    Quiet. Do not issue alerts.
+          -s sigcmd
+                Run the signature shell command \"sigcmd\" whose output is
+                used to check for changed circumstances requiring the service
+                to restart.
+          -t testcmd
+                Run the test shell command \"testcmd\" periodically to
+                govern whether the command should be active.
+          -T testrate
+                Interval between test polls in seconds. Default from SvcD.TEST_RATE
+          -u username
+                Run command as the specified username.
+          -U username
+                Run test and related commands as the specified username.
+          -x    Trace execution.
+    '''
+    badopts = False
     once = False
     use_lock = False
     lock_name = None
@@ -219,7 +217,8 @@ def main(argv=None):
           try:
             test_rate = int(value)
           except ValueError as e:
-            raise GetoptError("testrate should be a valid integer: %s" % (e,))
+            warning("testrate should be a valid integer: %s", e)
+            badopts = True
         elif opt == '-u':
           run_username = value
           run_uid = getpwnam(run_username).pw_uid
@@ -230,85 +229,98 @@ def main(argv=None):
           trace = True
         else:
           raise RuntimeError("unhandled option")
-    if use_lock and name is None:
-      raise GetoptError("-l (lock) requires a name (-n)")
     if not argv:
-      raise GetoptError("missing command")
-  except GetoptError as e:
-    warning("%s", e)
-    badopts = True
-  if badopts:
-    print(usage, file=sys.stderr)
-    return 2
-  if sig_shcmd is None:
-    sig_func = None
-  else:
+      warning("missing command")
+    if name is None:
+      name = basename(argv[0])
+    if use_lock and name is None:
+      warning("-l (lock) requires a name (-n)")
+      badopts = True
+    if badopts:
+      raise GetoptError("bad invocation")
 
-    def sig_func():
-      argv = ['sh', ('-xc' if trace else '-c'), sig_shcmd]
-      if test_uid != uid:
-        su_shcmd = 'exec ' + quotecmd(argv)
-        if trace:
-          su_shcmd = 'set -x; ' + su_shcmd
-        argv = ['su', test_username, '-c', su_shcmd]
-      P = LockedPopen(argv, stdin=DEVNULL, stdout=PIPE)
-      sig_text = P.stdout.read()
-      returncode = P.wait()
-      if returncode != 0:
-        warning("returncode %s from %r", returncode, sig_shcmd)
-        sig_text = None
-      return sig_text
+    if sig_shcmd is None:
+      sig_func = None
+    else:
 
-  if test_shcmd is None:
-    test_func = None
-  else:
-
-    def test_func():
-      with Pfx("main.test_func: shcmd=%r", test_shcmd):
-        argv = ['sh', '-c', test_shcmd]
+      def sig_func():
+        argv = ['sh', ('-xc' if trace else '-c'), sig_shcmd]
         if test_uid != uid:
-          argv = ['su', test_username, 'exec ' + quotecmd(argv)]
-        shcmd_ok = callproc(argv, stdin=DEVNULL) == 0
-        if not quiet:
-          info("exit status != 0")
-        return shcmd_ok
+          su_shcmd = 'exec ' + quotecmd(argv)
+          if trace:
+            su_shcmd = 'set -x; ' + su_shcmd
+          argv = ['su', test_username, '-c', su_shcmd]
+        P = LockedPopen(argv, stdin=DEVNULL, stdout=PIPE)
+        sig_text = P.stdout.read()
+        returncode = P.wait()
+        if returncode != 0:
+          warning("returncode %s from %r", returncode, sig_shcmd)
+          sig_text = None
+        return sig_text
 
-  if run_uid != uid:
-    argv = ['su', run_username, 'exec ' + quotecmd(argv)]
-  if use_lock:
-    argv = ['lock', '--', 'svcd-' + name] + argv
-  S = SvcD(
-      argv,
-      name=name,
-      pidfile=svc_pidfile,
-      sig_func=sig_func,
-      test_flags=test_flags,
-      test_func=test_func,
-      test_rate=test_rate,
-      once=once,
-      quiet=quiet,
-      trace=trace
-  )
+    if test_shcmd is None:
+      test_func = None
+    else:
 
-  def signal_handler(*_):
-    S.stop()
-    S.wait()
-    S.flag_stop = False
-    sys.exit(1)
+      def test_func():
+        with Pfx("main.test_func: shcmd=%r", test_shcmd):
+          argv = ['sh', '-c', test_shcmd]
+          if test_uid != uid:
+            argv = ['su', test_username, 'exec ' + quotecmd(argv)]
+          shcmd_ok = callproc(argv, stdin=DEVNULL) == 0
+          if not quiet:
+            info("exit status != 0")
+          return shcmd_ok
 
-  signal(SIGHUP, signal_handler)
-  signal(SIGINT, signal_handler)
-  signal(SIGTERM, signal_handler)
-  if S.pidfile or mypidfile:
-    if mypidfile is None:
-      pidfile_base, pidfile_ext = splitext(S.pidfile)
-      mypidfile = pidfile_base + '-svcd' + pidfile_ext
-    with PidFileManager(mypidfile):
-      S.start()
+    if run_uid != uid:
+      argv = ['su', run_username, 'exec ' + quotecmd(argv)]
+    if use_lock:
+      argv = ['lock', '--', 'svcd-' + name] + argv
+    S = SvcD(
+        *argv,
+        name=name,
+        pidfile=svc_pidfile,
+        sig_func=sig_func,
+        test_flags=test_flags,
+        test_func=test_func,
+        test_rate=test_rate,
+        once=once,
+        quiet=quiet,
+        trace=trace
+    )
+
+    def signal_handler(*_):
+      S.stop()
       S.wait()
-  else:
-    S.start()
-    S.wait()
+      S.flag_stop = False
+      sys.exit(1)
+
+    with signal_handlers({
+        SIGHUP: signal_handler,
+        SIGINT: signal_handler,
+        SIGTERM: signal_handler,
+    }):
+      if S.pidfile or mypidfile:
+        if mypidfile is None:
+          pidfile_base, pidfile_ext = splitext(S.pidfile)
+          mypidfile = pidfile_base + '-svcd' + pidfile_ext
+        with PidFileManager(mypidfile):
+          S.start()
+          S.wait()
+      else:
+        S.start()
+        S.wait()
+
+  def cmd_stop(self, argv):
+    ''' {cmd} stop names...
+          For each name set the flag {{NAME}}_STOP, causing the the
+          montior thread to kill the daemon process and exit.
+    '''
+    if not argv:
+      raise GetoptError("missing arguments")
+    for name in argv:
+      with Pfx(name):
+        SvcD(name=name).stop()
 
 _Popen_lock = Lock()
 
