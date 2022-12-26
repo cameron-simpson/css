@@ -183,6 +183,38 @@ class PlayOnCommand(BaseCommand):
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
 
+  def cmd_api(self, argv):
+    ''' Usage: {cmd} suburl
+          GET suburl via the API, print result.
+    '''
+    if not argv:
+      raise GetoptError("missing suburl")
+    suburl = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    result = api.suburl_data(suburl)
+    pprint(result)
+
+  def cmd_cds(self, argv):
+    ''' Usage: {cmd} suburl
+          GET suburl via the content delivery API, print result.
+          Example subpaths:
+            content
+            content/provider-name
+    '''
+    if not argv:
+      raise GetoptError("missing suburl")
+    suburl = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    X("login")
+    lstate = api.login_state
+    pprint(lstate)
+    result = api.cdsurl_data(suburl)
+    pprint(result)
+
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_dl(self, argv):
     ''' Usage: {cmd} [-j jobs] [-n] [recordings...]
