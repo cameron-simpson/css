@@ -283,7 +283,7 @@ class Portfwd(FlaggedMixin):
     self.group_name = 'PORTFWD ' + target.upper()
     self.flag_connected = False
     self.svcd = SvcD(
-        self.ssh_argv(),
+        *self.ssh_argv(),
         name=self.svcd_name,
         group_name=self.group_name,
         flags=self.flags,
