@@ -12,13 +12,14 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import partial
 from getopt import getopt, GetoptError
+from json import JSONDecodeError
 from netrc import netrc
 import os
 from os import environ
 from os.path import (
     basename, exists as pathexists, expanduser, realpath, splitext
 )
-from pprint import pformat
+from pprint import pformat, pprint
 import re
 import sys
 from threading import RLock, Semaphore
@@ -42,7 +43,7 @@ from cs.result import bg as bg_result, report as report_results
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20220311-post'
 
@@ -672,6 +673,9 @@ class PlayOnAPI(MultiOpenMixin):
   CDS_HOSTNAME = 'cds.playonrecorder.com'
   CDS_BASE = f'https://{CDS_HOSTNAME}/api/v6/'
 
+  CDS_HOSTNAME_LOCAL = 'cds-au.playonrecorder.com'
+  CDS_BASE_LOCAL = f'https://{CDS_HOSTNAME_LOCAL}/api/v6/'
+
   def __init__(self, login, password, sqltags=None):
     if sqltags is None:
       sqltags = PlayOnSQLTags()
@@ -846,6 +850,12 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.suburl_data('account')
 
+  @pfx_method
+  def notifications(self):
+    ''' Return the notifications.
+    '''
+    return self.suburl_data('notification')
+
   def cdsurl_data(self, suburl, _method='GET', headers=None, **kw):
     ''' Wrapper for `suburl_data` using `CDS_BASE` as the base URL.
     '''
@@ -990,7 +1000,7 @@ class PlayOnAPI(MultiOpenMixin):
       dl_rsp = None
     else:
       dl_cookies = dl_data['data']
-      jar = requests.cookies.RequestsCookieJar()
+      jar = self._cookies
       for ck_name in 'CloudFront-Expires', 'CloudFront-Key-Pair-Id', 'CloudFront-Signature':
         jar.set(
             ck_name,
