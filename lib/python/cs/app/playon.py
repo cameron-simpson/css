@@ -302,11 +302,12 @@ class PlayOnCommand(BaseCommand):
 
     return xit
 
-  @staticmethod
-  def _refresh_sqltags_data(api, sqltags, max_age=None):
+  def _refresh_sqltags_data(self, api, sqltags, max_age=None):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
+    options = self.options
+    upd = options.upd
     recordings = set(sqltags.recordings())
     need_refresh = (
         # any current recordings whose state is stale
@@ -315,13 +316,13 @@ class PlayOnCommand(BaseCommand):
             for recording in recordings
         ) or
         # no recording is current
-        not all(recording.is_expired() for recording in recordings)
+        all(recording.is_expired() for recording in recordings)
     )
     if need_refresh:
-      print("refresh queue and recordings...")
-      Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
-      for T in Ts:
-        T.join()
+      with upd.run_task("refresh queue and recordings"):
+        Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
+        for T in Ts:
+          T.join()
 
   @staticmethod
   def _list(argv, options, default_argv, default_format):
