@@ -11,7 +11,7 @@ Convenience facilities for managing exceptions.
 import sys
 import traceback
 from cs.deco import decorator
-from cs.logutils import error, exception, warning
+from cs.gimmicks import exception, error, warning
 from cs.py.func import funcname
 
 __version__ = '20221207-post'
@@ -25,7 +25,11 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.logutils', 'cs.py.func'],
+    'install_requires': [
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.py.func',
+    ],
 }
 
 if sys.hexversion >= 0x03000000:

@@ -149,8 +149,9 @@ class CSReleaseCommand(BaseCommand):
   def run_context(self):
     ''' Arrange to autosave the package tagsets.
     '''
-    with self.options.pkg_tagsets:
-      yield
+    with super().run_context():
+      with self.options.pkg_tagsets:
+        yield
 
   ##  export      Export release to temporary directory, report directory.
   ##  freshmeat-submit Announce last release to freshmeat.

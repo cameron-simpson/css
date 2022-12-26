@@ -59,12 +59,14 @@ class DLogCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the logging `SQLTags` around each command invocation.
     '''
-    options = self.options
-    dbpath = options.dbpath
-    with FSTags() as fstags:
-      with SQLTags(dbpath) as sqltags:
-        with stackattrs(options, fstags=fstags, sqltags=sqltags, verbose=True):
-          yield
+    with super().run_context():
+      options = self.options
+      dbpath = options.dbpath
+      with FSTags() as fstags:
+        with SQLTags(dbpath) as sqltags:
+          with stackattrs(options, fstags=fstags, sqltags=sqltags,
+                          verbose=True):
+            yield
 
   @staticmethod
   def cats_from_str(s):
