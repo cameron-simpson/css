@@ -46,17 +46,24 @@ from getopt import getopt, GetoptError
 import os
 from os.path import basename, join as joinpath, splitext
 from pwd import getpwnam, getpwuid
-from signal import signal, SIGHUP, SIGINT, SIGTERM
+from signal import SIGHUP, SIGINT, SIGTERM
 from subprocess import Popen, PIPE
 import sys
 from threading import Lock
 from time import sleep, time as now
+
 from cs.app.flag import Flags, FlaggedMixin
+from cs.cmdutils import BaseCommand
 from cs.env import VARRUN
-from cs.logutils import setup_logging, warning, info, debug, exception
+from cs.gimmicks import DEVNULL
+from cs.logutils import warning, info, debug, exception
 from cs.pfx import Pfx, PfxThread as Thread
-from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
-from cs.py3 import DEVNULL
+from cs.psutils import (
+    PidFileManager,
+    write_pidfile,
+    remove_pidfile,
+    signal_handlers,
+)
 from cs.sh import quotecmd
 
 __version__ = '20210316-post'
@@ -72,10 +79,10 @@ DISTINFO = {
     'install_requires': [
         'cs.app.flag',
         'cs.env',
+        'cs.gimmicks',
         'cs.logutils',
         'cs.pfx',
         'cs.psutils',
-        'cs.py3',
         'cs.sh',
     ],
     'entry_points': {
@@ -581,7 +588,7 @@ class SvcD(FlaggedMixin, object):
             if not stop and self.sig_func is not None:
               try:
                 new_sig = self.sig_func()
-              except Exception as e:
+              except Exception as e:  # pylint: disable=broad-except
                 exception("sig_func: %s", e)
                 new_sig = None
               if new_sig is not None:
