@@ -141,7 +141,7 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
     it = iter(sig_hnds)
   else:
     # (sig,hnd),... from mapping
-    it = items()
+    it = iter(items())
   try:
     sig, handler = next(it)
   except StopIteration:
@@ -150,7 +150,7 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
     with signal_handler(sig, handler,
                         call_previous=call_previous) as old_handler:
       _stacked[sig] = old_handler
-      with signal_handlers(sig_hnds, call_previous=call_previous,
+      with signal_handlers(it, call_previous=call_previous,
                            _stacked=_stacked) as stacked:
         yield stacked
     return
