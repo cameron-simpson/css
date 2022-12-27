@@ -39,7 +39,6 @@ DISTINFO = {
         'cs.deco',
         'cs.excutils',
         'cs.gimmicks',
-        'cs.logutils',
         'cs.pfx',
         'cs.py.func',
         'cs.seq',
