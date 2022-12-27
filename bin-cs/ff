@@ -5,7 +5,7 @@
 
 set -uex
 
-ffexe=/Applications/Firefox.app/Contents/MacOS/firefox
+ffexe=firefox   ## /Applications/Firefox.app/Contents/MacOS/firefox
 ffcontainers=$HOME/p/FIREFOX/containers.json
 
 umask 077
