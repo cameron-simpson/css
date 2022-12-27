@@ -334,8 +334,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   else:
     pre_argv = list(pre_argv)
     post_argv = list(post_argv)
-  pre_nbytes = sum([len(arg) + 1 for arg in pre_argv])
-  post_nbytes = sum([len(arg) + 1 for arg in post_argv])
+  pre_nbytes = sum(len(arg) + 1 for arg in pre_argv)
+  post_nbytes = sum(len(arg) + 1 for arg in post_argv)
   argvs = []
   available = max_argv - pre_nbytes - post_nbytes
   per = []
