@@ -69,7 +69,7 @@ cs.pipeline pypi.release="20191007.1" ok_revision=fdf8009af610626fe5788b22eec90c
 cs.pop3 ok_revision=adbfecd9bfd3d8d0baa852d102c880c793948c7d pypi.release="20221221"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
 cs.progress pypi.release="20221207" ok_revision="383ab73b224c05503b2cb3b668667c5c749d2eac" features={"20210803":["progress_runstate"]}
-cs.psutils pypi.release="20221118" ok_revision="93ebe336b3667941be456a66bc839fdf647d8a92" features={"20220429":["signal_handler"],"20220531":["print_argv"]}
+cs.psutils pypi.release="20221228" ok_revision="93ebe336b3667941be456a66bc839fdf647d8a92" features={"20220429":["signal_handler"],"20220531":["print_argv"]}
 cs.py.doc pypi.release="20220311" ok_revision="5f879c6cede60f3878cfe95e303a529b273f306f"
 cs.py.func pypi.release="20221207" ok_revision=a52db371f829cc455d1a6e273893ed01595ac1a1 features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
 cs.py.modules pypi.release="20220606" ok_revision="47871444e5c52d21dde402b72b4c5b1e71d38ee9" features={"20220606":["import_extra"]}
