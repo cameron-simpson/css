@@ -94,6 +94,6 @@ cs.tty
 cs.units
 cs.upd ok_revision="77660ce928dca2f099ea90aecaad9b8b053193c8"
 cs.x
-cs.xml
+cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
 icontract
 typeguard
