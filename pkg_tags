@@ -89,7 +89,7 @@ cs.sqlalchemy_utils
 cs.sqltags
 cs.tagset
 cs.taskqueue ok_revision="3124b308e9599978d77d3cd7e4c8f769400803e1" features={"20221207":["BaseTask"]} pypi.release="20221207"
-cs.threads ok_revision=ded132e5e6a3f13965847056336404df73007dd8 pypi.release="20221207"
+cs.threads ok_revision="23857c0eff7a8bb35cb33f1f80542a9b79adc8f5" pypi.release="20221207"
 cs.tty
 cs.units
 cs.upd ok_revision="77660ce928dca2f099ea90aecaad9b8b053193c8"
