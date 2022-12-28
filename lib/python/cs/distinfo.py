@@ -5,7 +5,6 @@
 ''' My Python package release script.
 '''
 
-from __future__ import print_function
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
 from contextlib import contextmanager
@@ -52,10 +51,12 @@ from cs.lex import (
 from cs.logutils import error, warning, info, status, trace
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.progress import progressbar
 import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
 from cs.tagset import TagFile, tag_or_tag_value
+from cs.upd import Upd, print
 from cs.vcs import VCS
 from cs.vcs.hg import VCS_Hg
 
@@ -523,26 +524,32 @@ class CSReleaseCommand(BaseCommand):
       pkg_names = argv
     else:
       pkg_names = sorted(options.pkg_tagsets.keys())
-    for pkg_name in pkg_names:
-      if pkg_name.startswith(MODULE_PREFIX):
-        pkg = options.modules[pkg_name]
-        pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
-        if pypi_release is not None:
-          problems = pkg.problems()
-          problem_text = (
-              "%d problems" % (len(problems),) if problems else "ok"
-          )
-          if problems and options.colourise:
-            problem_text = colourise(problem_text, 'yellow')
-          list_argv = [
-              pkg_name,
-              pypi_release,
-              problem_text,
-          ]
-          features = pkg.features(pypi_release)
-          if features:
-            list_argv.append('[' + ' '.join(sorted(features)) + ']')
-          print(*list_argv)
+    with Upd().insert(1) as proxy:
+      for pkg_name in progressbar(pkg_names, label="packages"):
+        proxy.prefix = f'{pkg_name}: '
+        if pkg_name.startswith(MODULE_PREFIX):
+          pkg = options.modules[pkg_name]
+          pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
+          if pypi_release is not None:
+            problems = pkg.problems()
+            if not problems:
+              proxy.text = "ok"
+            else:
+              proxy.text = f'{len(problems)} problems'
+              problem_text = (
+                  "%d problems" % (len(problems),) if problems else "ok"
+              )
+              if problems and options.colourise:
+                problem_text = colourise(problem_text, 'yellow')
+              list_argv = [
+                  pkg_name,
+                  pypi_release,
+                  problem_text,
+              ]
+              features = pkg.features(pypi_release)
+              if features:
+                list_argv.append('[' + ' '.join(sorted(features)) + ']')
+              print(*list_argv)
     return 0
 
   def cmd_resolve(self, argv):
