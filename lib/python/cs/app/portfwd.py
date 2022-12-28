@@ -44,7 +44,7 @@ from cs.py.func import prop
 from cs.py3 import DEVNULL
 from cs.sh import quotecmd as shq
 
-__version__ = '20221228'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
