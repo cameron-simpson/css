@@ -1343,9 +1343,9 @@ class NamedBackup(SingletonMixin):
   ):
     ''' Return a `UUIDNDJSONMapping` associated with the filename `ndjson_path`.
     '''
-    if not ndjson_path.endswith('.ndjson'):
+    if not ndjson_path.endswith(('.ndjson', '.ndjson.gz')):
       warning(
-          "%s.dirstate_from_pathname(%r): does not end in .ndjson",
+          "%s.dirstate_from_pathname(%r): does not end in .ndjson or .ndjson.gz",
           cls.__name__, ndjson_path
       )
     state = UUIDNDJSONMapping(
