@@ -12,7 +12,7 @@ cs.app.myke ok_revision="2d63b52a3bd5c244e3d73b0ea1548655a154cfa0" pypi.release=
 cs.app.nodedb
 cs.app.osx.plist ok_revision="0113b8892ffcd70e3896af568ff8005f433dd81e" pypi.release="20221228"
 cs.app.osx.release
-cs.app.playon ok_revision="773ef27b7223efe9baf794bdf93e0b5143bf5216" pypi.release="20220311" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds"]}
+cs.app.playon ok_revision="773ef27b7223efe9baf794bdf93e0b5143bf5216" pypi.release="20220311" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
 cs.app.plyon
 cs.app.portfwd pypi.release="20210316" ok_revision=a340f42feecc3b8910c40cef2d2d2c8a0ca8e96c
 cs.app.solar
