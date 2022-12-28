@@ -655,11 +655,12 @@ class KindleCommand(BaseCommand):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
-    options = self.options
-    with KindleTree(options.kindle_path) as kt:
-      with CalibreTree(options.calibre_path) as cal:
-        with stackattrs(options, kindle=kt, calibre=cal):
-          yield
+    with super().run_context():
+      options = self.options
+      with KindleTree(options.kindle_path) as kt:
+        with CalibreTree(options.calibre_path) as cal:
+          with stackattrs(options, kindle=kt, calibre=cal):
+            yield
 
   def cmd_app_path(self, argv):
     ''' Usage: {cmd} [content-path]

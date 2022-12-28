@@ -124,12 +124,14 @@ class CDRipCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    fstags = FSTags()
-    mbdb = MBDB(mbdb_path=self.options.mbdb_path)
-    with fstags:
-      with mbdb:
-        with stackattrs(self.options, fstags=fstags, mbdb=mbdb, verbose=True):
-          yield
+    with super().run_context():
+      fstags = FSTags()
+      mbdb = MBDB(mbdb_path=self.options.mbdb_path)
+      with fstags:
+        with mbdb:
+          with stackattrs(self.options, fstags=fstags, mbdb=mbdb,
+                          verbose=True):
+            yield
 
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...

@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Start firefox. - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -uex
+
+ffexe=firefox   ## /Applications/Firefox.app/Contents/MacOS/firefox
+ffcontainers=$HOME/p/FIREFOX/containers.json
+
+umask 077
+cd
+if [ -s "$ffcontainers" ]
+then  ff-sort-containers "$ffcontainers"
+else  echo "$0: warning: no $ffcontainers" >&2
+fi
+"$ffexe" -foreground &

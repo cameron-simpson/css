@@ -15,7 +15,7 @@ import time
 
 from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
 from cs.deco import default_params
-from cs.logutils import error, warning
+from cs.gimmicks import error, warning
 from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
@@ -23,7 +23,7 @@ from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 from cs.threads import State as ThreadState
 
-__version__ = '20221118-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -35,7 +35,7 @@ DISTINFO = {
     'install_requires': [
         'cs.context',
         'cs.deco',
-        'cs.logutils',
+        'cs.gimmicks',
         'cs.obj',
         'cs.pfx',
         'cs.psutils',
@@ -513,8 +513,11 @@ class RunState(ContextManagerMixin):
 
   current = ThreadState(runstate=None)
 
-  def __init__(self, name=None, signals=None, handle_signal=None):
+  def __init__(
+      self, name=None, signals=None, handle_signal=None, verbose=False
+  ):
     self.name = name
+    self.verbose = verbose
     self._started_from = None
     self._signals = tuple(signals) if signals else ()
     self._sigstack = None
@@ -684,7 +687,6 @@ class RunState(ContextManagerMixin):
       self,
       sig,
       call_previous=False,
-      verbose=False,
       handle_signal=None,
   ):
     ''' Context manager to catch the signal or signals `sig` and
@@ -696,8 +698,6 @@ class RunState(ContextManagerMixin):
         * `sig`: an `int` signal number or an iterable of signal numbers
         * `call_previous`: optional flag (default `False`)
           passed to `cs.psutils.signal_handlers`
-        * `verbose`: if true (default `False`),
-          issue a `warning` on receipt of a signal
     '''
     if handle_signal is None:
       handle_signal = self.handle_signal
@@ -709,10 +709,11 @@ class RunState(ContextManagerMixin):
 
   def handle_signal(self, sig, _):
     ''' `RunState` signal handler: cancel the run state.
-        Warn if `verbose`.
+        Warn if `self.verbose`.
       '''
     # pylint: disable=expression-not-assigned
-    warning("%s: received signal %s, cancelling", self, sig)
+    if self.verbose:
+      warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
 uses_runstate = default_params(runstate=lambda: RunState.current.runstate)

@@ -43,6 +43,7 @@ DISTINFO = {
     'install_requires': [
         'icontract',
         'sqlalchemy',
+        'typeguard',
         'cs.deco',
         'cs.fileutils',
         'cs.lex',

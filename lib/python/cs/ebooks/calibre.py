@@ -1084,8 +1084,9 @@ class CalibreCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    with self.options.calibre:
-      yield
+    with super().run_context():
+      with self.options.calibre:
+        yield
 
   @staticmethod
   def books_from_spec(calibre, book_spec):

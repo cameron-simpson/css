@@ -12,13 +12,14 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import partial
 from getopt import getopt, GetoptError
+from json import JSONDecodeError
 from netrc import netrc
 import os
 from os import environ
 from os.path import (
     basename, exists as pathexists, expanduser, realpath, splitext
 )
-from pprint import pformat
+from pprint import pformat, pprint
 import re
 import sys
 from threading import RLock, Semaphore
@@ -42,9 +43,9 @@ from cs.result import bg as bg_result, report as report_results
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220311-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -152,18 +153,20 @@ class PlayOnCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
-    options = self.options
-    sqltags = PlayOnSQLTags()
-    api = PlayOnAPI(options.user, options.password, sqltags)
-    with sqltags:
-      with stackattrs(options, api=api, sqltags=sqltags):
-        with api:
-          # preload all the recordings from the db
-          list(sqltags.recordings())
-          # if there are unexpired stale entries or no unexpired entries,
-          # refresh them
-          self._refresh_sqltags_data(api, sqltags)
-          yield
+    with super().run_context():
+      options = self.options
+      sqltags = PlayOnSQLTags()
+      api = PlayOnAPI(options.user, options.password, sqltags)
+      with sqltags:
+        with stackattrs(options, api=api, sqltags=sqltags):
+          with api:
+            # preload all the recordings from the db
+            ##print("RC PRELOAD")
+            ##list(sqltags.recordings())
+            # if there are unexpired stale entries or no unexpired entries,
+            # refresh them
+            self._refresh_sqltags_data(api, sqltags)
+            yield
 
   def cmd_account(self, argv):
     ''' Usage: {cmd}
@@ -174,6 +177,37 @@ class PlayOnCommand(BaseCommand):
     api = self.options.api
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
+
+  def cmd_api(self, argv):
+    ''' Usage: {cmd} suburl
+          GET suburl via the API, print result.
+    '''
+    if not argv:
+      raise GetoptError("missing suburl")
+    suburl = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    result = api.suburl_data(suburl)
+    pprint(result)
+
+  def cmd_cds(self, argv):
+    ''' Usage: {cmd} suburl
+          GET suburl via the content delivery API, print result.
+          Example subpaths:
+            content
+            content/provider-name
+    '''
+    if not argv:
+      raise GetoptError("missing suburl")
+    suburl = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    lstate = api.login_state
+    pprint(lstate)
+    result = api.cdsurl_data(suburl)
+    pprint(result)
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_dl(self, argv):
@@ -257,16 +291,17 @@ class PlayOnCommand(BaseCommand):
         dl_id = R.extra['dl_id']
         recording = sqltags[dl_id]
         if not R():
-          print("FAILED", dl_id)
+          warning("FAILED download of %d", dl_id)
           xit = 1
 
     return xit
 
-  @staticmethod
-  def _refresh_sqltags_data(api, sqltags, max_age=None):
+  def _refresh_sqltags_data(self, api, sqltags, max_age=None):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
+    options = self.options
+    upd = options.upd
     recordings = set(sqltags.recordings())
     need_refresh = (
         # any current recordings whose state is stale
@@ -275,13 +310,13 @@ class PlayOnCommand(BaseCommand):
             for recording in recordings
         ) or
         # no recording is current
-        not all(recording.is_expired() for recording in recordings)
+        all(recording.is_expired() for recording in recordings)
     )
     if need_refresh:
-      print("refresh queue and recordings...")
-      Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
-      for T in Ts:
-        T.join()
+      with upd.run_task("refresh queue and recordings"):
+        Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
+        for T in Ts:
+          T.join()
 
   @staticmethod
   def _list(argv, options, default_argv, default_format):
@@ -327,6 +362,12 @@ class PlayOnCommand(BaseCommand):
           Default format: {LS_FORMAT}
     '''
     return self._list(argv, self.options, ['available'], self.LS_FORMAT)
+
+  def cmd_poll(self, argv):
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    pprint(api.notifications())
 
   def cmd_queue(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
@@ -625,6 +666,9 @@ class PlayOnAPI(MultiOpenMixin):
   CDS_HOSTNAME = 'cds.playonrecorder.com'
   CDS_BASE = f'https://{CDS_HOSTNAME}/api/v6/'
 
+  CDS_HOSTNAME_LOCAL = 'cds-au.playonrecorder.com'
+  CDS_BASE_LOCAL = f'https://{CDS_HOSTNAME_LOCAL}/api/v6/'
+
   def __init__(self, login, password, sqltags=None):
     if sqltags is None:
       sqltags = PlayOnSQLTags()
@@ -634,7 +678,7 @@ class PlayOnAPI(MultiOpenMixin):
     self._password = password
     self._login_state = None
     self._jwt = None
-    self._cookies = {}
+    self._cookies = requests.cookies.RequestsCookieJar()
     self._storage = defaultdict(str)
     self.sqltags = sqltags
     self._fstags = FSTags()
@@ -737,8 +781,7 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.sqltags[download_id]
 
-  @staticmethod
-  def suburl_request(base_url, method, suburl):
+  def suburl_request(self, base_url, method, suburl):
     ''' Return a curried `requests` method
         to fetch `API_BASE/suburl`.
     '''
@@ -751,6 +794,7 @@ class PlayOnAPI(MultiOpenMixin):
         }[method],
         url,
         auth=_RequestsNoAuth(),
+        cookies=self._cookies,
     )
     return rqm
 
@@ -768,7 +812,7 @@ class PlayOnAPI(MultiOpenMixin):
         Parameters:
         * `suburl`: the API subURL designating the endpoint.
         * `_method`: optional HTTP method, default `'GET'`.
-        * `headers`: hreaders to accompany the request;
+        * `headers`: headers to accompany the request;
           default `{'Authorization':self.jwt}`.
         Other keyword arguments are passed to the `requests` method
         used to perform the HTTP call.
@@ -777,8 +821,15 @@ class PlayOnAPI(MultiOpenMixin):
       _base_url = self.API_BASE
     if headers is None:
       headers = dict(Authorization=self.jwt)
-    rqm = self.suburl_request(_base_url, _method, suburl)
-    result = rqm(headers=headers, **kw).json()
+    with Upd().run_task(f'{_method} {_base_url}/{suburl}'):
+      rqm = self.suburl_request(_base_url, _method, suburl)
+      basic_result = rqm(headers=headers, **kw)
+    basic_result.raise_for_status()
+    try:
+      result = basic_result.json()
+    except JSONDecodeError as e:
+      warning("basic result is not JSON: %s\n%r", e, basic_result)
+      raise
     if raw:
       return result
     ok = result.get('success')
@@ -791,6 +842,12 @@ class PlayOnAPI(MultiOpenMixin):
     ''' Return account information.
     '''
     return self.suburl_data('account')
+
+  @pfx_method
+  def notifications(self):
+    ''' Return the notifications.
+    '''
+    return self.suburl_data('notification')
 
   def cdsurl_data(self, suburl, _method='GET', headers=None, **kw):
     ''' Wrapper for `suburl_data` using `CDS_BASE` as the base URL.
@@ -936,7 +993,7 @@ class PlayOnAPI(MultiOpenMixin):
       dl_rsp = None
     else:
       dl_cookies = dl_data['data']
-      jar = requests.cookies.RequestsCookieJar()
+      jar = self._cookies
       for ck_name in 'CloudFront-Expires', 'CloudFront-Key-Pair-Id', 'CloudFront-Signature':
         jar.set(
             ck_name,

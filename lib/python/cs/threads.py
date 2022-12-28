@@ -18,12 +18,12 @@ from threading import Semaphore, Thread, Lock, local as thread_local
 from cs.context import stackattrs
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.logutils import LogTime, error, warning
+from cs.gimmicks import error, warning
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
 
-__version__ = '20221118-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'description':
@@ -38,7 +38,7 @@ DISTINFO = {
         'cs.context',
         'cs.deco',
         'cs.excutils',
-        'cs.logutils',
+        'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
         'cs.seq',
@@ -145,6 +145,7 @@ class AdjustableSemaphore(object):
     return "%s[%d]" % (self.__name, self.limit0)
 
   def __enter__(self):
+    from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
     with LogTime("%s(%d).__enter__: acquire", self.__name, self.__value):
       self.acquire()
 
@@ -165,7 +166,7 @@ class AdjustableSemaphore(object):
     if not blocking:
       return self.__sem.acquire(blocking)
     with self.__lock:
-      self.__sem.acquire(blocking)
+      self.__sem.acquire(blocking)  # pylint: disable=consider-using-with
     return True
 
   def adjust(self, newvalue):
@@ -193,10 +194,11 @@ class AdjustableSemaphore(object):
           self.__sem.release()
           delta -= 1
       else:
+        from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
         while delta < 0:
           with LogTime("AdjustableSemaphore(%s): acquire excess capacity",
                        self.__name):
-            self.__sem.acquire(True)
+            self.__sem.acquire(True)  # pylint: disable=consider-using-with
           delta += 1
       self.__value = newvalue
 
@@ -293,7 +295,7 @@ class LockableMixin(object):
     self._lock.acquire()
 
   # pylint: disable=unused-argument
-  def __exit(self, exc_type, exc_value, traceback):
+  def __exit__(self, exc_type, exc_value, traceback):
     self._lock.release()
 
   @property
@@ -327,6 +329,7 @@ class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
            type(self.lock).__name__, id(self.lock),
            str(self.priority_lock))
 
+# pylint: disable=too-many-instance-attributes
 class PriorityLock(object):
   ''' A priority based mutex which is acquired by and released to waiters
       in priority order.

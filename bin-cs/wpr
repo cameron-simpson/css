@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Select random screencaps and set MacOS desktop to selection.
+# - Cameron Simpson <cs@cskk.id.au> 24dec2022
+#
+
+set -ue
+
+set -x
+: "${SSV_DIR=$HOME/im/screencaps}"
+: "${WPDIR:=$HOME/im/wp}"
+: "${WPPATH:=$WPDIR:$SSV_DIR}"
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd word"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing word" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+rd=$HOME/var/im/wp/$( echo "$*" | tr ' /' -- )/random
+
+set -x
+[ -d "$rd" ] || set-x mkdir -p "$rd"
+cd "$rd"
+(
+  for wpsrcdir in $( echo "$WPPATH" | tr : ' ' )
+  do
+    find "$wpsrcdir"/* -type f \( -name \*.png -o -name \*.jpg \) || :
+  done \
+  | grepall -- "$@" \
+  | shuffle \
+  | sed 128q
+) \
+| {
+  first=1
+  while read -r img
+  do
+    [ $first ] && rm -f ./*
+    ln -s -- "$img" .
+    first=
+  done
+  [ $first ] && { echo "$cmd: nothing found" >&2; exit 1; }
+  spaces wp . "$rd"
+}
