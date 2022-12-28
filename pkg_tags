@@ -14,7 +14,7 @@ cs.app.osx.plist ok_revision="0113b8892ffcd70e3896af568ff8005f433dd81e" pypi.rel
 cs.app.osx.release
 cs.app.playon ok_revision="773ef27b7223efe9baf794bdf93e0b5143bf5216" pypi.release="20221228" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
 cs.app.plyon
-cs.app.portfwd pypi.release="20210316" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
+cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
 cs.app.solar
 cs.app.ssh pypi.release=20161003
 cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
