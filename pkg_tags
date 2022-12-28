@@ -16,7 +16,7 @@ cs.app.playon ok_revision="773ef27b7223efe9baf794bdf93e0b5143bf5216" pypi.releas
 cs.app.plyon
 cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
 cs.app.solar
-cs.app.ssh pypi.release=20161003
+cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9082bc3"
 cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
 cs.app.tagger
 cs.app.ydl pypi.release="20220318" ok_revision=c3034b39089e541de85a33496e6cb57d48b0436f
