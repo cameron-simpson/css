@@ -56,7 +56,7 @@ import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
 from cs.tagset import TagFile, tag_or_tag_value
-from cs.upd import Upd, print
+from cs.upd import Upd, print, uses_upd
 from cs.vcs import VCS
 from cs.vcs.hg import VCS_Hg
 
@@ -410,7 +410,8 @@ class CSReleaseCommand(BaseCommand):
 
   # pylint: disable=too-many-locals,too-many-return-statements
   # pylint: disable=too-many-branches,too-many-statements
-  def cmd_release(self, argv):
+  @uses_upd
+  def cmd_release(self, argv, *, upd):
     ''' Usage: {cmd} pkg_name
           Issue a new release for the named package.
     '''
@@ -442,8 +443,9 @@ class CSReleaseCommand(BaseCommand):
     for files, firstline in changes:
       print(" ", ' '.join(files) + ': ' + firstline)
     print()
-    with pipefrom('readdottext', keep_stdin=True) as dotfp:
-      release_message = dotfp.read().rstrip()
+    with upd.above():
+      with pipefrom('readdottext', keep_stdin=True) as dotfp:
+        release_message = dotfp.read().rstrip()
     if not release_message:
       error("empty release message, not making new release")
       return 1
@@ -760,7 +762,8 @@ def clean_release_entry(entry):
     lines = ['* ' + line for line in lines]
   return '\n'.join(lines)
 
-def prompt(message, fin=None, fout=None):
+@uses_upd
+def prompt(message, *, fin=None, fout=None, upd):
   ''' Prompt for a one line answer.
       Return the answer with trailing newlines or carriage returns stripped.
   '''
@@ -768,9 +771,10 @@ def prompt(message, fin=None, fout=None):
     fin = sys.stdin
   if fout is None:
     fout = sys.stderr
-  print(message, end='? ', file=fout)
-  fout.flush()
-  return fin.readline().rstrip('\r\n')
+  with upd.above():
+    print(message, end='? ', file=fout)
+    fout.flush()
+    return fin.readline().rstrip('\r\n')
 
 def ask(message, fin=None, fout=None):
   ''' Prompt with yes/no question, return true if response is "y" or "yes".
