@@ -79,8 +79,10 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.flag',
+        'cs.cmdutils',
         'cs.env',
         'cs.gimmicks',
+        'cs.lex',
         'cs.logutils',
         'cs.pfx',
         'cs.psutils',
@@ -146,6 +148,7 @@ class SvcDCommand(BaseCommand):
       with Pfx(name):
         SvcD(name=name).restart()
 
+  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_run(self, argv):
     ''' Usage: {cmd} [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [args...]
           Run a daemon command.
@@ -364,6 +367,7 @@ def callproc(*a, **kw):
   P.wait()
   return P.returncode
 
+# pylint: disable=too-many-instance-attributes
 class SvcD(FlaggedMixin, object):
   ''' A process based service.
   '''
@@ -372,6 +376,7 @@ class SvcD(FlaggedMixin, object):
   KILL_TIME = 5  # how long to wait for a terminated process to exit
   RESTART_DELAY = 3  # delay be restart of an exited process
 
+  # pylint: disable=too-many-locals
   def __init__(
       self,
       *argv,
@@ -562,11 +567,13 @@ class SvcD(FlaggedMixin, object):
       self.subp.kill()
     return self.reap()
 
+  # pylint: disable=too-many-statements
   def start(self):
     ''' Start the subprocess and its monitor.
     '''
     with Pfx("SvcD.start(%s)", self):
 
+      # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks
       def monitor():
         old_sig = None
         next_test_time = now()
