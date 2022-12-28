@@ -67,7 +67,7 @@ from cs.psutils import (
 )
 from cs.sh import quotecmd
 
-__version__ = '20221228'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
