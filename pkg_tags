@@ -17,7 +17,7 @@ cs.app.plyon
 cs.app.portfwd pypi.release="20210316" ok_revision=a340f42feecc3b8910c40cef2d2d2c8a0ca8e96c
 cs.app.solar
 cs.app.ssh pypi.release=20161003
-cs.app.svcd pypi.release="20210316" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
+cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
 cs.app.tagger
 cs.app.ydl pypi.release="20220318" ok_revision=c3034b39089e541de85a33496e6cb57d48b0436f
 cs.asynchron pypi.release=20160828
