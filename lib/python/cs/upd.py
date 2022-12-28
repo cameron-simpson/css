@@ -994,7 +994,7 @@ def print(*a, upd, end='\n', **kw):
   '''
   kw['flush'] = True
   with upd.above(need_newline=not end.endswith('\n')):
-    builtin_print(*a, **kw)
+    builtin_print(*a, end=end, **kw)
 
 @uses_upd
 def pfxprint(*a, upd, **kw):
