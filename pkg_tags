@@ -93,7 +93,7 @@ cs.taskqueue ok_revision="3124b308e9599978d77d3cd7e4c8f769400803e1" features={"2
 cs.threads ok_revision="23857c0eff7a8bb35cb33f1f80542a9b79adc8f5" pypi.release="20221228"
 cs.tty
 cs.units
-cs.upd ok_revision="77660ce928dca2f099ea90aecaad9b8b053193c8"
+cs.upd ok_revision="0f3ef56341773334a0a40ff79dee85d24c9d5c6d"
 cs.x
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
 icontract
