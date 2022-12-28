@@ -86,7 +86,7 @@ cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966
 cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e75882d2 featu
 cs.sh
 cs.sqlalchemy_utils ok_revision=cdf1c54d57f2bb5313ec9f1b50876965ec8e49fc
-cs.sqltags ok_revision="14532850e539eb1624e9d31e0c6891d47657d8d0"
+cs.sqltags ok_revision="14532850e539eb1624e9d31e0c6891d47657d8d0" pypi.release="20221228"
 cs.tagset ok_revision="89d6eda67ae6476789d6eade392c1e7576aa7a27" features={"20221228":["TagFile_prune"]} pypi.release="20221228"
 cs.taskqueue ok_revision="3124b308e9599978d77d3cd7e4c8f769400803e1" features={"20221207":["BaseTask"]} pypi.release="20221207"
 cs.threads ok_revision="23857c0eff7a8bb35cb33f1f80542a9b79adc8f5" pypi.release="20221228"
@@ -96,4 +96,5 @@ cs.upd ok_revision="77660ce928dca2f099ea90aecaad9b8b053193c8"
 cs.x
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
 icontract
+sqlalchemy
 typeguard
