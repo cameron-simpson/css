@@ -9,6 +9,7 @@ set -ue
 set -x
 : "${SSV_DIR=$HOME/im/screencaps}"
 : "${WPDIR:=$HOME/im/wp}"
+: "${WPLINKDIR:=$HOME/var/im/wp}"
 : "${WPPATH:=$WPDIR:$SSV_DIR}"
 
 cmd=$( basename "$0" )
@@ -24,7 +25,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-rd=$HOME/var/im/wp/$( echo "$*" | tr ' /' -- )/random
+rd=$WPLINKDIR/$( echo "$*" | tr ' /' -- )/random
 
 set -x
 [ -d "$rd" ] || set-x mkdir -p "$rd"
