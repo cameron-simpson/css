@@ -1109,7 +1109,7 @@ class IndexedSetMixin(ABC):
       * `IndexedSetMixin__pk`: the name of the primary key;
         it is an error for multiple records to have the same primary key
       * `scan`: a generator method to scan the backing store
-        and yield records, used for the inital load of the mapping
+        and yield records, used for the initial load of the mapping
       * `add_backend(record)`: add a new record to the backing store;
         this is called from the `.add(record)` method
         after indexing to persist the record in the backing store
