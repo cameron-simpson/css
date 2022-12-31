@@ -140,7 +140,6 @@ class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
     '''
     with self._lock:
       # TODO: was with rewrite_cmgr(self.__ndjson_filename) as T:,
-      # needs gz support somehow
       with gzifopen(self.__ndjson_filename, 'w') as f:
         i = 0
         for i, record in enumerate(self.by_uuid.values(), 1):
