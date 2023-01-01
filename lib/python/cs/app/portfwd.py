@@ -33,6 +33,7 @@ import subprocess
 import sys
 from threading import RLock
 from time import sleep
+
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
 from cs.env import envsub
@@ -43,7 +44,7 @@ from cs.py.func import prop
 from cs.py3 import DEVNULL
 from cs.sh import quotecmd as shq
 
-__version__ = '20210316-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -283,7 +284,7 @@ class Portfwd(FlaggedMixin):
     self.group_name = 'PORTFWD ' + target.upper()
     self.flag_connected = False
     self.svcd = SvcD(
-        self.ssh_argv(),
+        *self.ssh_argv(),
         name=self.svcd_name,
         group_name=self.group_name,
         flags=self.flags,

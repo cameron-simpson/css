@@ -1229,7 +1229,7 @@ class NamedBackup(SingletonMixin):
     self.state_dirpath = state_dirpath
     # the association of UUIDs with directory subpaths
     self.diruuids = UUIDNDJSONMapping(
-        joinpath(self.state_dirpath, 'diruuids.ndjson')
+        joinpath(self.state_dirpath, 'diruuids.ndjson.gz')
     )
     # the directory holding the DirState files
     self.dirstates_dirpath = joinpath(self.state_dirpath, 'dirstates')
@@ -1237,7 +1237,8 @@ class NamedBackup(SingletonMixin):
     self._dirstates = {}
     # cloud storage stuff
     self.backup_records = UUIDNDJSONMapping(
-        joinpath(self.state_dirpath, 'backups.ndjson'), dictclass=BackupRecord
+        joinpath(self.state_dirpath, 'backups.ndjson.gz'),
+        dictclass=BackupRecord
     )
     # TODO: not using _saved_hashcodes yet
     self._saved_hashcodes = set()
@@ -1327,7 +1328,7 @@ class NamedBackup(SingletonMixin):
     uupath = uuidpath(uu, 2, 2, make_subdir_of=self.dirstates_dirpath)
     dirstate_path = joinpath(
         self.dirstates_dirpath, dirname(uupath), uu.hex
-    ) + '.ndjson'
+    ) + '.ndjson.gz'
     return uu, dirstate_path
 
   @classmethod
@@ -1342,9 +1343,9 @@ class NamedBackup(SingletonMixin):
   ):
     ''' Return a `UUIDNDJSONMapping` associated with the filename `ndjson_path`.
     '''
-    if not ndjson_path.endswith('.ndjson'):
+    if not ndjson_path.endswith(('.ndjson', '.ndjson.gz')):
       warning(
-          "%s.dirstate_from_pathname(%r): does not end in .ndjson",
+          "%s.dirstate_from_pathname(%r): does not end in .ndjson or .ndjson.gz",
           cls.__name__, ndjson_path
       )
     state = UUIDNDJSONMapping(

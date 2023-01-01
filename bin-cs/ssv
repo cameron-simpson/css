@@ -2,6 +2,7 @@
 
 set -ue
 
+: "${MPV_WATCH_LATER_DIR=$HOME/var/mpv/watch_later}"
 : "${SSV_DIR:=$HOME/im/screencaps}"
 export SSV_DIR
 
@@ -44,6 +45,7 @@ umask 077
 
 set -x
 exec mpv \
+  "--watch-later-directory=$MPV_WATCH_LATER_DIR" \
   "--screenshot-directory=$sssubdir" \
   "--screenshot-format=png" \
   "--screenshot-template=%F--%P" \

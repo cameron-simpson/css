@@ -19,7 +19,7 @@ import time
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
-__version__ = '20221118-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -136,7 +136,7 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
     it = iter(sig_hnds)
   else:
     # (sig,hnd),... from mapping
-    it = items()
+    it = iter(items())
   try:
     sig, handler = next(it)
   except StopIteration:
@@ -145,7 +145,7 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
     with signal_handler(sig, handler,
                         call_previous=call_previous) as old_handler:
       _stacked[sig] = old_handler
-      with signal_handlers(sig_hnds, call_previous=call_previous,
+      with signal_handlers(it, call_previous=call_previous,
                            _stacked=_stacked) as stacked:
         yield stacked
     return
@@ -334,8 +334,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   else:
     pre_argv = list(pre_argv)
     post_argv = list(post_argv)
-  pre_nbytes = sum([len(arg) + 1 for arg in pre_argv])
-  post_nbytes = sum([len(arg) + 1 for arg in post_argv])
+  pre_nbytes = sum(len(arg) + 1 for arg in pre_argv)
+  post_nbytes = sum(len(arg) + 1 for arg in post_argv)
   argvs = []
   available = max_argv - pre_nbytes - post_nbytes
   per = []

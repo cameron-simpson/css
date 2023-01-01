@@ -9,6 +9,7 @@ set -ue
 set -x
 : "${SSV_DIR=$HOME/im/screencaps}"
 : "${WPDIR:=$HOME/im/wp}"
+: "${WPLINKDIR:=$HOME/var/im/wp}"
 : "${WPPATH:=$WPDIR:$SSV_DIR}"
 
 cmd=$( basename "$0" )
@@ -20,28 +21,32 @@ if [ $# = 0 ]
 then
   echo "$cmd: missing word" >&2
   badopts=1
-else
-  word=$1; shift
-  case "$word" in
-    .* | */*) echo "$cmd: slashes and leading dots forbidden in word: $word" >&2; badopts=1 ;;
-  esac
-  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-rd=$HOME/var/im/wp/$word/random
+rd=$WPLINKDIR/$( echo "$*" | tr ' /' -- )/random
 
 set -x
 [ -d "$rd" ] || set-x mkdir -p "$rd"
 cd "$rd"
-rm -f ./*.png
-pngs=$(
-  for wpsrcdir in ${WPPATH/:/ }
+(
+  for wpsrcdir in $( echo "$WPPATH" | tr : ' ' )
   do
-    find "$wpsrcdir"/*"$word"* -type f -name \*.png || :
-  done | shuffle | sed 128q
-)
-[ -n "$pngs" ] || { echo "$cmd: nothing found" >&2; exit 1; }
-ln -s $pngs .
-spaces wp . "$rd"
+    find "$wpsrcdir"/* -type f \( -name \*.png -o -name \*.jpg \) || :
+  done \
+  | grepall -- "$@" \
+  | shuffle \
+  | sed 128q
+) \
+| {
+  first=1
+  while read -r img
+  do
+    [ $first ] && rm -f ./*
+    ln -s -- "$img" .
+    first=
+  done
+  [ $first ] && { echo "$cmd: nothing found" >&2; exit 1; }
+  spaces wp . "$rd"
+}

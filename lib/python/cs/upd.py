@@ -90,7 +90,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20220918-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -994,7 +994,7 @@ def print(*a, upd, end='\n', **kw):
   '''
   kw['flush'] = True
   with upd.above(need_newline=not end.endswith('\n')):
-    builtin_print(*a, **kw)
+    builtin_print(*a, end=end, **kw)
 
 @uses_upd
 def pfxprint(*a, upd, **kw):

@@ -230,7 +230,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20220806-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -3421,7 +3421,7 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
         except OSError as e:
           error("save(%r) fails: %s", filepath, e)
 
-  def save(self, extra_types=None):
+  def save(self, extra_types=None, prune=False):
     ''' Save the tag map to the tag file if modified.
     '''
     tagsets = self._tagsets
@@ -3432,7 +3432,11 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       if self.is_modified():
         # there are modified TagSets
         self.save_tagsets(
-            self.fspath, tagsets, self.unparsed, extra_types=extra_types
+            self.fspath,
+            tagsets,
+            self.unparsed,
+            extra_types=extra_types,
+            prune=prune,
         )
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():

@@ -176,7 +176,7 @@ main(){
                         main squid -z
                         ;;
       squid)            exec $trace "$squid" -N -f "$config" ${1+"$@"} ;;
-      svc)              exec $trace svcd -n "${name:-squid}" -s "cat $config" \
+      svc)              exec $trace svcd run -n "${name:-squid}" -s "cat $config" \
                             "$squid" -N -f "$config" ${1+"$@"}
                         ;;
       update-config)    gen_config | rewriteif -d "$config" ;;
