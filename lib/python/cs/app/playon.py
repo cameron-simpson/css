@@ -7,7 +7,6 @@
     Includes a nice command line tool.
 '''
 
-from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import partial
@@ -22,7 +21,7 @@ from os.path import (
 from pprint import pformat, pprint
 import re
 import sys
-from threading import RLock, Semaphore
+from threading import Semaphore
 import time
 from urllib.parse import unquote as unpercent
 
@@ -38,12 +37,12 @@ from cs.lex import has_format_attributes, format_attribute
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
-from cs.resources import MultiOpenMixin
 from cs.result import bg as bg_result, report as report_results
+from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.upd import uses_upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20221228-post'
 
@@ -427,14 +426,6 @@ class PlayOnCommand(BaseCommand):
       for tag in playon:
         print(" ", tag)
 
-# pylint: disable=too-few-public-methods
-class _RequestsNoAuth(requests.auth.AuthBase):
-  ''' The API has a distinct login call, avoid basic auth from netrc etc.
-  '''
-
-  def __call__(self, r):
-    return r
-
 # pylint: disable=too-many-ancestors
 @has_format_attributes
 class Recording(SQLTagSet):
@@ -655,7 +646,7 @@ class PlayOnSQLTags(SQLTags):
 
 # pylint: disable=too-many-instance-attributes
 @monitor
-class PlayOnAPI(MultiOpenMixin):
+class PlayOnAPI(HTTPServiceAPI):
   ''' Access to the PlayOn API.
   '''
 
@@ -672,52 +663,14 @@ class PlayOnAPI(MultiOpenMixin):
   def __init__(self, login, password, sqltags=None):
     if sqltags is None:
       sqltags = PlayOnSQLTags()
-    self._lock = RLock()
-    self._auth_token = None
+    super().__init__(sqltags=sqltags)
     self._login = login
     self._password = password
-    self._login_state = None
-    self._jwt = None
-    self._cookies = requests.cookies.RequestsCookieJar()
-    self._storage = defaultdict(str)
-    self.sqltags = sqltags
-    self._fstags = FSTags()
-
-  @contextmanager
-  def startup_shutdown(self):
-    ''' Start up: open and init the `SQLTags`, open the `FSTags`.
-    '''
-    sqltags = self.sqltags
-    with sqltags:
-      sqltags.init()
-      with self._fstags:
-        yield
-
-  @property
-  @pfx_method
-  def auth_token(self):
-    ''' An auth token obtained from the login state.
-    '''
-    return self.login_state['auth_token']
-
-  @property
-  def login_state(self):
-    ''' The login state, a `dict`. Performs a login if necessary.
-    '''
-    with self._lock:
-      state = self._login_state
-      if not state or time.time() + self.API_AUTH_GRACETIME >= state['exp']:
-        self._login_state = None
-        self._jwt = None
-        # not logged in or login about to expire
-        state = self._login_state = self._dologin()
-        self._jwt = state['token']
-    return state
 
   @pfx_method
-  def _dologin(self):
+  def login(self):
     ''' Perform a login, return the resulting `dict`.
-        Does not update the state of `self`.
+        *Does not* update the state of `self`.
     '''
     login = self._login
     password = self._password
@@ -754,14 +707,27 @@ class PlayOnAPI(MultiOpenMixin):
     )
 
   @property
+  def login_expiry(self):
+    ''' Expiry UNIX time for the login state.
+    '''
+    return self.login_state_mapping['exp']
+
+  # UNUSED
+  @property
+  @pfx_method
+  def auth_token(self):
+    ''' An auth token obtained from the login state.
+    '''
+    return self.login_state['auth_token']
+
+  @property
   def jwt(self):
     ''' The JWT token.
     '''
-    # ensure logged in with current tokens
-    self.login_state  # pylint: disable=pointless-statement
-    return self._jwt
+    return self.login_state['token']
 
-  def _renew_jwt(self):
+  # UNUSED
+  def renew_jwt(self):
     at = self.auth_token
     data = self.suburl_data(
         'login/at', _method='POST', params=dict(auth_token=at)
@@ -793,18 +759,21 @@ class PlayOnAPI(MultiOpenMixin):
             'HEAD': requests.head,
         }[method],
         url,
-        auth=_RequestsNoAuth(),
+        auth=RequestsNoAuth(),
         cookies=self._cookies,
     )
     return rqm
 
+  @uses_upd
   def suburl_data(
       self,
       suburl,
+      *,
       _base_url=None,
       _method='GET',
       headers=None,
       raw=False,
+      upd,
       **kw
   ):
     ''' Call `suburl` and return the `'data'` component on success.
@@ -821,7 +790,7 @@ class PlayOnAPI(MultiOpenMixin):
       _base_url = self.API_BASE
     if headers is None:
       headers = dict(Authorization=self.jwt)
-    with Upd().run_task(f'{_method} {_base_url}/{suburl}'):
+    with upd.run_task(f'{_method} {_base_url}/{suburl}'):
       rqm = self.suburl_request(_base_url, _method, suburl)
       basic_result = rqm(headers=headers, **kw)
     basic_result.raise_for_status()
@@ -1002,7 +971,7 @@ class PlayOnAPI(MultiOpenMixin):
             secure=True,
         )
       dl_rsp = requests.get(
-          dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
+          dl_url, auth=RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
       with pfx_call(atomic_filename, filename, mode='wb',
@@ -1031,7 +1000,7 @@ class PlayOnAPI(MultiOpenMixin):
     if dl_rsp is not None:
       recording.set('download_path', fullpath)
     # apply the SQLTagSet to the FSTags TagSet
-    self._fstags[fullpath].update(recording.subtags('playon'), prefix='playon')
+    self.fstags[fullpath].update(recording.subtags('playon'), prefix='playon')
     return recording
 
 if __name__ == '__main__':
