@@ -511,23 +511,14 @@ class Recording(SQLTagSet):
 
   @format_attribute
   def is_stale(self, max_age=None):
-    ''' Test whether this entry is stale
-        i.e. the time since `self.last_updated` exceeds `max_age` seconds
-        (default from `self.STALE_AGE`).
-        Note that expired recordings are never stale
-        because they can no longer be queried from the API.
+    ''' Override for `TagSet.is_stale()` which considers expired
+        records not stale because they can never be refrehed from the
+        service.
     '''
-    if max_age is None:
-      max_age = self.STALE_AGE
     if self.is_expired():
       # expired recording will never become unstale
       return False
-    if max_age <= 0:
-      return True
-    last_updated = self.last_updated
-    if not last_updated:
-      return True
-    return time.time() >= last_updated + max_age
+    return super().is_stale(max_age=max_age)
 
   def ls(self, ls_format=None, long_mode=False, print_func=None):
     ''' List a recording.
