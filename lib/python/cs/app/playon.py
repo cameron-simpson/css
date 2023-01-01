@@ -747,58 +747,25 @@ class PlayOnAPI(HTTPServiceAPI):
     '''
     return self.sqltags[download_id]
 
-  def suburl_request(self, base_url, method, suburl):
-    ''' Return a curried `requests` method
-        to fetch `API_BASE/suburl`.
+  def suburl(self, suburl, headers=None, **kw):
+    ''' Override `HTTPServiceAPI.suburl` with default
+        `headers={'Authorization':self.jwt}`.
     '''
-    url = base_url + suburl
-    rqm = partial(
-        {
-            'GET': requests.get,
-            'POST': requests.post,
-            'HEAD': requests.head,
-        }[method],
-        url,
-        auth=RequestsNoAuth(),
-        cookies=self._cookies,
-    )
-    return rqm
+    if headers is None:
+      headers = dict(Authorization=self.jwt)
+    return super().suburl(suburl, headers=headers, **kw)
 
-  @uses_upd
-  def suburl_data(
-      self,
-      suburl,
-      *,
-      _base_url=None,
-      _method='GET',
-      headers=None,
-      raw=False,
-      upd,
-      **kw
-  ):
+  def suburl_data(self, suburl, *, raw=False, **kw):
     ''' Call `suburl` and return the `'data'` component on success.
 
         Parameters:
         * `suburl`: the API subURL designating the endpoint.
-        * `_method`: optional HTTP method, default `'GET'`.
-        * `headers`: headers to accompany the request;
-          default `{'Authorization':self.jwt}`.
-        Other keyword arguments are passed to the `requests` method
-        used to perform the HTTP call.
+        * `raw`: if true, return the whole decoded JSON result;
+          the default is `False`, returning `'success'` in the
+          result keys and returning `result['data']`
+        Other keyword arguments are passed to the `HTTPServiceAPI.json` method.
     '''
-    if _base_url is None:
-      _base_url = self.API_BASE
-    if headers is None:
-      headers = dict(Authorization=self.jwt)
-    with upd.run_task(f'{_method} {_base_url}/{suburl}'):
-      rqm = self.suburl_request(_base_url, _method, suburl)
-      basic_result = rqm(headers=headers, **kw)
-    basic_result.raise_for_status()
-    try:
-      result = basic_result.json()
-    except JSONDecodeError as e:
-      warning("basic result is not JSON: %s\n%r", e, basic_result)
-      raise
+    result = self.json(suburl, **kw)
     if raw:
       return result
     ok = result.get('success')
@@ -962,7 +929,7 @@ class PlayOnAPI(HTTPServiceAPI):
       dl_rsp = None
     else:
       dl_cookies = dl_data['data']
-      jar = self._cookies
+      jar = self.cookies
       for ck_name in 'CloudFront-Expires', 'CloudFront-Key-Pair-Id', 'CloudFront-Signature':
         jar.set(
             ck_name,
