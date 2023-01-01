@@ -43,7 +43,7 @@ from cs.result import bg as bg_result, report as report_results
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.upd import uses_upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20220311-post'
 
@@ -798,13 +798,16 @@ class PlayOnAPI(MultiOpenMixin):
     )
     return rqm
 
+  @uses_upd
   def suburl_data(
       self,
       suburl,
+      *,
       _base_url=None,
       _method='GET',
       headers=None,
       raw=False,
+      upd,
       **kw
   ):
     ''' Call `suburl` and return the `'data'` component on success.
@@ -821,7 +824,7 @@ class PlayOnAPI(MultiOpenMixin):
       _base_url = self.API_BASE
     if headers is None:
       headers = dict(Authorization=self.jwt)
-    with Upd().run_task(f'{_method} {_base_url}/{suburl}'):
+    with upd.run_task(f'{_method} {_base_url}/{suburl}'):
       rqm = self.suburl_request(_base_url, _method, suburl)
       basic_result = rqm(headers=headers, **kw)
     basic_result.raise_for_status()
