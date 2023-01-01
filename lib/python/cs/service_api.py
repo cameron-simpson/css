@@ -11,17 +11,22 @@
 '''
 
 from contextlib import contextmanager
+from json import JSONDecodeError
 from threading import RLock
 import time
 from typing import Mapping
 
+from icontract import require
 import requests
 
 from cs.context import stackattrs
 from cs.deco import promote
 from cs.fstags import FSTags
+from cs.logutils import warning
+from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
+from cs.upd import uses_upd
 
 class ServiceAPI(MultiOpenMixin):
   ''' `SewrviceAPI` base class for other APIs talking to services.
@@ -78,12 +83,72 @@ class ServiceAPI(MultiOpenMixin):
     return state
 
 class HTTPServiceAPI(ServiceAPI):
-  ''' `HTTPSewrviceAPI` base class for other APIs talking to HTTP services.
+  ''' `HTTPServiceAPI` base class for other APIs talking to HTTP services.
+
+      Subclasses must define:
+      * `API_BASE`: the base URL of API calls.
+        For example, the `PlayOnAPI` defines this as `f'https://{API_HOSTNAME}/v3/'`.
   '''
+
+  # mapping of method names to requests convenience calls
+  REQUESTS_METHOD_CALLS = {
+      'GET': requests.get,
+      'POST': requests.post,
+      'HEAD': requests.head,
+  }
 
   def __init__(self, **kw):
     super().__init__(**kw)
-    self._cookies = requests.cookies.RequestsCookieJar()
+    self.cookies = requests.cookies.RequestsCookieJar()
+
+  @uses_upd
+  @require(lambda suburl: not suburl.startswith('/'))
+  def suburl(
+      self,
+      suburl,
+      *,
+      _base_url=None,
+      _method='GET',
+      _no_raise_for_status=False,
+      cookies=None,
+      upd,
+      **rqkw,
+  ):
+    ''' Request `suburl` from the service, by default using a `GET`.
+        The `suburl` must be a URL subpath not commencing with `'/'`.
+
+        Keyword parameters:
+        * `_base_url`: the base request domain, default from `self.API_BASE`
+        * `_method`: the request method, default `'GET'`
+        * `_no_raise_for_status`: do not raise an HTTP error if the
+          response status is not 200, default `False` (raise if not 200)
+        * `cookies`: optional cookie jar, default from `self.cookies`
+        Other keyword parameters are passed to the requests method.
+    '''
+    rqm = self.REQUESTS_METHOD_CALLS[_method]
+    if _base_url is None:
+      _base_url = self.API_BASE
+    if cookies is None:
+      cookies = self.cookies
+    url = _base_url + suburl
+    with upd.run_task(f'{_method} {url}'):
+      rsp = pfx_call(rqm, url, cookies=cookies, **rqkw)
+    if not _no_raise_for_status:
+      rsp.raise_for_status()
+    return rsp
+
+  def json(self, suburl, **kw):
+    ''' Request `suburl` from the service, by default using a `GET`.
+        Return the result decoded as JSON.
+
+        Parameters are as for `HTTPServiceAPI.suburl`.
+    '''
+    rsp = self.suburl(suburl, **kw)
+    try:
+      return rsp.json()
+    except JSONDecodeError as e:
+      warning("response is not JSON: %s\n%r", e, rsp)
+      raise
 
 # pylint: disable=too-few-public-methods
 class RequestsNoAuth(requests.auth.AuthBase):
