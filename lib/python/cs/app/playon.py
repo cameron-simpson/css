@@ -304,10 +304,7 @@ class PlayOnCommand(BaseCommand):
     recordings = set(sqltags.recordings())
     need_refresh = (
         # any current recordings whose state is stale
-        any(
-            not recording.is_expired() and recording.is_stale(max_age=max_age)
-            for recording in recordings
-        ) or
+        any(recording.is_stale(max_age=max_age) for recording in recordings) or
         # no recording is current
         all(recording.is_expired() for recording in recordings)
     )
