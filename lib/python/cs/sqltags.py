@@ -1539,7 +1539,7 @@ class SQLTags(BaseTagSets):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Stub startup/shutdown since we use autosessions.
+    ''' Empty stub startup/shutdown since we use autosessions.
         Particularly, we do not want to keep SQLite dbs open.
     '''
     yield self
@@ -1660,7 +1660,7 @@ class SQLTags(BaseTagSets):
   @locked
   def __setitem__(self, index, te):
     ''' Dummy `__setitem__` which checks `te` against the db by type
-        because the factory inserts it into the database.
+        because the factory has already inserted it into the database.
     '''
     assert isinstance(te, SQLTagSet)
     assert te.sqltags is self
