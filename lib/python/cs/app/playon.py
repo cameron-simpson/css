@@ -562,6 +562,9 @@ class PlayOnSQLTags(SQLTags):
     return super().infer_db_url(envvar=envvar, default_path=default_path)
 
   def __getitem__(self, index):
+    ''' Override `SQLTags.__getitem__` to promote `int` indices
+        to a `str` with value `f'recording.{index}'`.
+    '''
     if isinstance(index, int):
       index = f'recording.{index}'
     return super().__getitem__(index)
@@ -610,8 +613,7 @@ class PlayOnSQLTags(SQLTags):
         r_text = arg[1:]
         if r_text.endswith('/'):
           r_text = r_text[:-1]
-        with Pfx("re.compile(%r, re.I)", r_text):
-          r = re.compile(r_text, re.I)
+        r = pfx_call(re.compile, r_text, re.I)
         for recording in self:
           pl_tags = recording.subtags('playon')
           if (pl_tags.Series and r.search(pl_tags.Series)
