@@ -831,17 +831,19 @@ class PlayOnAPI(HTTPServiceAPI):
   def queue(self):
     ''' Return the `TagSet` instances for the queued recordings.
     '''
-    data = self.suburl_data('queue')
-    entries = data['entries']
-    return self._recordings_from_entries(entries)
+    with self.sqltags.db_session():
+      data = self.suburl_data('queue')
+      entries = data['entries']
+      return self._recordings_from_entries(entries)
 
   @pfx_method
   def recordings(self):
     ''' Return the `TagSet` instances for the available recordings.
     '''
-    data = self.suburl_data('library/all')
-    entries = data['entries']
-    return self._recordings_from_entries(entries)
+    with self.sqltags.db_session():
+      data = self.suburl_data('library/all')
+      entries = data['entries']
+      return self._recordings_from_entries(entries)
 
   @pfx_method
   def _services_from_entries(self, entries):
