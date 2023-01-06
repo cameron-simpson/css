@@ -1,0 +1,2 @@
+lib/python/cs/gimmicks.py: cs.gimmicks: generalise the logging function map, add trace function
+lib/python/cs/gimmicks.py: cs.gimmicks: bugfix logging call lookup

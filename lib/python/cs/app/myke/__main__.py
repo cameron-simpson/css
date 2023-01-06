@@ -81,17 +81,18 @@ class MykeCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    M = self.options
-    M.makecmd = self.cmd
-    ok = M.loadMakefiles(M.makefiles)
-    ok = ok and M.loadMakefiles(M.appendfiles)
-    # prepend the command line namespace at the front again
-    if M.cmd_ns:
-      M.insert_namespace(M.cmd_ns)
-    if not ok:
-      raise GetoptError("errors loading Mykefiles")
-    with M:
-      yield
+    with super().run_context():
+      M = self.options
+      M.makecmd = self.cmd
+      ok = M.loadMakefiles(M.makefiles)
+      ok = ok and M.loadMakefiles(M.appendfiles)
+      # prepend the command line namespace at the front again
+      if M.cmd_ns:
+        M.insert_namespace(M.cmd_ns)
+      if not ok:
+        raise GetoptError("errors loading Mykefiles")
+      with M:
+        yield
 
   def main(self, argv):
     ''' Main body.

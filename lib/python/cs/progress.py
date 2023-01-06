@@ -33,7 +33,7 @@ from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from typeguard import typechecked
 
-__version__ = '20220918-post'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -244,7 +244,7 @@ class BaseProgress(object):
       arrow += ' ' * (width - len(arrow))
     return arrow
 
-  def format_counter(self, value, scale=None, max_parts=2, sep=','):
+  def format_counter(self, value, scale=None, max_parts=2, sep=',', **kw):
     ''' Format `value` accoridng to `scale` and `max_parts`
         using `cs.units.transcribe`.
     '''
@@ -252,7 +252,7 @@ class BaseProgress(object):
       scale = self.units_scale
     if scale is None:
       return str(value)
-    return transcribe(value, scale, max_parts=max_parts, sep=sep)
+    return transcribe(value, scale, max_parts=max_parts, sep=sep, **kw)
 
   def text_pos_of_total(
       self, fmt=None, fmt_pos=None, fmt_total=None, pos_first=False
@@ -639,11 +639,11 @@ class Progress(BaseProgress):
       self,
       name: Optional[str] = None,
       *,
-      position: Optional[int] = None,
-      start: Optional[int] = None,
+      position: Optional[float] = None,
+      start: Optional[float] = None,
       start_time: Optional[float] = None,
       throughput_window: Optional[int] = None,
-      total: Optional[int] = None,
+      total: Optional[float] = None,
       units_scale=None,
   ):
     ''' Initialise the Progesss object.

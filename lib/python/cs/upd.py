@@ -90,7 +90,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20220918-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -736,7 +736,7 @@ class Upd(SingletonMixin):
     return True
 
   # pylint: disable=too-many-branches,too-many-statements
-  def insert(self, index, txt='', proxy=None):
+  def insert(self, index, txt='', proxy=None) -> "UpdProxy":
     ''' Insert a new status line at `index`.
         Return the `UpdProxy` for the new status line.
     '''
@@ -994,7 +994,7 @@ def print(*a, upd, end='\n', **kw):
   '''
   kw['flush'] = True
   with upd.above(need_newline=not end.endswith('\n')):
-    builtin_print(*a, **kw)
+    builtin_print(*a, end=end, **kw)
 
 @uses_upd
 def pfxprint(*a, upd, **kw):

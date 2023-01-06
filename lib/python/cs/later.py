@@ -53,7 +53,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import State as ThreadState
 
-__version__ = '20220918-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -512,7 +512,6 @@ class Later(MultiOpenMixin):
     '''
     return not self.closed
 
-  @staticmethod
   @decorator
   def submittable(method):
     ''' Decorator requiring the `Later` to be submittable unless `force` is true.
@@ -888,6 +887,9 @@ class Later(MultiOpenMixin):
     ''' Return a `LatePool` to manage some tasks run with this `Later`.
     '''
     return LatePool(L=self, *a, **kw)
+
+  # forget the @submittable decorator
+  del submittable
 
 class SubLater(object):
   ''' A class for managing a group of deferred tasks using an existing `Later`.

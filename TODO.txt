@@ -1,3 +1,4 @@
+cs.cmdutils:BaseCommand - help should include the top level usage as well, currently omitted
 frename needs to be a mode of fstags to move the tags
 "Because" class containing a bool and an explaintion, start using in the SvcD test function and elsewhere
 @promote: make @strable wrap this, using params=[0],promote[0]=open
