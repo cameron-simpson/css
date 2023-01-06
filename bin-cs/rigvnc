@@ -2,7 +2,7 @@
 
 cmd=$0
 dispnum=5
-geom=2880x1800
+geom=1920x1200
 
 [ $# = 0 ] || { echo "Usage: $cmd" >&2; exit 2; }
 
