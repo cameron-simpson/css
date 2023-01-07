@@ -374,6 +374,13 @@ def getLibCrypto():
   import copy
   import subprocess
 
+  class DrmException(Exception):
+    ''' Really DeDRM/noDRM needs this in `__init__`, but instead
+        there are distinct classes all over the code, a disaster.
+        This class is bug-for-bug compatible.
+    '''
+    pass
+
   # interface to needed routines in openssl's libcrypto
   def _load_crypto_libcrypto():
     from ctypes import CDLL, byref, POINTER, c_void_p, c_char_p, c_int, c_long, \
