@@ -322,8 +322,9 @@ class DeDRMWrapper:
           sys,
           path=[tmpdirpath, joinpath(tmpdirpath, self.DEDRM_PACKAGE_NAME)] +
           sys.path):
-        import prefs
-        yield
+        with redirect_stdout(sys.stderr):
+          import prefs
+          yield
 
   def import_name(self, module_name, name=None, *, package=None):
     ''' Shim for `importlib.import_module` to import from the DeDRM/noDRM package.
