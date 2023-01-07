@@ -9,7 +9,7 @@
 '''
 
 from code import interact
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 from datetime import datetime, timezone
 import filecmp
 from functools import total_ordering
@@ -35,7 +35,7 @@ import shlex
 from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import List, Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -74,6 +74,7 @@ from cs.seq import unrepeated
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
 )
+from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
@@ -212,7 +213,6 @@ class DeDRMWrapper:
     with Pfx("dedrm_package_path %r", dedrm_package_path):
       if not isdirpath(dedrm_package_path):
         raise ValueError("not a directory")
-        badopt = True
       if not isdirpath(joinpath(dedrm_package_path, 'standalone')):
         raise ValueError("no \"standalone\" subdirectory")
       self.dedrm_package_path = dedrm_package_path
