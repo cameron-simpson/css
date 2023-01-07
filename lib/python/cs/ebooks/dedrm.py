@@ -201,7 +201,9 @@ class DeDRMWrapper:
   DEDRM_PLUGIN_NAME = 'DeDRM'
   DEDRM_PLUGIN_VERSION = '7.2.1'
 
-  def __init__(self, dedrm_package_path: str):
+  def __init__(
+      self, dedrm_package_path: str, sqltags: Optional[SQLTags] = None
+  ):
     ''' Initialise the DeDRM package.
 
         Parameters:
@@ -238,6 +240,7 @@ class DeDRMWrapper:
           super().__init__(*args)
 
       kindlekey.CryptUnprotectData = CryptUnprotectData
+    self.tags = SQLTags().subdomain(f'{self.DEDRM_PACKAGE_NAME}')
 
   @contextmanager
   def dedrm_imports(self):
@@ -356,6 +359,36 @@ class DeDRMWrapper:
           X("call self.dedrm.run(%r)...", srcpath)
           decrypted_ebook = self.dedrm.run(srcpath)
           X("  => decrypted_ebook = %r", decrypted_ebook)
+
+  @property
+  def kindlekeys(self) -> List[dict]:
+    ''' Return the cached `kindlekeys()`, a list of dicts.
+
+        If this is empty, a call is made to `self.update_kindlekeys()`
+        to load keys from the current environment.
+    '''
+    kk_tags = self.tags['kindlekeys']
+    kks = kk_tags.get('cache')
+    if not kks:
+      kks = self.update_kindlekeys()
+    return kks
+
+  def update_kindlekeys(self, filepaths: Optional[List[str]] = None):
+    ''' Update the cached kindle keys from the current environment
+        by calling `dedrm.kindlekey.kindlekeys(filepaths)`.
+    '''
+    dedrm = self.dedrm
+    if filepaths is None:
+      filepaths = []
+    kk_tags = self.tags['kindlekeys']
+    kks = kk_tags.get('cache') or []
+    kindlekeys = self.import_name('kindlekey', 'kindlekeys')
+    for keys in kindlekeys(filepaths):
+      if keys not in kks:
+        kks.append(keys)
+    print("update_kindlekeys =>", kks)
+    kk_tags['cache'] = kks
+    return kks
 
 class DeDRMOverride:
   ''' A collection of override methods from the DeDRM/noDRM `DeDRM` class
