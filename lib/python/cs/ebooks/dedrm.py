@@ -165,10 +165,10 @@ class DeDRMCommand(BaseCommand):
     return xit
 
   def cmd_kindlekeys(self, argv):
-    dedrm = self.options.dedrm
-    kindlekeys = dedrm.import_name('kindlekey', 'kindlekeys')
-    X("kindlekeys = %r", kindlekeys)
-    print(pformat(kindlekeys(argv)))
+    with redirect_stdout(sys.stderr):
+      dedrm = self.options.dedrm
+      kks = dedrm.kindlekeys
+    print(json.dumps(kks))
 
   def cmd_remove(self, argv):
     ''' Usage: {cmd} filenames...
