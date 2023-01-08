@@ -35,7 +35,7 @@ import shlex
 from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -171,10 +171,24 @@ class DeDRMCommand(BaseCommand):
     return xit
 
   def cmd_kindlekeys(self, argv):
-    with redirect_stdout(sys.stderr):
-      dedrm = self.options.dedrm
-      kks = dedrm.kindlekeys
-    print(json.dumps(kks))
+    ''' Usage: {cmd} [import]
+          import    Read a JSON list of key dicts and update the cached keys.
+    '''
+    if not argv:
+      with redirect_stdout(sys.stderr):
+        dedrm = self.options.dedrm
+        kks = dedrm.kindlekeys
+      print(json.dumps(kks))
+      return 0
+    op = argv.pop(0)
+    if op != 'import':
+      raise GetoptError("expected 'import', got %r" % (op,))
+    with Pfx(op):
+      if argv:
+        raise GetoptError("extra arguments: %r" % (argv,))
+      new_kks = json.loads(sys.stdin.read())
+      assert all(isinstance(kk, dict) for kk in new_kks)
+      dedrm.update_kindlekeys_from_keys(self, new_kks)
 
   def cmd_remove(self, argv):
     ''' Usage: {cmd} filenames...
@@ -386,10 +400,17 @@ class DeDRMWrapper:
     dedrm = self.dedrm
     if filepaths is None:
       filepaths = []
+    kindlekeys = self.import_name('kindlekey', 'kindlekeys')
+    new_kks = kindlekeys(filepaths)
+    return self.update_kindlekeys_from_keys(new_kks)
+
+  def update_kindlekeys_from_keys(self, new_kks: Iterable[dict]):
+    ''' Update the cached kindle keys with the key `dict`s
+        from the iterable `kindlekeys`.
+    '''
     kk_tags = self.tags['kindlekeys']
     kks = kk_tags.get('cache') or []
-    kindlekeys = self.import_name('kindlekey', 'kindlekeys')
-    for keys in kindlekeys(filepaths):
+    for keys in new_kks:
       if keys not in kks:
         kks.append(keys)
     print("update_kindlekeys =>", kks)
