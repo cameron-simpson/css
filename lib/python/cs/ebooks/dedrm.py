@@ -96,7 +96,7 @@ class DeDRMCommand(BaseCommand):
 
   GETOPT_SPEC = 'D:'
   USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
-    -D  Specify the filesystem path to the DeDRM/noDRM package top level.
+    -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
         For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
         at /path/to/DeDRM_tools--noDRM you could supply:
         -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
