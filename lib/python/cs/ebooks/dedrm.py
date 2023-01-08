@@ -87,6 +87,11 @@ from cs.x import X
 
 DEDRM_PACKAGE_PATH_ENVVAR = 'DEDRM_PACKAGE_PATH'
 
+def main(argv=None):
+  ''' DeDRM command line mode.
+  '''
+  return DeDRMCommand(argv).run()
+
 class DeDRMCommand(BaseCommand):
 
   GETOPT_SPEC = 'D:'
@@ -533,3 +538,6 @@ def getLibCrypto():
   LibCrypto = _load_crypto()
 
   return LibCrypto
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
