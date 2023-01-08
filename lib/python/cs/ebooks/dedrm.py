@@ -174,9 +174,9 @@ class DeDRMCommand(BaseCommand):
     ''' Usage: {cmd} [import]
           import    Read a JSON list of key dicts and update the cached keys.
     '''
+    dedrm = self.options.dedrm
     if not argv:
       with redirect_stdout(sys.stderr):
-        dedrm = self.options.dedrm
         kks = dedrm.kindlekeys
       print(json.dumps(kks))
       return 0
@@ -188,7 +188,7 @@ class DeDRMCommand(BaseCommand):
         raise GetoptError("extra arguments: %r" % (argv,))
       new_kks = json.loads(sys.stdin.read())
       assert all(isinstance(kk, dict) for kk in new_kks)
-      dedrm.update_kindlekeys_from_keys(self, new_kks)
+      dedrm.update_kindlekeys_from_keys(new_kks)
 
   def cmd_remove(self, argv):
     ''' Usage: {cmd} filenames...
