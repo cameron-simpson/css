@@ -639,10 +639,30 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
   @pfx_method
-  def add(self, bookpath, doit=True, quiet=False, **subp_options):
+  def add(
+      self,
+      bookpath,
+      *,
+      dedrm=None,
+      doit=True,
+      quiet=False,
+      **subp_options,
+  ):
     ''' Add a book file via the `calibredb add` command.
         Return the database id or `None` if `doit` is false or the command fails.
+
+        Parameters:
+        * `bookpath`: the filesystem path to the book
+        * `dedrm`: optional `DeDRMWrapper` instance
     '''
+    if dedrm is not None:
+      # try to remove DRM from the book file
+      # and add the cleared temporary copy
+      if doit:
+        with contextif(not quiet, run_task,
+                       f'remove DRM from {shortpath(bookpath)}'):
+          with dedrm.removed(bookpath) as clearpath:
+            return self.add(clearpath, doit=doit, quiet=quiet, **subp_options)
     cp = self.calibredb(
         'add',
         '--duplicates',
