@@ -11,6 +11,8 @@ from itertools import product
 from cs.context import push_cmgr, pop_cmgr
 from cs.deco import decorator
 
+__version__ = '20230109'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
