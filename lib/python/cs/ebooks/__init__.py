@@ -6,7 +6,7 @@
     These form the basis of my personal Kindle and Calibre workflow.
 '''
 
-__version__ = '20230110'
+__version__ = '20230110-post'
 
 DISTINFO = {
     'keywords': ["python3"],
