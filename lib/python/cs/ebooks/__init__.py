@@ -15,6 +15,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.app.osx.defaults',
         'cs.app.osx.plist',
         'cs.cmdutils',
         'cs.context',
@@ -30,8 +31,8 @@ DISTINFO = {
         'cs.progress',
         'cs.psutils',
         'cs.resources',
-        'cs.seq',
         'cs.sqlalchemy_utils',
+        'cs.sqltags',
         'cs.tagset',
         'cs.threads',
         'cs.units',
