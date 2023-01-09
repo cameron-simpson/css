@@ -1224,6 +1224,7 @@ class CalibreCommand(BaseCommand):
       with Pfx(bookpath):
         calibre.add(
             bookpath,
+            dedrm=dedrm,
             doit=options.doit,
             quiet=options.quiet,
         )
@@ -1430,6 +1431,7 @@ class CalibreCommand(BaseCommand):
     longmode = options.longmode
     ls_format = options.ls_format
     calibre = options.calibre
+    verbose = options.verbose
     upd = options.upd
     xit = 0
     cbooks = []
