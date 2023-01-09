@@ -111,6 +111,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       This is mostly to aid keeping track of state using `cs.fstags`.
   '''
 
+  CONTENT_DIRNAME = 'My Kindle Content'
+
   FSPATH_DEFAULT = default_kindle_library()
 
   FSPATH_ENVVAR = KINDLE_LIBRARY_ENVVAR
