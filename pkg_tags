@@ -34,7 +34,7 @@ cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="
 cs.debug pypi.release="20221118" ok_revision="32e79edcf8c727f9b6e5525f67de22cf1774a21e"
 cs.deco pypi.release="20221214" ok_revision="31ad1bf3a52693bd811f4cac01b181fea5a8e307" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"]}
 cs.distinfo
-cs.ebooks ok_revision="143e07dcc28380c9fcc2eca3af03b5af134d3c98" pypi.release="20221228"
+cs.ebooks ok_revision="143e07dcc28380c9fcc2eca3af03b5af134d3c98" pypi.release="20221228" features={"20230110":["dedrm"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
 cs.excutils pypi.release="20221228" ok_revision="1613fb66787015525a8b8edb5c150890568ccc47"
