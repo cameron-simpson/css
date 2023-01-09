@@ -124,16 +124,15 @@ class DeDRMCommand(BaseCommand):
       with Pfx("dedrm_package_path"):
         dedrm_package_path = options.dedrm_package_path
         if dedrm_package_path is None:
-          dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
-          if dedrm_package_path is None:
+          if not os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR):
             raise GetoptError(
                 f'no ${DEDRM_PACKAGE_PATH_ENVVAR} and no -D option'
             )
-        options.dedrm_package_path = dedrm_package_path
         try:
           options.dedrm = pfx_call(DeDRMWrapper, dedrm_package_path)
         except ValueError as e:
           raise GetoptError("bad dedrm_package_path: %s" % (e,))
+        options.dedrm_package_path = options.dedrm.dedrm_package_path
       yield
 
   def cmd_import(self, argv):
@@ -220,18 +219,33 @@ class DeDRMWrapper:
   DEDRM_PLUGIN_NAME = 'DeDRM'
   DEDRM_PLUGIN_VERSION = '7.2.1'
 
+  @pfx_method
+  @fmtdoc
   def __init__(
-      self, dedrm_package_path: str, sqltags: Optional[SQLTags] = None
+      self,
+      dedrm_package_path: Optional[str] = None,
+      sqltags: Optional[SQLTags] = None
   ):
     ''' Initialise the DeDRM package.
 
         Parameters:
-        * `dedrm_package_path`: filesystem path to the DeDRM/noDRM package top level.
+        * `dedrm_package_path`: optional filesystem path to the
+          DeDRM/noDRM package plugin subdirectory, default from
+          ${DEDRM_PACKAGE_PATH_ENVVAR}
         * `sqltags`: optional `SQLTags` instance to store state
           under the `self.DEDRM_PACKAGE_NAME.` prefix;
           default from `SQLTags()`
     '''
     with Pfx("dedrm_package_path %r", dedrm_package_path):
+      if dedrm_package_path is None:
+        dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+        if dedrm_package_path is None:
+          raise ValueError(
+              f'no dedrm_package_path and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
+          )
+        with Pfx('$%s=%r', DEDRM_PACKAGE_PATH_ENVVAR, dedrm_package_path):
+          self.__init__(dedrm_package_path, sqltags=sqltags)
+          return
       if not isdirpath(dedrm_package_path):
         raise ValueError("not a directory")
       if not isdirpath(joinpath(dedrm_package_path, 'standalone')):
