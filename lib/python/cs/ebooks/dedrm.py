@@ -228,6 +228,9 @@ class DeDRMWrapper:
 
         Parameters:
         * `dedrm_package_path`: filesystem path to the DeDRM/noDRM package top level.
+        * `sqltags`: optional `SQLTags` instance to store state
+          under the `self.DEDRM_PACKAGE_NAME.` prefix;
+          default from `SQLTags()`
     '''
     with Pfx("dedrm_package_path %r", dedrm_package_path):
       if not isdirpath(dedrm_package_path):
@@ -259,7 +262,9 @@ class DeDRMWrapper:
           super().__init__(*args)
 
       kindlekey.CryptUnprotectData = CryptUnprotectData
-    self.tags = SQLTags().subdomain(f'{self.DEDRM_PACKAGE_NAME}')
+    if sqltags is None:
+      sqltags = SQLTags()
+    self.tags = sqltags.subdomain(f'{self.DEDRM_PACKAGE_NAME}')
 
   @contextmanager
   def dedrm_imports(self):
