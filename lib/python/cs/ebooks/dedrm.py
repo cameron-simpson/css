@@ -207,7 +207,6 @@ class DeDRMCommand(BaseCommand):
                 realpath(output_dirpath), 'decrypted-' + basename(filename)
             )
         )
-        X("output_filename = %r", output_filename)
         pfx_call(dedrm.remove, filename, output_filename, exists_ok=exists_ok)
 
 class DeDRMWrapper:
@@ -239,7 +238,6 @@ class DeDRMWrapper:
         raise ValueError("no \"standalone\" subdirectory")
       self.dedrm_package_path = dedrm_package_path
       dedrm_DeDRM = self.import_name(self.DEDRM_PACKAGE_NAME, 'DeDRM')
-      X("dedrm_DeDRM = %s", r(dedrm_DeDRM))
 
       class CSEBookDeDRM(DeDRMOverride, dedrm_DeDRM):
         ''' Our wrapper for the DeDRM/noDRM `DeDRM` class
@@ -248,7 +246,6 @@ class DeDRMWrapper:
         alfdir = dedrm_package_path
 
       self.dedrm = CSEBookDeDRM()
-      X("self.dedrm = %r", self.dedrm)
     # monkey patch the kindlekey.CryptUnprotectData class
     with self.dedrm_imports():
       kindlekey = self.import_name('kindlekey')
@@ -297,7 +294,6 @@ class DeDRMWrapper:
       ##os.system(f'set -x; cat {module_path}')
 
     with TemporaryDirectory(prefix='dedrm_lib') as tmpdirpath:
-      X("tmpdirpath = %r", tmpdirpath)
       # present the dedrm package as DEDRM_PACKAGE_NAME ('dedrm')
       os.symlink(
           self.dedrm_package_path,
@@ -375,9 +371,7 @@ class DeDRMWrapper:
         * `exists_ok`: if true then `dstpath` may already exist; default `False`
     '''
     with atomic_filename(dstpath, exists_ok=exists_ok) as T:
-      X("T = %s", r(T))
       tmpfilename = T.name
-      X("tmpfilename = %r", tmpfilename)
       # monkey patch temporary_file method to return tmpfilename
       with stackattrs(self.dedrm, temporary_file=lambda ext: tmpfilename):
         with self.dedrm_imports():
@@ -446,11 +440,8 @@ class DeDRM_PrefsOverride:
 
 def getLibCrypto():
   ''' The OSX `LibCrypto` implementation as an experiment,
-        copied from Other_Tools/DRM_Key_Scripts/Kindle_for_Mac_and_PC/kindlekey.pyw
+        copied from `Other_Tools/DRM_Key_Scripts/Kindle_for_Mac_and_PC/kindlekey.pyw`.
     '''
-
-  import copy
-  import subprocess
 
   class DrmException(Exception):
     ''' Really DeDRM/noDRM needs this in `__init__`, but instead
