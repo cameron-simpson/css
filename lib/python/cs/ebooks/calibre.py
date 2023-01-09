@@ -46,6 +46,7 @@ from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
+from cs.context import contextif
 from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
@@ -68,7 +69,7 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, run_task, uses_upd, print  # pylint: disable=redefined-builtin
 
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
@@ -512,10 +513,11 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.db.shell()
 
-  def preload(self):
+  @uses_upd
+  def preload(self, upd):
     ''' Scan all the books, preload their data.
     '''
-    with UpdProxy(text=f"preload {self}"):
+    with upd.run_task(f'preload {self}'):
       db = self.db
       with db.session() as session:
         for db_book in self.db.books.lookup(session=session):
@@ -1291,6 +1293,7 @@ class CalibreCommand(BaseCommand):
     quiet = options.quiet
     runstate = options.runstate
     verbose = options.verbose
+    upd = options.upd
     quiet or print(
         "linkto", calibre.shortpath, "=>", shortpath(options.linkto_dirpath)
     )
@@ -1299,7 +1302,7 @@ class CalibreCommand(BaseCommand):
         key=lambda cbook: cbook.title.lower()
     )
     for cbook in progressbar(cbooks, "linkto"):
-      with UpdProxy(prefix='linkto: ') as proxy:
+      with upd.run_task('linkto: ') as proxy:
         if runstate.cancelled:
           break
         proxy.text = str(cbook)
@@ -1368,6 +1371,7 @@ class CalibreCommand(BaseCommand):
     longmode = options.longmode
     ls_format = options.ls_format
     calibre = options.calibre
+    upd = options.upd
     xit = 0
     cbooks = []
     if argv:
@@ -1378,10 +1382,11 @@ class CalibreCommand(BaseCommand):
       except ValueError as e:
         raise GetoptError("invalid book specifiers: %s") from e
     else:
-      calibre.preload()
-      cbooks = sorted(
-          calibre, key=cbook_sort_key, reverse=options.sort_reverse
-      )
+      with contextif(verbose, upd.run_task, "sort calibre contents"):
+        calibre.preload()
+        cbooks = sorted(
+            calibre, key=cbook_sort_key, reverse=options.sort_reverse
+        )
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
@@ -1516,7 +1521,6 @@ class CalibreCommand(BaseCommand):
             If no identifiers are provided, all books which have
             the specified identifier will be pulled.
     '''
-    Upd().out("pull " + shlex.join(argv))
     options = self.options
     calibre = options.calibre
     runstate = options.runstate
@@ -1527,8 +1531,10 @@ class CalibreCommand(BaseCommand):
     force = options.force
     quiet = options.quiet
     verbose = options.verbose
+    upd = options.upd
     other_library = options.calibre_other
     quiet or print("pull", other_library.shortpath, "=>", calibre.shortpath)
+    upd.out("pull " + shlex.join(argv))
     with Pfx(other_library.shortpath):
       with other_library:
         if other_library is calibre:
@@ -1547,7 +1553,7 @@ class CalibreCommand(BaseCommand):
           for identifier_name in sorted(other_library.identifier_names()):
             print(" ", identifier_name)
           return 0
-        with UpdProxy(text=f"scan identifiers from {other_library}..."):
+        with upd.run_task(f'scan identifiers from {other_library}...'):
           obooks_map = {
               idv: obook
               for idv, obook in (
