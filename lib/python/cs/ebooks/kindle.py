@@ -646,7 +646,19 @@ class KindleCommand(BaseCommand):
     if opt == '-C':
       options.calibre_path = val
     elif opt == '-K':
-      options.kindle_path = val
+      db_subpaths = (
+          KindleBookAssetDB.DB_FILENAME,
+          joinpath(KindleTree.CONTENT_DIRNAME, KindleBookAssetDB.DB_FILENAME),
+      )
+      for db_subpath in db_subpaths:
+        db_fspath = joinpath(val, db_subpath)
+        if existspath(db_fspath):
+          break
+      else:
+        raise GetoptError(
+            "cannot find db at %s" % (" or ".join(map(repr, dbsubpaths)),)
+        )
+      options.kindle_path = dirname(db_fspath)
     else:
       super().apply_opt(opt, val)
 
