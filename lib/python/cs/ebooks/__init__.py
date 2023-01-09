@@ -38,6 +38,7 @@ DISTINFO = {
         'cs.upd',
         'icontract',
         'mobi',
+        'pycryptodomex',
         'sqlalchemy',
         'typeguard',
     ],
