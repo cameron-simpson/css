@@ -391,12 +391,45 @@ class DeDRMWrapper:
     '''
     with atomic_filename(dstpath, exists_ok=exists_ok) as T:
       tmpfilename = T.name
+      dedrm = self.dedrm
       # monkey patch temporary_file method to return tmpfilename
-      with stackattrs(self.dedrm, temporary_file=lambda ext: tmpfilename):
+      with stackattrs(dedrm, temporary_file=lambda ext: T):
         with self.dedrm_imports():
-          X("call self.dedrm.run(%r)...", srcpath)
-          decrypted_ebook = self.dedrm.run(srcpath)
-          X("  => decrypted_ebook = %r", decrypted_ebook)
+          dedrm.starttime = time.time()
+          # infer book type from file extension
+          booktype = splitext(basename(srcpath))[1][1:].lower()
+          if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3', 'azw4',
+                          'tpz', 'kfx-zip']:
+            # Kindle/Mobipocket
+            decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
+          elif booktype == 'pdb':
+            # eReader
+            decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
+          elif booktype == 'pdf':
+            # Adobe PDF (hopefully) or LCP PDF
+            decrypted_ebook = dedrm.PDFDecrypt(srcpath)
+          elif booktype == 'epub':
+            # Adobe Adept, PassHash (B&N) or LCP ePub
+            decrypted_ebook = dedrm.ePubDecrypt(srcpath)
+          else:
+            raise ValueError(
+                "cannot decrypt %r, unhandle book type %r" %
+                (srcpath, booktype)
+            )
+          assert decrypted_ebook == T.name
+
+  @contextmanager
+  def removed(self, srcpath):
+    ''' Context manager to produce a deDRMed copy of `srcpath`,
+        yielding the temporary file containing the copy.
+    '''
+    srcext = splitext(basename(srcpath))[1]
+    with NamedTemporaryFile(
+        prefix=f'.{self.__class__.__name__}-',
+        suffix=srcext,
+    ) as T:
+      self.remove(srcpath, T.name, exists_ok=True)
+      yield T.name
 
   @property
   def kindlekeys(self) -> List[dict]:
