@@ -71,6 +71,8 @@ from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.upd import UpdProxy, run_task, uses_upd, print  # pylint: disable=redefined-builtin
 
+from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
+
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
@@ -1096,6 +1098,12 @@ class CalibreCommand(BaseCommand):
       from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
       return KindleTree(self.kindle_path)
 
+  def apply_defaults(self):
+    ''' Set up the default values in `options`.
+    '''
+    options = self.options
+    options.dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
     '''
@@ -1195,6 +1203,30 @@ class CalibreCommand(BaseCommand):
         sortkey = self.cbook_default_sortkey
       cbooks = sorted(cbooks, key=sortkey, reverse=reverse)
     return cbooks
+
+  def cmd_add(self, argv):
+    ''' Usage: {cmd} [-nqv] bookpaths...
+          Add the specified ebook bookpaths to the library.
+          -n    No action: recite planned actions.
+          -q    Quiet: only emit warnings.
+          -v    Verbose: report all actions and decisions.
+    '''
+    options = self.options
+    dedrm = (
+        DeDRMWrapper(options.dedrm_package_path)
+        if options.dedrm_package_path else None
+    )
+    calibre = options.calibre
+    self.popopts(argv, options, n='doit', q='quiet', v='verbose')
+    if not argv:
+      raise GetoptError("missing bookpaths")
+    for bookpath in argv:
+      with Pfx(bookpath):
+        calibre.add(
+            bookpath,
+            doit=options.doit,
+            quiet=options.quiet,
+        )
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_convert(self, argv):
