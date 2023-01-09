@@ -260,9 +260,12 @@ class DeDRMWrapper:
         alfdir = dedrm_package_path
 
       self.dedrm = CSEBookDeDRM()
-    # monkey patch the kindlekey.CryptUnprotectData class
     with self.dedrm_imports():
       kindlekey = self.import_name('kindlekey')
+      # monkey patch the kindlekey.kindlekeys function
+      self.base_kindlekeys = kindlekey.kindlekeys
+      kindlekey.kindlekeys = self.cached_kindlekeys
+      # monkey patch the kindlekey.CryptUnprotectData class
       BaseCryptUnprotectData = kindlekey.CryptUnprotectData
       LibCrypto = getLibCrypto()
 
@@ -397,6 +400,12 @@ class DeDRMWrapper:
 
   @property
   def kindlekeys(self) -> List[dict]:
+    ''' The cached `kindlekeys()`, a list of dicts.
+        Obtained via `self.cached_kindlekeys()`.
+    '''
+    return self.cached_kindlekeys()
+
+  def cached_kindlekeys(self) -> List[dict]:
     ''' Return the cached `kindlekeys()`, a list of dicts.
 
         If this is empty, a call is made to `self.update_kindlekeys()`
@@ -415,8 +424,7 @@ class DeDRMWrapper:
     dedrm = self.dedrm
     if filepaths is None:
       filepaths = []
-    kindlekeys = self.import_name('kindlekey', 'kindlekeys')
-    new_kks = kindlekeys(filepaths)
+    new_kks = self.base_kindlekeys(filepaths)
     return self.update_kindlekeys_from_keys(new_kks)
 
   def update_kindlekeys_from_keys(self, new_kks: Iterable[dict]):
