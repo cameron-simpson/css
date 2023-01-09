@@ -51,6 +51,8 @@ from cs.sqlalchemy_utils import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
+from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
+
 def main(argv=None):
   ''' Kindle command line mode.
   '''
@@ -242,6 +244,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
           self,
           calibre,
           *,
+          dedrm=None,
           doit=True,
           replace_format=False,
           force=False,
@@ -255,6 +258,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
             Parameters:
             * `calibre`: the `CalibreTree`
+            * `dedrm`: optional `DeDRMWrapper` instance
             * `doit`: optional flag, default `True`;
               if false just recite planned actions
             * `force`: optional flag, default `False`;
@@ -273,7 +277,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
           # new book
           # pylint: disable=expression-not-assigned
           quiet or print("new book <=", shortpath(azwpath))
-          dbid = calibre.add(azwpath, doit=doit, quiet=quiet)
+          dbid = calibre.add(azwpath, dedrm=dedrm, doit=doit, quiet=quiet)
           if dbid is None:
             added = not doit
             cbook = None
@@ -640,6 +644,7 @@ class KindleCommand(BaseCommand):
       calibre_path = None
     options.kindle_path = kindle_path
     options.calibre_path = calibre_path
+    options.dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -671,9 +676,14 @@ class KindleCommand(BaseCommand):
     from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     with super().run_context():
       options = self.options
+      dedrm = (
+          DeDRMWrapper(options.dedrm_package_path)
+          if options.dedrm_package_path else None
+      )
+
       with KindleTree(options.kindle_path) as kt:
         with CalibreTree(options.calibre_path) as cal:
-          with stackattrs(options, kindle=kt, calibre=cal):
+          with stackattrs(options, kindle=kt, calibre=cal, dedrm=dedrm):
             yield
 
   def cmd_app_path(self, argv):
@@ -722,6 +732,7 @@ class KindleCommand(BaseCommand):
     calibre = options.calibre
     runstate = options.runstate
     self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
+    dedrm = options.dedrm
     doit = options.doit
     force = options.force
     quiet = options.quiet
@@ -737,6 +748,7 @@ class KindleCommand(BaseCommand):
         try:
           kbook.export_to_calibre(
               calibre,
+              dedrm=dedrm,
               doit=doit,
               force=force,
               replace_format=force,
