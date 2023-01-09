@@ -46,6 +46,7 @@ from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
+from cs.context import contextif
 from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
@@ -61,14 +62,15 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
 from cs.resources import MultiOpenMixin
-from cs.seq import unrepeated
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
 )
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, run_task, uses_upd, print  # pylint: disable=redefined-builtin
+
+from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
@@ -512,10 +514,11 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.db.shell()
 
-  def preload(self):
+  @uses_upd
+  def preload(self, upd):
     ''' Scan all the books, preload their data.
     '''
-    with UpdProxy(text=f"preload {self}"):
+    with upd.run_task(f'preload {self}'):
       db = self.db
       with db.session() as session:
         for db_book in self.db.books.lookup(session=session):
@@ -637,10 +640,30 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
   @pfx_method
-  def add(self, bookpath, doit=True, quiet=False, **subp_options):
+  def add(
+      self,
+      bookpath,
+      *,
+      dedrm=None,
+      doit=True,
+      quiet=False,
+      **subp_options,
+  ):
     ''' Add a book file via the `calibredb add` command.
         Return the database id or `None` if `doit` is false or the command fails.
+
+        Parameters:
+        * `bookpath`: the filesystem path to the book
+        * `dedrm`: optional `DeDRMWrapper` instance
     '''
+    if dedrm is not None:
+      # try to remove DRM from the book file
+      # and add the cleared temporary copy
+      if doit:
+        with contextif(not quiet, run_task,
+                       f'remove DRM from {shortpath(bookpath)}'):
+          with dedrm.removed(bookpath) as clearpath:
+            return self.add(clearpath, doit=doit, quiet=quiet, **subp_options)
     cp = self.calibredb(
         'add',
         '--duplicates',
@@ -658,12 +681,19 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       return None
     # Extract the database id from the "calibredb add" output.
     dbids = []
-    for line in cp.stdout.split('\n'):
+    output_lines = cp.stdout.split('\n')
+    for line in output_lines:
       line_sfx = cutprefix(line, 'Added book ids:')
       if line_sfx is not line:
         dbids.extend(
             map(lambda dbid_s: int(dbid_s.strip()), line_sfx.split(','))
         )
+    if not dbids:
+      warning(
+          "calibredb add %r failed\n  Output:\n    %s", bookpath,
+          "    \n".join(output_lines)
+      )
+      return None
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
 
@@ -1067,6 +1097,12 @@ class CalibreCommand(BaseCommand):
       from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
       return KindleTree(self.kindle_path)
 
+  def apply_defaults(self):
+    ''' Set up the default values in `options`.
+    '''
+    options = self.options
+    options.dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
     '''
@@ -1166,6 +1202,31 @@ class CalibreCommand(BaseCommand):
         sortkey = self.cbook_default_sortkey
       cbooks = sorted(cbooks, key=sortkey, reverse=reverse)
     return cbooks
+
+  def cmd_add(self, argv):
+    ''' Usage: {cmd} [-nqv] bookpaths...
+          Add the specified ebook bookpaths to the library.
+          -n    No action: recite planned actions.
+          -q    Quiet: only emit warnings.
+          -v    Verbose: report all actions and decisions.
+    '''
+    options = self.options
+    dedrm = (
+        DeDRMWrapper(options.dedrm_package_path)
+        if options.dedrm_package_path else None
+    )
+    calibre = options.calibre
+    self.popopts(argv, options, n='doit', q='quiet', v='verbose')
+    if not argv:
+      raise GetoptError("missing bookpaths")
+    for bookpath in argv:
+      with Pfx(bookpath):
+        calibre.add(
+            bookpath,
+            dedrm=dedrm,
+            doit=options.doit,
+            quiet=options.quiet,
+        )
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_convert(self, argv):
@@ -1291,6 +1352,7 @@ class CalibreCommand(BaseCommand):
     quiet = options.quiet
     runstate = options.runstate
     verbose = options.verbose
+    upd = options.upd
     quiet or print(
         "linkto", calibre.shortpath, "=>", shortpath(options.linkto_dirpath)
     )
@@ -1299,7 +1361,7 @@ class CalibreCommand(BaseCommand):
         key=lambda cbook: cbook.title.lower()
     )
     for cbook in progressbar(cbooks, "linkto"):
-      with UpdProxy(prefix='linkto: ') as proxy:
+      with upd.run_task('linkto: ') as proxy:
         if runstate.cancelled:
           break
         proxy.text = str(cbook)
@@ -1368,6 +1430,8 @@ class CalibreCommand(BaseCommand):
     longmode = options.longmode
     ls_format = options.ls_format
     calibre = options.calibre
+    verbose = options.verbose
+    upd = options.upd
     xit = 0
     cbooks = []
     if argv:
@@ -1378,10 +1442,11 @@ class CalibreCommand(BaseCommand):
       except ValueError as e:
         raise GetoptError("invalid book specifiers: %s") from e
     else:
-      calibre.preload()
-      cbooks = sorted(
-          calibre, key=cbook_sort_key, reverse=options.sort_reverse
-      )
+      with contextif(verbose, upd.run_task, "sort calibre contents"):
+        calibre.preload()
+        cbooks = sorted(
+            calibre, key=cbook_sort_key, reverse=options.sort_reverse
+        )
     runstate = options.runstate
     for cbook in cbooks:
       if runstate.cancelled:
@@ -1516,7 +1581,6 @@ class CalibreCommand(BaseCommand):
             If no identifiers are provided, all books which have
             the specified identifier will be pulled.
     '''
-    Upd().out("pull " + shlex.join(argv))
     options = self.options
     calibre = options.calibre
     runstate = options.runstate
@@ -1527,8 +1591,10 @@ class CalibreCommand(BaseCommand):
     force = options.force
     quiet = options.quiet
     verbose = options.verbose
+    upd = options.upd
     other_library = options.calibre_other
     quiet or print("pull", other_library.shortpath, "=>", calibre.shortpath)
+    upd.out("pull " + shlex.join(argv))
     with Pfx(other_library.shortpath):
       with other_library:
         if other_library is calibre:
@@ -1547,7 +1613,7 @@ class CalibreCommand(BaseCommand):
           for identifier_name in sorted(other_library.identifier_names()):
             print(" ", identifier_name)
           return 0
-        with UpdProxy(text=f"scan identifiers from {other_library}..."):
+        with upd.run_task(f'scan identifiers from {other_library}...'):
           obooks_map = {
               idv: obook
               for idv, obook in (
