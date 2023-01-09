@@ -417,6 +417,19 @@ class DeDRMWrapper:
     kk_tags['cache'] = kks
     return kks
 
+  @classmethod
+  def promote(cls, obj) -> "DeDRMWrapper":
+    ''' Promote an object to a `DeDRMWrapper`.
+
+        If `obj` is `None` or a `str` return `DeDRMWrapper(dedrm_package_path=obj)`.
+    '''
+    if not isinstance(obj, cls):
+      if obj is None or isinstance(obj, str):
+        obj = cls(dedrm_package_path=obj)
+      else:
+        raise TypeError("cannot promote %s", r(obj))
+    return obj
+
 class DeDRMOverride:
   ''' A collection of override methods from the DeDRM/noDRM `DeDRM` class
       which we use to make it work outside the calibre plugin stuff.
