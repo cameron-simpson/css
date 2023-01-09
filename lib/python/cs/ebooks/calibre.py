@@ -680,12 +680,19 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       return None
     # Extract the database id from the "calibredb add" output.
     dbids = []
-    for line in cp.stdout.split('\n'):
+    output_lines = cp.stdout.split('\n')
+    for line in output_lines:
       line_sfx = cutprefix(line, 'Added book ids:')
       if line_sfx is not line:
         dbids.extend(
             map(lambda dbid_s: int(dbid_s.strip()), line_sfx.split(','))
         )
+    if not dbids:
+      warning(
+          "calibredb add %r failed\n  Output:\n    %s", bookpath,
+          "    \n".join(output_lines)
+      )
+      return None
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
 
