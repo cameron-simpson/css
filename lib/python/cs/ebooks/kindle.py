@@ -8,7 +8,9 @@ import filecmp
 from getopt import GetoptError
 import os
 from os.path import (
+    dirname,
     expanduser,
+    exists as existspath,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -185,6 +187,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       def amazon_url(self):
+        ''' The Amazon product page for this book.
+        '''
         # https://www.amazon.com.au/Wonder-Woman-2016-xx-Liars-ebook/dp/B097KMW2VY/
         title = self.tags.get('calibre.title',
                               'title').replace(' ', '-').replace('/', '-')
