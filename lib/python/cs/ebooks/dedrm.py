@@ -34,7 +34,8 @@ import re
 import shlex
 from subprocess import DEVNULL
 import sys
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
+import time
 from typing import Iterable, List, Optional
 
 from icontract import require
@@ -53,7 +54,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import cachedmethod
+from cs.deco import cachedmethod, fmtdoc
 from cs.fileutils import atomic_filename
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
