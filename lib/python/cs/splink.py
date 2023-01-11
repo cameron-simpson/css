@@ -64,7 +64,7 @@ from cs.timeseries import (
     timerange,
     tzfor,
 )
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.upd import uses_upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20220918-post'
 
@@ -570,6 +570,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     return plot_data
 
   # pylint: disable=too-many-branches,too-many-locals
+  @uses_upd
   @timerange
   def plot(
       self,
@@ -586,7 +587,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       event_labels=None,
       mode_patterns=None,
       stacked=False,
-      upd=None,
+      upd,
       runstate=None,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
@@ -601,8 +602,6 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       event_labels = DEFAULT_PLOT_EVENT_LABELS
     if mode_patterns is None:
       mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
-    if upd is None:
-      upd = Upd()
     if key_map is None:
       key_map = {}
     if color_map is None:
