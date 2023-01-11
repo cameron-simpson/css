@@ -1215,9 +1215,7 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
 
   @classmethod
   def promote(cls, epochy):
-    ''' Promote `epochy` to an `Epoch` (except for `None`).
-
-        `None` remains `None`.
+    ''' Promote `epochy` to an `Epoch`.
 
         An `Epoch` remains unchanged.
 
@@ -1226,7 +1224,7 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
 
         A 2-tuple of `(start,step)` will be used to construct a new `Epoch` directly.
     '''
-    if epochy is not None and not isinstance(epochy, Epoch):
+    if not isinstance(epochy, Epoch):
       if isinstance(epochy, (int, float)):
         # just the step value, start the epoch at 0
         epochy = 0, epochy
