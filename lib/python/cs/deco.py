@@ -807,9 +807,13 @@ def default_params(func, _strict=False, **param_defaults):
 def promote(func, params=None, types=None):
   ''' A decorator to promote argument values automaticaly in annotated functions.
       For any parameter with a type annotation, if that type has a
-      `.promote(value)` method and the function is called with a
+      `.promote(value)` class method and the function is called with a
       value not of the type of the annotation, the `.promote` method
       will be called to promote the value to the expected type.
+
+      If the annotation is `Optional[some_type]` or `Union[some_type,None]`
+      then the promotion will be to `some_type` but a value of `None`
+      will be passed through unchanged.
 
       The decorator accepts optional parameters:
       * `params`: if supplied, only parameters in this list will
@@ -835,7 +839,8 @@ def promote(func, params=None, types=None):
       The `promote` _method_ must appear after any methods in the
       class which are decorated with `@promote`, otherwise the the
       decorator method supplants the name `promote` making it
-      unavailable as the decorater.
+      unavailable as the decorator.
+      I usually just make `.promote` the last method.
 
       Failing example:
 
@@ -874,11 +879,13 @@ def promote(func, params=None, types=None):
     if annotation is Parameter.empty:
       continue
     # recognise optional parameters and use their primary type
+    optional = False
     if param.default is not Parameter.empty:
       anno_origin = typing.get_origin(annotation)
       anno_args = typing.get_args(annotation)
       if (anno_origin is typing.Union and len(anno_args) == 2
           and anno_args[-1] is type(None)):
+        optional = True
         annotation, _ = anno_args
     if types is not None and annotation not in types:
       continue
@@ -888,7 +895,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (annotation, promote_method)
+    promotions[param_name] = (optional, annotation, promote_method)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -896,10 +903,13 @@ def promote(func, params=None, types=None):
   def promoting_func(*a, **kw):
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
-    for param_name, (annotation, promote_method) in promotions.items():
+    for param_name, (optional, annotation,
+                     promote_method) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
+        continue
+      if optional and arg_value is None:
         continue
       if isinstance(param_name, annotation):
         continue
