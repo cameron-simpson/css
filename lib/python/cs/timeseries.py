@@ -2253,9 +2253,8 @@ class TimespanPolicy(DBC, HasEpochMixin):
   def from_name(
       cls, policy_name: str, epoch: Optional[Epoch] = None, **policy_kw
   ):
-    ''' Factory method to return a new `TimespanPolicy` instance
-        from the policy name,
-        which indexes `TimespanPolicy.FACTORIES`.
+    ''' Factory method to return a new `cls` instance from the policy name,
+        which indexes `cls.FACTORIES`.
     '''
     if cls is not TimespanPolicy:
       raise TypeError(
@@ -2287,7 +2286,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
       if epoch is None:
         raise ValueError("epoch may not be None if promotion is required")
       if isinstance(policy, str):
-        policy = TimespanPolicy.from_name(policy, epoch=epoch, **policy_kw)
+        policy = cls.from_name(policy, epoch=epoch, **policy_kw)
       elif isinstance(policy, type) and issubclass(policy, TimespanPolicy):
         policy = policy(epoch=epoch, **policy_kw)
       else:
