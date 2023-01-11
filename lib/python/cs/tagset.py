@@ -230,7 +230,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20220806-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -3359,7 +3359,7 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       return tagsets, unparsed
 
   @classmethod
-  def tags_line(cls, name, tags, extra_types=None):
+  def tags_line(cls, name, tags, extra_types=None, prune=False):
     ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
     if extra_types is None:
@@ -3375,11 +3375,16 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
               cls.__name__, name, tags, tag.value
           )
         continue
+      if prune and isinstance(tag.value,
+                              (list, tuple, dict)) and not tag.value:
+        continue
       fields.append(str(tag))
     return ' '.join(fields)
 
   @classmethod
-  def save_tagsets(cls, filepath, tagsets, unparsed, extra_types=None):
+  def save_tagsets(
+      cls, filepath, tagsets, unparsed, extra_types=None, prune=False
+  ):
     ''' Save `tagsets` and `unparsed` to `filepath`.
 
         This method will create the required intermediate directories
@@ -3407,12 +3412,16 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
             for name, tags in name_tags:
               if not tags:
                 continue
-              f.write(cls.tags_line(name, tags, extra_types=extra_types))
+              f.write(
+                  cls.tags_line(
+                      name, tags, extra_types=extra_types, prune=prune
+                  )
+              )
               f.write('\n')
         except OSError as e:
           error("save(%r) fails: %s", filepath, e)
 
-  def save(self, extra_types=None):
+  def save(self, extra_types=None, prune=False):
     ''' Save the tag map to the tag file if modified.
     '''
     tagsets = self._tagsets
@@ -3423,7 +3432,11 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       if self.is_modified():
         # there are modified TagSets
         self.save_tagsets(
-            self.fspath, tagsets, self.unparsed, extra_types=extra_types
+            self.fspath,
+            tagsets,
+            self.unparsed,
+            extra_types=extra_types,
+            prune=prune,
         )
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
@@ -3441,8 +3454,9 @@ class TagsOntologyCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    with self.options.ontology:
-      yield
+    with super().run_context():
+      with self.options.ontology:
+        yield
 
   def cmd_edit(self, argv):
     ''' Usage: {cmd} [{{/name-regexp | entity-name}}]

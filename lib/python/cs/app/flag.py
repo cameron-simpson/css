@@ -30,7 +30,7 @@ with flag names prefixed by the object's .name attribute
 uppercased and with an underscore appended:
 
       class SvcD(...,FlaggedMixin):
-        def __init__(self, name, ...)
+        def __init__(self, *argv, name, ...)
           self.name = name
           FlaggedMixin.__init__(self)
           ...
@@ -44,7 +44,7 @@ uppercased and with an underscore appended:
 
 so that an object set up as:
 
-      svcd = SvcD("portfwd")
+      svcd = SvcD(name="portfwd")
       print(svcd.flag_disable)
 
 accesses the flag named "PORTFWD_DISABLE".
@@ -303,10 +303,7 @@ class FlaggedMixin(object):
       flagname = self.__flagname(attr[5:])
       if flagname:
         return self.flags[flagname]
-    raise AttributeError("%s: no %r" % (
-        type(self).__name__,
-        '.' + attr,
-    ))
+    raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
   def __setattr__(self, attr, value):
     ''' Support .flag_suffix=value.

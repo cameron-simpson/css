@@ -18,13 +18,12 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20221106.1-post'
+__version__ = '20221214-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.gimmicks'],
@@ -100,6 +99,38 @@ def decorator(deco):
             ...
   '''
 
+  def decorate(func, *dargs, **dkwargs):
+    ''' Final decoration when we have the function and the decorator arguments.
+    '''
+    # decorate func
+    decorated = deco(func, *dargs, **dkwargs)
+    # catch mucked decorators which forget to return the new function
+    assert decorated is not None, (
+        "deco:%r(func:%r,...) -> None" % (deco, func)
+    )
+    if decorated is not func:
+      # we got a wrapper function back, pretty up the returned wrapper
+      # try functools.update_wrapper, otherwise do stuff by hand
+      try:
+        from functools import update_wrapper  # pylint: disable=import-outside-toplevel
+        update_wrapper(decorated, func)
+      except (AttributeError, ImportError):
+        try:
+          decorated.__name__ = getattr(func, '__name__', str(func))
+        except AttributeError:
+          pass
+        doc = getattr(func, '__doc__', None) or ''
+        try:
+          decorated.__doc__ = doc
+        except AttributeError:
+          warning("cannot set __doc__ on %r", decorated)
+        func_module = getattr(func, '__module__', None)
+        try:
+          decorated.__module__ = func_module
+        except AttributeError:
+          pass
+    return decorated
+
   def metadeco(*da, **dkw):
     ''' Compute either the wrapper function for `func`
         or a decorator expecting to get `func` when used.
@@ -115,36 +146,12 @@ def decorator(deco):
       # `func` is already supplied, pop it off and decorate it now.
       func = da[0]
       da = tuple(da[1:])
-      # decorate func
-      decorated = deco(func, *da, **dkw)
-      if decorated is not func:
-        # we got a wrapper function back, pretty up the returned wrapper
-        try:
-          decorated.__name__ = getattr(func, '__name__', str(func))
-        except AttributeError:
-          pass
-        decorated.__doc__ = getattr(func, '__doc__', None) or ''
-        func_module = getattr(func, '__module__', None)
-        try:
-          decorated.__module__ = func_module
-        except AttributeError:
-          pass
-      return decorated
+      return decorate(func, *da, **dkw)
 
     # `func` is not supplied, collect the arguments supplied and return a
     # decorator which takes the subsequent callable and returns
     # `deco(func, *da, **kw)`.
-    def overdeco(func):
-      decorated = deco(func, *da, **dkw)
-      decorated.__doc__ = getattr(func, '__doc__', None) or ''
-      func_module = getattr(func, '__module__', None)
-      try:
-        decorated.__module__ = func_module
-      except AttributeError:
-        pass
-      return decorated
-
-    return overdeco
+    return lambda func: decorate(func, *da, **dkw)
 
   metadeco.__doc__ = getattr(deco, '__doc__', '')
   metadeco.__module__ = getattr(deco, '__module__', None)
@@ -823,6 +830,33 @@ def promote(func, params=None, types=None):
           >>> f([1,2,3], epoch=12.0)
           epoch = <class 'cs.timeseries.Epoch'> Epoch(start=0, step=12)
 
+      *Note*: one issue with this is due to the conflict in name
+      between this decorator and the method it looks for in a class.
+      The `promote` _method_ must appear after any methods in the
+      class which are decorated with `@promote`, otherwise the the
+      decorator method supplants the name `promote` making it
+      unavailable as the decorater.
+
+      Failing example:
+
+          class Foo:
+              @classmethod
+              def promote(cls, obj):
+                  ... return promoted obj ...
+              @promote
+              def method(self, param:Type, ...):
+                  ...
+
+      Working example:
+
+          class Foo:
+              @promote
+              def method(self, param:Type, ...):
+                  ...
+              # promote method as the final method of the class
+              @classmethod
+              def promote(cls, obj):
+                  ... return promoted obj ...
   '''
   sig = signature(func)
   if params is not None:

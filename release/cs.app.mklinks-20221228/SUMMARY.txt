@@ -1,0 +1,3 @@
+Modernise command, pass a RunState to the merge methods.
+merge: check runstate more frequently, tweak progress bar.
+assimilate: plumb runstate.

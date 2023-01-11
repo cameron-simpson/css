@@ -15,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20220619-post'
+__version__ = '20230109-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -26,6 +26,22 @@ DISTINFO = {
     ],
     'install_requires': [],
 }
+
+@contextmanager
+def contextif(flag, cmgr_func, *cmgr_args, **cmgr_kwargs):
+  ''' A context manager to call call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
+      if `flag` is true or `nullcontext()` otherwise.
+
+      The driving use case in verbosity dependent status lines or
+      progress bars, eg:
+
+          from cs.upd import run_task
+          with contextif(run_task(....)) as proxy:
+            ... do stuff, updating proxy if not None ...
+  '''
+  cmgr = cmgr_func(*cmgr_args, **cmgr_kwargs) if flag else nullcontext()
+  with cmgr as ctxt:
+    yield ctxt
 
 def pushattrs(o, **attr_values):
   ''' The "push" part of `stackattrs`.

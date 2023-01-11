@@ -63,12 +63,12 @@ from cs.fsm import FSM
 from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
 from cs.pfx import pfx_method
-from cs.py.func import funcname
+from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20220918-post'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -95,12 +95,21 @@ class CancellationError(Exception):
   ''' Raised when accessing `result` or `exc_info` after cancellation.
   '''
 
-  def __init__(self, msg=None):
-    if msg is None:
-      msg = "cancelled"
-    elif not isinstance(msg, StringTypes):
-      msg = "%s: cancelled" % (msg,)
-    Exception.__init__(self, msg)
+  def __init__(self, message=None, **kw):
+    ''' Initialise the `CancellationError`.
+
+        The optional `message` parameter (default `"cancelled"`)
+        is set as the `message` attribute.
+        Other keyword parameters set their matching attributes.
+    '''
+    if message is None:
+      message = "cancelled"
+    elif not isinstance(message, StringTypes):
+      message = "cancelled: %s" % (message,)
+    Exception.__init__(self, message)
+    self.message = message
+    for k, v in kw.items():
+      setattr(self, k, v)
 
 # pylint: disable=too-many-instance-attributes
 class Result(FSM):
@@ -290,9 +299,7 @@ class Result(FSM):
         self.exc_info = sys.exc_info()
 
   def run_func(self, func, *a, **kw):
-    ''' Have the `Result` run `func(*a,**kw)` and store its return value as
-        `self.result`.
-        If `func` raises an exception, store it as `self.exc_info`.
+    ''' Fulfil the `Result` by running `func(*a,**kw)`.
     '''
     self.fsm_event('dispatch')
     try:
@@ -316,6 +323,18 @@ class Result(FSM):
     return bg_thread(
         self.run_func, name=self.name, args=[func] + list(a), kwargs=kw
     )
+
+  def run_func_in_thread(self, func, *a, **kw):
+    ''' Fulfil the `Result` by running `func(*a,**kw)`
+        in a separate `Thread`.
+
+        This exists to step out of the current `Thread's` thread
+        local context, such as a database transaction associated
+        with Django's implicit per-`Thread` database context.
+    '''
+    T = self.bg(func, *a, **kw)
+    T.join()
+    return self()
 
   @require(
       lambda self: self.fsm_state in
@@ -415,6 +434,33 @@ class Result(FSM):
       self.fsm_callback('DONE', callback)
       if self.fsm_state in (self.CANCELLED, self.DONE):
         notifier(self)
+
+def in_thread(func):
+  ''' Decorator to evaluate `func` in a separate `Thread`.
+      Return or exception is as for the original function.
+
+      This exists to step out of the current `Thread's` thread
+      local context, such as a database transaction associated
+      with Django's implicit per-`Thread` database context.
+  '''
+
+  def run_in_thread(*a, **kw):
+    ''' Create a `Result`, fulfil it by running `func(*a,**kw)`
+        in a separate `Thread`, return the function result (or exception).
+    '''
+    desc_fmt, desc_fmt_args = func_a_kw_fmt(func, *a, **kw)
+    R = Result(name=desc_fmt % tuple(desc_fmt_args))
+    return R.run_func_in_thread(func, *a, **kw)
+
+  # expose a reference to the original function
+  run_in_thread.direct = func
+  return run_in_thread
+
+def call_in_thread(func, *a, **kw):
+  ''' Run `func(*a,**kw)` in a separate `Thread` via the `@in_thread` decorator.
+      Return or exception is as for the original function.
+  '''
+  return in_thread(func)(*a, **kw)
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
