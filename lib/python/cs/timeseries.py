@@ -1009,7 +1009,7 @@ def plot_events(
 class PlotSeries(namedtuple('PlotSeries', 'label series extra')):
   ''' Information about a series to be plotted:
       - `label`: the label for this series
-      - `series`: an series
+      - `series`: a `Series`
       - `extra`: a `dict` of extra information such as plot styling
   '''
 
@@ -1027,6 +1027,7 @@ class PlotSeries(namedtuple('PlotSeries', 'label series extra')):
       extra = {}
     else:
       label, series = data
+    raise RuntimeError("PlotSeries.promote is incomplete!")
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
