@@ -1,3 +1,4 @@
+move hash classes into cs.hashutils, check compatibility
 scanbuf2: does it make any sense to use a Py_buffer type?
 FilesDir et al to accept optional index, bypassing indexclass if supplied
 FilesDir et al to accept optional index, bypassing indexclass if supplied
