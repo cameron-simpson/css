@@ -82,7 +82,7 @@ class OntCommand(TagsOntologyCommand):
     for tn in type_names:
       print(tn)
 
-class Ont(TagsOntology):
+class Ont(TagsOntology, HasFSPath):
   ''' A `TagsOntology` based on a persistent store.
   '''
 
@@ -100,6 +100,10 @@ class Ont(TagsOntology):
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.ont_path)
+
+  @property
+  def fspath(self):
+    return self.ont_path
 
   @classmethod
   @typechecked
