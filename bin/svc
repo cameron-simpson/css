@@ -191,7 +191,7 @@ case "$op" in
       SVC_TMUX_SESSION=SVC_$( printf '%s\n' "$name" | tr '[a-z]-' '[A-Z]_' )
       export SVC_OP SVC_NAME SVC_TMUX_SESSION
       set -x
-      exec tm "$SVC_TMUX_SESSION" set-x svcd -n "$SVC_NAME" sh -uexc "$start_shcmd"
+      exec tm "$SVC_TMUX_SESSION" set-x svcd run -n "$SVC_NAME" sh -uexc "$start_shcmd"
     fi
     ;;
   exec)

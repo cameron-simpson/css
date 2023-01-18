@@ -37,7 +37,7 @@ from cs.py.func import prop
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import UpdProxy, Upd, print, run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20210404-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'description':

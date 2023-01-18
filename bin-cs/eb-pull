@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Pull Kindle books to Calibre library.
+# - Cameron Simpson <cs@cskk.id.au> 09jan2023
+#
+
+set -ue
+
+[ $# = 0 ] || {
+  echo "Usage: $0"'
+  Export from Kindle library to Calibre.
+  Expoects:
+    $CALIBRE_LIBRARY    The path to the Calibre library.
+    $DEDRM_PACKAGE_PATH The path the plugin subdirectory of a DeDRM/noDRM checkout.
+    $KINDLE_LIBRARY     The path to the Kindle library.'
+  exit 2
+}
+
+# make sure we have this
+: "$DEDRM_PACKAGE_PATH"
+
+set -x
+exec ebooks kindle export
+
+##  cmd=$( basename "$0" )
+##  usage="Usage: $cmd
+##    Export from old Kindle to old Calibre, import from old Calibre to current Calibre."
+##
+##  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; echo "$usage" >&2; exit 2; }
+##
+##  sshopts=
+##  [ -t 2 ] && sshopts="$sshopts -t"
+##
+##  set -x
+##  envssh $sshopts "$KINDLE_REMOTEHOST" 'set -uex; ebooks kindle export'
+##  ebooks calibre pull -q "$CALIBRE_SOURCE"
