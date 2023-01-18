@@ -10,13 +10,16 @@ from os.path import (
     expanduser, isdir as isdirpath, isfile as isfilepath, join as joinpath
 )
 import sys
+
 from typeguard import typechecked
+
 from cs.context import stackattrs
+from cs.deco import fmtdoc
+from cs.fs import HasFSPath
 from cs.fstags import TagFile
-from cs.lex import cutsuffix
+from cs.lex import cutsuffix, r
 from cs.logutils import warning
 from cs.pfx import Pfx
-from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.tagset import TagsOntology, TagsOntologyCommand
 
@@ -103,6 +106,8 @@ class Ont(TagsOntology, HasFSPath):
 
   @property
   def fspath(self):
+    ''' The `.fspath` is `self.ont_path`.
+    '''
     return self.ont_path
 
   @classmethod
@@ -159,7 +164,14 @@ class Ont(TagsOntology, HasFSPath):
     return tagsets, ont_pfx_map
 
   @classmethod
+  @fmtdoc
   def promote(cls, ont):
+    ''' Promote the object `ont` to an `Ont` if it is not one already.
+
+        `None` is promoted to the default ontology path from ${ONTTAGS_PATH_ENVVAR},
+        falling back to `ONTTAGS_PATH_DEFAULT` (`'{ONTTAGS_PATH_DEFAULT}'`).
+        After that, a `str` is taken to the the filesystem path to an ontology file.
+    '''
     if not isinstance(ont, cls):
       if ont is None:
         ont = os.environ.get(ONTTAGS_PATH_ENVVAR
