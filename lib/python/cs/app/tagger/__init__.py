@@ -21,9 +21,9 @@ from os.path import (
     samefile,
 )
 from threading import RLock
-from typing import List
+from typing import List, Optional
 
-from cs.deco import cachedmethod, fmtdoc
+from cs.deco import cachedmethod, fmtdoc, promote
 from cs.fs import FSPathBasedSingleton, shortpath
 from cs.fstags import FSTags
 from cs.lex import FormatAsError, r, get_dotted_identifier
@@ -78,7 +78,8 @@ class Tagger(FSPathBasedSingleton):
 
   TAG_PREFIX = TAGGER_TAG_PREFIX_DEFAULT
 
-  def __init__(self, fspath: str, fstags=None, ont=None):
+  @promote
+  def __init__(self, fspath: str, fstags=None, ont: Optional[Ont] = None):
     ''' Initialise the `Tagger`.
 
         Parameters:
@@ -91,11 +92,6 @@ class Tagger(FSPathBasedSingleton):
       return
     if fstags is None:
       fstags = FSTags()
-    if ont is None:
-      ont = os.environ.get(ONTTAGS_PATH_ENVVAR
-                           ) or expanduser(ONTTAGS_PATH_DEFAULT)
-    if isinstance(ont, str):
-      ont = Ont(ont)
     super().__init__(fspath)
     self.fstags = fstags
     self.ont = ont
