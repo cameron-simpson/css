@@ -64,16 +64,12 @@ class OntCommand(TagsOntologyCommand):
   def run_context(self):
     ''' Set up the ontology around a run.
     '''
-    with super().run_context():
-      options = self.options
-      ont_path = options.ont_path
-      if ont_path is None:
-        ont_path = options.ont_path = expanduser(ONTTAGS_PATH_DEFAULT)
-      ont = Ont(ont_path)
-      with ont:
-        with stackattrs(options, ontology=ont):
-          with super().run_context():
-            yield
+    options = self.options
+    ont = Ont.promote(options.ont_path)
+    with ont:
+      with stackattrs(options, ontology=ont):
+        with super().run_context():
+          yield
 
   def cmd_test(self, argv):
     ''' Usage: {cmd}
