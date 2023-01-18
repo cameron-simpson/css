@@ -463,7 +463,7 @@ class _ImageWidget(_Widget):
       else:
         size = self.fixed_size or (self.width, self.height)
         try:
-          display_fspath = pngfor(expanduser(imgpath), size)
+          display_fspath = pngfor(expanduser(imgpath), max_size=size)
         except (OSError, ValueError) as e:
           warning("%r: %s", imgpath, e)
           display_fspath = None
@@ -769,6 +769,6 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
 
   @pfx_method
   def show_fspath(self, fspath):
-    ''' TODO: bring to correspnding thumbnail into view.
+    ''' TODO: bring the correspnding thumbnail into view.
     '''
     warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")
