@@ -108,11 +108,11 @@ class Ont(TagsOntology):
   @classmethod
   @typechecked
   def tagsetses_from_path(cls, ont_path: str):
-    ''' Return `(tagsets,ont_pfx_map)` instance from `ont_path`,
+    ''' A class method returing a `(tagsets,ont_pfx_map)` tuple from `ont_path`,
         being the default `TagSets` and a mapping of name->`TagSets`
         for various subontologies.
 
-        If `ont_path` resolves to a file the mapping wil be empty;
+        If `ont_path` resolves to a file the mapping will be empty;
         return an `SQLTags` if `ont_path` ends with `'.sqlite'`
         otherwise a `TagFile`.
 
@@ -157,6 +157,18 @@ class Ont(TagsOntology):
           return cls.tagsetses_from_path(ont_path_sqlite)
       raise ValueError(f"unsupported ont_path={ont_path!r}")
     return tagsets, ont_pfx_map
+
+  @classmethod
+  def promote(cls, ont):
+    if not isinstance(ont, cls):
+      if ont is None:
+        ont = os.environ.get(ONTTAGS_PATH_ENVVAR
+                             ) or expanduser(ONTTAGS_PATH_DEFAULT)
+      if isinstance(ont, str):
+        ont = cls(ont)
+      else:
+        raise TypeError("%s: cannot promote %s" % (cls, r(ont)))
+    return ont
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
