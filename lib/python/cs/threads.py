@@ -15,7 +15,7 @@ from inspect import ismethod
 import sys
 from threading import Semaphore, Thread, Lock, local as thread_local
 
-from cs.context import stackattrs
+from cs.context import ContextManagerMixin, stackattrs
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
 from cs.gimmicks import error, warning
@@ -83,6 +83,25 @@ class State(thread_local):
     '''
     with stackattrs(self, **kw) as prev_attrs:
       yield prev_attrs
+
+class HasThreadState(ContextManagerMixin):
+  ''' A mixin for classes with a `cs.threads.State` instance as `.state`
+      providing a context manager which pushes `current=self` onto that state
+      and a `default()` class method returning `cls.state.current`
+      as the default instance of that class.
+  '''
+
+  @classmethod
+  def default(cls):
+    ''' The default instance of this class, from `cls.state.current`.
+      '''
+    return cls.state.current
+
+  def __enter_exit__(self):
+    ''' Push `self.state.current=self` as the `Thread` local current instance.
+      '''
+    with self.state(current=self):
+      yield
 
 # pylint: disable=too-many-arguments
 def bg(
