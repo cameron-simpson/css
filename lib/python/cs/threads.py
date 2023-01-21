@@ -91,16 +91,20 @@ class HasThreadState(ContextManagerMixin):
       as the default instance of that class.
   '''
 
+  # the default name for the Thread state attribute
+  THREAD_STATE_ATTR = 'state'
+
   @classmethod
   def default(cls):
-    ''' The default instance of this class, from `cls.state.current`.
+    ''' The default instance of this class from `cls.state.current`.
       '''
-    return cls.state.current
+    return getattr(cls.THREAD_STATE_ATTR, 'current', None)
 
   def __enter_exit__(self):
     ''' Push `self.state.current=self` as the `Thread` local current instance.
       '''
-    with self.state(current=self):
+    state = getattr(self, self.THREAD_STATE_ATTR)
+    with state(current=self):
       yield
 
 # pylint: disable=too-many-arguments
