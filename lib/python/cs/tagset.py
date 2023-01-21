@@ -2579,7 +2579,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       * the type is `role`, so the ontology entry for the metadata
         is `role.marvel.black_widow`
 
-      this requires type information about a `role`.
+      This requires type information about a `role`.
       Here are some type definitions supporting the above metadata:
 
           type.person type=str description="A person."
