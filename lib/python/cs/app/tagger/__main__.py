@@ -55,8 +55,9 @@ class TaggerCommand(BaseTkCommand):
       options = self.options
       with FSTags() as fstags:
         tagger = Tagger('.', fstags=fstags)
-        with stackattrs(options, tagger=tagger, fstags=fstags):
-          yield
+        with tagger:
+          with stackattrs(options, tagger=tagger, fstags=fstags):
+            yield
 
   def tagger_for(self, fspath):
     ''' Return the `Tagger` for the filesystem path `fspath`.
