@@ -30,7 +30,7 @@ from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.resources import RunState
 from cs.tagset import Tag, TagSet
 
-from . import Tagger
+from . import Tagger, uses_tagger
 
 is_darwin = platform.system() == "Darwin"
 
@@ -53,6 +53,7 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
 
   WIDGET_FOREGROUND = None
 
+  @uses_tagger
   def __init__(self, parent, *, tagger, fspaths=None):
     self.app = None
     super().__init__(parent)
