@@ -1509,7 +1509,6 @@ class SQLTags(BaseTagSets):
   def __init__(self, db_url=None, ontology=None):
     if not db_url:
       db_url = self.infer_db_url()
-    self.__tstate = ThreadState()
     self.orm = SQLTagsORM(db_url=db_url)
     if ontology is None:
       ontology = TagsOntology(self)
