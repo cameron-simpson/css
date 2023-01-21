@@ -485,7 +485,7 @@ class ContextManagerMixin:
       if there was an exception in the managed suite
       then that exception is raised on return from the `yield`.
 
-      *However*, and _unlike_ an `@contextmanager` method,
+      *However*, and _unlike_ a `@contextmanager` method,
       the `__enter_exit__` generator _may_ also `yield`
       an additional true/false value to use as the result
       of the `__exit__` method, to indicate whether the exception was handled.
