@@ -464,7 +464,7 @@ class Pool(object):
           self.pool.append(o)
 
 # pylint: disable=too-many-instance-attributes
-class RunState(HasThreadState, ContextManagerMixin):
+class RunState(HasThreadState):
   ''' A class to track a running task whose cancellation may be requested.
 
       Its purpose is twofold, to provide easily queriable state
@@ -561,7 +561,7 @@ class RunState(HasThreadState, ContextManagerMixin):
         * cancel on exception during run
         * stop
     '''
-    with super().__enter_exit__():
+    with HasThreadState.as_contextmanager(self):
       with self.catch_signal(self._signals, call_previous=False,
                              handle_signal=self._sighandler) as sigstack:
         with stackattrs(self, _sigstack=sigstack):
