@@ -1095,8 +1095,14 @@ class FSTags(MultiOpenMixin):
     assert path == normpath(path)
     tagged_path = self._tagged_paths.get(path)
     if tagged_path is None:
+      import time
       tagfile = self.tagfile_for(path)
+      now = time.time()
       tagged_path = self._tagged_paths[path] = tagfile[basename(path)]
+      elapsed = time.time() - now
+      if elapsed >= 1.0:
+        warning("FSTags[%r] took %ss", path, elapsed)
+        ##raise RuntimeError("SLOW TAGFILE LOOKUP")
     return tagged_path
 
   @pfx_method
@@ -1552,6 +1558,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     ''' Forbid the special tag name `'name'`, reserved for the filename.
     '''
     assert tag_name != 'name'
+    ##assert tag_name != 'fspath'
     super().set(tag_name, value, **kw)
 
   # pylint: disable=arguments-differ

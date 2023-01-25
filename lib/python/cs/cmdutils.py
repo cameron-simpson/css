@@ -1105,6 +1105,7 @@ class BaseCommand:
               runstate=runstate,
               upd=upd,
           ):
+            X("options.runstate = %r", options.runstate)
             with options.runstate:
               yield
     finally:
