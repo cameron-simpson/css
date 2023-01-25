@@ -97,16 +97,16 @@ class HTTPServiceAPI(ServiceAPI):
         For example, the `PlayOnAPI` defines this as `f'https://{API_HOSTNAME}/v3/'`.
   '''
 
-  # mapping of method names to requests convenience calls
-  REQUESTS_METHOD_CALLS = {
-      'GET': requests.get,
-      'POST': requests.post,
-      'HEAD': requests.head,
-  }
-
   def __init__(self, **kw):
     super().__init__(**kw)
-    self.cookies = requests.cookies.RequestsCookieJar()
+    session = self.session = requests.Session()
+    # mapping of method names to requests convenience calls
+    self.REQUESTS_METHOD_CALLS = {
+        'GET': session.get,
+        'POST': session.post,
+        'HEAD': session.head,
+    }
+    self.cookies = session.cookies
 
   @uses_upd
   @require(lambda suburl: not suburl.startswith('/'))
