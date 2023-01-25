@@ -56,7 +56,7 @@ cs.later pypi.release="20221228" ok_revision=bd75545bebb3ede8de2ef9b7aa5c729cb38
 cs.lex pypi.release="20220918" ok_revision=be94fd4f84d46125856c79be946957a5344beccb features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"]}
 cs.logutils pypi.release="20220531" ok_revision=b00bf7d22f3b049e51068327ee8ffc299136d510 features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
-cs.mappings pypi.release="20220912.4" ok_revision="585f82b1d2287203f63b07bd1d0cd4fced168bca" features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"]}
+cs.mappings pypi.release="20220912.4" ok_revision="80604d2a2de25f75877761cd5532e6a628848719" features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"]}
 cs.mediainfo
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.mplutils ok_revision="58ff8b4668fb153629d847388703be4e27ca6b85" pypi.release="20220918" features={"20220918":["FigureSize"]}
