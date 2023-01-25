@@ -97,7 +97,14 @@ class HTTPServiceAPI(ServiceAPI):
         For example, the `PlayOnAPI` defines this as `f'https://{API_HOSTNAME}/v3/'`.
   '''
 
-  def __init__(self, **kw):
+  def __init__(self, api_hostname=None, *, default_headers=None, **kw):
+    if api_hostname is None:
+      api_hostname = self.API_HOSTNAME
+    else:
+      self.API_HOSTNAME = api_hostname
+      self.API_BASE = f'https://{api_hostname}/'
+    if default_headers is None:
+      default_headers = {}
     super().__init__(**kw)
     session = self.session = requests.Session()
     # mapping of method names to requests convenience calls
@@ -107,6 +114,7 @@ class HTTPServiceAPI(ServiceAPI):
         'HEAD': session.head,
     }
     self.cookies = session.cookies
+    self.default_headers = default_headers
 
   @uses_upd
   @require(lambda suburl: not suburl.startswith('/'))
@@ -118,6 +126,7 @@ class HTTPServiceAPI(ServiceAPI):
       _method='GET',
       _no_raise_for_status=False,
       cookies=None,
+      headers=None,
       upd,
       **rqkw,
   ):
@@ -138,8 +147,12 @@ class HTTPServiceAPI(ServiceAPI):
     if cookies is None:
       cookies = self.cookies
     url = _base_url + suburl
+    rq_headers = {}
+    rq_headers.update(self.default_headers)
+    if headers is not None:
+      rq_headers.update(headers)
     with upd.run_task(f'{_method} {url}'):
-      rsp = pfx_call(rqm, url, cookies=cookies, **rqkw)
+      rsp = pfx_call(rqm, url, cookies=cookies, headers=rq_headers, **rqkw)
     if not _no_raise_for_status:
       rsp.raise_for_status()
     return rsp
