@@ -69,17 +69,17 @@ class ServiceAPI(MultiOpenMixin):
     return None
 
   @property
-  def login_state(self):
+  def login_state(self, do_refresh=False) -> SQLTagSet:
     ''' The login state, a mapping. Performs a login if necessary.
     '''
     with self._lock:
-      state = self.login_state_mapping
-      if not state or (
+      state = self.sqltags['login.state']
+      if do_refresh or not state or (
           self.API_AUTH_GRACETIME is not None
-          and time.time() + self.API_AUTH_GRACETIME >= self.login_expiry):
-        self.login_state_mapping = None
-        # not logged in or login about to expire
-        state = self.login_state_mapping = self.login()
+          and time.time() + self.API_AUTH_GRACETIME >= state.expiry):
+        for k, v in self.login().items():
+          if k not in ('id', 'name'):
+            state[k] = v
     return state
 
 class HTTPServiceAPI(ServiceAPI):
