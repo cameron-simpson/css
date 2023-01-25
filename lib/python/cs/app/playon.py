@@ -529,6 +529,16 @@ class Recording(SQLTagSet):
       for tag in sorted(self):
         print_func(" ", tag)
 
+class LoginState(SQLTagSet):
+
+  @property
+  def expiry(self):
+    ''' Expiry unixtime of the login state information.
+        `-1` if the `'exp'` field is not present.
+    '''
+    exp = self.get('exp')
+    return exp or -1
+
 # pylint: disable=too-many-ancestors
 class PlayOnSQLTags(SQLTags):
   ''' `SQLTags` subclass with PlayOn related methods.
@@ -538,6 +548,7 @@ class PlayOnSQLTags(SQLTags):
 
   # map 'foo' from 'foo.bah' to a particular TagSet subclass
   TAGSETCLASS_PREFIX_MAPPING = {
+      'login': LoginState,
       'recording': Recording,
   }
 
