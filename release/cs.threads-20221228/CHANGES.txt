@@ -1,0 +1,2 @@
+lib/python/cs/threads.py: cs.threads: get error,warning from cs.gimmicks; late import of cs.logutils.LgTime to fix circular import
+lib/python/cs/threads.py: cs.threads: update DISTINFO

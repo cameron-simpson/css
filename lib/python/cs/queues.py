@@ -22,7 +22,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20221207-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'description':
@@ -149,7 +149,9 @@ class QueueIterator(MultiOpenMixin):
     self.q.join()
 
 def IterableQueue(capacity=0, name=None):
-  ''' Factory to create an iterable `Queue`.
+  ''' Factory to create an iterable queue.
+      Note that the returned queue is already open
+      and needs a close.
   '''
   return QueueIterator(Queue(capacity), name=name).open()
 

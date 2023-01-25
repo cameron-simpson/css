@@ -1,0 +1,3 @@
+TagFile: drop _singleton_key, FSPathBasedSingleton provides a good default.
+TagFile.save_tagsets,tags_line: new optional prune=False parameter to drop empty top level dict/lists.
+TagFile.save: plumb prune=False parameter.

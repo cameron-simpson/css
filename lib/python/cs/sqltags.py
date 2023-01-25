@@ -77,7 +77,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20220806-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1509,7 +1509,6 @@ class SQLTags(BaseTagSets):
   def __init__(self, db_url=None, ontology=None):
     if not db_url:
       db_url = self.infer_db_url()
-    self.__tstate = ThreadState()
     self.orm = SQLTagsORM(db_url=db_url)
     if ontology is None:
       ontology = TagsOntology(self)
@@ -1931,12 +1930,13 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    options = self.options
-    db_url = options.db_url
-    sqltags = self.TAGSETS_CLASS(db_url)
-    with sqltags:
-      with stackattrs(options, sqltags=sqltags, verbose=True):
-        yield
+    with super().run_context():
+      options = self.options
+      db_url = options.db_url
+      sqltags = self.TAGSETS_CLASS(db_url)
+      with sqltags:
+        with stackattrs(options, sqltags=sqltags, verbose=True):
+          yield
 
   @classmethod
   def parse_tagset_criterion(cls, arg, tag_based_test_class=None):

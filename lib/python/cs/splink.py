@@ -747,14 +747,15 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         * `tz`: the default local timezone
         * `spd`: the `SPLinkData` instance for `options.spdpath`
     '''
-    options = self.options
-    fstags = options.fstags
-    options.tz = tzlocal()
-    with fstags:
-      spd = SPLinkData(options.spdpath)
-      with stackattrs(options, spd=spd):
-        with spd:
-          yield
+    with super().run_context():
+      options = self.options
+      fstags = options.fstags
+      options.tz = tzlocal()
+      with fstags:
+        spd = SPLinkData(options.spdpath)
+        with stackattrs(options, spd=spd):
+          with spd:
+            yield
 
   def cmd_export(self, argv):
     ''' Usage: {cmd} dataset
