@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from json import JSONDecodeError
 from threading import RLock
 import time
-from typing import Mapping
+from typing import Mapping, Set
 
 from icontract import require
 import requests
@@ -25,7 +25,7 @@ from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin
-from cs.sqltags import SQLTags
+from cs.sqltags import SQLTags, SQLTagSet
 from cs.upd import uses_upd
 
 class ServiceAPI(MultiOpenMixin):
@@ -81,6 +81,13 @@ class ServiceAPI(MultiOpenMixin):
           if k not in ('id', 'name'):
             state[k] = v
     return state
+
+  def available(self) -> Set[SQLTagSet]:
+    ''' Return a set of the `SQLTagSet` instances representing available
+        items at the service, for example purchased books
+        available to your login.
+    '''
+    raise NotImplementedError
 
 class HTTPServiceAPI(ServiceAPI):
   ''' `HTTPServiceAPI` base class for other APIs talking to HTTP services.

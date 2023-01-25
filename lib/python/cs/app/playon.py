@@ -23,6 +23,7 @@ import re
 import sys
 from threading import Semaphore
 import time
+from typing import Set
 from urllib.parse import unquote as unpercent
 
 import requests
@@ -799,7 +800,7 @@ class PlayOnAPI(HTTPServiceAPI):
     )
 
   @pfx_method
-  def _recordings_from_entries(self, entries):
+  def _recordings_from_entries(self, entries) -> Set[SQLTagSet]:
     ''' Return the recording `TagSet` instances from PlayOn data entries.
     '''
     with self.sqltags:
@@ -854,6 +855,8 @@ class PlayOnAPI(HTTPServiceAPI):
       data = self.suburl_data('library/all')
       entries = data['entries']
       return self._recordings_from_entries(entries)
+
+  available = recordings
 
   @pfx_method
   def _services_from_entries(self, entries):
