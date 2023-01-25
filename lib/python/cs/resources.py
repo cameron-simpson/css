@@ -23,7 +23,7 @@ from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 from cs.threads import State as ThreadState, HasThreadState
 
-__version__ = '20221228-post'
+__version__ = '20230125'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
