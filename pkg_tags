@@ -94,7 +94,7 @@ cs.sqltags ok_revision="14532850e539eb1624e9d31e0c6891d47657d8d0" pypi.release="
 cs.tagset ok_revision="89d6eda67ae6476789d6eade392c1e7576aa7a27" features={"20221228":["TagFile_prune"]} pypi.release="20221228"
 cs.taskqueue ok_revision="3124b308e9599978d77d3cd7e4c8f769400803e1" features={"20221207":["BaseTask"]} pypi.release="20221207"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
-cs.threads ok_revision="7e37cbc0791cdd817a25982a071f03a0bbfc1565" pypi.release="20221228"
+cs.threads ok_revision="7e37cbc0791cdd817a25982a071f03a0bbfc1565" pypi.release="20221228" features={"20230125":["HasThreadState"]}
 cs.tty
 cs.units
 cs.upd ok_revision="0f3ef56341773334a0a40ff79dee85d24c9d5c6d" pypi.release="20221228"
