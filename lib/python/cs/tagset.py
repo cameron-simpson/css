@@ -546,7 +546,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
         For example if a `TagSet` has the tag `artists=["fred","joe"]`
         and `attr` is `artist_names`
-        then the metadata entries for `"fred"` and `"joe"` looked up
+        then the metadata entries for `"fred"` and `"joe"` are looked up
         and their `artist_name` tags are returned,
         perhaps resulting in the list
         `["Fred Thing","Joe Thang"]`.
@@ -557,7 +557,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
         Otherwise, a superclass attribute access is performed.
 
-        Example:
+        Example of dotted access to tags like `c.x`:
 
             >>> tags=TagSet(a=1,b=2)
             >>> tags.a
@@ -2579,7 +2579,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       * the type is `role`, so the ontology entry for the metadata
         is `role.marvel.black_widow`
 
-      this requires type information about a `role`.
+      This requires type information about a `role`.
       Here are some type definitions supporting the above metadata:
 
           type.person type=str description="A person."

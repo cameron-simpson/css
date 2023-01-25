@@ -485,7 +485,7 @@ class ContextManagerMixin:
       if there was an exception in the managed suite
       then that exception is raised on return from the `yield`.
 
-      *However*, and _unlike_ an `@contextmanager` method,
+      *However*, and _unlike_ a `@contextmanager` method,
       the `__enter_exit__` generator _may_ also `yield`
       an additional true/false value to use as the result
       of the `__exit__` method, to indicate whether the exception was handled.
@@ -558,3 +558,35 @@ class ContextManagerMixin:
       if super_exit(exc_type, exc_value, traceback):
         exit_result = True
     return exit_result
+
+  @classmethod
+  @contextmanager
+  def as_contextmanager(cls, self):
+    ''' Run the generator from the `cls` class specific `__enter_exit__`
+        method via `self` as a context manager.
+
+        Example from `RunState` which subclasses `HasThreadState`,
+        both of which are `ContextManagerMixin` subclasses:
+
+            class RunState(HasThreadState):
+                .....
+                def __enter_exit__(self):
+                    with HasThreadState.as_contextmanager(self):
+                        ... RunState context manager stuff ...
+
+        This runs the `HasThreadState` context manager
+        around the main `RunState` context manager.
+    '''
+    eegen = cls.__enter_exit__(self)
+    entered = next(eegen)
+    try:
+      yield entered
+    except Exception as e:
+      exit_result = eegen.throw(type(e), e, e.__traceback__)
+      if not exit_result:
+        raise
+    else:
+      try:
+        exit_result = next(eegen)
+      except StopIteration:
+        pass
