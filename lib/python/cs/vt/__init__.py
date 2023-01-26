@@ -218,3 +218,8 @@ class _Defaults(ThreadState):
       yield
 
 defaults = _Defaults()
+
+def uses_Store(func):
+  ''' Decorator to provide the default Store as the parameter `S`.
+  '''
+  return default_params(func, S=lambda: defaults.S)
