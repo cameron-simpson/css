@@ -23,6 +23,7 @@ import re
 import sys
 from threading import Semaphore
 import time
+from typing import Set
 from urllib.parse import unquote as unpercent
 
 import requests
@@ -304,10 +305,7 @@ class PlayOnCommand(BaseCommand):
     recordings = set(sqltags.recordings())
     need_refresh = (
         # any current recordings whose state is stale
-        any(
-            not recording.is_expired() and recording.is_stale(max_age=max_age)
-            for recording in recordings
-        ) or
+        any(recording.is_stale(max_age=max_age) for recording in recordings) or
         # no recording is current
         all(recording.is_expired() for recording in recordings)
     )
@@ -511,23 +509,14 @@ class Recording(SQLTagSet):
 
   @format_attribute
   def is_stale(self, max_age=None):
-    ''' Test whether this entry is stale
-        i.e. the time since `self.last_updated` exceeds `max_age` seconds
-        (default from `self.STALE_AGE`).
-        Note that expired recordings are never stale
-        because they can no longer be queried from the API.
+    ''' Override for `TagSet.is_stale()` which considers expired
+        records not stale because they can never be refrehed from the
+        service.
     '''
-    if max_age is None:
-      max_age = self.STALE_AGE
     if self.is_expired():
       # expired recording will never become unstale
       return False
-    if max_age <= 0:
-      return True
-    last_updated = self.last_updated
-    if not last_updated:
-      return True
-    return time.time() >= last_updated + max_age
+    return super().is_stale(max_age=max_age)
 
   def ls(self, ls_format=None, long_mode=False, print_func=None):
     ''' List a recording.
@@ -541,6 +530,16 @@ class Recording(SQLTagSet):
       for tag in sorted(self):
         print_func(" ", tag)
 
+class LoginState(SQLTagSet):
+
+  @property
+  def expiry(self):
+    ''' Expiry unixtime of the login state information.
+        `-1` if the `'exp'` field is not present.
+    '''
+    exp = self.get('exp')
+    return exp or -1
+
 # pylint: disable=too-many-ancestors
 class PlayOnSQLTags(SQLTags):
   ''' `SQLTags` subclass with PlayOn related methods.
@@ -550,6 +549,7 @@ class PlayOnSQLTags(SQLTags):
 
   # map 'foo' from 'foo.bah' to a particular TagSet subclass
   TAGSETCLASS_PREFIX_MAPPING = {
+      'login': LoginState,
       'recording': Recording,
   }
 
@@ -574,6 +574,9 @@ class PlayOnSQLTags(SQLTags):
     return super().infer_db_url(envvar=envvar, default_path=default_path)
 
   def __getitem__(self, index):
+    ''' Override `SQLTags.__getitem__` to promote `int` indices
+        to a `str` with value `f'recording.{index}'`.
+    '''
     if isinstance(index, int):
       index = f'recording.{index}'
     return super().__getitem__(index)
@@ -622,8 +625,7 @@ class PlayOnSQLTags(SQLTags):
         r_text = arg[1:]
         if r_text.endswith('/'):
           r_text = r_text[:-1]
-        with Pfx("re.compile(%r, re.I)", r_text):
-          r = re.compile(r_text, re.I)
+        r = pfx_call(re.compile, r_text, re.I)
         for recording in self:
           pl_tags = recording.subtags('playon')
           if (pl_tags.Series and r.search(pl_tags.Series)
@@ -747,58 +749,25 @@ class PlayOnAPI(HTTPServiceAPI):
     '''
     return self.sqltags[download_id]
 
-  def suburl_request(self, base_url, method, suburl):
-    ''' Return a curried `requests` method
-        to fetch `API_BASE/suburl`.
+  def suburl(self, suburl, headers=None, **kw):
+    ''' Override `HTTPServiceAPI.suburl` with default
+        `headers={'Authorization':self.jwt}`.
     '''
-    url = base_url + suburl
-    rqm = partial(
-        {
-            'GET': requests.get,
-            'POST': requests.post,
-            'HEAD': requests.head,
-        }[method],
-        url,
-        auth=RequestsNoAuth(),
-        cookies=self._cookies,
-    )
-    return rqm
+    if headers is None:
+      headers = dict(Authorization=self.jwt)
+    return super().suburl(suburl, headers=headers, **kw)
 
-  @uses_upd
-  def suburl_data(
-      self,
-      suburl,
-      *,
-      _base_url=None,
-      _method='GET',
-      headers=None,
-      raw=False,
-      upd,
-      **kw
-  ):
+  def suburl_data(self, suburl, *, raw=False, **kw):
     ''' Call `suburl` and return the `'data'` component on success.
 
         Parameters:
         * `suburl`: the API subURL designating the endpoint.
-        * `_method`: optional HTTP method, default `'GET'`.
-        * `headers`: headers to accompany the request;
-          default `{'Authorization':self.jwt}`.
-        Other keyword arguments are passed to the `requests` method
-        used to perform the HTTP call.
+        * `raw`: if true, return the whole decoded JSON result;
+          the default is `False`, returning `'success'` in the
+          result keys and returning `result['data']`
+        Other keyword arguments are passed to the `HTTPServiceAPI.json` method.
     '''
-    if _base_url is None:
-      _base_url = self.API_BASE
-    if headers is None:
-      headers = dict(Authorization=self.jwt)
-    with upd.run_task(f'{_method} {_base_url}/{suburl}'):
-      rqm = self.suburl_request(_base_url, _method, suburl)
-      basic_result = rqm(headers=headers, **kw)
-    basic_result.raise_for_status()
-    try:
-      result = basic_result.json()
-    except JSONDecodeError as e:
-      warning("basic result is not JSON: %s\n%r", e, basic_result)
-      raise
+    result = self.json(suburl, **kw)
     if raw:
       return result
     ok = result.get('success')
@@ -831,7 +800,7 @@ class PlayOnAPI(HTTPServiceAPI):
     )
 
   @pfx_method
-  def _recordings_from_entries(self, entries):
+  def _recordings_from_entries(self, entries) -> Set[SQLTagSet]:
     ''' Return the recording `TagSet` instances from PlayOn data entries.
     '''
     with self.sqltags:
@@ -873,17 +842,21 @@ class PlayOnAPI(HTTPServiceAPI):
   def queue(self):
     ''' Return the `TagSet` instances for the queued recordings.
     '''
-    data = self.suburl_data('queue')
-    entries = data['entries']
-    return self._recordings_from_entries(entries)
+    with self.sqltags.db_session():
+      data = self.suburl_data('queue')
+      entries = data['entries']
+      return self._recordings_from_entries(entries)
 
   @pfx_method
   def recordings(self):
     ''' Return the `TagSet` instances for the available recordings.
     '''
-    data = self.suburl_data('library/all')
-    entries = data['entries']
-    return self._recordings_from_entries(entries)
+    with self.sqltags.db_session():
+      data = self.suburl_data('library/all')
+      entries = data['entries']
+      return self._recordings_from_entries(entries)
+
+  available = recordings
 
   @pfx_method
   def _services_from_entries(self, entries):
@@ -962,7 +935,7 @@ class PlayOnAPI(HTTPServiceAPI):
       dl_rsp = None
     else:
       dl_cookies = dl_data['data']
-      jar = self._cookies
+      jar = self.cookies
       for ck_name in 'CloudFront-Expires', 'CloudFront-Key-Pair-Id', 'CloudFront-Signature':
         jar.set(
             ck_name,
