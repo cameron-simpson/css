@@ -27,6 +27,7 @@ from PIL import Image, ImageTk, UnidentifiedImageError
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
+from cs.convcache import convof
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags
 from cs.hashutils import SHA256
@@ -46,8 +47,6 @@ CONVCACHE_ROOT_ENVVAR = 'CONVCACHE_ROOT'
 CONVCACHE_ROOT = os.environ.get(
     CONVCACHE_ROOT_ENVVAR, expanduser('~/var/cache/convof')
 )
-
-_conv_cache = defaultdict(dict)
 
 class BaseTkCommand(BaseCommand):
   ''' A subclass of `cs.cmdutils.BaseCommand`
@@ -134,74 +133,70 @@ def image_size(path):
   return size
 
 @pfx
-def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
-  ''' Create a PNG version of the image at `path`,
+def imgof(
+    path,
+    max_size=None,
+    *,
+    min_size=None,
+    fmt='png',
+    force=False,
+):
+  ''' Create a version of the image at `path`,
       scaled to fit within some size constraints.
-      Return the pathname of the PNG file.
+      Return the pathname of the new file.
 
       Parameters:
       * `max_size`: optional `(width,height)` tuple, default `(1920,1800)`
       * `min_size`: optional `(width,height)` tuple, default half of `max_size`
-      * `cached`: optional mapping of `(path,'png',size)`->`pngof_path`
-        where size is the chosen final size tuple
+      * `fmt`: optional output format, default `'png'`
       * `force`: optional flag (default `False`)
         to force recreation of the PNG version and associated cache entry
   '''
+  assert '/' not in fmt
+  FMT = fmt.upper()
+  fmt = fmt.lower()
   if max_size is None:
     max_size = 1920, 1080
   if min_size is None:
     min_size = max_size[0] // 2, max_size[1] // 2
-  if cached is None:
-    # shared global cache
-    cached = _conv_cache
   tagged = _fstags[path]
   path = tagged.fspath
   size = image_size(path)
   if size is None:
+    # cannot determine source image size
     return None
   # choose a target size
   if size[0] > max_size[0] or size[1] > max_size[1]:
+    # scale down
     scale = min(max_size[0] / size[0], max_size[1] / size[1])
     re_size = int(size[0] * scale), int(size[1] * scale)
-    ##warning("too big, rescale by %s from %r to %r", scale, size, re_size)
-    key = path, 'png', re_size
   elif size[0] < min_size[0] or size[1] < min_size[1]:
+    # scale up
     scale = min(min_size[0] / size[0], min_size[1] / size[1])
     re_size = int(size[0] * scale), int(size[1] * scale)
-    ##warning("too small, rescale by %s from %r to %r", scale, size, re_size)
-    key = path, 'png', re_size
   else:
     re_size = None
-    key = path, 'png', size
-  cached_path = cached.get(key)
-  if cached_path:
-    return cached_path
-  if tagged.get('pil.format') == 'PNG' and re_size is None:
-    # right format, same size - return ourself
-    cached[key] = tagged.fspath
-    return tagged.fspath
-  # path to converted file
-  hashcode = SHA256.from_pathname(path)
-  pngbase = f'{hashcode}.png'
-  needdir(CONVCACHE_ROOT)
+    if tagged.get('pil.format').lower() == fmt:
+      # already an image of the right size and format
+      return path
+
+  def resize(srcpath, dstpath):
+    ''' Rescale and format `srcpath`, save as `dstpath`.
+    '''
+    with Image.open(srcpath) as im:
+      if re_size is None:
+        pfx_call(im.save, dstpath, FMT)
+      else:
+        im2 = im.resize(re_size)
+        pfx_call(im2.save, dstpath, FMT)
+
   convsize = re_size or size
-  convdirpath = joinpath(CONVCACHE_ROOT, f'png/{convsize[0]}x{convsize[1]}')
-  if not isdirpath(convdirpath):
-    pfx_call(os.makedirs, convdirpath)
-  pngpath = joinpath(convdirpath, pngbase)
-  if force or not isfilepath(pngpath):
-    try:
-      with Image.open(path) as im:
-        if re_size is None:
-          pfx_call(im.save, pngpath, 'PNG')
-        else:
-          im2 = im.resize(re_size)
-          pfx_call(im2.save, pngpath, 'PNG')
-    except UnidentifiedImageError as e:
-      warning("unhandled image: %s", e)
-      pngpath = None
-  cached[key] = pngpath
-  return pngpath
+  return convof(path, f'{fmt}/{convsize[0]}x{convsize[1]}', resize, ext=fmt)
+
+def pngfor(path, **imgof_kw):
+  ''' Call `imgof` specifying PNG output.
+  '''
+  return imgof(path, fmt='png', **imgof_kw)
 
 ##@require(lambda x1: x1 >= 0)
 @require(lambda dx1: dx1 > 0)
@@ -468,7 +463,7 @@ class _ImageWidget(_Widget):
       else:
         size = self.fixed_size or (self.width, self.height)
         try:
-          display_fspath = pngfor(expanduser(imgpath), size)
+          display_fspath = pngfor(expanduser(imgpath), max_size=size)
         except (OSError, ValueError) as e:
           warning("%r: %s", imgpath, e)
           display_fspath = None
@@ -774,6 +769,6 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
 
   @pfx_method
   def show_fspath(self, fspath):
-    ''' TODO: bring to correspnding thumbnail into view.
+    ''' TODO: bring the correspnding thumbnail into view.
     '''
     warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")

@@ -1,0 +1,4 @@
+lib/python/cs/testutils.py: cs.testutils: new module providing the @product_test decorator for running test matrices
+lib/python/cs/testutils.py: cs.testutils: fix docstring typos
+lib/python/cs/testutils.py: cs.testutils: new SetupTeardownMixin providing unittest setUp/tearDown from setupTeardown context manager method, add DISTINFO
+lib/python/cs/testutils.py: cs.testutils: docstring update

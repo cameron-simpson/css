@@ -220,10 +220,11 @@ class AppleBooksCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    options = self.options
-    with AppleBooksTree(options.apple_path) as at:
-      with stackattrs(options, apple=at, verbose=True):
-        yield
+    with super().run_context():
+      options = self.options
+      with AppleBooksTree(options.apple_path) as at:
+        with stackattrs(options, apple=at, verbose=True):
+          yield
 
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
