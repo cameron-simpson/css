@@ -47,7 +47,6 @@ from cs.context import stackattrs
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
-from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
 from cs.threads import State as ThreadState
@@ -219,35 +218,3 @@ class _Defaults(ThreadState):
       yield
 
 defaults = _Defaults()
-
-class _TestAdditionsMixin:
-  ''' Some common methods uses in tests.
-  '''
-
-  @classmethod
-  def mktmpdir(cls, prefix=None):
-    ''' Create a temporary directory.
-    '''
-    if prefix is None:
-      prefix = cls.__qualname__
-    return tempfile.TemporaryDirectory(
-        prefix="test-" + prefix + "-", suffix=".tmpdir", dir=os.getcwd()
-    )
-
-  def assertLen(self, o, length, *a, **kw):
-    ''' Test len(o) unless it raises TypeError.
-    '''
-    try:
-      olen = len(o)
-    except TypeError:
-      pass
-    else:
-      self.assertEqual(olen, length, *a, **kw)
-
-  def assertIsOrdered(self, s, strict=False):
-    ''' Assertion to test that an object's elements are ordered.
-    '''
-    self.assertTrue(
-        isordered(s, strict=strict),
-        "not ordered(strict=%s): %r" % (strict, s)
-    )
