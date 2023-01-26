@@ -57,6 +57,8 @@ from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 from .transcribe import parse
 
+from cs.py.func import trace
+
 def Store(spec, config, runstate=None, hashclass=None):
   ''' Factory to construct Stores from string specifications.
   '''
@@ -74,7 +76,7 @@ class Config(SingletonMixin):
         or the filename of a file in `.ini` format
   '''
 
-  @staticmethod
+  @classmethod
   @require(
       lambda config_map: config_map is None or
       isinstance(config_map, (str, dict))
@@ -83,9 +85,9 @@ class Config(SingletonMixin):
       lambda default_config:
       (default_config is None or isinstance(default_config, dict))
   )
-  def _singleton_key(config_map=None, default_config=None):
+  def _singleton_key(cls, config_map=None, default_config=None):
     if config_map is None:
-      config_map = DEFAULT_CONFIG_MAP
+      config_map = cls.default_config_map()
     return (
         config_map if isinstance(config_map, str) else id(config_map),
         id(DEFAULT_CONFIG_MAP)
@@ -94,7 +96,7 @@ class Config(SingletonMixin):
 
   def __init__(self, config_map=None, default_config=None):
     if config_map is None:
-      config_map = DEFAULT_CONFIG_MAP
+      config_map = self.default_config_map()
     if default_config is None:
       default_config = DEFAULT_CONFIG_MAP
     config = ConfigParser()
@@ -111,9 +113,9 @@ class Config(SingletonMixin):
             read_ok = True
         else:
           warning("missing config file")
-      if not read_ok:
-        warning("falling back to default configuration")
-        config.read_dict(default_config)
+        if not read_ok:
+          warning("falling back to default configuration")
+          config.read_dict(default_config)
     else:
       self.path = None
       config.read_dict(config_map)
@@ -139,13 +141,16 @@ class Config(SingletonMixin):
     self.map.write(f)
 
   @classmethod
-  def default(cls):
+  def default_config_map(cls):
     ''' Return the default `Config`.
     '''
-    config_path = os.environ.get(
+    # look for configuration file
+    config_map = os.environ.get(
         DEFAULT_CONFIG_ENVVAR, expanduser(DEFAULT_CONFIG_PATH)
     )
-    return cls(config_path)
+    if not pathexists(config_map):
+      config_map = DEFAULT_CONFIG_MAP
+    return config_map
 
   def __getitem__(self, clause_name):
     ''' Return the Store defined by the named clause.

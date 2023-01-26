@@ -202,7 +202,7 @@ class _Defaults(ThreadState):
     cfg = common.config
     if not cfg:
       from .config import Config
-      cfg = Config.default()
+      cfg = Config()
     return cfg
 
   def __getattr__(self, attr):
