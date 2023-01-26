@@ -58,6 +58,7 @@ from .blockify import (
     blocked_chunks_of2,
     top_block_for,
     blockify,
+    block_for,
 )
 from .compose import get_store_spec
 from .config import Config, Store
@@ -232,8 +233,7 @@ class VTCmd(BaseCommand):
         # redo these because defaults is already initialised
         with stackattrs(defaults, runstate=runstate,
                         show_progress=show_progress):
-          if cmd in ("config", "dump", "help", "init", "profile", "scan",
-                     "test"):
+          if cmd in ("config", "dump", "help", "init", "profile", "scan"):
             yield
           else:
             # open the default Store
@@ -1273,6 +1273,7 @@ class VTCmd(BaseCommand):
     ''' Usage: {cmd} subtest [subtestargs...]
           Test various facilites.
           blockify filenames... Blockify the contents of the filenames.
+          block_for filename    Store filename and report its top Block.
     '''
     if not argv:
       raise GetoptError("missing test subcommand")
@@ -1309,6 +1310,16 @@ class VTCmd(BaseCommand):
           ax = mplutils.axes()
           ax.hist(sizes, 128)
           mplutils.print_figure(ax)
+          return 0
+      elif subcmd == 'block_for':
+        if not argv:
+          raise GetoptError("missing filename")
+        filename = argv.pop(0)
+        with Pfx(filename):
+          if argv:
+            raise GetoptError("extra arguments after filename: %r" % (argv,))
+          B = block_for(filename)
+          print(B)
           return 0
     raise GetoptError("unrecognised subcommand")
 
