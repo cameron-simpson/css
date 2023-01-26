@@ -11,7 +11,7 @@ from itertools import chain
 import sys
 
 from cs.buffer import CornuCopyBuffer
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, promote
 from cs.logutils import warning, exception
 from cs.pfx import Pfx, pfx
 from cs.progress import progressbar
@@ -120,6 +120,15 @@ def block_from_chunks(bfr, **kw):
       Keyword arguments are passed to `blockify`.
   '''
   return top_block_for(blockify(bfr, **kw))
+
+@promote
+def block_for(obj: CornuCopyBuffer, **kw):
+  ''' Return a Block for the contents of `obj`, which is promoted
+      to a `CoruCopyBuffer` via `CornuCOpyBuffer.promote`.
+
+      Keyword arguments are passed to `blockify`.
+  '''
+  return block_from_chunks(obj, **kw)
 
 def spliced_blocks(B, new_blocks):
   ''' Splice (note *insert*) the iterable `new_blocks` into the data of the `Block` `B`.
