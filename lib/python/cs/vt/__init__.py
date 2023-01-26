@@ -43,7 +43,9 @@ from contextlib import contextmanager
 import os
 import tempfile
 from types import SimpleNamespace as NS
+
 from cs.context import stackattrs
+from cs.deco import default_params
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
