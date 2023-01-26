@@ -10,24 +10,35 @@ Store definition configuration file.
 
 from configparser import ConfigParser
 from io import StringIO
+import os
 from os.path import (
     abspath,
     basename,
-    realpath,
-    splitext,
+    exists as pathexists,
+    expanduser,
     isabs as isabspath,
     isfile as isfilepath,
     join as joinpath,
-    exists as pathexists,
+    realpath,
+    splitext,
 )
+
 from icontract import require
+
 from cs.fs import shortpath, longpath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, pfx_method
 from cs.result import OnDemandResult
-from . import Lock, DEFAULT_BASEDIR, DEFAULT_CONFIG_MAP
+
+from . import (
+    Lock,
+    DEFAULT_BASEDIR,
+    DEFAULT_CONFIG_ENVVAR,
+    DEFAULT_CONFIG_MAP,
+    DEFAULT_CONFIG_PATH,
+)
 from .archive import Archive, FilePathArchive
 from .backingfile import VTDStore
 from .cache import FileCacheStore, MemoryCacheStore
@@ -126,6 +137,15 @@ class Config(SingletonMixin):
     ''' Write the config to a file.
     '''
     self.map.write(f)
+
+  @classmethod
+  def default(cls):
+    ''' Return the default `Config`.
+    '''
+    config_path = os.environ.get(
+        DEFAULT_CONFIG_ENVVAR, expanduser(DEFAULT_CONFIG_PATH)
+    )
+    return cls(config_path)
 
   def __getitem__(self, clause_name):
     ''' Return the Store defined by the named clause.
