@@ -40,8 +40,6 @@
 '''
 
 from contextlib import contextmanager
-import os
-import tempfile
 from types import SimpleNamespace as NS
 
 from cs.context import stackattrs
@@ -204,12 +202,15 @@ class _Defaults(ThreadState):
     cfg = common.config
     if not cfg:
       from .config import Config
-      cfg = Config()
+      cfg = Config.default()
     return cfg
 
   def __getattr__(self, attr):
     if attr == 'S':
-      return common.S
+      S = common.S
+      if S is None:
+        S = self.config['default']
+      return S
     raise AttributeError(attr)
 
   @contextmanager
