@@ -1276,6 +1276,7 @@ class VTCmd(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing test subcommand")
+    runstate = self.options.runstate
     subcmd = argv.pop(0)
     with Pfx(subcmd):
       if subcmd == 'blockify':
@@ -1296,6 +1297,7 @@ class VTCmd(BaseCommand):
                     update_frequency=64,
                     itemlenfunc=len,
                     total=total_size,
+                    runstate=runstate,
                 )
             ]
         try:
