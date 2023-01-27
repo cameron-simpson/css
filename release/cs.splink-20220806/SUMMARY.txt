@@ -1,0 +1,1 @@
+Faster events prescan during import (it appears that timestamps are unique), less import noise.

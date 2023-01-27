@@ -14,21 +14,31 @@ import os
 from os.path import (
     abspath,
     basename,
-    realpath,
-    splitext,
+    exists as pathexists,
+    expanduser,
     isabs as isabspath,
     isfile as isfilepath,
     join as joinpath,
-    exists as pathexists,
+    realpath,
+    splitext,
 )
+
 from icontract import require
-from cs.fileutils import shortpath, longpath
+
+from cs.fs import shortpath, longpath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
-from cs.pfx import Pfx, XP, pfx_method
+from cs.pfx import Pfx, pfx_method
 from cs.result import OnDemandResult
-from . import Lock, DEFAULT_BASEDIR, DEFAULT_CONFIG_MAP
+
+from . import (
+    Lock,
+    DEFAULT_BASEDIR,
+    DEFAULT_CONFIG_ENVVAR,
+    DEFAULT_CONFIG_MAP,
+    DEFAULT_CONFIG_PATH,
+)
 from .archive import Archive, FilePathArchive
 from .backingfile import VTDStore
 from .cache import FileCacheStore, MemoryCacheStore
@@ -47,11 +57,14 @@ from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 from .transcribe import parse
 
+from cs.py.func import trace
+
 def Store(spec, config, runstate=None, hashclass=None):
   ''' Factory to construct Stores from string specifications.
   '''
   return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
 
+# pylint: disable=too-many-public-methods
 class Config(SingletonMixin):
   ''' A configuration specification.
 
@@ -61,11 +74,9 @@ class Config(SingletonMixin):
       Parameters:
       * `config_map`: either a mapping of mappings: `{clause_name: {param: value}}`
         or the filename of a file in `.ini` format
-      * `environ`: optional environment map for `$varname` substitution.
-        Default: `os.environ`
   '''
 
-  @staticmethod
+  @classmethod
   @require(
       lambda config_map: config_map is None or
       isinstance(config_map, (str, dict))
@@ -74,23 +85,20 @@ class Config(SingletonMixin):
       lambda default_config:
       (default_config is None or isinstance(default_config, dict))
   )
-  def _singleton_key(config_map=None, environ=None, default_config=None):
+  def _singleton_key(cls, config_map=None, default_config=None):
     if config_map is None:
-      config_map = DEFAULT_CONFIG_MAP
+      config_map = cls.default_config_map()
     return (
         config_map if isinstance(config_map, str) else id(config_map),
         id(DEFAULT_CONFIG_MAP)
         if default_config is None else id(default_config)
     )
 
-  def __init__(self, config_map=None, environ=None, default_config=None):
+  def __init__(self, config_map=None, default_config=None):
     if config_map is None:
-      config_map = DEFAULT_CONFIG_MAP
-    if environ is None:
-      environ = os.environ
+      config_map = self.default_config_map()
     if default_config is None:
       default_config = DEFAULT_CONFIG_MAP
-    self.environ = environ
     config = ConfigParser()
     if isinstance(config_map, str):
       self.path = path = config_map
@@ -105,9 +113,9 @@ class Config(SingletonMixin):
             read_ok = True
         else:
           warning("missing config file")
-      if not read_ok:
-        warning("falling back to default configuration")
-        config.read_dict(default_config)
+        if not read_ok:
+          warning("falling back to default configuration")
+          config.read_dict(default_config)
     else:
       self.path = None
       config.read_dict(config_map)
@@ -132,6 +140,18 @@ class Config(SingletonMixin):
     '''
     self.map.write(f)
 
+  @classmethod
+  def default_config_map(cls):
+    ''' Return the default `Config`.
+    '''
+    # look for configuration file
+    config_map = os.environ.get(
+        DEFAULT_CONFIG_ENVVAR, expanduser(DEFAULT_CONFIG_PATH)
+    )
+    if not pathexists(config_map):
+      config_map = DEFAULT_CONFIG_MAP
+    return config_map
+
   def __getitem__(self, clause_name):
     ''' Return the Store defined by the named clause.
     '''
@@ -145,26 +165,28 @@ class Config(SingletonMixin):
       )
     return R()
 
+  @pfx_method
   def _make_clause_store(self, clause_name):
     ''' Instantiate the `Store` associated with `clause_name`.
     '''
-    with Pfx("%s._make_clause_store(%r)", self, clause_name):
-      try:
-        bare_clause = self.map[clause_name]
-      except KeyError:
-        raise KeyError(f"no clause named [{clause_name}]")
-      clause = dict(bare_clause)
-      for discard in 'address', :
-        clause.pop(discard, None)
-      try:
-        store_type = clause.pop('type')
-      except KeyError:
-        raise ValueError("missing type field in clause")
-      store_name = "%s[%s]" % (self, clause_name)
-      S = self.new_Store(
-          store_name, store_type, clause_name=clause_name, **clause
-      )
-      return S
+    try:
+      bare_clause = self.map[clause_name]
+    except KeyError:
+      # pylint: disable=raise-missing-from
+      raise KeyError(f"no clause named [{clause_name}]")
+    clause = dict(bare_clause)
+    for discard in 'address', :
+      clause.pop(discard, None)
+    try:
+      store_type = clause.pop('type')
+    except KeyError:
+      # pylint: disable=raise-missing-from
+      raise ValueError("missing type field in clause")
+    store_name = "%s[%s]" % (self, clause_name)
+    S = self.new_Store(
+        store_name, store_type, clause_name=clause_name, **clause
+    )
+    return S
 
   def get_default(self, param, default=None):
     ''' Fetch a default parameter from the [GLOBALS] clause.
@@ -208,6 +230,7 @@ class Config(SingletonMixin):
     arpath = joinpath(self.basedir, archivename + '.vt')
     return Archive(arpath)
 
+  # pylint: disable=too-many-branches
   def parse_special(self, special, readonly):
     ''' Parse the mount command's special device from `special`.
         Return `(fsname,readonly,Store,Dir,basename,archive)`.
@@ -255,6 +278,7 @@ class Config(SingletonMixin):
       try:
         special_store = self[clause_name]
       except KeyError:
+        # pylint: disable=raise-missing-from
         raise ValueError("unknown config clause [%s]" % (clause_name,))
       if archive_name is None or not archive_name:
         special_basename = clause_name
@@ -329,7 +353,6 @@ class Config(SingletonMixin):
       )
     return stores
 
-  @pfx_method(use_str=True)
   def new_Store(
       self, store_name, store_type, *, clause_name, hashclass=None, **params
   ):
@@ -534,6 +557,7 @@ class Config(SingletonMixin):
         flags_prefix='VT_' + clause_name,
     )
 
+  # pylint: disable=too-many-branches,too-many-locals
   def proxy_Store(
       self,
       store_name,

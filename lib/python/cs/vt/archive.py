@@ -24,7 +24,7 @@ from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl, get_ini_clause_entryname
 from cs.logutils import warning, exception, debug
-from cs.pfx import Pfx, pfx
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.py.func import prop
 from .dir import _Dirent, DirentRecord
 from .meta import NOUSERID, NOGROUPID
@@ -36,8 +36,9 @@ class ArchiveEntry(BinaryMultiValue('ArchiveEntry',
   ''' An Archive entry record.
   '''
 
+@pfx
 def Archive(path, missing_ok=False, weird_ok=False, config=None):
-  ''' Return an Archive from the specification `path`.
+  ''' Return an `Archive` from the specification `path`.
 
       If the `path` begins with `'['`
       then it is presumed to be a Store Archive
@@ -196,7 +197,7 @@ class BaseArchive(ABC):
     for notify in self.notify_update:
       try:
         notify(E, when=when, source=source)
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         exception(
             "notify[%s](%s,when=%s,source=%s): %s", notify, E, when, source, e
         )
@@ -224,7 +225,7 @@ class FilePathArchive(BaseArchive):
     path = self.path
     with Pfx(path):
       try:
-        with open(path) as fp:
+        with open(path, encoding='utf8') as fp:
           yield from self.parse(fp)
       except OSError as e:
         if e.errno == errno.ENOENT:
@@ -236,7 +237,7 @@ class FilePathArchive(BaseArchive):
     '''
     path = self.path
     with lockfile(path):
-      with open(path, "a") as fp:
+      with open(path, "a", encoding='utf8') as fp:
         s = self.write(fp, E, when=when, etc=etc)
     return s
 
@@ -260,45 +261,33 @@ class FileOutputArchive(BaseArchive):
     s = self.write(self.fp, E, when=when, etc=etc)
     return s
 
+@pfx
 def apply_posix_stat(src_st, ospath):
   ''' Apply a stat object to the POSIX OS object at `ospath`.
   '''
-  with Pfx("apply_posix_stat(%r)", ospath):
-    path_st = os.stat(ospath)
-    if src_st.st_uid == NOUSERID or src_st.st_uid == path_st.st_uid:
-      uid = -1
-    else:
-      uid = src_st.st_uid
-    if src_st.st_gid == NOGROUPID or src_st.st_gid == path_st.st_gid:
-      gid = -1
-    else:
-      gid = src_st.st_gid
-    if uid != -1 or gid != -1:
-      with Pfx("chown(uid=%d,gid=%d)", uid, gid):
-        debug(
-            "chown(%r,%d,%d) from %d:%d", ospath, uid, gid, path_st.st_uid,
-            path_st.st_gid
-        )
-        try:
-          os.chown(ospath, uid, gid)
-        except OSError as e:
-          if e.errno == errno.EPERM:
-            warning("%s", e)
-          else:
-            raise
-    st_perms = path_st.st_mode & 0o7777
-    mst_perms = src_st.st_mode & 0o7777
-    if st_perms != mst_perms:
-      with Pfx("chmod(0o%04o)", mst_perms):
-        debug("chmod(%r,0o%04o) from 0o%04o", ospath, mst_perms, st_perms)
-        os.chmod(ospath, mst_perms)
-    mst_mtime = src_st.st_mtime
-    if mst_mtime > 0:
-      st_mtime = path_st.st_mtime
-      if mst_mtime != st_mtime:
-        with Pfx("chmod(0o%04o)", mst_perms):
-          debug(
-              "utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath,
-              path_st.st_atime, mst_mtime, st_mtime
-          )
-          os.utime(ospath, (path_st.st_atime, mst_mtime))
+  path_st = os.stat(ospath)
+  if src_st.st_uid in (NOUSERID, path_st.st_uid):
+    uid = -1
+  else:
+    uid = src_st.st_uid
+  if src_st.st_gid in (NOGROUPID, path_st.st_gid):
+    gid = -1
+  else:
+    gid = src_st.st_gid
+  if uid != -1 or gid != -1:
+    try:
+      pfx_call(os.chown, ospath, uid, gid)
+    except OSError as e:
+      if e.errno == errno.EPERM:
+        warning("%s", e)
+      else:
+        raise
+  st_perms = path_st.st_mode & 0o7777
+  mst_perms = src_st.st_mode & 0o7777
+  if st_perms != mst_perms:
+    pfx_call(os.chmod, ospath, mst_perms)
+  mst_mtime = src_st.st_mtime
+  if mst_mtime > 0:
+    st_mtime = path_st.st_mtime
+    if mst_mtime != st_mtime:
+      pfx_call(os.utime, ospath, (path_st.st_atime, mst_mtime))

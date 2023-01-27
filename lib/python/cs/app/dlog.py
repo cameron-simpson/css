@@ -26,7 +26,7 @@ from cs.fstags import FSTags
 from cs.lex import get_dotted_identifier
 from cs.logutils import debug
 from cs.pfx import Pfx, pfx, pfx_call
-from cs.sqltags import SQLTags
+from cs.sqltags import SQLTags, DBURL_DEFAULT
 from cs.tagset import Tag, TagSet
 
 def main(argv=None):
@@ -34,7 +34,7 @@ def main(argv=None):
   '''
   return DLogCommand(argv).run()
 
-DEFAULT_DBPATH = '~/var/sqltags.sqlite'
+DEFAULT_DBPATH = DBURL_DEFAULT
 DEFAULT_LOGPATH = '~/var/log/dlog-quick'
 
 class DLogCommand(BaseCommand):
@@ -59,12 +59,14 @@ class DLogCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the logging `SQLTags` around each command invocation.
     '''
-    options = self.options
-    dbpath = options.dbpath
-    with FSTags() as fstags:
-      with SQLTags(dbpath) as sqltags:
-        with stackattrs(options, fstags=fstags, sqltags=sqltags, verbose=True):
-          yield
+    with super().run_context():
+      options = self.options
+      dbpath = options.dbpath
+      with FSTags() as fstags:
+        with SQLTags(dbpath) as sqltags:
+          with stackattrs(options, fstags=fstags, sqltags=sqltags,
+                          verbose=True):
+            yield
 
   @staticmethod
   def cats_from_str(s):
@@ -222,7 +224,7 @@ def dlog(
   logtags.add('headline', headline)
   if categories:
     logtags.add('categories', sorted(categories))
-  sqltags.default_factory(None, unixtime=when, tags=tags)
+  sqltags.default_factory(None, unixtime=when, tags=logtags)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

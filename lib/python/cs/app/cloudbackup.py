@@ -73,6 +73,11 @@ from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 DEFAULT_JOB_MAX = 16
 
+def main(argv=None):
+  ''' The `cloudbackup` command line mode.
+  '''
+  return CloudBackupCommand(argv).run()
+
 class CloudBackupCommand(BaseCommand):
   ''' A main programme instance.
   '''
@@ -248,7 +253,7 @@ class CloudBackupCommand(BaseCommand):
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
     with UpdProxy() as proxy:
-      proxy.prefix = f"{options.cmd} {backup_root_dirpath} => {backup_name}"
+      proxy.prefix = f"{self.cmd} {backup_root_dirpath} => {backup_name}"
       options.cloud_backup.init()
       backup = options.cloud_backup.run_backup(
           options.cloud_area,
@@ -1224,7 +1229,7 @@ class NamedBackup(SingletonMixin):
     self.state_dirpath = state_dirpath
     # the association of UUIDs with directory subpaths
     self.diruuids = UUIDNDJSONMapping(
-        joinpath(self.state_dirpath, 'diruuids.ndjson')
+        joinpath(self.state_dirpath, 'diruuids.ndjson.gz')
     )
     # the directory holding the DirState files
     self.dirstates_dirpath = joinpath(self.state_dirpath, 'dirstates')
@@ -1232,7 +1237,8 @@ class NamedBackup(SingletonMixin):
     self._dirstates = {}
     # cloud storage stuff
     self.backup_records = UUIDNDJSONMapping(
-        joinpath(self.state_dirpath, 'backups.ndjson'), dictclass=BackupRecord
+        joinpath(self.state_dirpath, 'backups.ndjson.gz'),
+        dictclass=BackupRecord
     )
     # TODO: not using _saved_hashcodes yet
     self._saved_hashcodes = set()
@@ -1322,7 +1328,7 @@ class NamedBackup(SingletonMixin):
     uupath = uuidpath(uu, 2, 2, make_subdir_of=self.dirstates_dirpath)
     dirstate_path = joinpath(
         self.dirstates_dirpath, dirname(uupath), uu.hex
-    ) + '.ndjson'
+    ) + '.ndjson.gz'
     return uu, dirstate_path
 
   @classmethod
@@ -1337,9 +1343,9 @@ class NamedBackup(SingletonMixin):
   ):
     ''' Return a `UUIDNDJSONMapping` associated with the filename `ndjson_path`.
     '''
-    if not ndjson_path.endswith('.ndjson'):
+    if not ndjson_path.endswith(('.ndjson', '.ndjson.gz')):
       warning(
-          "%s.dirstate_from_pathname(%r): does not end in .ndjson",
+          "%s.dirstate_from_pathname(%r): does not end in .ndjson or .ndjson.gz",
           cls.__name__, ndjson_path
       )
     state = UUIDNDJSONMapping(
@@ -2000,4 +2006,4 @@ class FileBackupState(UUIDedDict):
     return AttrableMapping(backups[0])
 
 if __name__ == '__main__':
-  sys.exit(CloudBackupCommand.run_argv(sys.argv))
+  sys.exit(main(sys.argv))

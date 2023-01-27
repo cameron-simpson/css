@@ -4,7 +4,6 @@
 '''
 
 from contextlib import contextmanager
-import threading
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
@@ -15,7 +14,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20211115.1-post'
+__version__ = '20230125-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -26,6 +25,22 @@ DISTINFO = {
     ],
     'install_requires': [],
 }
+
+@contextmanager
+def contextif(flag, cmgr_func, *cmgr_args, **cmgr_kwargs):
+  ''' A context manager to call call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
+      if `flag` is true or `nullcontext()` otherwise.
+
+      The driving use case in verbosity dependent status lines or
+      progress bars, eg:
+
+          from cs.upd import run_task
+          with contextif(run_task(....)) as proxy:
+            ... do stuff, updating proxy if not None ...
+  '''
+  cmgr = cmgr_func(*cmgr_args, **cmgr_kwargs) if flag else nullcontext()
+  with cmgr as ctxt:
+    yield ctxt
 
 def pushattrs(o, **attr_values):
   ''' The "push" part of `stackattrs`.
@@ -70,7 +85,7 @@ def stackattrs(o, **attr_values):
   ''' Context manager to push new values for the attributes of `o`
       and to restore them afterward.
       Returns a `dict` containing a mapping of the previous attribute values.
-      Attributes not present are not present in the mapping.
+      Attributes not present are not present in returned mapping.
 
       Restoration includes deleting attributes which were not present
       initially.
@@ -79,6 +94,8 @@ def stackattrs(o, **attr_values):
       without having to pass it through the call stack.
 
       See `stackkeys` for a flavour of this for mappings.
+
+      See `cs.threads.State` for a convenient wrapper class.
 
       Example of fiddling a programme's "verbose" mode:
 
@@ -134,56 +151,6 @@ def stackattrs(o, **attr_values):
     yield old_values
   finally:
     popattrs(o, attr_values.keys(), old_values)
-
-class StackableState(threading.local):
-  ''' An object which can be called as a context manager
-      to push changes to its attributes.
-
-      Example:
-
-          >>> state = StackableState(a=1, b=2)
-          >>> state.a
-          1
-          >>> state.b
-          2
-          >>> state
-          StackableState(a=1,b=2)
-          >>> with state(a=3, x=4):
-          ...     print(state)
-          ...     print("a", state.a)
-          ...     print("b", state.b)
-          ...     print("x", state.x)
-          ...
-          StackableState(a=3,b=2,x=4)
-          a 3
-          b 2
-          x 4
-          >>> state.a
-          1
-          >>> state
-          StackableState(a=1,b=2)
-  '''
-
-  def __init__(self, **kw):
-    super().__init__()
-    for k, v in kw.items():
-      setattr(self, k, v)
-
-  def __str__(self):
-    return "%s(%s)" % (
-        type(self).__name__,
-        ','.join(["%s=%s" % (k, v) for k, v in sorted(self.__dict__.items())])
-    )
-
-  __repr__ = __str__
-
-  @contextmanager
-  def __call__(self, **kw):
-    ''' Calling an instance is a context manager yielding `self`
-        with attributes modified by `kw`.
-    '''
-    with stackattrs(self, **kw):
-      yield self
 
 def pushkeys(d, **key_values):
   ''' The "push" part of `stackkeys`.
@@ -282,7 +249,7 @@ def twostep(cmgr):
 
       See also the `push_cmgr(obj,attr,cmgr)` function
       and its partner `pop_cmgr(obj,attr)`
-      which form a convenience wrapper for this low level generator.
+      which form a convenient wrapper for this low level generator.
 
       The purpose of `twostep()` is to split any context manager's operation
       across two steps when the set up and tear down phases must operate
@@ -315,7 +282,8 @@ def twostep(cmgr):
           next(cmgr_iter)   # set up
           next(cmgr_iter)   # tear down
 
-      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead):
+      Example use in a class (but really you should use
+      `push_cmgr`/`pop_cmgr` instead):
 
           class SomeClass:
               def __init__(self, foo)
@@ -385,7 +353,14 @@ def setup_cmgr(cmgr):
   '''
   cmgr_twostep = twostep(cmgr)
   next(cmgr_twostep)
-  return lambda: next(cmgr_twostep)
+
+  def next2():
+    try:
+      next(cmgr_twostep)
+    except StopIteration:
+      pass
+
+  return next2
 
 def push_cmgr(o, attr, cmgr):
   ''' A convenience wrapper for `twostep(cmgr)`
@@ -424,6 +399,7 @@ def push_cmgr(o, attr, cmgr):
   '''
   cmgr_twostep = twostep(cmgr)
   enter_value = next(cmgr_twostep)
+  # pylint: disable=unnecessary-lambda-assignment
   pop_func = lambda: (popattrs(o, (attr,), pushed), next(cmgr_twostep))[1]
   pop_func_attr = '_push_cmgr__popfunc__' + attr
   pushed = pushattrs(o, **{attr: enter_value, pop_func_attr: pop_func})
@@ -441,6 +417,9 @@ class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods
       running the first and second steps of a single `__enter_exit__` generator method.
 
+      *Note*: the `__enter_exit__` method is _not_ a context manager,
+      but a short generator method.
+
       This makes it easy to use context managers inside `__enter_exit__`
       as the setup/teardown process, for example:
 
@@ -448,7 +427,6 @@ class ContextManagerMixin:
               with open(self.datafile, 'r') as f:
                   yield f
 
-      The `__enter_exit__` method is _not_ a context manager, but a short generator method.
       Like a context manager created via `@contextmanager`
       it performs the setup phase and then `yield`s the value for the `with` statement.
       If `None` is `yield`ed (as from a bare `yield`)
@@ -457,7 +435,7 @@ class ContextManagerMixin:
       if there was an exception in the managed suite
       then that exception is raised on return from the `yield`.
 
-      *However*, and _unlike_ an `@contextmanager` method,
+      *However*, and _unlike_ a `@contextmanager` method,
       the `__enter_exit__` generator _may_ also `yield`
       an additional true/false value to use as the result
       of the `__exit__` method, to indicate whether the exception was handled.
@@ -470,7 +448,7 @@ class ContextManagerMixin:
               def __enter_exit__(self):
                   ... do some setup here ...
                   # Returning self is common, but might be any relevant value.
-                  # Note that ifyou want `self`, you can just use a bare yield
+                  # Note that if you want `self`, you can just use a bare yield
                   # and ContextManagerMixin will provide `self` as the default.
                   enter_result = self
                   exit_result = False
@@ -510,18 +488,17 @@ class ContextManagerMixin:
     eegen, pushed = self._ContextManagerMixin__state
     popattrs(self, ('_ContextManagerMixin__state',), pushed)
     # return to the generator to run the __exit__ phase
-    try:
-      if exc_type:
-        exit_result = eegen.throw(exc_type, exc_value, traceback)
-      else:
-        exit_result = next(eegen)
-    except StopIteration:
-      # there was no optional extra yield
-      exit_result = None
+    if exc_type:
+      exit_result = eegen.throw(exc_type, exc_value, traceback)
     else:
-      if exit_result:
-        # exception handled, conceal it from the super method
-        exc_type, exc_value, traceback = None, None, None
+      try:
+        exit_result = next(eegen)
+      except StopIteration:
+        # there was no optional extra yield
+        exit_result = None
+    if exit_result:
+      # exception handled, conceal it from the super method
+      exc_type, exc_value, traceback = None, None, None
     try:
       super_exit = super().__exit__
     except AttributeError:
@@ -531,3 +508,35 @@ class ContextManagerMixin:
       if super_exit(exc_type, exc_value, traceback):
         exit_result = True
     return exit_result
+
+  @classmethod
+  @contextmanager
+  def as_contextmanager(cls, self):
+    ''' Run the generator from the `cls` class specific `__enter_exit__`
+        method via `self` as a context manager.
+
+        Example from `RunState` which subclasses `HasThreadState`,
+        both of which are `ContextManagerMixin` subclasses:
+
+            class RunState(HasThreadState):
+                .....
+                def __enter_exit__(self):
+                    with HasThreadState.as_contextmanager(self):
+                        ... RunState context manager stuff ...
+
+        This runs the `HasThreadState` context manager
+        around the main `RunState` context manager.
+    '''
+    eegen = cls.__enter_exit__(self)
+    entered = next(eegen)
+    try:
+      yield entered
+    except Exception as e:
+      exit_result = eegen.throw(type(e), e, e.__traceback__)
+      if not exit_result:
+        raise
+    else:
+      try:
+        exit_result = next(eegen)
+      except StopIteration:
+        pass

@@ -1,0 +1,5 @@
+PlayOnAPI.suburl_data: progress reporting, raise on bad response, upgrade JSON error warning.
+PlayOnAPI: use a common cookie jar across API calls.
+PlayOnCommand: new "api" and "cds" API access subcommands.
+PlayOnCommand._refresh_sqltags_data: bugfix "expired cache" logic.
+PlayOnCommand: new "poll" subcommand reporting the API notifications response.

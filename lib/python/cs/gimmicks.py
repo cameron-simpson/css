@@ -6,6 +6,8 @@ Gimmicks and hacks to make some of my other modules more robust and
 less demanding of others.
 '''
 
+# pylint: disable=wrong-import-position
+
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import
 except ImportError:
@@ -17,7 +19,15 @@ except ImportError:
     '''
     yield None
 
+import os
+import subprocess
+try:
+  DEVNULL = subprocess.DEVNULL
+except AttributeError:
+  DEVNULL = open(os.devnull, 'wb')  # pylint: disable=consider-using-with
+
 import sys
+
 try:
   from types import SimpleNamespace  # pylint: disable=unused-import
 except ImportError:
@@ -39,6 +49,7 @@ except ImportError:
       )
 
 try:
+  # pylint: disable=redefined-builtin,self-assigning-variable
   TimeoutError = TimeoutError
 except NameError:
   try:
@@ -67,7 +78,7 @@ except NameError:
           )
         Exception.__init__(self, msg)
 
-__version__ = '20211208-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -79,26 +90,23 @@ DISTINFO = {
     'install_requires': [],
 }
 
-_logging_functions = {}
+class _logging_map(dict):
 
-# Pull logging functions from cs.logutils if available, otherwise logging.
-# This defers the cs.logutils import, breaking circular imports.
-def _logging_stub(func_name, *a, **kw):
-  try:
-    logging_function = _logging_functions[func_name]
-  except KeyError:
-    # pylint: disable=import-outside-toplevel
+  def __missing__(self, func_name):
     try:
       import cs.logutils as logging_module
     except ImportError:
       import logging as logging_module
-    _logging_functions['log'] = logging_module.log
-    _logging_functions['debug'] = logging_module.debug
-    _logging_functions['info'] = logging_module.info
-    _logging_functions['warning'] = logging_module.warning
-    _logging_functions['error'] = logging_module.error
-    _logging_functions['exception'] = logging_module.exception
-    logging_function = _logging_functions[func_name]
+    func = getattr(logging_module, func_name)
+    self[func_name] = func
+    return func
+
+_logging_functions = _logging_map()
+
+# Pull logging functions from cs.logutils if available, otherwise logging.
+# This defers the cs.logutils import, breaking circular imports.
+def _logging_stub(func_name, *a, **kw):
+  logging_function = _logging_functions[func_name]
   if (sys.version_info.major, sys.version_info.minor) >= (3, 8):
     stacklevel = kw.pop('stacklevel', 1)
     kw['stacklevel'] = stacklevel + 1
@@ -112,6 +120,9 @@ debug = lambda *a, **kw: _logging_stub('debug', *a, **kw)
 
 # Wrapper for `info()` which does a deferred import.
 info = lambda *a, **kw: _logging_stub('info', *a, **kw)
+
+# Wrapper for `info()` which does a deferred import.
+trace = lambda *a, **kw: _logging_stub('trace', *a, **kw)
 
 # Wrapper for `warning()` which does a deferred import.
 warning = lambda *a, **kw: _logging_stub('warning', *a, **kw)

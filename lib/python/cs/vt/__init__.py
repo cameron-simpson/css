@@ -40,14 +40,13 @@
 '''
 
 from contextlib import contextmanager
-import os
-import tempfile
 from types import SimpleNamespace as NS
+
 from cs.context import stackattrs
+from cs.deco import default_params
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
-from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
 from cs.threads import State as ThreadState
@@ -79,6 +78,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.progress',
         'cs.py.func',
+        'cs.py.modules',
         'cs.py.stack',
         'cs.queues',
         'cs.range',
@@ -103,6 +103,7 @@ DISTINFO = {
     },
     'extras_requires': {
         'FUSE': ['llfuse'],
+        'plotting': ['cs.mplutils'],
     },
 }
 
@@ -206,7 +207,10 @@ class _Defaults(ThreadState):
 
   def __getattr__(self, attr):
     if attr == 'S':
-      return common.S
+      S = common.S
+      if S is None:
+        S = self.config['default']
+      return S
     raise AttributeError(attr)
 
   @contextmanager
@@ -218,34 +222,7 @@ class _Defaults(ThreadState):
 
 defaults = _Defaults()
 
-class _TestAdditionsMixin:
-  ''' Some common methods uses in tests.
+def uses_Store(func):
+  ''' Decorator to provide the default Store as the parameter `S`.
   '''
-
-  @classmethod
-  def mktmpdir(cls, prefix=None):
-    ''' Create a temporary directory.
-    '''
-    if prefix is None:
-      prefix = cls.__qualname__
-    return tempfile.TemporaryDirectory(
-        prefix="test-" + prefix + "-", suffix=".tmpdir", dir=os.getcwd()
-    )
-
-  def assertLen(self, o, length, *a, **kw):
-    ''' Test len(o) unless it raises TypeError.
-    '''
-    try:
-      olen = len(o)
-    except TypeError:
-      pass
-    else:
-      self.assertEqual(olen, length, *a, **kw)
-
-  def assertIsOrdered(self, s, strict=False):
-    ''' Assertion to test that an object's elements are ordered.
-    '''
-    self.assertTrue(
-        isordered(s, strict=strict),
-        "not ordered(strict=%s): %r" % (strict, s)
-    )
+  return default_params(func, S=lambda: defaults.S)

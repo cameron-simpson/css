@@ -33,7 +33,7 @@ from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from typeguard import typechecked
 
-__version__ = '20211208-post'
+__version__ = '20221207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -244,7 +244,7 @@ class BaseProgress(object):
       arrow += ' ' * (width - len(arrow))
     return arrow
 
-  def format_counter(self, value, scale=None, max_parts=2, sep=','):
+  def format_counter(self, value, scale=None, max_parts=2, sep=',', **kw):
     ''' Format `value` accoridng to `scale` and `max_parts`
         using `cs.units.transcribe`.
     '''
@@ -252,7 +252,7 @@ class BaseProgress(object):
       scale = self.units_scale
     if scale is None:
       return str(value)
-    return transcribe(value, scale, max_parts=max_parts, sep=sep)
+    return transcribe(value, scale, max_parts=max_parts, sep=sep, **kw)
 
   def text_pos_of_total(
       self, fmt=None, fmt_pos=None, fmt_total=None, pos_first=False
@@ -328,10 +328,9 @@ class BaseProgress(object):
       # how much room for an arrow? we would like:
       # "label: left arrow right"
       arrow_width = width - len(left) - len(right) - len(label) - 2
-      if label:
-        arrow_width -= 2  # allow for ': ' separator after label
-      if arrow_width < 1:
-        # no room for an arrow
+      if label:  # allow for ': ' separator after label
+        arrow_width -= 2
+      if arrow_width < 1:  # no room for an arrow
         arrow_field = ':'
       else:
         arrow_field = ' ' + self.arrow(arrow_width) + ' '
@@ -342,15 +341,12 @@ class BaseProgress(object):
         prefix = label + ': '
       elif label_width == len(label) + 1:
         prefix = label + ':'
-      # label_width<=len(label): need to crop the label
-      elif label_width <= 0:
+      elif label_width <= 0:  # label_width<=len(label): need to crop the label
         # no room
         prefix = ''
-      elif label_width == 1:
-        # just indicate the crop
+      elif label_width == 1:  # just indicate the crop
         prefix = '<'
-      elif label_width == 2:
-        # just indicate the crop
+      elif label_width == 2:  # just indicate the crop
         prefix = '<:'
       else:
         # crop as "<tail-of-label:"
@@ -465,6 +461,7 @@ class BaseProgress(object):
       width=None,
       window=None,
       update_frequency=1,
+      update_period=0.2,
       update_min_size=None,
       report_print=None,
       runstate=None,
@@ -508,6 +505,9 @@ class BaseProgress(object):
         * `update_min_size`: optional update step size;
           only update the progress bar after an advance of this many units,
           useful if the iteration size increment is quite small
+        * `update_period`: optional update time period, default `0.2`;
+          only update the progress bar after this much time has
+          elapsed since the last update
         * `report_print`: optional `print` compatible function
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
@@ -540,8 +540,11 @@ class BaseProgress(object):
     if proxy is None:
       if upd is None:
         upd = Upd()
-      proxy = upd.insert(1)
+      proxy = upd.insert(1, update_period=update_period)
       delete_proxy = True
+    else:
+      old_update_period = proxy.update_period
+      proxy.update_period = update_period
     if statusfunc is None:
       statusfunc = lambda P, label, width: P.status(
           label, width, window=window
@@ -549,45 +552,53 @@ class BaseProgress(object):
     iteration = 0
     last_update_iteration = 0
     last_update_pos = start_pos = self.position
+    last_update_time = None
 
     def update_status(force=False):
       nonlocal self, proxy, statusfunc, label, width
-      nonlocal iteration, last_update_iteration, last_update_pos
+      nonlocal iteration, last_update_iteration, last_update_pos, last_update_time
+      now = time.time()
       if (force or iteration - last_update_iteration >= update_frequency
           or (update_min_size is not None
-              and self.position - last_update_pos >= update_min_size)):
+              and self.position - last_update_pos >= update_min_size)
+          or (update_period and now >= last_update_time + update_period)):
         last_update_iteration = iteration
         last_update_pos = self.position
         proxy(statusfunc(self, label, width or proxy.width))
+        last_update_time = now
 
     update_status(True)
-    for iteration, item in enumerate(it):
-      length = itemlenfunc(item) if itemlenfunc else 1
-      if incfirst:
-        self += length
-        update_status()
-      yield item
-      if not incfirst:
-        self += length
-        update_status()
-      if runstate is not None and runstate.cancelled:
-        break
-    if delete_proxy:
-      proxy.delete()
-    else:
-      update_status(True)
-    if report_print:
-      if isinstance(report_print, bool):
-        report_print = print
-      report_print(
-          label + (
-              ': (cancelled)'
-              if runstate is not None and runstate.cancelled else ':'
-          ), self.format_counter(self.position - start_pos), 'in',
-          transcribe(
-              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
-          )
-      )
+    try:
+      for iteration, item in enumerate(it):
+        length = itemlenfunc(item) if itemlenfunc else 1
+        if incfirst:
+          self += length
+          update_status()
+        yield item
+        if not incfirst:
+          self += length
+          update_status()
+        if runstate is not None and runstate.cancelled:
+          break
+    finally:
+      if delete_proxy:
+        proxy.delete()
+      else:
+        # restore previous update frequency
+        proxy.update_period = old_update_period
+        update_status(True)
+      if report_print:
+        if isinstance(report_print, bool):
+          report_print = print
+        report_print(
+            label + (
+                ': (cancelled)'
+                if runstate is not None and runstate.cancelled else ':'
+            ), self.format_counter(self.position - start_pos), 'in',
+            transcribe(
+                self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+            )
+        )
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
@@ -637,11 +648,11 @@ class Progress(BaseProgress):
       self,
       name: Optional[str] = None,
       *,
-      position: Optional[int] = None,
-      start: Optional[int] = None,
+      position: Optional[float] = None,
+      start: Optional[float] = None,
       start_time: Optional[float] = None,
       throughput_window: Optional[int] = None,
-      total: Optional[int] = None,
+      total: Optional[float] = None,
       units_scale=None,
   ):
     ''' Initialise the Progesss object.

@@ -1,0 +1,19 @@
+lib/python/cs/result.py: cs.result,cs.taskqueue: initial move of code from cs.result to new cs.taskqueue
+lib/python/cs/result.py: cs.result: Result: pull ResultState values into Result as class attributes, access via self - this allows the Task subclass to override the state values, since it will have more states
+lib/python/cs/result.py: cs.result: Result: new __getattr__ to implement is_statename attributes
+lib/python/cs/result.py: cs.result: Result: [BREAKING] rename call to run_func for clarity; cs.taskqueue: Task: prevent .run_func(), rename .call() to .run()
+lib/python/cs/result.py: cs.result,taskqueue: separate out a common BaseResult class which lacks state definitions
+lib/python/cs/result.py: cs.result: update exception message
+lib/python/cs/result.py: cs.result: add missing import
+lib/python/cs/result.py: cs.result: remove unused imports
+lib/python/cs/result.py: cs.result: getting logging functions from cs.gimmicks, ignore some lint
+lib/python/cs/result.py: cs.result: Result: now subclasses cs.fsm.FSM
+lib/python/cs/result.py: cs.result: Result: drop __getattr__, no longer required, restore dropped Result._seq
+lib/python/cs/result.py: cs.result: update imports and DISTINFO
+lib/python/cs/result.py: cs.result: Result: provide @OBSOLETE wrappers for old properties
+lib/python/cs/result.py: cs.result: Result: logic refactors now that we use FSM
+lib/python/cs/result.py: cs.result: Result.bg: fix call to self.run_func; tweak a docstring
+lib/python/cs/result.py: cs.result: Result.notify: update to use FSM.fsm_callback
+lib/python/cs/result.py: cs.result: Result: update docstring
+lib/python/cs/result.py: merge default ==> myke
+lib/python/cs/result.py: cs.result: update DISTINFO

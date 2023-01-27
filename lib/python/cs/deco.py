@@ -10,23 +10,43 @@ Assorted decorator functions.
 
 from collections import defaultdict
 from contextlib import contextmanager
-from inspect import isgeneratorfunction
+from inspect import isgeneratorfunction, signature, Parameter
 import sys
 import time
 import traceback
+import typing
+
 from cs.gimmicks import warning
 
-__version__ = '20210823-post'
+__version__ = '20221214-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.gimmicks'],
 }
+
+def ALL(func):
+  ''' Include this function's name in its module's `__all__` list.
+
+      Example:
+
+          from cs.deco import ALL
+
+          __all__ = []
+
+          def obscure_function(...):
+              ...
+
+          @ALL
+          def well_known_function(...):
+              ...
+  '''
+  sys.modules[func.__module__].__all__.append(func.__name__)
+  return func
 
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
@@ -63,18 +83,53 @@ def decorator(deco):
 
       Examples:
 
+          # define your decorator as if always called with func and args
           @decorator
-          def mydeco(func, *da, kw=None):
-            ... decorate func subject to the values of da and kw
+          def mydeco(func, *da, arg2=None):
+            ... decorate func subject to the values of da and arg2
 
+          # mydeco called with defaults
           @mydeco
           def func1(...):
             ...
 
+          @ mydeco called with nondefault arguments
           @mydeco('foo', arg2='bah')
           def func2(...):
             ...
   '''
+
+  def decorate(func, *dargs, **dkwargs):
+    ''' Final decoration when we have the function and the decorator arguments.
+    '''
+    # decorate func
+    decorated = deco(func, *dargs, **dkwargs)
+    # catch mucked decorators which forget to return the new function
+    assert decorated is not None, (
+        "deco:%r(func:%r,...) -> None" % (deco, func)
+    )
+    if decorated is not func:
+      # we got a wrapper function back, pretty up the returned wrapper
+      # try functools.update_wrapper, otherwise do stuff by hand
+      try:
+        from functools import update_wrapper  # pylint: disable=import-outside-toplevel
+        update_wrapper(decorated, func)
+      except (AttributeError, ImportError):
+        try:
+          decorated.__name__ = getattr(func, '__name__', str(func))
+        except AttributeError:
+          pass
+        doc = getattr(func, '__doc__', None) or ''
+        try:
+          decorated.__doc__ = doc
+        except AttributeError:
+          warning("cannot set __doc__ on %r", decorated)
+        func_module = getattr(func, '__module__', None)
+        try:
+          decorated.__module__ = func_module
+        except AttributeError:
+          pass
+    return decorated
 
   def metadeco(*da, **dkw):
     ''' Compute either the wrapper function for `func`
@@ -87,40 +142,16 @@ def decorator(deco):
         Otherwise return a decorator using the provided arguments,
         ready for the subsequent function.
     '''
-    if len(da) >= 1 and callable(da[0]):
-      # `func` is already supplied, decorate it now.
+    if len(da) > 0 and callable(da[0]):
+      # `func` is already supplied, pop it off and decorate it now.
       func = da[0]
       da = tuple(da[1:])
-      decorated = deco(func, *da, **dkw)
-      if decorated is not func:
-        # pretty up the returned wrapper
-        try:
-          decorated.__name__ = getattr(func, '__name__', str(func))
-        except AttributeError:
-          pass
-        if not getattr(decorated, '__doc__', None):
-          decorated.__doc__ = getattr(func, '__doc__', '')
-        func_module = getattr(func, '__module__', None)
-        try:
-          decorated.__module__ = func_module
-        except AttributeError:
-          pass
-      return decorated
+      return decorate(func, *da, **dkw)
 
     # `func` is not supplied, collect the arguments supplied and return a
     # decorator which takes the subsequent callable and returns
     # `deco(func, *da, **kw)`.
-    def overdeco(func):
-      decorated = deco(func, *da, **dkw)
-      decorated.__doc__ = getattr(func, '__doc__', '')
-      func_module = getattr(func, '__module__', None)
-      try:
-        decorated.__module__ = func_module
-      except AttributeError:
-        pass
-      return decorated
-
-    return overdeco
+    return lambda func: decorate(func, *da, **dkw)
 
   metadeco.__doc__ = getattr(deco, '__doc__', '')
   metadeco.__module__ = getattr(deco, '__module__', None)
@@ -300,7 +331,7 @@ def contextdecorator(cmgrfunc):
         '''
         with cmgr(func, a, kw, *da, **dkw) as ctxt:
           if provide_context:
-            a = a.insert(0, ctxt)
+            a = [ctxt] + list(a)
           return func(*a, **kw)
 
     return wrapped
@@ -355,7 +386,7 @@ def cachedmethod(
       * `poll_delay`: minimum time between polls; after the first
         access, subsequent accesses before the `poll_delay` has elapsed
         will return the cached value.
-        Default: `None`, meaning no poll delay.
+        Default: `None`, meaning the value never becomes stale.
       * `sig_func`: a signature function, which should be significantly
         cheaper than the method. If the signature is unchanged, the
         cached value will be returned. The signature function
@@ -383,7 +414,7 @@ def cachedmethod(
 
       *Note*: use of this decorator requires the `cs.pfx` module.
   '''
-  from cs.pfx import Pfx
+  from cs.pfx import Pfx  # pylint: disable=import-outside-toplevel
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
   if poll_delay is not None and poll_delay <= 0:
@@ -398,7 +429,7 @@ def cachedmethod(
   lastpoll_attr = val_attr + '__lastpoll'
 
   # pylint: disable=too-many-branches
-  def wrapper(self, *a, **kw):
+  def cachedmethod_wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
       now = None
       value0 = getattr(self, val_attr, unset_value)
@@ -409,19 +440,18 @@ def cachedmethod(
         pass
       # we have a cached value for return in the following logic
       elif poll_delay is None:
-        # always poll
-        pass
-      else:
-        lastpoll = getattr(self, lastpoll_attr)
-        now = time.time()
-        if now - lastpoll < poll_delay:
-          # reuse cache
-          return value0
-      # not too soon, try to update the value
-      # update the poll time if we use it
-      if poll_delay is not None:
-        now = now or time.time()
-        setattr(self, lastpoll_attr, now)
+        # no repoll time, the cache is always good
+        return value0
+      # see if the value is stale
+      lastpoll = getattr(self, lastpoll_attr, None)
+      now = time.time()
+      if (poll_delay is not None and lastpoll is not None
+          and now - lastpoll < poll_delay):
+        # reuse cache
+        return value0
+      # never polled or the cached value is stale, poll now
+      # update the poll time
+      setattr(self, lastpoll_attr, now)
       # check the signature if provided
       # see if the signature is unchanged
       if sig_func is not None:
@@ -460,7 +490,11 @@ def cachedmethod(
         setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
       return value
 
-  return wrapper
+  ##  Doesn't work, has no access to self. :-(
+  ##  TODO: provide a .flush() function to clear the cached value
+  ##  cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
+
+  return cachedmethod_wrapper
 
 @decorator
 def OBSOLETE(func, suggestion=None):
@@ -471,25 +505,34 @@ def OBSOLETE(func, suggestion=None):
           @OBSOLETE
           def func(...):
 
+      or
+
+          @OBSOLETE("new_func_name")
+          def func(...):
+
       This emits a warning log message before calling the decorated function.
+      Only one warning is emitted per calling location.
   '''
+
+  callers = set()
 
   def wrapped(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
     frame = traceback.extract_stack(None, 2)[0]
     caller = frame[0], frame[1]
-    try:
-      callers = func._OBSOLETE_callers
-    except AttributeError:
-      callers = func._OBSOLETE_callers = set()
     if caller not in callers:
       callers.add(caller)
-      warning(
-          "OBSOLETE call to %s:%d %s(), called from %s:%d %s",
-          func.__code__.co_filename, func.__code__.co_firstlineno,
-          func.__name__, frame[0], frame[1], frame[2]
+      prefix = (
+          "OBSOLETE call" if suggestion is None else
+          ("OBSOLETE (suggest %r) call" % suggestion)
       )
+      fmt = "%s to %s:%d:%s(), called from %s:%d:%s"
+      fmtargs = [
+          prefix, func.__code__.co_filename, func.__code__.co_firstlineno,
+          func.__name__, frame[0], frame[1], frame[2]
+      ]
+      warning(fmt, *fmtargs)
     return func(*args, **kwargs)
 
   funcname = getattr(func, '__name__', str(func))
@@ -568,7 +611,7 @@ def strable(func, open_func=None):
 
       *Note*: use of this decorator requires the `cs.pfx` module.
   '''
-  from cs.pfx import Pfx
+  from cs.pfx import Pfx  # pylint: disable=import-outside-toplevel
   if open_func is None:
     open_func = open
 
@@ -612,6 +655,7 @@ def observable_class(property_names, only_unequal=False):
   if isinstance(property_names, str):
     property_names = (property_names,)
 
+  # pylint: disable=protected-access
   def make_observable_class(cls):
     ''' Annotate the class `cls` with observable properties.
     '''
@@ -695,58 +739,172 @@ def observable_class(property_names, only_unequal=False):
 
   return make_observable_class
 
-def _teststuff():
+@decorator
+def default_params(func, _strict=False, **param_defaults):
+  ''' Decorator to provide factory functions for default parameters.
 
-  @contextdecorator
-  def tracecall(func, a, kw):
-    print("call %s(*%r,**%r)" % (func, a, kw))
-    yield 9
-    print("return from %s(*%r,**%r)" % (func, a, kw))
+      This decorator accepts the following keyword parameters:
+      * `_strict`: default `False`; if true only replace genuinely
+        missing parameters; if false also replace the traditional
+        `None` placeholder value
+      The remaining keyword parameters are factory functions
+      providing the respective default values.
 
-  @tracecall
-  def f(*a, **kw):
-    print("hello from f: a=%r, kw=%r" % (a, kw))
-    return "V"
+      Atypical one off direct use:
 
-  @tracecall
-  def g(r):
-    yield from range(r)
+          @default_params(dbconn=open_default_dbconn,debug=lambda: settings.DB_DEBUG_MODE)
+          def dbquery(query, *, dbconn):
+              dbconn.query(query)
 
-  @tracecall(provide_context=True)
-  def f2(ctxt, *a, **kw):
-    print("hello from f2: ctxt=%s, a=%r, kw=%r" % (ctxt, a, kw))
-    return "V2"
+      Typical use as a decorator factory:
 
-  v = f("abc", y=1)
-  print("v =", v)
-  v = f2("abc2", y=1)
-  print("v2 =", v)
-  gg = g(9)
-  for i in gg:
-    print("i =", i)
-  sys.exit(1)
+          # in your support module
+          uses_ds3 = default_params(ds3client=get_ds3client)
 
-  # pylint: disable=too-few-public-methods
-  class Foo:
-    ''' Dummy class.
-    '''
+          # calling code which needs a ds3client
+          @uses_ds3
+          def do_something(.., *, ds3client,...):
+              ... make queries using ds3client ...
 
-    @cachedmethod(poll_delay=2)
-    def x(self, arg):
-      ''' Dummy `x` method.
-      '''
-      return str(self) + str(arg)
+      This replaces the standard boilerplate and avoids replicating
+      knowledge of the default factory as exhibited in this legacy code:
 
-  F = Foo()
-  y = F.x(1)
-  print("F.x() ==>", y)
-  y = F.x(1)
-  print("F.x() ==>", y)
-  y = F.x(2)
-  print("F.x() ==>", y)
-  time.sleep(3)
-  y = F.x(3)
-  print("F.x() ==>", y)
+          def do_something(.., *, ds3client=None,...):
+              if ds3client is None:
+                  ds3client = get_ds3client()
+              ... make queries using ds3client ...
+  '''
+  if not param_defaults:
+    raise ValueError("@default_params(%s): no defaults?" % (func,))
 
-if __name__ == '__main__':
-  _teststuff()
+  def defaulted_func(*a, **kw):
+    for param_name, param_default in param_defaults.items():
+      try:
+        v = kw[param_name]
+      except KeyError:
+        kw[param_name] = param_default()
+      else:
+        if v is None and not _strict:
+          kw[param_name] = param_default()
+    return func(*a, **kw)
+
+  defaulted_func.__name__ = func.__name__
+  # TODO: get the indent from some aspect of stripped_dedent
+  defaulted_func.__doc__ = '\n      '.join(
+      [
+          getattr(func, '__doc__', '') or '',
+          '',
+          'This function also accepts the following optional keyword parameters:',
+          *[
+              '* `%s`: default from `%s()`' % (param_name, param_default)
+              for param_name, param_default in sorted(param_defaults.items())
+          ],
+      ]
+  )
+  return defaulted_func
+
+@decorator
+def promote(func, params=None, types=None):
+  ''' A decorator to promote argument values automaticaly in annotated functions.
+      For any parameter with a type annotation, if that type has a
+      `.promote(value)` method and the function is called with a
+      value not of the type of the annotation, the `.promote` method
+      will be called to promote the value to the expected type.
+
+      The decorator accepts optional parameters:
+      * `params`: if supplied, only parameters in this list will
+        be promoted
+      * `types`: if supplied, only types in this list will be
+        considered for promotion
+
+      Example:
+
+          >>> from cs.timeseries import Epoch
+          >>> from typeguard import typechecked
+          >>>
+          >>> @promote
+          ... @typechecked
+          ... def f(data, epoch:Epoch=None):
+          ...     print("epoch =", type(epoch), epoch)
+          ...
+          >>> f([1,2,3], epoch=12.0)
+          epoch = <class 'cs.timeseries.Epoch'> Epoch(start=0, step=12)
+
+      *Note*: one issue with this is due to the conflict in name
+      between this decorator and the method it looks for in a class.
+      The `promote` _method_ must appear after any methods in the
+      class which are decorated with `@promote`, otherwise the the
+      decorator method supplants the name `promote` making it
+      unavailable as the decorater.
+
+      Failing example:
+
+          class Foo:
+              @classmethod
+              def promote(cls, obj):
+                  ... return promoted obj ...
+              @promote
+              def method(self, param:Type, ...):
+                  ...
+
+      Working example:
+
+          class Foo:
+              @promote
+              def method(self, param:Type, ...):
+                  ...
+              # promote method as the final method of the class
+              @classmethod
+              def promote(cls, obj):
+                  ... return promoted obj ...
+  '''
+  sig = signature(func)
+  if params is not None:
+    for param_name in params:
+      if param_name not in sig.parameters:
+        raise ValueError(
+            "@promote(%r,params=%r): no %r parameter in signature (sig.parameters=%r)"
+            % (func, params, param_name, dict(sig.parameters))
+        )
+  promotions = {}  # mapping of arg->(type,promote)
+  for param_name, param in sig.parameters.items():
+    if params is not None and param_name not in params:
+      continue
+    annotation = param.annotation
+    if annotation is Parameter.empty:
+      continue
+    # recognise optional parameters and use their primary type
+    if param.default is not Parameter.empty:
+      anno_origin = typing.get_origin(annotation)
+      anno_args = typing.get_args(annotation)
+      if (anno_origin is typing.Union and len(anno_args) == 2
+          and anno_args[-1] is type(None)):
+        annotation, _ = anno_args
+    if types is not None and annotation not in types:
+      continue
+    try:
+      promote_method = annotation.promote
+    except AttributeError:
+      continue
+    if not callable(promote_method):
+      continue
+    promotions[param_name] = (annotation, promote_method)
+  if not promotions:
+    warning("@promote(%s): no promotable parameters", func)
+    return func
+
+  def promoting_func(*a, **kw):
+    bound_args = sig.bind(*a, **kw)
+    arg_mapping = bound_args.arguments
+    for param_name, (annotation, promote_method) in promotions.items():
+      try:
+        arg_value = arg_mapping[param_name]
+      except KeyError:
+        continue
+      if isinstance(param_name, annotation):
+        continue
+      arg_value = promote_method(arg_value)
+      arg_mapping[param_name] = arg_value
+    return func(*bound_args.args, **bound_args.kwargs)
+
+  return promoting_func

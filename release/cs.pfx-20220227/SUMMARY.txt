@@ -1,0 +1,2 @@
+Pfx.prefixify: change OSError.args action: prefixify the first string.
+XP: use DEFAULT_SEPARATOR on both paths.

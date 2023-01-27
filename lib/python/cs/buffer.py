@@ -126,7 +126,7 @@ class CornuCopyBuffer(object):
         * `offset`: the current byte offset of the iterator; this
           is used during the buffer initialisation to compute
           `input_data_displacement`, the difference between the
-          buffer's logical offset and the input data's logical offset;
+          buffer's logical offset and the input data iterable's logical offset;
           if unavailable during initialisation this is presumed to
           be `0`.
         * `end_offset`: the end offset of the iterator if known.
@@ -925,6 +925,26 @@ class CornuCopyBuffer(object):
     bfr2.flush = flush  # pylint: disable=attribute-defined-outside-init
     return bfr2
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to a `CornuCopyBuffer`.
+
+        Promotes:
+        * `int`: assumed to be a file descriptor of a file open for binary read
+        * `str`: assed to the a filesystem pathname
+        * `bytes` and `bytes`like objects: data
+    '''
+    if not isinstance(obj, cls):
+      if isinstance(obj, int):
+        obj = cls.from_fd(obj)
+      elif isinstance(obj, str):
+        obj = cls.from_filename(obj)
+      elif iinstance(obj, (bytes, bytearray, mmap, memoryview)):
+        obj = cls.from_bytes(obj)
+      else:
+        raise TypeError("%s.promote: cannot promote %s" % (cls, r(obj)))
+    return obj
+
 class _BoundedBufferIterator(object):
   ''' An iterator over the data from a CornuCopyBuffer with an end
       offset bound.
@@ -953,7 +973,7 @@ class _BoundedBufferIterator(object):
     if limit <= 0:
       if limit < 0:
         raise RuntimeError("limit:%d < 0" % (limit,))
-      raise StopIteration
+      raise StopIteration("limit reached")
     # post: limit > 0
     buf = next(bfr)
     # post: bfr.buf now empty, can be modified

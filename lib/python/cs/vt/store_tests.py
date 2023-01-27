@@ -22,7 +22,7 @@ from cs.debug import thread_dump
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
-from . import _TestAdditionsMixin
+
 from .cache import FileCacheStore, MemoryCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashCode, HASHCLASS_BY_NAME
@@ -32,6 +32,7 @@ from .socket import (
 )
 from .store import MappingStore, DataDirStore, ProxyStore
 from .stream import StreamStore
+from .testsutils import _TestAdditionsMixin
 
 HASHCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__HASHCLASS_NAMES'
 INDEXCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__INDEXCLASS_NAMES'
@@ -217,9 +218,10 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
   def tearDown(self):
     if self.S is not None:
       self.S.close()
-    Ts = threading.enumerate()
+    Ts = [T for T in threading.enumerate() if not T.daemon]
     if len(Ts) > 1:
-      thread_dump(Ts=Ts, fp=open('/dev/tty', 'w'))
+      with open('/dev/tty', 'w') as tty:
+        thread_dump(Ts=Ts, fp=tty)
 
   @multitest
   def test00empty(self):

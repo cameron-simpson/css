@@ -9,13 +9,17 @@
 from heapq import heappush, heappop
 from itertools import chain
 import sys
+
 from cs.buffer import CornuCopyBuffer
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, promote
 from cs.logutils import warning, exception
 from cs.pfx import Pfx, pfx
+from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.seq import tee
 from cs.threads import bg as bg_thread
+from cs.units import BINARY_BYTES_SCALE
+
 from . import defaults
 from .block import Block, IndirectBlock
 from .scan import scan, scanbuf, MIN_BLOCKSIZE, MAX_BLOCKSIZE
@@ -91,12 +95,22 @@ def indirect_blocks(blocks):
       block = IndirectBlock.from_subblocks(subblocks)
     yield block
 
-def blockify(chunks, scanner=None, min_block=None, max_block=None):
+def blockify(
+    chunks, *, chunks_name=None, scanner=None, min_block=None, max_block=None
+):
   ''' Wrapper for `blocked_chunks_of` which yields `Block`s
       from the data from `chunks`.
   '''
-  for chunk in blocked_chunks_of2(chunks, scanner=scanner, min_block=min_block,
-                                  max_block=max_block):
+  if chunks_name is None:
+    chunks_name = chunks.__class__.__name__
+  for chunk in progressbar(
+      blocked_chunks_of2(chunks, scanner=scanner, min_block=min_block,
+                         max_block=max_block),
+      label=f'blockify({chunks_name})',
+      itemlenfunc=len,
+      units_scale=BINARY_BYTES_SCALE,
+      update_frequency=32,
+  ):
     yield Block(data=chunk)
 
 def block_from_chunks(bfr, **kw):
@@ -107,14 +121,24 @@ def block_from_chunks(bfr, **kw):
   '''
   return top_block_for(blockify(bfr, **kw))
 
+@promote
+def block_for(obj: CornuCopyBuffer, **kw):
+  ''' Return a Block for the contents of `obj`, which is promoted
+      to a `CoruCopyBuffer` via `CornuCOpyBuffer.promote`.
+
+      Keyword arguments are passed to `blockify`.
+  '''
+  return block_from_chunks(obj, **kw)
+
 def spliced_blocks(B, new_blocks):
-  ''' Splice `new_blocks` into the data of the `Block` `B`.
+  ''' Splice (note *insert*) the iterable `new_blocks` into the data of the `Block` `B`.
       Yield high level blocks covering the result
       i.e. all the data from `B` with `new_blocks` inserted.
 
       The parameter `new_blocks` is an iterable of `(offset,Block)`
       where `offset` is a position for `Block` within `B`.
-      The `Block`s in `new_blocks` must be in `offset` order.
+      The `Block`s in `new_blocks` must be in `offset` order
+      and may not overlap.
 
       Example:
 
@@ -125,18 +149,30 @@ def spliced_blocks(B, new_blocks):
           >>> b''.join(map(bytes, splicedBs))
           b'xxaayybbcczz'
   '''
-  upto = 0  # data span yielded so far
+  # note that upto and offset count in the original space of `B`
+  upto = 0  # data span from B yielded so far
+  prev_offset = 0
   for offset, newB in new_blocks:
+    # check splice poisition ordering
+    assert offset >= prev_offset, (
+        "new_block offset:%d < prev_offset:%d" % (offset, prev_offset)
+    )
+    prev_offset = offset
     # yield high level Blocks up to offset
     if offset > upto:
-      yield from B.top_blocks(upto, offset)
-      upto = offset
+      # fill data from upto through to the new offset
+      for fill_block in B.top_blocks(upto, offset):
+        yield fill_block
+        upto += len(fill_block)
+        assert upto <= offset
+      assert upto == offset
     elif offset < upto:
       raise ValueError(
           "new_blocks: offset=%d,newB=%s: this position has already been passed"
           % (offset, newB)
       )
-    # splice in th the new Block
+    # splice in the new Block
+    # the newly inserted data do not advance upto
     yield newB
   if upto < len(B):
     # yield high level Blocks for the data which follow

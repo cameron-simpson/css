@@ -1,0 +1,1 @@
+Move longpath and shortpath to cs.fs, leave legacy names behind.
