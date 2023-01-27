@@ -75,7 +75,7 @@ from types import SimpleNamespace
 from cs.buffer import CornuCopyBuffer
 from cs.gimmicks import warning, debug
 from cs.lex import cropped, cropped_repr, typed_str as s
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
 __version__ = '20210316-post'
@@ -449,6 +449,36 @@ class BinaryMixin:
           "unparsed data at offset %d: %r" % (offset, bs[offset:])
       )
     return instance
+
+  @classmethod
+  def load(cls, f):
+    ''' Load an instance from the file `f`
+        which may be a filename or an open file.
+        Return the instance.
+    '''
+    for instance in cls.scan_file(f):
+      return instance
+    return None
+
+  def save(self, f):
+    ''' Save this instance to the file `f`
+        which may be a filename or an open file.
+        Return the length of the transcription.
+    '''
+    if isinstance(f, str):
+      filename = f
+      with pfx_call(open, filename, 'wb') as f:
+        return self.save(f)
+    length = 0
+    for bs in self.transcribe_flat():
+      while bs:
+        written = f.write(bs)
+        length += written
+        if written < len(bs):
+          bs = bs[written:]
+        else:
+          break
+    return length
 
 class AbstractBinary(ABC, BinaryMixin):
   ''' Abstract class for all `Binary`* implementations,
