@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #
 # pylint: disable=too-many-lines
+#
 
 ''' Functions and classes relating to Blocks, which are data chunk references.
 
@@ -35,12 +36,15 @@
     this is the sum of the .span values of their subblocks.
 '''
 
-from __future__ import print_function
 from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
 import sys
+from typing import Optional
+
 from icontract import require
+from typeguard import typechecked
+
 from cs.binary import (
     BinarySingleValue, BSUInt, BSData, flatten as flatten_transcription
 )
@@ -50,6 +54,7 @@ from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
+
 from . import defaults, RLock
 from .hash import HashCode, io_fail
 from .transcribe import (
@@ -77,12 +82,11 @@ def isBlock(o):
 
 class _Block(Transcriber, ABC):
 
-  def __init__(self, block_type, span):
+  @typechecked
+  @require(lambda span: span is None or span >= 0)
+  def __init__(self, block_type, span: Optional[int]):
     self.type = block_type
-    if span is not None:
-      if not isinstance(span, int) or span < 0:
-        raise ValueError("invalid span: %r" % (span,))
-      self.span = span
+    self.span = span
     self.indirect = False
     self.blockmap = None
     self._lock = RLock()
