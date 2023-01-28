@@ -90,7 +90,7 @@ from . import MAX_FILE_SIZE, Lock, RLock, defaults
 from .archive import Archive
 from .block import Block
 from .blockify import (
-    DEFAULT_SCAN_SIZE, blocked_chunks_of2, spliced_blocks, top_block_for
+    DEFAULT_SCAN_SIZE, blocked_chunks_of, spliced_blocks, top_block_for
 )
 from .datafile import DataRecord, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
@@ -1365,8 +1365,8 @@ class PlatonicDir(FilesDir):
     scanner = scanner_from_filename(filepath)
     with open(filepath, 'rb') as fp:
       fp.seek(offset)
-      for data in blocked_chunks_of2(read_from(fp, DEFAULT_SCAN_SIZE),
-                                     scanner=scanner):
+      for data in blocked_chunks_of(read_from(fp, DEFAULT_SCAN_SIZE),
+                                    scanner=scanner):
         post_offset = offset + len(data)
         yield offset, data, post_offset
         offset = post_offset
