@@ -626,6 +626,13 @@ class HashCodeBlock(_Block):
     self.hashcode = hashcode
 
   @property
+  def uri(self):
+    ''' The block reference as a `VTURI`.
+    '''
+    from .uri import VTURI  # pylint: disable=import-outside-toplevel
+    return VTURI(indirect=self.indirect, hashcode=self.hashcode)
+
+  @property
   def data(self):
     ''' The data stored in this Block.
     '''
