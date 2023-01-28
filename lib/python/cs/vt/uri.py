@@ -7,13 +7,8 @@ from dataclasses import dataclass
 import re
 from typing import Optional, Union
 
-from cs.buffer import CornuCopyBuffer
-from cs.deco import promote
-from cs.lex import r
-
 from .block import HashCodeBlock, IndirectBlock
 from .blockify import block_for
-from .config import Store
 from .hash import HashCode
 
 @dataclass
@@ -43,8 +38,7 @@ class VTURI:
         f'/{self.hashcode!r}'
     )
 
-  @promote
-  def block(self, S: Store) -> Union[HashCodeBlock, IndirectBlock]:
+  def block(self) -> Union[HashCodeBlock, IndirectBlock]:
     ''' Return a Block for this URI.
     '''
     return (
