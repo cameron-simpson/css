@@ -40,10 +40,13 @@
 '''
 
 from contextlib import contextmanager
+import os
 from types import SimpleNamespace as NS
+from typing import Optional
 
 from cs.context import stackattrs
-from cs.deco import default_params
+from cs.deco import default_params, promote
+from cs.lex import r
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
@@ -111,6 +114,9 @@ DEFAULT_BASEDIR = '~/.local/share/vt'
 
 DEFAULT_CONFIG_ENVVAR = 'VT_CONFIG'
 DEFAULT_CONFIG_PATH = '~/.vtrc'
+VT_STORE_ENVVAR = 'VT_STORE'
+VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
+DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
 
 DEFAULT_CONFIG_MAP = {
     'GLOBAL': {
@@ -221,6 +227,35 @@ class _Defaults(ThreadState):
       yield
 
 defaults = _Defaults()
+
+def Store(
+    spec: Optional[str] = None,
+    config: Optional["Config"] = None,
+    *,
+    runstate=None,
+    hashclass=None
+):
+  ''' Factory to construct Stores from string specifications.
+  '''
+  from .config import Config
+  if spec is None:
+    spec = os.environ.get(VT_STORE_ENVVAR, '[default]')
+  if config is None:
+    config = Config()
+  return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
+
+def _promote_to_Store(obj):
+  ''' Promote `obj` to some kind of Store.
+  '''
+  from .store import _BasicStoreCommon
+  if isinstance(obj, _BasicStoreCommon):
+    return obj
+  if isinstance(obj, str):
+    # Store specification string
+    return Store(obj)
+  raise TypeError(f'Store.promote: cannot promote {r(obj)}')
+
+Store.promote = _promote_to_Store
 
 def uses_Store(func):
   ''' Decorator to provide the default Store as the parameter `S`.
