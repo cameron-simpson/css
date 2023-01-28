@@ -92,7 +92,7 @@ class _Block(Transcriber, ABC):
     self._lock = RLock()
 
   def __bytes__(self):
-    ''' `bytes(_Block)` returns allo the data together as a single `bytes` instance.
+    ''' `bytes(_Block)` returns all the data concatenated as a single `bytes` instance.
 
         Try not to do this for indirect blocks, it gets expensive.
     '''
@@ -538,7 +538,7 @@ class BlockRecord(BinarySingleValue):
     return B
 
   @staticmethod
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   def transcribe_value(B):
     ''' Transcribe this `Block`, the inverse of parse_value.
     '''
@@ -592,7 +592,7 @@ class HashCodeBlock(_Block):
   def __init__(self, hashcode=None, data=None, added=False, span=None, **kw):
     ''' Initialise a `BT_HASHCODE` Block.
 
-        A HashCodeBlock always stores its hashcode directly.
+        A `HashCodeBlock` always stores its hashcode directly.
         If `data` is supplied, store it and compute or check the hashcode.
         If `span` is not `None`, store it. Otherwise compute it on
           demand from the data, fetching that if necessary.
