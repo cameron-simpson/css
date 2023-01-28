@@ -26,7 +26,7 @@ from os.path import (
 from icontract import require
 
 from cs.fs import shortpath, longpath
-from cs.lex import get_ini_clausename, get_ini_clause_entryname
+from cs.lex import get_ini_clausename, get_ini_clause_entryname, r
 from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, pfx_method
@@ -63,6 +63,18 @@ def Store(spec, config, runstate=None, hashclass=None):
   ''' Factory to construct Stores from string specifications.
   '''
   return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
+
+def _promote_to_Store(obj):
+  ''' Promote `obj` to some kind of Store.
+  '''
+  if isinstance(obj, _BasicStoreCommon):
+    return obj
+  if isinstance(obj, str):
+    # Store specification string
+    return Store(obj)
+  raise TypeError(f'Store.promote: cannot promote {r(obj)}')
+
+Store.promote = _promote_to_Store
 
 # pylint: disable=too-many-public-methods
 class Config(SingletonMixin):
