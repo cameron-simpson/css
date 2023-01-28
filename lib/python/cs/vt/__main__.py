@@ -154,9 +154,7 @@ class VTCmd(BaseCommand):
       options.verbose = sys.stderr.isatty()
     except AttributeError:
       options.verbose = False
-    options.config_path = os.environ.get(
-        'VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH)
-    )
+    options.config_map = None
     options.store_spec = None
     options.cache_store_spec = os.environ.get(
         self.VT_CACHE_STORE_ENVVAR, '[cache]'
@@ -182,7 +180,7 @@ class VTCmd(BaseCommand):
         # specify Store
         options.store_spec = val
       elif opt == '-f':
-        options.config_path = val
+        options.config_map = val
       elif opt == '-h':
         options.hashname = val
       elif opt == '-P':
@@ -208,7 +206,7 @@ class VTCmd(BaseCommand):
       self.loginfo.level = logging.INFO
     if options.dflt_log is not None:
       logTo(options.dflt_log, delay=True)
-    options.config = Config(options.config_path)
+    options.config = Config(options.config_map)
 
   def handle_signal(self, sig, frame):
     ''' Override `BaseCommand.handle_signal`:
