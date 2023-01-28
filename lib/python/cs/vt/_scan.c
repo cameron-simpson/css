@@ -116,6 +116,11 @@ static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
     return ret_list;
 }
 
+/*
+ * Scan a buffer for offset points where the rolling hash function
+ * hits its magic value while honouring the min_block and max_block
+ * constraints on the distance between offsets.
+ */
 static PyObject *scan_scanbuf2(PyObject *self, PyObject *args) {
     Py_buffer       pbuf;
 
@@ -125,10 +130,12 @@ static PyObject *scan_scanbuf2(PyObject *self, PyObject *args) {
     unsigned long   max_block;
 
     // Arguments:
-    // buf, buflen: a buffer of unsigned char to scan
+    // pbuf: a Py_buffer referencing the data to scan
     // hash_value: unsigned long initial hash value
+    //             from the scan of the preceeding block
     // sofar: the length of the initial partial block scanned prior
-    //        to this buffer
+    //        to this buffer, contributing the the size which is
+    //        constrainted by min_block and max_block
     // min_block: unsigned long minimum distance between offsets
     // max_block: unsigned long maximum distance between offsets
     if (!PyArg_ParseTuple(args, "y*kkkk",
@@ -193,6 +200,9 @@ static PyObject *scan_scanbuf2(PyObject *self, PyObject *args) {
         free(offsets);
     }
 
+    // Return a 2 element list containing [hash_value, offsets]
+    // being the rolling hash value at the end of the scan for use in
+    // the next buffer and a list of the magic hash values offsets.
     PyObject    *ret_list = PyList_New(2);
     if (ret_list == NULL) {
         Py_DECREF(offset_list);
