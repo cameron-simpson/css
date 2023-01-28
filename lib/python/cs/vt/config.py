@@ -26,7 +26,7 @@ from os.path import (
 from icontract import require
 
 from cs.fs import shortpath, longpath
-from cs.lex import get_ini_clausename, get_ini_clause_entryname
+from cs.lex import get_ini_clausename, get_ini_clause_entryname, r
 from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, pfx_method
@@ -34,6 +34,7 @@ from cs.result import OnDemandResult
 
 from . import (
     Lock,
+    Store,
     DEFAULT_BASEDIR,
     DEFAULT_CONFIG_ENVVAR,
     DEFAULT_CONFIG_MAP,
@@ -58,11 +59,6 @@ from .socket import TCPClientStore, UNIXSocketClientStore
 from .transcribe import parse
 
 from cs.py.func import trace
-
-def Store(spec, config, runstate=None, hashclass=None):
-  ''' Factory to construct Stores from string specifications.
-  '''
-  return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
 
 # pylint: disable=too-many-public-methods
 class Config(SingletonMixin):

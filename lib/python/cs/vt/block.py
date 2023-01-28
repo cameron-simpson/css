@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #
 # pylint: disable=too-many-lines
+#
 
 ''' Functions and classes relating to Blocks, which are data chunk references.
 
@@ -35,12 +36,15 @@
     this is the sum of the .span values of their subblocks.
 '''
 
-from __future__ import print_function
 from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
 import sys
+from typing import Optional
+
 from icontract import require
+from typeguard import typechecked
+
 from cs.binary import (
     BinarySingleValue, BSUInt, BSData, flatten as flatten_transcription
 )
@@ -50,6 +54,7 @@ from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
+
 from . import defaults, RLock
 from .hash import HashCode, io_fail
 from .transcribe import (
@@ -77,18 +82,17 @@ def isBlock(o):
 
 class _Block(Transcriber, ABC):
 
-  def __init__(self, block_type, span):
+  @typechecked
+  @require(lambda span: span is None or span >= 0)
+  def __init__(self, block_type, span: Optional[int]):
     self.type = block_type
-    if span is not None:
-      if not isinstance(span, int) or span < 0:
-        raise ValueError("invalid span: %r" % (span,))
-      self.span = span
+    self.span = span
     self.indirect = False
     self.blockmap = None
     self._lock = RLock()
 
   def __bytes__(self):
-    ''' `bytes(_Block)` returns allo the data together as a single `bytes` instance.
+    ''' `bytes(_Block)` returns all the data concatenated as a single `bytes` instance.
 
         Try not to do this for indirect blocks, it gets expensive.
     '''
@@ -534,7 +538,7 @@ class BlockRecord(BinarySingleValue):
     return B
 
   @staticmethod
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   def transcribe_value(B):
     ''' Transcribe this `Block`, the inverse of parse_value.
     '''
@@ -588,7 +592,7 @@ class HashCodeBlock(_Block):
   def __init__(self, hashcode=None, data=None, added=False, span=None, **kw):
     ''' Initialise a `BT_HASHCODE` Block.
 
-        A HashCodeBlock always stores its hashcode directly.
+        A `HashCodeBlock` always stores its hashcode directly.
         If `data` is supplied, store it and compute or check the hashcode.
         If `span` is not `None`, store it. Otherwise compute it on
           demand from the data, fetching that if necessary.
@@ -620,6 +624,13 @@ class HashCodeBlock(_Block):
     self._span = None
     _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
+
+  @property
+  def uri(self):
+    ''' The block reference as a `VTURI`.
+    '''
+    from .uri import VTURI  # pylint: disable=import-outside-toplevel
+    return VTURI(indirect=self.indirect, hashcode=self.hashcode)
 
   @property
   def data(self):
@@ -675,7 +686,7 @@ class HashCodeBlock(_Block):
   def span(self, newspan):
     ''' Set the span of the data encompassed by this HashCodeBlock.
     '''
-    if newspan < 0:
+    if newspan is not None and newspan < 0:
       raise ValueError("%s: set .span: invalid newspan=%s" % (self, newspan))
     if self._span is None:
       self._span = newspan

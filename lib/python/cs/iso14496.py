@@ -20,6 +20,7 @@ from datetime import datetime
 from getopt import getopt, GetoptError
 import os
 import sys
+
 from cs.binary import (
     UInt8,
     Int16BE,
@@ -40,7 +41,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags, rpaths
+from cs.fstags import FSTags, rpaths, uses_fstags
 from cs.lex import get_identifier, get_decimal_value, cropped_repr
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
@@ -90,7 +91,8 @@ class MP4Command(BaseCommand):
 
   TAG_PREFIX = 'mp4'
 
-  def cmd_autotag(self, argv):
+  @uses_fstags
+  def cmd_autotag(self, argv, fstags):
     ''' Usage: {cmd} autotag [-n] [-p prefix] [--prefix=prefix] paths...
           Tag paths based on embedded MP4 metadata.
           -n  No action.
@@ -98,7 +100,6 @@ class MP4Command(BaseCommand):
               Set the prefix of added tags, default: 'mp4'
     '''
     xit = 0
-    fstags = FSTags()
     no_action = False
     tag_prefix = self.TAG_PREFIX
     opts, argv = getopt(argv, 'np:', longopts=['prefix'])

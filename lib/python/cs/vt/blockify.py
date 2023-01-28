@@ -95,16 +95,22 @@ def indirect_blocks(blocks):
       block = IndirectBlock.from_subblocks(subblocks)
     yield block
 
+@promote
 def blockify(
-    chunks, *, chunks_name=None, scanner=None, min_block=None, max_block=None
+    bfr: CornuCopyBuffer,
+    *,
+    chunks_name=None,
+    scanner=None,
+    min_block=None,
+    max_block=None
 ):
   ''' Wrapper for `blocked_chunks_of` which yields `Block`s
       from the data from `chunks`.
   '''
   if chunks_name is None:
-    chunks_name = chunks.__class__.__name__
+    chunks_name = bfr.__class__.__name__
   for chunk in progressbar(
-      blocked_chunks_of2(chunks, scanner=scanner, min_block=min_block,
+      blocked_chunks_of2(bfr, scanner=scanner, min_block=min_block,
                          max_block=max_block),
       label=f'blockify({chunks_name})',
       itemlenfunc=len,
@@ -113,22 +119,14 @@ def blockify(
   ):
     yield Block(data=chunk)
 
-def block_from_chunks(bfr, **kw):
-  ''' Return a Block for the contents `chunks`, an iterable of `bytes`like objects
+@promote
+def block_for(bfr: CornuCopyBuffer, **kw):
+  ''' Return a Block for the contents `bfr`, an iterable of `bytes`like objects
       such as a `CornuCopyBuffer`.
 
       Keyword arguments are passed to `blockify`.
   '''
   return top_block_for(blockify(bfr, **kw))
-
-@promote
-def block_for(obj: CornuCopyBuffer, **kw):
-  ''' Return a Block for the contents of `obj`, which is promoted
-      to a `CoruCopyBuffer` via `CornuCOpyBuffer.promote`.
-
-      Keyword arguments are passed to `blockify`.
-  '''
-  return block_from_chunks(obj, **kw)
 
 def spliced_blocks(B, new_blocks):
   ''' Splice (note *insert*) the iterable `new_blocks` into the data of the `Block` `B`.
