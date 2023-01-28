@@ -7,7 +7,6 @@
 ''' cs.vt command line utility.
 '''
 
-from collections import defaultdict
 from contextlib import contextmanager, nullcontext
 from datetime import datetime
 import errno
@@ -18,7 +17,6 @@ from os.path import (
     basename,
     splitext,
     exists as existspath,
-    expanduser,
     exists as pathexists,
     join as joinpath,
     isdir as isdirpath,
@@ -43,7 +41,7 @@ from cs.progress import progressbar, Progress
 from cs.py.modules import import_extra
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import print
+from cs.upd import print  # pylint: disable=redefined-builtin
 
 from . import (
     common,
@@ -72,8 +70,6 @@ from .paths import OSDir, OSFile, path_resolve
 from .scan import (
     MIN_BLOCKSIZE,
     MAX_BLOCKSIZE,
-    scanbuf,
-    py_scanbuf,
     scanbuf2,
     py_scanbuf2,
     scan_offsets,
@@ -326,12 +322,10 @@ class VTCmd(BaseCommand):
             blocked_chunks  Scan the data into edge aligned chunks without a parser.
             blocked_chunks2 Scan the data into edge aligned chunks without a parser.
             blockify        Scan the data into edge aligned Blocks without a parser.
-            py_scanbuf      Run the old pure Python scanbuf against the data.
             py_scanbuf2     Run the new pure Python scanbuf against the data.
             read            Read from data.
             scan_offsets    Run the new scan_offsets function against the data.
             scan_reblock    Run the new scan_reblock function against the data.
-            scanbuf         Run the old C scanbuf against the data.
             scanbuf2        Run the new C scanbuf2 against the data.
     '''
     runstate = self.options.runstate
@@ -354,7 +348,7 @@ class VTCmd(BaseCommand):
     with Pfx(mode):
       if mode == 'blocked_chunks':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         hash_value = 0
         for chunk in progressbar(
             blocked_chunks_of(inbfr),
@@ -370,7 +364,7 @@ class VTCmd(BaseCommand):
           sizes.append(len(chunk))
       elif mode == 'blockify':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         last_offset = 0
         for offset in progressbar(
             blockify(inbfr),
@@ -384,24 +378,9 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           last_offset = offset
-      elif mode == 'py_scanbuf':
-        if argv:
-          raise GetoptError("extra arguments: %r", argv)
-        hash_value = 0
-        for chunk in progressbar(
-            inbfr,
-            label=mode,
-            update_min_size=65536,
-            itemlenfunc=len,
-            total=length,
-            units_scale=BINARY_BYTES_SCALE,
-            runstate=runstate,
-            report_print=True,
-        ):
-          hash_value, chunk_scan_offsets = py_scanbuf(hash_value, chunk)
       elif mode == 'py_scanbuf2':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         hash_value = 0
         for chunk in progressbar(
             inbfr,
@@ -418,7 +397,7 @@ class VTCmd(BaseCommand):
           )
       elif mode == 'read':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         for chunk in progressbar(
             inbfr,
             label=mode,
@@ -432,7 +411,7 @@ class VTCmd(BaseCommand):
           pass
       elif mode == 'scan_offsets':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         last_offset = 0
         for offset in progressbar(
             scan_offsets(inbfr),
@@ -449,7 +428,7 @@ class VTCmd(BaseCommand):
           last_offset = offset
       elif mode == 'scan_reblock':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         for chunk in progressbar(
             scan_reblock(inbfr),
             label=mode,
@@ -462,25 +441,9 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           sizes.append(len(chunk))
-      elif mode == 'scanbuf':
-        if argv:
-          raise GetoptError("extra arguments: %r", argv)
-        hash_value = 0
-        for chunk in progressbar(
-            inbfr,
-            label=mode,
-            ##update_min_size=65536,
-            update_frequency=128,
-            itemlenfunc=len,
-            total=length,
-            units_scale=BINARY_BYTES_SCALE,
-            runstate=runstate,
-            report_print=True,
-        ):
-          hash_value, chunk_scan_offsets = scanbuf(hash_value, chunk)
       elif mode == 'scanbuf2':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         hash_value = 0
         for chunk in progressbar(
             inbfr,
@@ -525,7 +488,7 @@ class VTCmd(BaseCommand):
           Recite the configuration.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     print(self.options.config.as_text().rstrip())
     return 0
 
@@ -1088,7 +1051,7 @@ class VTCmd(BaseCommand):
     srcS = self.popStore(argv, "other_store")
     dstS = defaults.S
     if not argv:
-      pushables = srcS,
+      pushables = (srcS,)
     else:
       pushables = []
       ok = True
@@ -1117,7 +1080,7 @@ class VTCmd(BaseCommand):
     dstS = self.popStore(argv, "other_store")
     if not argv:
       # default is to push the entire source Store to the destination
-      pushables = srcS,
+      pushables = (srcS,)
     else:
       pushables = []
       ok = True
