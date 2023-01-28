@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 ''' A content hash based data store with a filesystem layer, using
     variable sized blocks, arbitrarily sized data and utilising some
