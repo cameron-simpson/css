@@ -48,9 +48,8 @@ from cs.upd import print
 from . import (
     common,
     defaults,
-    DEFAULT_CONFIG_PATH,
-    DEFAULT_CONFIG_ENVVAR,
     DISTINFO,
+    Store,
 )
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
@@ -61,7 +60,7 @@ from .blockify import (
     block_for,
 )
 from .compose import get_store_spec
-from .config import Config, Store
+from .config import Config
 from .convert import expand_path
 from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
@@ -104,9 +103,14 @@ class VTCmd(BaseCommand):
   ''' A main programme instance.
   '''
 
-  VT_STORE_ENVVAR = 'VT_STORE'
-  VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
-  DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
+  from . import (
+      DEFAULT_CONFIG_ENVVAR,
+      DEFAULT_CONFIG_PATH,
+      DEFAULT_HASHCLASS_ENVVAR,
+      VT_CACHE_STORE_ENVVAR,
+      VT_STORE_ENVVAR,
+  )
+
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
 
