@@ -679,7 +679,7 @@ class HashCodeBlock(_Block):
   def span(self, newspan):
     ''' Set the span of the data encompassed by this HashCodeBlock.
     '''
-    if newspan < 0:
+    if newspan is not None and newspan < 0:
       raise ValueError("%s: set .span: invalid newspan=%s" % (self, newspan))
     if self._span is None:
       self._span = newspan
