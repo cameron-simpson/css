@@ -54,7 +54,6 @@ from . import (
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
     blocked_chunks_of,
-    blocked_chunks_of2,
     top_block_for,
     blockify,
     block_for,
@@ -77,7 +76,8 @@ from .scan import (
     py_scanbuf,
     scanbuf2,
     py_scanbuf2,
-    scan,
+    scan_offsets,
+    scan_reblock,
 )
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore, ProgressStore
@@ -98,6 +98,19 @@ def mount_vtfs(argv=None):
   argv = list(argv)
   argv0 = argv.pop(0)
   return main([argv0, "mount"] + argv)
+
+def print_hist(samples, bins=128):
+  ''' Print a histogram of `samples` using `bins`.
+  '''
+  try:
+    mplutils = import_extra('cs.mplutils', DISTINFO)
+  except ImportError as e:
+    warning("import cs.mplutils: %s", e)
+    print(len(samples), "distinct samples")
+  else:
+    ax = mplutils.axes()
+    ax.hist(samples, 128)
+    mplutils.print_figure(ax)
 
 class VTCmd(BaseCommand):
   ''' A main programme instance.
@@ -316,7 +329,8 @@ class VTCmd(BaseCommand):
             py_scanbuf      Run the old pure Python scanbuf against the data.
             py_scanbuf2     Run the new pure Python scanbuf against the data.
             read            Read from data.
-            scan            Run the new scan function against the data.
+            scan_offsets    Run the new scan_offsets function against the data.
+            scan_reblock    Run the new scan_reblock function against the data.
             scanbuf         Run the old C scanbuf against the data.
             scanbuf2        Run the new C scanbuf2 against the data.
     '''
@@ -328,6 +342,7 @@ class VTCmd(BaseCommand):
     if os.isatty(data_fd):
       warning("reading data from %s", RANDOM_DEV)
       data_fd = pfx_call(os.open, RANDOM_DEV, os.O_RDONLY)
+    sizes = []
     inbfr = CornuCopyBuffer.from_fd(data_fd, readsize=1024 * 1024)
     try:
       S = os.fstat(data_fd)
@@ -352,23 +367,7 @@ class VTCmd(BaseCommand):
             runstate=runstate,
             report_print=True,
         ):
-          pass
-      elif mode == 'blocked_chunks2':
-        if argv:
-          raise GetoptError("extra arguments: %r", argv)
-        hash_value = 0
-        for chunk in progressbar(
-            blocked_chunks_of2(inbfr),
-            label=mode,
-            ##update_min_size=65536,
-            update_frequency=1024,
-            itemlenfunc=len,
-            total=length,
-            units_scale=BINARY_BYTES_SCALE,
-            runstate=runstate,
-            report_print=True,
-        ):
-          pass
+          sizes.append(len(chunk))
       elif mode == 'blockify':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
@@ -431,12 +430,12 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           pass
-      elif mode == 'scan':
+      elif mode == 'scan_offsets':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
         last_offset = 0
         for offset in progressbar(
-            scan(inbfr),
+            scan_offsets(inbfr),
             label=mode,
             update_frequency=256,
             ##update_min_size=65536,
@@ -446,7 +445,23 @@ class VTCmd(BaseCommand):
             runstate=runstate,
             report_print=True,
         ):
+          sizes.append(offset - last_offset)
           last_offset = offset
+      elif mode == 'scan_reblock':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        for chunk in progressbar(
+            scan_reblock(inbfr),
+            label=mode,
+            update_frequency=256,
+            ##update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          sizes.append(len(chunk))
       elif mode == 'scanbuf':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
@@ -481,8 +496,18 @@ class VTCmd(BaseCommand):
           hash_value, chunk_scan_offsets = scanbuf2(
               chunk, hash_value, 0, MIN_BLOCKSIZE, MAX_BLOCKSIZE
           )
+          print(
+              "scanbuf2", len(chunk), '=>', len(chunk_scan_offsets),
+              'chunk offsets'
+          )
+          offset = 0
+          for scan_offset in chunk_scan_offsets:
+            sizes.append(scan_offset - offset)
+          sizes.append(len(chunk) - scan_offset)
       else:
         raise GetoptError("unknown mode")
+      if sizes:
+        print_hist(sizes)
     return 0
 
   def cmd_cat(self, argv):
@@ -1294,8 +1319,8 @@ class VTCmd(BaseCommand):
             total_size = os.fstat(f.fileno()).st_size
             sizes = [
                 len(chunk) for chunk in progressbar(
-                    blocked_chunks_of2(file_data(f, None), scanner=scanner),
-                    f"blocked_chunks_of2({shortpath(filename)})",
+                    blocked_chunks_of(file_data(f, None), scanner=scanner),
+                    f"blocked_chunks_of({shortpath(filename)})",
                     units_scale=BINARY_BYTES_SCALE,
                     update_frequency=64,
                     itemlenfunc=len,
@@ -1303,16 +1328,8 @@ class VTCmd(BaseCommand):
                     runstate=runstate,
                 )
             ]
-        try:
-          mplutils = import_extra('cs.mplutils', DISTINFO)
-        except ImportError as e:
-          warning("import cs.mplutils: %s", e)
-          print(len(sizes), "distinct sizes")
-        else:
-          ax = mplutils.axes()
-          ax.hist(sizes, 128)
-          mplutils.print_figure(ax)
-          return 0
+        print_hist(sizes)
+        return 0
       elif subcmd == 'block_for':
         if not argv:
           raise GetoptError("missing filename")
