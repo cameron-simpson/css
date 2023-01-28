@@ -23,7 +23,7 @@ class VTURI:
 
   DEFAULT_SCHEME = 'x-vt'
   _URI_RE = re.compile(
-      r'(?P<scheme>[a-z][-a-z0-9]):'
+      r'(?P<scheme>[a-z][-a-z0-9]*):'
       r'//(?P<network>[^/]*)'
       r'/(?P<indirect>[hi])'
       r'/(?P<hashname>[a-z][a-z0-9]*):(?P<hashtext>([0-9a-f][0-9a-f])+)'
@@ -57,9 +57,11 @@ class VTURI:
     ''' Make a `VTURI` from a URI string.
     '''
     m = cls._URI_RE.match(uri_s)
+    if m is None:
+      raise ValueError(f'unrecognised URI: {uri_s!r}')
     return cls(
         scheme=m['scheme'],
-        network=m['network'],
+        network=m['network'] or None,
         indirect=m['indirect'] == 'i',
         hashcode=HashCode.from_named_hashbytes_hex(
             m['hashname'], m['hashtext']
