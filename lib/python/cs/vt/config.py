@@ -34,6 +34,7 @@ from cs.result import OnDemandResult
 
 from . import (
     Lock,
+    Store,
     DEFAULT_BASEDIR,
     DEFAULT_CONFIG_ENVVAR,
     DEFAULT_CONFIG_MAP,
@@ -58,23 +59,6 @@ from .socket import TCPClientStore, UNIXSocketClientStore
 from .transcribe import parse
 
 from cs.py.func import trace
-
-def Store(spec, config, runstate=None, hashclass=None):
-  ''' Factory to construct Stores from string specifications.
-  '''
-  return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
-
-def _promote_to_Store(obj):
-  ''' Promote `obj` to some kind of Store.
-  '''
-  if isinstance(obj, _BasicStoreCommon):
-    return obj
-  if isinstance(obj, str):
-    # Store specification string
-    return Store(obj)
-  raise TypeError(f'Store.promote: cannot promote {r(obj)}')
-
-Store.promote = _promote_to_Store
 
 # pylint: disable=too-many-public-methods
 class Config(SingletonMixin):
