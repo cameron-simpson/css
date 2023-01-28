@@ -42,16 +42,14 @@ PyMODINIT_FUNC PyInit__scan(void)
 
 static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
     unsigned long   hash_value;
-    unsigned char   *buf;
-#ifdef PY_SSIZE_T_CLEAN
-    Py_ssize_t      buflen;
-#else
-    int             buflen;
-#endif
+    Py_buffer       pbuf;
 
-    if (!PyArg_ParseTuple(args, "ky#", &hash_value, &buf, &buflen)) {
+    if (!PyArg_ParseTuple(args, "ky*", &hash_value, &pbuf)) {
         return NULL;
     }
+
+    unsigned char   *buf = (unsigned char *)pbuf.buf;
+    Py_ssize_t      buflen = pbuf.len;
 
     unsigned long   *offsets = NULL;
     int             noffsets = 0;
@@ -73,6 +71,9 @@ static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
         }
         Py_END_ALLOW_THREADS
     }
+
+    /* we're done with the buffer now */
+    PyBuffer_Release(&pbuf);
 
     /* compose a Python list containing the offsets */
     PyObject        *offset_list = PyList_New(noffsets);
@@ -116,12 +117,8 @@ static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
 }
 
 static PyObject *scan_scanbuf2(PyObject *self, PyObject *args) {
-    const unsigned char   *buf;
-#ifdef PY_SSIZE_T_CLEAN
-    Py_ssize_t      buflen;
-#else
-    int             buflen;
-#endif
+    Py_buffer       pbuf;
+
     unsigned long   hash_value;
     unsigned long   sofar;
     unsigned long   min_block;
@@ -134,11 +131,14 @@ static PyObject *scan_scanbuf2(PyObject *self, PyObject *args) {
     //        to this buffer
     // min_block: unsigned long minimum distance between offsets
     // max_block: unsigned long maximum distance between offsets
-    if (!PyArg_ParseTuple(args, "y#kkkk",
-            &buf, &buflen, &hash_value, &sofar, &min_block, &max_block)
+    if (!PyArg_ParseTuple(args, "y*kkkk",
+            &pbuf, &hash_value, &sofar, &min_block, &max_block)
     ) {
         return NULL;
     }
+
+    unsigned char   *buf = (unsigned char *)pbuf.buf;
+    Py_ssize_t      buflen = pbuf.len;
 
     unsigned long   *offsets = NULL;
     int             noffsets = 0;
@@ -165,6 +165,9 @@ static PyObject *scan_scanbuf2(PyObject *self, PyObject *args) {
         }
         Py_END_ALLOW_THREADS
     }
+
+    /* we're done with the buffer now */
+    PyBuffer_Release(&pbuf);
 
     /* compose a Python list containing the offsets */
     PyObject        *offset_list = PyList_New(noffsets);
