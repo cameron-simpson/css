@@ -837,8 +837,8 @@ def promote(func, params=None, types=None):
       *Note*: one issue with this is due to the conflict in name
       between this decorator and the method it looks for in a class.
       The `promote` _method_ must appear after any methods in the
-      class which are decorated with `@promote`, otherwise the the
-      decorator method supplants the name `promote` making it
+      class which are decorated with `@promote`, otherwise the
+      `promote` method supplants the name `promote` making it
       unavailable as the decorator.
       I usually just make `.promote` the last method.
 
