@@ -241,6 +241,20 @@ def stackkeys(d, **key_values):
   finally:
     popkeys(d, key_values.keys(), old_values)
 
+@contextmanager
+def stackset(s, element):
+  ''' Context manager to add `element` to the set `s` and remove it on return.
+      The element is neither added nor removed if it is already present.
+  '''
+  if element in s:
+    yield
+  else:
+    s.add(element)
+    try:
+      yield
+    finally:
+      s.remove(element)
+
 def twostep(cmgr):
   ''' Return a generator which operates the context manager `cmgr`.
 
