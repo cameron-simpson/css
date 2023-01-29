@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# Run ffmpeg via the linuxserver/ffmpeg Docker image.
+# - Cameron Simpson <cs@cskk.id.au> 29jan2023
+#
+
+set -ue
+
+: ${TMPDIR:-/tmp}
+
+cmd=$0
+usage="Usage: $cmd -i inputfile [conversion-opts...] outputfile"
+
+image=linuxserver/ffmpeg
+runopts=--rm
+ffopts=
+[ -t 1 ] && { runopts="$runopts -it" ffopts="$ffopts -v"; }
+
+badopts=
+
+if [ $# -lt 2 ]
+then
+  echo "$cmd: missing -i inputfile" >&2
+  badopts=1
+else
+  case $1 in
+    -i)   inputfile=$2; shift; shift ;;
+    *)    echo "$cmd: missing -i inputfile" >&2
+          badopts=1
+          ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing final outputfile" >&2
+  badopts=1
+else
+  eval "outputfile=\$$#"
+  [ ! -e "$outputfile" ] || {
+    echo "$cmd: outputfile already exists: $outputfile" >&2
+    badopts=1
+  }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmpdir=$(pwd)/.ffmpeg-docker.$$
+inputbase=$( basename "$inputfile" )
+outputbase=$( basename "$outputfile" )
+outputdir=$( dirname "$outputfile" )
+
+mkdir "$tmpdir"
+ln "$inputfile" "$tmpdir/"
+
+convdir=/convert
+uid=$( id -u )
+gid=$( id -g )
+
+# rebuild the command line arguments to run in the container
+first=1
+n=1
+lastn=$#
+for arg
+do
+  if [ $first ]
+  then
+    set -- -i "$convdir/$inputbase"
+    first=
+  fi
+  [ $n = $lastn ] && break
+  set -- "$@" "$arg"
+  n=$(( n+1 ))
+done
+set -- "$@" "$convdir/$outputbase"
+
+set -x
+PUID=$uid PGID=$gid \
+  docker run --rm -it -v "$tmpdir:$convdir" --entrypoint=/usr/local/bin/ffmpeg \
+  linuxserver/ffmpeg \
+  "$@" \
+&& mv "$tmpdir/$outputbase" "$outputdir/"
+xit=$?
+
+rm -r "$tmpdir"
+
+exit $xit
