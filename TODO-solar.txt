@@ -1,3 +1,4 @@
+splink plot: help should list modes etc
 splink plot: bar chart version with window/label function showing aggregate stuff per window
 splink plot: tick marks at 4 or 6 hours intervals?
 make plots of more days wider
