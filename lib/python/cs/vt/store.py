@@ -269,7 +269,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   def _defer(self, func, *args, **kwargs):
     ''' Defer a function via the internal `Later` queue.
-        Hold opens on `self` to avoid easy shutdown.
+        Hold an `open()` on `self` to avoid easy shutdown.
     '''
     self.open()
 
@@ -277,7 +277,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       with closing(self):
         return func(*args, **kwargs)
 
-    return self.later.defer(closing_self)
+    return self.later.defer(func.__qualname__, closing_self)
 
   ##########################################################################
   # Core Store methods, all abstract.
