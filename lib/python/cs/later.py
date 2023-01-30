@@ -602,7 +602,8 @@ class Later(MultiOpenMixin, HasThreadState):
       name=None,
       pfx=None,  # pylint: disable=redefined-outer-name
       LF=None,
-      retry_delay=None
+      retry_delay=None,
+      no_context=False,
   ):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding `LateFunction` for result collection.
@@ -636,7 +637,9 @@ class Later(MultiOpenMixin, HasThreadState):
     if pfx is not None:
       func = pfx.partial(func)
     if LF is None:
-      LF = LateFunction(func, name=name, retry_delay=retry_delay)
+      LF = LateFunction(
+          func, name=name, retry_delay=retry_delay, no_context=no_context
+      )
     pri_entry = list(priority)
     pri_entry.append(seq())  # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
@@ -733,7 +736,7 @@ class Later(MultiOpenMixin, HasThreadState):
       func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = self.submit(func, force=True, **params)  # pylint: disable=unexpected-keyword-arg
+    LF = self.submit(func, _force_submit=True, **params)  # pylint: disable=unexpected-keyword-arg
     return LF
 
   def with_result_of(self, callable1, func, *a, **kw):
