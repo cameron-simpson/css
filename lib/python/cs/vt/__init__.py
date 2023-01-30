@@ -175,7 +175,6 @@ _over_progress = OverProgress(name="cs.vt.common.over_progress")
 common = NS(
     progress=_progress,
     over_progress=_over_progress,
-    runstate=RunState("cs.vt.common.runstate"),
     config=None,
     S=None,
 )
@@ -198,7 +197,6 @@ class _Defaults(ThreadState):
   def __init__(self):
     super().__init__()
     self.progress = common.progress
-    self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
     self.show_progress = False
