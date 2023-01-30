@@ -11,13 +11,14 @@ from typeguard import typechecked
 
 from cs.logutils import warning
 from cs.pfx import Pfx
-from cs.resources import RunState
+from cs.resources import RunState, uses_runstate
 from cs.upd import state as upd_state
 
 from . import defaults
 from .dir import Dir, FileDirent
 from .paths import DirLike
 
+@uses_runstate
 @typechecked
 def merge(
     target_root: DirLike,
