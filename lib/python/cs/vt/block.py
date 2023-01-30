@@ -53,6 +53,7 @@ from cs.lex import untexthexify, get_decimal_value
 from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
+from cs.resources import uses_runstate
 from cs.threads import locked
 
 from . import defaults, RLock
@@ -905,7 +906,8 @@ class IndirectBlock(_Block):
         yield B.get_direct_data()[Bstart:Bend]
 
   @io_fail
-  def fsck(self, recurse=False):
+  @uses_runstate
+  def fsck(self, *, recurse=False, runstate):
     ''' Check this IndirectBlock.
     '''
     ok = True
@@ -915,14 +917,13 @@ class IndirectBlock(_Block):
       error("span:%d != sum(subblocks.span):%d", span, subspan)
       ok = False
     if recurse:
-      runstate = defaults.runstate
       for subB in self.subblocks:
         if runstate.cancelled:
           error("cancelled")
           ok = False
           break
         with Pfx(str(subB)):
-          if not subB.fsck(recurse=True):
+          if not subB.fsck(recurse=True, runstate=runstate):
             ok = False
     return ok
 
