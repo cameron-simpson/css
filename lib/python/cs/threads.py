@@ -148,6 +148,7 @@ def bg(
     func,
     daemon=None,
     name=None,
+    no_context=False,
     no_start=False,
     no_logexc=False,
     args=None,
@@ -161,6 +162,9 @@ def bg(
       * `daemon`: optional argument specifying the `.daemon` attribute.
       * `name`: optional argument specifying the `Thread` name,
         default: the name of `func`.
+      * `no_context`: if true (default `False`) prepare the `Thread`
+        with `threading.Thread` instead of `HasThreadState.Thread`,
+        bypassing the `HasThreadState` context setup
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
@@ -180,7 +184,8 @@ def bg(
     with Pfx(thread_prefix):
       return func(*args, **kwargs)
 
-  T = Thread(name=thread_prefix, target=thread_body)
+  T = (builtin_Thread if no_context else HasThreadState.Thread
+       )(name=thread_prefix, target=thread_body)
   if not no_logexc:
     func = logexc(func)
   if daemon is not None:
