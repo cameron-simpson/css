@@ -1002,7 +1002,9 @@ class SubLater(object):
           except Exception as e:  # pylint: disable=broad-except
             exception("%s: reap %s: %s", self, LF, e)
 
-    T = Thread(name="reaper(%s)" % (self,), target=reap, args=(self._queue,))
+    T = HasThreadState.Thread(
+        name="reaper(%s)" % (self,), target=reap, args=(self._queue,)
+    )
     T.start()
     return T
 
