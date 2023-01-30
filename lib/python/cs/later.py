@@ -449,9 +449,9 @@ class Later(MultiOpenMixin, HasThreadState):
 
   def __str__(self):
     return (
-        "<%s[%s] pending=%d running=%d delayed=%d>" % (
-            self.name, self.capacity, len(self.pending), len(self.running),
-            len(self.delayed)
+        "<%s:%s[%s] pending=%d running=%d delayed=%d>" % (
+            self.__class__.__name__, self.name, self.capacity,
+            len(self.pending), len(self.running), len(self.delayed)
         )
     )
 
