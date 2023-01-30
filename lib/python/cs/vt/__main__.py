@@ -238,12 +238,10 @@ class VTCmd(BaseCommand):
       options = self.options
       cmd = self.cmd
       config = options.config
-      runstate = options.runstate
       show_progress = options.show_progress
-      with stackattrs(common, runstate=runstate, config=config):
+      with stackattrs(common, config=config):
         # redo these because defaults is already initialised
-        with stackattrs(defaults, runstate=runstate,
-                        show_progress=show_progress):
+        with stackattrs(defaults, show_progress=show_progress):
           if cmd in ("config", "dump", "help", "init", "profile", "scan"):
             yield
           else:
@@ -256,7 +254,6 @@ class VTCmd(BaseCommand):
               options.store_spec = store_spec
             with Pfx("-S %r", options.store_spec):
               try:
-                # set up the primary Store using the main programme RunState for control
                 S = Store(options.store_spec, options.config)
               except (KeyError, ValueError) as e:
                 raise GetoptError(f"unusable Store specification: {e}") from e
@@ -305,7 +302,6 @@ class VTCmd(BaseCommand):
                     yield
             if cacheS:
               cacheS.backend = None
-      runstate.cancel()
       if ifdebug():
         dump_debug_threads()
 
