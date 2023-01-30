@@ -6,21 +6,20 @@
 ''' Utility routines to parse data streams into Blocks and Block streams into IndirectBlocks.
 '''
 
-from heapq import heappush, heappop
 from itertools import chain
 import sys
 
 from cs.buffer import CornuCopyBuffer
-from cs.deco import fmtdoc, promote, OBSOLETE
-from cs.logutils import warning, exception
-from cs.pfx import Pfx, pfx
+from cs.deco import fmtdoc, promote
+from cs.logutils import warning
+from cs.pfx import pfx
 from cs.progress import progressbar
 from cs.queues import IterableQueue
+from cs.resources import uses_runstate
 from cs.seq import tee
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 
-from . import defaults
 from .block import Block, IndirectBlock
 from .scan import (
     scan_offsets,
@@ -116,7 +115,7 @@ def blockify(
     chunks_name = bfr.__class__.__name__
   for chunk in progressbar(
       blocked_chunks_of(bfr, scanner=scanner, min_block=min_block,
-                         max_block=max_block),
+                        max_block=max_block),
       label=f'blockify({chunks_name})',
       itemlenfunc=len,
       units_scale=BINARY_BYTES_SCALE,
@@ -222,6 +221,7 @@ class _PendingBuffer:
 
 # pylint: disable=too-many-statements,too-many-locals
 @pfx
+@uses_runstate
 @fmtdoc
 def blocked_chunks_of(
     chunks,
@@ -229,6 +229,7 @@ def blocked_chunks_of(
     scanner=None,
     min_block=None,
     max_block=None,
+    runstate,
 ):
   ''' Generator which connects to a scanner of a chunk stream in
       order to emit low level edge aligned data chunks.
@@ -284,8 +285,6 @@ def blocked_chunks_of(
   # copy chunks to the parser and also to the post-parser chunk assembler
   tee_chunks = tee(chunks, dataQ)
   parse_bfr = CornuCopyBuffer(tee_chunks)
-
-  runstate = defaults.runstate
 
   def run_parser(runstate, bfr, min_block, max_block, offsetQ):
     ''' Thread body to scan `bfr` for offsets.
