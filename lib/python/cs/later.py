@@ -375,7 +375,9 @@ class Later(MultiOpenMixin, HasThreadState):
         # - dispatch a Thread to wait for completion and fire the
         #   finished_event Event
         # queue final action to mark activity completion
-        self.defer(self.finished_event.set, force=True)
+        self.defer(
+            dict(no_context=True), self.finished_event.set, _force_submit=True
+        )
         if self._timerQ:
           self._timerQ.close()
           self._timerQ.join()
@@ -539,8 +541,8 @@ class Later(MultiOpenMixin, HasThreadState):
     '''
     citation = funccite(method)
 
-    def submittable_method(self, *a, force=False, **kw):
-      if not force and not self.is_submittable():
+    def submittable_method(self, *a, _force_submit=False, **kw):
+      if not _force_submit and not self.is_submittable():
         raise RuntimeError("%s: %s: not submittable" % (self, citation))
       return method(self, *a, **kw)
 
