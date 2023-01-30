@@ -914,7 +914,7 @@ class VTCmd(BaseCommand):
         source = OSDir(ospath)
       else:
         source = OSFile(ospath)
-      if not merge(target, source, runstate=self.options.runstate):
+      if not merge(target, source):
         error("merge into %r fails", arpath)
         return 1
       A.update(target)
