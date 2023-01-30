@@ -36,7 +36,7 @@ from heapq import heappush, heappop
 from itertools import zip_longest
 import logging
 import sys
-from threading import Lock, Thread, Event
+from threading import Lock, Event, Thread as builtin_Thread
 import time
 from typing import Callable, Iterable, Optional
 
@@ -218,7 +218,7 @@ class LateFunction(Result):
       TODO: .cancel(), timeout for wait().
   '''
 
-  def __init__(self, func, name=None, retry_delay=None):
+  def __init__(self, func, name=None, retry_delay=None, no_context=False):
     ''' Initialise a `LateFunction`.
 
         Parameters:
@@ -235,6 +235,9 @@ class LateFunction(Result):
       retry_delay = DEFAULT_RETRY_DELAY
     self.name = name
     self.retry_delay = retry_delay
+    # we prepare the Thread now in order to honour the perThread states
+    self.thread = (builtin_Thread if no_context else HasThreadState.Thread
+                   )(name=name, target=func)
 
   def __str__(self):
     return "%s[%s]" % (type(self).__name__, self.name)
@@ -251,7 +254,7 @@ class LateFunction(Result):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    return self.bg(self.func)
+    return self.thread.start()
 
   @OBSOLETE
   def wait(self):
