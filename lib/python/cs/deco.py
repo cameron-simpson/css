@@ -109,8 +109,8 @@ def decorator(deco):
         "deco:%r(func:%r,...) -> None" % (deco, func)
     )
     if decorated is not func:
-      # we got a wrapper function back, pretty up the returned wrapper
-      # try functools.update_wrapper, otherwise do stuff by hand
+      # We got a wrapper function back, pretty up the returned wrapper.
+      # Try functools.update_wrapper, otherwise do stuff by hand.
       try:
         from functools import update_wrapper  # pylint: disable=import-outside-toplevel
         update_wrapper(decorated, func)
