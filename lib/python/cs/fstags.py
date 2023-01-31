@@ -1563,6 +1563,17 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     '''
     return self._fstags.keypath(self.fspath)
 
+  @property
+  def parent(self):
+    ''' A reference to the parent of this `TaggedPath`, or `None`.
+      '''
+    keypath = self.keypath
+    parent_path = dirname(keypath)
+    if parent_path == keypath:
+      # no parent
+      return None
+    return self._fstags[parent_path]
+
   # pylint: disable=redefined-outer-name
   @tag_or_tag_value
   def discard(self, tag_name, value, *, verbose=None):
