@@ -90,7 +90,7 @@ from . import MAX_FILE_SIZE, Lock, RLock, defaults
 from .archive import Archive
 from .block import Block
 from .blockify import (
-    DEFAULT_SCAN_SIZE, blocked_chunks_of2, spliced_blocks, top_block_for
+    DEFAULT_SCAN_SIZE, blocked_chunks_of, spliced_blocks, top_block_for
 )
 from .datafile import DataRecord, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
@@ -1269,7 +1269,7 @@ class PlatonicDir(FilesDir):
     if new_size is None:
       # skip non files
       debug("SKIP non-file")
-      return
+      return updated
     try:
       E = D[filename]
     except KeyError:
@@ -1289,7 +1289,8 @@ class PlatonicDir(FilesDir):
           "DFstate.scanned_to:%s != len(E.block):%s" %
           (DFstate.scanned_to, len(current_block))
       )
-      R = self.meta_store._defer(
+      # splice the newly scanned data into the existing data
+      top_block_result = self.meta_store._defer(
           lambda B, Q: top_block_for(spliced_blocks(B, Q)), current_block,
           blockQ
       )
@@ -1324,9 +1325,10 @@ class PlatonicDir(FilesDir):
         DFstate.scanned_to = post_offset
         if self.cancelled or self.flag_scan_disable:
           break
+      # now collect the top block of the spliced data
       blockQ.close()
       try:
-        top_block = R()
+        top_block = top_block_result()
       except MissingHashcodeError as e:
         error("missing data, forcing rescan: %s", e)
         DFstate.scanned_to = 0
@@ -1363,8 +1365,8 @@ class PlatonicDir(FilesDir):
     scanner = scanner_from_filename(filepath)
     with open(filepath, 'rb') as fp:
       fp.seek(offset)
-      for data in blocked_chunks_of2(read_from(fp, DEFAULT_SCAN_SIZE),
-                                     scanner=scanner):
+      for data in blocked_chunks_of(read_from(fp, DEFAULT_SCAN_SIZE),
+                                    scanner=scanner):
         post_offset = offset + len(data)
         yield offset, data, post_offset
         offset = post_offset

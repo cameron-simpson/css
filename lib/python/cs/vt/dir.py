@@ -24,6 +24,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
+from cs.resources import uses_runstate
 from cs.threads import locked
 
 from . import PATHSEP, defaults, RLock
@@ -1299,10 +1300,10 @@ class Dir(_Dirent, DirLike):
     return True
 
   @io_fail
-  def fsck(self, recurse=False):
+  @uses_runstate
+  def fsck(self, *, recurse=False, runstate):
     ''' Check this Dir.
     '''
-    runstate = defaults.runstate
     ok = True
     B = self.block
     if not B.fsck(recurse=recurse):

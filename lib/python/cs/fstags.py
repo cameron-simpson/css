@@ -1532,7 +1532,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
   '''
 
   @uses_fstags
-  def __init__(self, fspath, fstags: FSTags, _id=None, _ontology=None):
+  def __init__(self, fspath, *, fstags: FSTags, _id=None, _ontology=None):
     if _ontology is None:
       _ontology = fstags.ontology_for(fspath)
     self.__dict__.update(

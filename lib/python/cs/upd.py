@@ -76,11 +76,12 @@ from threading import RLock, Thread
 import time
 from typing import Optional
 
-from cs.context import stackattrs, StackableState
+from cs.context import stackattrs
 from cs.deco import decorator, default_params
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
+from cs.threads import State as ThreadState
 from cs.tty import ttysize
 from cs.units import transcribe, TIME_SCALE
 
@@ -99,11 +100,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context>=stackable_state',
+        'cs.context',
         'cs.deco',
         'cs.gimmicks',
         'cs.lex',
         'cs.obj>=20210122',
+        'cs.threads',
         'cs.tty',
         'cs.units',
     ],
@@ -542,7 +544,7 @@ class Upd(SingletonMixin):
     )
     return txts
 
-  def out(self, txt, *a, slot=0, raw_text=False, redraw=False):
+  def out(self, txt, *a, slot=0, raw_text=False, redraw=False) -> str:
     ''' Update the status line at `slot` to `txt`.
         Return the previous status line content.
 
@@ -565,7 +567,11 @@ class Upd(SingletonMixin):
       slots = self._slot_text
       if slot == 0 and not slots:
         self.insert(0)
-      oldtxt = slots[slot]
+      try:
+        oldtxt = slots[slot]
+      except IndexError as e:
+        warning("%s.out(slot=%d): %s, ignoring %r", self, slot, e, txt)
+        return ''
       if self._disabled or self._backend is None:
         slots[slot] = txt
       else:
@@ -736,14 +742,17 @@ class Upd(SingletonMixin):
     return True
 
   # pylint: disable=too-many-branches,too-many-statements
-  def insert(self, index, txt='', proxy=None) -> "UpdProxy":
+  def insert(self, index, txt='', proxy=None, **proxy_kw) -> "UpdProxy":
     ''' Insert a new status line at `index`.
         Return the `UpdProxy` for the new status line.
     '''
-    if proxy and proxy.upd is not None:
-      raise ValueError(
-          "proxy %s already associated with an Upd: %s" % (proxy, self)
-      )
+    if proxy:
+      if proxy.upd is not None:
+        raise ValueError(
+            "proxy %s already associated with an Upd: %s" % (proxy, self)
+        )
+      if proxy_kw:
+        raise ValueError("cannot supply both a proxy and **proxy_kw")
     slots = self._slot_text
     proxies = self._proxies
     txts = []
@@ -767,7 +776,7 @@ class Upd(SingletonMixin):
           )
       if proxy is None:
         # create the proxy, which inserts it
-        return UpdProxy(index=index, upd=self, prefix=txt)
+        return UpdProxy(index=index, upd=self, prefix=txt, **proxy_kw)
 
       # associate the proxy with self
       assert proxy.upd is None
@@ -1054,6 +1063,8 @@ class UpdProxy(object):
       '_text_auto':
       'An optional callable to generate the text if _text is empty.',
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
+      '_update_period': 'Update time interval.',
+      'last_update': 'Time of last update.',
   }
 
   @uses_upd
@@ -1066,6 +1077,7 @@ class UpdProxy(object):
       prefix: Optional[str] = None,
       suffix: Optional[str] = None,
       text_auto=None,
+      update_period: Optional[float] = None,
   ):
     ''' Initialise a new `UpdProxy` status line.
 
@@ -1082,6 +1094,9 @@ class UpdProxy(object):
     self._text = ''
     self._text_auto = text_auto
     self._suffix = suffix or ''
+    self._update_period = update_period
+    if update_period:
+      self.last_update = time.time()
     upd.insert(index, proxy=self)
     if text:
       self(text)
@@ -1108,15 +1123,23 @@ class UpdProxy(object):
 
   def _update(self):
     upd = self.upd
-    if upd is not None:
-      with upd._lock:  # pylint: disable=protected-access
-        index = self.index
-        if index is not None:
-          txt = upd.normalise(self._prefix + self._text + self._suffix)
-          overflow = len(txt) - upd.columns + 1
-          if overflow > 0:
-            txt = '<' + txt[overflow + 1:]
-          self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+    if upd is None:
+      return
+    update_period = self._update_period
+    if update_period:
+      now = time.time()
+      if now - self.last_update < update_period:
+        return
+    with upd._lock:  # pylint: disable=protected-access
+      index = self.index
+      if index is not None:
+        txt = upd.normalise(self._prefix + self._text + self._suffix)
+        overflow = len(txt) - upd.columns + 1
+        if overflow > 0:
+          txt = '<' + txt[overflow + 1:]
+        self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+    if update_period:
+      self.last_update = now
 
   def reset(self):
     ''' Clear the proxy: set both the prefix and text to `''`.
@@ -1227,7 +1250,7 @@ class UpdProxy(object):
       return upd.insert(index, txt)
 
 # pylint: disable=too-few-public-methods
-class _UpdState(StackableState):
+class _UpdState(ThreadState):
 
   def __getattr__(self, attr):
     if attr == 'upd':

@@ -34,7 +34,7 @@ from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
 import operator
 import os
-from os.path import expanduser, exists as existspath
+from os.path import expanduser, exists as existspath, isabs as isabspath
 import re
 import sys
 from subprocess import run
@@ -1538,7 +1538,7 @@ class SQLTags(BaseTagSets):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Stub startup/shutdown since we use autosessions.
+    ''' Empty stub startup/shutdown since we use autosessions.
         Particularly, we do not want to keep SQLite dbs open.
     '''
     yield self
@@ -1659,7 +1659,7 @@ class SQLTags(BaseTagSets):
   @locked
   def __setitem__(self, index, te):
     ''' Dummy `__setitem__` which checks `te` against the db by type
-        because the factory inserts it into the database.
+        because the factory has already inserted it into the database.
     '''
     assert isinstance(te, SQLTagSet)
     assert te.sqltags is self
@@ -1879,6 +1879,19 @@ class SQLTags(BaseTagSets):
       for tag in te.tags:
         with Pfx(tag):
           e.add_tag(tag)
+
+  @classmethod
+  def promote(cls, obj):
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, str):
+      if obj.startswith('~') or isabspath(obj):
+        # expect filesystem path to an SQLite file
+        if not obj.endswith('.sqlite'):
+          raise ValueError("expected path to .sqlite file")
+        obj = expanduser(obj)
+        return cls(obj)
+    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
 
 class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' Common features for commands oriented around an `SQLTags` database.

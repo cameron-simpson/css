@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 ''' A content hash based data store with a filesystem layer, using
     variable sized blocks, arbitrarily sized data and utilising some
@@ -41,13 +41,15 @@
 
 from contextlib import contextmanager
 import os
-import tempfile
 from types import SimpleNamespace as NS
+from typing import Optional
+
 from cs.context import stackattrs
+from cs.deco import default_params, promote
+from cs.lex import r
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
-from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
 from cs.threads import State as ThreadState
@@ -112,6 +114,9 @@ DEFAULT_BASEDIR = '~/.local/share/vt'
 
 DEFAULT_CONFIG_ENVVAR = 'VT_CONFIG'
 DEFAULT_CONFIG_PATH = '~/.vtrc'
+VT_STORE_ENVVAR = 'VT_STORE'
+VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
+DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
 
 DEFAULT_CONFIG_MAP = {
     'GLOBAL': {
@@ -170,7 +175,6 @@ _over_progress = OverProgress(name="cs.vt.common.over_progress")
 common = NS(
     progress=_progress,
     over_progress=_over_progress,
-    runstate=RunState("cs.vt.common.runstate"),
     config=None,
     S=None,
 )
@@ -193,7 +197,6 @@ class _Defaults(ThreadState):
   def __init__(self):
     super().__init__()
     self.progress = common.progress
-    self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
     self.show_progress = False
@@ -208,7 +211,10 @@ class _Defaults(ThreadState):
 
   def __getattr__(self, attr):
     if attr == 'S':
-      return common.S
+      S = common.S
+      if S is None:
+        S = self.config['default']
+      return S
     raise AttributeError(attr)
 
   @contextmanager
@@ -220,34 +226,36 @@ class _Defaults(ThreadState):
 
 defaults = _Defaults()
 
-class _TestAdditionsMixin:
-  ''' Some common methods uses in tests.
+def Store(
+    spec: Optional[str] = None,
+    config: Optional["Config"] = None,
+    *,
+    runstate=None,
+    hashclass=None
+):
+  ''' Factory to construct Stores from string specifications.
   '''
+  from .config import Config
+  if spec is None:
+    spec = os.environ.get(VT_STORE_ENVVAR, '[default]')
+  if config is None:
+    config = Config()
+  return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
 
-  @classmethod
-  def mktmpdir(cls, prefix=None):
-    ''' Create a temporary directory.
-    '''
-    if prefix is None:
-      prefix = cls.__qualname__
-    return tempfile.TemporaryDirectory(
-        prefix="test-" + prefix + "-", suffix=".tmpdir", dir=os.getcwd()
-    )
+def _promote_to_Store(obj):
+  ''' Promote `obj` to some kind of Store.
+  '''
+  from .store import _BasicStoreCommon
+  if isinstance(obj, _BasicStoreCommon):
+    return obj
+  if isinstance(obj, str):
+    # Store specification string
+    return Store(obj)
+  raise TypeError(f'Store.promote: cannot promote {r(obj)}')
 
-  def assertLen(self, o, length, *a, **kw):
-    ''' Test len(o) unless it raises TypeError.
-    '''
-    try:
-      olen = len(o)
-    except TypeError:
-      pass
-    else:
-      self.assertEqual(olen, length, *a, **kw)
+Store.promote = _promote_to_Store
 
-  def assertIsOrdered(self, s, strict=False):
-    ''' Assertion to test that an object's elements are ordered.
-    '''
-    self.assertTrue(
-        isordered(s, strict=strict),
-        "not ordered(strict=%s): %r" % (strict, s)
-    )
+def uses_Store(func):
+  ''' Decorator to provide the default Store as the parameter `S`.
+  '''
+  return default_params(func, S=lambda: defaults.S)

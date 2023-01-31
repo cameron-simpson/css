@@ -230,7 +230,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20221228-post'
+__version__ = '20230126-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -879,7 +879,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   @property
   def unixtime(self):
-    ''' `unixtime` property, autosets to `time.time()` if accessed.
+    ''' `unixtime` property, autosets to `time.time()` if accessed and missing.
     '''
     ts = self.get('unixtime')
     if ts is None:
@@ -892,6 +892,21 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     ''' Set the `unixtime`.
     '''
     self['unixtime'] = new_unixtime
+
+  @format_attribute
+  def is_stale(self, max_age=None):
+    ''' Test whether this `TagSet` is stale
+        i.e. the time since `self.last_updated` UNIX time exceeds `max_age` seconds
+        (default from `self.STALE_AGE`).
+
+        This is a convenience function for `TagSet`s which cache external data.
+    '''
+    if max_age is None:
+      max_age = self.STALE_AGE
+    last_updated = self.get('last_updated', None)
+    if not last_updated:
+      return True
+    return time.time() >= last_updated + max_age
 
   #############################################################################
   # The '.auto' attribute space.
