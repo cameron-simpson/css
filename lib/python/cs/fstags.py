@@ -97,7 +97,7 @@ import shutil
 import sys
 from threading import Lock, RLock
 
-from icontract import require
+from icontract import ensure, require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
@@ -1087,18 +1087,26 @@ class FSTags(MultiOpenMixin):
         type(self).__name__, self.tagsfile_basename
     )
 
+  @ensure(lambda result: result == normpath(result))
+  def keypath(self, fspath):
+    ''' Compute the absolute path used to index a `TaggedPath` instance.
+
+        This returns `realpath(fspath)` if `self.config.physical`,
+        otherwise `abspath(fspath)`.
+    '''
+    return realpath(path) if self.config.physical else abspath(path)
+
   @locked
   def __getitem__(self, path):
     ''' Return the `TaggedPath` for `abspath(path)`.
     '''
-    path = realpath(path) if self.config.physical else abspath(path)
-    assert path == normpath(path)
-    tagged_path = self._tagged_paths.get(path)
+    keypath = self.keypath(path)
+    tagged_path = self._tagged_paths.get(keypath)
     if tagged_path is None:
       import time
-      tagfile = self.tagfile_for(path)
+      tagfile = self.tagfile_for(keypath)
       now = time.time()
-      tagged_path = self._tagged_paths[path] = tagfile[basename(path)]
+      tagged_path = self._tagged_paths[keypath] = tagfile[basename(keypath)]
       elapsed = time.time() - now
       if elapsed >= 1.0:
         warning("FSTags[%r] took %ss", path, elapsed)
@@ -1546,6 +1554,13 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     ''' The `.name` is `basename(self.fspath)`.
     '''
     return basename(self.fspath)
+
+  @property
+  def keypath(self):
+    ''' The key path used to index this `TaggedPath` within its `FSTags`
+        from `FSTags.keypath(path)`.
+    '''
+    return self._fstags.keypath(self.fspath)
 
   # pylint: disable=redefined-outer-name
   @tag_or_tag_value
