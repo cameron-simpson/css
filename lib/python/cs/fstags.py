@@ -1602,6 +1602,17 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
       return tags
     return tags.as_tags(prefix=prefix)
 
+  def findup(self, check):
+    ''' Locate the first `TaggedPath` from `self` upwards (via `.parent`)
+        for which `check(TaggedPath)` is true.
+    '''
+    node = self
+    while node is not None:
+      if check(node):
+        break
+      node = node.parent
+    return node
+
   def auto_infer(self, attr):
     ''' Infer a value from `attr` via the associated `FSTags.cascade_rules`.
 
