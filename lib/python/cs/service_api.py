@@ -28,6 +28,30 @@ from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.upd import uses_upd
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.cmdutils>=20210404',
+        'cs.context',
+        'cs.deco',
+        'cs.fileutils',
+        'cs.fs>=HasFSPath',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.resources',
+        'cs.tagset>=TagSet_is_stale',
+        'cs.threads',
+        'cs.upd',
+        'icontract',
+        'typeguard',
+    ],
+}
+
 class ServiceAPI(MultiOpenMixin):
   ''' `SewrviceAPI` base class for other APIs talking to services.
   '''
