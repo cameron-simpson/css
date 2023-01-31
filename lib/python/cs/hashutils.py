@@ -59,7 +59,7 @@ class _HashCode(bytes):
     finally:
       if fd is not None:
         os.close(fd)
-    # mmpa fails, try plain open of file
+    # mmap fails, try plain open of file
     return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
 
 class SHA256(_HashCode):
