@@ -75,9 +75,10 @@ done
 set -- "$@" "$convdir/$outputbase"
 
 set -x
-PUID=$uid PGID=$gid \
-  docker run --rm -it -v "$tmpdir:$convdir" --entrypoint=/usr/local/bin/ffmpeg \
+docker run --rm -it -v "$tmpdir:$convdir" --entrypoint=/usr/bin/s6-setuidgid
   linuxserver/ffmpeg \
+  "$uid:$gid" \
+  /usr/local/bin/ffmpeg \
   "$@" \
 && mv "$tmpdir/$outputbase" "$outputdir/"
 xit=$?
