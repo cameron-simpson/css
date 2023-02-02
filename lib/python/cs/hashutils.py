@@ -9,9 +9,21 @@ import os
 
 from cs.buffer import CornuCopyBuffer
 
-class _HashCode(bytes):
+class BaseHashCode(bytes):
+  ''' Base class for hashcodes, subclassed by `SHA1`, `SHA256` et al.
+  '''
 
   __slots__ = ()
+
+  def __init_subclass__(cls, /, hashfunc, hashname=None, **kw):
+    super().__init_subclass__(**kw)
+    if hashname is None:
+      hashname = cls.__name__.lower()
+    cls.hashname = hashname
+    cls.hashfunc = hashfunc
+    cls.hashlen = len(hashfunc(b'').digest())
+    if not cls.__doc__:
+      cls.__doc__ = f'{hashfunc.__name__} hashcode class, subclass of `bytes`.'
 
   hashfunc = lambda bs=None: None  # pylint: disable=unnecessary-lambda-assignment
 
@@ -62,9 +74,10 @@ class _HashCode(bytes):
     # mmap fails, try plain open of file
     return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
 
-class SHA256(_HashCode):
-  ''' SHA256 hashcode class, subclass of `bytes`.
-  '''
-
+# pylint: disable=missing-class-docstring
+class SHA1(BaseHashCode, hashfunc=hashlib.sha1):
   __slots__ = ()
-  hashfunc = hashlib.sha256
+
+# pylint: disable=missing-class-docstring
+class SHA256(BaseHashCode, hashfunc=hashlib.sha256):
+  __slots__ = ()
