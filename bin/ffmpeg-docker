@@ -6,13 +6,21 @@
 
 set -ue
 
-cmd=$0
-usage="Usage: $cmd [--tm] [input-opts...] -i inputfile [output-opts...] outputfile"
-
 use_tmux=${FFMPEG_DOCKER_TMUX:-''}
 image=linuxserver/ffmpeg
 runopts=--rm
 ffopts=
+
+cmd=$0
+usage="Usage: $cmd [--tm] [input-opts...] -i inputfile [output-opts...] outputfile
+  Run ffmpeg via \"docker run ... $image ...\" as a method for
+  running a modern ffmpeg on a stale system.
+
+  Leading options:
+  --tm  Run the \"docker run ...\" in a tmux(1) session via the tm(1cs) command.
+        This is handy when your transcoding machine is remote, or
+        when you want to run a few ffmpegs in named sessions.
+        I keep a shell alias \"fftm=ffmpeg-docker --tm\" for this purpose."
 
 badopts=
 
