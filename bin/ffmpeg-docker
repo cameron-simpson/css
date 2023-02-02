@@ -6,83 +6,118 @@
 
 set -ue
 
-: ${TMPDIR:-/tmp}
+: "${TMPDIR:-/tmp}"
 
 cmd=$0
-usage="Usage: $cmd -i inputfile [conversion-opts...] outputfile"
+usage="Usage: $cmd [input-opts...] -i inputfile [output-opts...] outputfile"
 
 image=linuxserver/ffmpeg
 runopts=--rm
 ffopts=
-[ -t 1 ] && { runopts="$runopts -it" ffopts="$ffopts -v"; }
 
 badopts=
 
-if [ $# -lt 2 ]
-then
-  echo "$cmd: missing -i inputfile" >&2
-  badopts=1
-else
-  case $1 in
-    -i)   inputfile=$2; shift; shift ;;
-    *)    echo "$cmd: missing -i inputfile" >&2
-          badopts=1
+# rebuild the command line arguments to run in the container
+convdir=/convert
+lastn=$#
+in_minus_i=
+did_minus_i=
+did_outputfile=
+n=1
+for arg
+do
+  [ $n = 1 ] && set --  #  reset argument list
+  if [ $n != $lastn ]
+  then
+    # before the final output argument
+    if [ $in_minus_i ]
+    then
+      # inputfile argument following -i
+      inputfile=$arg
+      case "$inputfile" in
+        -) run_it_opts=-i inputmnt=/dev/null ;;
+        *) if [ -t 0 ] && [ -t 1 ]
+          then run_it_opts=-it
+          else run_it_opts=
+          fi
+          if [ ! -r "$inputfile" ]
+          then
+            echo "$cmd: inputfile not readable: $inputfile" >&2
+            badopts=1
+          else
+            case "$inputfile" in
+              /*) ;; *) inputfile=$(pwd)/$inputfile ;;
+            esac
+            inputbase=$( basename "$inputfile" )
+            inputmnt=$inputfile
+            inputmnt_as=$convdir/in/$inputbase
+            arg=$inputmnt_as
+          fi
           ;;
-  esac
-fi
+      esac
+      in_minus_i=
+      did_minus_i=1
+    else
+      if [ "x$arg" = "x-i" ]
+      then
+        # recognised the -i option
+        if [ $did_minus_i ]
+        then
+          echo "$cmd: repeated -i option" >&2
+          badopts=1
+        fi
+        in_minus_i=1
+      else
+        # pass other arguments through unchanged
+        :
+      fi
+    fi
+  else
+    # final argument, expect output file
+    outputfile=$arg
+    case "$outputfile" in
+      -) outputmnt=/dev/null ;;
+      -*)echo "$cmd: expected final argument to be \"-\" or a filename," \
+                "but seem to have an option: $outputfile" >&2
+        badopts=1
+        ;;
+      *)if [ -e "$outputfile" ]
+        then
+          echo "$cmd: output already exists: $outputfile" >&2
+          badopts=1
+        else
+          case "$outputfile" in
+            /*) ;; *) outputfile=$(pwd)/$outputfile ;;
+          esac
+          outputbase=$( basename "$outputfile" )
+          outputdir=$( dirname "$outputfile" )
+          outputmnt=$outputdir
+          outputmnt_as=$convdir/out
+          arg=$convdir/out/$outputbase
+        fi
+        ;;
+    esac
+    did_outputfile=1
+  fi
+  set -- "$@" "$arg"
+  n=$(( n + 1 ))
+done
 
-if [ $# = 0 ]
-then
-  echo "$cmd: missing final outputfile" >&2
-  badopts=1
-else
-  eval "outputfile=\$$#"
-  [ ! -e "$outputfile" ] || {
-    echo "$cmd: outputfile already exists: $outputfile" >&2
-    badopts=1
-  }
-fi
+[ "$did_minus_i" ] || { echo "$cmd: no -i inputfile option" >&2; badopts=1; }
+[ "$did_outputfile" ] || { echo "$cmd: no outputfile" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmpdir=$(pwd)/.ffmpeg-docker.$$
-inputbase=$( basename "$inputfile" )
-outputbase=$( basename "$outputfile" )
-outputdir=$( dirname "$outputfile" )
-
-mkdir "$tmpdir"
-ln "$inputfile" "$tmpdir/"
-
-convdir=/convert
 uid=$( id -u )
 gid=$( id -g )
 
-# rebuild the command line arguments to run in the container
-first=1
-n=1
-lastn=$#
-for arg
-do
-  if [ $first ]
-  then
-    set -- -i "$convdir/$inputbase"
-    first=
-  fi
-  [ $n = $lastn ] && break
-  set -- "$@" "$arg"
-  n=$(( n+1 ))
-done
-set -- "$@" "$convdir/$outputbase"
-
 set -x
-docker run --rm -it -v "$tmpdir:$convdir" --entrypoint=/usr/bin/s6-setuidgid
-  linuxserver/ffmpeg \
-  "$uid:$gid" \
-  /usr/local/bin/ffmpeg \
-  "$@" \
-&& mv "$tmpdir/$outputbase" "$outputdir/"
-xit=$?
-
-rm -r "$tmpdir"
-
-exit $xit
+exec docker run $runopts $run_it_opts \
+    --mount "type=bind,readonly,source=$inputmnt,destination=$inputmnt_as" \
+    --mount "type=bind,source=$outputmnt,destination=$outputmnt_as" \
+    -w "$convdir" \
+    --entrypoint=/usr/bin/s6-setuidgid \
+    "$image" \
+    "$uid:$gid" \
+    /usr/local/bin/ffmpeg \
+    "$@"
