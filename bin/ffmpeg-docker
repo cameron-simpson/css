@@ -7,13 +7,17 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd [input-opts...] -i inputfile [output-opts...] outputfile"
+usage="Usage: $cmd [--tm] [input-opts...] -i inputfile [output-opts...] outputfile"
 
+use_tmux=${FFMPEG_DOCKER_TMUX:-''}
 image=linuxserver/ffmpeg
 runopts=--rm
 ffopts=
 
 badopts=
+
+# run in a tmux session
+[ $# -gt 0 ] && [ "x$1" = x--tm ] && { use_tmux=1; shift; }
 
 # rebuild the command line arguments to run in the container
 convdir=/convert
@@ -33,7 +37,7 @@ do
       # inputfile argument following -i
       inputfile=$arg
       case "$inputfile" in
-        -) run_it_opts=-i inputmnt=/dev/null ;;
+        -) run_it_opts=-i inputmnt=/dev/null inputbase=- ;;
         *) if [ -t 0 ] && [ -t 1 ]
           then run_it_opts=-it
           else run_it_opts=
@@ -79,7 +83,7 @@ do
     # final argument, expect output file
     outputfile=$arg
     case "$outputfile" in
-      -) outputmnt=/dev/null ;;
+      -) outputmnt=/dev/null outputbase=- ;;
       -*)echo "$cmd: expected final argument to be \"-\" or a filename," \
                 "but seem to have an option: $outputfile" >&2
         badopts=1
@@ -119,8 +123,7 @@ done
 uid=$( id -u )
 gid=$( id -g )
 
-set -x
-exec docker run $runopts $run_it_opts \
+set -- docker run $runopts $run_it_opts \
     --mount "type=bind,readonly,source=$inputmnt,destination=$inputmnt_as" \
     --mount "type=bind,source=$outputmnt,destination=$outputmnt_as" \
     -w "$convdir" \
@@ -129,3 +132,12 @@ exec docker run $runopts $run_it_opts \
     "$uid:$gid" \
     /usr/local/bin/ffmpeg \
     "$@"
+
+if [ $use_tmux ]
+then
+  session_name=$( echo "FFMPEG $inputbase $outputbase $$" | tr -s ' .:' '___' )
+  set -- tm -x "$session_name" "$@"
+fi
+
+set -x
+exec "$@"
