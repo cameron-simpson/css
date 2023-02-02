@@ -130,7 +130,7 @@ class VTCmd(BaseCommand):
       'VT_CACHE_STORE_ENVVAR': VT_CACHE_STORE_ENVVAR,
       'DEFAULT_CONFIG_ENVVAR': DEFAULT_CONFIG_ENVVAR,
       'DEFAULT_CONFIG_PATH': DEFAULT_CONFIG_PATH,
-      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.HASHNAME,
+      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.hashname,
       'DEFAULT_HASHCLASS_ENVVAR': DEFAULT_HASHCLASS_ENVVAR,
   }
 
@@ -170,7 +170,7 @@ class VTCmd(BaseCommand):
     )
     options.dflt_log = os.environ.get(self.VT_LOGFILE_ENVVAR)
     options.hashname = os.environ.get(
-        self.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.HASHNAME
+        self.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname
     )
     options.show_progress = False
     options.status_label = self.cmd

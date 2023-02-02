@@ -159,7 +159,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
         val_s = str(val)
       params.append(attr + '=' + val_s)
     return "%s:%s(%s)" % (
-        self.__class__.__name__, self.hashclass.HASHNAME,
+        self.__class__.__name__, self.hashclass.hashname,
         ','.join([repr(self.name)] + params)
     )
 

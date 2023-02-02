@@ -43,13 +43,13 @@ class HasDotHashclassMixin:
   def hashenum(self):
     ''' The hashclass enum value.
     '''
-    return self.hashclass.HASHENUM
+    return self.hashclass.hashenum
 
   @property
   def hashname(self):
     ''' The name token for this hashclass.
     '''
-    return self.hashclass.HASHNAME
+    return self.hashclass.hashname
 
 class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
   ''' Binary transcription of hashcodes.
@@ -73,13 +73,13 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
     '''
     hashenum = BSUInt.parse_value(bfr)
     hashcls = HASHCLASS_BY_ENUM[hashenum]
-    return hashcls.from_hashbytes(bfr.take(hashcls.HASHLEN))
+    return hashcls.from_hashbytes(bfr.take(hashcls.hashlen))
 
   @staticmethod
   def transcribe_value(hashcode):
     ''' Serialise a hashcode.
     '''
-    yield BSUInt.transcribe_value(hashcode.HASHENUM)
+    yield BSUInt.transcribe_value(hashcode.hashenum)
     yield hashcode
 
 decode_buffer = HashCodeField.parse_value
@@ -140,7 +140,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
     return transcribe_s(self)
 
   def __repr__(self):
-    return ':'.join((self.HASHNAME, hexify(self)))
+    return ':'.join((self.hashname, hexify(self)))
 
   @property
   def hashclass(self):
@@ -152,7 +152,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   def bare_etag(self):
     ''' An HTTP ETag string (HTTP/1.1, RFC2616 3.11) without the quote marks.
     '''
-    return ':'.join((self.HASHNAME, hexify(self)))
+    return ':'.join((self.hashname, hexify(self)))
 
   @property
   def etag(self):
@@ -161,7 +161,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
     return '"' + self.bare_etag + '"'
 
   def __eq__(self, other):
-    return self.HASHENUM == other.HASHENUM and bytes.__eq__(self, other)
+    return self.hashenum == other.hashenum and bytes.__eq__(self, other)
 
   def __hash__(self):
     return bytes.__hash__(self)
@@ -189,9 +189,9 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   def from_hashbytes(cls, hashbytes):
     ''' Factory function returning a `HashCode` object from the hash bytes.
     '''
-    assert len(hashbytes) == cls.HASHLEN, (
+    assert len(hashbytes) == cls.hashlen, (
         "expected %d bytes, received %d: %r" %
-        (cls.HASHLEN, len(hashbytes), hashbytes)
+        (cls.hashlen, len(hashbytes), hashbytes)
     )
     return cls(hashbytes)
 
@@ -220,7 +220,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   def from_chunk(cls, chunk):
     ''' Factory function returning a HashCode object from a data block.
     '''
-    hashbytes = cls.HASHFUNC(chunk).digest()  # pylint: disable=not-callable
+    hashbytes = cls.hashfunc(chunk).digest()  # pylint: disable=not-callable
     return cls.from_hashbytes(hashbytes)
 
   @property
@@ -233,14 +233,14 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   def filename(self):
     ''' A file basename for files related to this hashcode: {hashcodehex}.{hashtypename}
     '''
-    return hexify(self) + '.' + self.HASHNAME
+    return hexify(self) + '.' + self.hashname
 
   @classmethod
   def from_filename(cls, filename):
     ''' Take a *hashcodehex*`.`*hashname* string
         and return a `HashCode` subclass instance.
 
-        If `cls` has a `.HASHNAME` attribute then that is taken as
+        If `cls` has a `.hashname` attribute then that is taken as
         a default if there is no `.`*hashname*.
     '''
     hexpart, ext = splitext(filename)
@@ -248,7 +248,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
       hashname = ext[1:]
     else:
       try:
-        hashname = cls.HASHNAME
+        hashname = cls.hashname
       except AttributeError as e:
         raise ValueError("no .hashname extension") from e
     hashclass = cls.by_index(hashname)
@@ -256,7 +256,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
     return hashclass.from_hashbytes(hashbytes)
 
   def transcribe_inner(self, T, fp):
-    fp.write(self.HASHNAME)
+    fp.write(self.hashname)
     fp.write(':')
     fp.write(hexify(self))
 
@@ -272,7 +272,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
     if offset >= len(s) or s[offset] != ':':
       raise ValueError("missing colon at offset %d" % (offset,))
     offset += 1
-    hexlen = hashclass.HASHLEN * 2
+    hexlen = hashclass.hashlen * 2
     hashtext = s[offset:offset + hexlen]
     if len(hashtext) != hexlen:
       raise ValueError(
@@ -329,7 +329,7 @@ class HashCodeUtilsMixin:
         which is based on the `hash_of_hashcodes` method.
     '''
     hashclass = self.hashclass
-    hashstate = hashclass.HASHFUNC()
+    hashstate = hashclass.hashfunc()
     for bs in bss:
       hashstate.update(bs)
     return hashclass.from_chunk(hashstate.digest())
