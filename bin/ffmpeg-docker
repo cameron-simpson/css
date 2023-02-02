@@ -6,8 +6,6 @@
 
 set -ue
 
-: "${TMPDIR:-/tmp}"
-
 cmd=$0
 usage="Usage: $cmd [input-opts...] -i inputfile [output-opts...] outputfile"
 
