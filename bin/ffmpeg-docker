@@ -50,6 +50,11 @@ do
             esac
             inputbase=$( basename "$inputfile" )
             inputmnt=$inputfile
+            case "$inputmnt" in
+              *,*)  echo "$cmd: inputfile path contains a comma, docker run hates it: $inputmnt" >&2
+                    badopts=1
+                    ;;
+            esac
             inputmnt_as=$convdir/in/$inputbase
             arg=$inputmnt_as
           fi
@@ -92,6 +97,11 @@ do
           outputbase=$( basename "$outputfile" )
           outputdir=$( dirname "$outputfile" )
           outputmnt=$outputdir
+          case "$outputmnt" in
+            *,*)  echo "$cmd: output directory contains a comma, docker run hates it: $outputmnt" >&2
+                  badopts=1
+                  ;;
+          esac
           outputmnt_as=$convdir/out
           arg=$convdir/out/$outputbase
         fi
