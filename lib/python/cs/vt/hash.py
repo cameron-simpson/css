@@ -4,17 +4,22 @@
 ''' Functions and classes around hashcodes.
 '''
 
+from abc import ABC
 from binascii import unhexlify
 from bisect import bisect_left
 from hashlib import sha1, sha256
 from os.path import splitext
 import sys
+
 from icontract import require
 from typeguard import typechecked
+
 from cs.binary import BSUInt, BinarySingleValue
 from cs.excutils import exc_fold
+from cs.hashutils import BaseHashCode
 from cs.lex import get_identifier, hexify
 from cs.resources import MultiOpenMixin
+
 from .pushpull import missing_hashcodes
 from .transcribe import Transcriber, transcribe_s, register as register_transcriber
 
@@ -75,6 +80,7 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
     hashcls = HASHCLASS_BY_ENUM[hashenum]
     return hashcls.from_hashbytes(bfr.take(hashcls.hashlen))
 
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(hashcode):
     ''' Serialise a hashcode.
@@ -85,41 +91,30 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
 decode_buffer = HashCodeField.parse_value
 decode = HashCodeField.parse_value_from_bytes
 
-class HashCode(bytes, Transcriber, HasDotHashclassMixin):
-  ''' All hashes are bytes subclasses.
+class HashCode(Transcriber, ABC):
+  ''' All hashes are `bytes` subclassed via `cs.hashutils.BaseHashCode`.
   '''
 
   __slots__ = ()
+
+  hashlen = None
 
   by_name = {}
   by_enum = {}
 
   @classmethod
   @typechecked
-  @require(lambda cls, hashname: hashname not in cls.by_name)
-  @require(lambda cls, hashenum: hashenum not in cls.by_enum)
-  def new_class(
-      cls, hashname: str, hashenum: int, *, hashfunc: callable, hashlen: int
-  ):
-    ''' Factory to create, register and return a new `HashCode` subclass.
-    '''
-
-    class hashclass(HashCode):
-      ''' `HashCode` subclass.
-      '''
-      __slots__ = ()
-      HASHNAME = hashname
-      HASHFUNC = hashfunc
-      HASHLEN = hashlen
-      HASHENUM = hashenum
-      HASHENUM_BS = bytes(BSUInt(hashenum))
-      HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
-
-    hashclass.__name__ = 'Hash_' + hashname.upper()
-    hashclass.__doc__ = f"HashCode(bytes) subclass for the {hashname} hash function."
-    cls.by_name[hashname] = hashclass
-    cls.by_enum[hashenum] = hashclass
-    return hashclass
+  def register(cls, hashenum: int):
+    hashname = cls.hashname
+    assert hashname not in cls.by_name
+    assert hashenum not in cls.by_enum
+    cls.hashenum = hashenum
+    cls.by_name[hashname] = cls
+    cls.by_enum[hashenum] = cls
+    # precompute serialisation of the enum
+    cls.hashenum_bs = bytes(BSUInt(hashenum))
+    # precompute the length of the serialisation of a hashcode
+    cls.hashlen_encoded = len(cls.hashenum_bs) + cls.hashlen
 
   @classmethod
   def by_index(cls, index):
@@ -141,12 +136,6 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
 
   def __repr__(self):
     return ':'.join((self.hashname, hexify(self)))
-
-  @property
-  def hashclass(self):
-    ''' The hash class is our own type.
-    '''
-    return type(self)
 
   @property
   def bare_etag(self):
@@ -211,9 +200,8 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
     try:
       hashclass = HASHCLASS_BY_NAME[hashname.lower()]
     except KeyError:
-      raise ValueError(
-          "unknown hashclass name %r" % (hashname,)
-      )  # pylint: raise-missing-from
+      # pylint: disable=raise-missing-from
+      raise ValueError("unknown hashclass name %r" % (hashname,))
     return hashclass.from_hashbytes_hex(hashtext)
 
   @classmethod
@@ -292,10 +280,17 @@ HASHCLASS_BY_ENUM = HashCode.by_enum
 HASH_SHA1_T = 0
 HASH_SHA256_T = 1
 
-Hash_SHA1 = HashCode.new_class('sha1', HASH_SHA1_T, hashfunc=sha1, hashlen=20)
-Hash_SHA256 = HashCode.new_class(
-    'sha256', HASH_SHA256_T, hashfunc=sha256, hashlen=32
-)
+# pylint: disable=missing-class-docstring
+class Hash_SHA1(HashCode, BaseHashCode, hashfunc=sha1):
+  __slots__ = ()
+
+Hash_SHA1.register(HASH_SHA1_T)
+
+# pylint: disable=missing-class-docstring
+class Hash_SHA256(HashCode, BaseHashCode, hashfunc=sha256):
+  __slots__ = ()
+
+Hash_SHA256.register(HASH_SHA256_T)
 
 DEFAULT_HASHCLASS = Hash_SHA1
 
