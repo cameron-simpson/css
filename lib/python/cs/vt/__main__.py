@@ -232,8 +232,8 @@ class VTCmd(BaseCommand):
     ''' Set up and tear down the surrounding context.
     '''
     with super().run_context():
-      options = self.options
       cmd = self.cmd
+      options = self.options
       config = options.config
       show_progress = options.show_progress
       with stackattrs(common, config=config):
