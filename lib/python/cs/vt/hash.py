@@ -281,13 +281,13 @@ HASH_SHA1_T = 0
 HASH_SHA256_T = 1
 
 # pylint: disable=missing-class-docstring
-class Hash_SHA1(HashCode, BaseHashCode, hashfunc=sha1):
+class Hash_SHA1(HashCode, BaseHashCode, hashfunc=sha1, hashname='sha1'):
   __slots__ = ()
 
 Hash_SHA1.register(HASH_SHA1_T)
 
 # pylint: disable=missing-class-docstring
-class Hash_SHA256(HashCode, BaseHashCode, hashfunc=sha256):
+class Hash_SHA256(HashCode, BaseHashCode, hashfunc=sha256, hashname='sha256'):
   __slots__ = ()
 
 Hash_SHA256.register(HASH_SHA256_T)
