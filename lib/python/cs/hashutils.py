@@ -15,7 +15,7 @@ class BaseHashCode(bytes):
 
   __slots__ = ()
 
-  def __init_subclass__(cls, /, hashfunc, hashname=None, **kw):
+  def __init_subclass__(cls, *, hashfunc, hashname=None, **kw):
     super().__init_subclass__(**kw)
     if hashname is None:
       hashname = cls.__name__.lower()
