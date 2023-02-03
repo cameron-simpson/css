@@ -75,6 +75,7 @@ from types import SimpleNamespace
 from typing import List, Union
 
 from cs.buffer import CornuCopyBuffer
+from cs.deco import promote
 from cs.gimmicks import warning, debug
 from cs.lex import cropped, cropped_repr, typed_str as s
 from cs.pfx import Pfx, pfx_method, pfx_call
@@ -327,12 +328,15 @@ class BinaryMixin:
   __len__ = transcribed_length
 
   @classmethod
-  def scan(cls, bfr, count=None, min_count=None, max_count=None):
+  @promote
+  def scan(
+      cls, bfr: CornuCopyBuffer, count=None, min_count=None, max_count=None
+  ):
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
         until end of input and yield them.
 
         Parameters:
-        * `bfr`: the buffer to scan
+        * `bfr`: the buffer to scan, or any object suitable for `CornuCopyBuffer.promote`
         * `count`: the required number of instances to scan,
           equivalent to setting `min_count=count` and `max_count=count`
         * `min_count`: the minimum number of instances to scan
