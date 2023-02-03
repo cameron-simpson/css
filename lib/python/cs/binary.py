@@ -77,7 +77,7 @@ from typing import List, Union
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.gimmicks import warning, debug
-from cs.lex import cropped, cropped_repr, typed_str as s
+from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
@@ -92,6 +92,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.buffer',
+        'cs.deco',
         'cs.gimmicks',
         'cs.lex',
         'cs.pfx',
@@ -185,6 +186,7 @@ def pt_spec(pt, name=None):
     f_transcribe_value = pt.transcribe_value
   except AttributeError:
     if isinstance(pt, int):
+      # pylint: disable=unnecessary-lambda-assignment
       f_parse_value = lambda bfr: bfr.take(pt)
       f_transcribe_value = lambda value: value
     else:
@@ -488,8 +490,8 @@ class BinaryMixin:
     '''
     if isinstance(f, str):
       filename = f
-      with pfx_call(open, filename, 'wb') as f:
-        return self.save(f)
+      with pfx_call(open, filename, 'wb') as f2:
+        return self.save(f2)
     length = 0
     for bs in self.transcribe_flat():
       while bs:
@@ -560,6 +562,7 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
     if attr_names is None:
       attr_names = sorted(self.__dict__.keys())
     if attr_choose is None:
+      # pylint: disable=unnecessary-lambda-assignment
       attr_choose = lambda attr: not attr.startswith('_')
     return "%s(%s)" % (
         type(self).__name__, ','.join(
@@ -1137,7 +1140,7 @@ class BSString(BinarySingleValue):
       bs = bs.tobytes()
     return bs.decode(encoding=encoding, errors=errors)
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   @staticmethod
   def transcribe_value(s, encoding='utf-8'):
     ''' Transcribe a string.
