@@ -570,7 +570,7 @@ class Upd(SingletonMixin):
       try:
         oldtxt = slots[slot]
       except IndexError as e:
-        warning("%s.out(slot=%d): %s, ignoring %r", self, slot, e, txt)
+        ##debug("%s.out(slot=%d): %s, ignoring %r", self, slot, e, txt)
         return ''
       if self._disabled or self._backend is None:
         slots[slot] = txt
@@ -863,7 +863,7 @@ class Upd(SingletonMixin):
       if len(slots) == 0 and index == 0:
         return None
       if index < 0 or index >= len(slots):
-        warning("Upd.delete(index=%d): index out of range, ignored", index)
+        ##debug("Upd.delete(index=%d): index out of range, ignored", index)
         return None
       if len(slots) == 1:
         # silently do not delete
