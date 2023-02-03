@@ -93,12 +93,16 @@ def merge(
             targetf = target.get(filename)
             if targetf is None:
               # new file
-              if isinstance(target, Dir) and isinstance(sourcef, FileDirent):
-                # create FileDirent from block
-                target[filename] = FileDirent(sourcef.block)
-              else:
-                # copy data
-                targetf = target.file_fromchunks(filename, sourcef.datafrom())
+              if isinstance(target, Dir):
+                # we can put a file in target
+                if isinstance(sourcef, FileDirent):
+                  # create FileDirent from block
+                  target[filename] = FileDirent(sourcef.block)
+                else:
+                  # copy data
+                  targetf = target.file_fromchunks(
+                      filename, sourcef.datafrom()
+                  )
             else:
               warning("conflicting target file")
               ok = False
