@@ -805,7 +805,7 @@ def default_params(func, _strict=False, **param_defaults):
 
 @decorator
 def promote(func, params=None, types=None):
-  ''' A decorator to promote argument values automaticaly in annotated functions.
+  ''' A decorator to promote argument values automaticly in annotated functions.
       For any parameter with a type annotation, if that type has a
       `.promote(value)` method and the function is called with a
       value not of the type of the annotation, the `.promote` method
@@ -829,6 +829,18 @@ def promote(func, params=None, types=None):
           ...
           >>> f([1,2,3], epoch=12.0)
           epoch = <class 'cs.timeseries.Epoch'> Epoch(start=0, step=12)
+
+      A typical `promote(cls, obj)` method looks like this:
+
+          @classmethod
+          def promote(cls, obj):
+              if isinstance(obj, cls):
+                  return obj
+              ... recognise various types ...
+              ... and return a suitable instance of cls ...
+              raise TypeError(
+                  "%s.promote: cannot promote %s:%r",
+                  cls.__name__, obj.__class__.__name__, obj)
 
       *Note*: one issue with this is due to the conflict in name
       between this decorator and the method it looks for in a class.
