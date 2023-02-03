@@ -164,7 +164,7 @@ class VTCmd(BaseCommand):
     except AttributeError:
       options.verbose = False
     options.config_map = None
-    options.store_spec = None
+    options.store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
     options.cache_store_spec = os.environ.get(
         self.VT_CACHE_STORE_ENVVAR, '[cache]'
     )
@@ -181,10 +181,7 @@ class VTCmd(BaseCommand):
     options = self.options
     for opt, val in opts:
       if opt == '-C':
-        if val == 'NONE':
-          options.cache_store_spec = None
-        else:
-          options.cache_store_spec = val
+        options.cache_store_spec = val
       elif opt == '-S':
         # specify Store
         options.store_spec = val
@@ -260,7 +257,7 @@ class VTCmd(BaseCommand):
               except Exception as e:
                 exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
                 raise GetoptError(f"unusable Store specification: {e}") from e
-            if options.cache_store_spec is None:
+            if options.cache_store_spec == 'NONE':
               cacheS = None
             else:
               with Pfx("-C %r", options.cache_store_spec):
