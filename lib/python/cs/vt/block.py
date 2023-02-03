@@ -590,7 +590,9 @@ class HashCodeBlock(_Block):
 
   transcribe_prefix = 'B'
 
-  def __init__(self, hashcode=None, data=None, added=False, span=None, **kw):
+  def __init__(
+      self, *, hashcode=None, data=None, added=False, span=None, **kw
+  ):
     ''' Initialise a `BT_HASHCODE` Block.
 
         A `HashCodeBlock` always stores its hashcode directly.
