@@ -77,6 +77,7 @@ def merge(
         else:
           warning("conflicting item in target: not a directory")
           ok = False
+          continue
         # import files
         for filename in filenames:
           with Pfx(filename):
