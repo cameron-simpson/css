@@ -219,7 +219,7 @@ class LateFunction(Result):
       TODO: .cancel(), timeout for wait().
   '''
 
-  def __init__(self, func, name=None, retry_delay=None, no_context=False):
+  def __init__(self, func, name=None, retry_delay=None, thread_states=None):
     ''' Initialise a `LateFunction`.
 
         Parameters:
@@ -227,6 +227,7 @@ class LateFunction(Result):
         * `name`, if supplied, specifies an identifying name for the `LateFunction`.
         * `retry_local`: time delay before retry of this function on RetryError.
           Default from `later.retry_delay`.
+        * `thread_states`: optional thread states passed to `HasThreadState.Thread`
     '''
     Result.__init__(self)
     self.func = func
@@ -237,8 +238,11 @@ class LateFunction(Result):
     self.name = name
     self.retry_delay = retry_delay
     # we prepare the Thread now in order to honour the perThread states
-    self.thread = (builtin_Thread if no_context else HasThreadState.Thread
-                   )(name=name, target=partial(self.run_func, func))
+    self.thread = HasThreadState.Thread(
+        name=name,
+        target=partial(self.run_func, func),
+        thread_states=thread_states,
+    )
 
   def __str__(self):
     return "%s[%s]" % (type(self).__name__, self.name)
@@ -379,7 +383,9 @@ class Later(MultiOpenMixin, HasThreadState):
         #   finished_event Event
         # queue final action to mark activity completion
         self.defer(
-            dict(no_context=True), self.finished_event.set, _force_submit=True
+            dict(thread_states=False),
+            self.finished_event.set,
+            _force_submit=True,
         )
         if self._timerQ:
           self._timerQ.close()
@@ -606,7 +612,7 @@ class Later(MultiOpenMixin, HasThreadState):
       pfx=None,  # pylint: disable=redefined-outer-name
       LF=None,
       retry_delay=None,
-      no_context=False,
+      thread_states=None,
   ):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding `LateFunction` for result collection.
@@ -641,7 +647,10 @@ class Later(MultiOpenMixin, HasThreadState):
       func = pfx.partial(func)
     if LF is None:
       LF = LateFunction(
-          func, name=name, retry_delay=retry_delay, no_context=no_context
+          func,
+          name=name,
+          retry_delay=retry_delay,
+          thread_states=thread_states
       )
     pri_entry = list(priority)
     pri_entry.append(seq())  # ensure FIFO servicing of equal priorities
