@@ -28,7 +28,9 @@ from cs.pfx import Pfx, pfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.py.func import prop
 from cs.queues import Channel, IterableQueue, QueueIterator
-from cs.resources import MultiOpenMixin, openif, RunStateMixin, RunState
+from cs.resources import (
+    MultiOpenMixin, openif, RunStateMixin, RunState, uses_runstate
+)
 from cs.result import report, bg as bg_result
 from cs.seq import Seq
 from cs.threads import bg as bg_thread, HasThreadState, State as ThreadState
@@ -101,9 +103,10 @@ class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
 
   basicstore_perthread_state = ThreadState()
 
+  @uses_runstate
   @pfx_method
   @fmtdoc
-  def __init__(self, name, capacity=None, hashclass=None, runstate=None):
+  def __init__(self, name, capacity=None, hashclass=None, runstate: RunState):
     ''' Initialise the Store.
 
         Parameters:
@@ -129,8 +132,6 @@ class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
     assert issubclass(hashclass, HashCode)
     if capacity is None:
       capacity = 4
-    if runstate is None:
-      runstate = RunState(name)
     RunStateMixin.__init__(self, runstate=runstate)
     self._str_attrs = {}
     self.name = name
