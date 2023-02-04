@@ -13,19 +13,21 @@ from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
-from cs.upd import state as upd_state
+from cs.upd import Upd, uses_upd, print
 
 from . import defaults
 from .dir import Dir, FileDirent
 from .paths import DirLike, OSDir
 
 @uses_runstate
+@uses_upd
 @typechecked
 def merge(
     target_root: DirLike,
     source_root: DirLike,
     *,
     runstate: RunState,
+    upd: Upd,
 ):
   ''' Merge contents of the DirLike `source_root`
       into the DirLike `target_root`.
@@ -44,7 +46,7 @@ def merge(
   if not target_root.exists():
     target_root.create()
   if defaults.show_progress:
-    proxy_cmgr = upd_state.upd.insert(1)
+    proxy_cmgr = upd.insert(1)
   else:
     proxy_cmgr = nullcontext()
   with proxy_cmgr as proxy:
