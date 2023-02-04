@@ -5,18 +5,19 @@
 '''
 
 from contextlib import nullcontext
-from os.path import basename, dirname
+from os.path import basename, dirname, exists as existspath
 
 from typeguard import typechecked
 
+from cs.lex import r
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.upd import state as upd_state
 
 from . import defaults
 from .dir import Dir, FileDirent
-from .paths import DirLike
+from .paths import DirLike, OSDir
 
 @uses_runstate
 @typechecked
@@ -103,6 +104,17 @@ def merge(
                   targetf = target.file_fromchunks(
                       filename, sourcef.datafrom()
                   )
+              elif isinstance(target, OSDir):
+                filepath = target.pathto(filename)
+                assert not existspath(filepath)
+                with pfx_call(open, filepath, 'wb') as f:
+                  for bs in sourcef.datafrom():
+                    assert f.write(bs) == len(bs)
+              else:
+                raise RuntimeError(
+                    "do not know how to write a file to %s[filename=%r]" %
+                    (r(target), filename)
+                )
             else:
               warning("conflicting target file")
               ok = False
