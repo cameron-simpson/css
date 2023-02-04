@@ -806,6 +806,7 @@ def default_params(func, _strict=False, **param_defaults):
 @decorator
 def promote(func, params=None, types=None):
   ''' A decorator to promote argument values automaticly in annotated functions.
+
       For any parameter with a type annotation, if that type has a
       `.promote(value)` method and the function is called with a
       value not of the type of the annotation, the `.promote` method
@@ -886,12 +887,14 @@ def promote(func, params=None, types=None):
     if annotation is Parameter.empty:
       continue
     # recognise optional parameters and use their primary type
+    optional = False
     if param.default is not Parameter.empty:
       anno_origin = typing.get_origin(annotation)
       anno_args = typing.get_args(annotation)
       if (anno_origin is typing.Union and len(anno_args) == 2
           and anno_args[-1] is type(None)):
         annotation, _ = anno_args
+        optional = True
     if types is not None and annotation not in types:
       continue
     try:
@@ -900,7 +903,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (annotation, promote_method)
+    promotions[param_name] = (annotation, promote_method, optional)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -908,12 +911,18 @@ def promote(func, params=None, types=None):
   def promoting_func(*a, **kw):
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
-    for param_name, (annotation, promote_method) in promotions.items():
+    for param_name, (annotation, promote_method,
+                     optional) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
+        # parameter not supplied
         continue
-      if isinstance(param_name, annotation):
+      if optional and arg_value is None:
+        # skip omitted optional value
+        continue
+      if isinstance(arg_value, annotation):
+        # already of the desired type
         continue
       arg_value = promote_method(arg_value)
       arg_mapping[param_name] = arg_value
