@@ -92,7 +92,7 @@ class HasThreadState(ContextManagerMixin):
   '''
 
   _HasThreadState_lock = Lock()
-  classes = set()
+  _HasThreadState_classes = set()
 
   # the default name for the Thread state attribute
   THREAD_STATE_ATTR = 'state'
@@ -106,11 +106,11 @@ class HasThreadState(ContextManagerMixin):
   def __enter_exit__(self):
     ''' Push `self.state.current=self` as the `Thread` local current instance.
 
-        Include `self.__class__` in `HasThreadState.classes` for the duration.
+        Include `self.__class__` in the set of currently active classes for the duration.
     '''
     cls = self.__class__
     with cls._HasThreadState_lock:
-      stacked = stackset(cls.classes, cls)
+      stacked = stackset(cls._HasThreadState_classes, cls)
     with stacked:
       state = getattr(cls, cls.THREAD_STATE_ATTR)
       with state(current=self):
@@ -125,7 +125,7 @@ class HasThreadState(ContextManagerMixin):
     with cls._HasThreadState_lock:
       currency = {
           htscls: getattr(htscls, htscls.THREAD_STATE_ATTR).current
-          for htscls in cls.classes
+          for htscls in cls._HasThreadState_classes
       }
 
     if currency:
