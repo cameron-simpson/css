@@ -84,6 +84,7 @@ class State(thread_local):
     with stackattrs(self, **kw) as prev_attrs:
       yield prev_attrs
 
+# TODO: what to do about overlapping HasThreadState usage of a particular class?
 class HasThreadState(ContextManagerMixin):
   ''' A mixin for classes with a `cs.threads.State` instance as `.state`
       providing a context manager which pushes `current=self` onto that state
