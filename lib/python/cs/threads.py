@@ -14,6 +14,7 @@ from heapq import heappush, heappop
 from inspect import ismethod
 import sys
 from threading import Semaphore, Thread as builtin_Thread, Lock, local as thread_local
+from typing import Any, Mapping, Optional
 
 from cs.context import ContextManagerMixin, stackattrs, stackset
 from cs.deco import decorator
@@ -31,7 +32,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -118,32 +118,70 @@ class HasThreadState(ContextManagerMixin):
         yield
 
   @classmethod
-  def Thread(cls, *Thread_a, target, **Thread_kw):
-    ''' Factory for a `Thread` to push the `.current` state for the
-        currently active classes.
+  def thread_states(cls):
+    ''' Return a mapping of `class`->*current_instance*`
+        for use with `HasThreadState.with_thread_states`.
     '''
-    # snapshot the .current states in the source Thread
     with cls._HasThreadState_lock:
       currency = {
           htscls: getattr(htscls, htscls.THREAD_STATE_ATTR).current
           for htscls in cls._HasThreadState_classes
       }
+    return currency
 
-    if currency:
+  @classmethod
+  @contextmanager
+  def with_thread_states(
+      cls, thread_states: Optional[Mapping[type, Any]] = None
+  ):
+    ''' Context manager to push all the current objects from `thread_states`
+        by calling each as a context manager.
+
+        The default `thread_states` comes from `HasThreadState.thread_states()`.
+    '''
+    if thread_states is None:
+      thread_states = cls.thread_states()
+    if not thread_states:
+      yield
+    else:
+      state_iter = iter(list(thread_states.items()))
+
+      def with_thread_states_pusher():
+        try:
+          htscls, htsobj = next(state_iter)
+        except StopIteration:
+          yield
+        else:
+          with htsobj:
+            yield from with_thread_states_pusher()
+
+      yield from with_thread_states_pusher()
+
+  @classmethod
+  def Thread(cls, *Thread_a, target, thread_states=None, **Thread_kw):
+    ''' Factory for a `Thread` to push the `.current` state for the
+        currently active classes.
+
+        The optional parameter `thread_states`
+        may be used to pass an explicit mapping of thread states to use;
+        the default states come from `HasThreadState.thread_states()`.
+        A boolean value may also be passed meaning:
+        * `False`: do not apply any thread states
+        * `True`: apply the default thread states
+    '''
+    # snapshot the .current states in the source Thread
+    if thread_states is None or thread_states is True:
+      thread_states = cls.thread_states()
+    if thread_states:
 
       def target_wrapper(*a, **kw):
         ''' Wrapper for the `Thread.target` to push the source `.current`
             states in the new Thread before running the target.
         '''
-        if currency:
-          htscls = next(iter(currency.keys()))
-          current = currency.pop(htscls)
-          assert isinstance(current, htscls)
-          with current:
-            return target_wrapper(*a, **kw)
-        return target(*a, **kw)
+        with cls.with_thread_states(thread_states):
+          return target(*a, **kw)
     else:
-      # no state to prepare, eshew the wrapper
+      # no state to prepare, eschew the wrapper
       target_wrapper = target
 
     return builtin_Thread(*Thread_a, target=target_wrapper, **Thread_kw)
@@ -153,9 +191,9 @@ def bg(
     func,
     daemon=None,
     name=None,
-    no_context=False,
     no_start=False,
     no_logexc=False,
+    thread_states=None,
     args=None,
     kwargs=None
 ):
@@ -167,12 +205,10 @@ def bg(
       * `daemon`: optional argument specifying the `.daemon` attribute.
       * `name`: optional argument specifying the `Thread` name,
         default: the name of `func`.
-      * `no_context`: if true (default `False`) prepare the `Thread`
-        with `threading.Thread` instead of `HasThreadState.Thread`,
-        bypassing the `HasThreadState` context setup
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
+      * `thread_states`: passed to `HasThreadState.Thread`
       * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
@@ -189,8 +225,11 @@ def bg(
     with Pfx(thread_prefix):
       return func(*args, **kwargs)
 
-  T = (builtin_Thread if no_context else HasThreadState.Thread
-       )(name=thread_prefix, target=thread_body)
+  T = HasThreadState.Thread(
+      name=thread_prefix,
+      target=thread_body,
+      thread_states=thread_states,
+  )
   if not no_logexc:
     func = logexc(func)
   if daemon is not None:
