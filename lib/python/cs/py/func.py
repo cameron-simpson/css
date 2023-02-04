@@ -166,6 +166,8 @@ def trace(
             log_cite,
             (pformat if use_pformat else repr)(result),
         )
+      else:
+        xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
       _trace_indent = old_indent
       return result
 
