@@ -91,6 +91,7 @@ class HasThreadState(ContextManagerMixin):
       as the default instance of that class.
   '''
 
+  _HasThreadState_lock = Lock()
   classes = set()
 
   # the default name for the Thread state attribute
@@ -108,7 +109,9 @@ class HasThreadState(ContextManagerMixin):
         Include `self.__class__` in `HasThreadState.classes` for the duration.
     '''
     cls = self.__class__
-    with stackset(cls.classes, cls):
+    with cls._HasThreadState_lock:
+      stacked = stackset(cls.classes, cls)
+    with stacked:
       state = getattr(cls, cls.THREAD_STATE_ATTR)
       with state(current=self):
         yield
@@ -119,10 +122,11 @@ class HasThreadState(ContextManagerMixin):
         currently active classes.
     '''
     # snapshot the .current states in the source Thread
-    currency = {
-        htscls: getattr(htscls, htscls.THREAD_STATE_ATTR).current
-        for htscls in cls.classes
-    }
+    with cls._HasThreadState_lock:
+      currency = {
+          htscls: getattr(htscls, htscls.THREAD_STATE_ATTR).current
+          for htscls in cls.classes
+      }
 
     if currency:
 
