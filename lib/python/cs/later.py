@@ -30,6 +30,7 @@ so to collect the result you just call the `LateFunction`.
 '''
 
 from __future__ import print_function
+
 from contextlib import contextmanager
 from functools import partial
 from heapq import heappush, heappop
@@ -237,7 +238,7 @@ class LateFunction(Result):
     self.retry_delay = retry_delay
     # we prepare the Thread now in order to honour the perThread states
     self.thread = (builtin_Thread if no_context else HasThreadState.Thread
-                   )(name=name, target=func)
+                   )(name=name, target=partial(self.run_func, func))
 
   def __str__(self):
     return "%s[%s]" % (type(self).__name__, self.name)
@@ -254,7 +255,9 @@ class LateFunction(Result):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    return self.thread.start()
+    T = self.thread
+    T.start()
+    return T
 
   @OBSOLETE
   def wait(self):
