@@ -742,16 +742,16 @@ class RunStateMixin(object):
       Provides: `.runstate`, `.cancelled`, `.running`, `.stopping`, `.stopped`.
   '''
 
-  def __init__(self, runstate=None):
+  @uses_runstate
+  def __init__(self, runstate: RunState):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
         Parameters:
         * `runstate`: optional `RunState` instance or name.
           If a `str`, a new `RunState` with that name is allocated.
+          If omitted, the default `RunState` is used.
     '''
-    if runstate is None:
-      runstate = RunState(type(self).__name__)
-    elif isinstance(runstate, str):
+    if isinstance(runstate, str):
       runstate = RunState(runstate)
     self.runstate = runstate
 
