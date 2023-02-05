@@ -926,52 +926,46 @@ class Upd(SingletonMixin):
       self,
       label: str,
       report_print=False,
-      runstate=None,
-      tick_delay=0.3,
+      tick_delay: int = 0.3,
       tick_chars='|/-\\',
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
         It yields the proxy.
     '''
-    if tick_delay is not None:
-      if tick_delay <= 0:
-        raise ValueError(
-            "run_task(%r,...,tick_delay=%s): tick_delay should be >0" %
-            (label, tick_delay)
-        )
-
-      def _ticker(proxy, runstate):
-        i = 0
-        while not runstate.cancelled:
-          proxy.suffix = ' ' + tick_chars[i % len(tick_chars)]
-          i += 1
-          time.sleep(tick_delay)
-
-    _runstate = None
+    if tick_delay < 0:
+      raise ValueError(
+          "run_task(%r,...,tick_delay=%s): tick_delay should be >=0" %
+          (label, tick_delay)
+      )
     with self.insert(1, label + ' ') as proxy:
-      if tick_delay is not None:
+      ticker_runstate = None
+      if tick_delay > 0:
         from cs.resources import RunState  # pylint: disable=import-outside-toplevel
-        _runstate = runstate or RunState()
-        Thread(target=_ticker, args=(proxy, _runstate), daemon=True).start()
+        ticker_runstate = RunState()
+
+        def _ticker():
+          i = 0
+          while not ticker_runstate.cancelled:
+            proxy.suffix = ' ' + tick_chars[i % len(tick_chars)]
+            i += 1
+            time.sleep(tick_delay)
+
+        Thread(target=_ticker, daemon=True).start()
       proxy.text = '...'
       start_time = time.time()
-      with _runstate:
-        try:
-          yield proxy
-        finally:
-          end_time = time.time()
-          if _runstate and _runstate is not runstate:
-            # shut down the ticker
-            _runstate.cancel()
+      try:
+        yield proxy
+      finally:
+        end_time = time.time()
+        if ticker_runstate:
+          # shut down the ticker
+          ticker_runstate.cancel()
     elapsed_time = end_time - start_time
     if report_print:
       if isinstance(report_print, bool):
         report_print = print
       report_print(
-          label + (
-              ': (cancelled)'
-              if runstate is not None and runstate.cancelled else ':'
-          ), 'in',
+          label + ': in',
           transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
       )
 
