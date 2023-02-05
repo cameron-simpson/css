@@ -75,7 +75,7 @@ from types import SimpleNamespace
 from typing import List, Union
 
 from cs.buffer import CornuCopyBuffer
-from cs.deco import promote
+from cs.deco import OBSOLETE, promote
 from cs.gimmicks import warning, debug
 from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx_method, pfx_call
@@ -332,7 +332,12 @@ class BinaryMixin:
   @classmethod
   @promote
   def scan(
-      cls, bfr: CornuCopyBuffer, count=None, min_count=None, max_count=None
+      cls,
+      bfr: CornuCopyBuffer,
+      count=None,
+      min_count=None,
+      max_count=None,
+      with_offsets=False,
   ):
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
         until end of input and yield them.
@@ -343,6 +348,8 @@ class BinaryMixin:
           equivalent to setting `min_count=count` and `max_count=count`
         * `min_count`: the minimum number of instances to scan
         * `max_count`: the maximum number of instances to scan
+        * `with_offsets`: optional flag, default `False`;
+          if true yield `(pre_offset,obj,post_offset)`, otherwise just `obj`
         It is in error to specify both `count` and one of `min_count` or `max_count`.
 
         Scanning stops after `max_count` instances (if specified).
@@ -386,7 +393,12 @@ class BinaryMixin:
         min_count = max_count = count
       scanned = 0
       while (max_count is None or scanned < max_count) and not bfr.at_eof():
-        yield cls.parse(bfr)
+        pre_offset = bfr.offset
+        obj = cls.parse(bfr)
+        if with_offsets:
+          yield pre_offset, obj, bfr.offset
+        else:
+          yield obj
         scanned += 1
       if min_count is not None and scanned < min_count:
         warning(
@@ -395,24 +407,31 @@ class BinaryMixin:
         )
 
   @classmethod
+  @OBSOLETE(suggestion="BinaryMixin.scan")
   def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
     ''' Wrapper for `scan()` which yields `(pre_offset,instance,post_offset)`
         indicating the start and end offsets of the yielded instances.
         All parameters are as for `scan()`.
+
+        *Deprecated; please just call `scan` with the `with_offsets=True` parameter.
     '''
-    pre_offset = bfr.offset
-    for instance in cls.scan(bfr, count=count, min_count=min_count,
-                             max_count=max_count):
-      post_offset = bfr.offset
-      yield pre_offset, instance, post_offset
-      pre_offset = post_offset
+    return cls.scan(
+        bfr,
+        count=count,
+        min_count=min_count,
+        max_count=max_count,
+        with_offsets=True
+    )
 
   @classmethod
+  @OBSOLETE(suggestion="BinaryMixin.scan")
   def scan_fspath(cls, fspath: str, *, with_offsets=False, **kw):
     ''' Open the file with filesystenm path `fspath` for read
         and yield from `self.scan(..,**kw)` or
         `self.scan_with_offsets(..,**kw)` according to the
         `with_offsets` parameter.
+
+        *Deprecated; please just call `scan` with a filesystem pathname.
 
         Parameters:
         * `fspath`: the filesystem path of the file to scan
