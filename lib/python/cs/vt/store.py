@@ -106,7 +106,9 @@ class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
   @uses_runstate
   @pfx_method
   @fmtdoc
-  def __init__(self, name, capacity=None, hashclass=None, runstate: RunState):
+  def __init__(
+      self, name, *, capacity=None, hashclass=None, runstate: RunState
+  ):
     ''' Initialise the Store.
 
         Parameters:
