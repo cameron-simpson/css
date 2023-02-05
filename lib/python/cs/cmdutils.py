@@ -18,7 +18,7 @@ from os.path import basename
 from signal import SIGHUP, SIGINT, SIGTERM
 import sys
 from types import SimpleNamespace
-from typing import List
+from typing import List, Optional
 
 from cs.context import stackattrs
 from cs.gimmicks import nullcontext
@@ -33,7 +33,7 @@ from cs.lex import (
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
-from cs.resources import RunState
+from cs.resources import RunState, uses_runstate
 
 __version__ = '20221228-post'
 
@@ -41,7 +41,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -372,7 +371,16 @@ class BaseCommand:
     cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
+  @uses_runstate
+  def __init__(
+      self,
+      argv=None,
+      *,
+      cmd=None,
+      options=None,
+      runstate: Optional[RunState],
+      **kw_options
+  ):
     ''' Initialise the command line.
         Raises `GetoptError` for unrecognised options.
 
@@ -448,8 +456,11 @@ class BaseCommand:
         argv0 = cmd
     if cmd is None:
       cmd = basename(argv0)
+    if runstate is None:
+      runstate = RunState(cmd)
     self.cmd = cmd
     options = self.options = self.OPTIONS_CLASS()
+    options.runstate = runstate
     options.runstate_signals = self.DEFAULT_SIGNALS
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
@@ -996,7 +1007,7 @@ class BaseCommand:
 
         Any keyword arguments are used to override `self.options` attributes
         for the duration of the run,
-        for example to presupply a shared `RunState` from an outer context.
+        for example to presupply a shared `Upd` from an outer context.
 
         If the first command line argument *foo*
         has a corresponding method `cmd_`*foo*
@@ -1088,25 +1099,24 @@ class BaseCommand:
     # redundant try/finally to remind subclassers of correct structure
     try:
       options = self.options
-      try:
-        runstate = options.runstate
-      except AttributeError:
-        runstate = RunState(
-            self.cmd,
-            signals=options.runstate_signals,
-            handle_signal=getattr(self, 'handle_signal', None),
-        )
+      runstate = options.runstate
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with upd_context:
         with stackattrs(self, cmd=self._subcmd or self.cmd):
           with stackattrs(
               options,
-              runstate=runstate,
               upd=upd,
           ):
-            with options.runstate:
-              yield
+            # pylint: disable=protected-access
+            with stackattrs(
+                runstate,
+                _signals=tuple(options.runstate_signals),
+                _sighandler=getattr(self, 'handle_signal',
+                                    runstate._sighandler),
+            ):
+              with runstate:
+                yield
     finally:
       pass
 
