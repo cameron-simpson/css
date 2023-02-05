@@ -931,8 +931,9 @@ class CornuCopyBuffer(object):
 
         Promotes:
         * `int`: assumed to be a file descriptor of a file open for binary read
-        * `str`: assed to the a filesystem pathname
+        * `str`: assumed to be a filesystem pathname
         * `bytes` and `bytes`like objects: data
+        * iterable: assumed to be an iterable of `bytes`like objects
     '''
     if isinstance(obj, cls):
       return obj
