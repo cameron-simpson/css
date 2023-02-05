@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Single line status updates.
 #   - Cameron Simpson <cs@cskk.id.au>
@@ -65,7 +65,6 @@ The constructor has an optional parameter `disabled` to override
 this default behaviour.
 '''
 
-from __future__ import with_statement, print_function
 import atexit
 from builtins import print as builtin_print
 from contextlib import contextmanager
@@ -87,8 +86,8 @@ from cs.units import transcribe, TIME_SCALE
 
 try:
   import curses
-except ImportError as e:
-  warning("cannot import curses: %s", e)
+except ImportError as curses_e:
+  warning("cannot import curses: %s", curses_e)
   curses = None
 
 __version__ = '20221228-post'
@@ -569,7 +568,7 @@ class Upd(SingletonMixin):
         self.insert(0)
       try:
         oldtxt = slots[slot]
-      except IndexError as e:
+      except IndexError:
         ##debug("%s.out(slot=%d): %s, ignoring %r", self, slot, e, txt)
         return ''
       if self._disabled or self._backend is None:
