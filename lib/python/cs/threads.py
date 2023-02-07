@@ -90,6 +90,12 @@ class HasThreadState(ContextManagerMixin):
       providing a context manager which pushes `current=self` onto that state
       and a `default()` class method returning `cls.state.current`
       as the default instance of that class.
+
+      *NOTE*: the documentation here refers to `cls.state`, but in
+      fact we honour the `cls.THREAD_STATE_ATTR` attribute to name
+      the state attribute which allows perclass state attributes,
+      and also use with classes which already use `.state` for
+      another purpose.
   '''
 
   _HasThreadState_lock = Lock()
@@ -99,10 +105,22 @@ class HasThreadState(ContextManagerMixin):
   THREAD_STATE_ATTR = 'state'
 
   @classmethod
-  def default(cls):
+  def default(cls, ifNone=None):
     ''' The default instance of this class from `cls.state.current`.
+
+        The optional `ifNone` parameter may be a callable to return
+        a default instance if `cls.state.current` is `None` or
+        missing. Otherwise this circumstance raises `RuntimeError`.
     '''
-    return getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
+    current = getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
+    if current is None:
+      if ifNone is None:
+        raise RuntimeError(
+            "%s.default: %s.%s.current is missing/None" %
+            (cls.__name__, cls.__name__, cls.THREAD_STATE_ATTR)
+        )
+      current = ifNone()
+    return current
 
   def __enter_exit__(self):
     ''' Push `self.state.current=self` as the `Thread` local current instance.
