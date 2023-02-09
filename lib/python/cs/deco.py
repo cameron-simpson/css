@@ -10,7 +10,7 @@ Assorted decorator functions.
 
 from collections import defaultdict
 from contextlib import contextmanager
-from inspect import isgeneratorfunction, signature, Parameter
+from inspect import isgeneratorfunction, ismethod, signature, Parameter
 import sys
 import time
 import traceback
@@ -805,17 +805,26 @@ def default_params(func, _strict=False, **param_defaults):
 
 @decorator
 def promote(func, params=None, types=None):
-  ''' A decorator to promote argument values automaticaly in annotated functions.
-      For any parameter with a type annotation, if that type has a
-      `.promote(value)` method and the function is called with a
-      value not of the type of the annotation, the `.promote` method
-      will be called to promote the value to the expected type.
+  ''' A decorator to promote argument values automatically in annotated functions.
 
       The decorator accepts optional parameters:
       * `params`: if supplied, only parameters in this list will
         be promoted
       * `types`: if supplied, only types in this list will be
         considered for promotion
+
+      For any parameter with a type annotation, if that type has a
+      `.promote(value)` class method and the function is called with a
+      value not of the type of the annotation, the `.promote` method
+      will be called to promote the value to the expected type.
+
+      Additionally, if the `.promote(value)` class method raises a `TypeError`
+      and `value` has a `.as_`*typename* attribute
+      where *typename* is the name of the type annotation,
+      if that attribute is an instance method of `value`
+      then promotion will be attempted by calling `value.as_`*typename*`()`
+      otherwise the attribute will ve used directly
+      on the presumption that it is a property.
 
       Example:
 
@@ -829,6 +838,29 @@ def promote(func, params=None, types=None):
           ...
           >>> f([1,2,3], epoch=12.0)
           epoch = <class 'cs.timeseries.Epoch'> Epoch(start=0, step=12)
+
+      Example using a class with an `as_P` instance method:
+
+          >>> class P:
+          ...   def __init__(self, x):
+          ...     self.x = x
+          ...   @classmethod
+          ...   def promote(cls, obj):
+          ...     raise TypeError("dummy promote method")
+          ...
+          >>> class C:
+          ...   def __init__(self, n):
+          ...     self.n = n
+          ...   def as_P(self):
+          ...     return P(self.n + 1)
+          ...
+          >>> @promote
+          ... def p(p: P):
+          ...   print("P =", type(p), p.x)
+          ...
+          >>> c = C(1)
+          >>> p(c)
+          P = <class 'cs.deco.P'> 2
 
       *Note*: one issue with this is due to the conflict in name
       between this decorator and the method it looks for in a class.
@@ -896,6 +928,13 @@ def promote(func, params=None, types=None):
   def promoting_func(*a, **kw):
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
+    # we don't import cs.pfx (many dependencies!)
+    get_context = lambda: (
+        "@promote(%s.%s)(%s=%s:%r)" % (
+            func.__module__, func.__name__, param_name, arg_value.__class__.
+            __name__, arg_value
+        )
+    )
     for param_name, (annotation, promote_method) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
@@ -903,7 +942,32 @@ def promote(func, params=None, types=None):
         continue
       if isinstance(param_name, annotation):
         continue
-      arg_value = promote_method(arg_value)
+      try:
+        promoted_value = promote_method(arg_value)
+      except TypeError as te:
+        # see if the value has an as_TypeName() method
+        as_method_name = "as_" + annotation.__name__
+        try:
+          as_annotation = getattr(arg_value, as_method_name)
+        except AttributeError:
+          # no .as_TypeName, reraise the original TypeError
+          raise te
+        else:
+          if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
+            # bound instance method of arg_value
+            try:
+              as_value = as_annotation()
+            except (TypeError, ValueError) as e:
+              raise TypeError(
+                  "%s: %s.%s(): %s" %
+                  (get_context(), param_name, as_method_name, e)
+              ) from e
+          else:
+            # assuming a property or even a plain attribute
+            as_value = as_annotation
+          arg_value = as_value
+      else:
+        arg_value = promoted_value
       arg_mapping[param_name] = arg_value
     return func(*bound_args.args, **bound_args.kwargs)
 
