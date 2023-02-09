@@ -1018,6 +1018,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     with state(verbose=True):
       self.options.fstags.import_xattrs(paths)
 
+# A decorator for functions expecting an fstags parameter.
+uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
+
 # pylint: disable=too-many-public-methods
 class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
@@ -2035,12 +2038,6 @@ class FSTagsConfig(FSPathBasedSingleton):
     '''
     self.config['general']['tagsfile'] = tagsfile_basename
 
-# A default general purpose FSTags instance.
-DEFAULT_FSTAGS = FSTags()
-
-# A decorator for functions expecting an fstags parameter.
-uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
-
 def get_xattr_value(fspath, xattr_name):
   ''' Read the extended attribute `xattr_name` of `fspath`.
       Return the extended attribute value as a string,
@@ -2113,6 +2110,9 @@ def update_xattr_value(fspath, xattr_name, new_xattr_value):
           if e.errno not in (errno.ENOTSUP, errno.ENOENT):
             raise
     return old_xattr_value
+
+# A default general purpose FSTags instance.
+DEFAULT_FSTAGS = FSTags()
 
 if __name__ == '__main__':
   sys.argv[0] = basename(sys.argv[0])
