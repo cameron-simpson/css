@@ -15,15 +15,15 @@ from inspect import ismethod
 import sys
 from threading import Semaphore, Thread, Lock, local as thread_local
 
-from cs.context import stackattrs
+from cs.context import ContextManagerMixin, stackattrs
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.logutils import LogTime, error, warning
+from cs.gimmicks import error, warning
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
 
-__version__ = '20221207-post'
+__version__ = '20230125-post'
 
 DISTINFO = {
     'description':
@@ -38,7 +38,7 @@ DISTINFO = {
         'cs.context',
         'cs.deco',
         'cs.excutils',
-        'cs.logutils',
+        'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
         'cs.seq',
@@ -83,6 +83,29 @@ class State(thread_local):
     '''
     with stackattrs(self, **kw) as prev_attrs:
       yield prev_attrs
+
+class HasThreadState(ContextManagerMixin):
+  ''' A mixin for classes with a `cs.threads.State` instance as `.state`
+      providing a context manager which pushes `current=self` onto that state
+      and a `default()` class method returning `cls.state.current`
+      as the default instance of that class.
+  '''
+
+  # the default name for the Thread state attribute
+  THREAD_STATE_ATTR = 'state'
+
+  @classmethod
+  def default(cls):
+    ''' The default instance of this class from `cls.state.current`.
+    '''
+    return getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
+
+  def __enter_exit__(self):
+    ''' Push `self.state.current=self` as the `Thread` local current instance.
+    '''
+    state = getattr(self, self.THREAD_STATE_ATTR)
+    with state(current=self):
+      yield
 
 # pylint: disable=too-many-arguments
 def bg(
@@ -145,6 +168,7 @@ class AdjustableSemaphore(object):
     return "%s[%d]" % (self.__name, self.limit0)
 
   def __enter__(self):
+    from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
     with LogTime("%s(%d).__enter__: acquire", self.__name, self.__value):
       self.acquire()
 
@@ -193,6 +217,7 @@ class AdjustableSemaphore(object):
           self.__sem.release()
           delta -= 1
       else:
+        from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
         while delta < 0:
           with LogTime("AdjustableSemaphore(%s): acquire excess capacity",
                        self.__name):

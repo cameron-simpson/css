@@ -128,7 +128,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20220918-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -220,17 +220,18 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   def run_context(self):
     ''' Push the `FSTags`.
     '''
-    options = self.options
-    fstags = FSTags(
-        ontology_filepath=options.ontology_path, physical=options.physical
-    )
-    with fstags:
-      with stackattrs(
-          options,
-          fstags=fstags,
-          physical=fstags.config.physical,
-      ):
-        yield
+    with super().run_context():
+      options = self.options
+      fstags = FSTags(
+          ontology_filepath=options.ontology_path, physical=options.physical
+      )
+      with fstags:
+        with stackattrs(
+            options,
+            fstags=fstags,
+            physical=fstags.config.physical,
+        ):
+          yield
 
   def cmd_autotag(self, argv):
     ''' Usage: {cmd} paths...

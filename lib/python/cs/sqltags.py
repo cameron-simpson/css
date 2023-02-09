@@ -34,7 +34,7 @@ from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
 import operator
 import os
-from os.path import expanduser, exists as existspath
+from os.path import expanduser, exists as existspath, isabs as isabspath
 import re
 import sys
 from subprocess import run
@@ -77,7 +77,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20220806-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1554,7 +1554,6 @@ class SQLTags(BaseTagSets):
   def __init__(self, db_url=None, ontology=None):
     if not db_url:
       db_url = self.infer_db_url()
-    self.__tstate = ThreadState()
     self.orm = SQLTagsORM(db_url=db_url)
     if ontology is None:
       ontology = TagsOntology(self)
@@ -1584,7 +1583,7 @@ class SQLTags(BaseTagSets):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Stub startup/shutdown since we use autosessions.
+    ''' Empty stub startup/shutdown since we use autosessions.
         Particularly, we do not want to keep SQLite dbs open.
     '''
     yield self
@@ -1705,7 +1704,7 @@ class SQLTags(BaseTagSets):
   @locked
   def __setitem__(self, index, te):
     ''' Dummy `__setitem__` which checks `te` against the db by type
-        because the factory inserts it into the database.
+        because the factory has already inserted it into the database.
     '''
     assert isinstance(te, SQLTagSet)
     assert te.sqltags is self
@@ -1926,6 +1925,19 @@ class SQLTags(BaseTagSets):
         with Pfx(tag):
           e.add_tag(tag)
 
+  @classmethod
+  def promote(cls, obj):
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, str):
+      if obj.startswith('~') or isabspath(obj):
+        # expect filesystem path to an SQLite file
+        if not obj.endswith('.sqlite'):
+          raise ValueError("expected path to .sqlite file")
+        obj = expanduser(obj)
+        return cls(obj)
+    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
+
 class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' Common features for commands oriented around an `SQLTags` database.
   '''
@@ -1976,12 +1988,13 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    options = self.options
-    db_url = options.db_url
-    sqltags = self.TAGSETS_CLASS(db_url)
-    with sqltags:
-      with stackattrs(options, sqltags=sqltags, verbose=True):
-        yield
+    with super().run_context():
+      options = self.options
+      db_url = options.db_url
+      sqltags = self.TAGSETS_CLASS(db_url)
+      with sqltags:
+        with stackattrs(options, sqltags=sqltags, verbose=True):
+          yield
 
   @classmethod
   def parse_tagset_criterion(cls, arg, tag_based_test_class=None):

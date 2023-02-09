@@ -1,0 +1,1 @@
+New contextif(flag,cmgr_func,...) context manager to use cmgr_func if flag is true otherwise nullcontext.

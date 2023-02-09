@@ -1,0 +1,5 @@
+lib/python/cs/cmdutils.py: merge default ==> pilfer
+lib/python/cs/cmdutils.py: merge default ==> pilfer
+lib/python/cs/cmdutils.py: merge default ==> pilfer for @cs.deco.promote
+lib/python/cs/cmdutils.py: cs.cmdutils: move a lot of the context logic from BaseCommand.run to BaseCommand.run_context, which now must be correctly overridden in subclasses
+lib/python/cs/cmdutils.py: cs.cmdutils: improve BaseCOmmand.run_context docstring
