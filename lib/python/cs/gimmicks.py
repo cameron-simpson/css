@@ -24,7 +24,7 @@ import subprocess
 try:
   DEVNULL = subprocess.DEVNULL
 except AttributeError:
-  DEVNULL = open(os.devnull, 'wb')  # pylint: disable=consider-using-with
+  DEVNULL = open(os.devnull, 'r+b')  # pylint: disable=consider-using-with
 
 import sys
 
