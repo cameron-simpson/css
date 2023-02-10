@@ -3463,7 +3463,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
               with Pfx(name):
                 if not tags:
                   continue
-                X("update_mapping=%s", r(update_mapping))
                 if update_mapping:
                   # mirror tags to secondary mapping eg an SQLTags
                   # this associates a UUID with the file
