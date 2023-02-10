@@ -1149,3 +1149,48 @@ class BaseCommand:
     if unknown:
       warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit
+
+  def shell(self, *argv, banner=None, local=None):
+    ''' Run an interactive Python prompt with some predefined local names.
+
+        Parameters:
+        * `argv`: any notional command line arguments
+        * `banner`: optional banner string
+        * `local`: optional local names mapping
+
+        The default `local` mapping is a `dict` containing:
+        * `argv`: from `argv`
+        * `options`: from `self.options`
+        * `self`: from `self`
+        * the attributes of `options`
+        * the attributes of `self`
+
+        This is not presented automatically as a subcommand, but
+        commands wishing such a command should provide something
+        like this:
+
+            def cmd_shell(self, argv):
+              """ Usage: {cmd}
+                    Run an interactive Python prompt with some predefined local names.
+              """
+              return self.shell(*argv)
+    '''
+    options = self.options
+    if banner is None:
+      banner = f'{self.cmd}: {options.sqltags}'
+    if local is None:
+      local = dict(self.__dict__)
+      local.update(options.__dict__)
+      local.update(argv=argv, cmd=self.cmd, options=options, self=self)
+    try:
+      from bpython import embed
+    except ImportError:
+      return interact(
+          banner=banner,
+          local=local,
+      )
+    else:
+      return embed(
+          banner=banner,
+          locals_=local,
+      )
