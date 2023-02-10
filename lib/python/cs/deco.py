@@ -823,7 +823,7 @@ def promote(func, params=None, types=None):
       where *typename* is the name of the type annotation,
       if that attribute is an instance method of `value`
       then promotion will be attempted by calling `value.as_`*typename*`()`
-      otherwise the attribute will ve used directly
+      otherwise the attribute will be used directly
       on the presumption that it is a property.
 
       Example:
