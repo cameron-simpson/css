@@ -32,8 +32,10 @@ import sys
 from textwrap import dedent
 from threading import Lock
 
+from dateutil.tz import tzlocal
 from typeguard import typechecked
 
+from cs.dateutils import unixtime2datetime, UTC
 from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -49,11 +51,13 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
         'cs.seq>=20200914',
+        'dateutil',
         'typeguard',
     ],
 }
@@ -697,7 +701,7 @@ def get_sloshed_text(
         )
       special_starts.add(special[0])
       special_seqs.append(special)
-    special_starts = u''.join(special_starts)
+    special_starts = ''.join(special_starts)
     special_seqs = sorted(special_seqs, key=lambda s: -len(s))
   chunks = []
   slen = len(s)
@@ -1008,7 +1012,7 @@ def as_lines(chunks, partials=None):
   '''
   if partials is None:
     partials = []
-  if any(['\n' in p for p in partials]):
+  if any('\n' in p for p in partials):
     raise ValueError("newline in partials: %r" % (partials,))
   for chunk in chunks:
     pos = 0
@@ -1223,7 +1227,7 @@ def snakecase(camelcased):
   '''
   strs = []
   was_lower = False
-  for i, c in enumerate(camelcased):
+  for _, c in enumerate(camelcased):
     if c.isupper():
       c = c.lower()
       if was_lower:
@@ -1327,7 +1331,7 @@ def format_as(
 _format_as = format_as  # for reuse in the format_as method below
 
 def format_attribute(method):
-  ''' Mark a method as available as a format method.
+  ''' A decorator to mark a method as available as a format method.
       Requires the enclosing class to be decorated with `@has_format_attributes`.
 
       For example,
@@ -1352,12 +1356,37 @@ def format_attribute(method):
   method.is_format_attribute = True
   return method
 
-def has_format_attributes(cls):
+@decorator
+def has_format_attributes(cls, inherit=()):
   ''' Class decorator to walk this class for direct methods
       marked as for use in format strings
       and to include them in `cls.format_attributes()`.
+
+      Methods are normally marked with the `@format_attribute` decorator.
+
+      If `inherit` is true the base format attributes will be
+      obtained from other classes:
+      * `inherit` is `True`: use `cls.__mro__`
+      * `inherit` is a class: use that class
+      * otherwise assume `inherit` is an iterable of classes
+      For each class `otherclass`, update the initial attribute
+      mapping from `otherclass.get_format_attributes()`.
   '''
   attributes = cls.get_format_attributes()
+  if inherit:
+    if inherit is True:
+      classes = cls.__mro__
+    elif isinstance(inherit, type):
+      classes = (inherit,)
+    else:
+      classes = inherit
+    for superclass in classes:
+      try:
+        super_attributes = superclass.get_format_attributes()
+      except AttributeError:
+        pass
+      else:
+        attributes.update(super_attributes)
   for attr in dir(cls):
     try:
       attribute = getattr(cls, attr)
@@ -1458,14 +1487,14 @@ class FormatableFormatter(Formatter):
 
   # pylint: disable=arguments-differ
   @pfx_method
-  def get_field(self, field_name, a, kw):
+  def get_field(self, field_name, args, kwargs):
     ''' Get the object referenced by the field text `field_name`.
         Raises `KeyError` for an unknown `field_name`.
     '''
-    assert not a
-    with Pfx("field_name=%r: kw=%r", field_name, kw):
+    assert not args
+    with Pfx("field_name=%r: kwargs=%r", field_name, kwargs):
       arg_name, offset = self.get_arg_name(field_name)
-      arg_value, _ = self.get_value(arg_name, a, kw)
+      arg_value, _ = self.get_value(arg_name, args, kwargs)
       # resolve the rest of the field
       subfield = self.get_subfield(arg_value, field_name[offset:])
       return subfield, field_name
@@ -1499,15 +1528,15 @@ class FormatableFormatter(Formatter):
       value = fmt.format(value=value)
     return value
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   @pfx_method
-  def get_value(self, arg_name, a, kw):
+  def get_value(self, arg_name, args, kwargs):
     ''' Get the object with index `arg_name`.
 
-        This default implementation returns `(kw[arg_name],arg_name)`.
+        This default implementation returns `(kwargs[arg_name],arg_name)`.
     '''
-    assert not a
-    return kw[arg_name], arg_name
+    assert not args
+    return kwargs[arg_name], arg_name
 
   @classmethod
   def get_format_subspecs(cls, format_spec):
@@ -1831,6 +1860,32 @@ class FStr(FormatableMixin, str):
     ''' Convert to a Windows filesystem `pathlib.Path`.
     '''
     return PureWindowsPath(self)
+
+class FNumericMixin(FormatableMixin):
+  ''' A `FormatableMixin` subclass.
+  '''
+
+  @format_attribute
+  def utctime(self):
+    ''' Treat this as a UNIX timestamp and return a UTC `datetime`.
+    '''
+    return unixtime2datetime(self, tz=UTC)
+
+  @format_attribute
+  def localtime(self):
+    ''' Treat this as a UNIX timestamp and return a localtime `datetime`.
+    '''
+    return unixtime2datetime(self, tz=tzlocal())
+
+@has_format_attributes
+class FFloat(FNumericMixin, float):
+  ''' Formattable `float`.
+  '''
+
+@has_format_attributes
+class FInt(FNumericMixin, int):
+  ''' Formattable `int`.
+  '''
 
 if __name__ == '__main__':
   import cs.lex_tests
