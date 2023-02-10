@@ -96,6 +96,7 @@ from pathlib import PurePath
 import shutil
 import sys
 from threading import Lock, RLock
+from typing import Mapping, Optional
 
 from icontract import require
 from typeguard import typechecked
@@ -167,6 +168,9 @@ XATTR_B = (
 
 FIND_OUTPUT_FORMAT_DEFAULT = '{fspath}'
 LS_OUTPUT_FORMAT_DEFAULT = '{fspath:json} {tags}'
+
+FSTAGS_UPDATE_MAPPING_ENVVAR = 'FSTAGS_UPDATE_MAPPING'
+FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR = 'FSTAGS_UPDATE_MAPPING_PREFIX'
 
 # pylint: disable=too-many-locals
 
@@ -1023,19 +1027,59 @@ class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
+  @fmtdoc
   def __init__(
-      self, tagsfile_basename=None, ontology_filepath=None, physical=None
+      self,
+      tagsfile_basename=None,
+      ontology_filepath=None,
+      physical=None,
+      update_mapping: Optional[Mapping] = None,
+      update_prefix: Optional[str] = __name__,
+      update_uuid_tag_name: Optional[str] = 'uuid',
   ):
+    ''' Initialise the `FSTags` instance.
+
+        Parameters:
+        * `tagsfile_basename`: optional basename forthe backing tags files,
+          default from `TAGSFILE_BASENAME`: `{TAGSFILE_BASENAME!r}`
+        * `ontology_filepath`: optional filesystem path for an associated ontology
+        * `physical`: optional flag for the associated `FSTagsConfig`
+          specifying whether `TagFile`s are indexed by their physical or logical
+          filesystem paths
+        * `update_mapping`: optional secondary mapping to which to mirror
+          tags, such as an `SQLTags`;
+          the default comes from an `SQLTags` specified by the
+          environment variable `${FSTAGS_UPDATE_MAPPING_ENVVAR}`
+          if present
+        * `update_prefix`: optional key prefix for use in the secondary mapping;
+          the default comes from the environment variable
+          `${FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR}` if present,
+          otherwise `{__name__!r}`
+        * `update_uuid_tag_name`: optional name for the per file UUID tag name;
+          default `'uuid'`
+    '''
     if tagsfile_basename is None:
       tagsfile_basename = TAGSFILE_BASENAME
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
+    if update_mapping is None:
+      update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR)
+      if update_mapping:
+        from cs.sqltags import SQLTags
+        update_mapping = SQLTags(update_mapping)
+      if update_prefix is None:
+        update_prefix = os.environ.get(
+            FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR, __name__
+        )
     self.config = FSTagsConfig(physical=physical)
     self.config.tagsfile_basename = tagsfile_basename
     self.config.ontology_filepath = ontology_filepath
     self._tagfiles = {}  # cache of `FSTagsTagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
+    self.update_mapping = update_mapping
+    self.update_prefix = update_prefix
+    self.update_uuid_tag_name = update_uuid_tag_name
     self._lock = RLock()
 
   def startup(self):
@@ -1066,7 +1110,12 @@ class FSTags(MultiOpenMixin):
     '''
     ontology = None if no_ontology else self.ontology_for(path)
     tagfile = self._tagfiles[path] = FSTagsTagFile(
-        path, ontology=ontology, fstags=self
+        path,
+        ontology=ontology,
+        fstags=self,
+        update_mapping=self.update_mapping,
+        update_prefix=self.update_prefix,
+        update_uuid_tag_name=self.update_uuid_tag_name,
     )
     return tagfile
 
@@ -1781,11 +1830,11 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
   '''
 
   @typechecked
-  def __init__(self, fspath: str, *, ontology=Ellipsis, fstags=None):
+  def __init__(self, fspath: str, *, ontology=Ellipsis, fstags=None, **kw):
     if ontology is Ellipsis:
       ontology = fstags.ontology
     self.__dict__.update(_fstags=fstags)
-    super().__init__(fspath, ontology=ontology)
+    super().__init__(fspath, ontology=ontology, **kw)
 
   @typechecked
   @require(
