@@ -2311,6 +2311,9 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     for k in self.keys(prefix=prefix):
       yield k, self.get(k)
 
+  def __bool__(self):
+    return True
+
   def __contains__(self, name: str):
     ''' Test whether `name` is present in the underlying mapping.
     '''
