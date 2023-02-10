@@ -996,7 +996,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         try:
           tag = Tag.from_str(line)
         except ValueError as e:
-          warning("parse error, discarded: %s", line)
+          warning("parse error %s, discarded: %s", e, line)
           no_discard = True
         else:
           new_values[tag.name] = tag.value
