@@ -893,6 +893,17 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     self['unixtime'] = new_unixtime
 
+  @property
+  def uuid(self) -> UUID:
+    ''' The `TagSet`'s `'uuid'` value as a UUID if present, otherwise `None`.
+    '''
+    try:
+      uuid_s = self['uuid']
+    except KeyError:
+      return None
+    else:
+      return UUID(uuid_s) if uuid_s else None
+
   @format_attribute
   def is_stale(self, max_age=None):
     ''' Test whether this `TagSet` is stale
