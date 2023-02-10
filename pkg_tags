@@ -91,7 +91,7 @@ cs.sh
 cs.sharedfile
 cs.sqlalchemy_utils ok_revision=cdf1c54d57f2bb5313ec9f1b50876965ec8e49fc
 cs.sqltags ok_revision="14532850e539eb1624e9d31e0c6891d47657d8d0" pypi.release="20221228"
-cs.tagset ok_revision=c598e46c04af9bd07aa44911f53fcab6576e1250 features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20230126"
+cs.tagset ok_revision="40b1917a48e751ed801fdb3836e64a0fbaa0ebf6" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20230126"
 cs.taskqueue ok_revision="3124b308e9599978d77d3cd7e4c8f769400803e1" features={"20221207":["BaseTask"]} pypi.release="20221207"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
 cs.threads ok_revision="7e37cbc0791cdd817a25982a071f03a0bbfc1565" pypi.release="20230125" features={"20230125":["HasThreadState"]}
