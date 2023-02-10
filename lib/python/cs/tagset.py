@@ -199,11 +199,13 @@ from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
-from os.path import dirname, isdir as isdirpath, isfile as isfilepath
+from os.path import (
+    dirname, isdir as isdirpath, isfile as isfilepath, join as joinpath
+)
 import re
 import time
-from typing import Optional, Union
-from uuid import UUID
+from typing import Mapping, Optional, Union
+from uuid import UUID, uuid4
 
 from icontract import require
 from typeguard import typechecked
@@ -3226,12 +3228,23 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
   '''
 
   @typechecked
-  def __init__(self, fspath: str, *, ontology=None):
+  def __init__(
+      self,
+      fspath: str,
+      *,
+      ontology=None,
+      update_mapping: Optional[Mapping] = None,
+      update_prefix: Optional[str] = None,
+      update_uuid_tag_name: Optional[str] = None,
+  ):
     if hasattr(self, 'fspath'):
       return
     FSPathBasedSingleton.__init__(self, fspath)
     BaseTagSets.__init__(self, ontology=ontology)
     self._tagsets = None
+    self.update_mapping = update_mapping
+    self.update_prefix = update_prefix
+    self.update_uuid_tag_name = update_uuid_tag_name
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, shortpath(self.fspath))
@@ -3412,7 +3425,15 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
 
   @classmethod
   def save_tagsets(
-      cls, filepath, tagsets, unparsed, extra_types=None, prune=False
+      cls,
+      filepath,
+      tagsets,
+      unparsed,
+      extra_types=None,
+      prune=False,
+      update_mapping: Optional[Mapping] = None,
+      update_prefix: Optional[str] = None,
+      update_uuid_tag_name: Optional[str] = None,
   ):
     ''' Save `tagsets` and `unparsed` to `filepath`.
 
@@ -3439,14 +3460,46 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
               f.write(line)
               f.write('\n')
             for name, tags in name_tags:
-              if not tags:
-                continue
-              f.write(
-                  cls.tags_line(
-                      name, tags, extra_types=extra_types, prune=prune
-                  )
-              )
-              f.write('\n')
+              with Pfx(name):
+                if not tags:
+                  continue
+                X("update_mapping=%s", r(update_mapping))
+                if update_mapping:
+                  # mirror tags to secondary mapping eg an SQLTags
+                  # this associates a UUID with the file
+                  try:
+                    uuid_s = tags[update_uuid_tag_name]
+                  except KeyError:
+                    uuid = uuid4()
+                    uuid_s = str(uuid)
+                    tags[update_uuid_tag_name] = uuid_s
+                  else:
+                    try:
+                      uuid = UUID(uuid_s)
+                    except ValueError as e:
+                      warning(
+                          "invalid UUID tag %r=%s: %s", update_uuid_tag_name,
+                          uuid_s, e
+                      )
+                      uuid = None
+                    else:
+                      uuid_s = str(uuid)
+                  if uuid is not None:
+                    # apply the tags to the secondary mapping
+                    key = (
+                        "%s.%s" %
+                        (update_prefix, uuid_s) if update_prefix else uuid_s
+                    )
+                    d = tags.as_dict()
+                    del d[update_uuid_tag_name]
+                    d['fspath'] = joinpath(dirname(filepath), name)
+                    update_mapping[key].update(d)
+                f.write(
+                    cls.tags_line(
+                        name, tags, extra_types=extra_types, prune=prune
+                    )
+                )
+                f.write('\n')
         except OSError as e:
           error("save(%r) fails: %s", filepath, e)
 
@@ -3466,6 +3519,9 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
             self.unparsed,
             extra_types=extra_types,
             prune=prune,
+            update_mapping=self.update_mapping,
+            update_prefix=self.update_prefix,
+            update_uuid_tag_name=self.update_uuid_tag_name,
         )
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
