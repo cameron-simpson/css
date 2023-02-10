@@ -42,7 +42,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20220918-post'
+__version__ = '20230210'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
