@@ -2338,30 +2338,9 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_shell(self, argv):
     ''' Usage: {cmd}
-          Run an interactive Python prompt with some predefined named:
-          calibre: the CalibreTree
-          options: self.options
+          Run an interactive Python prompt with some predefined local names.
     '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    options = self.options
-    banner = f'{self.cmd}: {options.sqltags}'
-    local = dict(
-        sqltags=options.sqltags,
-        options=options,
-    )
-    try:
-      from bpython import embed
-    except ImportError:
-      interact(
-          banner=banner,
-          local=local,
-      )
-    else:
-      embed(
-          locals_=local,
-          banner=banner,
-      )
+    return self.shell(*argv)
 
   # pylint: disable=too-many-branches
   def cmd_tag(self, argv):
