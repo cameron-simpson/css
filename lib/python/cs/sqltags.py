@@ -26,6 +26,7 @@
 
 from abc import abstractmethod
 from builtins import id as builtin_id
+from code import interact
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
@@ -2334,6 +2335,33 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
           log_tags.append(Tag('categories', list(tag_categories)))
         sqltags.default_factory(None, unixtime=unixtime, tags=log_tags)
     return xit
+
+  def cmd_shell(self, argv):
+    ''' Usage: {cmd}
+          Run an interactive Python prompt with some predefined named:
+          calibre: the CalibreTree
+          options: self.options
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    banner = f'{self.cmd}: {options.sqltags}'
+    local = dict(
+        sqltags=options.sqltags,
+        options=options,
+    )
+    try:
+      from bpython import embed
+    except ImportError:
+      interact(
+          banner=banner,
+          local=local,
+      )
+    else:
+      embed(
+          locals_=local,
+          banner=banner,
+      )
 
   # pylint: disable=too-many-branches
   def cmd_tag(self, argv):
