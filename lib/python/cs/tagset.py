@@ -2476,7 +2476,6 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
 
   @typechecked
   def __init__(self, tagsets: BaseTagSets, match, unmatch=None):
-    X("_TagsOntology_SubTagSets: match=%r, unmatch=%r", match, unmatch)
     self.__match = match
     self.__unmatch = unmatch
     accepts_key = None
@@ -2489,18 +2488,11 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
       assert unmatch is None
       if match.endswith(('.', '-', '_')):
         # prefixed based match and translation
-        X("  prefixed based match and translation")
         prefixify = PrefixedMappingProxy.prefixify_subkey
         unprefixify = PrefixedMappingProxy.unprefixify_key
         accepts_key = lambda key: key.startswith(match)
-        to_subkey = lambda key: (
-            X("to_subkey:unprefixify(key=%r,match=%r)" % (key, match)),
-            unprefixify(key, match),
-        )[1]
-        from_subkey = lambda subk: (
-            X("from_subkey:prefixify(subk=%r,match=%r)" % (subk, match)),
-            prefixify(subk, match),
-        )[1]
+        to_subkey = lambda key: unprefixify(key, match)
+        from_subkey = lambda subk: prefixify(subk, match)
       else:
         # prefixed based match, but use keys unchanged
         match_ = match + '.'
@@ -2974,7 +2966,6 @@ class TagsOntology(SingletonMixin, BaseTagSets):
   def type_names(self):
     ''' Return defined type names i.e. all entries starting `type.`.
     '''
-    X("self._subtagsetses=%r", self._subtagsetses)
     return set(
         subtype_name  ## subtagsets.key(subtype_name)
         for subtagsets in self._subtagsetses
