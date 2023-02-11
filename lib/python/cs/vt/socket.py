@@ -9,9 +9,11 @@
 
 from contextlib import contextmanager
 import os
+from os.path import exists as existspath
 from socket import socket, AF_INET, AF_UNIX
-from socketserver import TCPServer, UnixStreamServer, \
-    ThreadingMixIn, StreamRequestHandler
+from socketserver import (
+    TCPServer, UnixStreamServer, ThreadingMixIn, StreamRequestHandler
+)
 import sys
 
 from icontract import require
@@ -76,6 +78,8 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   @contextmanager
   def startup_shutdown(self):
     ''' Start up the server.
+        Subclasses' `startup_shutdown` must setup and clear `self.socker_server`
+        around a call to this method.
     '''
     with super().startup_shutdown():
       with stackattrs(
@@ -95,7 +99,6 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
           self.socket_server_thread.join()
           if self.socket_server and self.socket_server.socket is not None:
             self.socket_server.socket.close()
-          self.socket_server = None
 
   def shutdown_now(self):
     ''' Issue closes until all current opens have been consumed.
@@ -104,7 +107,6 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
       self.socket_server.shutdown()
       if self.socket_server.socket is not None:
         self.socket_server.socket.close()
-      self.socket_server = None
 
   def flush(self):
     ''' Flush the backing Store.
@@ -168,7 +170,19 @@ class TCPStoreServer(_SocketStoreServer):
   def __init__(self, bind_addr, **kw):
     super().__init__(**kw)
     self.bind_addr = bind_addr
-    self.socket_server = _TCPServer(self, bind_addr)
+    self.socket_server = None
+
+  @contextmanager
+  def startup_shutdown(self):
+    with stackattrs(
+        self,
+        socket_server=_TCPServer(self, self.bind_addr),
+    ):
+      try:
+        with super().startup_shutdown():
+          yield
+      finally:
+        self.socket_server.shutdown()
 
 class TCPClientStore(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
@@ -183,11 +197,15 @@ class TCPClientStore(StreamStore):
         self, name, None, None, addif=addif, connect=self._tcp_connect, **kw
     )
 
-  def shutdown(self):
-    StreamStore.shutdown(self)
-    if self.sock is not None:
-      self.sock.close()
-      self.sock = None
+  @contextmanager
+  def startup_shutdown(self):
+    try:
+      with super().startup_shutdown():
+        yield
+    finally:
+      if self.sock is not None:
+        self.sock.close()
+        self.sock = None
 
   @pfx_method
   @require(lambda self: not self.sock)
@@ -234,11 +252,22 @@ class UNIXSocketStoreServer(_SocketStoreServer):
   def __init__(self, socket_path, **kw):
     super().__init__(**kw)
     self.socket_path = socket_path
-    self.socket_server = _UNIXSocketServer(self, socket_path)
+    self.socket_server = None
 
-  def shutdown(self):
-    super().shutdown()
-    os.remove(self.socket_path)
+  @contextmanager
+  def startup_shutdown(self):
+    if existspath(self.socket_path):
+      raise RuntimeError("socket already exists: %r" % (self.socket_path,))
+    with stackattrs(
+        self,
+        socket_server=_UNIXSocketServer(self, self.socket_path),
+    ):
+      try:
+        with super().startup_shutdown():
+          yield
+      finally:
+        self.socket_server.shutdown()
+        os.remove(self.socket_path)
 
 class UNIXSocketClientStore(StreamStore):
   ''' A Store attached to a remote Store at `socket_path`.

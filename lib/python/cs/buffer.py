@@ -925,6 +925,32 @@ class CornuCopyBuffer(object):
     bfr2.flush = flush  # pylint: disable=attribute-defined-outside-init
     return bfr2
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to a `CornuCopyBuffer`.
+
+        Promotes:
+        * `int`: assumed to be a file descriptor of a file open for binary read
+        * `str`: assed to the a filesystem pathname
+        * `bytes` and `bytes`like objects: data
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, int):
+      obj = cls.from_fd(obj)
+    elif isinstance(obj, str):
+      obj = cls.from_filename(obj)
+    elif isinstance(obj, (bytes, bytearray, mmap.mmap, memoryview)):
+      obj = cls.from_bytes(obj)
+    try:
+      iter(obj)
+    except TypeError:
+      pass
+    else:
+      # assume this iterates byteslike objects
+      return cls(obj)
+    raise TypeError("%s.promote: cannot promote %s" % (cls, r(obj)))
+
 class _BoundedBufferIterator(object):
   ''' An iterator over the data from a CornuCopyBuffer with an end
       offset bound.

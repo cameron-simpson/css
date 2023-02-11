@@ -2962,11 +2962,12 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     subtagsets = self._subtagsets_for_type(type_name)
     return subtagsets.typedef(type_name)
 
+  @pfx_method
   def type_names(self):
     ''' Return defined type names i.e. all entries starting `type.`.
     '''
     return set(
-        subtagsets.key(subtype_name)
+        subtype_name  ## subtagsets.key(subtype_name)
         for subtagsets in self._subtagsetses
         for subtype_name in subtagsets.type_names()
     )
