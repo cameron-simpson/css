@@ -2336,6 +2336,22 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
         sqltags.default_factory(None, unixtime=unixtime, tags=log_tags)
     return xit
 
+  def cmd_orm(self, argv):
+    ''' Usage: {cmd} define_schema
+          Runs the ORM's `define_schema()` method, which creates missing tables
+          and entity 0 if missing.
+    '''
+    if not argv:
+      raise GetoptError("missing subcommand")
+    subcmd = argv.pop(0)
+    with Pfx(subcmd):
+      if subcmd == 'define_schema':
+        if argv:
+          raise GetoptError("extra arguments: %s", argv)
+        self.options.sqltags.orm.define_schema()
+      else:
+        raise GetoptError("unrecognised subcommand")
+
   def cmd_shell(self, argv):
     ''' Usage: {cmd}
           Run an interactive Python prompt with some predefined local names.
