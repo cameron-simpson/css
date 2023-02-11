@@ -162,11 +162,11 @@ class HasThreadState(ContextManagerMixin):
     if not thread_states:
       yield
     else:
-      state_iter = iter(list(thread_states.items()))
+      state_iter = iter(list(thread_states.values()))
 
       def with_thread_states_pusher():
         try:
-          htscls, htsobj = next(state_iter)
+          htsobj = next(state_iter)
         except StopIteration:
           yield
         else:
