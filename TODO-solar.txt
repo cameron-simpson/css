@@ -1,3 +1,4 @@
+aggregate summaries on plots eg total power of some type over the time frame
 battery state in power graph on secondary axis
 stacked power graph
 identifierish event name selection

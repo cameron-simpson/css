@@ -9,6 +9,7 @@ from cs.cmdutils import BaseCommand
 
 from .apple import AppleBooksCommand
 from .calibre import CalibreCommand
+from .dedrm import DeDRMCommand
 from .kindle import KindleCommand
 from .mobi import MobiCommand
 
@@ -18,6 +19,7 @@ class EBooksCommand(BaseCommand):
 
   cmd_apple = AppleBooksCommand
   cmd_calibre = CalibreCommand
+  cmd_dedrm = DeDRMCommand
   cmd_kindle = KindleCommand
   cmd_mobi = MobiCommand
 

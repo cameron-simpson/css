@@ -5,7 +5,6 @@
 ''' My Python package release script.
 '''
 
-from __future__ import print_function
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
 from contextlib import contextmanager
@@ -52,10 +51,12 @@ from cs.lex import (
 from cs.logutils import error, warning, info, status, trace
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.progress import progressbar
 import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
 from cs.tagset import TagFile, tag_or_tag_value
+from cs.upd import Upd, print, uses_upd
 from cs.vcs import VCS
 from cs.vcs.hg import VCS_Hg
 
@@ -149,8 +150,9 @@ class CSReleaseCommand(BaseCommand):
   def run_context(self):
     ''' Arrange to autosave the package tagsets.
     '''
-    with self.options.pkg_tagsets:
-      yield
+    with super().run_context():
+      with self.options.pkg_tagsets:
+        yield
 
   ##  export      Export release to temporary directory, report directory.
   ##  freshmeat-submit Announce last release to freshmeat.
@@ -408,7 +410,8 @@ class CSReleaseCommand(BaseCommand):
 
   # pylint: disable=too-many-locals,too-many-return-statements
   # pylint: disable=too-many-branches,too-many-statements
-  def cmd_release(self, argv):
+  @uses_upd
+  def cmd_release(self, argv, *, upd):
     ''' Usage: {cmd} pkg_name
           Issue a new release for the named package.
     '''
@@ -440,8 +443,9 @@ class CSReleaseCommand(BaseCommand):
     for files, firstline in changes:
       print(" ", ' '.join(files) + ': ' + firstline)
     print()
-    with pipefrom('readdottext', keep_stdin=True) as dotfp:
-      release_message = dotfp.read().rstrip()
+    with upd.above():
+      with pipefrom('readdottext', keep_stdin=True) as dotfp:
+        release_message = dotfp.read().rstrip()
     if not release_message:
       error("empty release message, not making new release")
       return 1
@@ -453,16 +457,22 @@ class CSReleaseCommand(BaseCommand):
         filter(None,
                prompt('Any named features with this release').split())
     )
-    if any(map(lambda feature_name: not is_identifier(feature_name) or
-               feature_name.startswith('fix_'), features)):
+    if any(map(
+        lambda feature_name: (not is_dotted_identifier(feature_name) or
+                              feature_name.startswith('fix_')),
+        features,
+    )):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(
         filter(None,
                prompt('Any named bugs fixed with this release').split())
     )
-    if any(map(lambda bug_name: not is_identifier(bug_name) or bug_name.
-               startswith('fix_'), bugfixes)):
+    if any(map(
+        lambda bug_name:
+        (not is_dotted_identifier(bug_name) or bug_name.startswith('fix_')),
+        bugfixes,
+    )):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(map(lambda bug_name: 'fix_' + bug_name, bugfixes))
@@ -516,26 +526,32 @@ class CSReleaseCommand(BaseCommand):
       pkg_names = argv
     else:
       pkg_names = sorted(options.pkg_tagsets.keys())
-    for pkg_name in pkg_names:
-      if pkg_name.startswith(MODULE_PREFIX):
-        pkg = options.modules[pkg_name]
-        pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
-        if pypi_release is not None:
-          problems = pkg.problems()
-          problem_text = (
-              "%d problems" % (len(problems),) if problems else "ok"
-          )
-          if problems and options.colourise:
-            problem_text = colourise(problem_text, 'yellow')
-          list_argv = [
-              pkg_name,
-              pypi_release,
-              problem_text,
-          ]
-          features = pkg.features(pypi_release)
-          if features:
-            list_argv.append('[' + ' '.join(sorted(features)) + ']')
-          print(*list_argv)
+    with Upd().insert(1) as proxy:
+      for pkg_name in progressbar(pkg_names, label="packages"):
+        proxy.prefix = f'{pkg_name}: '
+        if pkg_name.startswith(MODULE_PREFIX):
+          pkg = options.modules[pkg_name]
+          pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
+          if pypi_release is not None:
+            problems = pkg.problems()
+            if not problems:
+              proxy.text = "ok"
+            else:
+              proxy.text = f'{len(problems)} problems'
+              problem_text = (
+                  "%d problems" % (len(problems),) if problems else "ok"
+              )
+              if problems and options.colourise:
+                problem_text = colourise(problem_text, 'yellow')
+              list_argv = [
+                  pkg_name,
+                  pypi_release,
+                  problem_text,
+              ]
+              features = pkg.features(pypi_release)
+              if features:
+                list_argv.append('[' + ' '.join(sorted(features)) + ']')
+              print(*list_argv)
     return 0
 
   def cmd_resolve(self, argv):
@@ -746,7 +762,8 @@ def clean_release_entry(entry):
     lines = ['* ' + line for line in lines]
   return '\n'.join(lines)
 
-def prompt(message, fin=None, fout=None):
+@uses_upd
+def prompt(message, *, fin=None, fout=None, upd):
   ''' Prompt for a one line answer.
       Return the answer with trailing newlines or carriage returns stripped.
   '''
@@ -754,9 +771,10 @@ def prompt(message, fin=None, fout=None):
     fin = sys.stdin
   if fout is None:
     fout = sys.stderr
-  print(message, end='? ', file=fout)
-  fout.flush()
-  return fin.readline().rstrip('\r\n')
+  with upd.above():
+    print(message, end='? ', file=fout)
+    fout.flush()
+    return fin.readline().rstrip('\r\n')
 
 def ask(message, fin=None, fout=None):
   ''' Prompt with yes/no question, return true if response is "y" or "yes".
@@ -1625,6 +1643,8 @@ class Module:
     if M is None:
       problems.append("module import fails")
       return problems
+    # TODO: import_names to be a set
+    # TODO: scan all the .py files in a package
     import_names = []
     for import_name in direct_imports(M.__file__, self.name):
       if self.modules[import_name].isstdlib():

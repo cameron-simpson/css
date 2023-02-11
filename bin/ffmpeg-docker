@@ -1,0 +1,151 @@
+#!/bin/sh
+#
+# Run ffmpeg via the linuxserver/ffmpeg Docker image.
+# - Cameron Simpson <cs@cskk.id.au> 29jan2023
+#
+
+set -ue
+
+use_tmux=${FFMPEG_DOCKER_TMUX:-''}
+image=linuxserver/ffmpeg
+runopts=--rm
+ffopts=
+
+cmd=$0
+usage="Usage: $cmd [--tm] [input-opts...] -i inputfile [output-opts...] outputfile
+  Run ffmpeg via \"docker run ... $image ...\" as a method for
+  running a modern ffmpeg on a stale system.
+
+  Leading options:
+  --tm  Run the \"docker run ...\" in a tmux(1) session via the tm(1cs) command.
+        This is handy when your transcoding machine is remote, or
+        when you want to run a few ffmpegs in named sessions.
+        I keep a shell alias \"fftm=ffmpeg-docker --tm\" for this purpose."
+
+badopts=
+
+# run in a tmux session
+[ $# -gt 0 ] && [ "x$1" = x--tm ] && { use_tmux=1; shift; }
+
+# rebuild the command line arguments to run in the container
+convdir=/convert
+lastn=$#
+in_minus_i=
+did_minus_i=
+did_outputfile=
+n=1
+for arg
+do
+  [ $n = 1 ] && set --  #  reset argument list
+  if [ $n != $lastn ]
+  then
+    # before the final output argument
+    if [ $in_minus_i ]
+    then
+      # inputfile argument following -i
+      inputfile=$arg
+      case "$inputfile" in
+        -) run_it_opts=-i inputmnt=/dev/null inputbase=- ;;
+        *) if [ -t 0 ] && [ -t 1 ]
+          then run_it_opts=-it
+          else run_it_opts=
+          fi
+          if [ ! -r "$inputfile" ]
+          then
+            echo "$cmd: inputfile not readable: $inputfile" >&2
+            badopts=1
+          else
+            case "$inputfile" in
+              /*) ;; *) inputfile=$(pwd)/$inputfile ;;
+            esac
+            inputbase=$( basename "$inputfile" )
+            inputmnt=$inputfile
+            case "$inputmnt" in
+              *,*)  echo "$cmd: inputfile path contains a comma, docker run hates it: $inputmnt" >&2
+                    badopts=1
+                    ;;
+            esac
+            inputmnt_as=$convdir/in/$inputbase
+            arg=$inputmnt_as
+          fi
+          ;;
+      esac
+      in_minus_i=
+      did_minus_i=1
+    else
+      if [ "x$arg" = "x-i" ]
+      then
+        # recognised the -i option
+        if [ $did_minus_i ]
+        then
+          echo "$cmd: repeated -i option" >&2
+          badopts=1
+        fi
+        in_minus_i=1
+      else
+        # pass other arguments through unchanged
+        :
+      fi
+    fi
+  else
+    # final argument, expect output file
+    outputfile=$arg
+    case "$outputfile" in
+      -) outputmnt=/dev/null outputbase=- ;;
+      -*)echo "$cmd: expected final argument to be \"-\" or a filename," \
+                "but seem to have an option: $outputfile" >&2
+        badopts=1
+        ;;
+      *)if [ -e "$outputfile" ]
+        then
+          echo "$cmd: output already exists: $outputfile" >&2
+          badopts=1
+        else
+          case "$outputfile" in
+            /*) ;; *) outputfile=$(pwd)/$outputfile ;;
+          esac
+          outputbase=$( basename "$outputfile" )
+          outputdir=$( dirname "$outputfile" )
+          outputmnt=$outputdir
+          case "$outputmnt" in
+            *,*)  echo "$cmd: output directory contains a comma, docker run hates it: $outputmnt" >&2
+                  badopts=1
+                  ;;
+          esac
+          outputmnt_as=$convdir/out
+          arg=$convdir/out/$outputbase
+        fi
+        ;;
+    esac
+    did_outputfile=1
+  fi
+  set -- "$@" "$arg"
+  n=$(( n + 1 ))
+done
+
+[ "$did_minus_i" ] || { echo "$cmd: no -i inputfile option" >&2; badopts=1; }
+[ "$did_outputfile" ] || { echo "$cmd: no outputfile" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+uid=$( id -u )
+gid=$( id -g )
+
+set -- docker run $runopts $run_it_opts \
+    --mount "type=bind,readonly,source=$inputmnt,destination=$inputmnt_as" \
+    --mount "type=bind,source=$outputmnt,destination=$outputmnt_as" \
+    -w "$convdir" \
+    --entrypoint=/usr/bin/s6-setuidgid \
+    "$image" \
+    "$uid:$gid" \
+    /usr/local/bin/ffmpeg \
+    "$@"
+
+if [ $use_tmux ]
+then
+  session_name=$( echo "FFMPEG $inputbase $outputbase $$" | tr -s ' .:' '___' )
+  set -- tm -x "$session_name" "$@"
+fi
+
+set -x
+exec "$@"

@@ -1,0 +1,1 @@
+lib/python/cs/py/func.py: cs.py.func: drop the returns_* and yields_* decorators, these days type annotations and checked are the go

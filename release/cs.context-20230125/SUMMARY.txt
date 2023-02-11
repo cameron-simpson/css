@@ -1,0 +1,1 @@
+New ContextManagerMixin.as_contextmanager(cls,self) class method to run the __enter_exit__ from a specific class, useful in subclasses.

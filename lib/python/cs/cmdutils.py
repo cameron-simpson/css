@@ -35,7 +35,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20220626-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1015,27 +1015,9 @@ class BaseCommand:
       return 2
     options = self.options
     try:
-      try:
-        runstate = options.runstate
-      except AttributeError:
-        runstate = options.runstate = RunState(
-            self.cmd,
-            signals=options.runstate_signals,
-            handle_signal=getattr(self, 'handle_signal', None),
-        )
-      upd = getattr(options, 'upd', self.loginfo.upd)
-      upd_context = nullcontext() if upd is None else upd
-      with upd_context:
-        with stackattrs(self, cmd=self._subcmd if self._subcmd else self.cmd):
-          with stackattrs(
-              options,
-              runstate=runstate,
-              upd=upd,
-          ):
-            with stackattrs(options, **kw_options):
-              with options.runstate:
-                with self.run_context():
-                  return self._run(self._subcmd, self, self._argv)
+      with stackattrs(options, **kw_options):
+        with self.run_context():
+          return self._run(self._subcmd, self, self._argv)
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
@@ -1089,11 +1071,42 @@ class BaseCommand:
 
   @contextmanager
   def run_context(self):
-    ''' Stub context manager which surrounds `main` or `cmd_`*subcmd*.
+    ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
+
+        This default does several things, and subclasses should
+        override it like this:
+
+            @contextmanager
+            def run_context(self):
+              with super().run_context():
+                try:
+                  ... subclass context setup ...
+                    yield
+                finally:
+                  ... any unconditional cleanup ...
     '''
     # redundant try/finally to remind subclassers of correct structure
     try:
-      yield
+      options = self.options
+      try:
+        runstate = options.runstate
+      except AttributeError:
+        runstate = RunState(
+            self.cmd,
+            signals=options.runstate_signals,
+            handle_signal=getattr(self, 'handle_signal', None),
+        )
+      upd = getattr(options, 'upd', self.loginfo.upd)
+      upd_context = nullcontext() if upd is None else upd
+      with upd_context:
+        with stackattrs(self, cmd=self._subcmd or self.cmd):
+          with stackattrs(
+              options,
+              runstate=runstate,
+              upd=upd,
+          ):
+            with options.runstate:
+              yield
     finally:
       pass
 
@@ -1136,3 +1149,48 @@ class BaseCommand:
     if unknown:
       warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit
+
+  def shell(self, *argv, banner=None, local=None):
+    ''' Run an interactive Python prompt with some predefined local names.
+
+        Parameters:
+        * `argv`: any notional command line arguments
+        * `banner`: optional banner string
+        * `local`: optional local names mapping
+
+        The default `local` mapping is a `dict` containing:
+        * `argv`: from `argv`
+        * `options`: from `self.options`
+        * `self`: from `self`
+        * the attributes of `options`
+        * the attributes of `self`
+
+        This is not presented automatically as a subcommand, but
+        commands wishing such a command should provide something
+        like this:
+
+            def cmd_shell(self, argv):
+              """ Usage: {cmd}
+                    Run an interactive Python prompt with some predefined local names.
+              """
+              return self.shell(*argv)
+    '''
+    options = self.options
+    if banner is None:
+      banner = f'{self.cmd}: {options.sqltags}'
+    if local is None:
+      local = dict(self.__dict__)
+      local.update(options.__dict__)
+      local.update(argv=argv, cmd=self.cmd, options=options, self=self)
+    try:
+      from bpython import embed
+    except ImportError:
+      return interact(
+          banner=banner,
+          local=local,
+      )
+    else:
+      return embed(
+          banner=banner,
+          locals_=local,
+      )

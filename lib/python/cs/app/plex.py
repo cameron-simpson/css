@@ -59,8 +59,9 @@ class PlexCommand(BaseCommand):
   def run_context(self):
     ''' Use the FSTags context.
     '''
-    with self.options.fstags:
-      yield
+    with super().run_context():
+      with self.options.fstags:
+        yield
 
   def cmd_linktree(self, argv):
     ''' Usage: {cmd} srctrees... dsttree
