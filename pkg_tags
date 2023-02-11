@@ -38,7 +38,7 @@ cs.distinfo
 cs.ebooks ok_revision="143e07dcc28380c9fcc2eca3af03b5af134d3c98" pypi.release="20230110" features={"20230110":["dedrm"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
-cs.excutils pypi.release="20221228" ok_revision="2e8aa06ec61e7b92454d70fa9430bda88a351076"
+cs.excutils pypi.release="20230212.1" ok_revision="2e8aa06ec61e7b92454d70fa9430bda88a351076"
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20221118" ok_revision=be925b0bc6d06d74b397a1f63e76fe7b7a42367f features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
 cs.fs ok_revision="3ee8daf7c926c65fe1acbef903e8dd0adcd7be4b" pypi.release="20221221" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
