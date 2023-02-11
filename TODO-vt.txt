@@ -1,3 +1,4 @@
+autotag to use the fstags autotag support, merge?
 FilesDir et al to accept optional index, bypassing indexclass if supplied
 FilesDir et al to accept optional index, bypassing indexclass if supplied
 every use of os.mkdir to use needdir
