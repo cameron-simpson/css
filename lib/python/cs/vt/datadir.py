@@ -840,8 +840,8 @@ class DataDir(FilesDir):
     bfr = CornuCopyBuffer.from_filename(filepath, offset=offset)
     yield from DataRecord.scan_with_offsets(bfr)
 
-  @upd_proxy
-  def _monitor_datafiles(self):
+  @with_upd_proxy
+  def _monitor_datafiles(self, *, upd_proxy: UpdProxy):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
 
         This is what supports shared use of the data area. Other clients
@@ -849,7 +849,6 @@ class DataDir(FilesDir):
         and new data in existing files and scans them, adding the index
         information to the local state.
     '''
-    proxy = self._monitor_proxy
     index = self.index
     filemap = self._filemap
     datadirpath = self.datapath
@@ -858,7 +857,7 @@ class DataDir(FilesDir):
         sleep(0.1)
         continue
       # scan for new datafiles
-      with proxy.extend_prefix(" check datafiles"):
+      with upd_proxy.extend_prefix(" check datafiles"):
         with Pfx("listdir(%r)", datadirpath):
           try:
             listing = list(os.listdir(datadirpath))
@@ -872,7 +871,7 @@ class DataDir(FilesDir):
           if (not filename.startswith('.')
               and filename.endswith(DATAFILE_DOT_EXT)
               and filename not in filemap):
-            with proxy.extend_prefix(" add " + filename):
+            with upd_proxy.extend_prefix(" add " + filename):
               info("MONITOR: add new filename %r", filename)
               filemap.add_path(filename)
       # now scan known datafiles for new data
@@ -1143,10 +1142,10 @@ class PlatonicDir(FilesDir):
     return DF
 
   @pfx_method(use_str=True)
-  def _monitor_datafiles(self):
+  @with_upd_proxy
+  def _monitor_datafiles(self, *, upd_proxy: UpdProxy):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
-    proxy = self._monitor_proxy
     datadirpath = self.datapath
     disabled = False
     while not self.cancelled:
@@ -1159,14 +1158,14 @@ class PlatonicDir(FilesDir):
       if disabled:
         info("scan %r ENABLED", shortpath(datadirpath))
         disabled = False
-      self._scan_datatree(proxy=proxy)
+      self._scan_datatree(upd_proxy=upd_proxy)
 
-  def _scan_datatree(self, *, proxy):
+  def _scan_datatree(self, *, upd_proxy: UpdProxy):
     topdir = self.topdir
     # scan for new datafiles
     seen = set()
     info("scan %s ... ", self.datapath)
-    with proxy.extend_prefix("walk "):
+    with upd_proxy.extend_prefix("walk "):
       updated = False
       for dirpath, dirnames, filenames in os.walk(self.datapath,
                                                   followlinks=True):
@@ -1213,7 +1212,7 @@ class PlatonicDir(FilesDir):
                 info("del %r", name)
                 del D[name]
           if filenames:
-            with (proxy.extend_prefix(f'{rdirpath}/ ')
+            with (upd_proxy.extend_prefix(f'{rdirpath}/ ')
                   if filenames else nullcontext()):
               for filename in filenames:
                 with Pfx(filename):
@@ -1225,10 +1224,10 @@ class PlatonicDir(FilesDir):
                   filepath = joinpath(dirpath, filename)
                   if not isfilepath(filepath):
                     continue
-                  proxy.text = f'scan {filename!r}'
+                  upd_proxy.text = f'scan {filename!r}'
                   try:
                     updated |= self._scan_datafile(
-                        D, filename, rfilepath, proxy=proxy
+                        D, filename, rfilepath, upd_proxy=upd_proxy
                     )
                   except Exception as e:
                     warning(
@@ -1241,7 +1240,7 @@ class PlatonicDir(FilesDir):
           updated = False
     self.flush()
 
-  def _scan_datafile(self, D, filename, rfilepath, *, proxy):
+  def _scan_datafile(self, D, filename, rfilepath, *, upd_proxy: UpdProxy):
     ''' Scan the data file at `data/{rfilepath}`, record as `D[filename]`.
         Return a Boolean indicating whether `D` was updated.
     '''
@@ -1300,12 +1299,12 @@ class PlatonicDir(FilesDir):
       if 1:
         scanner = progressbar(
             scanner,
-            "scan " + rfilepath[:max(16, proxy.width - 60)],
+            "scan " + rfilepath[:max(16, upd_proxy.width - 60)],
             position=DFstate.scanned_to,
             total=new_size,
             itemlenfunc=lambda t3: t3[2] - t3[0],
             update_frequency=256,
-            proxy=proxy,
+            proxy=upd_proxy,
             units_scale=BINARY_BYTES_SCALE,
             report_print=True,
         )

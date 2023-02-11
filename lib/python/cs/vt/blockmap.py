@@ -25,8 +25,8 @@ from cs.py.func import prop
 from cs.resources import RunStateMixin
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import upd_proxy, state as upd_state
 from cs.x import X
+from cs.upd import with_upd_proxy, UpdProxy
 from . import defaults
 from .block import HashCodeBlock, IndirectBlock
 
@@ -300,12 +300,11 @@ class BlockMap(RunStateMixin):
         submap.close()
         maps[i] = None
 
-  @upd_proxy
+  @with_upd_proxy
   @pfx_method(use_str=True)
-  def _load_maps(self, S):
+  def _load_maps(self, S, upd_proxy: UpdProxy):
     ''' Load leaf offsets and hashcodes into the unfilled portion of the blockmap.
     '''
-    proxy = upd_state.proxy
     offset = self.mapped_to
     mapsize = self.mapsize
     submap_index = offset // mapsize - 1
@@ -318,14 +317,14 @@ class BlockMap(RunStateMixin):
       submap_fp = None
       submap_path = None
       nleaves = 0
-      proxy.prefix = "%s(%s) leaves " % (type(self).__name__, block)
+      upd_proxy.prefix = "%s(%s) leaves " % (type(self).__name__, block)
       for leaf, start, length in progressbar(
           block.slices(offset, blocklen),
           position=offset,
           total=blocklen,
           itemlenfunc=(lambda leaf_start_length: leaf_start_length[2] -
                        leaf_start_length[1]),
-          proxy=proxy,
+          proxy=upd_proxy,
           update_frequency=16,
           units_scale=BINARY_BYTES_SCALE,
       ):
@@ -399,7 +398,7 @@ class BlockMap(RunStateMixin):
               "processed %d leaves in %gs (%d leaves/s)", nleaves,
               runstate.run_time, nleaves // runstate.run_time
           )
-      proxy("")
+      upd_proxy("")
       log_info("leaf scan finished")
       # attach final submap after the loop if one is in progress
       if submap_fp is not None:
