@@ -704,7 +704,7 @@ class RunState(HasThreadState):
     if handle_signal is None:
       handle_signal = self.handle_signal
     sigs = (sig,) if isinstance(sig, int) else sig
-    sig_hnds = map(lambda signum: (signum, handle_signal), sigs)
+    sig_hnds = {signum: handle_signal for signum in sigs}
     with signal_handlers(sig_hnds,
                          call_previous=call_previous) as old_handler_map:
       yield old_handler_map
