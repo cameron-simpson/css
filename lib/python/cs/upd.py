@@ -81,7 +81,7 @@ from cs.deco import decorator, default_params
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
-from cs.threads import State as ThreadState
+from cs.threads import HasThreadState, State as ThreadState
 from cs.tty import ttysize
 from cs.units import transcribe, TIME_SCALE
 
@@ -120,11 +120,13 @@ def _cleanup():
 atexit.register(_cleanup)
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
-class Upd(SingletonMixin):
+class Upd(SingletonMixin, HasThreadState):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
 
       The default backend is `sys.stderr`.
   '''
+
+  state = ThreadState()
 
   # pylint: disable=unused-argument
   @staticmethod
@@ -220,47 +222,33 @@ class Upd(SingletonMixin):
     )
 
   ############################################################
-  # Sequence methods.
-  #
-
-  def __len__(self):
-    ''' The length of an `Upd` is the number of slots.
-    '''
-    return len(self._slot_text)
-
-  def __getitem__(self, index):
-    return self._slot_text[index]
-
-  def __setitem__(self, index, txt):
-    self.out(txt, slot=index)
-
-  def __delitem__(self, index):
-    self.delete(index)
-
-  ############################################################
   # Context manager methods.
   #
 
-  def __enter__(self):
-    return self
+  def __enter_exit__(self):
+    ''' Generator supporting `__enter__` and `__exit__`.
 
-  def __exit__(self, exc_type, exc_val, _):
-    ''' Tidy up on exiting the context.
-
-        If we are exiting because of an exception
+        On shutdown, if we are exiting because of an exception
         which is not a `SystemExit` with a `code` of `None` or `0`
         then we preserve the status lines one screen.
         Otherwise we clean up the status lines.
     '''
-    preserve_display = not (
-        exc_type is None or (
-            issubclass(exc_type, SystemExit) and (
-                exc_val.code == 0
-                if isinstance(exc_val.code, int) else exc_val.code is None
+    with HasThreadState.as_contextmanager(self):
+      try:
+        yield self
+      except Exception as e:
+        exc_type = type(e)
+        # pylint: disable=no-member
+        preserve_display = not (
+            exc_type is None or (
+                issubclass(exc_type, SystemExit) and
+                (e.code == 0 if isinstance(e.code, int) else e.code is None)
             )
         )
-    )
-    self.shutdown(preserve_display)
+        self.shutdown(preserve_display)
+        raise
+      else:
+        self.shutdown()
 
   def shutdown(self, preserve_display=False):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
@@ -285,6 +273,24 @@ class Upd(SingletonMixin):
           self._backend.write(''.join(txts))
           self._backend.flush()
     self._reset()
+
+  ############################################################
+  # Sequence methods.
+  #
+
+  def __len__(self):
+    ''' The length of an `Upd` is the number of slots.
+    '''
+    return len(self._slot_text)
+
+  def __getitem__(self, index):
+    return self._slot_text[index]
+
+  def __setitem__(self, index, txt):
+    self.out(txt, slot=index)
+
+  def __delitem__(self, index):
+    self.delete(index)
 
   def _set_cursor_visible(self, mode):
     ''' Set the cursor visibility mode, return terminal sequence.
@@ -976,9 +982,10 @@ class Upd(SingletonMixin):
       )
 
 def uses_upd(func):
-  ''' Decorator for functions accepting an optional `upd=Upd()` parameter.
+  ''' Decorator for functions accepting an optional `upd=Upd()` parameter,
+      default from `Upd.state.current`.
   '''
-  return default_params(func, upd=Upd)
+  return default_params(func, upd=Upd.default)
 
 @uses_upd
 def out(msg, *a, upd, **outkw):
