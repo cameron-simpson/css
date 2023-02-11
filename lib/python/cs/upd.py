@@ -1186,7 +1186,7 @@ class UpdProxy(object):
   def text(self):
     ''' The text of this proxy's slot, without the prefix.
     '''
-    return self._text or ('' if self._auto_text is None else self._auto_text())
+    return self._text or ('' if self._text_auto is None else self._text_auto())
 
   @text.setter
   def text(self, txt):
