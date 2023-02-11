@@ -7,7 +7,6 @@
 ''' cs.vt command line utility.
 '''
 
-from collections import defaultdict
 from contextlib import contextmanager, nullcontext
 from datetime import datetime
 import errno
@@ -18,7 +17,6 @@ from os.path import (
     basename,
     splitext,
     exists as existspath,
-    expanduser,
     exists as pathexists,
     join as joinpath,
     isdir as isdirpath,
@@ -43,24 +41,23 @@ from cs.progress import progressbar, Progress
 from cs.py.modules import import_extra
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import print
+from cs.upd import print  # pylint: disable=redefined-builtin
 
 from . import (
     common,
     defaults,
-    DEFAULT_CONFIG_PATH,
-    DEFAULT_CONFIG_ENVVAR,
     DISTINFO,
+    Store,
 )
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
     blocked_chunks_of,
-    blocked_chunks_of2,
     top_block_for,
     blockify,
+    block_for,
 )
 from .compose import get_store_spec
-from .config import Config, Store
+from .config import Config
 from .convert import expand_path
 from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
@@ -73,11 +70,10 @@ from .paths import OSDir, OSFile, path_resolve
 from .scan import (
     MIN_BLOCKSIZE,
     MAX_BLOCKSIZE,
-    scanbuf,
-    py_scanbuf,
     scanbuf2,
     py_scanbuf2,
-    scan,
+    scan_offsets,
+    scan_reblock,
 )
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore, ProgressStore
@@ -99,13 +95,31 @@ def mount_vtfs(argv=None):
   argv0 = argv.pop(0)
   return main([argv0, "mount"] + argv)
 
+def print_hist(samples, bins=128):
+  ''' Print a histogram of `samples` using `bins`.
+  '''
+  try:
+    mplutils = import_extra('cs.mplutils', DISTINFO)
+  except ImportError as e:
+    warning("import cs.mplutils: %s", e)
+    print(len(samples), "distinct samples")
+  else:
+    ax = mplutils.axes()
+    ax.hist(samples, 128)
+    mplutils.print_figure(ax)
+
 class VTCmd(BaseCommand):
   ''' A main programme instance.
   '''
 
-  VT_STORE_ENVVAR = 'VT_STORE'
-  VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
-  DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
+  from . import (
+      DEFAULT_CONFIG_ENVVAR,
+      DEFAULT_CONFIG_PATH,
+      DEFAULT_HASHCLASS_ENVVAR,
+      VT_CACHE_STORE_ENVVAR,
+      VT_STORE_ENVVAR,
+  )
+
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
 
@@ -149,9 +163,7 @@ class VTCmd(BaseCommand):
       options.verbose = sys.stderr.isatty()
     except AttributeError:
       options.verbose = False
-    options.config_path = os.environ.get(
-        'VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH)
-    )
+    options.config_map = None
     options.store_spec = None
     options.cache_store_spec = os.environ.get(
         self.VT_CACHE_STORE_ENVVAR, '[cache]'
@@ -177,7 +189,7 @@ class VTCmd(BaseCommand):
         # specify Store
         options.store_spec = val
       elif opt == '-f':
-        options.config_path = val
+        options.config_map = val
       elif opt == '-h':
         options.hashname = val
       elif opt == '-P':
@@ -203,7 +215,7 @@ class VTCmd(BaseCommand):
       self.loginfo.level = logging.INFO
     if options.dflt_log is not None:
       logTo(options.dflt_log, delay=True)
-    options.config = Config(options.config_path)
+    options.config = Config(options.config_map)
 
   def handle_signal(self, sig, frame):
     ''' Override `BaseCommand.handle_signal`:
@@ -226,14 +238,11 @@ class VTCmd(BaseCommand):
       options = self.options
       cmd = self.cmd
       config = options.config
-      runstate = options.runstate
       show_progress = options.show_progress
-      with stackattrs(common, runstate=runstate, config=config):
+      with stackattrs(common, config=config):
         # redo these because defaults is already initialised
-        with stackattrs(defaults, runstate=runstate,
-                        show_progress=show_progress):
-          if cmd in ("config", "dump", "help", "init", "profile", "scan",
-                     "test"):
+        with stackattrs(defaults, show_progress=show_progress):
+          if cmd in ("config", "dump", "help", "init", "profile", "scan"):
             yield
           else:
             # open the default Store
@@ -245,7 +254,6 @@ class VTCmd(BaseCommand):
               options.store_spec = store_spec
             with Pfx("-S %r", options.store_spec):
               try:
-                # set up the primary Store using the main programme RunState for control
                 S = Store(options.store_spec, options.config)
               except (KeyError, ValueError) as e:
                 raise GetoptError(f"unusable Store specification: {e}") from e
@@ -294,7 +302,6 @@ class VTCmd(BaseCommand):
                     yield
             if cacheS:
               cacheS.backend = None
-      runstate.cancel()
       if ifdebug():
         dump_debug_threads()
 
@@ -311,11 +318,10 @@ class VTCmd(BaseCommand):
             blocked_chunks  Scan the data into edge aligned chunks without a parser.
             blocked_chunks2 Scan the data into edge aligned chunks without a parser.
             blockify        Scan the data into edge aligned Blocks without a parser.
-            py_scanbuf      Run the old pure Python scanbuf against the data.
             py_scanbuf2     Run the new pure Python scanbuf against the data.
             read            Read from data.
-            scan            Run the new scan function against the data.
-            scanbuf         Run the old C scanbuf against the data.
+            scan_offsets    Run the new scan_offsets function against the data.
+            scan_reblock    Run the new scan_reblock function against the data.
             scanbuf2        Run the new C scanbuf2 against the data.
     '''
     runstate = self.options.runstate
@@ -326,6 +332,7 @@ class VTCmd(BaseCommand):
     if os.isatty(data_fd):
       warning("reading data from %s", RANDOM_DEV)
       data_fd = pfx_call(os.open, RANDOM_DEV, os.O_RDONLY)
+    sizes = []
     inbfr = CornuCopyBuffer.from_fd(data_fd, readsize=1024 * 1024)
     try:
       S = os.fstat(data_fd)
@@ -337,7 +344,7 @@ class VTCmd(BaseCommand):
     with Pfx(mode):
       if mode == 'blocked_chunks':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         hash_value = 0
         for chunk in progressbar(
             blocked_chunks_of(inbfr),
@@ -350,26 +357,10 @@ class VTCmd(BaseCommand):
             runstate=runstate,
             report_print=True,
         ):
-          pass
-      elif mode == 'blocked_chunks2':
-        if argv:
-          raise GetoptError("extra arguments: %r", argv)
-        hash_value = 0
-        for chunk in progressbar(
-            blocked_chunks_of2(inbfr),
-            label=mode,
-            ##update_min_size=65536,
-            update_frequency=1024,
-            itemlenfunc=len,
-            total=length,
-            units_scale=BINARY_BYTES_SCALE,
-            runstate=runstate,
-            report_print=True,
-        ):
-          pass
+          sizes.append(len(chunk))
       elif mode == 'blockify':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         last_offset = 0
         for offset in progressbar(
             blockify(inbfr),
@@ -383,24 +374,9 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           last_offset = offset
-      elif mode == 'py_scanbuf':
-        if argv:
-          raise GetoptError("extra arguments: %r", argv)
-        hash_value = 0
-        for chunk in progressbar(
-            inbfr,
-            label=mode,
-            update_min_size=65536,
-            itemlenfunc=len,
-            total=length,
-            units_scale=BINARY_BYTES_SCALE,
-            runstate=runstate,
-            report_print=True,
-        ):
-          hash_value, chunk_scan_offsets = py_scanbuf(hash_value, chunk)
       elif mode == 'py_scanbuf2':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         hash_value = 0
         for chunk in progressbar(
             inbfr,
@@ -417,7 +393,7 @@ class VTCmd(BaseCommand):
           )
       elif mode == 'read':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         for chunk in progressbar(
             inbfr,
             label=mode,
@@ -429,12 +405,12 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           pass
-      elif mode == 'scan':
+      elif mode == 'scan_offsets':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         last_offset = 0
         for offset in progressbar(
-            scan(inbfr),
+            scan_offsets(inbfr),
             label=mode,
             update_frequency=256,
             ##update_min_size=65536,
@@ -444,26 +420,26 @@ class VTCmd(BaseCommand):
             runstate=runstate,
             report_print=True,
         ):
+          sizes.append(offset - last_offset)
           last_offset = offset
-      elif mode == 'scanbuf':
+      elif mode == 'scan_reblock':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
-        hash_value = 0
+          raise GetoptError(f'extra arguments: {argv!r}')
         for chunk in progressbar(
-            inbfr,
+            scan_reblock(inbfr),
             label=mode,
+            update_frequency=256,
             ##update_min_size=65536,
-            update_frequency=128,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
             runstate=runstate,
             report_print=True,
         ):
-          hash_value, chunk_scan_offsets = scanbuf(hash_value, chunk)
+          sizes.append(len(chunk))
       elif mode == 'scanbuf2':
         if argv:
-          raise GetoptError("extra arguments: %r", argv)
+          raise GetoptError(f'extra arguments: {argv!r}')
         hash_value = 0
         for chunk in progressbar(
             inbfr,
@@ -479,8 +455,18 @@ class VTCmd(BaseCommand):
           hash_value, chunk_scan_offsets = scanbuf2(
               chunk, hash_value, 0, MIN_BLOCKSIZE, MAX_BLOCKSIZE
           )
+          print(
+              "scanbuf2", len(chunk), '=>', len(chunk_scan_offsets),
+              'chunk offsets'
+          )
+          offset = 0
+          for scan_offset in chunk_scan_offsets:
+            sizes.append(scan_offset - offset)
+          sizes.append(len(chunk) - scan_offset)
       else:
         raise GetoptError("unknown mode")
+      if sizes:
+        print_hist(sizes)
     return 0
 
   def cmd_cat(self, argv):
@@ -498,7 +484,7 @@ class VTCmd(BaseCommand):
           Recite the configuration.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     print(self.options.config.as_text().rstrip())
     return 0
 
@@ -520,7 +506,7 @@ class VTCmd(BaseCommand):
         if path.endswith('.vtd'):
           print(path)
           try:
-            fd = os.open(path, os.O_RDONLY)
+            fd = pfx_call(os.open, path, os.O_RDONLY)
           except OSError as e:
             warning("open: %s", e)
             xit = 1
@@ -588,11 +574,9 @@ class VTCmd(BaseCommand):
         TODO: hook into vt.merge.
     '''
     options = self.options
-    options.update(
-        delete=False,
-        overlay=False,
-        whole_read=False,
-    )
+    options.delete = False
+    options.overlay = False
+    options.whole_read = False
     options.popopts(argv, D='delete', o='overlay', W='whole_read')
     if not argv:
       raise GetoptError("missing srcpath")
@@ -713,7 +697,12 @@ class VTCmd(BaseCommand):
           first = False
         else:
           print()
-        D, offset = parse(path)
+        try:
+          D, offset = parse(path)
+        except ValueError as e:
+          warning("parse error: %s", e)
+          xit = 1
+          continue
         if offset < len(path):
           warning("unparsed text: %r, skipping", path[offset:])
           xit = 1
@@ -921,7 +910,7 @@ class VTCmd(BaseCommand):
         source = OSDir(ospath)
       else:
         source = OSFile(ospath)
-      if not merge(target, source, runstate=self.options.runstate):
+      if not merge(target, source):
         error("merge into %r fails", arpath)
         return 1
       A.update(target)
@@ -1058,7 +1047,7 @@ class VTCmd(BaseCommand):
     srcS = self.popStore(argv, "other_store")
     dstS = defaults.S
     if not argv:
-      pushables = srcS,
+      pushables = (srcS,)
     else:
       pushables = []
       ok = True
@@ -1087,7 +1076,7 @@ class VTCmd(BaseCommand):
     dstS = self.popStore(argv, "other_store")
     if not argv:
       # default is to push the entire source Store to the destination
-      pushables = srcS,
+      pushables = (srcS,)
     else:
       pushables = []
       ok = True
@@ -1270,9 +1259,11 @@ class VTCmd(BaseCommand):
     ''' Usage: {cmd} subtest [subtestargs...]
           Test various facilites.
           blockify filenames... Blockify the contents of the filenames.
+          block_for filename    Store filename and report its top Block.
     '''
     if not argv:
       raise GetoptError("missing test subcommand")
+    runstate = self.options.runstate
     subcmd = argv.pop(0)
     with Pfx(subcmd):
       if subcmd == 'blockify':
@@ -1287,23 +1278,26 @@ class VTCmd(BaseCommand):
             total_size = os.fstat(f.fileno()).st_size
             sizes = [
                 len(chunk) for chunk in progressbar(
-                    blocked_chunks_of2(file_data(f, None), scanner=scanner),
-                    f"blocked_chunks_of2({shortpath(filename)})",
+                    blocked_chunks_of(file_data(f, None), scanner=scanner),
+                    f"blocked_chunks_of({shortpath(filename)})",
                     units_scale=BINARY_BYTES_SCALE,
                     update_frequency=64,
                     itemlenfunc=len,
                     total=total_size,
+                    runstate=runstate,
                 )
             ]
-        try:
-          mplutils = import_extra('cs.mplutils', DISTINFO)
-        except ImportError as e:
-          warning("import cs.mplutils: %s", e)
-          print(len(sizes), "distinct sizes")
-        else:
-          ax = mplutils.axes()
-          ax.hist(sizes, 128)
-          mplutils.print_figure(ax)
+        print_hist(sizes)
+        return 0
+      elif subcmd == 'block_for':
+        if not argv:
+          raise GetoptError("missing filename")
+        filename = argv.pop(0)
+        with Pfx(filename):
+          if argv:
+            raise GetoptError("extra arguments after filename: %r" % (argv,))
+          B = block_for(filename)
+          print(B)
           return 0
     raise GetoptError("unrecognised subcommand")
 

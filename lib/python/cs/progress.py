@@ -328,10 +328,9 @@ class BaseProgress(object):
       # how much room for an arrow? we would like:
       # "label: left arrow right"
       arrow_width = width - len(left) - len(right) - len(label) - 2
-      if label:
-        arrow_width -= 2  # allow for ': ' separator after label
-      if arrow_width < 1:
-        # no room for an arrow
+      if label:  # allow for ': ' separator after label
+        arrow_width -= 2
+      if arrow_width < 1:  # no room for an arrow
         arrow_field = ':'
       else:
         arrow_field = ' ' + self.arrow(arrow_width) + ' '
@@ -342,15 +341,12 @@ class BaseProgress(object):
         prefix = label + ': '
       elif label_width == len(label) + 1:
         prefix = label + ':'
-      # label_width<=len(label): need to crop the label
-      elif label_width <= 0:
+      elif label_width <= 0:  # label_width<=len(label): need to crop the label
         # no room
         prefix = ''
-      elif label_width == 1:
-        # just indicate the crop
+      elif label_width == 1:  # just indicate the crop
         prefix = '<'
-      elif label_width == 2:
-        # just indicate the crop
+      elif label_width == 2:  # just indicate the crop
         prefix = '<:'
       else:
         # crop as "<tail-of-label:"
@@ -465,6 +461,7 @@ class BaseProgress(object):
       width=None,
       window=None,
       update_frequency=1,
+      update_period=0.2,
       update_min_size=None,
       report_print=None,
       runstate=None,
@@ -508,6 +505,9 @@ class BaseProgress(object):
         * `update_min_size`: optional update step size;
           only update the progress bar after an advance of this many units,
           useful if the iteration size increment is quite small
+        * `update_period`: optional update time period, default `0.2`;
+          only update the progress bar after this much time has
+          elapsed since the last update
         * `report_print`: optional `print` compatible function
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
@@ -540,8 +540,11 @@ class BaseProgress(object):
     if proxy is None:
       if upd is None:
         upd = Upd()
-      proxy = upd.insert(1)
+      proxy = upd.insert(1, update_period=update_period)
       delete_proxy = True
+    else:
+      old_update_period = proxy.update_period
+      proxy.update_period = update_period
     if statusfunc is None:
       statusfunc = lambda P, label, width: P.status(
           label, width, window=window
@@ -549,16 +552,20 @@ class BaseProgress(object):
     iteration = 0
     last_update_iteration = 0
     last_update_pos = start_pos = self.position
+    last_update_time = None
 
     def update_status(force=False):
       nonlocal self, proxy, statusfunc, label, width
-      nonlocal iteration, last_update_iteration, last_update_pos
+      nonlocal iteration, last_update_iteration, last_update_pos, last_update_time
+      now = time.time()
       if (force or iteration - last_update_iteration >= update_frequency
           or (update_min_size is not None
-              and self.position - last_update_pos >= update_min_size)):
+              and self.position - last_update_pos >= update_min_size)
+          or (update_period and now >= last_update_time + update_period)):
         last_update_iteration = iteration
         last_update_pos = self.position
         proxy(statusfunc(self, label, width or proxy.width))
+        last_update_time = now
 
     update_status(True)
     try:
@@ -577,6 +584,8 @@ class BaseProgress(object):
       if delete_proxy:
         proxy.delete()
       else:
+        # restore previous update frequency
+        proxy.update_period = old_update_period
         update_status(True)
       if report_print:
         if isinstance(report_print, bool):

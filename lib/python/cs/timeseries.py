@@ -3197,12 +3197,12 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def startup_shutdown(self):
     ''' Close the subsidiary `TimeSeries` instances.
     '''
-    try:
-      with self.fstags:
+    with self.fstags:
+      try:
         yield
-    finally:
-      for ts in self._ts_by_partition.values():
-        ts.close()
+      finally:
+        for ts in self._ts_by_partition.values():
+          ts.close()
 
   @property
   @cachedmethod

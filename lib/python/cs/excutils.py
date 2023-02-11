@@ -83,6 +83,8 @@ def noexc(func):
   '''
 
   def noexc_wrapper(*args, **kwargs):
+    from cs.gimmicks import exception  # pylint: disable=import-outside-toplevel
+    from cs.x import X  # pylint: disable=import-outside-toplevel
     # pylint: disable=broad-except
     try:
       return func(*args, **kwargs)
@@ -93,7 +95,6 @@ def noexc(func):
         )
       except Exception as e:
         try:
-          from cs.x import X  # pylint: disable=import-outside-toplevel
           X(
               "exception calling %s(%s, **(%s)): %s", func.__name__, args,
               kwargs, e
@@ -120,6 +121,7 @@ def noexc_gen(func):
       it = iter(func(*args, **kwargs))
     except Exception as e0:
       try:
+        from cs.gimmicks import exception  # pylint: disable=import-outside-toplevel
         exception(
             "exception calling %s(*%s, **(%s)): %s", func.__name__, args,
             kwargs, e0
@@ -140,6 +142,7 @@ def noexc_gen(func):
         raise
       except Exception as e:
         try:
+          from cs.gimmicks import exception  # pylint: disable=import-outside-toplevel
           exception(
               "exception calling next(%s(*%s, **(%s))): %s", func.__name__,
               args, kwargs, e
@@ -187,7 +190,6 @@ def transmute(func, exc_from, exc_to=None):
               (type(src_exc), src_exc, exc_to)
           )
       )
-      # TODO: raise from for py3
       raise_from(src_exc, dst_exc)  # pylint: disable=undefined-variable
       raise RuntimeError("NOTREACHED")  # pylint: disable=raise-missing-from
 
@@ -242,6 +244,7 @@ class NoExceptions(object):
       if self.handler is not None:
         return self.handler(exc_type, exc_value, tb)
       # report handled exception
+      from cs.gimmicks import warning  # pylint: disable=import-outside-toplevel
       warning("IGNORE  " + str(exc_type) + ": " + str(exc_value))
       for line in traceback.format_tb(tb):
         warning("IGNORE> " + line[:-1])
@@ -253,6 +256,7 @@ def LogExceptions(conceal=False):
   '''
 
   def handler(exc_type, exc_value, _):
+    from cs.gimmicks import exception  # pylint: disable=import-outside-toplevel
     exception("EXCEPTION: <%s> %s", exc_type, exc_value)
     return conceal
 
@@ -298,8 +302,7 @@ def exc_fold(func, exc_types=None, exc_return=False):
   def wrapped(*a, **kw):
     try:
       return func(*a, **kw)
-    except exc_types as e:
-      error("%s", e)
+    except exc_types:
       return exc_return
 
   wrapped.__name__ = (

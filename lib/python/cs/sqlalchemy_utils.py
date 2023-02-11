@@ -29,7 +29,7 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-__version__ = '20220606-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'description':
@@ -297,7 +297,7 @@ class ORM(MultiOpenMixin, ABC):
       self._sessionmaker_raw = None
     self.db_url = db_url
     self.engine_keywords = dict(
-        case_sensitive=True,
+        ##case_sensitive=True,
         echo='SQL' in map(str.upper,
                           os.environ.get('DEBUG', '').split(',')),
     )

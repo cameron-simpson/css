@@ -36,7 +36,7 @@ from heapq import heappush, heappop
 from itertools import zip_longest
 import logging
 import sys
-from threading import Lock, Thread, Event
+from threading import Lock, Event, Thread as builtin_Thread
 import time
 from typing import Callable, Iterable, Optional
 
@@ -218,7 +218,7 @@ class LateFunction(Result):
       TODO: .cancel(), timeout for wait().
   '''
 
-  def __init__(self, func, name=None, retry_delay=None):
+  def __init__(self, func, name=None, retry_delay=None, no_context=False):
     ''' Initialise a `LateFunction`.
 
         Parameters:
@@ -235,6 +235,9 @@ class LateFunction(Result):
       retry_delay = DEFAULT_RETRY_DELAY
     self.name = name
     self.retry_delay = retry_delay
+    # we prepare the Thread now in order to honour the perThread states
+    self.thread = (builtin_Thread if no_context else HasThreadState.Thread
+                   )(name=name, target=func)
 
   def __str__(self):
     return "%s[%s]" % (type(self).__name__, self.name)
@@ -251,7 +254,7 @@ class LateFunction(Result):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    return self.bg(self.func)
+    return self.thread.start()
 
   @OBSOLETE
   def wait(self):
@@ -372,7 +375,9 @@ class Later(MultiOpenMixin, HasThreadState):
         # - dispatch a Thread to wait for completion and fire the
         #   finished_event Event
         # queue final action to mark activity completion
-        self.defer(self.finished_event.set, force=True)
+        self.defer(
+            dict(no_context=True), self.finished_event.set, _force_submit=True
+        )
         if self._timerQ:
           self._timerQ.close()
           self._timerQ.join()
@@ -444,9 +449,9 @@ class Later(MultiOpenMixin, HasThreadState):
 
   def __str__(self):
     return (
-        "<%s[%s] pending=%d running=%d delayed=%d>" % (
-            self.name, self.capacity, len(self.pending), len(self.running),
-            len(self.delayed)
+        "<%s:%s[%s] pending=%d running=%d delayed=%d>" % (
+            self.__class__.__name__, self.name, self.capacity,
+            len(self.pending), len(self.running), len(self.delayed)
         )
     )
 
@@ -536,8 +541,8 @@ class Later(MultiOpenMixin, HasThreadState):
     '''
     citation = funccite(method)
 
-    def submittable_method(self, *a, force=False, **kw):
-      if not force and not self.is_submittable():
+    def submittable_method(self, *a, _force_submit=False, **kw):
+      if not _force_submit and not self.is_submittable():
         raise RuntimeError("%s: %s: not submittable" % (self, citation))
       return method(self, *a, **kw)
 
@@ -597,7 +602,8 @@ class Later(MultiOpenMixin, HasThreadState):
       name=None,
       pfx=None,  # pylint: disable=redefined-outer-name
       LF=None,
-      retry_delay=None
+      retry_delay=None,
+      no_context=False,
   ):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding `LateFunction` for result collection.
@@ -631,7 +637,9 @@ class Later(MultiOpenMixin, HasThreadState):
     if pfx is not None:
       func = pfx.partial(func)
     if LF is None:
-      LF = LateFunction(func, name=name, retry_delay=retry_delay)
+      LF = LateFunction(
+          func, name=name, retry_delay=retry_delay, no_context=no_context
+      )
     pri_entry = list(priority)
     pri_entry.append(seq())  # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
@@ -728,7 +736,7 @@ class Later(MultiOpenMixin, HasThreadState):
       func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = self.submit(func, force=True, **params)  # pylint: disable=unexpected-keyword-arg
+    LF = self.submit(func, _force_submit=True, **params)  # pylint: disable=unexpected-keyword-arg
     return LF
 
   def with_result_of(self, callable1, func, *a, **kw):
@@ -994,7 +1002,9 @@ class SubLater(object):
           except Exception as e:  # pylint: disable=broad-except
             exception("%s: reap %s: %s", self, LF, e)
 
-    T = Thread(name="reaper(%s)" % (self,), target=reap, args=(self._queue,))
+    T = HasThreadState.Thread(
+        name="reaper(%s)" % (self,), target=reap, args=(self._queue,)
+    )
     T.start()
     return T
 

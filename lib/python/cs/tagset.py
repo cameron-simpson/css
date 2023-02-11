@@ -232,7 +232,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20230126-post'
+__version__ = '20230210-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -2962,11 +2962,12 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     subtagsets = self._subtagsets_for_type(type_name)
     return subtagsets.typedef(type_name)
 
+  @pfx_method
   def type_names(self):
     ''' Return defined type names i.e. all entries starting `type.`.
     '''
     return set(
-        subtagsets.key(subtype_name)
+        subtype_name  ## subtagsets.key(subtype_name)
         for subtagsets in self._subtagsetses
         for subtype_name in subtagsets.type_names()
     )
@@ -3463,7 +3464,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
               with Pfx(name):
                 if not tags:
                   continue
-                X("update_mapping=%s", r(update_mapping))
                 if update_mapping:
                   # mirror tags to secondary mapping eg an SQLTags
                   # this associates a UUID with the file
