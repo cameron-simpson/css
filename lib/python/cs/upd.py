@@ -1257,46 +1257,28 @@ class UpdProxy(object):
         index += self.index
       return upd.insert(index, txt)
 
-# pylint: disable=too-few-public-methods
-class _UpdState(ThreadState):
-
-  def __getattr__(self, attr):
-    if attr == 'upd':
-      value = Upd()
-    else:
-      raise AttributeError("%s.%s" % (type(self).__name__, attr))
-    setattr(self, attr, value)
-    return value
-
-state = _UpdState()
-
 @decorator
-def upd_proxy(func, prefix=None, insert_at=1):
-  ''' Decorator to create a new `UpdProxy` and record it as `state.proxy`.
+def with_upd_proxy(func, prefix=None, insert_at=1):
+  ''' Decorator to run `func` with an additional parameter `upd_proxy`
+      being an `UpdProxy` for progress reporting.
 
-      Parameters:
-      * `func`: the function to decorate
-      * `prefix`: initial proxy prefix, default `func.__name__`
-      * `insert_at`: the position for the new proxy, default `1`
+      Example:
 
-      Typical example:
-
-          from cs.upd import upd_proxy, state as upd_state
-          ...
-          @upd_proxy
-          def func*(self, ...):
-              proxy = upd_state.proxy
-              proxy.prefix = str(self) + " taskname"
+          @with_upd_proxy
+          def func(*a, upd_proxy:UpdProxy, **kw):
+            ... perform task, updating upd_proxy ...
   '''
+
   if prefix is None:
     prefix = func.__name__
 
-  def upd_proxy_wrapper(*a, **kw):
-    with state.upd.insert(insert_at) as proxy:
-      with stackattrs(state, proxy=proxy):
-        return func(*a, **kw)
+  @uses_upd
+  def upd_with_proxy_wrapper(*a, upd, **kw):
+    with upd.insert(insert_at) as proxy:
+      with stackattrs(proxy, prefix=prefix):
+        return func(*a, upd_proxy=proxy, **kw)
 
-  return upd_proxy_wrapper
+  return upd_with_proxy_wrapper
 
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.
