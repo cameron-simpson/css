@@ -87,8 +87,8 @@ from cs.units import transcribe, TIME_SCALE
 
 try:
   import curses
-except ImportError as e:
-  warning("cannot import curses: %s", e)
+except ImportError as import_e:
+  warning("cannot import curses: %s", import_e)
   curses = None
 
 __version__ = '20221228-post'
@@ -927,6 +927,7 @@ class Upd(SingletonMixin, HasThreadState):
         self._backend.flush()
       return proxy
 
+  # pylint: disable=too-many-arguments
   @contextmanager
   def run_task(
       self,
