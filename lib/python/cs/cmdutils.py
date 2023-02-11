@@ -33,9 +33,9 @@ from cs.lex import (
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
-from cs.resources import RunState
+from cs.resources import RunState, uses_runstate
 
-__version__ = '20221228-post'
+__version__ = '20230211-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1070,7 +1070,8 @@ class BaseCommand:
     return True
 
   @contextmanager
-  def run_context(self):
+  @uses_runstate
+  def run_context(self, runstate: RunState):
     ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
 
         This default does several things, and subclasses should
@@ -1088,14 +1089,13 @@ class BaseCommand:
     # redundant try/finally to remind subclassers of correct structure
     try:
       options = self.options
-      try:
-        runstate = options.runstate
-      except AttributeError:
-        runstate = RunState(
-            self.cmd,
-            signals=options.runstate_signals,
-            handle_signal=getattr(self, 'handle_signal', None),
-        )
+      if runstate is None:
+        runstate = getattr(options, 'runstate', None)
+        if runstate is None:
+          runstate = RunState(self.cmd)
+      handle_signal = getattr(
+          self, 'handle_signal', lambda *_: runstate.cancel()
+      )
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with upd_context:
@@ -1107,7 +1107,10 @@ class BaseCommand:
           ):
             X("options.runstate = %r", options.runstate)
             with options.runstate:
-              yield
+              with runstate.catch_signal(options.runstate_signals,
+                                         call_previous=False,
+                                         handle_signal=handle_signal):
+                yield
     finally:
       pass
 
@@ -1150,3 +1153,48 @@ class BaseCommand:
     if unknown:
       warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit
+
+  def shell(self, *argv, banner=None, local=None):
+    ''' Run an interactive Python prompt with some predefined local names.
+
+        Parameters:
+        * `argv`: any notional command line arguments
+        * `banner`: optional banner string
+        * `local`: optional local names mapping
+
+        The default `local` mapping is a `dict` containing:
+        * `argv`: from `argv`
+        * `options`: from `self.options`
+        * `self`: from `self`
+        * the attributes of `options`
+        * the attributes of `self`
+
+        This is not presented automatically as a subcommand, but
+        commands wishing such a command should provide something
+        like this:
+
+            def cmd_shell(self, argv):
+              """ Usage: {cmd}
+                    Run an interactive Python prompt with some predefined local names.
+              """
+              return self.shell(*argv)
+    '''
+    options = self.options
+    if banner is None:
+      banner = f'{self.cmd}: {options.sqltags}'
+    if local is None:
+      local = dict(self.__dict__)
+      local.update(options.__dict__)
+      local.update(argv=argv, cmd=self.cmd, options=options, self=self)
+    try:
+      from bpython import embed
+    except ImportError:
+      return interact(
+          banner=banner,
+          local=local,
+      )
+    else:
+      return embed(
+          banner=banner,
+          locals_=local,
+      )

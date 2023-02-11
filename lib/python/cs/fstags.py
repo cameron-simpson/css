@@ -96,6 +96,7 @@ from pathlib import PurePath
 import shutil
 import sys
 from threading import Lock, RLock
+from typing import Mapping, Optional
 
 from icontract import ensure, require
 from typeguard import typechecked
@@ -113,7 +114,7 @@ from cs.lex import (
 )
 from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.tagset import (
     Tag,
     TagSet,
@@ -128,7 +129,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20221228-post'
+__version__ = '20230211-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -167,6 +168,9 @@ XATTR_B = (
 
 FIND_OUTPUT_FORMAT_DEFAULT = '{fspath}'
 LS_OUTPUT_FORMAT_DEFAULT = '{fspath:json} {tags}'
+
+FSTAGS_UPDATE_MAPPING_ENVVAR = 'FSTAGS_UPDATE_MAPPING'
+FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR = 'FSTAGS_UPDATE_MAPPING_PREFIX'
 
 # pylint: disable=too-many-locals
 
@@ -379,7 +383,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return xit
 
   # pylint: disable=too-many-branches
-  def cmd_find(self, argv):
+  @uses_runstate
+  def cmd_find(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
           List files from path matching all the constraints.
           --direct    Use direct tags instead of all tags.
@@ -434,6 +439,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         print(include)
     else:
       for fspath in filepaths:
+        if runstate.cancelled:
+          return 1
         with Pfx(fspath):
           try:
             output = fstags[fspath].format_as(
@@ -572,7 +579,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             )
     return 0
 
-  def cmd_ls(self, argv):
+  @uses_runstate
+  def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-d] [--direct] [-o output_format] [paths...]
           List files from paths and their tags.
           -d          Treat directories like files, do not recurse.
@@ -608,6 +616,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       fullpath = realpath(path)
       for fspath in ((fullpath,)
                      if directories_like_files else rfilepaths(fullpath)):
+        if runstate.cancelled:
+          return 1
         with Pfx(fspath):
           tags = fstags[fspath]
           if long_format:
@@ -1026,19 +1036,59 @@ class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
+  @fmtdoc
   def __init__(
-      self, tagsfile_basename=None, ontology_filepath=None, physical=None
+      self,
+      tagsfile_basename=None,
+      ontology_filepath=None,
+      physical=None,
+      update_mapping: Optional[Mapping] = None,
+      update_prefix: Optional[str] = __name__,
+      update_uuid_tag_name: Optional[str] = 'uuid',
   ):
+    ''' Initialise the `FSTags` instance.
+
+        Parameters:
+        * `tagsfile_basename`: optional basename forthe backing tags files,
+          default from `TAGSFILE_BASENAME`: `{TAGSFILE_BASENAME!r}`
+        * `ontology_filepath`: optional filesystem path for an associated ontology
+        * `physical`: optional flag for the associated `FSTagsConfig`
+          specifying whether `TagFile`s are indexed by their physical or logical
+          filesystem paths
+        * `update_mapping`: optional secondary mapping to which to mirror
+          tags, such as an `SQLTags`;
+          the default comes from an `SQLTags` specified by the
+          environment variable `${FSTAGS_UPDATE_MAPPING_ENVVAR}`
+          if present
+        * `update_prefix`: optional key prefix for use in the secondary mapping;
+          the default comes from the environment variable
+          `${FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR}` if present,
+          otherwise `{__name__!r}`
+        * `update_uuid_tag_name`: optional name for the per file UUID tag name;
+          default `'uuid'`
+    '''
     if tagsfile_basename is None:
       tagsfile_basename = TAGSFILE_BASENAME
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
+    if update_mapping is None:
+      update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR) or None
+      if update_mapping:
+        from cs.sqltags import SQLTags
+        update_mapping = SQLTags(update_mapping)
+      if update_prefix is None:
+        update_prefix = os.environ.get(
+            FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR, __name__
+        )
     self.config = FSTagsConfig(physical=physical)
     self.config.tagsfile_basename = tagsfile_basename
     self.config.ontology_filepath = ontology_filepath
     self._tagfiles = {}  # cache of `FSTagsTagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
+    self.update_mapping = update_mapping
+    self.update_prefix = update_prefix
+    self.update_uuid_tag_name = update_uuid_tag_name
     self._lock = RLock()
 
   def startup(self):
@@ -1069,7 +1119,12 @@ class FSTags(MultiOpenMixin):
     '''
     ontology = None if no_ontology else self.ontology_for(path)
     tagfile = self._tagfiles[path] = FSTagsTagFile(
-        path, ontology=ontology, fstags=self
+        path,
+        ontology=ontology,
+        fstags=self,
+        update_mapping=self.update_mapping,
+        update_prefix=self.update_prefix,
+        update_uuid_tag_name=self.update_uuid_tag_name,
     )
     return tagfile
 
@@ -1100,7 +1155,7 @@ class FSTags(MultiOpenMixin):
     return realpath(path) if self.config.physical else abspath(path)
 
   @locked
-  def __getitem__(self, path):
+  def __getitem__(self, path) -> "TaggedPath":
     ''' Return the `TaggedPath` for `abspath(path)`.
     '''
     keypath = self.keypath(path)
@@ -1829,11 +1884,11 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
   '''
 
   @typechecked
-  def __init__(self, fspath: str, *, ontology=Ellipsis, fstags=None):
+  def __init__(self, fspath: str, *, ontology=Ellipsis, fstags=None, **kw):
     if ontology is Ellipsis:
       ontology = fstags.ontology
     self.__dict__.update(_fstags=fstags)
-    super().__init__(fspath, ontology=ontology)
+    super().__init__(fspath, ontology=ontology, **kw)
 
   @typechecked
   @require(

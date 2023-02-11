@@ -13,10 +13,10 @@ from pprint import pformat
 
 from cs.deco import decorator
 from cs.py.stack import caller
-from cs.py3 import unicode, raise_from
+from cs.py3 import raise_from
 from cs.x import X
 
-__version__ = '20221207-post'
+__version__ = '20230210-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -260,58 +260,3 @@ def derived_from(property_name):
       derived_property,
       original_revision_name='_' + property_name + '__revision'
   )
-
-def yields_type(func, basetype):
-  ''' Decorator which checks that a generator yields values of type `basetype`.
-  '''
-  citation = funccite(func)
-
-  def check_yields_type(*a, **kw):
-    for item in func(*a, **kw):
-      if not isinstance(item, basetype):
-        raise TypeError(
-            "wrong type yielded from func %s: expected subclass of %s, got %s: %r"
-            % (citation, basetype, type(item), item)
-        )
-      yield item
-
-  check_yields_type.__name__ = 'check_yields_type[%s,basetype=%s]' % (
-      citation,
-      basetype,
-  )
-  return check_yields_type
-
-def returns_type(func, basetype):
-  ''' Decrator which checks that a function returns values of type `basetype`.
-  '''
-  citation = funccite(func)
-
-  def check_returns_type(*a, **kw):
-    retval = func(*a, **kw)
-    if not isinstance(retval, basetype):
-      raise TypeError(
-          "wrong type returned from func %s: expected subclass of %s, got %s: %r"
-          % (citation, basetype, type(retval), retval)
-      )
-    return retval
-
-  check_returns_type.__name__ = 'check_returns_type[%s,basetype=%s]' % (
-      citation,
-      basetype,
-  )
-  return check_returns_type
-
-def yields_str(func):
-  ''' Decorator for generators which should yield strings.
-  '''
-  return yields_type(func, (str, unicode))
-
-def returns_bool(func):
-  ''' Decorator for functions which should return Booleans.
-  '''
-  return returns_type(func, bool)
-
-def returns_str(func):
-  ''' Decorator for functions which should return strings.
-  '''
-  return returns_type(func, (str, unicode))
