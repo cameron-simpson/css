@@ -297,7 +297,7 @@ class ORM(MultiOpenMixin, ABC):
       self._sessionmaker_raw = None
     self.db_url = db_url
     self.engine_keywords = dict(
-        case_sensitive=True,
+        ##case_sensitive=True,
         echo='SQL' in map(str.upper,
                           os.environ.get('DEBUG', '').split(',')),
     )
