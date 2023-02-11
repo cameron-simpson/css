@@ -1063,7 +1063,7 @@ class FSTags(MultiOpenMixin):
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
     if update_mapping is None:
-      update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR)
+      update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR) or None
       if update_mapping:
         from cs.sqltags import SQLTags
         update_mapping = SQLTags(update_mapping)
