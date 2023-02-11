@@ -874,12 +874,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
                                                '').split(',')):
       self.engine_keywords.update(echo=True)
-    db_fspath = self.db_fspath
-    if db_fspath is not None and not existspath(db_fspath):
-      track("create and init %r", db_fspath)
-      with Pfx("init %r", db_fspath):
-        self.define_schema()
-        info('created database')
+    self.define_schema()
 
   def define_schema(self):
     ''' Instantiate the schema and define the root metanode.
