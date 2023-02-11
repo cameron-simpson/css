@@ -870,7 +870,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
   def __init__(self, *, db_url):
     super().__init__(db_url)
-    self.engine_keywords.update(case_sensitive=True)
+    ##self.engine_keywords.update(case_sensitive=True)
     if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
                                                '').split(',')):
       self.engine_keywords.update(echo=True)
