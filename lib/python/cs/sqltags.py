@@ -1064,7 +1064,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
   # pylint: disable=too-many-branches,too-many-locals
   @pfx_method
-  @require(lambda mode: mode == "tagged")
+  ##@require(lambda mode: mode == "tagged")
   def search(self, criteria, *, session, mode='tagged'):
     ''' Construct a query to match `Entity` rows
         matching the supplied `criteria` iterable.
