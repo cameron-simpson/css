@@ -80,11 +80,11 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress, progressbar
 from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
-from cs.resources import MultiOpenMixin, RunStateMixin
+from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.seq import imerge
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
-from cs.upd import upd_proxy, state as upd_state, print
+from cs.upd import with_upd_proxy, UpdProxy, uses_upd
 
 from . import MAX_FILE_SIZE, Lock, RLock, defaults
 from .archive import Archive
@@ -342,13 +342,13 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     needdir(self.datapath, log=warning)
 
   @contextmanager
-  def startup_shutdown(self):
+  @uses_upd
+  @uses_runstate
+  def startup_shutdown(self, *, upd, runstate: RunState):
     ''' Start up and shut down the `FilesDir`: take locks, start worker threads etc.
     '''
     with super().startup_shutdown():
       self.initdir()
-      upd = upd_state.upd
-      runstate = self.runstate
       hashname = self.hashname
       # cache of open DataFiles
       cache = LRU_Cache(

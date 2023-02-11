@@ -127,7 +127,7 @@ from cs.tagset import (
     tag_or_tag_value,
 )
 from cs.threads import locked, locked_property, State
-from cs.upd import print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20230211-post'
 
@@ -237,7 +237,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         ):
           yield
 
-  def cmd_autotag(self, argv):
+  @uses_upd
+  @uses_runstate
+  def cmd_autotag(self, argv, *, runstate: RunState, upd: Upd):
     ''' Usage: {cmd} paths...
           Tag paths based on rules from the rc file.
     '''
