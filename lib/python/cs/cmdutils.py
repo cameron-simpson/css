@@ -21,7 +21,6 @@ from types import SimpleNamespace
 from typing import List
 
 from cs.context import stackattrs
-from cs.gimmicks import nullcontext
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -34,6 +33,7 @@ from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState, uses_runstate
+from cs.upd import Upd
 
 __version__ = '20230211-post'
 
@@ -46,7 +46,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
-        'cs.gimmicks',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -1096,16 +1095,14 @@ class BaseCommand:
       handle_signal = getattr(
           self, 'handle_signal', lambda *_: runstate.cancel()
       )
-      upd = getattr(options, 'upd', self.loginfo.upd)
-      upd_context = nullcontext() if upd is None else upd
-      with upd_context:
-        with stackattrs(self, cmd=self._subcmd or self.cmd):
-          with stackattrs(
-              options,
-              runstate=runstate,
-              upd=upd,
-          ):
-            X("options.runstate = %r", options.runstate)
+      upd = getattr(options, 'upd', self.loginfo.upd) or Upd()
+      with stackattrs(self, cmd=self._subcmd or self.cmd):
+        with stackattrs(
+            options,
+            runstate=runstate,
+            upd=upd,
+        ):
+          with upd:
             with options.runstate:
               with runstate.catch_signal(options.runstate_signals,
                                          call_previous=False,
