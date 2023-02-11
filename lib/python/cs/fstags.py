@@ -129,7 +129,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230210-post'
+__version__ = '20230211-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1069,7 +1069,7 @@ class FSTags(MultiOpenMixin):
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
     if update_mapping is None:
-      update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR)
+      update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR) or None
       if update_mapping:
         from cs.sqltags import SQLTags
         update_mapping = SQLTags(update_mapping)

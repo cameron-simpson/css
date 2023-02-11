@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20221228-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -870,16 +870,11 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
   def __init__(self, *, db_url):
     super().__init__(db_url)
-    self.engine_keywords.update(case_sensitive=True)
+    ##self.engine_keywords.update(case_sensitive=True)
     if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
                                                '').split(',')):
       self.engine_keywords.update(echo=True)
-    db_fspath = self.db_fspath
-    if db_fspath is not None and not existspath(db_fspath):
-      track("create and init %r", db_fspath)
-      with Pfx("init %r", db_fspath):
-        self.define_schema()
-        info('created database')
+    self.define_schema()
 
   def define_schema(self):
     ''' Instantiate the schema and define the root metanode.
@@ -1064,7 +1059,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
   # pylint: disable=too-many-branches,too-many-locals
   @pfx_method
-  @require(lambda mode: mode == "tagged")
+  ##@require(lambda mode: mode == "tagged")
   def search(self, criteria, *, session, mode='tagged'):
     ''' Construct a query to match `Entity` rows
         matching the supplied `criteria` iterable.
