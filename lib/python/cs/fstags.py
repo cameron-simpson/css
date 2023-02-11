@@ -1143,7 +1143,7 @@ class FSTags(MultiOpenMixin):
     )
 
   @locked
-  def __getitem__(self, path):
+  def __getitem__(self, path) -> "TaggedPath":
     ''' Return the `TaggedPath` for `abspath(path)`.
     '''
     path = realpath(path) if self.config.physical else abspath(path)
