@@ -49,8 +49,8 @@ from os import (
     SEEK_END,
 )
 from os.path import (
-    basename, exists as existspath, isdir as isdirpath, isfile as isfilepath,
-    join as joinpath, realpath, relpath
+    basename, exists as existspath, isfile as isfilepath, join as joinpath,
+    realpath, relpath
 )
 import sqlite3
 import stat
@@ -59,7 +59,7 @@ from time import time, sleep
 from types import SimpleNamespace
 from uuid import uuid4
 
-from icontract import ensure, require
+from icontract import require
 from typeguard import typechecked
 
 from cs.app.flag import DummyFlags, FlaggedMixin
@@ -97,7 +97,7 @@ from .dir import Dir, FileDirent
 from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
 from .index import choose as choose_indexclass, FileDataIndexEntry
 from .parsers import scanner_from_filename
-from .util import createpath, openfd_read, openfd_append
+from .util import createpath, openfd_read
 
 ##_sleep = sleep
 ##
