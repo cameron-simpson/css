@@ -89,7 +89,7 @@ cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e7588
 cs.service_api
 cs.sh
 cs.sharedfile
-cs.sqlalchemy_utils ok_revision=cdf1c54d57f2bb5313ec9f1b50876965ec8e49fc
+cs.sqlalchemy_utils ok_revision="8c6eb6904bd805ba7a3e51e0d94373d148e72496"
 cs.sqltags ok_revision="14532850e539eb1624e9d31e0c6891d47657d8d0" pypi.release="20221228"
 cs.tagset ok_revision="40b1917a48e751ed801fdb3836e64a0fbaa0ebf6" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20230210"
 cs.taskqueue ok_revision="3124b308e9599978d77d3cd7e4c8f769400803e1" features={"20221207":["BaseTask"]} pypi.release="20221207"
