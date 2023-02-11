@@ -114,7 +114,7 @@ from cs.lex import (
 )
 from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.tagset import (
     Tag,
     TagSet,
@@ -383,7 +383,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return xit
 
   # pylint: disable=too-many-branches
-  def cmd_find(self, argv):
+  @uses_runstate
+  def cmd_find(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
           List files from path matching all the constraints.
           --direct    Use direct tags instead of all tags.
@@ -438,6 +439,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         print(include)
     else:
       for fspath in filepaths:
+        if runstate.cancelled:
+          return 1
         with Pfx(fspath):
           try:
             output = fstags[fspath].format_as(
@@ -576,7 +579,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             )
     return 0
 
-  def cmd_ls(self, argv):
+  @uses_runstate
+  def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-d] [--direct] [-o output_format] [paths...]
           List files from paths and their tags.
           -d          Treat directories like files, do not recurse.
@@ -612,6 +616,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       fullpath = realpath(path)
       for fspath in ((fullpath,)
                      if directories_like_files else rfilepaths(fullpath)):
+        if runstate.cancelled:
+          return 1
         with Pfx(fspath):
           tags = fstags[fspath]
           if long_format:
