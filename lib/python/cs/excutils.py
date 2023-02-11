@@ -14,7 +14,7 @@ from cs.deco import decorator
 from cs.gimmicks import exception, error, warning
 from cs.py.func import funcname
 
-__version__ = '20230212'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'description':
