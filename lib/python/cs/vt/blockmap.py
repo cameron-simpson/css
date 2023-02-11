@@ -25,10 +25,12 @@ from cs.py.func import prop
 from cs.resources import RunStateMixin
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.x import X
 from cs.upd import with_upd_proxy, UpdProxy
+
 from . import defaults
 from .block import HashCodeBlock, IndirectBlock
+
+from cs.x import X
 
 # The record format uses 4 byte integer offsets
 # so this is the maximum (and default) scale for the memory maps.
