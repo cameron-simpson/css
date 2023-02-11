@@ -10,6 +10,7 @@
 '''
 
 from __future__ import print_function, absolute_import
+from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
