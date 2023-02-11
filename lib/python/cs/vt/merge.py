@@ -13,12 +13,13 @@ from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
-from cs.upd import Upd, uses_upd, print
+from cs.upd import Upd, uses_upd
 
 from . import defaults
 from .dir import Dir, FileDirent
 from .paths import DirLike, OSDir
 
+@uses_upd
 @uses_runstate
 @uses_upd
 @typechecked
@@ -36,6 +37,7 @@ def merge(
       * `target_root`: a `DirLike` to receive contents
       * `source_root`: a `DirLike` from which to obtain contents
       * `runstate`: a `RunState` to support cancellation
+      * `upd`: an `Upd` for displaying progress
 
       TODO: apply .stat results to merge targets.
       TODO: many modes for conflict resolution.

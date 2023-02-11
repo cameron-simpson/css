@@ -26,6 +26,7 @@
 
 from abc import abstractmethod
 from builtins import id as builtin_id
+from code import interact
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
@@ -61,7 +62,7 @@ from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fileutils import shortpath
-from cs.lex import FormatAsError, get_decimal_value, r
+from cs.lex import FormatAsError, has_format_attributes, format_attribute, get_decimal_value, r
 from cs.logutils import error, warning, track, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -77,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20221228-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -117,7 +118,7 @@ CATEGORIES_PREFIX_re = re.compile(
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
 DBURL_DEFAULT = '~/var/sqltags.sqlite'
 
-FIND_OUTPUT_FORMAT_DEFAULT = '{datetime} {headline}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{localtime} {headline}'
 
 def main(argv=None):
   ''' Command line mode.
@@ -869,16 +870,11 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
   def __init__(self, *, db_url):
     super().__init__(db_url)
-    self.engine_keywords.update(case_sensitive=True)
+    ##self.engine_keywords.update(case_sensitive=True)
     if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
                                                '').split(',')):
       self.engine_keywords.update(echo=True)
-    db_fspath = self.db_fspath
-    if db_fspath is not None and not existspath(db_fspath):
-      track("create and init %r", db_fspath)
-      with Pfx("init %r", db_fspath):
-        self.define_schema()
-        info('created database')
+    self.define_schema()
 
   def define_schema(self):
     ''' Instantiate the schema and define the root metanode.
@@ -1063,6 +1059,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
   # pylint: disable=too-many-branches,too-many-locals
   @pfx_method
+  ##@require(lambda mode: mode == "tagged")
   def search(self, criteria, *, session, mode='tagged'):
     ''' Construct a query to match `Entity` rows
         matching the supplied `criteria` iterable.
@@ -1115,36 +1112,67 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           tag = criterion.tag
           tag_name = tag.name
           tag_value = tag.value
-          if tag_name == 'id':
-            alias = entities
-            entity_tests.append(
-                criterion.SQL_ID_VALUE_COMPARISON_FUNCS[criterion.comparison]
-                (entities, tag_value)
-            )
-          elif tag_name == 'name':
-            alias = entities
-            entity_tests.append(
-                criterion.SQL_NAME_VALUE_COMPARISON_FUNCS[criterion.comparison]
-                (entities, tag_value)
-            )
-          elif tag_name == 'unixtime':
-            alias = entities
-            entity_tests.append(
-                criterion.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS[
-                    criterion.comparison](entities, tag_value)
-            )
+          # no subsequent check of the tagged entity
+          post_check = None
+          # default operation map
+          op = criterion.comparison
+          op_map = {
+              '=': lambda column, value: column == value,
+              '!=': lambda column, value: column != value,
+              '<': lambda column, value: column < value,
+              '<=': lambda column, value: column <= value,
+              '>': lambda column, value: column > value,
+              '>=': lambda column, value: column >= value,
+          }
+          if tag_name in ('id', 'name', 'unixtime'):
+            # criterion based on the entities table
+            column = getattr(entities, tag_name)
+            tests = entity_tests
           else:
-            tag_tests = per_tag_tests[tag_name]
-            if tag_tests:
+            # criterion based on the tags table
+            tests = per_tag_tests[tag_name]
+            if tests:
               # reuse existing alias - same tag name
               alias = per_tag_aliases[tag_name]
             else:
               # first test for this tag - make an alias
-              per_tag_aliases[tag_name] = aliased(tags)
-            tag_tests.append(
-                criterion.SQL_TAG_VALUE_COMPARISON_FUNCS[criterion.comparison]
-                (per_tag_aliases[tag_name], tag_value)
-            )
+              alias = per_tag_aliases[tag_name] = aliased(tags)
+            if tag_value is None:
+              column = None
+              op_map = {
+                  '=':
+                  lambda column, value: and_(
+                      alias.float_value is None, alias.string_value is None,
+                      alias.structured_value is None
+                  ),
+              }
+            elif isinstance(tag_value, (int, float)):
+              column = alias.float_value
+            elif isinstance(tag_value, str):
+              column = alias.string_value
+            elif isinstance(tag_value, re.Pattern):
+              column = alias.string_value
+              op_map = {
+                  '~': lambda column, value: column is not None,
+              }
+              post_check = lambda te: value.match(te[tag_name])
+            else:
+              raise TypeError(
+                  "unhandled type for %s=%s" % (
+                      tag_name,
+                      r(tag_value),
+                  )
+              )
+            try:
+              op_func = op_map[criterion.comparison]
+            except KeyError as e:
+              raise TypeError(
+                  "no implementation of op %r for %s=%s" %
+                  (op, tag_name, r(tag_value))
+              )
+          test_func = op_map[op]
+          test_cond = test_func(column, tag_value)
+          tests.append(test_cond)
         else:
           try:
             sqlp = criterion.sql_parameters(self)
@@ -1191,6 +1219,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         raise ValueError("unrecognised mode")
     return query
 
+@has_format_attributes(inherit=True)
 class SQLTagSet(SingletonMixin, TagSet):
   ''' A singleton `TagSet` attached to an `SQLTags` instance.
 
@@ -1291,6 +1320,18 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   def __hash__(self):
     return id(self)
+
+  def __getitem__(self, key):
+    try:
+      return super().__getitem__(key)
+    except KeyError:
+      if key == 'name':
+        return self._name
+      if key == 'id':
+        return self._id
+      if key == 'unixtime':
+        return self._unixtime
+      raise
 
   @property
   def name(self):
@@ -2289,6 +2330,28 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
           log_tags.append(Tag('categories', list(tag_categories)))
         sqltags.default_factory(None, unixtime=unixtime, tags=log_tags)
     return xit
+
+  def cmd_orm(self, argv):
+    ''' Usage: {cmd} define_schema
+          Runs the ORM's `define_schema()` method, which creates missing tables
+          and entity 0 if missing.
+    '''
+    if not argv:
+      raise GetoptError("missing subcommand")
+    subcmd = argv.pop(0)
+    with Pfx(subcmd):
+      if subcmd == 'define_schema':
+        if argv:
+          raise GetoptError("extra arguments: %s" % (argv,))
+        self.options.sqltags.orm.define_schema()
+      else:
+        raise GetoptError("unrecognised subcommand")
+
+  def cmd_shell(self, argv):
+    ''' Usage: {cmd}
+          Run an interactive Python prompt with some predefined local names.
+    '''
+    return self.shell(*argv)
 
   # pylint: disable=too-many-branches
   def cmd_tag(self, argv):

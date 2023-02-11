@@ -24,7 +24,7 @@ import subprocess
 try:
   DEVNULL = subprocess.DEVNULL
 except AttributeError:
-  DEVNULL = open(os.devnull, 'wb')  # pylint: disable=consider-using-with
+  DEVNULL = open(os.devnull, 'r+b')  # pylint: disable=consider-using-with
 
 import sys
 
@@ -78,7 +78,7 @@ except NameError:
           )
         Exception.__init__(self, msg)
 
-__version__ = '20221228-post'
+__version__ = '20230210-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

@@ -6,6 +6,7 @@
 
 from abc import ABC
 from collections import defaultdict, namedtuple
+from contextlib import contextmanager
 import os
 from os.path import (
     abspath,
@@ -70,6 +71,7 @@ class BaseTkCommand(BaseCommand):
     super().__init__(argv, **kw)
     self.widget_class = widget_class
 
+  @contextmanager
   def run_context(self):
     ''' In addition to the behaviour of `BaseCommand.run_context()`,
         also create a top level `tk.Frame` as `self.options.tk_app`.
@@ -311,10 +313,10 @@ class _Widget(ABC):
         - its rectangle overlaps its parent
         - its parent is visible
     '''
-    assert self.winfo_ismapped() is self.winfo_viewable(), (
-        "%s.winfo_ismapped()=%s but %s.winfo_viewable()=%s" %
-        (self, self.winfo_ismapped(), self, self.winfo_viewable())
-    )
+    ##assert self.winfo_ismapped() is self.winfo_viewable(), (
+    ##    "%s.winfo_ismapped()=%s but %s.winfo_viewable()=%s" %
+    ##    (self, self.winfo_ismapped(), self, self.winfo_viewable())
+    ##)
     if not self.winfo_ismapped() or not self.winfo_viewable():
       return None
     g = WidgetGeometry.of(self)

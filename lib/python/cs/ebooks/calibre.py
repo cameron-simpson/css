@@ -1711,7 +1711,7 @@ class CalibreCommand(BaseCommand):
 
   def cmd_shell(self, argv):
     ''' Usage: {cmd}
-          Run an interactive Python prompt with some predefined named:
+          Run an interactive Python prompt with some predefined names:
           calibre: the CalibreTree
           options: self.options
     '''

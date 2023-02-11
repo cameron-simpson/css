@@ -80,7 +80,7 @@ from cs.deco import decorator, default_params
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
-from cs.threads import State as ThreadState
+from cs.threads import HasThreadState, State as ThreadState
 from cs.tty import ttysize
 from cs.units import transcribe, TIME_SCALE
 
@@ -119,11 +119,13 @@ def _cleanup():
 atexit.register(_cleanup)
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
-class Upd(SingletonMixin):
+class Upd(SingletonMixin, HasThreadState):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
 
       The default backend is `sys.stderr`.
   '''
+
+  state = ThreadState()
 
   # pylint: disable=unused-argument
   @staticmethod
@@ -219,47 +221,33 @@ class Upd(SingletonMixin):
     )
 
   ############################################################
-  # Sequence methods.
-  #
-
-  def __len__(self):
-    ''' The length of an `Upd` is the number of slots.
-    '''
-    return len(self._slot_text)
-
-  def __getitem__(self, index):
-    return self._slot_text[index]
-
-  def __setitem__(self, index, txt):
-    self.out(txt, slot=index)
-
-  def __delitem__(self, index):
-    self.delete(index)
-
-  ############################################################
   # Context manager methods.
   #
 
-  def __enter__(self):
-    return self
+  def __enter_exit__(self):
+    ''' Generator supporting `__enter__` and `__exit__`.
 
-  def __exit__(self, exc_type, exc_val, _):
-    ''' Tidy up on exiting the context.
-
-        If we are exiting because of an exception
+        On shutdown, if we are exiting because of an exception
         which is not a `SystemExit` with a `code` of `None` or `0`
         then we preserve the status lines one screen.
         Otherwise we clean up the status lines.
     '''
-    preserve_display = not (
-        exc_type is None or (
-            issubclass(exc_type, SystemExit) and (
-                exc_val.code == 0
-                if isinstance(exc_val.code, int) else exc_val.code is None
+    with HasThreadState.as_contextmanager(self):
+      try:
+        yield self
+      except Exception as e:
+        exc_type = type(e)
+        # pylint: disable=no-member
+        preserve_display = not (
+            exc_type is None or (
+                issubclass(exc_type, SystemExit) and
+                (e.code == 0 if isinstance(e.code, int) else e.code is None)
             )
         )
-    )
-    self.shutdown(preserve_display)
+        self.shutdown(preserve_display)
+        raise
+      else:
+        self.shutdown()
 
   def shutdown(self, preserve_display=False):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
@@ -284,6 +272,24 @@ class Upd(SingletonMixin):
           self._backend.write(''.join(txts))
           self._backend.flush()
     self._reset()
+
+  ############################################################
+  # Sequence methods.
+  #
+
+  def __len__(self):
+    ''' The length of an `Upd` is the number of slots.
+    '''
+    return len(self._slot_text)
+
+  def __getitem__(self, index):
+    return self._slot_text[index]
+
+  def __setitem__(self, index, txt):
+    self.out(txt, slot=index)
+
+  def __delitem__(self, index):
+    self.delete(index)
 
   def _set_cursor_visible(self, mode):
     ''' Set the cursor visibility mode, return terminal sequence.
@@ -920,6 +926,7 @@ class Upd(SingletonMixin):
         self._backend.flush()
       return proxy
 
+  # pylint: disable=too-many-arguments
   @contextmanager
   def run_task(
       self,
@@ -969,9 +976,10 @@ class Upd(SingletonMixin):
       )
 
 def uses_upd(func):
-  ''' Decorator for functions accepting an optional `upd=Upd()` parameter.
+  ''' Decorator for functions accepting an optional `upd=Upd()` parameter,
+      default from `Upd.state.current`.
   '''
-  return default_params(func, upd=Upd)
+  return default_params(func, upd=Upd.default)
 
 @uses_upd
 def out(msg, *a, upd, **outkw):
@@ -1172,7 +1180,7 @@ class UpdProxy(object):
   def text(self):
     ''' The text of this proxy's slot, without the prefix.
     '''
-    return self._text or ('' if self._auto_text is None else self._auto_text())
+    return self._text or ('' if self._text_auto is None else self._text_auto())
 
   @text.setter
   def text(self, txt):
@@ -1242,46 +1250,28 @@ class UpdProxy(object):
         index += self.index
       return upd.insert(index, txt)
 
-# pylint: disable=too-few-public-methods
-class _UpdState(ThreadState):
-
-  def __getattr__(self, attr):
-    if attr == 'upd':
-      value = Upd()
-    else:
-      raise AttributeError("%s.%s" % (type(self).__name__, attr))
-    setattr(self, attr, value)
-    return value
-
-state = _UpdState()
-
 @decorator
-def upd_proxy(func, prefix=None, insert_at=1):
-  ''' Decorator to create a new `UpdProxy` and record it as `state.proxy`.
+def with_upd_proxy(func, prefix=None, insert_at=1):
+  ''' Decorator to run `func` with an additional parameter `upd_proxy`
+      being an `UpdProxy` for progress reporting.
 
-      Parameters:
-      * `func`: the function to decorate
-      * `prefix`: initial proxy prefix, default `func.__name__`
-      * `insert_at`: the position for the new proxy, default `1`
+      Example:
 
-      Typical example:
-
-          from cs.upd import upd_proxy, state as upd_state
-          ...
-          @upd_proxy
-          def func*(self, ...):
-              proxy = upd_state.proxy
-              proxy.prefix = str(self) + " taskname"
+          @with_upd_proxy
+          def func(*a, upd_proxy:UpdProxy, **kw):
+            ... perform task, updating upd_proxy ...
   '''
+
   if prefix is None:
     prefix = func.__name__
 
-  def upd_proxy_wrapper(*a, **kw):
-    with state.upd.insert(insert_at) as proxy:
-      with stackattrs(state, proxy=proxy):
-        return func(*a, **kw)
+  @uses_upd
+  def upd_with_proxy_wrapper(*a, upd, **kw):
+    with upd.insert(insert_at) as proxy:
+      with stackattrs(proxy, prefix=prefix):
+        return func(*a, upd_proxy=proxy, **kw)
 
-  return upd_proxy_wrapper
+  return upd_with_proxy_wrapper
 
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.

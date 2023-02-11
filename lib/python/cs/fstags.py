@@ -96,8 +96,9 @@ from pathlib import PurePath
 import shutil
 import sys
 from threading import Lock, RLock
+from typing import Mapping, Optional
 
-from icontract import require
+from icontract import ensure, require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
@@ -113,7 +114,7 @@ from cs.lex import (
 )
 from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.tagset import (
     Tag,
     TagSet,
@@ -126,9 +127,9 @@ from cs.tagset import (
     tag_or_tag_value,
 )
 from cs.threads import locked, locked_property, State
-from cs.upd import print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20221228-post'
+__version__ = '20230211-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -167,6 +168,9 @@ XATTR_B = (
 
 FIND_OUTPUT_FORMAT_DEFAULT = '{fspath}'
 LS_OUTPUT_FORMAT_DEFAULT = '{fspath:json} {tags}'
+
+FSTAGS_UPDATE_MAPPING_ENVVAR = 'FSTAGS_UPDATE_MAPPING'
+FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR = 'FSTAGS_UPDATE_MAPPING_PREFIX'
 
 # pylint: disable=too-many-locals
 
@@ -233,7 +237,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         ):
           yield
 
-  def cmd_autotag(self, argv):
+  @uses_upd
+  @uses_runstate
+  def cmd_autotag(self, argv, *, runstate: RunState, upd: Upd):
     ''' Usage: {cmd} paths...
           Tag paths based on rules from the rc file.
     '''
@@ -379,7 +385,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return xit
 
   # pylint: disable=too-many-branches
-  def cmd_find(self, argv):
+  @uses_runstate
+  def cmd_find(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
           List files from path matching all the constraints.
           --direct    Use direct tags instead of all tags.
@@ -434,6 +441,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         print(include)
     else:
       for fspath in filepaths:
+        if runstate.cancelled:
+          return 1
         with Pfx(fspath):
           try:
             output = fstags[fspath].format_as(
@@ -572,7 +581,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             )
     return 0
 
-  def cmd_ls(self, argv):
+  @uses_runstate
+  def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-d] [--direct] [-o output_format] [paths...]
           List files from paths and their tags.
           -d          Treat directories like files, do not recurse.
@@ -608,6 +618,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       fullpath = realpath(path)
       for fspath in ((fullpath,)
                      if directories_like_files else rfilepaths(fullpath)):
+        if runstate.cancelled:
+          return 1
         with Pfx(fspath):
           tags = fstags[fspath]
           if long_format:
@@ -1018,24 +1030,67 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     with state(verbose=True):
       self.options.fstags.import_xattrs(paths)
 
+# A decorator for functions expecting an fstags parameter.
+uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
+
 # pylint: disable=too-many-public-methods
 class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
+  @fmtdoc
   def __init__(
-      self, tagsfile_basename=None, ontology_filepath=None, physical=None
+      self,
+      tagsfile_basename=None,
+      ontology_filepath=None,
+      physical=None,
+      update_mapping: Optional[Mapping] = None,
+      update_prefix: Optional[str] = __name__,
+      update_uuid_tag_name: Optional[str] = 'uuid',
   ):
+    ''' Initialise the `FSTags` instance.
+
+        Parameters:
+        * `tagsfile_basename`: optional basename forthe backing tags files,
+          default from `TAGSFILE_BASENAME`: `{TAGSFILE_BASENAME!r}`
+        * `ontology_filepath`: optional filesystem path for an associated ontology
+        * `physical`: optional flag for the associated `FSTagsConfig`
+          specifying whether `TagFile`s are indexed by their physical or logical
+          filesystem paths
+        * `update_mapping`: optional secondary mapping to which to mirror
+          tags, such as an `SQLTags`;
+          the default comes from an `SQLTags` specified by the
+          environment variable `${FSTAGS_UPDATE_MAPPING_ENVVAR}`
+          if present
+        * `update_prefix`: optional key prefix for use in the secondary mapping;
+          the default comes from the environment variable
+          `${FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR}` if present,
+          otherwise `{__name__!r}`
+        * `update_uuid_tag_name`: optional name for the per file UUID tag name;
+          default `'uuid'`
+    '''
     if tagsfile_basename is None:
       tagsfile_basename = TAGSFILE_BASENAME
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
+    if update_mapping is None:
+      update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR) or None
+      if update_mapping:
+        from cs.sqltags import SQLTags
+        update_mapping = SQLTags(update_mapping)
+      if update_prefix is None:
+        update_prefix = os.environ.get(
+            FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR, __name__
+        )
     self.config = FSTagsConfig(physical=physical)
     self.config.tagsfile_basename = tagsfile_basename
     self.config.ontology_filepath = ontology_filepath
     self._tagfiles = {}  # cache of `FSTagsTagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
+    self.update_mapping = update_mapping
+    self.update_prefix = update_prefix
+    self.update_uuid_tag_name = update_uuid_tag_name
     self._lock = RLock()
 
   def startup(self):
@@ -1066,7 +1121,12 @@ class FSTags(MultiOpenMixin):
     '''
     ontology = None if no_ontology else self.ontology_for(path)
     tagfile = self._tagfiles[path] = FSTagsTagFile(
-        path, ontology=ontology, fstags=self
+        path,
+        ontology=ontology,
+        fstags=self,
+        update_mapping=self.update_mapping,
+        update_prefix=self.update_prefix,
+        update_uuid_tag_name=self.update_uuid_tag_name,
     )
     return tagfile
 
@@ -1087,16 +1147,30 @@ class FSTags(MultiOpenMixin):
         type(self).__name__, self.tagsfile_basename
     )
 
+  @ensure(lambda result: result == normpath(result))
+  def keypath(self, fspath):
+    ''' Compute the absolute path used to index a `TaggedPath` instance.
+
+        This returns `realpath(fspath)` if `self.config.physical`,
+        otherwise `abspath(fspath)`.
+    '''
+    return realpath(fspath) if self.config.physical else abspath(fspath)
+
   @locked
-  def __getitem__(self, path):
+  def __getitem__(self, path) -> "TaggedPath":
     ''' Return the `TaggedPath` for `abspath(path)`.
     '''
-    path = realpath(path) if self.config.physical else abspath(path)
-    assert path == normpath(path)
-    tagged_path = self._tagged_paths.get(path)
+    keypath = self.keypath(path)
+    tagged_path = self._tagged_paths.get(keypath)
     if tagged_path is None:
-      tagfile = self.tagfile_for(path)
-      tagged_path = self._tagged_paths[path] = tagfile[basename(path)]
+      import time
+      tagfile = self.tagfile_for(keypath)
+      now = time.time()
+      tagged_path = self._tagged_paths[keypath] = tagfile[basename(keypath)]
+      elapsed = time.time() - now
+      if elapsed >= 1.0:
+        warning("FSTags[%r] took %ss", path, elapsed)
+        ##raise RuntimeError("SLOW TAGFILE LOOKUP")
     return tagged_path
 
   @pfx_method
@@ -1517,7 +1591,8 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
   ''' Class to manipulate the tags for a specific path.
   '''
 
-  def __init__(self, fspath, *, fstags=None, _id=None, _ontology=None):
+  @uses_fstags
+  def __init__(self, fspath, *, fstags: FSTags, _id=None, _ontology=None):
     if _ontology is None:
       _ontology = fstags.ontology_for(fspath)
     self.__dict__.update(
@@ -1541,6 +1616,24 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     '''
     return basename(self.fspath)
 
+  @property
+  def keypath(self):
+    ''' The key path used to index this `TaggedPath` within its `FSTags`
+        from `FSTags.keypath(path)`.
+    '''
+    return self._fstags.keypath(self.fspath)
+
+  @property
+  def parent(self):
+    ''' A reference to the parent of this `TaggedPath`, or `None`.
+      '''
+    keypath = self.keypath
+    parent_path = dirname(keypath)
+    if parent_path == keypath:
+      # no parent
+      return None
+    return self._fstags[parent_path]
+
   # pylint: disable=redefined-outer-name
   @tag_or_tag_value
   def discard(self, tag_name, value, *, verbose=None):
@@ -1552,6 +1645,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     ''' Forbid the special tag name `'name'`, reserved for the filename.
     '''
     assert tag_name != 'name'
+    ##assert tag_name != 'fspath'
     super().set(tag_name, value, **kw)
 
   # pylint: disable=arguments-differ
@@ -1567,6 +1661,17 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     if not prefix:
       return tags
     return tags.as_tags(prefix=prefix)
+
+  def findup(self, check):
+    ''' Locate the first `TaggedPath` from `self` upwards (via `.parent`)
+        for which `check(TaggedPath)` is true.
+    '''
+    node = self
+    while node is not None:
+      if check(node):
+        break
+      node = node.parent
+    return node
 
   def auto_infer(self, attr):
     ''' Infer a value from `attr` via the associated `FSTags.cascade_rules`.
@@ -1781,11 +1886,11 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
   '''
 
   @typechecked
-  def __init__(self, fspath: str, *, ontology=Ellipsis, fstags=None):
+  def __init__(self, fspath: str, *, ontology=Ellipsis, fstags=None, **kw):
     if ontology is Ellipsis:
       ontology = fstags.ontology
     self.__dict__.update(_fstags=fstags)
-    super().__init__(fspath, ontology=ontology)
+    super().__init__(fspath, ontology=ontology, **kw)
 
   @typechecked
   @require(
@@ -1990,12 +2095,6 @@ class FSTagsConfig(FSPathBasedSingleton):
     '''
     self.config['general']['tagsfile'] = tagsfile_basename
 
-# A default general purpose FSTags instance.
-DEFAULT_FSTAGS = FSTags()
-
-# A decorator for functions expecting an fstags parameter.
-uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
-
 def get_xattr_value(fspath, xattr_name):
   ''' Read the extended attribute `xattr_name` of `fspath`.
       Return the extended attribute value as a string,
@@ -2068,6 +2167,9 @@ def update_xattr_value(fspath, xattr_name, new_xattr_value):
           if e.errno not in (errno.ENOTSUP, errno.ENOENT):
             raise
     return old_xattr_value
+
+# A default general purpose FSTags instance.
+DEFAULT_FSTAGS = FSTags()
 
 if __name__ == '__main__':
   sys.argv[0] = basename(sys.argv[0])
