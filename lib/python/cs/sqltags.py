@@ -2347,7 +2347,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     with Pfx(subcmd):
       if subcmd == 'define_schema':
         if argv:
-          raise GetoptError("extra arguments: %s", argv)
+          raise GetoptError("extra arguments: %s" % (argv,))
         self.options.sqltags.orm.define_schema()
       else:
         raise GetoptError("unrecognised subcommand")
