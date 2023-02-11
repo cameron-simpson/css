@@ -5,10 +5,12 @@
 #
 
 from __future__ import print_function
+
 import sys
 import threading
 import time
 import unittest
+
 from cs.result import Result, after, bg
 
 class TestResult(unittest.TestCase):
@@ -94,6 +96,17 @@ class TestResult(unittest.TestCase):
     time.sleep(0.2)
     self.assertTrue(R.ready)
     self.assertEqual(R.result, 3)
+
+  def test00join(self):
+    R = self.R
+    R.result = 1
+    R.join()
+    R.join()
+
+  def test01post_notify(self):
+    R = self.R
+    R2 = R.post_notify(lambda r2: print("r2 =", r2))
+    R.result = 1
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

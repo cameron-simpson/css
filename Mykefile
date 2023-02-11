@@ -182,6 +182,10 @@ _optcss:
 _home:
         @$(deploy($(HOME)))
 
+_push:
+        set -ue; hg push "ssh://$$HG_PUSH_HOST/$$HG_PUSH_PATH"
+        set -ue; incd "$$HG_PUSH_HOST:$$HG_PUSH_PATH" hg up
+
 _remote:
         set -uex; rsync -ia --include=*/ --include=*.py --exclude=* cs/ "$$$(RSYNC_TARGET_PYTHON_ENVVAR)/"
 

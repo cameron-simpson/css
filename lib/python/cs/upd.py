@@ -76,18 +76,19 @@ from threading import RLock, Thread
 import time
 from typing import Optional
 
-from cs.context import stackattrs, StackableState
+from cs.context import stackattrs
 from cs.deco import decorator, default_params
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
+from cs.threads import HasThreadState, State as ThreadState
 from cs.tty import ttysize
 from cs.units import transcribe, TIME_SCALE
 
 try:
   import curses
-except ImportError as e:
-  warning("cannot import curses: %s", e)
+except ImportError as import_e:
+  warning("cannot import curses: %s", import_e)
   curses = None
 
 __version__ = '20221228-post'
@@ -99,11 +100,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context>=stackable_state',
+        'cs.context',
         'cs.deco',
         'cs.gimmicks',
         'cs.lex',
         'cs.obj>=20210122',
+        'cs.threads',
         'cs.tty',
         'cs.units',
     ],
@@ -118,11 +120,13 @@ def _cleanup():
 atexit.register(_cleanup)
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
-class Upd(SingletonMixin):
+class Upd(SingletonMixin, HasThreadState):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
 
       The default backend is `sys.stderr`.
   '''
+
+  state = ThreadState()
 
   # pylint: disable=unused-argument
   @staticmethod
@@ -218,47 +222,33 @@ class Upd(SingletonMixin):
     )
 
   ############################################################
-  # Sequence methods.
-  #
-
-  def __len__(self):
-    ''' The length of an `Upd` is the number of slots.
-    '''
-    return len(self._slot_text)
-
-  def __getitem__(self, index):
-    return self._slot_text[index]
-
-  def __setitem__(self, index, txt):
-    self.out(txt, slot=index)
-
-  def __delitem__(self, index):
-    self.delete(index)
-
-  ############################################################
   # Context manager methods.
   #
 
-  def __enter__(self):
-    return self
+  def __enter_exit__(self):
+    ''' Generator supporting `__enter__` and `__exit__`.
 
-  def __exit__(self, exc_type, exc_val, _):
-    ''' Tidy up on exiting the context.
-
-        If we are exiting because of an exception
+        On shutdown, if we are exiting because of an exception
         which is not a `SystemExit` with a `code` of `None` or `0`
         then we preserve the status lines one screen.
         Otherwise we clean up the status lines.
     '''
-    preserve_display = not (
-        exc_type is None or (
-            issubclass(exc_type, SystemExit) and (
-                exc_val.code == 0
-                if isinstance(exc_val.code, int) else exc_val.code is None
+    with HasThreadState.as_contextmanager(self):
+      try:
+        yield self
+      except Exception as e:
+        exc_type = type(e)
+        # pylint: disable=no-member
+        preserve_display = not (
+            exc_type is None or (
+                issubclass(exc_type, SystemExit) and
+                (e.code == 0 if isinstance(e.code, int) else e.code is None)
             )
         )
-    )
-    self.shutdown(preserve_display)
+        self.shutdown(preserve_display)
+        raise
+      else:
+        self.shutdown()
 
   def shutdown(self, preserve_display=False):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
@@ -283,6 +273,24 @@ class Upd(SingletonMixin):
           self._backend.write(''.join(txts))
           self._backend.flush()
     self._reset()
+
+  ############################################################
+  # Sequence methods.
+  #
+
+  def __len__(self):
+    ''' The length of an `Upd` is the number of slots.
+    '''
+    return len(self._slot_text)
+
+  def __getitem__(self, index):
+    return self._slot_text[index]
+
+  def __setitem__(self, index, txt):
+    self.out(txt, slot=index)
+
+  def __delitem__(self, index):
+    self.delete(index)
 
   def _set_cursor_visible(self, mode):
     ''' Set the cursor visibility mode, return terminal sequence.
@@ -542,7 +550,7 @@ class Upd(SingletonMixin):
     )
     return txts
 
-  def out(self, txt, *a, slot=0, raw_text=False, redraw=False):
+  def out(self, txt, *a, slot=0, raw_text=False, redraw=False) -> str:
     ''' Update the status line at `slot` to `txt`.
         Return the previous status line content.
 
@@ -565,7 +573,11 @@ class Upd(SingletonMixin):
       slots = self._slot_text
       if slot == 0 and not slots:
         self.insert(0)
-      oldtxt = slots[slot]
+      try:
+        oldtxt = slots[slot]
+      except IndexError as e:
+        warning("%s.out(slot=%d): %s, ignoring %r", self, slot, e, txt)
+        return ''
       if self._disabled or self._backend is None:
         slots[slot] = txt
       else:
@@ -736,14 +748,17 @@ class Upd(SingletonMixin):
     return True
 
   # pylint: disable=too-many-branches,too-many-statements
-  def insert(self, index, txt='', proxy=None) -> "UpdProxy":
+  def insert(self, index, txt='', proxy=None, **proxy_kw) -> "UpdProxy":
     ''' Insert a new status line at `index`.
         Return the `UpdProxy` for the new status line.
     '''
-    if proxy and proxy.upd is not None:
-      raise ValueError(
-          "proxy %s already associated with an Upd: %s" % (proxy, self)
-      )
+    if proxy:
+      if proxy.upd is not None:
+        raise ValueError(
+            "proxy %s already associated with an Upd: %s" % (proxy, self)
+        )
+      if proxy_kw:
+        raise ValueError("cannot supply both a proxy and **proxy_kw")
     slots = self._slot_text
     proxies = self._proxies
     txts = []
@@ -767,7 +782,7 @@ class Upd(SingletonMixin):
           )
       if proxy is None:
         # create the proxy, which inserts it
-        return UpdProxy(index=index, upd=self, prefix=txt)
+        return UpdProxy(index=index, upd=self, prefix=txt, **proxy_kw)
 
       # associate the proxy with self
       assert proxy.upd is None
@@ -912,6 +927,7 @@ class Upd(SingletonMixin):
         self._backend.flush()
       return proxy
 
+  # pylint: disable=too-many-arguments
   @contextmanager
   def run_task(
       self,
@@ -967,9 +983,10 @@ class Upd(SingletonMixin):
       )
 
 def uses_upd(func):
-  ''' Decorator for functions accepting an optional `upd=Upd()` parameter.
+  ''' Decorator for functions accepting an optional `upd=Upd()` parameter,
+      default from `Upd.state.current`.
   '''
-  return default_params(func, upd=Upd)
+  return default_params(func, upd=Upd.default)
 
 @uses_upd
 def out(msg, *a, upd, **outkw):
@@ -1054,6 +1071,8 @@ class UpdProxy(object):
       '_text_auto':
       'An optional callable to generate the text if _text is empty.',
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
+      '_update_period': 'Update time interval.',
+      'last_update': 'Time of last update.',
   }
 
   @uses_upd
@@ -1066,6 +1085,7 @@ class UpdProxy(object):
       prefix: Optional[str] = None,
       suffix: Optional[str] = None,
       text_auto=None,
+      update_period: Optional[float] = None,
   ):
     ''' Initialise a new `UpdProxy` status line.
 
@@ -1082,6 +1102,9 @@ class UpdProxy(object):
     self._text = ''
     self._text_auto = text_auto
     self._suffix = suffix or ''
+    self._update_period = update_period
+    if update_period:
+      self.last_update = time.time()
     upd.insert(index, proxy=self)
     if text:
       self(text)
@@ -1108,15 +1131,23 @@ class UpdProxy(object):
 
   def _update(self):
     upd = self.upd
-    if upd is not None:
-      with upd._lock:  # pylint: disable=protected-access
-        index = self.index
-        if index is not None:
-          txt = upd.normalise(self._prefix + self._text + self._suffix)
-          overflow = len(txt) - upd.columns + 1
-          if overflow > 0:
-            txt = '<' + txt[overflow + 1:]
-          self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+    if upd is None:
+      return
+    update_period = self._update_period
+    if update_period:
+      now = time.time()
+      if now - self.last_update < update_period:
+        return
+    with upd._lock:  # pylint: disable=protected-access
+      index = self.index
+      if index is not None:
+        txt = upd.normalise(self._prefix + self._text + self._suffix)
+        overflow = len(txt) - upd.columns + 1
+        if overflow > 0:
+          txt = '<' + txt[overflow + 1:]
+        self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+    if update_period:
+      self.last_update = now
 
   def reset(self):
     ''' Clear the proxy: set both the prefix and text to `''`.
@@ -1156,7 +1187,7 @@ class UpdProxy(object):
   def text(self):
     ''' The text of this proxy's slot, without the prefix.
     '''
-    return self._text or ('' if self._auto_text is None else self._auto_text())
+    return self._text or ('' if self._text_auto is None else self._text_auto())
 
   @text.setter
   def text(self, txt):
@@ -1226,46 +1257,28 @@ class UpdProxy(object):
         index += self.index
       return upd.insert(index, txt)
 
-# pylint: disable=too-few-public-methods
-class _UpdState(StackableState):
-
-  def __getattr__(self, attr):
-    if attr == 'upd':
-      value = Upd()
-    else:
-      raise AttributeError("%s.%s" % (type(self).__name__, attr))
-    setattr(self, attr, value)
-    return value
-
-state = _UpdState()
-
 @decorator
-def upd_proxy(func, prefix=None, insert_at=1):
-  ''' Decorator to create a new `UpdProxy` and record it as `state.proxy`.
+def with_upd_proxy(func, prefix=None, insert_at=1):
+  ''' Decorator to run `func` with an additional parameter `upd_proxy`
+      being an `UpdProxy` for progress reporting.
 
-      Parameters:
-      * `func`: the function to decorate
-      * `prefix`: initial proxy prefix, default `func.__name__`
-      * `insert_at`: the position for the new proxy, default `1`
+      Example:
 
-      Typical example:
-
-          from cs.upd import upd_proxy, state as upd_state
-          ...
-          @upd_proxy
-          def func*(self, ...):
-              proxy = upd_state.proxy
-              proxy.prefix = str(self) + " taskname"
+          @with_upd_proxy
+          def func(*a, upd_proxy:UpdProxy, **kw):
+            ... perform task, updating upd_proxy ...
   '''
+
   if prefix is None:
     prefix = func.__name__
 
-  def upd_proxy_wrapper(*a, **kw):
-    with state.upd.insert(insert_at) as proxy:
-      with stackattrs(state, proxy=proxy):
-        return func(*a, **kw)
+  @uses_upd
+  def upd_with_proxy_wrapper(*a, upd, **kw):
+    with upd.insert(insert_at) as proxy:
+      with stackattrs(proxy, prefix=prefix):
+        return func(*a, upd_proxy=proxy, **kw)
 
-  return upd_proxy_wrapper
+  return upd_with_proxy_wrapper
 
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.
