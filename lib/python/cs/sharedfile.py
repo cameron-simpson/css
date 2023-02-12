@@ -17,10 +17,10 @@ import sys
 from tempfile import mkstemp
 from threading import RLock
 import time
+
 from cs.filestate import FileState
-from cs.gimmicks import TimeoutError
+from cs.gimmicks import TimeoutError, warning
 from cs.lex import as_lines
-from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.range import Range
 
@@ -39,7 +39,6 @@ DISTINFO = {
         'cs.filestate',
         'cs.gimmicks>=TimeoutError',
         'cs.lex',
-        'cs.logutils',
         'cs.pfx',
         'cs.range',
     ],
