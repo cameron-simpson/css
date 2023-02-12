@@ -52,6 +52,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.doc',
         'cs.resources',
+        'cs.upd',
     ],
 }
 
@@ -1185,6 +1186,7 @@ class BaseCommand:
       local.update(options.__dict__)
       local.update(argv=argv, cmd=self.cmd, options=options, self=self)
     try:
+      # pylint: disable=import-outside-toplevel
       from bpython import embed
     except ImportError:
       return interact(
