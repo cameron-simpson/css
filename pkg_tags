@@ -89,7 +89,7 @@ cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966
 cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e75882d2 featu
 cs.service_api
 cs.sh
-cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da"
+cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.sqlalchemy_utils ok_revision="8c6eb6904bd805ba7a3e51e0d94373d148e72496" pypi.release="20230212"
 cs.sqltags ok_revision="0e298ebf580df25c481cf047dca02204cdfe76fb" pypi.release="20230212"
 cs.tagset ok_revision="40b1917a48e751ed801fdb3836e64a0fbaa0ebf6" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20230210"
