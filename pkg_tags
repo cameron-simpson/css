@@ -91,7 +91,7 @@ cs.service_api
 cs.sh
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.sqlalchemy_utils ok_revision="8c6eb6904bd805ba7a3e51e0d94373d148e72496" pypi.release="20230212"
-cs.sqltags ok_revision="0e298ebf580df25c481cf047dca02204cdfe76fb" pypi.release="20230212"
+cs.sqltags ok_revision="25423c05ed66da615673786c252e52baed33a463" pypi.release="20230212"
 cs.tagset ok_revision="7b47efb82fd0391380d508a515d65fa869ca5349" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20230212"
 cs.taskqueue ok_revision="3124b308e9599978d77d3cd7e4c8f769400803e1" features={"20221207":["BaseTask"]} pypi.release="20221207"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
