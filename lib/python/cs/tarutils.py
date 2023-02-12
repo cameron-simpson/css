@@ -133,7 +133,7 @@ def traced_untar(
       * `chdirpath`: optional directory to which to `chdir` before accessing `srcpaths`
       * `label`: optional label for the progress bar
       * `tar_exe`: optional `tar` executable, default from `TAR_EXE`: `{TAR_EXE}`
-      * `bcount`: blocking factor in 152 byte unites,
+      * `bcount`: blocking factor in 512 byte unites,
         default from `DEFAULT_BCOUNT`: `{DEFAULT_BCOUNT}`
   '''
   if isinstance(tarfd, str):
@@ -218,7 +218,7 @@ def tar(
       * `srcpaths`: source filesystem paths
       * `chdirpath`: optional directory to which to `chdir` before accessing `srcpaths`
       * `tar_exe`: optional `tar` executable, default from `TAR_EXE`: `{TAR_EXE}`
-      * `bcount`: blocking factor in 152 byte unites,
+      * `bcount`: blocking factor in 512 byte unites,
         default from `DEFAULT_BCOUNT`: `{DEFAULT_BCOUNT}`
   '''
   if not srcpaths:
@@ -255,7 +255,7 @@ def traced_cpdir(
         which must not already exist
       * `label`: optional label for the progress bar
       * `tar_exe`: optional `tar` executable, default from `TAR_EXE`: `{TAR_EXE}`
-      * `bcount`: blocking factor in 152 byte unites,
+      * `bcount`: blocking factor in 512 byte unites,
         default from `DEFAULT_BCOUNT`: `{DEFAULT_BCOUNT}`
   '''
   if label is None:
