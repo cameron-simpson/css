@@ -8,6 +8,7 @@ r'''
 Assorted decorator functions.
 '''
 
+from abc import ABC, abstractclassmethod
 from collections import defaultdict
 from contextlib import contextmanager
 from inspect import isgeneratorfunction, ismethod, signature, Parameter
@@ -972,3 +973,14 @@ def promote(func, params=None, types=None):
     return func(*bound_args.args, **bound_args.kwargs)
 
   return promoting_func
+
+class Promotable(ABC):
+  ''' A class which supports the `@promote` decorator.
+  '''
+
+  @abstractclassmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
+        This method supports the `@promote` decorator.
+    '''
+    raise NotImplemented
