@@ -11,7 +11,6 @@
     an automatically refilling buffer to support parsing of data streams.
 '''
 
-from __future__ import print_function
 from contextlib import contextmanager
 import os
 from os import fstat, SEEK_SET, SEEK_CUR, SEEK_END
@@ -19,6 +18,8 @@ import mmap
 from stat import S_ISREG
 import sys
 from threading import Thread
+
+from cs.gimmicks import r
 from cs.py3 import pread
 
 __version__ = '20230212-post'
@@ -30,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.gimmicks', 'cs.py3'],
 }
 
 DEFAULT_READSIZE = 131072
@@ -335,7 +336,7 @@ class CornuCopyBuffer(object):
 
         Other keyword arguments are passed to the buffer constructor.
     '''
-    f = open(filename, 'rb')
+    f = open(filename, 'rb')  # pylint: disable=consider-using-with
     bfr = cls.from_file(f, close=f.close, **kw)
     if offset is not None:
       if offset < 0:
