@@ -8,7 +8,7 @@ r'''
 Assorted decorator functions.
 '''
 
-from abc import ABC, abstractclassmethod
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 from inspect import isgeneratorfunction, ismethod, signature, Parameter
@@ -804,6 +804,7 @@ def default_params(func, _strict=False, **param_defaults):
   )
   return defaulted_func
 
+# pylint: disable=too-many-statements
 @decorator
 def promote(func, params=None, types=None):
   ''' A decorator to promote argument values automatically in annotated functions.
@@ -930,6 +931,7 @@ def promote(func, params=None, types=None):
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
     # we don't import cs.pfx (many dependencies!)
+    # pylint: disable=unnecessary-lambda-assignment
     get_context = lambda: (
         "@promote(%s.%s)(%s=%s:%r)" % (
             func.__module__, func.__name__, param_name, arg_value.__class__.
@@ -952,7 +954,7 @@ def promote(func, params=None, types=None):
           as_annotation = getattr(arg_value, as_method_name)
         except AttributeError:
           # no .as_TypeName, reraise the original TypeError
-          raise te
+          raise te  # pylint: disable=raise-missing-from
         else:
           if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
             # bound instance method of arg_value
@@ -974,13 +976,14 @@ def promote(func, params=None, types=None):
 
   return promoting_func
 
+# pylint: disable=too-few-public-methods
 class Promotable(ABC):
   ''' A class which supports the `@promote` decorator.
   '''
 
-  @abstractclassmethod
+  @abstractmethod
   def promote(cls, obj):
     ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
         This method supports the `@promote` decorator.
     '''
-    raise NotImplemented
+    raise NotImplementedError
