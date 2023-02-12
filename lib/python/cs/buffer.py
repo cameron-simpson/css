@@ -22,7 +22,7 @@ from threading import Thread
 from cs.gimmicks import r
 from cs.py3 import pread
 
-__version__ = '20230212.1'
+__version__ = '20230212.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
