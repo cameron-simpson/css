@@ -212,7 +212,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator, fmtdoc
+from cs.deco import decorator, fmtdoc, Promotable
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton
@@ -1729,7 +1729,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     except KeyError:
       raise AttributeError('member_type')  # pylint: disable=raise-missing-from
 
-class TagSetCriterion(ABC):
+class TagSetCriterion(Promotable):
   ''' A testable criterion for a `TagSet`.
   '''
 
@@ -1751,12 +1751,13 @@ class TagSetCriterion(ABC):
         Instances of `cls` are returned unchanged.
         Instances of s`str` are promoted via `cls.from_str`.
     '''
-    if not isinstance(criterion, cls):
-      if isinstance(criterion, str):
-        criterion = cls.from_str(criterion, fallback_parse=fallback_parse)
-      else:
-        raise TypeError("cannot promote to %s: %s" % (cls, r(criterion)))
-    return criterion
+    if isinstance(criterion, cls):
+      return criterion
+    if isinstance(criterion, str):
+      return cls.from_str(criterion, fallback_parse=fallback_parse)
+    raise TypeError(
+        "%s.promote: cannot promote to %s" % (cls.__name__, r(criterion))
+    )
 
   @classmethod
   @pfx_method
