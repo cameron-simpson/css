@@ -60,7 +60,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, Promotable
 from cs.fileutils import shortpath
 from cs.lex import FormatAsError, has_format_attributes, format_attribute, get_decimal_value, r
 from cs.logutils import error, warning, track, info, ifverbose
@@ -1528,7 +1528,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     return children
 
 # pylint: disable=too-many-ancestors
-class SQLTags(BaseTagSets):
+class SQLTags(BaseTagSets, Promotable):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 

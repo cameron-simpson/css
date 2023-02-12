@@ -62,6 +62,7 @@ except ImportError:
   except AttributeError:
     pass
 
+from cs.deco import Promotable
 from cs.lex import parseUC_sAttr
 from cs.logutils import debug, error, warning, exception
 from cs.pfx import Pfx, pfx_iter
@@ -82,7 +83,7 @@ def isURL(U):
   '''
   return isinstance(U, _URL)
 
-class URL(str):
+class URL(str, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
@@ -124,14 +125,11 @@ class URL(str):
       raise TypeError(
           "%s.promote: cannot convert to URL: %s" % (cls.__name__, r(obj))
       )
+    if isinstance(url, cls):
+      obj = url if referer is None else cls(url, referer=referer)
     else:
-      if isinstance(url, cls):
-        obj = url if referer is None else cls(url, referer=referer)
-      else:
-        obj = cls.promote(url) if referer is None else cls(
-            url, referer=referer
-        )
-    return boj
+      obj = cls.promote(url) if referer is None else cls(url, referer=referer)
+    return obj
 
   def __getattr__(self, attr):
     ''' Ad hoc attributes.
