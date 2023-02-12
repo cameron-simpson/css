@@ -63,7 +63,7 @@ case "$file" in
       *)    exec untar "$file" ;;
     esac
     ;;
-  *.tar.gz | *.tar.bz2 )
+  *.tar.gz | *.tar.bz2 | *.tgz )
     case "`uname -s`" in
       Darwin)
         # tar understands bz2 and gz directly without options
