@@ -21,7 +21,7 @@ import sys
 from threading import Thread
 from cs.py3 import pread
 
-__version__ = '20230212'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
