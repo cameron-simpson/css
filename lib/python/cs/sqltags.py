@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230212-post'
+__version__ = '20230212.1'
 
 DISTINFO = {
     'keywords': ["python3"],
