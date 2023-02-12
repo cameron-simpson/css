@@ -49,7 +49,7 @@ cs.gvutils ok_revision=a2f35c4da8b7e797f4f62a274bf5e1ccb3b6d65d pypi.release="20
 cs.html pypi.release=20160828 ok_revision="23989d64974a81c6521174d3fe496bcfdd280d3f"
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
-cs.iso14496 pypi.release="20220606" ok_revision=b98d5cc1c47872fae8a9580a424e115bd70ae473
+cs.iso14496 pypi.release="20220606" ok_revision=c04ebfa44a5019270d73a049f597c84a17b5e13b
 cs.iso8601
 cs.jdson
 cs.later pypi.release="20230212" ok_revision="8667161984ccce319a0de21578de370f4341455c"
