@@ -24,7 +24,7 @@ cs.app.ydl pypi.release="20220318" ok_revision=c3034b39089e541de85a33496e6cb57d4
 cs.asynchron pypi.release=20160828
 cs.binary pypi.release="20221206" ok_revision="8f058d1f9004d17dd1c05ac1864e7b86981a8a4d"
 cs.buffe
-cs.buffer pypi.release="20210316" ok_revision="735d0c748a665ac5629cd00a3d2402e211df4826"
+cs.buffer pypi.release="20210316" ok_revision="735d0c748a665ac5629cd00a3d2402e211df4826" features={"20230212":["CornuCopyBuffer_promote"]}
 cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.clockutils pypi.release=20190101
 cs.cmdutils pypi.release="20230212" ok_revision="0d0be68698f8bfaa1ab447cbd1e889a8f1a474fe" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"]}
