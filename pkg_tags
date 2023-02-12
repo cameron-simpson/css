@@ -33,7 +33,7 @@ cs.context pypi.release="20230212" ok_revision="38335475b495c3b873a37f5e0b12a4a2
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20221118" ok_revision="32e79edcf8c727f9b6e5525f67de22cf1774a21e"
-cs.deco pypi.release="20230210" ok_revision="44a16e7ef6dfcc91a231040cc2b487703b9f58be" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"]}
+cs.deco pypi.release="20230210" ok_revision="44a16e7ef6dfcc91a231040cc2b487703b9f58be" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"]}
 cs.distinfo
 cs.ebooks ok_revision="143e07dcc28380c9fcc2eca3af03b5af134d3c98" pypi.release="20230110" features={"20230110":["dedrm"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
