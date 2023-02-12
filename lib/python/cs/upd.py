@@ -986,7 +986,7 @@ def uses_upd(func):
   ''' Decorator for functions accepting an optional `upd=Upd()` parameter,
       default from `Upd.state.current`.
   '''
-  return default_params(func, upd=Upd.default)
+  return default_params(func, upd=lambda: Upd.default() or Upd())
 
 @uses_upd
 def out(msg, *a, upd, **outkw):
