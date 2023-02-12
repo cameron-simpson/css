@@ -1037,29 +1037,6 @@ class CopyingIterator(object):
     # proxy other attributes from the base iterator
     return getattr(self.it, attr)
 
-def chunky(bfr_func):
-  ''' Decorator for a function accepting a leading `CornuCopyBuffer`
-      parameter.
-      Returns a function accepting a leading data chunks parameter
-      (`bytes` instances) and optional `offset` and 'copy_offsets`
-      keywords parameters.
-
-      Example::
-
-          @chunky
-          def func(bfr, ...):
-  '''
-
-  def chunks_func(chunks, *a, **kw):
-    ''' Function accepting chunk iterator.
-    '''
-    offset = kw.pop('offset', 0)
-    copy_offsets = kw.pop('copy_offsets', None)
-    bfr = CornuCopyBuffer(chunks, offset=offset, copy_offsets=copy_offsets)
-    return bfr_func(bfr, *a, **kw)
-
-  return chunks_func
-
 class _Iterator(object):
   ''' A base class for iterators over seekable things.
   '''
