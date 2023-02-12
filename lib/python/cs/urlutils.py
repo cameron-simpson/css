@@ -78,17 +78,12 @@ from cs.xml import etree  # ElementTree
 ##  return putheader0(self, header, *values)
 ##HTTPConnection.putheader = my_putheader
 
-def isURL(U):
-  ''' Test if an object `U` is an URL instance.
-  '''
-  return isinstance(U, _URL)
-
 class URL(str, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
   def _init(self, *, referer=None, user_agent=None, opener=None):
-    ''' Initialise the _URL.
+    ''' Initialise the `URL`.
         `s`: the string defining the URL.
         `referer`: the referring URL.
         `user_agent`: User-Agent string, inherited from `referer` if unspecified,
