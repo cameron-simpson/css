@@ -7,4 +7,5 @@
 import sys
 sys.path[:] = [ path for path in sys.path if path ]
 from cs.tarutils import traced_untar
-sys.exit(traced_untar(*sys.argv[1:]))
+args = sys.argv[1:] or (sys.stdin.fileno(),)
+sys.exit(traced_untar(*args))
