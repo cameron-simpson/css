@@ -7,6 +7,7 @@ less demanding of others.
 '''
 
 # pylint: disable=wrong-import-position
+# pylint: disable=unnecessary-lambda-assignment
 
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import
@@ -78,6 +79,12 @@ except NameError:
           )
         Exception.__init__(self, msg)
 
+try:
+  from cs.lex import r, s  # pylint: disable=unused-import
+except ImportError:
+  r = repr
+  s = lambda obj: "%s:%s" % (obj.__class__.__name__, str(obj))
+
 __version__ = '20230210-post'
 
 DISTINFO = {
@@ -94,8 +101,10 @@ class _logging_map(dict):
 
   def __missing__(self, func_name):
     try:
+      # pylint: disable=import-outside-toplevel
       import cs.logutils as logging_module
     except ImportError:
+      # pylint: disable=import-outside-toplevel
       import logging as logging_module
     func = getattr(logging_module, func_name)
     self[func_name] = func
