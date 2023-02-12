@@ -6,6 +6,7 @@
 ''' Assorted tar related things.
 '''
 
+import os
 from os import mkdir, lstat
 from os.path import (
     exists as existspath,
@@ -20,7 +21,7 @@ from typing import Iterable, List
 
 from cs.deco import fmtdoc
 from cs.fs import shortpath
-from cs.logutils import warning
+from cs.gimmicks import warning
 from cs.pfx import pfx_call
 from cs.progress import progressbar
 from cs.queues import IterableQueue
@@ -119,6 +120,8 @@ def traced_untar(
     label=None,
     tar_exe=TAR_EXE,
     bcount=DEFAULT_BCOUNT,
+    total=None,
+    _stat_fd=False,
     upd
 ):
   ''' Read tar data from `tarfd` and extract.
@@ -141,10 +144,28 @@ def traced_untar(
           label=f'untar {shortpath(tarfd)} -> {chdirpath}',
           tar_exe=tar_exe,
           bcount=bcount,
+          _stat_fd=tarfd.endswith('.tar'),
           upd=upd,
       )
   if label is None:
     label = f'untar {tarfd} -> {chdirpath}'
+  if total is None and _stat_fd:
+    # stat the file to get its size
+    if isinstance(tarfd, int):
+      fd = tarfd
+    else:
+      try:
+        fd = tarfd.fileno()
+      except AttributeError as e:
+        fd = -1
+    if fd >= 0:
+      try:
+        S = os.fstat(fd)
+      except OSError as e:
+        warning("os.fstat(%r): %s", tarfd, e)
+      else:
+        if S_ISREG(S.st_mode):
+          total = S.st_size
   # pylint: disable=consider-using-with
   P = Popen(
       [tar_exe, '-x', '-v', '-C', chdirpath, '-b',
@@ -175,6 +196,7 @@ def traced_untar(
         _watch_filenames(filenames_q, chdirpath),
         label=label,
         itemlenfunc=lambda f_d: diff,
+        total=total,
         upd=upd,
         report_print=True,
         units_scale=BINARY_BYTES_SCALE,
