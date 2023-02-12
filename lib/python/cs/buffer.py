@@ -19,6 +19,7 @@ from stat import S_ISREG
 import sys
 from threading import Thread
 
+from cs.deco import Promotable
 from cs.gimmicks import r
 from cs.py3 import pread
 
@@ -31,7 +32,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
-    'install_requires': ['cs.gimmicks', 'cs.py3'],
+    'install_requires': ['cs.deco', 'cs.gimmicks', 'cs.py3'],
 }
 
 DEFAULT_READSIZE = 131072
@@ -39,7 +40,7 @@ DEFAULT_READSIZE = 131072
 MEMORYVIEW_THRESHOLD = DEFAULT_READSIZE  # tweak if this gets larger
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
-class CornuCopyBuffer(object):
+class CornuCopyBuffer(Promotable):
   ''' An automatically refilling buffer intended to support parsing
       of data streams.
 
@@ -929,7 +930,8 @@ class CornuCopyBuffer(object):
 
   @classmethod
   def promote(cls, obj):
-    ''' Promote `obj` to a `CornuCopyBuffer`.
+    ''' Promote `obj` to a `CornuCopyBuffer`,
+        used by the @cs.deco.promote` decorator.
 
         Promotes:
         * `int`: assumed to be a file descriptor of a file open for binary read
