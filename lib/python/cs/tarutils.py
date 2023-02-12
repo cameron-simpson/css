@@ -133,6 +133,16 @@ def traced_untar(
       * `bcount`: blocking factor in 152 byte unites,
         default from `DEFAULT_BCOUNT`: `{DEFAULT_BCOUNT}`
   '''
+  if isinstance(tarfd, str):
+    with pfx_call(open, tarfd, 'rb') as tarf:
+      return traced_untar(
+          tarf,
+          chdirpath=chdirpath,
+          label=f'untar {shortpath(tarfd)} -> {chdirpath}',
+          tar_exe=tar_exe,
+          bcount=bcount,
+          upd=upd,
+      )
   if label is None:
     label = f'untar {tarfd} -> {chdirpath}'
   # pylint: disable=consider-using-with
