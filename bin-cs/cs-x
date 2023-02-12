@@ -23,12 +23,26 @@ file=$1; shift
 
 case "$mtype" in
   # special handling for tar data
-  application/x-tar | application/x-tar-bz2 | application/x-tar-gz )
+  application/x-tar )
     case "$file" in
       -)    exec untar ;;
       *)    exec untar "$file" ;;
     esac
     ;;
+  application/x-tar-bz2 | application/x-tar-gz )
+    case "`uname -s`" in
+      Darwin)
+        # tar understands bz2 and gz directly without options
+        case "$file" in
+          -)    exec untar ;;
+          *)    exec untar "$file" ;;
+        esac
+        ;;
+    esac
+    ;;
+esac
+
+case "$mtype" in
   # other types look up the mailcap
   ?*)
     unpack=`mailcap -s "$file" "$mtype" unpack` && exec sh -uexc "$unpack"
@@ -43,10 +57,21 @@ esac
 
 # special handling for tar data
 case "$file" in
-  *.tar | *.tar.gz | *.tar.bz2 )
+  *.tar )
     case "$file" in
       -)    exec untar ;;
       *)    exec untar "$file" ;;
+    esac
+    ;;
+  *.tar.gz | *.tar.bz2 )
+    case "`uname -s`" in
+      Darwin)
+        # tar understands bz2 and gz directly without options
+        case "$file" in
+          -)    exec untar ;;
+          *)    exec untar "$file" ;;
+        esac
+        ;;
     esac
     ;;
 esac
