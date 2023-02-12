@@ -1155,7 +1155,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               op_map = {
                   '~': lambda column, value: column is not None,
               }
-              post_check = lambda te: value.match(te[tag_name])
+              post_check = lambda te: tag_value.match(te[tag_name])
             else:
               raise TypeError(
                   "unhandled type for %s=%s" % (
