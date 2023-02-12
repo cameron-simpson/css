@@ -52,7 +52,7 @@ cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd51109296
 cs.iso14496 pypi.release="20220606" ok_revision=b98d5cc1c47872fae8a9580a424e115bd70ae473
 cs.iso8601
 cs.jdson
-cs.later pypi.release="20230125" ok_revision=b1d9307eb494b64fc3799a6706bcc5a3b91b6e90
+cs.later pypi.release="20230125" ok_revision="8667161984ccce319a0de21578de370f4341455c"
 cs.lex pypi.release="20230210" ok_revision=bc57cdbcf4ca6e966a9a609faa22a6da9b5d8784 features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"]}
 cs.loguitls
 cs.logutils pypi.release="20230212" ok_revision="770c9ea67c7a53169da1cda49bbe94eb83530f5d" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"]}
