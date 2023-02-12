@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 ''' A content hash based data store with a filesystem layer, using
     variable sized blocks, arbitrarily sized data and utilising some
@@ -39,16 +39,20 @@
     which is also a system based on variable sized blocks.
 '''
 
+from contextlib import contextmanager
 import os
-import tempfile
-import threading
 from types import SimpleNamespace as NS
+from typing import Optional
+
+from cs.context import stackattrs
+from cs.deco import default_params, promote
+from cs.lex import r
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
-from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
+from cs.threads import State as ThreadState
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -77,6 +81,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.progress',
         'cs.py.func',
+        'cs.py.modules',
         'cs.py.stack',
         'cs.queues',
         'cs.range',
@@ -85,6 +90,7 @@ DISTINFO = {
         'cs.seq',
         'cs.socketutils',
         'cs.threads',
+        'cs.testutils',
         'cs.tty',
         'cs.units',
         'cs.upd',
@@ -100,6 +106,7 @@ DISTINFO = {
     },
     'extras_requires': {
         'FUSE': ['llfuse'],
+        'plotting': ['cs.mplutils'],
     },
 }
 
@@ -107,6 +114,9 @@ DEFAULT_BASEDIR = '~/.local/share/vt'
 
 DEFAULT_CONFIG_ENVVAR = 'VT_CONFIG'
 DEFAULT_CONFIG_PATH = '~/.vtrc'
+VT_STORE_ENVVAR = 'VT_STORE'
+VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
+DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
 
 DEFAULT_CONFIG_MAP = {
     'GLOBAL': {
@@ -165,14 +175,14 @@ _over_progress = OverProgress(name="cs.vt.common.over_progress")
 common = NS(
     progress=_progress,
     over_progress=_over_progress,
-    runstate=RunState("cs.vt.common.runstate"),
-    config=None
+    config=None,
+    S=None,
 )
 
 del _progress
 del _over_progress
 
-class _Defaults(threading.local):
+class _Defaults(ThreadState):
   ''' Per-thread default context stack.
 
       A Store's __enter__/__exit__ methods push/pop that store
@@ -185,12 +195,11 @@ class _Defaults(threading.local):
   _Ss = []
 
   def __init__(self):
-    threading.local.__init__(self)
+    super().__init__()
     self.progress = common.progress
-    self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
-    self.Ss = []
+    self.show_progress = False
 
   @property
   def config(self):
@@ -200,100 +209,53 @@ class _Defaults(threading.local):
       cfg = Config()
     return cfg
 
-  def _fallback(self, key):
-    ''' Fallback function for empty stack.
-    '''
-    if key == 'S':
-      warning("no per-Thread Store stack, using the global stack")
-      stack_dump(indent=2)
-      Ss = self._Ss
-      if Ss:
-        return Ss[-1]
-      error(
-          "%s: no per-Thread defaults.S and no global stack, returning None",
-          self
-      )
-      return None
-    raise ValueError("no fallback for %r" % (key,))
+  def __getattr__(self, attr):
+    if attr == 'S':
+      S = common.S
+      if S is None:
+        S = self.config['default']
+      return S
+    raise AttributeError(attr)
 
-  @property
-  def S(self):
-    ''' The topmost Store.
+  @contextmanager
+  def common_S(self, S):
+    ''' Context manager to push a Store onto `common.S`.
     '''
-    Ss = self.Ss
-    if Ss:
-      return self.Ss[-1]
-    _Ss = self._Ss
-    if _Ss:
-      return self._Ss[-1]
-    raise AttributeError('S')
-
-  @S.setter
-  def S(self, newS):
-    ''' Set the topmost Store.
-        Sets the topmost global Store
-        if there's no current perThread Store stack.
-    '''
-    Ss = self.Ss
-    if Ss:
-      Ss[-1] = newS
-    else:
-      _Ss = self._Ss
-      if _Ss:
-        _Ss[-1] = newS
-      else:
-        _Ss.append(newS)
-
-  def pushStore(self, newS):
-    ''' Push a new Store onto the per-Thread stack.
-    '''
-    self.Ss.append(newS)
-
-  def popStore(self):
-    ''' Pop and return the topmost Store from the per-Thread stack.
-    '''
-    return self.Ss.pop()
-
-  def push_Ss(self, newS):
-    ''' Push a new Store onto the global stack.
-    '''
-    self._Ss.append(newS)
-
-  def pop_Ss(self):
-    ''' Pop and return the topmost Store from the global stack.
-    '''
-    return self._Ss.pop()
+    with stackattrs(common, S=S):
+      yield
 
 defaults = _Defaults()
 
-class _TestAdditionsMixin:
-  ''' Some common methods uses in tests.
+def Store(
+    spec: Optional[str] = None,
+    config: Optional["Config"] = None,
+    *,
+    runstate=None,
+    hashclass=None
+):
+  ''' Factory to construct Stores from string specifications.
   '''
+  from .config import Config
+  if spec is None:
+    spec = os.environ.get(VT_STORE_ENVVAR, '[default]')
+  if config is None:
+    config = Config()
+  return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
 
-  @classmethod
-  def mktmpdir(cls, prefix=None):
-    ''' Create a temporary directory.
-    '''
-    if prefix is None:
-      prefix = cls.__qualname__
-    return tempfile.TemporaryDirectory(
-        prefix="test-" + prefix + "-", suffix=".tmpdir", dir=os.getcwd()
-    )
+def _promote_to_Store(obj):
+  ''' Promote `obj` to some kind of Store.
+  '''
+  from .store import _BasicStoreCommon
+  if isinstance(obj, _BasicStoreCommon):
+    return obj
+  if isinstance(obj, str):
+    # Store specification string
+    return Store(obj)
+  raise TypeError(f'Store.promote: cannot promote {r(obj)}')
 
-  def assertLen(self, o, length, *a, **kw):
-    ''' Test len(o) unless it raises TypeError.
-    '''
-    try:
-      olen = len(o)
-    except TypeError:
-      pass
-    else:
-      self.assertEqual(olen, length, *a, **kw)
+Store.promote = _promote_to_Store
 
-  def assertIsOrdered(self, s, strict=False):
-    ''' Assertion to test that an object's elements are ordered.
-    '''
-    self.assertTrue(
-        isordered(s, strict=strict),
-        "not ordered(strict=%s): %r" % (strict, s)
-    )
+def uses_Store(func):
+  ''' Decorator to provide the default Store as the parameter `S`.
+  '''
+  return default_params(func, S=lambda: defaults.S)

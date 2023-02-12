@@ -1,0 +1,67 @@
+lib/python/cs/taskqueue.py: cs.result,cs.taskqueue: initial move of code from cs.result to new cs.taskqueue
+lib/python/cs/taskqueue.py: cs.result: Result: pull ResultState values into Result as class attributes, access via self - this allows the Task subclass to override the state values, since it will have more states
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.__init__: plumb in a RunState
+lib/python/cs/taskqueue.py: cs.result: Result: [BREAKING] rename call to run_func for clarity; cs.taskqueue: Task: prevent .run_func(), rename .call() to .run()
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: provide state names, adjust sanity check
+lib/python/cs/taskqueue.py: cs.taskqueue: fix examples in docstring
+lib/python/cs/taskqueue.py: cs.result,taskqueue: separate out a common BaseResult class which lacks state definitions
+lib/python/cs/taskqueue.py: cs.taskqueue: use cs.fsm.FSM for the Task state management
+lib/python/cs/taskqueue.py: cs.taskqueue: add missing imports, tweak docstrings, add RunStateMixin init
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.callif: state check, possible obsolete already
+lib/python/cs/taskqueue.py: cs.taskqueue: new TaskError subclassing FSMError
+lib/python/cs/taskqueue.py: cs.taskqueue: new BlockedError subclassing TaskError; Task: no longer subclass BaseResult
+lib/python/cs/taskqueue.py: cs.taskqueue: remove old BlockedError, update some docstrings
+lib/python/cs/taskqueue.py: cs.taskqueue: drop old state constants, update FSM_TRANSITIONS
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.__init__: lead with the function, accept inital state parameter (default Task._state.initial_state), new .result attribute since we are no longer subclassing Result, make .required public
+lib/python/cs/taskqueue.py: cs.taskqueue: update imports
+lib/python/cs/taskqueue.py: cs.taskqueue: remove Task.required property, underlying attribute now exposed
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: add .require(0 and its dual .block()
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.cancel: cancel the runstate if running, otherwise fire 'cancel' event
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: new run() method to run the function, irrespective of blockers etc
+lib/python/cs/taskqueue.py: cs.taskqueue: new TaskSubType type definition
+lib/python/cs/taskqueue.py: cs.taskqueue: new make(*tasks) function to make a task and its prerequisites; convenience Task.make() method
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: drop old .block method and .ready property
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: new __call__ to call the Result
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.then: accept a function or another Task, drop auto execution - this is just prep
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: new .join() method to join self.result
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: remove .callif(), tweak .bg()
+lib/python/cs/taskqueue.py: cs.taskqueue: comment and format
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.blockers: tidy up logic
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: drop old run_func() method
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.__init__: new optional track parameter to trace all task transitions; tweak docstring and initial state
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.__init__: bugfix handling of optional name
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: new __str__ method
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.then: bugfix handling of optional name
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: new iscompleted() and isblocked() methods to clarify other logic and allow subclass customisation
+lib/python/cs/taskqueue.py: cs.taskqueue: use Task.iscompleted() instead of hardwired checks
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.dispatch: move blockers check inside the lock, add sanity check for tasks in ABORT state
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.then: update doctest to compare dispatch and make
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.dispatch: just call Task.run after the dispatch event, keeps all state handling there
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.make: use Task.iscompleted() instead of hardwired test
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.make: clean up logic, update docstring and doctest
+lib/python/cs/taskqueue.py: cs.taskqueue: tweak docstring
+lib/python/cs/taskqueue.py: cs.taskqueue: autoformat
+lib/python/cs/taskqueue.py: cs.taskqueue: initial implementation of TaskQueue, a "dispatch worker" oriented manager of a set of tasks
+lib/python/cs/taskqueue.py: cs.taskqueue: update imports, clean lint, fix small bug found by linter
+lib/python/cs/taskqueue.py: cs.taskqueue: remove import used only for debugging
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: new .blocking set being the other end of the .required set - this supports descending a task tree
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: add __repr__, fix docstring typo
+lib/python/cs/taskqueue.py: cs.taskqueue: TaskQueue: rework the run() method, make _on_state_change called during run etc (no longer a state transition callback), add run_dependent_tasks mode to pull dependencies into the queue if their prerequisite gets run
+lib/python/cs/taskqueue.py: cs.taskqueue: FIXUP previous: TaskQueue: add the run_dependent_tasks mode, add "once" parametert for run(), format
+lib/python/cs/taskqueue.py: cs.taskqueue: update imports, clean some lint, update doctests
+lib/python/cs/taskqueue.py: cs.taskqueue: drop the @task decorator for the moment, not ready conceptually
+lib/python/cs/taskqueue.py: cs.taskqueue: put the decorator back as private name @_task until I'm happy
+lib/python/cs/taskqueue.py: cs.taskqueue: new Task.as_dot and Task.tasks_as_dot graph diagram methods; new TaskQueue.as_dot method
+lib/python/cs/taskqueue.py: cs.taskqueue: new Task.dot_node_attrs() hook to allow returning a mapping of DOT specific node attributes
+lib/python/cs/taskqueue.py: cs.taskqueue: main: further tweak to exercise the DOT output
+lib/python/cs/taskqueue.py: cs.taskqueue: Tasl: drop dot_node_attrs, add dot_node_label; Task.tasks_as_dot: most of the complexity now comes from DOTNodeMixin
+lib/python/cs/taskqueue.py: cs.taskqueue: more testing fiddling
+lib/python/cs/taskqueue.py: cs.taskqueue: Task.DOT_NODE_FILL_PALETTE: add 'yellow' for RUNNING
+lib/python/cs/taskqueue.py: cs.fsm,cs.taskqueue: consistent DOT_NODE_FILLCOLOR_PALETTE spelling, drop node_fill_palette from Task.tasks_as_dot
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: add a QUEUED state to FSM_TRANSITIONS, rename the CANCELLED->PENDING event from "requeue" to "retry"
+lib/python/cs/taskqueue.py: cs.taskqueue: docstring and exception text updates
+lib/python/cs/taskqueue.py: cs.taskqueue: make: accept optional `queue` callable parameter, support QUEUED state in the internal logic
+lib/python/cs/taskqueue.py: cs.taskqueue: new make_now(*tasks) function to run the make() generator to completion
+lib/python/cs/taskqueue.py: cs.taskqueue: new make_later(Later, *tasks) function to run make_now(*tasks) using a Later as a queue
+lib/python/cs/taskqueue.py: cs.taskqueue: make: docstring update
+lib/python/cs/taskqueue.py: cs.taskqueue: add DISTINFO, tweak module docstring

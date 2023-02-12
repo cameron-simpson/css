@@ -1,0 +1,2 @@
+lib/python/cs/context.py: cs.context: ContextManagerMixin: update docstring with an example
+lib/python/cs/context.py: cs.context: ContextManagerMixin: rename the combined enter/exit method to `__enter_exit__`

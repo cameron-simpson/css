@@ -1,5 +1,13 @@
+#!/usr/bin/env python3
+
+''' Random stuff for a jailbroken iPhone, probaboy obsolete.
+'''
+
 import os
-from cs.logutils import D
+
+from cs.gimmicks import warning
+
+from .plist import readPlist
 
 PLIST_IPHONE_SPRINGBOARD = \
         '/private/var/mobile/Library/Preferences/com.apple.springboard.plist'
@@ -18,10 +26,11 @@ class IPhoneIconList(list):
       Each dict contains an 'iconMatrix' entry which is a list of rows.
       There are five rows, the last of which is empty).
       Each row has four entries.
-      Each entry is a 0 for a blank slot or a dict with an entry
-      'displayIdentifier' containing an app id string.
+      Each entry is a `0` for a blank slot or a dict with an entry
+      `'displayIdentifier'` containing an app id string.
   '''
-  def __init__(self, sbprefs = None):
+
+  def __init__(self, sbprefs=None):
     list.__init__(self)
     self._byApp = {}
     if sbprefs is not None:
@@ -44,36 +53,37 @@ class IPhoneIconList(list):
               appname = slot["displayIdentifier"]
               icon = {"displayIdentifier": appname}
             self.placeIcon(icon)
-    D("icons = %r", self)
 
-  def placeIcon(self, icon, pos = None):
-    ''' Place the supplied icon (which may be None).
-        If pos is not supplied or None, append the icon to the list.
+  def placeIcon(self, icon, pos=None):
+    ''' Place the supplied icon (which may be `None`).
+        If pos is not supplied or `None`, append the icon to the list.
     '''
     if pos is None:
       pos = len(self)
     if len(self) <= pos:
-      self.extend(None for i in range(pos-len(self)+1))
+      self.extend(None for i in range(pos - len(self) + 1))
     assert self[pos] is None, "pos %d taken by %s" % (pos, self[pos])
     self[pos] = icon
     if icon is not None:
       self._byApp.setdefault(icon["displayIdentifier"], []).append([pos, icon])
 
-  def placeApp(self, appname, startpos = 0, allowDupe = False):
+  def placeApp(self, appname, startpos=0, allowDupe=False):
     ''' Place the named application at the first free slot at startpos
         or beyond.
     '''
     if not allowDupe and self._byApp.get(appname, ()):
-      D("placeApp(%s, %d, allowDupe = %s): app exists at: %s",
-        appname, startpos, allowDupe, self._byApp[appname])
+      warning(
+          "placeApp(%s, %d, allowDupe = %s): app exists at: %s", appname,
+          startpos, allowDupe, self._byApp[appname]
+      )
     pos = startpos
     while pos < len(self) and self[pos] is not None:
       pos += 1
     self.placeIcon({"displayIdentifier": appname}, pos)
 
 class IPhonePrefsSpringboard(object):
-  def __init__(self, plist = None):
-    from .plist import readPlist
+
+  def __init__(self, plist=None):
     if plist is None:
       plist = PLIST_IPHONE_SPRINGBOARD
     self.plist = plist

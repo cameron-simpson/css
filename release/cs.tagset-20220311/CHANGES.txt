@@ -1,0 +1,10 @@
+lib/python/cs/tagset.py: cs.tagset: TagSet.__setattr__: private attrubutes also go straight into self.__dict__
+lib/python/cs/tagset.py: cs.tagset: autoformat
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.metadata: bugfix the key for the subtagsets
+lib/python/cs/tagset.py: merge default ==> tagsets
+lib/python/cs/tagset.py: cs.tagset: TagSet: new dump() method to write a pformatted dump
+lib/python/cs/tagset.py: cs.tagset: TagSet.dump: skip computations if no keys
+lib/python/cs/tagset.py: merge default ==> cdrip
+lib/python/cs/tagset.py: cs.tagset: add a typecheck, a little autoformatting
+lib/python/cs/tagset.py: cs.tagset: TagSet.__getattr__: no magic for attributes commencing with an underscore
+lib/python/cs/tagset.py: cs.tagset: TagSet.auto_infer: back off debug message

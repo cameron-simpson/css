@@ -48,7 +48,7 @@
         >>> tags.add(subtopic)
         >>> # Tags have nice repr() and str()
         >>> subtopic
-        Tag(name='subtopic',value='ontologies',ontology=None)
+        Tag(name='subtopic',value='ontologies')
         >>> print(subtopic)
         subtopic=ontologies
         >>> # a TagSet also has a nice repr() and str()
@@ -88,147 +88,151 @@
         >>> subtopic2 in tags
         False
 
-== Ontologies ==
+    ## Ontologies
 
-`Tag`s and `TagSet`s suffice to apply simple annotations to things.
-However, an ontology brings meaning to those annotations.
+    `Tag`s and `TagSet`s suffice to apply simple annotations to things.
+    However, an ontology brings meaning to those annotations.
 
-See the `TagsOntology` class for implementation details,
-access methods and more examples.
+    See the `TagsOntology` class for implementation details,
+    access methods and more examples.
 
-Consider a record about a movie, with these tags (a `TagSet`):
+    Consider a record about a movie, with these tags (a `TagSet`):
 
-    title="Avengers Assemble"
-    series="Avengers (Marvel)"
-    cast={"Scarlett Johansson":"Black Widow (Marvel)"}
+        title="Avengers Assemble"
+        series="Avengers (Marvel)"
+        cast={"Scarlett Johansson":"Black Widow (Marvel)"}
 
-where we have the movie title,
-a name for the series in which it resides,
-and a cast as an association of actors with roles.
+    where we have the movie title,
+    a name for the series in which it resides,
+    and a cast as an association of actors with roles.
 
-An ontology lets us associate implied types and metadata with these values.
+    An ontology lets us associate implied types and metadata with these values.
 
-Here's an example ontology supporting the above `TagSet`:
+    Here's an example ontology supporting the above `TagSet`:
 
-    type.cast type=dict key_type=person member_type=character description="members of a production"
-    type.character description="an identified member of a story"
-    type.series type=str
-    character.marvel.black_widow type=character names=["Natasha Romanov"]
-    person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
+        type.cast type=dict key_type=person member_type=character description="members of a production"
+        type.character description="an identified member of a story"
+        type.series type=str
+        character.marvel.black_widow type=character names=["Natasha Romanov"]
+        person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
 
-The type information for a `cast`
-is defined by the ontology entry named `type.cast`,
-which tells us that a `cast` `Tag` is a `dict`,
-whose keys are of type `person`
-and whose values are of type `character`.
-(The default type is `str`.)
+    The type information for a `cast`
+    is defined by the ontology entry named `type.cast`,
+    which tells us that a `cast` `Tag` is a `dict`,
+    whose keys are of type `person`
+    and whose values are of type `character`.
+    (The default type is `str`.)
 
-To find out the underlying type for a `character`
-we look that up in the ontology in turn;
-because it does not have a specified `type` `Tag`, it it taken to be a `str`.
+    To find out the underlying type for a `character`
+    we look that up in the ontology in turn;
+    because it does not have a specified `type` `Tag`, it it taken to be a `str`.
 
-Having the types for a `cast`,
-it is now possible to look up the metadata for the described cast members.
+    Having the types for a `cast`,
+    it is now possible to look up the metadata for the described cast members.
 
-The key `"Scarlett Johansson"` is a `person`
-(from the type definition of `cast`).
-The ontology entry for her is named `person.scarlett_johansson`
-which is computed as:
-* `person`: the type name
-* `scarlett_johansson`: obtained by downcasing `"Scarlett Johansson"`
-  and replacing whitespace with an underscore.
-  The full conversion process is defined
-  by the `TagsOntology.value_to_tag_name` function.
+    The key `"Scarlett Johansson"` is a `person`
+    (from the type definition of `cast`).
+    The ontology entry for her is named `person.scarlett_johansson`
+    which is computed as:
+    * `person`: the type name
+    * `scarlett_johansson`: obtained by downcasing `"Scarlett Johansson"`
+      and replacing whitespace with an underscore.
+      The full conversion process is defined
+      by the `TagsOntology.value_to_tag_name` function.
 
-The key `"Black Widow (Marvel)"` is a `character`
-(again, from the type definition of `cast`).
-The ontology entry for her is named `character.marvel.black_widow`
-which is computed as:
-* `character`: the type name
-* `marvel.black_widow`: obtained by downcasing `"Black Widow (Marvel)"`,
-  replacing whitespace with an underscore,
-  and moving a bracketed suffix to the front as an unbracketed prefix.
-  The full conversion process is defined
-  by the `TagsOntology.value_to_tag_name` function.
+    The key `"Black Widow (Marvel)"` is a `character`
+    (again, from the type definition of `cast`).
+    The ontology entry for her is named `character.marvel.black_widow`
+    which is computed as:
+    * `character`: the type name
+    * `marvel.black_widow`: obtained by downcasing `"Black Widow (Marvel)"`,
+      replacing whitespace with an underscore,
+      and moving a bracketed suffix to the front as an unbracketed prefix.
+      The full conversion process is defined
+      by the `TagsOntology.value_to_tag_name` function.
 
-== Format Strings ==
+    ## Format Strings
 
-You can just use `str.format_map` as shown above
-for the direct values in a `TagSet`,
-since it subclasses `dict`.
+    You can just use `str.format_map` as shown above
+    for the direct values in a `TagSet`,
+    since it subclasses `dict`.
 
-However, `TagSet`s also subclass `cs.lex.FormatableMixin`
-and therefore have a richer `format_as` method which has an extended syntax
-for the format component.
-Command line tools like `fstags` use this for output format specifications.
+    However, `TagSet`s also subclass `cs.lex.FormatableMixin`
+    and therefore have a richer `format_as` method which has an extended syntax
+    for the format component.
+    Command line tools like `fstags` use this for output format specifications.
 
-An example:
+    An example:
 
-    >>> # an ontology specifying the type for a colour
-    >>> # and some information about the colour "blue"
-    >>> ont = TagsOntology(
-    ...   {
-    ...       'type.colour':
-    ...       TagSet(description="a colour, a hue", type="str"),
-    ...       'colour.blue':
-    ...       TagSet(
-    ...           url='https://en.wikipedia.org/wiki/Blue',
-    ...           wavelengths='450nm-495nm'
-    ...       ),
-    ...   }
-    ... )
-    >>> # tag set with a "blue" tag, using the ontology above
-    >>> tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
-    >>> tags.format_as('The colour is {colour}.')
-    'The colour is blue.'
-    >>> # format a string about the tags showing some metadata about the colour
-    >>> tags.format_as('Information about the colour may be found here: {colour:metadata.url}')
-    'Information about the colour may be found here: https://en.wikipedia.org/wiki/Blue'
-
-
+        >>> # an ontology specifying the type for a colour
+        >>> # and some information about the colour "blue"
+        >>> ont = TagsOntology(
+        ...   {
+        ...       'type.colour':
+        ...       TagSet(description="a colour, a hue", type="str"),
+        ...       'colour.blue':
+        ...       TagSet(
+        ...           url='https://en.wikipedia.org/wiki/Blue',
+        ...           wavelengths='450nm-495nm'
+        ...       ),
+        ...   }
+        ... )
+        >>> # tag set with a "blue" tag, using the ontology above
+        >>> tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
+        >>> tags.format_as('The colour is {colour}.')
+        'The colour is blue.'
+        >>> # format a string about the tags showing some metadata about the colour
+        >>> tags.format_as('Information about the colour may be found here: {colour:metadata.url}')
+        'Information about the colour may be found here: https://en.wikipedia.org/wiki/Blue'
 '''
 
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from collections.abc import MutableMapping
+from configparser import ConfigParser
 from contextlib import contextmanager
 from datetime import date, datetime
 import errno
 from fnmatch import (fnmatch, fnmatchcase, translate as fn_translate)
+from functools import partial
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
-from os.path import dirname, isdir as isdirpath
+from os.path import (
+    dirname, isdir as isdirpath, isfile as isfilepath, join as joinpath
+)
 import re
-from threading import Lock
 import time
-from typing import Optional, Union
-from uuid import UUID
+from typing import Mapping, Optional, Union
+from uuid import UUID, uuid4
+
 from icontract import require
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator
+from cs.deco import decorator, fmtdoc, Promotable
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
+from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
-    has_format_attributes, format_attribute, FStr, typed_repr as r
+    has_format_attributes, format_attribute, FStr, r
 )
-from cs.logutils import setup_logging, warning, error, ifverbose
+from cs.logutils import setup_logging, debug, warning, error, ifverbose
 from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
 )
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20210913-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -242,6 +246,7 @@ DISTINFO = {
         'cs.deco',
         'cs.edit',
         'cs.fileutils',
+        'cs.fs>=FSPathBasedSingleton',
         'cs.lex',
         'cs.logutils',
         'cs.mappings',
@@ -255,17 +260,23 @@ DISTINFO = {
     ],
 }
 
+pfx_open = partial(pfx_call, open)
+
+# default Tag name holds a metadata entry's "value"
+DEFAULT_VALUE_TAG_NAME = 'value'
+
+# default editor command
 EDITOR = os.environ.get('TAGSET_EDITOR') or os.environ.get('EDITOR')
 
 @decorator
 def tag_or_tag_value(func, no_self=False):
   ''' A decorator for functions or methods which may be called as:
 
-          func(name, [value])
+          func(name[,value])
 
       or as:
 
-          func(Tag, [None])
+          func(Tag)
 
       The optional decorator argument `no_self` (default `False`)
       should be supplied for plain functions
@@ -349,6 +360,28 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
+class _FormatStringTagProxy:
+  ''' A proxy for a `Tag` where `__str__` returns `str(self.value)`.
+
+      This is for use during `TagSet` string formatting
+      because the "no format spec" falls through to `__str__`.
+  '''
+
+  def __init__(self, proxied):
+    assert isinstance(proxied, Tag), "proxied is not a Tag: %s" % (r(proxied),)
+    self.__proxied = proxied
+
+  def __str__(self):
+    return str(self.__proxied.value)
+
+  def __repr__(self):
+    return "%s(%s:%s)" % (
+        type(self).__name__, type(self.__proxied).__name__, self.__proxied
+    )
+
+  def __getattr__(self, attr):
+    return getattr(self.__proxied, attr)
+
 @has_format_attributes
 class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
@@ -361,7 +394,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
       *NOTE*: iteration yields `Tag`s, not dict keys.
 
-      Also note that all the `Tags` from `TagSet`
+      Also note that all the `Tags` from a `TagSet`
       share its ontology.
 
       Subclasses should override the `set` and `discard` methods;
@@ -382,11 +415,12 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         a `float` holding seconds since the UNIX epoch
         (midnight, 1 January 1970 UTC).
         This is typically the row creation time
-        for entities associated with database rows.
+        for entities associated with database rows,
+        but usually the event time for `TagSet`s describing an event.
 
       Because ` TagSet` subclasses `cs.mappings.AttrableMappingMixin`
       you can also access tag values as attributes
-      provided that they do not conflict with instance attributes
+      *provided* that they do not conflict with instance attributes
       or class methods or properties.
       The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
       as `None` which causes attribute access to return `None`
@@ -440,16 +474,38 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
+  @classmethod
+  def from_tags(cls, tags, _id=None, _ontology=None):
+    ''' Make a `TagSet` from an iterable of `Tag`s.
+    '''
+    return cls(
+        _id=_id, _ontology=_ontology, **{tag.name: tag.value
+                                         for tag in tags}
+    )
+
   #################################################################
-  # methods supporting FormattableMixin/ExtendedFormatter
+  # methods supporting FormattableMixin
 
   def get_arg_name(self, field_name):
-    ''' Leading dotted identifiers represent tags or tag prefixes.
+    ''' Override for `FormattableMixin.get_arg_name`:
+        return the leading dotted identifier,
+        which represents a tag or tag prefix.
     '''
     return get_dotted_identifier(field_name)
 
   def get_value(self, arg_name, a, kw):
+    ''' Override for `FormattableMixin.get_value`:
+        look up `arg_name` in `kw`, return a value.
+
+        The value is obtained as follows:
+        * `kw[arg_name]`: the `Tag` named `arg_name` if present
+        * `kw.get_format_attribute(arg_name)`:
+          a formattable attribute named `arg_name`
+        otherwise raise `KeyError` if `self.format_mode.strict`
+        otherwise return the placeholder string `'{'+arg_name+'}'`.
+    '''
     assert isinstance(kw, TagSet)
+    ##assert kw is self ## not the case, needs a bit more digging
     assert not a
     try:
       value = kw[arg_name]
@@ -458,6 +514,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         attribute = kw.get_format_attribute(arg_name)
       except AttributeError:
         if self.format_mode.strict:
+          # pylint: disable=raise-missing-from
           raise KeyError(
               "%s.get_value: unrecognised arg_name %r" %
               (type(self).__name__, arg_name)
@@ -465,16 +522,18 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         value = f'{{{arg_name}}}'
       else:
         value = attribute() if callable(attribute) else attribute
+    else:
+      value = _FormatStringTagProxy(Tag(arg_name, value, ontology=kw.ontology))
     return value, arg_name
 
   ################################################################
   # The magic attributes.
 
-  # pylint: disable=too-many-nested-blocks,too-many-return-statements
+  # pylint: disable=too-many-nested-blocks,too-many-return-statements,too-many-branches
   def __getattr__(self, attr):
     ''' Support access to dotted name attributes.
 
-        The following attribute access are supported:
+        The following attribute accesses are supported:
 
         If `attr` is a key, return `self[attr]`.
 
@@ -490,7 +549,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
         For example if a `TagSet` has the tag `artists=["fred","joe"]`
         and `attr` is `artist_names`
-        then the metadata entries for `"fred"` and `"joe"` looked up
+        then the metadata entries for `"fred"` and `"joe"` are looked up
         and their `artist_name` tags are returned,
         perhaps resulting in the list
         `["Fred Thing","Joe Thang"]`.
@@ -501,7 +560,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
         Otherwise, a superclass attribute access is performed.
 
-        Example:
+        Example of dotted access to tags like `c.x`:
 
             >>> tags=TagSet(a=1,b=2)
             >>> tags.a
@@ -536,7 +595,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     except KeyError:
       try:
         return self.auto_infer(attr)
-      except ValueError as e:
+      except ValueError:  # as e:
         # no match
         ##warning("auto_infer(%r): %s", attr, e)
         pass
@@ -591,7 +650,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
 
-        If `attr` is in `self.__dict__` then that is updated,
+        If `attr` is private or is in `self.__dict__` then that is updated,
         supporting "normal" attributes set on the instance.
         Otherwise the `Tag` named `attr` is set to `value`.
 
@@ -602,7 +661,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
             self.__dict__.update(id=_id, ontology=_ontology, modified=False)
     '''
-    if attr in self.__dict__:
+    if attr.startswith('_') or attr in self.__dict__:
       self.__dict__[attr] = value
     else:
       self[attr] = value
@@ -648,6 +707,13 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def tag(self, tag_name, prefix=None, ontology=None):
     ''' Return a `Tag` for `tag_name`, or `None` if missing.
+
+        Parameters:
+        * `tag_name`: the name of the `Tag` to create
+        * `prefix`: optional prefix;
+          if supplied, prepend `prefix+'.'` to the `Tag` name
+        * `ontology`: optional ontology for the `Tag`,
+          default `self.ontology`
     '''
     try:
       value = self[tag_name]
@@ -693,15 +759,16 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     self.modified = True
     if verbose is None or verbose:
-      old_value = self.get(tag_name)
-      if old_value is not value and old_value != value:
-        # report different values
-        tag = Tag(tag_name, value, ontology=self.ontology)
-        msg = (
-            "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
-            (tag, old_value)
-        )
-        ifverbose(verbose, msg)
+      if tag_name in self:
+        old_value = self.get(tag_name)
+        if old_value is not value and old_value != value:
+          # report different values
+          tag = Tag(tag_name, value, ontology=self.ontology)
+          msg = (
+              "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
+              (tag, old_value)
+          )
+          ifverbose(verbose, msg)
     super().__setitem__(tag_name, value)
 
   # "set" mode
@@ -799,8 +866,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       # prepare a standalone TagSet
       prefix_ = prefix + '.'
       subdict = {
-          cutprefix(k, prefix_): self[k]
-          for k in self.keys()
+          cutprefix(k, prefix_): v
+          for k, v in self.items()
           if k.startswith(prefix_)
       }
       return TagSet(subdict, _ontology=self.ontology)
@@ -815,7 +882,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   @property
   def unixtime(self):
-    ''' `unixtime` property, autosets to `time.time()` if accessed.
+    ''' `unixtime` property, autosets to `time.time()` if accessed and missing.
     '''
     ts = self.get('unixtime')
     if ts is None:
@@ -829,10 +896,38 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     self['unixtime'] = new_unixtime
 
+  @property
+  def uuid(self) -> UUID:
+    ''' The `TagSet`'s `'uuid'` value as a UUID if present, otherwise `None`.
+    '''
+    try:
+      uuid_s = self['uuid']
+    except KeyError:
+      return None
+    else:
+      return UUID(uuid_s) if uuid_s else None
+
+  @format_attribute
+  def is_stale(self, max_age=None):
+    ''' Test whether this `TagSet` is stale
+        i.e. the time since `self.last_updated` UNIX time exceeds `max_age` seconds
+        (default from `self.STALE_AGE`).
+
+        This is a convenience function for `TagSet`s which cache external data.
+    '''
+    if max_age is None:
+      max_age = self.STALE_AGE
+    last_updated = self.get('last_updated', None)
+    if not last_updated:
+      return True
+    return time.time() >= last_updated + max_age
+
   #############################################################################
   # The '.auto' attribute space.
 
-  class Auto:
+  class _Auto:
+    ''' Implementation of the `.auto` attribute space.
+    '''
 
     def __init__(self, tagset, prefix=None):
       self._tagset = tagset
@@ -840,7 +935,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
     def __bool__(self):
       ''' We return `False` so that an unresolved attribute,
-          which returns a deeper `Auto` instance,
+          which returns a deeper `_Auto` instance,
           looks false, enabling:
 
               title = tags.auto.title or "default title"
@@ -855,11 +950,14 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         return self._tagset.auto_infer(fullattr)
       except ValueError:
         # auto view of deeper attributes
-        return self._tagset.Auto(self._tagset, fullattr)
+        return self._tagset._Auto(self._tagset, fullattr)
 
   @property
   def auto(self):
-    return self.Auto(self)
+    ''' The automatic namespace.
+        Here we can refer to dotted tag names directly as attributes.
+    '''
+    return self._Auto(self)
 
   @pfx_method
   def auto_infer(self, attr):
@@ -872,37 +970,48 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         if present.
     '''
     if attr in self:
-      warning("returning direct tag value for %r", attr)
+      debug("returning direct tag value for %r", attr)
       return self[attr]
     raise ValueError("cannot infer value for %r" % (attr,))
 
   #############################################################################
   # Edit tags.
 
-  def edit(self, editor=None, verbose=None):
+  def edit(self, editor=None, verbose=None, comments=()):
     ''' Edit this `TagSet`.
     '''
     if editor is None:
       editor = EDITOR
     lines = (
-        ["# Edit TagSet.", "# One tag per line."] +
-        list(map(str, sorted(self)))
+        ["# Edit TagSet.", "# One tag per line."] + [
+            ("# " + comment.replace("\n", "\n# ")).rstrip()
+            for comment in comments
+        ] + list(map(str, sorted(self)))
     )
     new_lines = edit_lines(lines, editor=editor)
     new_values = {}
+    no_discard = False
     for lineno, line in enumerate(new_lines):
       with Pfx("%d: %r", lineno, line):
         line = line.strip()
         if not line or line.startswith('#'):
           continue
-        tag = Tag.from_str(line)
-        new_values[tag.name] = tag.value
-    self.set_from(new_values, verbose=verbose)
+        try:
+          tag = Tag.from_str(line)
+        except ValueError as e:
+          warning("parse error %s, discarded: %s", e, line)
+          no_discard = True
+        else:
+          new_values[tag.name] = tag.value
+    if no_discard:
+      self.update(new_values, verbose=True)
+    else:
+      self.set_from(new_values, verbose=verbose)
 
   @classmethod
   @pfx_method
   def _from_named_tags_line(cls, line, ontology=None):
-    ''' Parse a "name-or-id tags..." line as used by `edit_many()`,
+    ''' Parse a "name-or-id tags..." line as used by `edit_tagsets()`,
         return the `TagSet`.
     '''
     name, offset = Tag.parse_value(line)
@@ -923,7 +1032,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   @classmethod
   @pfx_method
-  def edit_many(cls, tes, editor=None, verbose=True):
+  def edit_tagsets(cls, tes, editor=None, verbose=True):
     ''' Edit a collection of `TagSet`s.
         Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
@@ -991,6 +1100,72 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return [self.unixtime, self.id, self.name
             ] + [str(tag) for tag in self if tag.name != 'name']
 
+  @classmethod
+  def from_ini(cls, f, section: str, missing_ok=False):
+    ''' Load a `TagSet` from a section of a `.ini` file.
+
+        Parameters:
+        * `f`: the `.ini` format file to read;
+          an iterable of lines (eg a file object)
+          or the name of a file to open
+        * `section`: the name of the config section
+          from which to load the `TagSet`
+        * `missing_ok`: optional flag, default `False`;
+          if true a missing file will return an empty `TagSet`
+          instead of raising `FileNotFoundError`
+    '''
+    if isinstance(f, str):
+      try:
+        with pfx_open(f) as subf:
+          return cls.from_ini(subf, section)
+      except FileNotFoundError:
+        if missing_ok:
+          return cls()
+        raise
+    cp = ConfigParser()
+    cp.read_file(f)
+    tags = cls()
+    try:
+      s = cp[section]
+    except KeyError:
+      pass
+    else:
+      for tag_name, tag_value_s in s.items():
+        with Pfx(tag_name):
+          tag_value_s = tag_value_s.strip()
+          tag_value, offset = (
+              Tag.parse_value(tag_value_s) if tag_value_s else (None, 0)
+          )
+          if offset < len(tag_value_s):
+            raise ValueError("unparsed text: %r", tag_value_s[offset:])
+          tags.add(tag_name, tag_value)
+    return tags
+
+  def save_as_ini(self, f, section: str, config=None):
+    ''' Save this `TagSet` to the config file `f` as `section`.
+
+        If `f` is a string, read an existing config from that file
+        and update the section.
+    '''
+    if config is None:
+      config = ConfigParser()
+    if isinstance(f, str):
+      try:
+        with pfx_open(f) as cf:
+          config.read_file(cf)
+      except FileNotFoundError:
+        pass
+    if isinstance(f, str):
+      with pfx_open(f, 'w') as cf:
+        self.save_as_ini(cf, section, config=config)
+    else:
+      config[section] = {}
+      for tag in self:
+        config[section][
+            tag.name
+        ] = ('' if tag.value is None else tag.transcribe_value(tag.value))
+      config.write(f)
+
 @has_format_attributes
 class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
   ''' A `Tag` has a `.name` (`str`) and a `.value`
@@ -1030,27 +1205,22 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
           >>> ont = TagsOntology({'colour.blue': TagSet(wavelengths='450nm-495nm')})
           >>> tag0 = Tag('colour', 'blue')
           >>> tag0
-          Tag(name='colour',value='blue',ontology=None)
+          Tag(name='colour',value='blue')
           >>> tag = Tag(tag0)
           >>> tag
-          Tag(name='colour',value='blue',ontology=None)
-          >>> tag is tag0
-          True
+          Tag(name='colour',value='blue')
           >>> tag = Tag(tag0, ontology=ont)
           >>> tag # doctest: +ELLIPSIS
           Tag(name='colour',value='blue',ontology=...)
-          >>> tag is tag0
-          False
           >>> tag = Tag(tag0, prefix='surface')
           >>> tag
-          Tag(name='surface.colour',value='blue',ontology=None)
-          >>> tag is tag0
-          False
+          Tag(name='surface.colour',value='blue')
   '''
 
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
-  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
+  JSON_ENCODER_DEFAULTS = dict(separators=(',', ':'))
+  JSON_ENCODER = JSONEncoder(**JSON_ENCODER_DEFAULTS)
 
   # A JSON decoder.
   JSON_DECODER = JSONDecoder()
@@ -1061,10 +1231,11 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
 
+  @tag_or_tag_value
   @typechecked
   def __new__(
       cls,
-      name,
+      name: str,
       value=None,
       *,
       ontology: Optional["TagsOntology"] = None,
@@ -1129,8 +1300,14 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return self.value < other.value
 
   def __repr__(self):
-    return "%s(name=%r,value=%r,ontology=%r)" % (
-        type(self).__name__, self.name, self.value, self.ontology
+    return (
+        (
+            "%s(name=%r,value=%r)" %
+            (type(self).__name__, self.name, self.value)
+        ) if self.ontology is None else (
+            "%s(name=%r,value=%r,ontology=%r)" %
+            (type(self).__name__, self.name, self.value, self.ontology)
+        )
     )
 
   def __str__(self):
@@ -1147,7 +1324,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return name + '=' + value_s
 
   @classmethod
-  def transcribe_value(cls, value, extra_types=None):
+  def transcribe_value(cls, value, extra_types=None, json_options=None):
     ''' Transcribe `value` for use in `Tag` transcription.
 
         The optional `extra_types` parameter may be an iterable of
@@ -1183,19 +1360,45 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if isinstance(value, (tuple, set)):
       value = list(value)
     # fall back to JSON encoded form of value
-    return cls.JSON_ENCODER.encode(value)
+    if json_options:
+      # custom encoder
+      json_options = dict(json_options)
+      for k, v in cls.JSON_ENCODER_DEFAULTS.items():
+        json_options.setdefault(k, v)
+      encoder = JSONEncoder(**json_options)
+    else:
+      encoder = cls.JSON_ENCODER
+    return encoder.encode(value)
 
   @classmethod
-  def from_str(cls, s, offset=0, ontology=None):
+  def from_str(cls, s, offset=0, ontology=None, fallback_parse=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
     with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
-      tag, post_offset = cls.from_str2(s, offset=offset, ontology=ontology)
+      tag, post_offset = cls.from_str2(
+          s, offset=offset, ontology=ontology, fallback_parse=fallback_parse
+      )
       if post_offset < len(s):
         raise ValueError(
             "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
         )
       return tag
+
+  @classmethod
+  def from_arg(cls, arg, offset=0, ontology=None):
+    ''' Parse a `Tag` from the string `arg` at `offset` (default `0`).
+        where `arg` is known to be entirely composed of the value,
+        such as a command line argument.
+
+        This calls the `from_str` method with `fallback_parse` set
+        to gather then entire tail of the supplied string `arg`.
+    '''
+    return cls.from_str(
+        arg,
+        offset=offset,
+        ontology=ontology,
+        fallback_parse=lambda s, offset: (s[offset:], len(s))
+    )
 
   @staticmethod
   def is_valid_name(name):
@@ -1219,7 +1422,9 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def from_str2(cls, s, offset=0, *, ontology, extra_types=None):
+  def from_str2(
+      cls, s, offset=0, *, ontology, extra_types=None, fallback_parse=None
+  ):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.from_str2(%s)", cls.__name__, cropped_repr(s[offset:])):
@@ -1231,7 +1436,12 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
             value = None
           elif sep == '=':
             offset += 1
-            value, offset = cls.parse_value(s, offset, extra_types=extra_types)
+            value, offset = cls.parse_value(
+                s,
+                offset,
+                extra_types=extra_types,
+                fallback_parse=fallback_parse
+            )
           else:
             name_end, offset = get_nonwhite(s, offset)
             name += name_end
@@ -1243,7 +1453,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   # pylint: disable=too-many-branches
   @classmethod
-  def parse_value(cls, s, offset=0, extra_types=None):
+  def parse_value(cls, s, offset=0, extra_types=None, fallback_parse=None):
     ''' Parse a value from `s` at `offset` (default `0`).
         Return the value, or `None` on no data.
 
@@ -1253,6 +1463,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         (expected to be an instance of `type`).
         The default comes from `cls.EXTRA_TYPES`.
         This supports storage of nonJSONable values in text form.
+
+        The optional `fallback_parse` parameter
+        specifies a parse function accepting `(s,offset)`
+        and returning `(parsed,new_offset)`
+        where `parsed` is text from `s[offset:]`
+        and `new_offset` is where the parse stopped.
+        The default is `cs.lex.get_nonwhite`
+        to gather nonwhitespace characters,
+        intended support *tag_name*`=`*bare_word*
+        in human edited tag files.
 
         The core syntax for values is JSON;
         value text commencing with any of `'"'`, `'['` or `'{'`
@@ -1275,6 +1495,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     '''
     if extra_types is None:
       extra_types = cls.EXTRA_TYPES
+    if fallback_parse is None:
+      fallback_parse = get_nonwhite
     if offset >= len(s) or s[offset].isspace():
       warning("offset %d: missing value part", offset)
       value = None
@@ -1289,8 +1511,9 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         ) from e
       offset += suboffset
     else:
-      # collect nonwhitespace, check for special forms
-      nonwhite, offset = get_nonwhite(s, offset)
+      # collect nonwhitespace (or whatever fallback_parse gathers),
+      # check for special forms
+      nonwhite, offset = fallback_parse(s, offset)
       value = None
       for _, from_str, _ in extra_types:
         try:
@@ -1305,18 +1528,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         try:
           i = int(nonwhite)
         except ValueError:
-          pass
+          try:
+            f = float(nonwhite)
+          except ValueError:
+            pass
+          else:
+            if str(f) == nonwhite:
+              value = f
         else:
           if str(i) == nonwhite:
             value = i
-          else:
-            try:
-              f = float(nonwhite)
-            except ValueError:
-              pass
-            else:
-              if str(f) == nonwhite:
-                value = f
       if value is None:
         # not a special value, preserve as a string
         value = nonwhite
@@ -1347,6 +1568,15 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       warning("%s:%r: no ontology, returning None", type(self), self)
       return None
     return ont.typedef(self.name)
+
+  def alt_values(self, value_tag_name=None):
+    ''' Return a list of alternative values for this `Tag`
+        on the premise that each has a metadata entry.
+    '''
+    ont = self.ontology
+    if not ont:
+      return []
+    return list(ont.type_values(self.name, value_tag_name=value_tag_name))
 
   @property
   @pfx_method(use_str=True)
@@ -1500,7 +1730,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     except KeyError:
       raise AttributeError('member_type')  # pylint: disable=raise-missing-from
 
-class TagSetCriterion(ABC):
+class TagSetCriterion(Promotable):
   ''' A testable criterion for a `TagSet`.
   '''
 
@@ -1517,16 +1747,48 @@ class TagSetCriterion(ABC):
 
   @classmethod
   @pfx_method
-  def from_str(cls, s):
+  def promote(cls, criterion, fallback_parse=None):
+    ''' Promote an object to a criterion.
+        Instances of `cls` are returned unchanged.
+        Instances of s`str` are promoted via `cls.from_str`.
+    '''
+    if isinstance(criterion, cls):
+      return criterion
+    if isinstance(criterion, str):
+      return cls.from_str(criterion, fallback_parse=fallback_parse)
+    raise TypeError(
+        "%s.promote: cannot promote to %s" % (cls.__name__, r(criterion))
+    )
+
+  @classmethod
+  @pfx_method
+  @typechecked
+  def from_str(cls, s: str, fallback_parse=None):
     ''' Prepare a `TagSetCriterion` from the string `s`.
     '''
-    criterion, offset = cls.from_str2(s)
+    criterion, offset = cls.from_str2(s, fallback_parse=fallback_parse)
     if offset != len(s):
       raise ValueError("unparsed specification: %r" % (s[offset:],))
+    assert not isinstance(criterion, list)
+    assert isinstance(criterion, TagSetCriterion)
     return criterion
 
   @classmethod
-  def from_str2(cls, s, offset=0, delim=None):
+  @pfx_method
+  def from_arg(cls, arg, fallback_parse=None):
+    ''' Prepare a `TagSetCriterion` from the string `arg`
+        where `arg` is known to be entirely composed of the value,
+        such as a command line argument.
+
+        This calls the `from_str` method with `fallback_parse` set
+        to gather then entire tail of the supplied string `arg`.
+    '''
+    return cls.from_str(
+        arg, fallback_parse=lambda s, offset: (s[offset:], len(s))
+    )
+
+  @classmethod
+  def from_str2(cls, s, offset=0, delim=None, fallback_parse=None):
     ''' Parse a criterion from `s` at `offset` and return `(TagSetCriterion,offset)`.
 
         This method recognises an optional leading `'!'` or `'-'`
@@ -1547,7 +1809,8 @@ class TagSetCriterion(ABC):
         try:
           params, offset = parse_method(s, offset, delim)
         except ValueError:
-          pass
+          # does not parse, try the next one
+          continue
         else:
           criterion = crit_cls(s[offset0:offset], choice, **params)
           break
@@ -1771,9 +2034,7 @@ class TagSetPrefixView(FormatableMixin):
   def __str__(self):
     tag = self.tag
     if tag is None:
-      return repr(
-          dict(map(lambda k: (self._prefix_ + k, self._tags[k]), self.keys()))
-      )
+      return str(TagSet(self.as_dict()))
     return FStr(tag.value)
 
   def __repr__(self):
@@ -1816,10 +2077,27 @@ class TagSetPrefixView(FormatableMixin):
   def __getitem__(self, k):
     return self._tags[self._prefix_ + k]
 
+  def get(self, k, default=None):
+    ''' Mapping `get` method.
+    '''
+    try:
+      return self[k]
+    except KeyError:
+      return default
+
   def __setitem__(self, k, v):
     self._tags[self._prefix_ + k] = v
 
-  def __deltitem__(self, k):
+  def setdefault(self, k, v=None):
+    ''' Mapping `setdefault` method.
+    '''
+    try:
+      return self[k]
+    except KeyError:
+      self[k] = v
+      return v
+
+  def __delitem__(self, k):
     del self._tags[self._prefix_ + k]
 
   def items(self):
@@ -1831,6 +2109,11 @@ class TagSetPrefixView(FormatableMixin):
     ''' Return an iterable of the values (`Tag`s).
     '''
     return map(lambda k: self[k], self.keys())
+
+  def as_dict(self):
+    ''' Return a `dict` representation of this view.
+    '''
+    return {k: self._tags[self._prefix_ + k] for k in self.keys()}
 
   def __getattr__(self, attr):
     ''' Proxy other attributes through to the `TagSet`.
@@ -1893,7 +2176,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       * `keys(self)`: return an iterable of names
 
       Subclasses may reasonably want to override the following:
-      * `startup_shutdown(self)`: context manager to allocate and release any 
+      * `startup_shutdown(self)`: context manager to allocate and release any
         needed resources such as database connections
 
       Subclasses may implement:
@@ -1951,7 +2234,8 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
   def __str__(self):
     return "%s<%s>" % (type(self).__name__, id(self))
 
-  __repr__ = __str__
+  def __repr__(self):
+    return str(self)
 
   def default_factory(self, name: str):
     ''' Create a new `TagSet` named `name`.
@@ -2031,6 +2315,9 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     for k in self.keys(prefix=prefix):
       yield k, self.get(k)
 
+  def __bool__(self):
+    return True
+
   def __contains__(self, name: str):
     ''' Test whether `name` is present in the underlying mapping.
     '''
@@ -2075,20 +2362,21 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
         * `select_tagset`: optional callable accepting a `TagSet`
           which tests whether it should be included in the `TagSet`s
           to be edited
-        Other keyword arguments are passed to `Tag.edit_many`.
+        Other keyword arguments are passed to `Tag.edit_tagsets`.
     '''
     if select_tagset is None:
       tes = self
     else:
       tes = {name: te for name, te in self.items() if select_tagset(te)}
-    changed_tes = TagSet.edit_many(tes, **kw)
+    changed_tes = TagSet.edit_tagsets(tes, **kw)
     for old_name, new_name, te in changed_tes:
       if old_name != new_name:
         with Pfx("rename %r => %r", old_name, new_name):
           te.name = new_name
 
 class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
-  ''' A view into a `BaseTagSets` for keys commencing with a prefix.
+  ''' A view into a `BaseTagSets` for keys commencing with a prefix
+      being the subdomain plus a dot (`'.'`).
   '''
 
   @classmethod
@@ -2188,6 +2476,7 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
           ['prefix.bah']
   '''
 
+  # pylint: disable=unnecessary-lambda-assignment
   @typechecked
   def __init__(self, tagsets: BaseTagSets, match, unmatch=None):
     self.__match = match
@@ -2202,11 +2491,13 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
       assert unmatch is None
       if match.endswith(('.', '-', '_')):
         # prefixed based match and translation
+        prefixify = PrefixedMappingProxy.prefixify_subkey
+        unprefixify = PrefixedMappingProxy.unprefixify_key
         accepts_key = lambda key: key.startswith(match)
-        to_subkey = lambda key: cutprefix(key, match)
-        from_subkey = lambda subkey: match + subkey
+        to_subkey = lambda key: unprefixify(key, match)
+        from_subkey = lambda subk: prefixify(subk, match)
       else:
-        # prefixed based match, use keys unchanged
+        # prefixed based match, but use keys unchanged
         match_ = match + '.'
         accepts_key = lambda key: key.startswith(match_)
         to_subkey = lambda key: key
@@ -2222,8 +2513,8 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     self.accepts_key = accepts_key
 
   def __repr__(self):
-    return "%s(match=%r,unmatch=%r)" % (
-        type(self).__name__, self.__match, self.__unmatch
+    return "%s(match=%r,unmatch=%r,tagsets=%s)" % (
+        type(self).__name__, self.__match, self.__unmatch, self.tagsets
     )
 
   @contextmanager
@@ -2260,6 +2551,8 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     return self.tagsets[subtype_name]
 
   def type_names(self):
+    ''' Return the type definition keys.
+    '''
     return map(
         lambda subkey: self.key(cutprefix(subkey, 'type.')),
         self.tagsets.keys(prefix='type.')
@@ -2320,7 +2613,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       * the type is `role`, so the ontology entry for the metadata
         is `role.marvel.black_widow`
 
-      this requires type information about a `role`.
+      This requires type information about a `role`.
       Here are some type definitions supporting the above metadata:
 
           type.person type=str description="A person."
@@ -2383,7 +2676,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       tagsets[name] = tagset
 
   def __str__(self):
-    return str(self.as_dict())
+    return "%s(%s)" % (type(self).__name__, self._subtagsetses)
 
   @contextmanager
   def startup_shutdown(self):
@@ -2573,20 +2866,26 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     ''' Fetch the entity named `name` or `default`.
     '''
     subtagsets = self._subtagsets_for_key(name)
-    return subtagsets.get(subtagsets.subkey(name), default)
+    return subtagsets.get(name, default)
+
+  def __getitem__(self, name):
+    ''' Fetch `tags` for the entity named `name`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    return subtagsets[name]
 
   def __setitem__(self, name, tags):
     ''' Apply `tags` to the entity named `name`.
     '''
     subtagsets = self._subtagsets_for_key(name)
-    subtags = subtagsets[subtagsets.subkey(name)]
+    subtags = subtagsets[name]
     subtags.update(tags)
 
   def __delitem__(self, name):
     ''' Delete the entity named `name`.
     '''
     subtagsets = self._subtagsets_for_key(name)
-    del subtagsets[subtagsets.subkey(name)]
+    del subtagsets[name]
 
   def subtype_name(self, type_name):
     ''' Return the type name for use within `self.tagsets` from `type_name`.
@@ -2664,14 +2963,14 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
     subtagsets = self._subtagsets_for_type(type_name)
-    subtype_name = subtagsets.subkey(type_name)
-    return subtagsets.typedef(subtype_name)
+    return subtagsets.typedef(type_name)
 
+  @pfx_method
   def type_names(self):
     ''' Return defined type names i.e. all entries starting `type.`.
     '''
     return set(
-        subtagsets.key(subtype_name)
+        subtype_name  ## subtagsets.key(subtype_name)
         for subtagsets in self._subtagsetses
         for subtype_name in subtagsets.type_names()
     )
@@ -2702,6 +3001,43 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         key = subtagsets.key(subkey)
         assert key.startswith(type_name_)
         yield key
+
+  @fmtdoc
+  def type_values(self, type_name, value_tag_name=None):
+    ''' Yield the various defined values for `type_name`.
+        This is useful for types with enumerated metadata entries.
+
+        For example, if metadata entries exist as `foo.bah` and `foo.baz`
+        for the `type_name` `'foo'`
+        then this yields `'bah'` and `'baz'`.`
+
+        Note that this looks for a `Tag` for the value,
+        falling back to the entry suffix if the tag is not present.
+        That tag is normally named `{DEFAULT_VALUE_TAG_NAME}`
+        (from DEFAULT_VALUE_TAG_NAME)
+        but may be overridden by the `value_tag_name` parameter.
+        Also note that normally it is desireable that the value
+        convert to the suffix via the `value_to_tag_name` method
+        so that the metadata entry can be located from the value.
+    '''
+    if value_tag_name is None:
+      value_tag_name = DEFAULT_VALUE_TAG_NAME
+    type_name_ = type_name + '.'
+    for name, tags in self.by_type(type_name, with_tagsets=True):
+      assert name.startswith(type_name_)
+      try:
+        value = tags[value_tag_name]
+      except KeyError:
+        value = cutprefix(name, type_name_)
+      else:
+        # sanity check the value
+        if __debug__ and type_name_ + self.value_to_tag_name(value) != name:
+          warning(
+              "type_values(%r,value_tag_name=%r): name=%r:"
+              " value=%s does not convert to name", type_name, value_tag_name,
+              name, cropped_repr(value)
+          )
+      yield value
 
   ################################################################
   # Metadata.
@@ -2758,12 +3094,11 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         to obtain the "metadata" `TagSet` for each specific value.
     '''
     md = None
-    typedef = (
-        TagSet() if type_name == 'type' else self.metadata('type', type_name)
-    )
-    primary_type_name = typedef.type_name
-    if primary_type_name:
-      type_name = primary_type_name
+    typedef = self.get(type_name)
+    if typedef:
+      primary_type_name = typedef.get('type_name')
+      if primary_type_name:
+        type_name = primary_type_name
     if not isinstance(value, str):
       # strs look a lot like other sequences, sidestep the probes
       try:
@@ -2805,7 +3140,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         value_key = convert(value)
         assert isinstance(value_key, str) and value_key
       key = type_name + '.' + value_key
-      md = subtagsets[value_key]
+      md = subtagsets[key]
     return md
 
   def basetype(self, typename):
@@ -2889,31 +3224,37 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         del self[old_index]
     return changed_tes
 
-class TagFile(SingletonMixin, BaseTagSets):
+class TagFile(FSPathBasedSingleton, BaseTagSets):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
       itself a mapping of tag name => tag value.
   '''
 
-  @classmethod
-  def _singleton_key(cls, filepath, **_):
-    return filepath
-
   @typechecked
-  def __init__(self, filepath: str, *, ontology=None):
-    if hasattr(self, 'filepath'):
+  def __init__(
+      self,
+      fspath: str,
+      *,
+      ontology=None,
+      update_mapping: Optional[Mapping] = None,
+      update_prefix: Optional[str] = None,
+      update_uuid_tag_name: Optional[str] = None,
+  ):
+    if hasattr(self, 'fspath'):
       return
-    super().__init__(ontology=ontology)
-    self.filepath = filepath
+    FSPathBasedSingleton.__init__(self, fspath)
+    BaseTagSets.__init__(self, ontology=ontology)
     self._tagsets = None
-    self._lock = Lock()
+    self.update_mapping = update_mapping
+    self.update_prefix = update_prefix
+    self.update_uuid_tag_name = update_uuid_tag_name
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__, shortpath(self.filepath))
+    return "%s(%r)" % (type(self).__name__, shortpath(self.fspath))
 
   def __repr__(self):
-    return "%s(%r)" % (type(self).__name__, self.filepath)
+    return "%s(%r)" % (type(self).__name__, self.fspath)
 
   def startup(self):
     ''' No special startup.
@@ -2975,7 +3316,7 @@ class TagFile(SingletonMixin, BaseTagSets):
         This is loaded on demand.
     '''
     ts = {}
-    loaded_tagsets, unparsed = self.load_tagsets(self.filepath, self.ontology)
+    loaded_tagsets, unparsed = self.load_tagsets(self.fspath, self.ontology)
     self.unparsed = unparsed
     ont = self.ontology
     for name, tags in loaded_tagsets.items():
@@ -3064,7 +3405,7 @@ class TagFile(SingletonMixin, BaseTagSets):
       return tagsets, unparsed
 
   @classmethod
-  def tags_line(cls, name, tags, extra_types=None):
+  def tags_line(cls, name, tags, extra_types=None, prune=False):
     ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
     if extra_types is None:
@@ -3080,12 +3421,24 @@ class TagFile(SingletonMixin, BaseTagSets):
               cls.__name__, name, tags, tag.value
           )
         continue
+      if prune and isinstance(tag.value,
+                              (list, tuple, dict)) and not tag.value:
+        continue
       fields.append(str(tag))
     return ' '.join(fields)
 
   @classmethod
-  @pfx_method
-  def save_tagsets(cls, filepath, tagsets, unparsed, extra_types=None):
+  def save_tagsets(
+      cls,
+      filepath,
+      tagsets,
+      unparsed,
+      extra_types=None,
+      prune=False,
+      update_mapping: Optional[Mapping] = None,
+      update_prefix: Optional[str] = None,
+      update_uuid_tag_name: Optional[str] = None,
+  ):
     ''' Save `tagsets` and `unparsed` to `filepath`.
 
         This method will create the required intermediate directories
@@ -3101,22 +3454,59 @@ class TagFile(SingletonMixin, BaseTagSets):
         with Pfx("os.makedirs(%r)", dirpath):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
-      try:
-        with open(filepath, 'w') as f:
-          for _, line in unparsed:
-            if not line.startswith('#'):
-              f.write('##  ')
-            f.write(line)
-            f.write('\n')
-          for name, tags in name_tags:
-            if not tags:
-              continue
-            f.write(cls.tags_line(name, tags, extra_types=extra_types))
-            f.write('\n')
-      except OSError as e:
-        error("save(%r) fails: %s", filepath, e)
+      # skip save if no file and nothing to save
+      if name_tags or unparsed or isfilepath(filepath):
+        try:
+          with pfx_call(open, filepath, 'w') as f:
+            for _, line in unparsed:
+              if not line.startswith('#'):
+                f.write('##  ')
+              f.write(line)
+              f.write('\n')
+            for name, tags in name_tags:
+              with Pfx(name):
+                if not tags:
+                  continue
+                if update_mapping:
+                  # mirror tags to secondary mapping eg an SQLTags
+                  # this associates a UUID with the file
+                  try:
+                    uuid_s = tags[update_uuid_tag_name]
+                  except KeyError:
+                    uuid = uuid4()
+                    uuid_s = str(uuid)
+                    tags[update_uuid_tag_name] = uuid_s
+                  else:
+                    try:
+                      uuid = UUID(uuid_s)
+                    except ValueError as e:
+                      warning(
+                          "invalid UUID tag %r=%s: %s", update_uuid_tag_name,
+                          uuid_s, e
+                      )
+                      uuid = None
+                    else:
+                      uuid_s = str(uuid)
+                  if uuid is not None:
+                    # apply the tags to the secondary mapping
+                    key = (
+                        "%s.%s" %
+                        (update_prefix, uuid_s) if update_prefix else uuid_s
+                    )
+                    d = tags.as_dict()
+                    del d[update_uuid_tag_name]
+                    d['fspath'] = joinpath(dirname(filepath), name)
+                    update_mapping[key].update(d)
+                f.write(
+                    cls.tags_line(
+                        name, tags, extra_types=extra_types, prune=prune
+                    )
+                )
+                f.write('\n')
+        except OSError as e:
+          error("save(%r) fails: %s", filepath, e)
 
-  def save(self, extra_types=None):
+  def save(self, extra_types=None, prune=False):
     ''' Save the tag map to the tag file if modified.
     '''
     tagsets = self._tagsets
@@ -3127,7 +3517,14 @@ class TagFile(SingletonMixin, BaseTagSets):
       if self.is_modified():
         # there are modified TagSets
         self.save_tagsets(
-            self.filepath, tagsets, self.unparsed, extra_types=extra_types
+            self.fspath,
+            tagsets,
+            self.unparsed,
+            extra_types=extra_types,
+            prune=prune,
+            update_mapping=self.update_mapping,
+            update_prefix=self.update_prefix,
+            update_uuid_tag_name=self.update_uuid_tag_name,
         )
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
@@ -3145,8 +3542,9 @@ class TagsOntologyCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    with self.options.ontology:
-      yield
+    with super().run_context():
+      with self.options.ontology:
+        yield
 
   def cmd_edit(self, argv):
     ''' Usage: {cmd} [{{/name-regexp | entity-name}}]
@@ -3242,7 +3640,7 @@ class TagsOntologyCommand(BaseCommand):
                 subkey = cutprefix(key, type_name_)
                 assert subkey not in tagset_map
                 tagset_map[subkey] = tagset
-            for old_subkey, new_subkey, new_tags in TagSet.edit_many(
+            for old_subkey, new_subkey, new_tags in TagSet.edit_tagsets(
                 tagset_map, verbose=True):
               tags = tagset_map[old_subkey]
               if old_subkey != new_subkey:
@@ -3266,7 +3664,7 @@ class TagsOntologyCommand(BaseCommand):
           etags = ont.metadata(type_name, entity_name)
           print("entity tags =", etags)
           for arg in argv:
-            with Pfx("%s", arg):
+            with Pfx(arg):
               tag = Tag.from_str(arg)
               etags.add(tag)
           return 0
@@ -3282,6 +3680,37 @@ class TagsCommandMixin:
         with an `.extend_query` method for computing an SQL JOIN
         used in searching for tagged entities.
   '''
+
+  TagAddRemove = namedtuple('TagAddRemove', 'remove tag')
+
+  @classmethod
+  def parse_tag_addremove(cls, arg, offset=0):
+    ''' Parse `arg` as an add/remove tag specification
+        of the form [`-`]*tag_name*[`=`*value*].
+        Return `(remove,Tag)`.
+
+        Examples:
+
+            >>> TagsCommandMixin.parse_tag_addremove('a')
+            TagAddRemove(remove=False, tag=Tag(name='a',value=None))
+            >>> TagsCommandMixin.parse_tag_addremove('-a')
+            TagAddRemove(remove=True, tag=Tag(name='a',value=None))
+            >>> TagsCommandMixin.parse_tag_addremove('a=1')
+            TagAddRemove(remove=False, tag=Tag(name='a',value=1))
+            >>> TagsCommandMixin.parse_tag_addremove('-a=1')
+            TagAddRemove(remove=True, tag=Tag(name='a',value=1))
+            >>> TagsCommandMixin.parse_tag_addremove('-a="foo bah"')
+            TagAddRemove(remove=True, tag=Tag(name='a',value='foo bah'))
+            >>> TagsCommandMixin.parse_tag_addremove('-a=foo bah')
+            TagAddRemove(remove=True, tag=Tag(name='a',value='foo bah'))
+    '''
+    if arg.startswith('-', offset):
+      remove = True
+      offset += 1
+    else:
+      remove = False
+    tag = Tag.from_arg(arg, offset=offset)
+    return cls.TagAddRemove(remove, tag)
 
   @classmethod
   def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
@@ -3337,7 +3766,7 @@ class TagsCommandMixin:
     for arg in argv:
       with Pfx(arg):
         try:
-          tag_choice = TagSetCriterion.from_str(arg)
+          tag_choice = TagSetCriterion.from_arg(arg)
         except ValueError as e:
           raise ValueError("bad tag specifications: %s" % (e,)) from e
         if tag_choice.comparison != '=':
@@ -3352,9 +3781,10 @@ class RegexpTagRule:
       and returns inferred `Tag`s.
   '''
 
-  def __init__(self, regexp):
+  def __init__(self, regexp, tag_prefix=None):
     self.regexp_src = regexp
     self.regexp = re.compile(regexp)
+    self.tag_prefix = tag_prefix
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.regexp_src)
@@ -3411,6 +3841,8 @@ class RegexpTagRule:
               pass
             else:
               tag_name = tag_name_prefix
+          if self.tag_prefix:
+            tag_name = self.tag_prefix + '.' + tag_name
           tag = Tag(tag_name, value)
           tags.append(tag)
     return tags

@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #
 # pylint: disable=too-many-lines
+#
 
 ''' Functions and classes relating to Blocks, which are data chunk references.
 
@@ -35,12 +36,15 @@
     this is the sum of the .span values of their subblocks.
 '''
 
-from __future__ import print_function
 from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
 import sys
+from typing import Optional
+
 from icontract import require
+from typeguard import typechecked
+
 from cs.binary import (
     BinarySingleValue, BSUInt, BSData, flatten as flatten_transcription
 )
@@ -49,7 +53,9 @@ from cs.lex import untexthexify, get_decimal_value
 from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
+from cs.resources import uses_runstate
 from cs.threads import locked
+
 from . import defaults, RLock
 from .hash import HashCode, io_fail
 from .transcribe import (
@@ -77,18 +83,17 @@ def isBlock(o):
 
 class _Block(Transcriber, ABC):
 
-  def __init__(self, block_type, span):
+  @typechecked
+  @require(lambda span: span is None or span >= 0)
+  def __init__(self, block_type, span: Optional[int]):
     self.type = block_type
-    if span is not None:
-      if not isinstance(span, int) or span < 0:
-        raise ValueError("invalid span: %r" % (span,))
-      self.span = span
+    self.span = span
     self.indirect = False
     self.blockmap = None
     self._lock = RLock()
 
   def __bytes__(self):
-    ''' `bytes(_Block)` returns allo the data together as a single `bytes` instance.
+    ''' `bytes(_Block)` returns all the data concatenated as a single `bytes` instance.
 
         Try not to do this for indirect blocks, it gets expensive.
     '''
@@ -412,8 +417,10 @@ class _Block(Transcriber, ABC):
         that the final Store shutdown of `S2` will wait for outstanding
         operations anyway.
     '''
+    if progress is not None and progress.total is None:
+      progress.total = 0
     with defaults.S:
-      if progress:
+      if progress is not None:
         progress.total += len(self)
       Q.put(self)
       if self.indirect:
@@ -456,7 +463,7 @@ class BlockRecord(BinarySingleValue):
             BS(flags)
               0x01 indirect blockref
               0x02 typed: type follows, otherwise BT_HASHCODE
-              0x04 type flags: per type flags follow type
+              0x04 has type flags: additional per type flags follow type
             BS(span)
             [BS(type)]
             [BS(type_flags)]
@@ -532,7 +539,7 @@ class BlockRecord(BinarySingleValue):
     return B
 
   @staticmethod
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   def transcribe_value(B):
     ''' Transcribe this `Block`, the inverse of parse_value.
     '''
@@ -586,7 +593,7 @@ class HashCodeBlock(_Block):
   def __init__(self, hashcode=None, data=None, added=False, span=None, **kw):
     ''' Initialise a `BT_HASHCODE` Block.
 
-        A HashCodeBlock always stores its hashcode directly.
+        A `HashCodeBlock` always stores its hashcode directly.
         If `data` is supplied, store it and compute or check the hashcode.
         If `span` is not `None`, store it. Otherwise compute it on
           demand from the data, fetching that if necessary.
@@ -618,6 +625,13 @@ class HashCodeBlock(_Block):
     self._span = None
     _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
+
+  @property
+  def uri(self):
+    ''' The block reference as a `VTURI`.
+    '''
+    from .uri import VTURI  # pylint: disable=import-outside-toplevel
+    return VTURI(indirect=self.indirect, hashcode=self.hashcode)
 
   @property
   def data(self):
@@ -673,7 +687,7 @@ class HashCodeBlock(_Block):
   def span(self, newspan):
     ''' Set the span of the data encompassed by this HashCodeBlock.
     '''
-    if newspan < 0:
+    if newspan is not None and newspan < 0:
       raise ValueError("%s: set .span: invalid newspan=%s" % (self, newspan))
     if self._span is None:
       self._span = newspan
@@ -725,7 +739,7 @@ class HashCodeBlock(_Block):
     '''
     ok = True
     hashcode = self.hashcode
-    with Pfx("%s", hashcode):
+    with Pfx(hashcode):
       with defaults.S as S:
         try:
           data = S[hashcode]
@@ -892,7 +906,8 @@ class IndirectBlock(_Block):
         yield B.get_direct_data()[Bstart:Bend]
 
   @io_fail
-  def fsck(self, recurse=False):
+  @uses_runstate
+  def fsck(self, *, recurse=False, runstate):
     ''' Check this IndirectBlock.
     '''
     ok = True
@@ -902,14 +917,13 @@ class IndirectBlock(_Block):
       error("span:%d != sum(subblocks.span):%d", span, subspan)
       ok = False
     if recurse:
-      runstate = defaults.runstate
       for subB in self.subblocks:
         if runstate.cancelled:
           error("cancelled")
           ok = False
           break
         with Pfx(str(subB)):
-          if not subB.fsck(recurse=True):
+          if not subB.fsck(recurse=True, runstate=runstate):
             ok = False
     return ok
 

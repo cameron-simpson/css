@@ -69,16 +69,19 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
-from struct import Struct
+from struct import Struct  # pylint: disable=no-name-in-module
 import sys
 from types import SimpleNamespace
+from typing import List, Union
+
 from cs.buffer import CornuCopyBuffer
+from cs.deco import strable, promote
 from cs.gimmicks import warning, debug
-from cs.lex import cropped, cropped_repr, typed_str as s
-from cs.pfx import Pfx, pfx_method
+from cs.lex import cropped, cropped_repr, typed_str
+from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
-__version__ = '20210316-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -87,8 +90,13 @@ DISTINFO = {
         "Environment :: Console",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.buffer', 'cs.gimmicks', 'cs.lex', 'cs.pfx', 'cs.seq'],
+    'install_requires': [
+        'cs.buffer',
+        'cs.gimmicks',
+        'cs.lex',
+        'cs.pfx',
+        'cs.seq',
+    ],
     'python_requires':
     '>=3.6',
 }
@@ -177,6 +185,7 @@ def pt_spec(pt, name=None):
     f_transcribe_value = pt.transcribe_value
   except AttributeError:
     if isinstance(pt, int):
+      # pylint: disable=unnecessary-lambda-assignment
       f_parse_value = lambda bfr: bfr.take(pt)
       f_transcribe_value = lambda value: value
     else:
@@ -218,6 +227,10 @@ def pt_spec(pt, name=None):
 
 class BinaryMixin:
   ''' Presupplied helper methods for binary objects.
+
+      Naming conventions:
+      - `parse`* methods parse a single instance from a buffer
+      - `scan`* methods are generators yielding successive instances from a buffer
   '''
 
   @pfx_method
@@ -297,7 +310,7 @@ class BinaryMixin:
                   "should be an instance of %s:%s but is %s", (
                       'tuple'
                       if isinstance(basetype, tuple) else basetype.__name__
-                  ), basetype, cropped(s(field), max_length=64)
+                  ), basetype, typed_str(field, max_length=64)
               )
               ok = False
     return ok
@@ -316,7 +329,10 @@ class BinaryMixin:
   __len__ = transcribed_length
 
   @classmethod
-  def scan(cls, bfr, count=None, min_count=None, max_count=None):
+  @promote
+  def scan(
+      cls, bfr: CornuCopyBuffer, count=None, min_count=None, max_count=None
+  ):
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
         until end of input and yield them.
 
@@ -379,7 +395,7 @@ class BinaryMixin:
 
   @classmethod
   def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
-    ''' Wrapper for `scan()` which yields (pre_offset,instance,post_offset)`
+    ''' Wrapper for `scan()` which yields `(pre_offset,instance,post_offset)`
         indicating the start and end offsets of the yielded instances.
         All parameters are as for `scan()`.
     '''
@@ -391,20 +407,26 @@ class BinaryMixin:
       pre_offset = post_offset
 
   @classmethod
-  def scan_file(cls, f):
-    ''' Function to scan the file `f` for repeated instances of `cls`
-        until end of input,
-        yields instances of `f`.
+  def scan_fspath(cls, fspath: str, *, with_offsets=False, **kw):
+    ''' Open the file with filesystenm path `fspath` for read
+        and yield from `self.scan(..,**kw)` or
+        `self.scan_with_offsets(..,**kw)` according to the
+        `with_offsets` parameter.
 
         Parameters:
-        * `f`: the binary file object to parse;
-          if `f` is a string, that pathname is opened for binary read.
+        * `fspath`: the filesystem path of the file to scan
+        * `with_offsets`: optional flag, default `False`;
+          if true then scan with `scan_with_offsets` instead of
+          with `scan`
+        Other keyword parameters are passed to `scan` or
+        `scan_with_offsets`.
     '''
-    if isinstance(f, str):
-      with open(f, 'rb') as f2:
-        yield from cls.scan_file(f2)
-    else:
-      yield from cls.scan(CornuCopyBuffer.from_file(f))
+    with open(fspath, 'rb') as f:
+      bfr = CornuCopyBuffer.from_file(f)
+      if with_offsets:
+        yield from cls.scan_with_offsets(bfr, **kw)
+      else:
+        yield from cls.scan(bfr, **kw)
 
   def transcribe_flat(self):
     ''' Return a flat iterable of chunks transcribing this field.
@@ -450,12 +472,40 @@ class BinaryMixin:
       )
     return instance
 
+  @classmethod
+  def load(cls, f):
+    ''' Load an instance from the file `f`
+        which may be a filename or an open file as for `BinaryMixin.scan`.
+        Return the instance or `None` if the file is empty.
+    '''
+    for instance in cls.scan(f):
+      return instance
+    return None
+
+  @strable(open_func=lambda fspath: pfx_call(open, fspath, 'wb'))
+  def save(self, f):
+    ''' Save this instance to the file `f`
+        which may be a filename or an open file.
+        Return the length of the transcription.
+    '''
+    length = 0
+    for bs in self.transcribe_flat():
+      while bs:
+        written = f.write(bs)
+        length += written
+        if written < len(bs):
+          bs = bs[written:]
+        else:
+          break
+    return length
+
 class AbstractBinary(ABC, BinaryMixin):
   ''' Abstract class for all `Binary`* implementations,
       specifying the `parse` and `transcribe` methods
       and providing the methods from `BinaryMixin`.
   '''
 
+  # pylint: disable=deprecated-decorator
   @abstractclassmethod
   def parse(cls, bfr):
     ''' Parse an instance of `cls` from the buffer `bfr`.
@@ -493,7 +543,7 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
       thus providing a nice `__str__` and a keyword based `__init__`.
       Implementors must still define `.parse` and `.transcribe`.
 
-      To constraint the arguments passed to `__init__`,
+      To constrain the arguments passed to `__init__`,
       define an `__init__` which accepts specific keyword arguments
       and pass through to `super().__init__()`. Example:
 
@@ -508,6 +558,7 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
     if attr_names is None:
       attr_names = sorted(self.__dict__.keys())
     if attr_choose is None:
+      # pylint: disable=unnecessary-lambda-assignment
       attr_choose = lambda attr: not attr.startswith('_')
     return "%s(%s)" % (
         type(self).__name__, ','.join(
@@ -700,7 +751,9 @@ class BinaryListValues(AbstractBinary):
 
 _binary_multi_struct_classes = {}
 
-def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
+def BinaryMultiStruct(
+    class_name: str, struct_format: str, field_names: Union[str, List[str]]
+):
   ''' A class factory for `AbstractBinary` `namedtuple` subclasses
       built around complex `struct` formats.
 
@@ -1002,7 +1055,7 @@ class BSUInt(BinarySingleValue):
       n = (n << 7) | (b & 0x7f)
     return n, offset
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(n):
     ''' Encode an unsigned int as an entensible byte serialised octet
@@ -1045,7 +1098,7 @@ class BSData(BinarySingleValue):
     data = bfr.take(data_length)
     return data
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(data):
     ''' Transcribe the payload length and then the payload.
@@ -1085,10 +1138,10 @@ class BSString(BinarySingleValue):
 
   # pylint: disable=arguments-differ
   @staticmethod
-  def transcribe_value(s, encoding='utf-8'):
+  def transcribe_value(value: str, encoding='utf-8'):
     ''' Transcribe a string.
     '''
-    payload = s.encode(encoding)
+    payload = value.encode(encoding)
     return b''.join((BSUInt.transcribe_value(len(payload)), payload))
 
 class BSSFloat(BinarySingleValue):
@@ -1107,7 +1160,7 @@ class BSSFloat(BinarySingleValue):
     s = BSString.parse_value(bfr)
     return float(s)
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(f):
     ''' Transcribe a float.
@@ -1141,7 +1194,7 @@ class _BinaryMultiValue_Base(SimpleBinary):
       That is done by the `BinaryMultiValue` class factory.
   '''
 
-  def s(self, *, crop_length=64, choose_name=None):
+  def _s(self, *, crop_length=64, choose_name=None):
     ''' Common implementation of `__str__` and `__repr__`.
         Transcribe type and attributes, cropping long values
         and omitting private values.
@@ -1169,8 +1222,8 @@ class _BinaryMultiValue_Base(SimpleBinary):
         )
     )
 
-  __str__ = s
-  ##__repr__ = s
+  __str__ = _s
+  ##__repr__ = _s
 
   @classmethod
   def parse(cls, bfr):
@@ -1290,41 +1343,42 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
         which parses a run length encoded data chunk;
         this is a `BinarySingleValue` so we store its `bytes` value directly.
 
-          >>> class BMV(BinaryMultiValue("BMV", {
-          ...         'n1': (UInt8.parse_value, UInt8.transcribe_value),
-          ...         'n2': UInt8,
-          ...         'n3': UInt8,
-          ...         'nd': ('>H4s', 'short bs'),
-          ...         'data1': (
-          ...             BSData.parse_value,
-          ...             BSData.transcribe_value,
-          ...         ),
-          ...         'data2': BSData,
-          ... })):
-          ...     pass
-          >>> BMV.FIELD_ORDER
-          ['n1', 'n2', 'n3', 'nd', 'data1', 'data2']
-          >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
-          >>> bmv.n1  #doctest: +ELLIPSIS
-          17
-          >>> bmv.n2
-          34
-          >>> bmv  #doctest: +ELLIPSIS
-          BMV(n1=17, n2=34, n3=119, nd=nd_1_short__bs(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
-          >>> bmv.nd  #doctest: +ELLIPSIS
-          nd_1_short__bs(short=33154, bs=b'zyxw')
-          >>> bmv.nd.bs
-          b'zyxw'
-          >>> bytes(bmv.nd)
-          b'\x81\x82zyxw'
-          >>> bmv.data1
-          b'AB'
-          >>> bmv.data2
-          b'DEFG'
-          >>> bytes(bmv)
-          b'\\x11"w\\x81\\x82zyxw\\x02AB\\x04DEFG'
-          >>> list(bmv.transcribe_flat())
-          [b'\\x11', b'"', b'w', b'\\x81\\x82zyxw', b'\\x02', b'AB', b'\\x04', b'DEFG']
+            >>> class BMV(BinaryMultiValue("BMV", {
+            ...         'n1': (UInt8.parse_value, UInt8.transcribe_value),
+            ...         'n2': UInt8,
+            ...         'n3': UInt8,
+            ...         'nd': ('>H4s', 'short bs'),
+            ...         'data1': (
+            ...             BSData.parse_value,
+            ...             BSData.transcribe_value,
+            ...         ),
+            ...         'data2': BSData,
+            ... })):
+            ...     pass
+            >>> BMV.FIELD_ORDER
+            ['n1', 'n2', 'n3', 'nd', 'data1', 'data2']
+            >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
+            >>> bmv.n1  #doctest: +ELLIPSIS
+            17
+            >>> bmv.n2
+            34
+            >>> bmv  #doctest: +ELLIPSIS
+            BMV(n1=17, n2=34, n3=119, nd=nd_1_short__bs(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
+            >>> bmv.nd  #doctest: +ELLIPSIS
+            nd_1_short__bs(short=33154, bs=b'zyxw')
+            >>> bmv.nd.bs
+            b'zyxw'
+            >>> bytes(bmv.nd)
+            b'\x81\x82zyxw'
+            >>> bmv.data1
+            b'AB'
+            >>> bmv.data2
+            b'DEFG'
+            >>> bytes(bmv)
+            b'\\x11"w\\x81\\x82zyxw\\x02AB\\x04DEFG'
+            >>> list(bmv.transcribe_flat())
+            [b'\\x11', b'"', b'w', b'\\x81\\x82zyxw', b'\\x02', b'AB', b'\\x04', b'DEFG']
+
   '''  # pylint: disable=line-too-long
   with Pfx("BinaryMultiValue(%r,...)", class_name):
     if field_order is None:
@@ -1430,7 +1484,7 @@ class BinaryUTF8NUL(BinarySingleValue):
         )
     return utf8
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(s):
     ''' Transcribe the `value` in UTF-8 with a terminating NUL.
@@ -1795,7 +1849,7 @@ class UTF8NULField(PacketField):
     bfr.take(1)
     return utf8
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(s):
     ''' Transcribe the `value` in UTF-8 with a terminating NUL.

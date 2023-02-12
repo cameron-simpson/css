@@ -10,13 +10,16 @@ from os.path import (
     expanduser, isdir as isdirpath, isfile as isfilepath, join as joinpath
 )
 import sys
+
 from typeguard import typechecked
+
 from cs.context import stackattrs
+from cs.deco import fmtdoc, Promotable
+from cs.fs import HasFSPath
 from cs.fstags import TagFile
-from cs.lex import cutsuffix
+from cs.lex import cutsuffix, r
 from cs.logutils import warning
 from cs.pfx import Pfx
-from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.tagset import TagsOntology, TagsOntologyCommand
 
@@ -65,10 +68,7 @@ class OntCommand(TagsOntologyCommand):
     ''' Set up the ontology around a run.
     '''
     options = self.options
-    ont_path = options.ont_path
-    if ont_path is None:
-      ont_path = options.ont_path = expanduser(ONTTAGS_PATH_DEFAULT)
-    ont = Ont(ont_path)
+    ont = Ont.promote(options.ont_path)
     with ont:
       with stackattrs(options, ontology=ont):
         with super().run_context():
@@ -85,7 +85,7 @@ class OntCommand(TagsOntologyCommand):
     for tn in type_names:
       print(tn)
 
-class Ont(TagsOntology):
+class Ont(TagsOntology, HasFSPath, Promotable):
   ''' A `TagsOntology` based on a persistent store.
   '''
 
@@ -101,14 +101,23 @@ class Ont(TagsOntology):
       X("add %r => %s", prefix_, subtagsets)
       self.add_tagsets(subtagsets, prefix_)
 
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, self.ont_path)
+
+  @property
+  def fspath(self):
+    ''' The `.fspath` is `self.ont_path`.
+    '''
+    return self.ont_path
+
   @classmethod
   @typechecked
   def tagsetses_from_path(cls, ont_path: str):
-    ''' Return `(tagsets,ont_pfx_map)` instance from `ont_path`,
+    ''' A class method returing a `(tagsets,ont_pfx_map)` tuple from `ont_path`,
         being the default `TagSets` and a mapping of name->`TagSets`
         for various subontologies.
 
-        If `ont_path` resolves to a file the mapping wil be empty;
+        If `ont_path` resolves to a file the mapping will be empty;
         return an `SQLTags` if `ont_path` ends with `'.sqlite'`
         otherwise a `TagFile`.
 
@@ -153,6 +162,24 @@ class Ont(TagsOntology):
           return cls.tagsetses_from_path(ont_path_sqlite)
       raise ValueError(f"unsupported ont_path={ont_path!r}")
     return tagsets, ont_pfx_map
+
+  @classmethod
+  @fmtdoc
+  def promote(cls, ont):
+    ''' Promote the object `ont` to an `Ont` if it is not one already.
+
+        `None` is promoted to the default ontology path from ${ONTTAGS_PATH_ENVVAR},
+        falling back to `ONTTAGS_PATH_DEFAULT` (`'{ONTTAGS_PATH_DEFAULT}'`).
+        After that, a `str` is taken to the the filesystem path to an ontology file.
+    '''
+    if isinstance(ont, cls):
+      return ont
+    if ont is None:
+      ont = os.environ.get(ONTTAGS_PATH_ENVVAR
+                           ) or expanduser(ONTTAGS_PATH_DEFAULT)
+    if isinstance(ont, str):
+      return cls(ont)
+    raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(ont)))
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

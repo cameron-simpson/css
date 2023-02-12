@@ -1,0 +1,3 @@
+incorporate the season/episode stripping functions, gather them into the format and tags if missing
+honour SIGINT during dl and during refresh, run_task during refresh
+playon not autorefreshing

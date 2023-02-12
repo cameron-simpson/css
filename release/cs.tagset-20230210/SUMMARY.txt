@@ -1,0 +1,2 @@
+TagFile: new optional update_mapping secondary mapping to which to mirror file tags, for example to an SQLTags.
+New .uuid:UUID property returning the UUID for the tag named 'uuid' or None.

@@ -1,0 +1,7 @@
+lib/python/cs/later.py: cs.later: replace submittable checks with decorator accepting a force=True override
+lib/python/cs/later.py: cs.later: update imports, docstrings, DISTINFO
+lib/python/cs/later.py: cs.later: rename variable
+lib/python/cs/later.py: cs.later: Later.defer_iterable: implement greedy vs nongreedy
+lib/python/cs/later.py: cs.later: clean lint
+lib/python/cs/later.py: cs.later: fix shutdown
+lib/python/cs/later.py: cs.later: @Later.submittable: make plain decorator function, del the name at the end of the class - fixes code prior to Python 3.10

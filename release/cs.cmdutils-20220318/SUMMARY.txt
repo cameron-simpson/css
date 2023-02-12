@@ -1,0 +1,1 @@
+BaseCommand.__init__: handle main() method in the New Scheme.

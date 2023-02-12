@@ -32,31 +32,32 @@ import sys
 from textwrap import dedent
 from threading import Lock
 
+from dateutil.tz import tzlocal
 from typeguard import typechecked
 
+from cs.dateutils import unixtime2datetime, UTC
 from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
-from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20210913-post'
+__version__ = '20230210-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
-        'cs.py3',
         'cs.seq>=20200914',
+        'dateutil',
         'typeguard',
     ],
 }
@@ -151,7 +152,7 @@ def tabpadding(padlen, tabsize=8, offset=0):
 
   return pad
 
-def typed_str(o, use_cls=False, use_repr=False, max_length=None):
+def typed_str(o, use_cls=False, use_repr=False, max_length=32):
   ''' Return "type(o).__name__:str(o)" for some object `o`.
       This is available as both `typed_str` and `s`.
 
@@ -168,12 +169,10 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=None):
           X("foo = %s", s(foo))
   '''
   # pylint: disable=redefined-outer-name
-  s = "%s:%s" % (
-      type(o) if use_cls else type(o).__name__,
-      repr(o) if use_repr else str(o),
-  )
+  o_s = repr(o) if use_repr else str(o)
   if max_length is not None:
-    s = cropped(s, max_length)
+    o_s = cropped(o_s, max_length)
+  s = "%s:%s" % (type(o) if use_cls else type(o).__name__, o_s)
   return s
 
 # convenience alias
@@ -278,7 +277,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   '''
   if whitelist is None:
     whitelist = _texthexify_white_chars
-  if isinstance(whitelist, StringTypes) and not isinstance(whitelist, bytes):
+  if isinstance(whitelist, str):
     whitelist = bytes(ord(ch) for ch in whitelist)
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
@@ -364,7 +363,7 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     if len(s) % 2 != 0:
       raise ValueError("uneven hex sequence %r" % (s,))
     chunks.append(unhexify(s))
-  return joinbytes(chunks)
+  return b''.join(chunks)
 
 # pylint: disable=redefined-outer-name
 def get_chars(s, offset, gochars):
@@ -444,7 +443,7 @@ def strip_prefix_n(s, prefix, n=None):
       * `s`: the string to strip
       * `prefix`: the prefix string which must appear at the start of `s`
       * `n`: optional integer value;
-        if omitted any value will be accepted, otherise the numeric
+        if omitted any value will be accepted, otherwise the numeric
         part must match `n`
 
       Examples:
@@ -702,7 +701,7 @@ def get_sloshed_text(
         )
       special_starts.add(special[0])
       special_seqs.append(special)
-    special_starts = u''.join(special_starts)
+    special_starts = ''.join(special_starts)
     special_seqs = sorted(special_seqs, key=lambda s: -len(s))
   chunks = []
   slen = len(s)
@@ -802,7 +801,7 @@ def get_sloshed_text(
         break
       offset += 1
     chunks.append(s[offset0:offset])
-  return u''.join(ustr(chunk) for chunk in chunks), offset
+  return ''.join(chunks), offset
 
 # pylint: disable=redefined-outer-name
 def get_envvar(s, offset=0, environ=None, default=None, specials=None):
@@ -926,7 +925,7 @@ def get_tokens(s, offset, getters):
     kwargs = {}
     if callable(getter):
       func = getter
-    elif isinstance(getter, StringTypes):
+    elif isinstance(getter, str):
 
       # pylint: disable=redefined-outer-name
       def func(s, offset):
@@ -1013,7 +1012,7 @@ def as_lines(chunks, partials=None):
   '''
   if partials is None:
     partials = []
-  if any(['\n' in p for p in partials]):
+  if any('\n' in p for p in partials):
     raise ValueError("newline in partials: %r" % (partials,))
   for chunk in chunks:
     pos = 0
@@ -1175,6 +1174,71 @@ def get_ini_clause_entryname(s, offset=0):
     raise ValueError("missing entryname identifier at position %d" % (offset,))
   return clausename, entryname, offset
 
+def camelcase(snakecased, first_letter_only=False):
+  ''' Convert a snake cased string `snakecased` into camel case.
+
+      Parameters:
+      * `snakecased`: the snake case string to convert
+      * `first_letter_only`: optional flag (default `False`);
+        if true then just ensure that the first character of a word
+        is uppercased, otherwise use `str.title`
+
+      Example:
+
+          >>> camelcase('abc_def')
+          'abcDef'
+          >>> camelcase('ABc_def')
+          'abcDef'
+          >>> camelcase('abc_dEf')
+          'abcDef'
+          >>> camelcase('abc_dEf', first_letter_only=True)
+          'abcDEf'
+  '''
+  words = snakecased.split('_')
+  for i, word in enumerate(words):
+    if not word:
+      continue
+    if first_letter_only:
+      word = word[0].upper() + word[1:]
+    else:
+      word = word.title()
+    if i == 0:
+      word = word[0].lower() + word[1:]
+    words[i] = word
+  return ''.join(words)
+
+def snakecase(camelcased):
+  ''' Convert a camel cased string `camelcased` into snake case.
+
+      Parameters:
+      * `cameelcased`: the cameel case string to convert
+      * `first_letter_only`: optional flag (default `False`);
+        if true then just ensure that the first character of a word
+        is uppercased, otherwise use `str.title`
+
+      Example:
+
+          >>> snakecase('abcDef')
+          'abc_def'
+          >>> snakecase('abcDEf')
+          'abc_def'
+          >>> snakecase('AbcDef')
+          'abc_def'
+  '''
+  strs = []
+  was_lower = False
+  for _, c in enumerate(camelcased):
+    if c.isupper():
+      c = c.lower()
+      if was_lower:
+        # boundary
+        was_lower = False
+        strs.append('_')
+    else:
+      was_lower = True
+    strs.append(c)
+  return ''.join(strs)
+
 # pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
@@ -1267,18 +1331,62 @@ def format_as(
 _format_as = format_as  # for reuse in the format_as method below
 
 def format_attribute(method):
-  ''' Mark a method as available as a format method.
+  ''' A decorator to mark a method as available as a format method.
       Requires the enclosing class to be decorated with `@has_format_attributes`.
+
+      For example,
+      the `FormatableMixin.json` method is defined like this:
+
+          @format_attribute
+          def json(self):
+              return self.FORMAT_JSON_ENCODER.encode(self)
+
+      which allows a `FormatableMixin` subclass instance
+      to be used in a format string like this:
+
+          {instance:json}
+
+      to insert a JSON transcription of the instance.
+
+      It is recommended that methods marked with `@format_attribute`
+      have no side effects and do not modify state,
+      as they are intended for use in ad hoc format strings
+      supplied by an end user.
   '''
   method.is_format_attribute = True
   return method
 
-def has_format_attributes(cls):
+@decorator
+def has_format_attributes(cls, inherit=()):
   ''' Class decorator to walk this class for direct methods
       marked as for use in format strings
       and to include them in `cls.format_attributes()`.
+
+      Methods are normally marked with the `@format_attribute` decorator.
+
+      If `inherit` is true the base format attributes will be
+      obtained from other classes:
+      * `inherit` is `True`: use `cls.__mro__`
+      * `inherit` is a class: use that class
+      * otherwise assume `inherit` is an iterable of classes
+      For each class `otherclass`, update the initial attribute
+      mapping from `otherclass.get_format_attributes()`.
   '''
   attributes = cls.get_format_attributes()
+  if inherit:
+    if inherit is True:
+      classes = cls.__mro__
+    elif isinstance(inherit, type):
+      classes = (inherit,)
+    else:
+      classes = inherit
+    for superclass in classes:
+      try:
+        super_attributes = superclass.get_format_attributes()
+      except AttributeError:
+        pass
+      else:
+        attributes.update(super_attributes)
   for attr in dir(cls):
     try:
       attribute = getattr(cls, attr)
@@ -1379,14 +1487,14 @@ class FormatableFormatter(Formatter):
 
   # pylint: disable=arguments-differ
   @pfx_method
-  def get_field(self, field_name, a, kw):
+  def get_field(self, field_name, args, kwargs):
     ''' Get the object referenced by the field text `field_name`.
         Raises `KeyError` for an unknown `field_name`.
     '''
-    assert not a
-    with Pfx("field_name=%r: kw=%r", field_name, kw):
+    assert not args
+    with Pfx("field_name=%r: kwargs=%r", field_name, kwargs):
       arg_name, offset = self.get_arg_name(field_name)
-      arg_value, _ = self.get_value(arg_name, a, kw)
+      arg_value, _ = self.get_value(arg_name, args, kwargs)
       # resolve the rest of the field
       subfield = self.get_subfield(arg_value, field_name[offset:])
       return subfield, field_name
@@ -1420,15 +1528,15 @@ class FormatableFormatter(Formatter):
       value = fmt.format(value=value)
     return value
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   @pfx_method
-  def get_value(self, arg_name, a, kw):
+  def get_value(self, arg_name, args, kwargs):
     ''' Get the object with index `arg_name`.
 
-        This default implementation returns `(kw[arg_name],arg_name)`.
+        This default implementation returns `(kwargs[arg_name],arg_name)`.
     '''
-    assert not a
-    return kw[arg_name], arg_name
+    assert not args
+    return kwargs[arg_name], arg_name
 
   @classmethod
   def get_format_subspecs(cls, format_spec):
@@ -1476,7 +1584,7 @@ class FormatableFormatter(Formatter):
         assert len(format_subspec) > 0
         with Pfx("value=%r, format_subspec=%r", value, format_subspec):
           # promote bare str to FStr
-          if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+          if value is None or type(value) is str:  # pylint: disable=unidiomatic-typecheck
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
@@ -1486,7 +1594,7 @@ class FormatableFormatter(Formatter):
               if isinstance(value, str):
                 value = FStr(value)
               else:
-                value = format(value, format_subspec)
+                value = pfx_call(format, value, format_subspec)
             value, offset = value.convert_via_method_or_attr(
                 value, format_subspec
             )
@@ -1500,7 +1608,7 @@ class FormatableFormatter(Formatter):
 @has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
   ''' A subclass of `FormatableFormatter` which  provides 2 features:
-      - a `__format__ method which parses the `format_spec` string
+      - a `__format__` method which parses the `format_spec` string
         into multiple colon separated terms whose results chain
       - a `format_as` method which formats a format string using `str.format_map`
         with a suitable mapping derived from the instance
@@ -1544,7 +1652,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         As such, a `format_spec` is considered
         a sequence of colon separated terms.
 
-        Classes wanting to implement addition format string syntaxes
+        Classes wanting to implement additional format string syntaxes
         should either:
         - override `FormatableFormatter.format_field1` to implement
           terms with no colons, letting `format_field1` do the split into terms
@@ -1585,7 +1693,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   ##@staticmethod
   def convert_field(self, value, conversion):
-    ''' Default converter for fields calls `Formatter.convert_field`.
+    ''' The default converter for fields calls `Formatter.convert_field`.
     '''
     if conversion == '':
       warning(
@@ -1673,7 +1781,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     if strict is None:
       strict = self.format_mode.strict
     with self.format_mode(strict=strict):
-      return _format_as(
+      return pfx_call(
+          _format_as,
           format_s,
           format_mapping,
           formatter=self,
@@ -1690,8 +1799,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 @has_format_attributes
 class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
-      particularly its `__format__`
-      which use `str` method names as valid formats.
+      particularly its `__format__` method
+      which uses `str` method names as valid formats.
 
       It also has a bunch of utility methods which are available
       as `:`*method* in format strings.
@@ -1751,6 +1860,32 @@ class FStr(FormatableMixin, str):
     ''' Convert to a Windows filesystem `pathlib.Path`.
     '''
     return PureWindowsPath(self)
+
+class FNumericMixin(FormatableMixin):
+  ''' A `FormatableMixin` subclass.
+  '''
+
+  @format_attribute
+  def utctime(self):
+    ''' Treat this as a UNIX timestamp and return a UTC `datetime`.
+    '''
+    return unixtime2datetime(self, tz=UTC)
+
+  @format_attribute
+  def localtime(self):
+    ''' Treat this as a UNIX timestamp and return a localtime `datetime`.
+    '''
+    return unixtime2datetime(self, tz=tzlocal())
+
+@has_format_attributes
+class FFloat(FNumericMixin, float):
+  ''' Formattable `float`.
+  '''
+
+@has_format_attributes
+class FInt(FNumericMixin, int):
+  ''' Formattable `int`.
+  '''
 
 if __name__ == '__main__':
   import cs.lex_tests

@@ -49,7 +49,7 @@ dosync()
   shift; shift
 
   $trace \
-    mrsync -rptOHCi --delete \
+    mrsync -rptOHCli --delete \
         '--no-implied-dirs' \
         '--exclude=.DS_Store' \
         '--exclude=.zsh_history' \

@@ -1,0 +1,2 @@
+lib/python/cs/seq.py: cs.seq: Seq: calling a Seq is like next(seq), improve docstring
+lib/python/cs/seq.py: cs.seq: update DISTINFO

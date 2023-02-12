@@ -1,0 +1,4 @@
+lib/python/cs/psutils.py: cs.psutils: autoformat, tweak docstring
+lib/python/cs/psutils.py: cs.psutils: new signal_handler(sig,handler,call_previous=False) context manager to push a signal handler
+lib/python/cs/psutils.py: cs.psutils: new signal_handlers() context manager to stack handlers for multiple signals; polish signal_handler()
+lib/python/cs/psutils.py: cs.psutils: get DEVNULL from cs.gimmicks, clean lint

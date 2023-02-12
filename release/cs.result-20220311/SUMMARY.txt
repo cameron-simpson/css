@@ -1,0 +1,3 @@
+Result: class local Seq instance.
+Result.call: thread safe runtime check of self.state==pending.
+New Task and @task decorator, prototype for rerunnable blocking chaining tasks scheme - very alpha.

@@ -1,0 +1,2 @@
+lib/python/cs/sqltags.py: cs.*: mark classes supporting @promote as Promotable
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.search: fix variable name

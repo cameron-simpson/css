@@ -9,15 +9,17 @@
 ''' Protocol for accessing Stores over a stream connection.
 '''
 
-from __future__ import with_statement
+from contextlib import contextmanager
 from enum import IntEnum
 from functools import lru_cache
 from subprocess import Popen, PIPE
 from threading import Lock
 import time
-from typing import Optional
+from typing import Optional, Tuple
+
 from icontract import require
 from typeguard import typechecked
+
 from cs.binary import (
     BinaryMultiValue,
     BSString,
@@ -31,7 +33,7 @@ from cs.packetstream import PacketConnection
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.resources import ClosedError
-from cs.result import CancellationError
+from cs.result import CancellationError, Result
 from cs.threads import locked
 from .archive import BaseArchive, ArchiveEntry
 from .dir import _Dirent
@@ -76,13 +78,14 @@ class StreamStore(BasicStoreSync):
       local_store=None,
       exports=None,
       capacity=None,
+      sync=False,
       **kw
   ):
     ''' Initialise the `StreamStore`.
 
         Parameters:
         * `addif`: optional mode causing `.add` to probe the peer for
-          the data chunk's hash and to only submit a ADD request
+          the data chunk's hash and to only submit an ADD request
           if the block is missing; this is a bandwith optimisation
           at the expense of latency.
         * `connect`: if not `None`, a function to return `recv` and `send`.
@@ -101,6 +104,10 @@ class StreamStore(BasicStoreSync):
           For a file descriptor sending is done via an `os.dup()` of
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
+        * `sync`: optional flag, default `False`;
+          if true a `.add()` will block until acknowledged by the far end;
+          if false a `.add()` will queue the add packet and return
+          the hashcode immediately
 
         Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
@@ -109,6 +116,7 @@ class StreamStore(BasicStoreSync):
     super().__init__('StreamStore:%s' % (name,), capacity=capacity, **kw)
     self._lock = Lock()
     self.mode_addif = addif
+    self.mode_sync = sync
     self._local_store = local_store
     self.exports = exports
     # parameters controlling connection hysteresis
@@ -159,28 +167,24 @@ class StreamStore(BasicStoreSync):
     '''
     self.local_store = self.exports[export_name]
 
-  @pfx_method(use_str=True)
-  def startup(self):
-    ''' Start up the StreamStore.
-        Open the `local_store` if not `None`.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close `self.local_store` if not `None`.
     '''
-    super().startup()
-    local_store = self.local_store
-    if local_store is not None:
-      local_store.open()
-
-  @pfx_method
-  def shutdown(self):
-    ''' Shut down the StreamStore.
-    '''
-    conn = self._conn
-    if conn:
-      conn.shutdown()
-      self._conn = None
-    local_store = self.local_store
-    if local_store is not None:
-      local_store.close()
-    super().shutdown()
+    with super().startup_shutdown():
+      local_store = self.local_store
+      if local_store is not None:
+        local_store.open()
+      try:
+        yield
+      finally:
+        conn = self._conn
+        if conn:
+          conn.shutdown()
+          self._conn = None
+        local_store = self.local_store
+        if local_store is not None:
+          local_store.close()
 
   @pfx_method
   def connection(self):
@@ -213,7 +217,7 @@ class StreamStore(BasicStoreSync):
         recv,
         send,
         self._handle_request,
-        name='PacketConnection:' + self.name,
+        name=self.name,
         packet_grace=0,
         tick=True
     )
@@ -239,32 +243,46 @@ class StreamStore(BasicStoreSync):
     if conn:
       conn.join()
 
-  def do(self, rq):
-    ''' Wrapper for `self._conn.do` to catch and report failed autoconnection.
-        Raises `StoreError` on protocol failure or not `ok` responses.
-        Returns `(flags,payload)` otherwise.
+  def do_bg(self, rq) -> Result:
+    ''' Wrapper for `self._conn.request` to catch and report failed autoconnection.
+        Raises `StoreError` on `ClosedError` or `CancellationError`.
     '''
-    with Pfx("%s.do(%s)", self, rq):
-      conn = self.connection()
-      if conn is None:
-        raise StoreError("no connection")
-      try:
-        retval = conn.do(rq.RQTYPE, getattr(rq, 'packet_flags', 0), bytes(rq))
-      except ClosedError as e:
-        self._conn = None
-        raise StoreError("connection closed: %s" % (e,), request=rq) from e
-      except CancellationError as e:
-        raise StoreError("request cancelled: %s" % (e,), request=rq) from e
-      else:
-        if retval is None:
-          raise StoreError("NO RESPONSE", request=rq)
-        ok, flags, payload = retval
-        if not ok:
-          raise StoreError(
-              "NOT OK response", request=rq, flags=flags, payload=payload
-          )
-        return flags, payload
-      raise RuntimeError("NOTREACHED")
+    conn = self.connection()
+    if conn is None:
+      raise StoreError("no connection")
+    try:
+      submitted = conn.request(
+          rq.RQTYPE, getattr(rq, 'packet_flags', 0), bytes(rq)
+      )
+    except ClosedError as e:
+      self._conn = None
+      raise StoreError("connection closed: %s" % (e,), request=rq) from e
+    except CancellationError as e:
+      raise StoreError("request cancelled: %s" % (e,), request=rq) from e
+
+    def decode_response(response):
+      ''' Decode the response returned by from the connection.
+      '''
+      if response is None:
+        raise StoreError("NO RESPONSE", request=rq)
+      ok, flags, payload = response
+      if not ok:
+        raise StoreError(
+            "NOT OK response", request=rq, flags=flags, payload=payload
+        )
+      return flags, payload
+
+    return submitted.post_notify(decode_response)
+
+  @typechecked
+  def do(self, rq) -> Tuple[int, bytes]:
+    ''' Synchronous interface to `self._conn.request`
+        In addition to the exceptions raised by `self.do_bg()`
+        this method raises `StoreError` if the response is not ok.
+        Otherwise it returns a `(flags,payload)` tuple
+        and the caller can assume the request was ok.
+    '''
+    return self.do_bg(rq)()
 
   @staticmethod
   def decode_request(rq_type, flags, payload):
@@ -304,28 +322,29 @@ class StreamStore(BasicStoreSync):
       warning("unparsed bytes after BSUInt(length): %r", payload[offset:])
     return length
 
-  @pfx_method
-  def add(self, data):
+  def add(self, data: bytes):
     h = self.hash(data)
     if self.mode_addif:
       if self.contains(h):
         return h
     rq = AddRequest(data=data, hashenum=self.hashclass.HASHENUM)
-    flags, payload = self.do(rq)
-    h2, offset = hash_decode(payload)
-    if offset != len(payload):
-      raise StoreError(
-          "extra payload data after hashcode: %r" % (payload[offset:],)
-      )
-    assert flags == 0
-    if h != h2:
-      raise RuntimeError(
-          "precomputed hash %s:%s != hash from .add %s:%s" %
-          (type(h), h, type(h2), h2)
-      )
+    if self.mode_sync:
+      flags, payload = self.do(rq)
+      h2, offset = hash_decode(payload)
+      if offset != len(payload):
+        raise StoreError(
+            "extra payload data after hashcode: %r" % (payload[offset:],)
+        )
+      assert flags == 0
+      if h != h2:
+        raise RuntimeError(
+            "precomputed hash %s:%s != hash from .add %s:%s" %
+            (type(h), h, type(h2), h2)
+        )
+    else:
+      self.do_bg(rq)
     return h
 
-  @pfx_method
   def get(self, h, default=None):
     try:
       flags, payload = self.do(GetRequest(h))
@@ -357,7 +376,6 @@ class StreamStore(BasicStoreSync):
       raise StoreError("unexpected payload: %r" % (payload,))
     return found
 
-  @pfx_method
   def flush(self):
     if self._conn is None:
       pass  # XP("SKIP FLUSH WHEN _conn=None")
@@ -489,7 +507,7 @@ class StreamStore(BasicStoreSync):
     return StreamStoreArchive(self, archive_name)
 
 class StreamStoreArchive(BaseArchive):
-  ''' An Archive associates with this StreamStore.
+  ''' An `Archive` associated with a `StreamStore`.
 
       Its methods proxy requests to the archive name at the remote end.
   '''

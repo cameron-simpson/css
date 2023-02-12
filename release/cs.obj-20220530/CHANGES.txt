@@ -1,0 +1,4 @@
+lib/python/cs/obj.py: cs.obj: SingletonMixin: fix docstring typo
+lib/python/cs/obj.py: cs.obj: SingletonMixin: update docstring example
+lib/python/cs/obj.py: cs.obj: SingletonMixin: tweak docstring
+lib/python/cs/obj.py: cs.obj: SingletonMixin: give all instances a ._SingletonMixin_key attribute derived from ._singleton_key, add default __hash__ and __eq__ methods to support dict and set membership

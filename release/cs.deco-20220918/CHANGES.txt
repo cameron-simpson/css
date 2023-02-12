@@ -1,0 +1,4 @@
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: tweak message format
+lib/python/cs/deco.py: merge default ==> vt
+lib/python/cs/deco.py: cs.deco: @default_params: docstring: simplify the example and improve the explaination
+lib/python/cs/deco.py: cs.deco: @default_params: set the __name__ of the wrapper function

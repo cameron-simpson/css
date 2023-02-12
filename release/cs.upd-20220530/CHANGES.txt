@@ -1,0 +1,7 @@
+lib/python/cs/upd.py: cs.upd: UpdProxy: new .suffix property
+lib/python/cs/upd.py: cs.upd: Upd: new run_task context manager to display an UpdProxy while something runs, with optional ticker
+lib/python/cs/upd.py: cs.upd: Upd.insert: bugfix the call to UpdProxy
+lib/python/cs/upd.py: cs.upd: lint: explicitly return None
+lib/python/cs/upd.py: cs.upd: fix warning
+lib/python/cs/upd.py: merge default => ebooks
+lib/python/cs/upd.py: cs.upd: update DISTINFO
