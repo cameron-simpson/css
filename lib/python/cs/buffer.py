@@ -65,10 +65,11 @@ class CornuCopyBuffer(object):
 
       The primary methods supporting parsing of data streams are
       `.extend()` and `take()`.
-      Calling `.extend(min_size)` arranges that `.buf` contains at least
-      `min_size` bytes.
-      Calling `.take(size)` fetches exactly `size` bytes from `.buf` and the
-      input source if necessary and returns them, adjusting `.buf`.
+      Calling `.extend(min_size)` arranges that the internal buffer
+      contains at least `min_size` bytes.
+      Calling `.take(size)` fetches exactly `size` bytes from the
+      internal buffer and the input source if necessary and returns
+      them, adjusting the internal buffer.
 
       len(`CornuCopyBuffer`) returns the length of any buffered data.
 
@@ -78,8 +79,8 @@ class CornuCopyBuffer(object):
       returning an individual byte's value (an `int`).
 
       A `CornuCopyBuffer` is also iterable, yielding data in whatever
-      sizes come from its `input_data` source, preceeded by the
-      current `.buf` if not empty.
+      sizes come from its `input_data` source, preceeded by any
+      content in the internal buffer.
 
       A `CornuCopyBuffer` also supports the file methods `.read`,
       `.tell` and `.seek` supporting drop in use of the buffer in
@@ -917,8 +918,8 @@ class CornuCopyBuffer(object):
     )
 
     def flush():
-      ''' Flush the contents of `bfr2.buf` back into `self.buf`, adjusting
-          the latter's `.offset` accordingly.
+      ''' Flush the internal buffer of `bfr2` back into `self`'s
+          internal buffer, adjusting the latter's `.offset` accordingly.
       '''
       for buf in reversed(bfr2.bufs):
         self.push(buf)
@@ -983,7 +984,7 @@ class _BoundedBufferIterator(object):
       raise StopIteration("limit reached")
     # post: limit > 0
     buf = next(bfr)
-    # post: bfr.buf now empty, can be modified
+    # post: bfr's internal buffer now empty, can be modified
     length = len(buf)
     if length <= limit:
       return buf
