@@ -981,6 +981,7 @@ class Promotable(ABC):
   ''' A class which supports the `@promote` decorator.
   '''
 
+  @classmethod
   @abstractmethod
   def promote(cls, obj):
     ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
