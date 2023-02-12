@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Extract various archive formats.
-#	- Cameron Simpson <cs@cskk.id.au> 17dec2002
+#   - Cameron Simpson <cs@cskk.id.au> 17dec2002
 #
 
 : ${TMPDIR:=/tmp}
@@ -21,17 +21,17 @@ then
     [ -t 0 ] && { echo "$cmd: won't read stdin from a tty" >&2; exit 1; }
     if [ -n "$mtype" ]
     then
-	file=/dev/fd/0
+    file=/dev/fd/0
     else
-	tmpf=$TMPDIR/$cmd$$
-	trap 'rm -f "$tmpf"' 0 1 2 13 15
-	(umask 077; exec dd bs=1024 count=1 >"$tmpf") || exit 1
-    	mtype=`file2mime "$tmpf"` \
-	|| { echo "$cmd: stdin: no MIME type recognised" >&2
-	     exit 1
-	   }
-	cat "$tmpf" - | "$0" -t "$mtype" -
-	exit $?
+    tmpf=$TMPDIR/$cmd$$
+    trap 'rm -f "$tmpf"' 0 1 2 13 15
+    (umask 077; exec dd bs=1024 count=1 >"$tmpf") || exit 1
+        mtype=`file2mime "$tmpf"` \
+    || { echo "$cmd: stdin: no MIME type recognised" >&2
+         exit 1
+       }
+    cat "$tmpf" - | "$0" -t "$mtype" -
+    exit $?
     fi
 else
     [ -n "$mtype" ] \
