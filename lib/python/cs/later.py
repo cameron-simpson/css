@@ -54,7 +54,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import State as ThreadState, HasThreadState
 
-__version__ = '20230125-post'
+__version__ = '20230212.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -237,7 +237,7 @@ class LateFunction(Result):
     self.retry_delay = retry_delay
     # we prepare the Thread now in order to honour the perThread states
     self.thread = (builtin_Thread if no_context else HasThreadState.Thread
-                   )(name=name, target=func)
+                   )(name=name, target=partial(self.run_func, func))
 
   def __str__(self):
     return "%s[%s]" % (type(self).__name__, self.name)

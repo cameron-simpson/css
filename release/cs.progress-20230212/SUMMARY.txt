@@ -1,0 +1,1 @@
+BaseProgress: new update_period=0.2 parameter to constraint updates by elapsed time.

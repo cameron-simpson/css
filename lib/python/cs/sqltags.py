@@ -60,7 +60,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, Promotable
 from cs.fileutils import shortpath
 from cs.lex import FormatAsError, has_format_attributes, format_attribute, get_decimal_value, r
 from cs.logutils import error, warning, track, info, ifverbose
@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230212-post'
+__version__ = '20230212.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1155,7 +1155,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               op_map = {
                   '~': lambda column, value: column is not None,
               }
-              post_check = lambda te: value.match(te[tag_name])
+              post_check = lambda te: tag_value.match(te[tag_name])
             else:
               raise TypeError(
                   "unhandled type for %s=%s" % (
@@ -1528,7 +1528,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     return children
 
 # pylint: disable=too-many-ancestors
-class SQLTags(BaseTagSets):
+class SQLTags(BaseTagSets, Promotable):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 

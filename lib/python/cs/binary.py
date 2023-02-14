@@ -75,12 +75,13 @@ from types import SimpleNamespace
 from typing import List, Union
 
 from cs.buffer import CornuCopyBuffer
+from cs.deco import strable, promote
 from cs.gimmicks import warning, debug
-from cs.lex import cropped, cropped_repr, typed_str as s
+from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
-__version__ = '20221206-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -184,6 +185,7 @@ def pt_spec(pt, name=None):
     f_transcribe_value = pt.transcribe_value
   except AttributeError:
     if isinstance(pt, int):
+      # pylint: disable=unnecessary-lambda-assignment
       f_parse_value = lambda bfr: bfr.take(pt)
       f_transcribe_value = lambda value: value
     else:
@@ -327,7 +329,10 @@ class BinaryMixin:
   __len__ = transcribed_length
 
   @classmethod
-  def scan(cls, bfr, count=None, min_count=None, max_count=None):
+  @promote
+  def scan(
+      cls, bfr: CornuCopyBuffer, count=None, min_count=None, max_count=None
+  ):
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
         until end of input and yield them.
 
@@ -470,22 +475,19 @@ class BinaryMixin:
   @classmethod
   def load(cls, f):
     ''' Load an instance from the file `f`
-        which may be a filename or an open file.
-        Return the instance.
+        which may be a filename or an open file as for `BinaryMixin.scan`.
+        Return the instance or `None` if the file is empty.
     '''
-    for instance in cls.scan_file(f):
+    for instance in cls.scan(f):
       return instance
     return None
 
+  @strable(open_func=lambda fspath: pfx_call(open, fspath, 'wb'))
   def save(self, f):
     ''' Save this instance to the file `f`
         which may be a filename or an open file.
         Return the length of the transcription.
     '''
-    if isinstance(f, str):
-      filename = f
-      with pfx_call(open, filename, 'wb') as f:
-        return self.save(f)
     length = 0
     for bs in self.transcribe_flat():
       while bs:
@@ -556,6 +558,7 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
     if attr_names is None:
       attr_names = sorted(self.__dict__.keys())
     if attr_choose is None:
+      # pylint: disable=unnecessary-lambda-assignment
       attr_choose = lambda attr: not attr.startswith('_')
     return "%s(%s)" % (
         type(self).__name__, ','.join(
@@ -1135,10 +1138,10 @@ class BSString(BinarySingleValue):
 
   # pylint: disable=arguments-differ
   @staticmethod
-  def transcribe_value(s, encoding='utf-8'):
+  def transcribe_value(value: str, encoding='utf-8'):
     ''' Transcribe a string.
     '''
-    payload = s.encode(encoding)
+    payload = value.encode(encoding)
     return b''.join((BSUInt.transcribe_value(len(payload)), payload))
 
 class BSSFloat(BinarySingleValue):

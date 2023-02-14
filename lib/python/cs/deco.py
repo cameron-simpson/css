@@ -8,6 +8,7 @@ r'''
 Assorted decorator functions.
 '''
 
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 from inspect import isgeneratorfunction, ismethod, signature, Parameter
@@ -18,7 +19,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20230210-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -803,6 +804,7 @@ def default_params(func, _strict=False, **param_defaults):
   )
   return defaulted_func
 
+# pylint: disable=too-many-statements
 @decorator
 def promote(func, params=None, types=None):
   ''' A decorator to promote argument values automatically in annotated functions.
@@ -929,6 +931,7 @@ def promote(func, params=None, types=None):
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
     # we don't import cs.pfx (many dependencies!)
+    # pylint: disable=unnecessary-lambda-assignment
     get_context = lambda: (
         "@promote(%s.%s)(%s=%s:%r)" % (
             func.__module__, func.__name__, param_name, arg_value.__class__.
@@ -951,7 +954,7 @@ def promote(func, params=None, types=None):
           as_annotation = getattr(arg_value, as_method_name)
         except AttributeError:
           # no .as_TypeName, reraise the original TypeError
-          raise te
+          raise te  # pylint: disable=raise-missing-from
         else:
           if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
             # bound instance method of arg_value
@@ -972,3 +975,16 @@ def promote(func, params=None, types=None):
     return func(*bound_args.args, **bound_args.kwargs)
 
   return promoting_func
+
+# pylint: disable=too-few-public-methods
+class Promotable(ABC):
+  ''' A class which supports the `@promote` decorator.
+  '''
+
+  @classmethod
+  @abstractmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
+        This method supports the `@promote` decorator.
+    '''
+    raise NotImplementedError
