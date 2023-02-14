@@ -121,7 +121,7 @@ atexit.register(_cleanup)
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
 class Upd(SingletonMixin, HasThreadState):
-  ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
+  ''' A `SingletonMixin` subclass for maintaining multiple status lines.
 
       The default backend is `sys.stderr`.
   '''
@@ -284,6 +284,8 @@ class Upd(SingletonMixin, HasThreadState):
     return len(self._slot_text)
 
   def __getitem__(self, index):
+    ''' The text of the status line at `index`.
+    '''
     return self._slot_text[index]
 
   def __setitem__(self, index, txt):
@@ -1003,7 +1005,7 @@ def out(msg, *a, upd, **outkw):
 
 # pylint: disable=redefined-builtin
 @uses_upd
-def print(*a, upd, end='\n', **kw):
+def print(*a, upd: Upd, end='\n', **kw):
   ''' Wrapper for the builtin print function
       to call it inside `Upd.above()` and enforce a flush.
 
