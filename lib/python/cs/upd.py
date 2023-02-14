@@ -983,10 +983,16 @@ class Upd(SingletonMixin, HasThreadState):
       )
 
 def uses_upd(func):
-  ''' Decorator for functions accepting an optional `upd=Upd()` parameter,
-      default from `Upd.state.current`.
+  ''' Decorator for functions accepting an optional `upd:Upd` parameter,
+      default from `Upd.default() or Upd()`.
+      This also makes the `upd` the default `Upd` instance for this thread.
   '''
-  return default_params(func, upd=lambda: Upd.default() or Upd())
+
+  def with_func(*a, upd: Upd, **kw):
+    with upd:
+      return func(*a, upd=upd, **kw)
+
+  return default_params(with_func, upd=lambda: Upd.default() or Upd())
 
 @uses_upd
 def out(msg, *a, upd, **outkw):
