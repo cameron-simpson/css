@@ -649,6 +649,34 @@ class CornuCopyBuffer(Promotable):
       return bytes(taken[0])
     return b''.join(taken)
 
+  def readline(self):
+    ''' Return a binary "line" from `self`, where a line is defined by
+        its ending `b'\n'` delimiter.
+        The final line from a buffer might not have a trailing newline;
+        `b''` is returned at EOF.
+
+        Example:
+
+            >>> bfr = CornuCopyBuffer([b'abc', b'def\nhij'])
+            >>> bfr.readline()
+            b'abcdef\n'
+            >>> bfr.readline()
+            b'hij'
+            >>> bfr.readline()
+            b''
+            >>> bfr.readline()
+            b''
+    '''
+    pending = []
+    for bs in self:
+      nlpos = bs.find(b'\n')
+      if nlpos >= 0:
+        pending.append(bs[:nlpos + 1])
+        self.push(bs[nlpos + 1:])
+        break
+      pending.append(bs)
+    return b''.join(pending)
+
   def peek(self, size, short_ok=False):
     ''' Examine the leading bytes of the buffer without consuming them,
         a `take` followed by a `push`.
