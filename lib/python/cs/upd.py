@@ -81,6 +81,7 @@ from cs.deco import decorator, default_params
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
+from cs.resources import MultiOpenMixin
 from cs.threads import HasThreadState, State as ThreadState
 from cs.tty import ttysize
 from cs.units import transcribe, TIME_SCALE
@@ -120,7 +121,7 @@ def _cleanup():
 atexit.register(_cleanup)
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
-class Upd(SingletonMixin, HasThreadState):
+class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
   ''' A `SingletonMixin` subclass for maintaining multiple status lines.
 
       The default backend is `sys.stderr`.
@@ -233,22 +234,24 @@ class Upd(SingletonMixin, HasThreadState):
         then we preserve the status lines one screen.
         Otherwise we clean up the status lines.
     '''
-    with HasThreadState.as_contextmanager(self):
-      try:
-        yield self
-      except Exception as e:
-        exc_type = type(e)
-        # pylint: disable=no-member
-        preserve_display = not (
-            exc_type is None or (
-                issubclass(exc_type, SystemExit) and
-                (e.code == 0 if isinstance(e.code, int) else e.code is None)
-            )
-        )
-        self.shutdown(preserve_display)
-        raise
-      else:
-        self.shutdown()
+    with MultiOpenMixin.as_contextmanager(self):
+      with HasThreadState.as_contextmanager(self):
+        yield
+
+  @contextmanager
+  def startup_shutdown(self):
+    if self._current_slot is None:
+      self._reset()
+    try:
+      yield
+    except Exception as e:  # pylint: disable=broad-except
+      preserve_display = not (
+          isinstance(e, SystemExit) and
+          (e.code == 0 if isinstance(e.code, int) else e.code is None)
+      )
+      self.shutdown(preserve_display=preserve_display)
+    else:
+      self.shutdown(preserve_display=False)
 
   def shutdown(self, preserve_display=False):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
@@ -380,17 +383,6 @@ class Upd(SingletonMixin, HasThreadState):
       for index in range(len(self._slot_text)):
         proxies[index].index = index
 
-  def close(self):
-    ''' Close this Upd.
-    '''
-    if self._backend is not None and self._slot_text:
-      self.out('')
-      self._backend = None
-
-  def closed(self):
-    ''' Test whether this Upd is closed.
-    '''
-    return self._backend is None
 
   def ti_str(self, ti_name):
     ''' Fetch the terminfo capability string named `ti_name`.
@@ -1287,6 +1279,9 @@ def with_upd_proxy(func, prefix=None, insert_at=1):
         return func(*a, upd_proxy=proxy, **kw)
 
   return upd_with_proxy_wrapper
+
+# always create a default Upd() in open state
+Upd().open()
 
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.
