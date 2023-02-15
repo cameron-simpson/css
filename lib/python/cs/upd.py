@@ -770,13 +770,10 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
               (len(self), index0)
           )
       elif index > len(self):
-        if index == 1 and not slots:
-          self.insert(0)
-        else:
-          raise ValueError(
-              "index should be in the range 0..%d inclusive: got %s" %
-              (len(self), index)
-          )
+        raise ValueError(
+            "index should be in the range 0..%d inclusive: got %s" %
+            (len(self), index)
+        )
       if proxy is None:
         # create the proxy, which inserts it
         return UpdProxy(index=index, upd=self, prefix=txt, **proxy_kw)
