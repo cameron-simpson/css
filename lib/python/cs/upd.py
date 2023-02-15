@@ -259,25 +259,23 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
     '''
     slots = getattr(self, '_slot_text', None)
-    if slots:
-      if not preserve_display:
-        # remove the Upd display
-        with self._lock:
-          while len(slots) > 1:
-            del self[len(slots) - 1]
-          self[0] = ''
-      elif not self._disabled and self._backend is not None:
-        # preserve the display for debugging purposes
-        # move to the bottom and emit a newline
-        with self._lock:
-          txts = self._move_to_slot_v(self._current_slot, 0)
-          if slots[0]:
-            # preserve the last status line if not empty
-            txts.append('\n')
-          txts.append(self._set_cursor_visible(True))
-          self._backend.write(''.join(txts))
-          self._backend.flush()
-    self._reset()
+    if not preserve_display:
+      # remove the Upd display
+      with self._lock:
+        while len(slots) > 1:
+          del self[len(slots) - 1]
+        self[0] = ''
+    elif not self._disabled and self._backend is not None:
+      # preserve the display for debugging purposes
+      # move to the bottom and emit a newline
+      with self._lock:
+        txts = self._move_to_slot_v(self._current_slot, 0)
+        if slots[0]:
+          # preserve the last status line if not empty
+          txts.append('\n')
+        txts.append(self._set_cursor_visible(True))
+        self._backend.write(''.join(txts))
+        self._backend.flush()
 
   ############################################################
   # Sequence methods.
@@ -756,7 +754,9 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
       if proxy_kw:
         raise ValueError("cannot supply both a proxy and **proxy_kw")
     slots = self._slot_text
+    assert slots
     proxies = self._proxies
+    assert proxies
     txts = []
     with self._lock:
       if index < 0:
@@ -794,62 +794,49 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
       # not disabled: manage the display
       cursor_up = self.ti_str('cuu1')
       insert_line = self.ti_str('il1')
-      first_slot = not slots
-      if first_slot:
-        # move to the start of the current cursor line, set _current_slot=0
-        txts.append('\r')
-        txts.extend(self._redraw_line_v(txt))
+      if not cursor_up:
+        raise IndexError(
+            "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
+            % (os.environ.get('TERM'),)
+        )
+      # make sure insert line does not push the bottom line off the screen
+      # by forcing a scroll: move to bottom, VT, cursor up
+      if insert_line:
+        txts.extend(self._move_to_slot_v(self._current_slot, 0))
         self._current_slot = 0
+        txts.append('\v')
+        txts.append(cursor_up)
+        # post: inserting a line will not drive the lowest line off the screen
+      if index == 0:
+        # move to bottom slot, add line below
+        txts.extend(self._move_to_slot_v(self._current_slot, 0))
+        txts.append('\v\r')
+        if insert_line:
+          txts.append(insert_line)
+          txts.append(txt)
+        else:
+          txts.extend(self._redraw_line_v(txt))
         slots.insert(index, txt)
         proxies.insert(index, proxy)
         self._update_proxies()
+        self._current_slot = 0
       else:
-        # we're inserting an additional line to a nonempty display
-        if not cursor_up:
-          raise IndexError(
-              "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
-              % (os.environ.get('TERM'),)
-          )
-        # make sure insert line does not push the bottom line off the screen
-        # by forcing a scroll: move to bottom, VT, cursor up
+        # move to the line which is to be below the inserted line,
+        # insert line above that
+        txts.extend(self._move_to_slot_v(self._current_slot, index - 1))
+        slots.insert(index, txt)
+        proxies.insert(index, proxy)
+        self._update_proxies()
         if insert_line:
-          txts.extend(self._move_to_slot_v(self._current_slot, 0))
-          self._current_slot = 0
-          txts.append('\v')
-          txts.append(cursor_up)
-          # post: inserting a line will not drive the lowest line off the screen
-        if index == 0:
-          # move to bottom slot, add line below
-          txts.extend(self._move_to_slot_v(self._current_slot, 0))
-          txts.append('\v\r')
-          if insert_line:
-            txts.append(insert_line)
-            txts.append(txt)
-          else:
-            txts.extend(self._redraw_line_v(txt))
-          slots.insert(index, txt)
-          proxies.insert(index, proxy)
-          self._update_proxies()
-          self._current_slot = 0
+          # insert a line with `txt`
+          txts.append(insert_line)
+          txts.append('\r')
+          txts.append(txt)
+          self._current_slot = index
         else:
-          # move to the line which is to be below the inserted line,
-          # insert line above that
-          txts.extend(self._move_to_slot_v(self._current_slot, index - 1))
-          slots.insert(index, txt)
-          proxies.insert(index, proxy)
-          self._update_proxies()
-          if insert_line:
-            # insert a line with `txt`
-            txts.append(insert_line)
-            txts.append('\r')
-            txts.append(txt)
-            self._current_slot = index
-          else:
-            # no insert, just redraw from here down completely
-            txts.extend(
-                self._redraw_trailing_slots_v(index, skip_first_vt=True)
-            )
-            self._current_slot = 0
+          # no insert, just redraw from here down completely
+          txts.extend(self._redraw_trailing_slots_v(index, skip_first_vt=True))
+          self._current_slot = 0
       self._backend.write(''.join(txts))
       self._backend.flush()
     return proxy
