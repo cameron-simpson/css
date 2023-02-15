@@ -74,7 +74,7 @@ import os
 import sys
 from threading import RLock, Thread
 import time
-from typing import Optional
+from typing import Optional, Union
 
 from cs.context import stackattrs
 from cs.deco import decorator, default_params
@@ -1081,7 +1081,7 @@ class UpdProxy(object):
       text: Optional[str] = None,
       *,
       upd: Upd,
-      index: int = 1,
+      index: Union[int, None] = 1,
       prefix: Optional[str] = None,
       suffix: Optional[str] = None,
       text_auto=None,
@@ -1097,7 +1097,7 @@ class UpdProxy(object):
         * `text`: optional initial text for the new status line
     '''
     self.upd = None
-    self.index = None
+    self.index = index
     self._prefix = prefix or ''
     self._text = ''
     self._text_auto = text_auto
@@ -1105,7 +1105,12 @@ class UpdProxy(object):
     self._update_period = update_period
     if update_period:
       self.last_update = time.time()
-    upd.insert(index, proxy=self)
+    if index is None:
+      self.upd = upd
+    else:
+      self.upd = None
+      upd.insert(index, proxy=self)
+      assert self.index is not None
     if text:
       self(text)
 
