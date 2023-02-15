@@ -801,7 +801,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("missing -o option")
     if not argv:
       raise GetoptError("missing paths")
-    if len(argv) == 1 and argv[0] == '-':
+    if argv == ['-']:
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
