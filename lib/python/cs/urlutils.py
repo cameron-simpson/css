@@ -62,6 +62,7 @@ except ImportError:
   except AttributeError:
     pass
 
+from cs.deco import Promotable
 from cs.lex import parseUC_sAttr
 from cs.logutils import debug, error, warning, exception
 from cs.pfx import Pfx, pfx_iter
@@ -77,17 +78,12 @@ from cs.xml import etree  # ElementTree
 ##  return putheader0(self, header, *values)
 ##HTTPConnection.putheader = my_putheader
 
-def isURL(U):
-  ''' Test if an object `U` is an URL instance.
-  '''
-  return isinstance(U, _URL)
-
-class URL(str):
+class URL(str, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
   def _init(self, *, referer=None, user_agent=None, opener=None):
-    ''' Initialise the _URL.
+    ''' Initialise the `URL`.
         `s`: the string defining the URL.
         `referer`: the referring URL.
         `user_agent`: User-Agent string, inherited from `referer` if unspecified,
@@ -124,14 +120,11 @@ class URL(str):
       raise TypeError(
           "%s.promote: cannot convert to URL: %s" % (cls.__name__, r(obj))
       )
+    if isinstance(url, cls):
+      obj = url if referer is None else cls(url, referer=referer)
     else:
-      if isinstance(url, cls):
-        obj = url if referer is None else cls(url, referer=referer)
-      else:
-        obj = cls.promote(url) if referer is None else cls(
-            url, referer=referer
-        )
-    return boj
+      obj = cls.promote(url) if referer is None else cls(url, referer=referer)
+    return obj
 
   def __getattr__(self, attr):
     ''' Ad hoc attributes.

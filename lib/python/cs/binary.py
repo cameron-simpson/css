@@ -75,13 +75,13 @@ from types import SimpleNamespace
 from typing import List, Union
 
 from cs.buffer import CornuCopyBuffer
-from cs.deco import OBSOLETE, promote
+from cs.deco import OBSOLETE, promote, strable
 from cs.gimmicks import warning, debug
 from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
-__version__ = '20221206-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -335,6 +335,7 @@ class BinaryMixin:
       cls,
       bfr: CornuCopyBuffer,
       count=None,
+      *,
       min_count=None,
       max_count=None,
       with_offsets=False,
@@ -495,22 +496,19 @@ class BinaryMixin:
   @classmethod
   def load(cls, f):
     ''' Load an instance from the file `f`
-        which may be a filename or an open file.
-        Return the instance.
+        which may be a filename or an open file as for `BinaryMixin.scan`.
+        Return the instance or `None` if the file is empty.
     '''
-    for instance in cls.scan_file(f):
+    for instance in cls.scan(f):
       return instance
     return None
 
+  @strable(open_func=lambda fspath: pfx_call(open, fspath, 'wb'))
   def save(self, f):
     ''' Save this instance to the file `f`
         which may be a filename or an open file.
         Return the length of the transcription.
     '''
-    if isinstance(f, str):
-      filename = f
-      with pfx_call(open, filename, 'wb') as f2:
-        return self.save(f2)
     length = 0
     for bs in self.transcribe_flat():
       while bs:
@@ -1161,10 +1159,10 @@ class BSString(BinarySingleValue):
 
   # pylint: disable=arguments-differ,arguments-renamed
   @staticmethod
-  def transcribe_value(s, encoding='utf-8'):
+  def transcribe_value(value: str, encoding='utf-8'):
     ''' Transcribe a string.
     '''
-    payload = s.encode(encoding)
+    payload = value.encode(encoding)
     return b''.join((BSUInt.transcribe_value(len(payload)), payload))
 
 class BSSFloat(BinarySingleValue):

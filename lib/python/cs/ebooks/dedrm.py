@@ -29,7 +29,7 @@ from typing import Iterable, List, Optional
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
@@ -160,7 +160,7 @@ class DeDRMCommand(BaseCommand):
         )
         pfx_call(dedrm.remove, filename, output_filename, exists_ok=exists_ok)
 
-class DeDRMWrapper:
+class DeDRMWrapper(Promotable):
   ''' Class embodying the DeDRM/noDRM package actions.
   '''
 
@@ -429,12 +429,11 @@ class DeDRMWrapper:
 
         If `obj` is `None` or a `str` return `DeDRMWrapper(dedrm_package_path=obj)`.
     '''
-    if not isinstance(obj, cls):
-      if obj is None or isinstance(obj, str):
-        obj = cls(dedrm_package_path=obj)
-      else:
-        raise TypeError("cannot promote %s", r(obj))
-    return obj
+    if isinstance(obj, cls):
+      return obj
+    if obj is None or isinstance(obj, str):
+      return cls(dedrm_package_path=obj)
+    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
 
 class DeDRMOverride:
   ''' A collection of override methods from the DeDRM/noDRM `DeDRM` class

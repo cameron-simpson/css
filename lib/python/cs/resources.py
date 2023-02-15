@@ -23,7 +23,7 @@ from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 from cs.threads import State as ThreadState, HasThreadState
 
-__version__ = '20230125-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -78,6 +78,9 @@ class _mom_state(object):
     self._lock = RLock()
     self._finalise_later = False
     self._finalise = None
+
+  def __repr__(self):
+    return "%s:%r" % (self.__class__.__name__, self.__dict__)
 
 ## debug: TrackedClassMixin
 class MultiOpenMixin(ContextManagerMixin):

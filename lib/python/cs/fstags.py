@@ -127,9 +127,9 @@ from cs.tagset import (
     tag_or_tag_value,
 )
 from cs.threads import locked, locked_property, State
-from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230211-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -245,37 +245,37 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
-    U = options.upd
     if not argv:
       argv = ['.']
     filename_rules = fstags.config.filename_rules
     with state(verbose=True):
-      for top_path in argv:
-        for isdir, path in rpaths(top_path, yield_dirs=True):
-          spath = shortpath(path)
-          U.out(spath)
-          with Pfx(spath):
-            ont = fstags.ontology_for(path)
-            tagged_path = fstags[path]
-            all_tags = tagged_path.merged_tags()
-            for autotag in tagged_path.infer_from_basename(filename_rules):
-              U.out(spath + ' ' + str(autotag))
-              if ont:
-                autotag = ont.convert_tag(autotag)
-              if autotag not in all_tags:
-                tagged_path.add(autotag, verbose=state.verbose)
-            if not isdir:
-              try:
-                S = os.stat(path)
-              except OSError:
-                pass
-              else:
-                tagged_path.add('filesize', S.st_size)
-            # update the merged tags
-            all_tags = tagged_path.merged_tags()
-            for tag in fstags.cascade_tags(all_tags):
-              if tag.name not in tagged_path:
-                tagged_path.add(tag)
+      with UpdProxy() as proxy:
+        for top_path in argv:
+          for isdir, path in rpaths(top_path, yield_dirs=True):
+            spath = shortpath(path)
+            proxy.text = spath
+            with Pfx(spath):
+              ont = fstags.ontology_for(path)
+              tagged_path = fstags[path]
+              all_tags = tagged_path.merged_tags()
+              for autotag in tagged_path.infer_from_basename(filename_rules):
+                proxy.text = spath + ' ' + str(autotag)
+                if ont:
+                  autotag = ont.convert_tag(autotag)
+                if autotag not in all_tags:
+                  tagged_path.add(autotag, verbose=state.verbose)
+              if not isdir:
+                try:
+                  S = os.stat(path)
+                except OSError:
+                  pass
+                else:
+                  tagged_path.add('filesize', S.st_size)
+              # update the merged tags
+              all_tags = tagged_path.merged_tags()
+              for tag in fstags.cascade_tags(all_tags):
+                if tag.name not in tagged_path:
+                  tagged_path.add(tag)
 
   # cmd_cp, cmd_ln and cmd_mv are grouped together lower down
 
@@ -432,9 +432,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     xit = 0
-    U = options.upd
     filepaths = fstags.find(
-        realpath(path), tag_choices, use_direct_tags=use_direct_tags, U=U
+        realpath(path), tag_choices, use_direct_tags=use_direct_tags
     )
     if as_rsync_includes:
       for include in rsync_patterns(filepaths, path):
@@ -782,63 +781,68 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       return TagsOntologyCommand(argv, **options.__dict__).run()
 
   def cmd_rename(self, argv):
-    ''' Usage: {cmd} -n newbasename_format paths...
+    ''' Usage: {cmd} -o basename_format paths...
           Rename paths according to a format string.
-          -n newbasename_format
-              Use newbasename_format as a Python format string to
+          -o basename_format
+              Use basename_format as a Python format string to
               compute the new basename for each path.
     '''
     xit = 0
+    cmd = self.cmd
     options = self.options
     fstags = options.fstags
     name_format = None
-    opts, argv = getopt(argv, 'n:')
+    opts, argv = getopt(argv, 'o:')
     for subopt, value in opts:
-      if subopt == '-n':
+      if subopt == '-o':
         name_format = fstags.resolve_format_string(value)
       else:
         raise RuntimeError("unhandled subopt: %r" % (subopt,))
     if name_format is None:
-      raise GetoptError("missing -n option")
+      raise GetoptError("missing -o option")
     if not argv:
       raise GetoptError("missing paths")
-    if len(argv) == 1 and argv[0] == '-':
+    if argv == ['-']:
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
     xit = 0
-    U = options.upd
     with state(verbose=True):
-      for fspath in paths:
-        U.out(fspath)
-        with Pfx(fspath):
-          if fspath == '-':
-            warning(
-                "ignoring name %r: standard input is only supported alone",
-                fspath
-            )
-            xit = 1
-            continue
-          dirpath = dirname(fspath)
-          base = basename(fspath)
-          try:
-            newbase = fstags[fspath].format_as(
-                name_format, error_sep='\n  ', direct=False
-            )
-          except FormatAsError as e:
-            error(str(e))
-            xit = 1
-            continue
-          newbase = newbase.replace(os.sep, ':')
-          if base == newbase:
-            continue
-          dstpath = joinpath(dirpath, newbase)
-          verbose("-> %s", dstpath)
-          try:
-            options.fstags.move(fspath, dstpath, crop_ok=True)
-          except OSError as e:
-            error("-> %s: %s", dstpath, e)
-            xit = 1
+      with UpdProxy(prefix=cmd + ' ') as proxy:
+        for fspath in paths:
+          proxy.text = fspath
+          with Pfx(fspath):
+            if fspath == '-':
+              warning(
+                  "ignoring name %r: standard input is only supported alone",
+                  fspath
+              )
+              xit = 1
+              continue
+            dirpath = dirname(fspath)
+            base = basename(fspath)
+            try:
+              newbase = fstags[fspath].format_as(
+                  name_format, error_sep='\n  ', direct=False
+              )
+            except FormatAsError as e:
+              error(str(e))
+              xit = 1
+              continue
+            newbase = newbase.replace(os.sep, ':')
+            if base == newbase:
+              continue
+            dstpath = joinpath(dirpath, newbase)
+            verbose("-> %s", dstpath)
+            if not existspath(fspath):
+              warning("skipping name %r: does not exist", fspath)
+              xit = 1
+              continue
+            try:
+              options.fstags.move(fspath, dstpath, crop_ok=True)
+            except OSError as e:
+              error("-> %s: %s", dstpath, e)
+              xit = 1
     return xit
 
   def cmd_scrub(self, argv):
@@ -1358,7 +1362,7 @@ class FSTags(MultiOpenMixin):
         with Pfx(path):
           self[path].import_xattrs()
 
-  def find(self, path, tag_tests, use_direct_tags=False, U=None):
+  def find(self, path, tag_tests, use_direct_tags=False):
     ''' Walk the file tree from `path`
         searching for files matching the supplied `tag_tests`.
         Yield the matching file paths.
@@ -1371,7 +1375,7 @@ class FSTags(MultiOpenMixin):
           Default: `False`
     '''
     assert isinstance(tag_tests, (tuple, list))
-    for _, fspath in rpaths(path, yield_dirs=use_direct_tags, U=U):
+    for _, fspath in rpaths(path, yield_dirs=use_direct_tags):
       if self.test(fspath, tag_tests, use_direct_tags=use_direct_tags):
         yield fspath
 
@@ -1933,8 +1937,8 @@ class CascadeRule:
     return None
 
 @pfx
-def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
-  ''' Recurse over `path`, yielding `(is_dir,subpath)`
+def rpaths(path, *, yield_dirs=False, name_selector=None):
+  ''' Generator to recurse over `path`, yielding `(is_dir,subpath)`
       for all selected subpaths.
   '''
   if name_selector is None:
@@ -1942,38 +1946,33 @@ def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
-    if U:
-      U.out(dirpath)
-    with Pfx(dirpath):
-      with Pfx("scandir"):
-        try:
-          dirents = sorted(os.scandir(dirpath), key=lambda entry: entry.name)
-        except NotADirectoryError:
-          yield False, dirpath
-          continue
-        except (FileNotFoundError, PermissionError) as e:
-          warning("%s", e)
-          continue
-      for entry in dirents:
-        name = entry.name
-        with Pfx(name):
-          if not name_selector(name):
-            continue
-          entrypath = entry.path
-          if entry.is_dir(follow_symlinks=False):
-            if yield_dirs:
-              yield True, entrypath
-            pending.append(entrypath)
-          else:
-            yield False, entrypath
+    try:
+      with Pfx("scandir(%r)", dirpath):
+        dirents = sorted(os.scandir(dirpath), key=lambda entry: entry.name)
+    except NotADirectoryError:
+      yield False, dirpath
+      continue
+    except (FileNotFoundError, PermissionError) as e:
+      warning("%s", e)
+      continue
+    for entry in dirents:
+      name = entry.name
+      if not name_selector(name):
+        continue
+      entrypath = entry.path
+      if entry.is_dir(follow_symlinks=False):
+        if yield_dirs:
+          yield True, entrypath
+        pending.append(entrypath)
+      else:
+        yield False, entrypath
 
-def rfilepaths(path, name_selector=None, U=None):
+def rfilepaths(path, name_selector=None):
   ''' Generator yielding pathnames of files found under `path`.
   '''
   return (
       subpath for is_dir, subpath in
-      rpaths(path, yield_dirs=False, name_selector=name_selector, U=U)
-      if not is_dir
+      rpaths(path, yield_dirs=False, name_selector=name_selector) if not is_dir
   )
 
 def rsync_patterns(paths, top_path):

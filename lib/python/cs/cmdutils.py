@@ -36,7 +36,7 @@ from cs.py.doc import obj_docstring
 from cs.resources import RunState, uses_runstate
 from cs.upd import Upd
 
-__version__ = '20230211-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -51,6 +51,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.doc',
         'cs.resources',
+        'cs.upd',
     ],
 }
 
@@ -1196,6 +1197,7 @@ class BaseCommand:
       local.update(options.__dict__)
       local.update(argv=argv, cmd=self.cmd, options=options, self=self)
     try:
+      # pylint: disable=import-outside-toplevel
       from bpython import embed
     except ImportError:
       return interact(

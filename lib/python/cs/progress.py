@@ -17,6 +17,9 @@ import sys
 from threading import RLock
 import time
 from typing import Optional
+
+from typeguard import typechecked
+
 from cs.deco import decorator
 from cs.logutils import debug, exception
 from cs.py.func import funcname
@@ -31,9 +34,7 @@ from cs.units import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-from typeguard import typechecked
-
-__version__ = '20221207-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -413,6 +414,7 @@ class BaseProgress(object):
     if upd is None:
       upd = Upd()
     if statusfunc is None:
+      # pylint: disable=unnecessary-lambda-assignment
       statusfunc = lambda P, label, width: P.status(
           label, width, window=window
       )
@@ -546,6 +548,7 @@ class BaseProgress(object):
       old_update_period = proxy.update_period
       proxy.update_period = update_period
     if statusfunc is None:
+      # pylint: disable=unnecessary-lambda-assignment
       statusfunc = lambda P, label, width: P.status(
           label, width, window=window
       )
@@ -558,6 +561,7 @@ class BaseProgress(object):
       nonlocal self, proxy, statusfunc, label, width
       nonlocal iteration, last_update_iteration, last_update_pos, last_update_time
       now = time.time()
+      # pylint: disable=too-many-boolean-expressions
       if (force or iteration - last_update_iteration >= update_frequency
           or (update_min_size is not None
               and self.position - last_update_pos >= update_min_size)
@@ -1120,7 +1124,7 @@ def auto_progressbar(func, label=None, report_print=False):
 def selftest(argv):
   ''' Exercise some of the functionality.
   '''
-  with open(__file__) as f:
+  with open(__file__, encoding='utf8') as f:
     lines = f.readlines()
   lines += lines
   for _ in progressbar(lines, "lines"):
@@ -1136,7 +1140,7 @@ def selftest(argv):
       ##total=len(lines),
       units_scale=DECIMAL_SCALE,
   )
-  with open(__file__) as f:
+  with open(__file__, encoding='utf8') as f:
     for _ in P.iterbar(f):
       time.sleep(0.005)
   from cs.debug import selftest as runtests  # pylint: disable=import-outside-toplevel

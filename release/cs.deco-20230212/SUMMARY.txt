@@ -1,0 +1,1 @@
+New Promotable abstract class mixin, which requires the creation of a .promote(cls,obj)->cls class method.

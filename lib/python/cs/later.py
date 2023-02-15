@@ -37,7 +37,7 @@ from heapq import heappush, heappop
 from itertools import zip_longest
 import logging
 import sys
-from threading import Lock, Event, Thread as builtin_Thread
+from threading import Lock, Event
 import time
 from typing import Callable, Iterable, Optional
 
@@ -55,7 +55,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import State as ThreadState, HasThreadState
 
-__version__ = '20230125-post'
+__version__ = '20230212.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
