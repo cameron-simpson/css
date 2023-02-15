@@ -781,24 +781,24 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       return TagsOntologyCommand(argv, **options.__dict__).run()
 
   def cmd_rename(self, argv):
-    ''' Usage: {cmd} -n newbasename_format paths...
+    ''' Usage: {cmd} -o basename_format paths...
           Rename paths according to a format string.
-          -n newbasename_format
-              Use newbasename_format as a Python format string to
+          -o basename_format
+              Use basename_format as a Python format string to
               compute the new basename for each path.
     '''
     xit = 0
     options = self.options
     fstags = options.fstags
     name_format = None
-    opts, argv = getopt(argv, 'n:')
+    opts, argv = getopt(argv, 'o:')
     for subopt, value in opts:
-      if subopt == '-n':
+      if subopt == '-o':
         name_format = fstags.resolve_format_string(value)
       else:
         raise RuntimeError("unhandled subopt: %r" % (subopt,))
     if name_format is None:
-      raise GetoptError("missing -n option")
+      raise GetoptError("missing -o option")
     if not argv:
       raise GetoptError("missing paths")
     if len(argv) == 1 and argv[0] == '-':
