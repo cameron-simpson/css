@@ -206,8 +206,8 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     self.columns = columns
     self._cursor_visible = True
     self._current_slot = None
-    self._reset()
     self._lock = RLock()
+    self._reset()
 
   def _reset(self):
     ''' Set up the initial internal empty state.
