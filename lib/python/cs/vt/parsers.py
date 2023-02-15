@@ -59,8 +59,6 @@ def scan_text(bfr, prefixes=None):
         yield next_offset
       offset += len(line)
 
-scan_text_from_chunks = chunky(scan_text)
-
 def report_offsets(bfr, run_parser):
   ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
 
@@ -94,8 +92,6 @@ def report_offsets(bfr, run_parser):
     T = PfxThread(target=thread_body)
     T.start()
     return offsetQ
-
-report_offsets_from_chunks = chunky(report_offsets)
 
 def scan_vtd(bfr):
   ''' Scan a datafile from `bfr` and yield chunk start offsets.
