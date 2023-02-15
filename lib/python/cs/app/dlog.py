@@ -26,7 +26,7 @@ from cs.fstags import FSTags
 from cs.lex import get_dotted_identifier
 from cs.logutils import debug
 from cs.pfx import Pfx, pfx, pfx_call
-from cs.sqltags import SQLTags
+from cs.sqltags import SQLTags, DBURL_DEFAULT
 from cs.tagset import Tag, TagSet
 
 def main(argv=None):
@@ -34,7 +34,7 @@ def main(argv=None):
   '''
   return DLogCommand(argv).run()
 
-DEFAULT_DBPATH = '~/var/sqltags.sqlite'
+DEFAULT_DBPATH = DBURL_DEFAULT
 DEFAULT_LOGPATH = '~/var/log/dlog-quick'
 
 class DLogCommand(BaseCommand):

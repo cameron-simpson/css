@@ -11,19 +11,22 @@ from typeguard import typechecked
 
 from cs.logutils import warning
 from cs.pfx import Pfx
-from cs.resources import RunState
-from cs.upd import state as upd_state
+from cs.resources import RunState, uses_runstate
+from cs.upd import Upd, uses_upd
 
 from . import defaults
 from .dir import Dir, FileDirent
 from .paths import DirLike
 
+@uses_upd
+@uses_runstate
 @typechecked
 def merge(
     target_root: DirLike,
     source_root: DirLike,
     *,
     runstate: RunState,
+    upd: Upd,
 ):
   ''' Merge contents of the DirLike `source_root`
       into the DirLike `target_root`.
@@ -32,6 +35,7 @@ def merge(
       * `target_root`: a `DirLike` to receive contents
       * `source_root`: a `DirLike` from which to obtain contents
       * `runstate`: a `RunState` to support cancellation
+      * `upd`: an `Upd` for displaying progress
 
       TODO: apply .stat results to merge targets.
       TODO: many modes for conflict resolution.
@@ -42,7 +46,7 @@ def merge(
   if not target_root.exists():
     target_root.create()
   if defaults.show_progress:
-    proxy_cmgr = upd_state.upd.insert(1)
+    proxy_cmgr = upd.insert(1)
   else:
     proxy_cmgr = nullcontext()
   with proxy_cmgr as proxy:

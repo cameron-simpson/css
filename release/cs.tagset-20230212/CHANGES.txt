@@ -1,0 +1,6 @@
+lib/python/cs/tagset.py: merge default ==> tagger
+lib/python/cs/tagset.py: merge vt ==> tagger
+lib/python/cs/tagset.py: merge fstags ==> tagger
+lib/python/cs/tagset.py: cs.tagset: remove debug
+lib/python/cs/tagset.py: cs.tagset: mark TagSetCriterion as Promotable
+lib/python/cs/tagset.py: cs.tagset: clean some lint

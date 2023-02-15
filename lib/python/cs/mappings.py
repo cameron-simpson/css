@@ -1370,6 +1370,7 @@ class RemappedMappingProxy:
   def key(self, subk):
     ''' Return the external key for `subk`.
     '''
+    X("%s.key(subk=%r)...", self.__class__.__name__, subk)
     try:
       k = self._mapped_subkeys[subk]
     except KeyError:
@@ -1434,15 +1435,18 @@ class PrefixedMappingProxy(RemappedMappingProxy):
   def prefixify_subkey(subk, prefix):
     ''' Return the external (prefixed) key from a subkey `subk`.
     '''
-    assert not subk.startswith(prefix)
+    assert not subk.startswith(prefix), (
+        "subkey %r already starts with the prefix %r" % (subk, prefix)
+    )
     return prefix + subk
 
   @staticmethod
   def unprefixify_key(key, prefix):
     ''' Return the internal subkey (unprefixed) from the external `key`.
     '''
-    assert key.startswith(prefix), \
+    assert key.startswith(prefix), (
         "key:%r does not start with prefix:%r" % (key, prefix)
+    )
     return cutprefix(key, prefix)
 
   # pylint: disable=arguments-differ

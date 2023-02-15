@@ -1643,6 +1643,8 @@ class Module:
     if M is None:
       problems.append("module import fails")
       return problems
+    # TODO: import_names to be a set
+    # TODO: scan all the .py files in a package
     import_names = []
     for import_name in direct_imports(M.__file__, self.name):
       if self.modules[import_name].isstdlib():
