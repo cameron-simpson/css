@@ -1106,7 +1106,14 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             "not an SQTCriterion: %s:%r" %
             (type(criterion).__name__, criterion)
         )
-        if isinstance(criterion, TagBasedTest):
+        if isinstance(criterion, SQTCriterion):
+          try:
+            sqlp = criterion.sql_parameters(self)
+          except ValueError:
+            warning("SKIP, cannot compute sql_parameters")
+            continue
+          sqlps.append(sqlp)
+        elif isinstance(criterion, TagBasedTest):
           # we know how to treat these efficiently
           # by mergeing conditions on the same tag name
           tag = criterion.tag
