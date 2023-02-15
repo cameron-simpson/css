@@ -79,6 +79,9 @@ class _mom_state(object):
     self._finalise_later = False
     self._finalise = None
 
+  def __repr__(self):
+    return "%s:%r" % (self.__class__.__name__, self.__dict__)
+
 ## debug: TrackedClassMixin
 class MultiOpenMixin(ContextManagerMixin):
   ''' A multithread safe mixin to count open and close calls,
