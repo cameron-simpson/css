@@ -213,10 +213,12 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     ''' Set up the initial internal empty state.
         This does *not* do anything with the display.
     '''
-    self._slot_text = []
-    self._current_slot = None
+    self._current_slot = 0
     self._above = None
-    self._proxies = []
+    self._slot_text = ['']
+    proxy0 = UpdProxy(index=None, upd=self)
+    self._proxies = [proxy0]
+    proxy0.index = 0
 
   def __str__(self):
     return "%s(backend=%s)" % (
