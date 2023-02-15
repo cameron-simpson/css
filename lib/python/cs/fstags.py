@@ -788,6 +788,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
               compute the new basename for each path.
     '''
     xit = 0
+    cmd = self.cmd
     options = self.options
     fstags = options.fstags
     name_format = None
