@@ -490,9 +490,11 @@ class CornuCopyBuffer(Promotable):
     ''' Push the chunk `bs` onto the front of the buffered data.
         Rewinds the logical `.offset` by the length of `bs`.
     '''
-    self.bufs.insert(0, bs)
-    self.buflen += len(bs)
-    self.offset -= len(bs)
+    blen = len(bs)
+    if blen > 0:
+      self.bufs.insert(0, bs)
+      self.buflen += blen
+      self.offset -= blen
 
   @property
   def end_offset(self):
