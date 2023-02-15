@@ -221,9 +221,8 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     proxy0.index = 0
 
   def __str__(self):
-    return "%s(backend=%s)" % (
-        type(self).__name__, getattr(self, '_backend', None)
-    )
+    backend = self._disabled_backend if self._disabled else self._backend
+    return "%s(backend=%s)" % (self.__class__.__name__, backend)
 
   ############################################################
   # Context manager methods.
