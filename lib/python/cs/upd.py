@@ -153,6 +153,8 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
       return
     if backend is None:
       backend = sys.stderr
+    self._backend = backend
+    assert self._backend is not None
     # test isatty and the associated file descriptor
     isatty = backend.isatty()
     if isatty:
@@ -174,7 +176,6 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
         disabled = not backend.isatty()
       except AttributeError:
         disabled = True
-    self._backend = backend
     self._backend_isatty = isatty
     self._backend_fd = backend_fd
     # prepare the terminfo capability mapping, if any
