@@ -14,7 +14,7 @@ from os.path import basename, splitext
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.logutils import warning, exception
-from cs.pfx import Pfx, PfxThread
+from cs.pfx import Pfx, PfxThread, pfx
 from cs.queues import IterableQueue
 
 from .datafile import DataRecord
@@ -31,7 +31,8 @@ def linesof(bfr: CornuCopyBuffer):
       break
     yield bs
 
-def scan_text(bfr, prefixes=None):
+@promote
+def scan_text(bfr: CornuCopyBuffer, prefixes=None):
   ''' Scan textual data, yielding offsets of lines starting with
       useful prefixes, such as function definitions.
   '''
@@ -59,8 +60,10 @@ def scan_text(bfr, prefixes=None):
         yield next_offset
       offset += len(line)
 
-def report_offsets(bfr, run_parser):
-  ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
+@promote
+def report_offsets(bfr: CornuCopyBuffer, run_parser):
+  ''' Dispatch a parser in a separate `Thread`, return an `IterableQueue`
+      yielding offsets.
 
       Parameters:
       * `bfr`: a `CornuCopyBuffer` providing data to parse
@@ -80,7 +83,7 @@ def report_offsets(bfr, run_parser):
     bfr.copy_offsets = offsetQ.put
 
     def thread_body():
-      with Pfx("parser-thread"):
+      with Pfx("parser-thread(%s)", run_parser):
         try:
           run_parser(bfr)
         except Exception as e:
@@ -93,44 +96,46 @@ def report_offsets(bfr, run_parser):
     T.start()
     return offsetQ
 
-def scan_vtd(bfr):
+@pfx
+@promote
+def scan_vtd(bfr: CornuCopyBuffer):
   ''' Scan a datafile from `bfr` and yield chunk start offsets.
   '''
-  with Pfx("scan_vtd"):
 
-    def run_parser(bfr):
-      for offset, _, _ in DataRecord.scan_with_offsets(bfr):
-        bfr.report_offset(offset)
+  def run_parser(bfr):
+    for offset, _, _ in DataRecord.scan_with_offsets(bfr):
+      bfr.report_offset(offset)
 
-    return report_offsets(bfr, run_parser)
+  return report_offsets(bfr, run_parser)
 
-def scan_mp3(bfr):
+@pfx
+@promote
+def scan_mp3(bfr: CornuCopyBuffer):
   ''' Scan MP3 data from `bfr` and yield frame start offsets.
   '''
-  from cs.mp3 import MP3Frame
-  for frame in MP3Frame.scan(bfr):
+  from cs.mp3 import MP3Frame  # pylint: disable=import-outside-toplevel
+  for _ in MP3Frame.scan(bfr):
     yield bfr.offset
 
-def scan_mp4(bfr):
-  ''' Scan ISO14496 input and yield Box start offsets.
+@pfx
+@promote
+def scan_mp4(bfr: CornuCopyBuffer):
+  ''' Scan ISO14496 (eg MP4/MOV) input and yield `Box` start offsets.
 
-      This is more complex than the MP3 scanner because Boxes nest
+      This is more complex than the MP3 scanner because `Box`es nest
       in the MP4 structure.
   '''
-  from cs.iso14496 import Box
-  with Pfx("parse_mp4"):
+  from cs.iso14496 import Box  # pylint: disable=import-outside-toplevel
 
-    def run_parser(bfr):
-      for _ in Box.scan(bfr):
-        pass
+  def run_parser(bfr):
+    for _ in Box.scan(bfr):
+      pass
 
-    return report_offsets(bfr, run_parser)
+  return report_offsets(bfr, run_parser)
 
-parse_mp4_from_chunks = chunky(scan_mp4)
-
-def scanner_from_filename(filename):
-  ''' Choose a scanner based on a filename.
-      Returns None if these is no special scanner.
+def scanner_from_filename(filename: str):
+  ''' Choose a scanner based on a filename's extension.
+      Returns `None` if these is no special scanner.
   '''
   _, ext = splitext(basename(filename))
   if ext:
