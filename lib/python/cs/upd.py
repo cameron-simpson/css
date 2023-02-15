@@ -746,10 +746,11 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     ''' Insert a new status line at `index`.
         Return the `UpdProxy` for the new status line.
     '''
+    assert index is not None
     if proxy:
       if proxy.upd is not None:
         raise ValueError(
-            "proxy %s already associated with an Upd: %s" % (proxy, self)
+            "proxy %s already associated with an Upd: %s" % (proxy, proxy.upd)
         )
       if proxy_kw:
         raise ValueError("cannot supply both a proxy and **proxy_kw")
@@ -1106,7 +1107,7 @@ class UpdProxy(object):
   def __str__(self):
     return (
         "%s(upd=%s,index=%s:%r)" %
-        (type(self).__name__, self.upd, self.index, self.text)
+        (self.__class__.__name__, self.upd, self.index, self.text)
     )
 
   def __call__(self, msg, *a):
@@ -1283,15 +1284,15 @@ def demo():
   from time import sleep  # pylint: disable=import-outside-toplevel
   U = Upd()
   p = U.proxy(0)
-  for n in range(20):
+  for n in range(10):
     p(str(n))
     sleep(0.1)
   # proxy line above
   p2 = U.insert(1)
   p2.prefix = 'above: '
-  for n in range(20):
+  for n in range(10):
     p(str(n))
-    p2(str(n))
+    p2("2:" + str(n))
     sleep(0.1)
 
 if __name__ == '__main__':
