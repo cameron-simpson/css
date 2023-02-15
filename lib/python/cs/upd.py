@@ -450,12 +450,12 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     ''' Compute the text sequences required to move our cursor
         to the end of `to_slot` from `from_slot`.
     '''
-    assert from_slot >= 0
-    assert from_slot < len(self)
-    assert to_slot >= 0
-    assert to_slot < len(self)
     if from_slot is None:
       from_slot = self._current_slot
+    assert from_slot >= 0
+    assert from_slot == 0 or from_slot < len(self)
+    assert to_slot >= 0
+    assert to_slot == 0 or to_slot < len(self)
     movetxts = []
     if to_slot != from_slot:
       # move cursor to target slot
