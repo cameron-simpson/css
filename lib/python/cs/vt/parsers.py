@@ -10,34 +10,26 @@
 
 from functools import partial
 from os.path import basename, splitext
-from cs.buffer import chunky
+
+from cs.buffer import CornuCopyBuffer
+from cs.deco import promote
 from cs.logutils import warning, exception
 from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
+
 from .datafile import DataRecord
 
-def linesof(chunks):
-  ''' Process binary chunks, yield binary lines ending in '\n'.
+@promote
+def linesof(bfr: CornuCopyBuffer):
+  ''' Yield binary "lines" from `bfr`, where a line is defined by
+      its ending `b'\n'` delimiter.
       The final line might not have a trailing newline.
   '''
-  pending = []
-  for chunk in chunks:
-    # get a memoryview so that we can cheaply queue bits of it
-    mv_chunk = memoryview(chunk)
-    upto = 0
-    # but scan the chunk, because memoryviews do not have .find
-    nlpos = chunk.find(b'\n')
-    while nlpos >= 0:
-      pending.append(mv_chunk[upto:nlpos + 1])
-      yield b''.join(pending)
-      pending = []
-      upto = nlpos + 1
-      nlpos = chunk.find(b'\n', upto)
-    # stash incomplete line in pending
-    if upto < len(chunk):
-      pending.append(mv_chunk[upto:])
-  if pending:
-    yield b''.join(pending)
+  while True:
+    bs = bfr.readline()
+    if len(bs) == 0:
+      break
+    yield bs
 
 def scan_text(bfr, prefixes=None):
   ''' Scan textual data, yielding offsets of lines starting with
