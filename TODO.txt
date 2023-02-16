@@ -1,3 +1,4 @@
+Pfx: reimplement as a linked list, use HasThreadState
 CornuCopyBuffer: improve docstring - replace references to .buf etc
 cs.cmdutils:BaseCommand - help should include the top level usage as well, currently omitted
 frename needs to be a mode of fstags to move the tags
