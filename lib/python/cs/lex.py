@@ -33,6 +33,7 @@ from textwrap import dedent
 from threading import Lock
 
 from dateutil.tz import tzlocal
+from icontract import require
 from typeguard import typechecked
 
 from cs.dateutils import unixtime2datetime, UTC
@@ -58,6 +59,7 @@ DISTINFO = {
         'cs.py.func',
         'cs.seq>=20200914',
         'dateutil',
+        'icontract',
         'typeguard',
     ],
 }
@@ -487,6 +489,62 @@ def strip_prefix_n(s, prefix, n=None):
       return s0
     s = s[pos:]
   return s
+
+@require(lambda offset: offset >= 0)
+def get_prefix_n(s, prefix, n=None, *, offset=0):
+  ''' Strip a leading `prefix` and numeric value `n` from the string `s`
+      starting at `offset` (default `0`).
+      Return the matched prefix, the numeric value and the new offset.
+      Returns `(None,None,offset)` on no match.
+
+      Parameters:
+      * `s`: the string to parse
+      * `prefix`: the prefix string which must appear at `offset`
+        or an object with a `match(str,offset)` method
+        such as an `re.Pattern` regexp instance
+      * `n`: optional integer value;
+        if omitted any value will be accepted, otherwise the numeric
+        part must match `n`
+
+      If `prefix` is a `str`, the "matched prefix" return value is `prefix`.
+      Otherwise the "matched prefix" return value is the result of
+      the `prefix.match(s,offset)` call. The result must also support
+      a `.end()` method returning the offset in `s` beyond the match,
+      used to locate the following numeric portion.
+
+      Examples:
+
+         >>> import re
+         >>> get_prefix_n('s03e01--', 's')
+         ('s', 3, 3)
+         >>> get_prefix_n('s03e01--', 's', 3)
+         ('s', 3, 3)
+         >>> get_prefix_n('s03e01--', 's', 4)
+         (None, None, 0)
+         >>> get_prefix_n('s03e01--', re.compile('[es]',re.I))
+         (<re.Match object; span=(0, 1), match='s'>, 3, 3)
+         >>> get_prefix_n('s03e01--', re.compile('[es]',re.I), offset=3)
+         (<re.Match object; span=(3, 4), match='e'>, 1, 6)
+  '''
+  no_match = None, None, offset
+  if isinstance(prefix, str):
+    if s.startswith(prefix, offset):
+      matched = prefix
+      offset += len(prefix)
+    else:
+      # no match, return unchanged
+      return no_match
+  else:
+    matched = pfx_call(prefix.match, s, offset)
+    if not matched:
+      return no_match
+    offset = matched.end()
+  if offset >= len(s) or not s[offset].isdigit():
+    return no_match
+  gn, offset = get_decimal_value(s, offset)
+  if n is not None and gn != n:
+    return no_match
+  return matched, gn, offset
 
 # pylint: disable=redefined-outer-name
 def get_nonwhite(s, offset=0):
