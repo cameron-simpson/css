@@ -34,7 +34,7 @@ from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
 from cs.fileutils import atomic_filename
-from cs.lex import has_format_attributes, format_attribute
+from cs.lex import has_format_attributes, format_attribute, get_prefix_n
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
@@ -833,6 +833,19 @@ class PlayOnAPI(HTTPServiceAPI):
                   else:
                     entry[field] = value2
           recording = self[entry_id]
+          # sometimes the name is spuriously prefixed with the seaon and episode
+          playon_name = entry['Name']
+          season = entry.get('Season')
+          spfx, sn, offset = get_prefix_n(playon_name, 's', season)
+          if spfx:
+            episode = entry.get('Episode')
+            epfx, en, offset = get_prefix_n(
+                playon_name, 'e', episode, offset=offset
+            )
+            if epfx:
+              entry['Season'] = sn
+              entry['Episode'] = en
+              entry['Name'] = playon_name[offset:].lstrip(' -')
           recording.update(entry, prefix='playon')
           recording.update(dict(last_updated=now))
           recordings.add(recording)
