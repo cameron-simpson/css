@@ -101,7 +101,7 @@ cs.timeseries ok_revision=cd00aff2217b6f85c07f1eb19116933a77ec01e8 pypi.release=
 cs.tty
 cs.units
 cs.upd ok_revision="79e6360644ba4ae2af0b1a7091749ccf2e6e086b" pypi.release="20230217" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"]}
-cs.x ok_revision=ea9636194c0a7f6de0eab9aa10aa47fd67a1f9d1
+cs.x ok_revision=ea9636194c0a7f6de0eab9aa10aa47fd67a1f9d1 pypi.release="20230218"
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
 dateutil
 icontract
