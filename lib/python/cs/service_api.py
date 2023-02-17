@@ -92,9 +92,9 @@ class ServiceAPI(MultiOpenMixin):
     '''
     return None
 
-  @property
-  def login_state(self, do_refresh=False) -> SQLTagSet:
-    ''' The login state, a mapping. Performs a login if necessary.
+  def get_login_state(self, do_refresh=False) -> SQLTagSet:
+    ''' The login state, a mapping. Performs a login if necessary
+        or if `do_refresh` is true (default `False`).
     '''
     with self._lock:
       state = self.sqltags['login.state']
@@ -105,6 +105,12 @@ class ServiceAPI(MultiOpenMixin):
           if k not in ('id', 'name'):
             state[k] = v
     return state
+
+  @property
+  def login_state(self) -> SQLTagSet:
+    ''' The login state, a mapping. Performs a login if necessary.
+    '''
+    return self.get_login_state()
 
   def available(self) -> Set[SQLTagSet]:
     ''' Return a set of the `SQLTagSet` instances representing available
