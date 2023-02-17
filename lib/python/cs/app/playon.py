@@ -86,7 +86,7 @@ DBURL_DEFAULT = '~/var/playon.sqlite'
 
 FILENAME_FORMAT_ENVVAR = 'PLAYON_FILENAME_FORMAT'
 DEFAULT_FILENAME_FORMAT = (
-    '{playon.Series}--{playon.Name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
+    '{series_prefix}{playon.Name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
 # download parallelism
@@ -479,6 +479,26 @@ class Recording(SQLTagSet):
       if getattr(self, f'is_{status_label}')():
         return status_label
     raise RuntimeError("cannot infer a status string: %s" % (self,))
+
+  @format_attribute
+  def series_prefix(self):
+    ''' Return a series prefix for recording containing the series name
+        and season and episode, or `''`.
+    '''
+    sep = '--'
+    parts = []
+    if self.playon.Series:
+      parts.append(self.playon.Series)
+    se_parts = []
+    if self.playon.Season is not None:
+      se_parts.append(f's{self.playon.Season:02d}')
+    if self.playon.Episode:
+      se_parts.append(f'e{self.playon.Episode:02d}')
+    if se_parts:
+      parts.append(''.join(se_parts))
+    if not parts:
+      return ''
+    return sep.join(parts) + sep
 
   @format_attribute
   def is_available(self):
