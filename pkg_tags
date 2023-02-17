@@ -53,7 +53,7 @@ cs.iso14496 pypi.release="20230212" ok_revision=c04ebfa44a5019270d73a049f597c84a
 cs.iso8601
 cs.jdson
 cs.later pypi.release="20230212.1" ok_revision=f03791f89149d43df20cb80dea08dfa72aaa3fcb
-cs.lex pypi.release="20230217" ok_revision="04385a16f5c1b55aa91699ffb13befee7e2c3632" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"]}
+cs.lex pypi.release="20230217" ok_revision="30a4a609e09e636386fa404bd5c422176be42dd2" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"]}
 cs.loguitls
 cs.logutils pypi.release="20230212" ok_revision="770c9ea67c7a53169da1cda49bbe94eb83530f5d" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
