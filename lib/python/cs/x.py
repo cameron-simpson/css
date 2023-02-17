@@ -42,6 +42,7 @@ from __future__ import print_function
 from io import UnsupportedOperation
 import os
 import os.path
+import stat
 import sys
 from cs.ansi_colour import colourise
 
@@ -69,6 +70,7 @@ X_logger = None
 # colouring
 X_default_colour = os.environ.get('CS_X_COLOUR')
 
+# pylint: disable=too-many-branches
 def X(msg, *args, **kw):
   ''' Unconditionally write the message `msg`.
 
@@ -109,13 +111,21 @@ def X(msg, *args, **kw):
     if X_via_tty:
       # NB: ignores any kwargs
       try:
+        # Linux+Python makes it insanely difficult to open /dev/tty
+        # for append or even read/write/no-truncate, thus this
+        # elaborate fallback, trying write+truncate only if /dev/tty
+        # is a character device.
         try:
           f = open(X_via_tty, 'a')
-        except (OSError, UnsupportedOperation) as e:
-          # sometimes you cannot append to a tty (Linux?)
-          # so open for readwrite and seek to the end
-          # (may also fail on a tty, so ignore the seek error)
-          f = open(X_via_tty, 'r+')
+        except (OSError, UnsupportedOperation):
+          try:
+            f = open(X_via_tty, 'r+')
+          except (OSError, UnsupportedOperation):
+            S = os.stat(X_via_tty)
+            if stat.S_ISCHR(S.st_mode):
+              f = open(X_via_tty, 'w')
+            else:
+              raise
           try:
             f.seek(0, os.SEEK_END)
           except (OSError, UnsupportedOperation):
