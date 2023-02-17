@@ -43,7 +43,7 @@ cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20221118" ok_revision=be925b0bc6d06d74b397a1f63e76fe7b7a42367f features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
 cs.fs ok_revision="3ee8daf7c926c65fe1acbef903e8dd0adcd7be4b" pypi.release="20221221" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
 cs.fsm ok_revision=ef0fb0ddccdc43e16ca922726cbf2adfb7eebff4 pypi.release="20221118"
-cs.fstags pypi.release="20230212" ok_revision="9c120388f7e81d4b4e85be337feebc9311e809e8" features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"]}
+cs.fstags pypi.release="20230212" ok_revision="2e5cf35a95841b6b33b8cd7205306a58e0af60a8" features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"]}
 cs.gimmicks ok_revision=bb49d94c5e4045c59c5d618abc626d406eb26283 pypi.release="20230212" features={"20211208":["TimeoutError"],"20220429":["devnull"],"20230212":["gimmick_r","gimmick_s"]}
 cs.gvutils ok_revision=a2f35c4da8b7e797f4f62a274bf5e1ccb3b6d65d pypi.release="20221207" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"],"20221207":["gvsvg"]}
 cs.html pypi.release=20160828 ok_revision="23989d64974a81c6521174d3fe496bcfdd280d3f"
