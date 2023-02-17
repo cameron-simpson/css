@@ -106,6 +106,7 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.lex',
         'cs.obj>=20210122',
+        'cs.resources',
         'cs.threads',
         'cs.tty',
         'cs.units',
@@ -382,7 +383,6 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     with self._lock:
       for index in range(len(self._slot_text)):
         proxies[index].index = index
-
 
   def ti_str(self, ti_name):
     ''' Fetch the terminfo capability string named `ti_name`.
