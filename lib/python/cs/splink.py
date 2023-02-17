@@ -92,7 +92,7 @@ DISTINFO = {
         'cs.tagset',
         'cs.timeseries',
         'cs.upd',
-        'dateutil',
+        'python-dateutil',
         'typeguard',
     ],
     'entry_points': {

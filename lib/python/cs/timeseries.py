@@ -133,7 +133,7 @@ DISTINFO = {
         'cs.resources',
         'cs.result',
         'cs.upd',
-        'dateutil',
+        'python-dateutil',
         'icontract',
         'matplotlib',
         'numpy',

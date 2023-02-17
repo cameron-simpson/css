@@ -58,7 +58,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.func',
         'cs.seq>=20200914',
-        'dateutil',
+        'python-dateutil',
         'icontract',
         'typeguard',
     ],
