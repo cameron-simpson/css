@@ -72,6 +72,7 @@ DISTINFO = {
         'cs.progress',
         'cs.resources',
         'cs.result',
+        'cs.service_api',
         'cs.sqltags',
         'cs.threads',
         'cs.units',
