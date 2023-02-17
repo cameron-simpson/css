@@ -35,20 +35,16 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.cmdutils>=20210404',
         'cs.context',
         'cs.deco',
-        'cs.fileutils',
-        'cs.fs>=HasFSPath',
-        'cs.lex',
+        'cs.fstags',
         'cs.logutils',
         'cs.pfx',
         'cs.resources',
-        'cs.tagset>=TagSet_is_stale',
-        'cs.threads',
+        'cs.sqltags',
         'cs.upd',
         'icontract',
-        'typeguard',
+        'requests',
     ],
 }
 
