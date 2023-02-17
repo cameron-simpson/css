@@ -66,7 +66,7 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217'
+__version__ = '20230217-post'
 
 DISTINFO = {
     'keywords': ["python3"],
