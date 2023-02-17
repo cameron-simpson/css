@@ -26,7 +26,6 @@
 
 from abc import abstractmethod
 from builtins import id as builtin_id
-from code import interact
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
@@ -35,7 +34,7 @@ from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
 import operator
 import os
-from os.path import expanduser, exists as existspath, isabs as isabspath
+from os.path import expanduser, isabs as isabspath
 import re
 import sys
 from subprocess import run
@@ -62,8 +61,8 @@ from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import shortpath
-from cs.lex import FormatAsError, has_format_attributes, format_attribute, get_decimal_value, r
-from cs.logutils import error, warning, track, info, ifverbose
+from cs.lex import FormatAsError, has_format_attributes, get_decimal_value, r
+from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.sqlalchemy_utils import (
@@ -1173,6 +1172,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             try:
               op_func = op_map[criterion.comparison]
             except KeyError as e:
+              # pylint: disable=raise-missing-from
               raise TypeError(
                   "no implementation of op %r for %s=%s" %
                   (op, tag_name, r(tag_value))
