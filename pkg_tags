@@ -98,7 +98,7 @@ cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"2
 cs.threads ok_revision="1a7c0a36acf500424b8925d2ca49f3ff24b84841" pypi.release="20230212" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"]}
 cs.tty
 cs.units
-cs.upd ok_revision=a857ce65b02982ea881107b1dbdcf57ff1146d5a pypi.release="20230212" features={"20230212":["with_upd_proxy"]}
+cs.upd ok_revision="79e6360644ba4ae2af0b1a7091749ccf2e6e086b" pypi.release="20230212" features={"20230212":["with_upd_proxy"]}
 cs.x
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
 dateutil
