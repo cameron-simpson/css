@@ -181,13 +181,15 @@ class HTTPServiceAPI(ServiceAPI):
       rsp.raise_for_status()
     return rsp
 
-  def json(self, suburl, **kw):
+  def json(self, suburl, _response_encoding=None, **kw):
     ''' Request `suburl` from the service, by default using a `GET`.
         Return the result decoded as JSON.
 
         Parameters are as for `HTTPServiceAPI.suburl`.
     '''
     rsp = self.suburl(suburl, **kw)
+    if _response_encoding is not None:
+      rsp.encoding = _response_encoding
     try:
       return rsp.json()
     except JSONDecodeError as e:
