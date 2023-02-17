@@ -87,7 +87,7 @@ cs.result pypi.release="20230212" ok_revision=ed748fd9422b1fe93428cc3a27dc7bf90c
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e75882d2 featu
-cs.service_api
+cs.service_api ok_revision="610afeff2f297823181a9ec77242a21400dbd21c"
 cs.sh
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.sqlalchemy_utils ok_revision="8c6eb6904bd805ba7a3e51e0d94373d148e72496" pypi.release="20230212"
