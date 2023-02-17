@@ -92,9 +92,9 @@ class ServiceAPI(MultiOpenMixin):
     '''
     return None
 
-  @property
-  def login_state(self, do_refresh=False) -> SQLTagSet:
-    ''' The login state, a mapping. Performs a login if necessary.
+  def get_login_state(self, do_refresh=False) -> SQLTagSet:
+    ''' The login state, a mapping. Performs a login if necessary
+        or if `do_refresh` is true (default `False`).
     '''
     with self._lock:
       state = self.sqltags['login.state']
@@ -105,6 +105,12 @@ class ServiceAPI(MultiOpenMixin):
           if k not in ('id', 'name'):
             state[k] = v
     return state
+
+  @property
+  def login_state(self) -> SQLTagSet:
+    ''' The login state, a mapping. Performs a login if necessary.
+    '''
+    return self.get_login_state()
 
   def available(self) -> Set[SQLTagSet]:
     ''' Return a set of the `SQLTagSet` instances representing available
@@ -181,13 +187,15 @@ class HTTPServiceAPI(ServiceAPI):
       rsp.raise_for_status()
     return rsp
 
-  def json(self, suburl, **kw):
+  def json(self, suburl, _response_encoding=None, **kw):
     ''' Request `suburl` from the service, by default using a `GET`.
         Return the result decoded as JSON.
 
         Parameters are as for `HTTPServiceAPI.suburl`.
     '''
     rsp = self.suburl(suburl, **kw)
+    if _response_encoding is not None:
+      rsp.encoding = _response_encoding
     try:
       return rsp.json()
     except JSONDecodeError as e:
