@@ -31,6 +31,7 @@ from cs.upd import uses_upd
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
+        "Development Status :: 3 - Alpha",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
