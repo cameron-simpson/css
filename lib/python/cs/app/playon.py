@@ -38,7 +38,8 @@ from cs.lex import has_format_attributes, format_attribute, get_prefix_n
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
-from cs.result import bg as bg_result, report as report_results
+from cs.resources import RunState, uses_runstate
+from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
@@ -290,9 +291,16 @@ class PlayOnCommand(BaseCommand):
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
         recording = sqltags[dl_id]
-        if not R():
-          warning("FAILED download of %d", dl_id)
+        warning("RECORDING = %s", recording)
+        try:
+          dl = R()
+        except CancellationError as e:
+          warning("%s: download interrupted: %s", recording.nice_name(), e)
           xit = 1
+        else:
+          if not dl:
+            warning("FAILED download of %d", dl_id)
+            xit = 1
 
     return xit
 
@@ -922,8 +930,9 @@ class PlayOnAPI(HTTPServiceAPI):
 
   # pylint: disable=too-many-locals
   @pfx_method
+  @uses_runstate
   @typechecked
-  def download(self, download_id: int, filename=None):
+  def download(self, download_id: int, filename=None, *, runstate: RunState):
     ''' Download the file with `download_id` to `filename_basis`.
         Return the `TagSet` for the recording.
 
@@ -970,6 +979,8 @@ class PlayOnAPI(HTTPServiceAPI):
             itemlenfunc=len,
             report_print=True,
         ):
+          if runstate.cancelled:
+            raise CancellationError
           offset = 0
           length = len(chunk)
           while offset < length:
