@@ -291,7 +291,6 @@ class PlayOnCommand(BaseCommand):
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
         recording = sqltags[dl_id]
-        warning("RECORDING = %s", recording)
         try:
           dl = R()
         except CancellationError as e:
