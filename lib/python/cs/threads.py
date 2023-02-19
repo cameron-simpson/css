@@ -105,21 +105,20 @@ class HasThreadState(ContextManagerMixin):
   THREAD_STATE_ATTR = 'state'
 
   @classmethod
-  def default(cls, ifNone=None):
+  def default(cls, raise_on_None=False):
     ''' The default instance of this class from `cls.state.current`.
 
-        The optional `ifNone` parameter may be a callable to return
-        a default instance if `cls.state.current` is `None` or
-        missing. Otherwise this circumstance raises `RuntimeError`.
+        The optional `raise_on_None` parameter may be true
+        in which case a `RuntimeError` will be raised
+        if `cls.state.current` is `None` or missing.
     '''
     current = getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
     if current is None:
-      if ifNone is None:
+      if raise_on_None:
         raise RuntimeError(
-            "%s.default: %s.%s.current is missing/None" %
+            "%s.default: %s.%s.current is missing/None and ifNone is None" %
             (cls.__name__, cls.__name__, cls.THREAD_STATE_ATTR)
         )
-      current = ifNone()
     return current
 
   def __enter_exit__(self):
