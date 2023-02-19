@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+#
+
+''' Propagate the maximum modification time of entries in a directory
+    tree up to the root.
+    The motiviating use case is our PVR, which is configured to show
+    the most recent items at the top of the directory listing, and
+    this script causes new things low in the hierarchy to bump the times
+    of their ancestor directories.
+    - Cameron Simpson <cs@cskk.id.au> 18feb2023
+'''
+
+from collections import defaultdict
+from datetime import datetime
+import os
+from os.path import dirname, isdir as isdirpath
+import sys
+
+from cs.logutils import setup_logging, warning
+from cs.pfx import Pfx, pfx_call
+from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
+
+USAGE = r'''Usage: {cmd} dirpaths...
+  Propagate the maximum modification time of entries each directory
+  tree up to the root, recursively.'''
+
+# pylint: disable=too-many-branches
+@uses_upd
+def main(argv=None, *, upd: Upd):
+  ''' maximise-mtimes command line implementation.
+  '''
+  if argv is None:
+    argv = list(sys.argv)
+  cmd = argv.pop(0)
+  usage = USAGE.format(cmd=cmd)
+  setup_logging(cmd)
+  doit = True
+  badopts = False
+  if argv and argv[0] == '-n':
+    doit = False
+    argv.pop(0)
+  if not argv:
+    warning("missing dirpaths")
+    badopts = True
+  else:
+    for dirpath in argv:
+      with Pfx(dirpath):
+        if not isdirpath(dirpath):
+          warning("not a directory")
+          badopts = True
+  if badopts:
+    print(usage, file=sys.stderr, upd=upd)
+    return 2
+  proxy = upd.proxy(0)
+  proxy.prefix = f'{cmd}: '
+  dirpath_maxmtimes = defaultdict(int)
+  dirpaths = list(reversed(argv))
+  while dirpaths:
+    dirpath = dirpaths.pop()
+    proxy.text = dirpath
+    S = pfx_call(os.stat, dirpath)
+    if dirpath in dirpath_maxmtimes:
+      # we've seen this - apply the max accrued mtime
+      mtime = dirpath_maxmtimes[dirpath]
+      if mtime > S.st_mtime:
+        print(
+            "%s: mtime => %s" % (dirpath, datetime.fromtimestamp(mtime)),
+            upd=upd
+        )
+        if doit:
+          pfx_call(os.utime, dirpath, (S.st_atime, mtime))
+      # advance the mtime of the parent
+      updirpath = dirname(dirpath)
+      dirpath_maxmtimes[updirpath] = max(
+          (dirpath_maxmtimes[updirpath], S.st_mtime)
+      )
+    else:
+      # new dirpath - note its mtime, queue it for a revisit
+      # queue its subdirectories
+      # stat its files
+      dirpath_maxmtimes[dirpath] = S.st_mtime
+      dirpaths.append(dirpath)
+      for entry in pfx_call(os.scandir, dirpath):
+        if entry.is_dir():
+          dirpaths.append(entry.path)
+        else:
+          try:
+            S = entry.stat()
+          except FileNotFoundError as e:
+            warning("skip %s: stat: %s", entry.path, e)
+          except OSError as e:
+            warning("stat(%s): %s", entry.path, e)
+            return 1
+          dirpath_maxmtimes[dirpath] = max(
+              (dirpath_maxmtimes[dirpath], S.st_mtime)
+          )
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

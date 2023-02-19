@@ -91,7 +91,7 @@ except ImportError as curses_e:
   warning("cannot import curses: %s", curses_e)
   curses = None
 
-__version__ = '20230212-post'
+__version__ = '20230217-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -105,6 +105,7 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.lex',
         'cs.obj>=20210122',
+        'cs.resources',
         'cs.threads',
         'cs.tty',
         'cs.units',
@@ -381,7 +382,6 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     with self._lock:
       for index in range(len(self._slot_text)):
         proxies[index].index = index
-
 
   def ti_str(self, ti_name):
     ''' Fetch the terminfo capability string named `ti_name`.

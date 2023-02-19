@@ -103,7 +103,7 @@ from cs.resources import MultiOpenMixin
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220918-post'
+__version__ = '20230217-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -133,7 +133,7 @@ DISTINFO = {
         'cs.resources',
         'cs.result',
         'cs.upd',
-        'dateutil',
+        'python-dateutil',
         'icontract',
         'matplotlib',
         'numpy',

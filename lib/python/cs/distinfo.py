@@ -651,7 +651,9 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
     ''' Parse a requirement string, return a `ModuleRequirement`.
     '''
     with Pfx(requirement_spec):
-      module_name, offset = get_dotted_identifier(requirement_spec)
+      module_name, offset = get_dotted_identifier(
+          requirement_spec, extras='_-'
+      )
       if not module_name:
         raise ValueError('module_name is not a dotted identifier')
       if offset == len(requirement_spec):
@@ -809,8 +811,9 @@ class Modules(defaultdict):
         type(mod_name),
         mod_name,
     )
-    assert is_dotted_identifier(mod_name
-                                ), "not a dotted identifier: %r" % (mod_name,)
+    assert is_dotted_identifier(
+        mod_name, extras='_-'
+    ), ("not a dotted identifier: %r" % (mod_name,))
     M = Module(mod_name, self.options)
     self[mod_name] = M
     return M
