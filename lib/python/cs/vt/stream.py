@@ -327,7 +327,7 @@ class StreamStore(BasicStoreSync):
     if self.mode_addif:
       if self.contains(h):
         return h
-    rq = AddRequest(data=data, hashenum=self.hashclass.HASHENUM)
+    rq = AddRequest(data=data, hashenum=self.hashclass.hashenum)
     if self.mode_sync:
       flags, payload = self.do(rq)
       h2, offset = hash_decode(payload)
@@ -765,7 +765,7 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
     )
 
   def transcribe(self):
-    yield BSString.transcribe_value(self.hashclass.HASHNAME)
+    yield BSString.transcribe_value(self.hashclass.hashname)
     start_hashcode = self.start_hashcode
     if start_hashcode is not None:
       yield HashCodeField.transcribe_value(start_hashcode)

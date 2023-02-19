@@ -30,6 +30,7 @@ from cs.lex import get_ini_clausename, get_ini_clause_entryname, r
 from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, pfx_method
+from cs.resources import RunState, uses_runstate
 from cs.result import OnDemandResult
 
 from . import (
@@ -295,7 +296,8 @@ class Config(SingletonMixin):
       archive = FilePathArchive(arpath)
     return fsname, readonly, special_store, specialD, special_basename, archive
 
-  def Store_from_spec(self, store_spec, runstate=None, hashclass=None):
+  @uses_runstate
+  def Store_from_spec(self, store_spec, runstate: RunState, hashclass=None):
     ''' Factory function to return an appropriate `BasicStore`* subclass
         based on its argument:
 
@@ -324,8 +326,7 @@ class Config(SingletonMixin):
             read2=stores[1:],
             hashclass=hashclass
         )
-      if runstate is not None:
-        S.runstate = runstate
+      S.runstate = runstate
       return S
 
   def Stores_from_spec(self, store_spec, hashclass=None):

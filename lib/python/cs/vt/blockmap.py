@@ -86,7 +86,7 @@ class MappedFD:
         original file to be closed by the caller.
     '''
     self.hashclass = hashclass
-    self.rec_size = OFF_STRUCT.size + hashclass.HASHLEN
+    self.rec_size = OFF_STRUCT.size + hashclass.hashlen
     if isinstance(f, str):
       with Pfx("open(%r)", f):
         fd = os.open(f, os.O_RDONLY)

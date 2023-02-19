@@ -19,7 +19,7 @@ from os.path import basename
 from signal import SIGHUP, SIGINT, SIGTERM
 import sys
 from types import SimpleNamespace
-from typing import List
+from typing import List, Optional
 
 from cs.context import stackattrs
 from cs.lex import (
@@ -42,7 +42,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -373,7 +372,16 @@ class BaseCommand:
     cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
+  @uses_runstate
+  def __init__(
+      self,
+      argv=None,
+      *,
+      cmd=None,
+      options=None,
+      runstate: Optional[RunState],
+      **kw_options
+  ):
     ''' Initialise the command line.
         Raises `GetoptError` for unrecognised options.
 
@@ -449,8 +457,11 @@ class BaseCommand:
         argv0 = cmd
     if cmd is None:
       cmd = basename(argv0)
+    if runstate is None:
+      runstate = RunState(cmd)
     self.cmd = cmd
     options = self.options = self.OPTIONS_CLASS()
+    options.runstate = runstate
     options.runstate_signals = self.DEFAULT_SIGNALS
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
@@ -997,7 +1008,7 @@ class BaseCommand:
 
         Any keyword arguments are used to override `self.options` attributes
         for the duration of the run,
-        for example to presupply a shared `RunState` from an outer context.
+        for example to presupply a shared `Upd` from an outer context.
 
         If the first command line argument *foo*
         has a corresponding method `cmd_`*foo*

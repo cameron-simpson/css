@@ -109,7 +109,7 @@ def blockify(
     max_block=None
 ):
   ''' Wrapper for `blocked_chunks_of` which yields `Block`s
-      from the data from `chunks`.
+      from the data from `bfr`.
   '''
   if chunks_name is None:
     chunks_name = bfr.__class__.__name__

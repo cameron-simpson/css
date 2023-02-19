@@ -35,15 +35,11 @@ from string import ascii_letters, digits
 import sys
 from uuid import UUID
 
-from typeguard import typechecked
-
 from cs.deco import decorator
 from cs.lex import get_identifier, is_identifier, \
                    get_decimal_or_float_value, get_qstr, \
                    texthexify
 from cs.pfx import Pfx, pfx_call, pfx_method
-
-from cs.x import X
 
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
@@ -156,7 +152,9 @@ class Transcribe:
       prefixes = (prefixes,)
     for prefix in prefixes:
       if prefix in self.prefix_map:
-        raise ValueError("prefix %r already taken" % (prefix,))
+        raise ValueError(
+            "prefix %r already taken: %r" % (prefix, self.prefix_map[prefix])
+        )
       if (not isinstance(baseclass, Transcriber)
           and (not hasattr(baseclass, 'transcribe_inner')
                or not hasattr(baseclass, 'parse_inner'))):

@@ -64,7 +64,7 @@ class BackingFile(MutableMapping, MultiOpenMixin):
 
   def __str__(self):
     return "%s:%s:%s(%r,index=%s)" % (
-        type(self).__name__, self.hashclass.HASHNAME,
+        type(self).__name__, self.hashclass.hashname,
         self.data_record_class.__name__, shortpath(self.path), self.index
     )
 
@@ -340,7 +340,7 @@ class BinaryHashCodeIndex(Mapping, HashCodeUtilsMixin, MultiOpenMixin):
 
   def __str__(self):
     return "%s(hashclass=%s,index_entry_class=%s,binary_index=%s)" % (
-        type(self).__name__, self.hashclass.HASHNAME,
+        type(self).__name__, self.hashclass.hashname,
         type(self.index_entry_class).__name__, self.binary_index
     )
 
@@ -394,7 +394,7 @@ def VTDStore(name, path, *, hashclass, index=None, preferred_indexclass=None):
       raise ValueError("missing path %r" % (path,))
     pathbase, _ = splitext(path)
     if index is None:
-      index_basepath = f"{pathbase}-index-{hashclass.HASHNAME}"
+      index_basepath = f"{pathbase}-index-{hashclass.hashname}"
       indexclass = choose_indexclass(
           index_basepath, preferred_indexclass=preferred_indexclass
       )

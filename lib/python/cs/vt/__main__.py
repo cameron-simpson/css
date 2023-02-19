@@ -130,7 +130,7 @@ class VTCmd(BaseCommand):
       'VT_CACHE_STORE_ENVVAR': VT_CACHE_STORE_ENVVAR,
       'DEFAULT_CONFIG_ENVVAR': DEFAULT_CONFIG_ENVVAR,
       'DEFAULT_CONFIG_PATH': DEFAULT_CONFIG_PATH,
-      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.HASHNAME,
+      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.hashname,
       'DEFAULT_HASHCLASS_ENVVAR': DEFAULT_HASHCLASS_ENVVAR,
   }
 
@@ -164,13 +164,13 @@ class VTCmd(BaseCommand):
     except AttributeError:
       options.verbose = False
     options.config_map = None
-    options.store_spec = None
+    options.store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
     options.cache_store_spec = os.environ.get(
         self.VT_CACHE_STORE_ENVVAR, '[cache]'
     )
     options.dflt_log = os.environ.get(self.VT_LOGFILE_ENVVAR)
     options.hashname = os.environ.get(
-        self.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.HASHNAME
+        self.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname
     )
     options.show_progress = False
     options.status_label = self.cmd
@@ -181,10 +181,7 @@ class VTCmd(BaseCommand):
     options = self.options
     for opt, val in opts:
       if opt == '-C':
-        if val == 'NONE':
-          options.cache_store_spec = None
-        else:
-          options.cache_store_spec = val
+        options.cache_store_spec = val
       elif opt == '-S':
         # specify Store
         options.store_spec = val
@@ -235,8 +232,8 @@ class VTCmd(BaseCommand):
     ''' Set up and tear down the surrounding context.
     '''
     with super().run_context():
-      options = self.options
       cmd = self.cmd
+      options = self.options
       config = options.config
       show_progress = options.show_progress
       with stackattrs(common, config=config):
@@ -248,46 +245,36 @@ class VTCmd(BaseCommand):
             # open the default Store
             if options.store_spec is None:
               if cmd == "serve":
-                store_spec = '[server]'
-              else:
-                store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
-              options.store_spec = store_spec
-            with Pfx("-S %r", options.store_spec):
-              try:
-                S = Store(options.store_spec, options.config)
-              except (KeyError, ValueError) as e:
-                raise GetoptError(f"unusable Store specification: {e}") from e
-              except Exception as e:
-                exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
-                raise GetoptError(f"unusable Store specification: {e}") from e
-            if options.cache_store_spec is None:
+                options.store_spec = store_spec
+            try:
+              S = pfx_call(Store, options.store_spec, options.config)
+            except (KeyError, ValueError) as e:
+              raise GetoptError(f"unusable Store specification: {e}") from e
+            except Exception as e:
+              exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
+              raise GetoptError(f"unusable Store specification: {e}") from e
+            if options.cache_store_spec == 'NONE':
               cacheS = None
             else:
-              with Pfx("-C %r", options.cache_store_spec):
-                try:
-                  cacheS = Store(options.cache_store_spec, options.config)
-                except (KeyError, ValueError) as e:
-                  ##warning("foo")
-                  raise GetoptError(
-                      f"unusable Store specification: {e}"
-                  ) from e
-                except Exception as e:
-                  exception(
-                      f"UNEXPECTED EXCEPTION: can't open cache store: {e}"
-                  )
-                  raise GetoptError(
-                      f"unusable Store specification: {e}"
-                  ) from e
-                else:
-                  S = ProxyStore(
-                      "%s:%s" % (cacheS.name, S.name),
-                      read=(cacheS,),
-                      read2=(S,),
-                      copy2=(cacheS,),
-                      save=(cacheS, S),
-                      archives=((S, '*'),),
-                  )
-                  S.config = options.config
+              try:
+                cacheS = pfx_call(
+                    Store, options.cache_store_spec, options.config
+                )
+              except (KeyError, ValueError) as e:
+                ##warning("foo")
+                raise GetoptError(f"unusable Store specification: {e}") from e
+              except Exception as e:
+                exception(f"UNEXPECTED EXCEPTION: can't open cache store: {e}")
+                raise GetoptError(f"unusable Store specification: {e}") from e
+              S = ProxyStore(
+                  "%s:%s" % (cacheS.name, S.name),
+                  read=(cacheS,),
+                  read2=(S,),
+                  copy2=(cacheS,),
+                  save=(cacheS, S),
+                  archives=((S, '*'),),
+              )
+              S.config = options.config
             if show_progress:
               S = ProgressStore(S)
               add_bar_cmgr = S.progress_add.bar("ADD")

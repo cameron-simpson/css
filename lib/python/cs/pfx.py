@@ -576,18 +576,19 @@ class PfxCallInfo(Pfx):
         caller[2], grandcaller[0], grandcaller[1], grandcaller[2]
     )
 
-def PfxThread(target=None, **kw):
-  ''' Factory function returning a Thread
+def PfxThread(target, **kw):
+  ''' Factory function returning a `Thread`
       which presents the current prefix as context.
   '''
+  from cs.threads import HasThreadState
+
   current_prefix = prefix()
 
-  def run(*a, **kw):
+  def PfxThread_run(*a, **kw):
     with Pfx(current_prefix):
-      if target is not None:
-        target(*a, **kw)
+      return target(*a, **kw)
 
-  return threading.Thread(target=run, **kw)
+  return HasThreadState.Thread(target=PfxThread_run, **kw)
 
 @decorator
 def pfx(func, message=None, message_args=()):

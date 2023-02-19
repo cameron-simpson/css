@@ -828,6 +828,18 @@ def promote(func, params=None, types=None):
       otherwise the attribute will be used directly
       on the presumption that it is a property.
 
+      A typical `promote(cls, obj)` method looks like this:
+
+          @classmethod
+          def promote(cls, obj):
+              if isinstance(obj, cls):
+                  return obj
+              ... recognise various types ...
+              ... and return a suitable instance of cls ...
+              raise TypeError(
+                  "%s.promote: cannot promote %s:%r",
+                  cls.__name__, obj.__class__.__name__, obj)
+
       Example:
 
           >>> from cs.timeseries import Epoch
@@ -908,12 +920,14 @@ def promote(func, params=None, types=None):
     if annotation is Parameter.empty:
       continue
     # recognise optional parameters and use their primary type
+    optional = False
     if param.default is not Parameter.empty:
       anno_origin = typing.get_origin(annotation)
       anno_args = typing.get_args(annotation)
       if (anno_origin is typing.Union and len(anno_args) == 2
           and anno_args[-1] is type(None)):
         annotation, _ = anno_args
+        optional = True
     if types is not None and annotation not in types:
       continue
     try:
@@ -922,7 +936,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (annotation, promote_method)
+    promotions[param_name] = (annotation, promote_method, optional)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -938,12 +952,18 @@ def promote(func, params=None, types=None):
             __name__, arg_value
         )
     )
-    for param_name, (annotation, promote_method) in promotions.items():
+    for param_name, (annotation, promote_method,
+                     optional) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
+        # parameter not supplied
         continue
-      if isinstance(param_name, annotation):
+      if optional and arg_value is None:
+        # skip omitted optional value
+        continue
+      if isinstance(arg_value, annotation):
+        # already of the desired type
         continue
       try:
         promoted_value = promote_method(arg_value)

@@ -32,7 +32,7 @@ from .socket import (
 )
 from .store import MappingStore, DataDirStore, ProxyStore
 from .stream import StreamStore
-from .testsutils import _TestAdditionsMixin
+from .testsutil import _TestAdditionsMixin
 
 HASHCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__HASHCLASS_NAMES'
 INDEXCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__INDEXCLASS_NAMES'

@@ -200,7 +200,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     '''
     if indexclass is None:
       indexclass = choose_indexclass(
-          cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.HASHNAME)
+          cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.hashname)
       )
     if rollover is None:
       rollover = cls.DATA_ROLLOVER
@@ -305,7 +305,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     self.indexclass = resolved.indexclass
     self.rollover = resolved.rollover
     self.hashclass = hashclass
-    self.hashname = hashclass.HASHNAME
+    self.hashname = hashclass.hashname
     self.statefilepath = self.pathto(
         self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
     )

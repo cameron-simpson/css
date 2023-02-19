@@ -28,10 +28,12 @@ from cs.pfx import Pfx, pfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.py.func import prop
 from cs.queues import Channel, IterableQueue, QueueIterator
-from cs.resources import MultiOpenMixin, openif, RunStateMixin, RunState
+from cs.resources import (
+    MultiOpenMixin, openif, RunStateMixin, RunState, uses_runstate
+)
 from cs.result import report, bg as bg_result
 from cs.seq import Seq
-from cs.threads import bg as bg_thread
+from cs.threads import bg as bg_thread, HasThreadState, State as ThreadState
 
 from . import defaults, Lock, RLock
 from .datadir import DataDir, RawDataDir, PlatonicDir
@@ -56,8 +58,8 @@ class StoreError(Exception):
         s += ":%s=%r" % (k, getattr(self, k))
     return s
 
-class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
-                        RunStateMixin, ABC):
+class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
+                        HashCodeUtilsMixin, RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
       Subclasses should not subclass this class but BasicStoreSync
@@ -97,9 +99,16 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   _seq = Seq()
 
+  THREAD_STATE_ATTR = 'basicstore_perthread_state'
+
+  basicstore_perthread_state = ThreadState()
+
+  @uses_runstate
   @pfx_method
   @fmtdoc
-  def __init__(self, name, capacity=None, hashclass=None, runstate=None):
+  def __init__(
+      self, name, *, capacity=None, hashclass=None, runstate: RunState
+  ):
     ''' Initialise the Store.
 
         Parameters:
@@ -125,8 +134,6 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     assert issubclass(hashclass, HashCode)
     if capacity is None:
       capacity = 4
-    if runstate is None:
-      runstate = RunState(name)
     RunStateMixin.__init__(self, runstate=runstate)
     self._str_attrs = {}
     self.name = name
@@ -159,7 +166,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
         val_s = str(val)
       params.append(attr + '=' + val_s)
     return "%s:%s(%s)" % (
-        self.__class__.__name__, self.hashclass.HASHNAME,
+        self.__class__.__name__, self.hashclass.hashname,
         ','.join([repr(self.name)] + params)
     )
 
@@ -225,21 +232,10 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   ## Context manager methods via ContextManagerMixin.
   ##
   def __enter_exit__(self):
-    with defaults(S=self):
-      try:
-        super_eeg = super().__enter_exit__
-      except AttributeError:
-
-        def super_eeg():
+    with HasThreadState.as_contextmanager(self):
+      with MultiOpenMixin.as_contextmanager(self):
+        with defaults(S=self):
           yield
-
-      eeg = super_eeg()
-      next(eeg)
-      yield
-      try:
-        next(eeg)
-      except StopIteration:
-        pass
 
   ##########################
   ## MultiOpenMixin methods.
