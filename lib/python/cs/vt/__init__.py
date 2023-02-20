@@ -45,7 +45,7 @@ from types import SimpleNamespace as NS
 from typing import Optional
 
 from cs.context import stackattrs
-from cs.deco import default_params, promote
+from cs.deco import default_params, fmtdoc, promote
 from cs.lex import r
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
@@ -222,12 +222,13 @@ class _Defaults(ThreadState):
 
 defaults = _Defaults()
 
+@fmtdoc
 def Store(
     spec: Optional[str] = None,
     config: Optional["Config"] = None,
     *,
-    runstate=None,
-    hashclass=None
+    hashclass=None,
+    runstate: Optional[RunState] = None,
 ):
   ''' Factory to construct Stores from string specifications.
 
@@ -243,7 +244,7 @@ def Store(
     spec = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
   if config is None:
     config = Config()
-  return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
+  return config.Store_from_spec(spec, hashclass=hashclass, runstate=runstate)
 
 def _promote_to_Store(obj):
   ''' Promote `obj` to some kind of Store.
