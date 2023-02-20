@@ -29,9 +29,10 @@ from cs.fs import shortpath, longpath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname, r
 from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.resources import RunState, uses_runstate
 from cs.result import OnDemandResult
+from cs.threads import HasThreadState, State as ThreadState
 
 from . import (
     Lock,
@@ -298,8 +299,11 @@ class Config(SingletonMixin, HasThreadState):
       archive = FilePathArchive(arpath)
     return fsname, readonly, special_store, specialD, special_basename, archive
 
+  @pfx
   @uses_runstate
-  def Store_from_spec(self, store_spec, runstate: RunState, hashclass=None):
+  def Store_from_spec(
+      self, store_spec: str, runstate: RunState, hashclass=None
+  ):
     ''' Factory function to return an appropriate `BasicStore`* subclass
         based on its argument:
 
@@ -312,24 +316,23 @@ class Config(SingletonMixin, HasThreadState):
         See also the `.Stores_from_spec` method, which returns the
         separate `Store`s unassembled.
     '''
-    with Pfx(repr(store_spec)):
-      stores = self.Stores_from_spec(store_spec, hashclass=hashclass)
-      if not stores:
-        raise ValueError("empty Store specification: %r" % (store_spec,))
-      if len(stores) == 1:
-        S = stores[0]
-      else:
-        # multiple stores: save to the front store, read first from the
-        # front store then from the rest
-        S = ProxyStore(
-            store_spec,
-            stores[0:1],
-            stores[0:1],
-            read2=stores[1:],
-            hashclass=hashclass
-        )
-      S.runstate = runstate
-      return S
+    stores = self.Stores_from_spec(store_spec, hashclass=hashclass)
+    if not stores:
+      raise ValueError("empty Store specification: %r" % (store_spec,))
+    if len(stores) == 1:
+      S = stores[0]
+    else:
+      # multiple stores: save to the front store, read first from the
+      # front store then from the rest
+      S = ProxyStore(
+          store_spec,
+          stores[0:1],
+          stores[0:1],
+          read2=stores[1:],
+          hashclass=hashclass
+      )
+    S.runstate = runstate
+    return S
 
   def Stores_from_spec(self, store_spec, hashclass=None):
     ''' Parse a colon separated list of Store specifications,
