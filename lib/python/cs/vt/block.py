@@ -924,7 +924,7 @@ class IndirectBlock(_Block):
       error("span:%d != sum(subblocks.span):%d", span, subspan)
       ok = False
     if recurse:
-      with rnstate:
+      with runstate:
         for subB in self.subblocks:
           if runstate.cancelled:
             error("cancelled")
