@@ -23,6 +23,7 @@ from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.excutils import logexc
 from cs.later import Later
+from cs.lex import r
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.progress import Progress, progressbar
@@ -35,7 +36,7 @@ from cs.result import report, bg as bg_result
 from cs.seq import Seq
 from cs.threads import bg as bg_thread, HasThreadState, State as ThreadState
 
-from . import defaults, Lock, RLock
+from . import defaults, Lock, RLock, VT_STORE_ENVVAR, VT_STORE_DEFAULT
 from .datadir import DataDir, RawDataDir, PlatonicDir
 from .hash import (
     HashCode, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin,
@@ -111,7 +112,7 @@ class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
 
         Parameters:
         * `name`: a name for this Store;
-          if None, a sequential name based on the Store class name
+          if `None`, a sequential name based on the Store class name
           is generated
         * `capacity`: a capacity for the internal `Later` queue, default 4
         * `hashclass`: the hash class to use for this Store,
@@ -379,7 +380,7 @@ class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
         * `progress`: an optional `Progress` counting submitted and completed data bytes.
 
         Once called, the caller can then `.put` Blocks onto the queue.
-        When finished, call Q.close() to indicate end of Blocks and
+        When finished, call `Q.close()` to indicate end of Blocks and
         T.join() to wait for the processing completion.
     '''
     name = "%s.pushto(%s)" % (self.name, dstS.name)
@@ -432,6 +433,26 @@ class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
               continue
             data = item.data
             dstS.add_bg(data)
+
+  @fmtdoc
+  def promote(cls, obj):
+    ''' Promote `obj` to a `_BasicStoreCommon` instance.
+        Existing instances are returned unchanged.
+        A `str` is promoted via `Config.Store_from_spec`
+        using the default `Config`.
+        If `obj` is `None` it is obtained from the environment
+        variable ${VT_STORE_ENVVAR} or {VT_STORE_DEFAULT!r}
+        and then promoted from `str`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if obj is None:
+      obj = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
+    if isinstance(obj, str):
+      from .config import Config
+      config = Config.default(factory=True)
+      return config.Store_from_spec(obj)
+    raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations
