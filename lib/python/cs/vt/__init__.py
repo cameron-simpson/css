@@ -176,7 +176,6 @@ _over_progress = OverProgress(name="cs.vt.common.over_progress")
 common = NS(
     progress=_progress,
     over_progress=_over_progress,
-    config=None,
     S=None,
 )
 
@@ -204,11 +203,7 @@ class _Defaults(ThreadState):
 
   @property
   def config(self):
-    cfg = common.config
-    if not cfg:
-      from .config import Config
-      cfg = Config()
-    return cfg
+    return Config.default(factory=True)
 
   def __getattr__(self, attr):
     if attr == 'S':
