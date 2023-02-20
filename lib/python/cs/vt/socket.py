@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python3 -tt
 #
 # TCP and UNIX socket client/server code.
 # - Cameron Simpson <cs@cskk.id.au> 07dec2007

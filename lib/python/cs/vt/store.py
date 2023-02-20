@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Block stores.
 #       - Cameron Simpson <cs@cskk.id.au>

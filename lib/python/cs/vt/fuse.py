@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Fuse interface to a Store.
 # Uses llfuse: https://bitbucket.org/nikratio/python-llfuse/

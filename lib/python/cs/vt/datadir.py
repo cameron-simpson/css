@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python3 -tt
 #
 # Data stores based on local files.
 # - Cameron Simpson <cs@cskk.id.au>

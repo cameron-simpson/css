@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # File interfaces.      - Cameron Simpson <cs@cskk.id.au>
 #

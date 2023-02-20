@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # A cache store, connected to a fast cache and a slower backend.
 #       - Cameron Simpson <cs@cskk.id.au> 07dec2007

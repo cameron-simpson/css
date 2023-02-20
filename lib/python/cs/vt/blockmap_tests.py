@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # BlockMap tests.
 # - Cameron Simpson <cs@cskk.id.au>

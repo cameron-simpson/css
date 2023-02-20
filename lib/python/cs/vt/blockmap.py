@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python33
 #
 # Map block to leaves and offsets.
 # - Cameron Simpson <cs@cskk.id.au> 07feb2018
