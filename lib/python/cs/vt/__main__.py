@@ -236,59 +236,66 @@ class VTCmd(BaseCommand):
       options = self.options
       config = options.config
       show_progress = options.show_progress
-      with stackattrs(common, config=config):
-        # redo these because defaults is already initialised
-        with stackattrs(defaults, show_progress=show_progress):
-          if cmd in ("config", "dump", "help", "init", "profile", "scan"):
-            yield
-          else:
-            # open the default Store
-            if options.store_spec is None:
-              if cmd == "serve":
-                options.store_spec = store_spec
-            try:
-              S = pfx_call(Store, options.store_spec, options.config)
-            except (KeyError, ValueError) as e:
-              raise GetoptError(f"unusable Store specification: {e}") from e
-            except Exception as e:
-              exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
-              raise GetoptError(f"unusable Store specification: {e}") from e
-            if options.cache_store_spec == 'NONE':
-              cacheS = None
+      with config:
+        with stackattrs(common, config=config):
+          # redo these because defaults is already initialised
+          with stackattrs(defaults, show_progress=show_progress):
+            if cmd in ("config", "dump", "help", "init", "profile", "scan"):
+              yield
             else:
+              # open the default Store
+              if options.store_spec is None:
+                if cmd == "serve":
+                  options.store_spec = store_spec
               try:
-                cacheS = pfx_call(
-                    Store, options.cache_store_spec, options.config
-                )
+                S = pfx_call(Store, options.store_spec, options.config)
               except (KeyError, ValueError) as e:
-                ##warning("foo")
                 raise GetoptError(f"unusable Store specification: {e}") from e
               except Exception as e:
-                exception(f"UNEXPECTED EXCEPTION: can't open cache store: {e}")
+                exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
                 raise GetoptError(f"unusable Store specification: {e}") from e
-              S = ProxyStore(
-                  "%s:%s" % (cacheS.name, S.name),
-                  read=(cacheS,),
-                  read2=(S,),
-                  copy2=(cacheS,),
-                  save=(cacheS, S),
-                  archives=((S, '*'),),
-              )
-              S.config = options.config
-            if show_progress:
-              S = ProgressStore(S)
-              add_bar_cmgr = S.progress_add.bar("ADD")
-              get_bar_cmgr = S.progress_get.bar("GET")
-            else:
-              add_bar_cmgr = nullcontext()
-              get_bar_cmgr = nullcontext()
-            with defaults(common_S=S):
-              with S:
-                with add_bar_cmgr:
-                  with get_bar_cmgr:
-                    yield
-            if cacheS:
-              cacheS.backend = None
+              if options.cache_store_spec == 'NONE':
+                cacheS = None
+              else:
+                try:
+                  cacheS = pfx_call(
+                      Store, options.cache_store_spec, options.config
+                  )
+                except (KeyError, ValueError) as e:
+                  ##warning("foo")
+                  raise GetoptError(
+                      f"unusable Store specification: {e}"
+                  ) from e
+                except Exception as e:
+                  exception(
+                      f"UNEXPECTED EXCEPTION: can't open cache store: {e}"
+                  )
+                  raise GetoptError(
+                      f"unusable Store specification: {e}"
+                  ) from e
+                S = ProxyStore(
+                    "%s:%s" % (cacheS.name, S.name),
+                    read=(cacheS,),
+                    read2=(S,),
+                    copy2=(cacheS,),
+                    save=(cacheS, S),
+                    archives=((S, '*'),),
+                )
+                S.config = options.config
+              if show_progress:
+                S = ProgressStore(S)
+                add_bar_cmgr = S.progress_add.bar("ADD")
+                get_bar_cmgr = S.progress_get.bar("GET")
+              else:
+                add_bar_cmgr = nullcontext()
+                get_bar_cmgr = nullcontext()
+              with defaults(common_S=S):
+                with S:
+                  with add_bar_cmgr:
+                    with get_bar_cmgr:
+                      yield
+              if cacheS:
+                cacheS.backend = None
       if ifdebug():
         dump_debug_threads()
 
