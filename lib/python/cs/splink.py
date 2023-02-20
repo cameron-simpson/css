@@ -571,6 +571,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
 
   # pylint: disable=too-many-branches,too-many-locals
   @timerange
+  @uses_runstate
   def plot(
       self,
       start,
@@ -587,7 +588,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       mode_patterns=None,
       stacked=False,
       upd=None,
-      runstate=None,
+      runstate: RunState,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
@@ -662,7 +663,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
         )
       else:
         for label, series, extra in plot_ps:
-          if runstate and runstate.canclled:
+          if runstate.canclled:
             break
           ax.plot(indices, series, label=label, **extra)
       if ax_title is not None:

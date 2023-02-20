@@ -99,7 +99,7 @@ from cs.mplutils import axes, remove_decorations, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
@@ -440,13 +440,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
             "fields:%r should not be suppplied for a %s" % (argv, s(ts))
         )
       ax = ts.plot(
-          start,
-          stop,
-          ax=ax,
-          runstate=runstate,
-          tz=tz,
-          figsize=(plot_dx, plot_dy),
-          **plot_kw
+          start, stop, ax=ax, tz=tz, figsize=(plot_dx, plot_dy), **plot_kw
       )  # pylint: disable=missing-kwoa
     elif isinstance(ts, TimeSeriesMapping):
       # multiple timeseries each with their own key
@@ -469,7 +463,6 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           start,
           stop,
           keys,
-          runstate=runstate,
           tz=tz,
           ax=ax,
           **plot_kw,
@@ -1459,7 +1452,6 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
       figure=None,
       ax=None,
       label=None,
-      runstate=None,  # pylint: disable=unused-argument
       utcoffset,
       **plot_kw,
   ) -> Axes:
@@ -1469,7 +1461,6 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
         Parameters:
         * `start`,`stop`: the time range
         * `label`: optional label for the graph
-        * `runstate`: optional `RunState`, ignored in this implementation
         * `utcoffset`: optional timestamp skew from UTC in seconds
         * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
@@ -2691,6 +2682,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     return 'd'
 
   @pfx
+  @uses_runstate
   @typechecked
   def as_pd_dataframe(
       self,
@@ -2699,7 +2691,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       df_data: Optional[Iterable[Union[str, Tuple[str, Any]]]] = None,
       *,
       key_map=None,
-      runstate=None,
+      runstate: RunState,
       utcoffset=None,
   ):
     ''' Return a `numpy.DataFrame` containing the specified data.
@@ -2736,7 +2728,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
       for data in progressbar(df_data, "gather fields"):
-        if runstate and runstate.cancelled:
+        if runstate.cancelled:
           raise CancellationError
         pfx_context = (
             data
@@ -2753,7 +2745,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
             key, series = data
           data_key = key_map.get(key, key)
           data_dict[data_key] = series
-    if runstate and runstate.cancelled:
+    if runstate.cancelled:
       raise CancellationError
     return pfx_call(
         pd.DataFrame,
@@ -2793,6 +2785,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     df.to_csv(f, **to_csv_kw)
 
   @timerange
+  @uses_runstate
   @typechecked
   def plot(
       self,
@@ -2803,7 +2796,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       figure=None,
       ax=None,
       label=None,
-      runstate=None,
+      runstate: RunState,
       utcoffset,
       stacked=False,
       kind=None,
@@ -2819,7 +2812,6 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         * `plot_data`: optional iterable of plot data,
           default `sorted(self.keys())`
         * `label`: optional label for the graph
-        * `runstate`: optional `RunState` to allow interruption
         * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
 
@@ -2840,7 +2832,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         runstate=runstate,
         utcoffset=utcoffset,
     )
-    if runstate and runstate.cancelled:
+    if runstate.cancelled:
       raise CancellationError
     return df.plot(ax=ax, kind=kind, stacked=stacked, **plot_kw)
 
@@ -3415,7 +3407,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       figure=None,
       ax=None,
       label=None,
-      runstate=None,
       **plot_kw,
   ) -> Axes:
     ''' Convenience shim for `DataFrame.plot` to plot data from
@@ -3432,13 +3423,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     if label is None:
       label = self.tags.get('csv.header')
     return super().plot(
-        start,
-        stop,
-        figure=figure,
-        ax=ax,
-        label=label,
-        runstate=runstate,
-        **plot_kw
+        start, stop, figure=figure, ax=ax, label=label, **plot_kw
     )
 
 @promote

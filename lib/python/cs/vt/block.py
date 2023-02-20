@@ -404,7 +404,8 @@ class _Block(Transcriber, ABC):
     )
 
   @uses_Store
-  def pushto_queue(self, Q, *, S, runstate=None, progress=None):
+  @uses_runstate
+  def pushto_queue(self, Q, *, S, runstate, progress=None):
     ''' Push this Block and any implied subblocks to a queue.
 
         Parameters:
@@ -427,11 +428,12 @@ class _Block(Transcriber, ABC):
       Q.put(self)
       if self.indirect:
         # recurse, reusing the Queue
-        for subB in self.subblocks:
-          if runstate and runstate.cancelled:
-            warning("%s: push cancelled", self)
-            break
-          subB.pushto_queue(Q, runstate=runstate, progress=progress)
+        with runstate:
+          for subB in self.subblocks:
+            if runstate.cancelled:
+              warning("%s: push cancelled", self)
+              break
+            subB.pushto_queue(Q, progress=progress)
 
 class BlockRecord(BinarySingleValue):
   ''' Support for binary parsing and transcription of blockrefs.
@@ -922,14 +924,15 @@ class IndirectBlock(_Block):
       error("span:%d != sum(subblocks.span):%d", span, subspan)
       ok = False
     if recurse:
-      for subB in self.subblocks:
-        if runstate.cancelled:
-          error("cancelled")
-          ok = False
-          break
-        with Pfx(str(subB)):
-          if not subB.fsck(recurse=True, runstate=runstate):
+      with rnstate:
+        for subB in self.subblocks:
+          if runstate.cancelled:
+            error("cancelled")
             ok = False
+            break
+          with Pfx(str(subB)):
+            if not subB.fsck(recurse=True):
+              ok = False
     return ok
 
 class RLEBlock(_Block):

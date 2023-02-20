@@ -897,7 +897,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     '''
     return _Dirent.transcribe_inner(self, T, fp, {})
 
-  def pushto_queue(self, Q, runstate=None, progress=None):
+  def pushto_queue(self, Q, progress=None):
     ''' Push the Block with the file contents to a queue.
 
         Parameters:
@@ -908,7 +908,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
 
         Semantics are as for `cs.vt.block.Block.pushto_queue`.
     '''
-    return self.block.pushto_queue(Q, runstate=runstate, progress=progress)
+    return self.block.pushto_queue(Q, progress=progress)
 
   @io_fail
   def fsck(self, recurse=False):
@@ -1278,7 +1278,8 @@ class Dir(_Dirent, DirLike):
     return _Dirent.transcribe_inner(self, T, fp, {})
 
   @pfx_method
-  def pushto_queue(self, Q, runstate=None, progress=None):
+  @uses_runstate
+  def pushto_queue(self, Q, *, runstate, progress=None):
     ''' Push the Dir Blocks to a queue.
 
         Parameters:
@@ -1292,11 +1293,12 @@ class Dir(_Dirent, DirLike):
     # push the Dir block data
     B.pushto_queue(Q, runstate=runstate, progress=progress)
     # and recurse into contents
-    for E in DirentRecord.scan_values(B.bufferfrom()):
-      if runstate and runstate.cancelled:
-        warning("push cancelled")
-        return False
-      E.pushto_queue(Q, runstate=runstate, progress=progress)
+    with runstate:
+      for E in DirentRecord.scan_values(B.bufferfrom()):
+        if runstate.cancelled:
+          warning("push cancelled")
+          return False
+        E.pushto_queue(Q, progress=progress)
     return True
 
   @io_fail
