@@ -1,1 +1,2 @@
+use the main HashCode class instead of the local version
 some kind of include/exclude after the fashion of rsync - utilising the .hbinclude would be handy
