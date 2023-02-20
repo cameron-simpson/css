@@ -605,7 +605,7 @@ class VTCmd(BaseCommand):
         elif not dst.isdir:
           error('target name %r is not a directory', srcbase)
           xit = 1
-        elif not merge(dst, src, runstate=runstate):
+        elif not merge(dst, src):
           error("merge failed")
           xit = 1
       elif isfilepath(srcpath):
@@ -990,7 +990,8 @@ class VTCmd(BaseCommand):
     return obj
 
   @staticmethod
-  def _push(srcS, dstS, *pushables, progress=None, runstate=None):
+  @uses_runstate
+  def _push(srcS, dstS, *pushables, progress=None, runstate: RunState):
     ''' Push data from the source Store `srcS` to destination Store `dstS`
         to ensure that `dstS` has all the Blocks needs to support
         the `pushables`.
@@ -1001,16 +1002,14 @@ class VTCmd(BaseCommand):
       try:
         for pushable in pushables:
           with Pfx("push %s", pushable):
-            if runstate and runstate.cancelled:
+            if runstate.cancelled:
               xit = 1
               break
             with Pfx(pushable):
               progress = Progress(str(pushable))
               pushq = pushable.pushto_queue
               try:
-                pushed_ok = pfx_call(
-                    pushq, Q, runstate=runstate, progress=progress
-                )
+                pushed_ok = pfx_call(pushq, Q, progress=progress)
                 assert isinstance(pushed_ok, bool)
               except Exception as e:
                 error("push fails: %s", e)
@@ -1049,7 +1048,7 @@ class VTCmd(BaseCommand):
             pushables.append(obj)
       if not ok:
         raise GetoptError("unrecognised pushables")
-    return self._push(srcS, dstS, *pushables, runstate=options.runstate)
+    return self._push(srcS, dstS, *pushables)
 
   def cmd_pushto(self, argv):
     ''' Usage: {cmd} other_store [objects...]
@@ -1078,7 +1077,7 @@ class VTCmd(BaseCommand):
             pushables.append(obj)
       if not ok:
         raise GetoptError("unrecognised pushables")
-    return self._push(srcS, dstS, *pushables, runstate=options.runstate)
+    return self._push(srcS, dstS, *pushables)
 
   def cmd_save(self, argv):
     ''' Usage: {cmd} [-F] [{{ospath|-}}...]
@@ -1113,7 +1112,7 @@ class VTCmd(BaseCommand):
         elif isdirpath(ospath):
           target = Dir(basename(ospath))
           source = OSDir(ospath)
-          merge(target, source, runstate=runstate)
+          merge(target, source)
           print(target, ospath)
           continue
         else:
@@ -1214,9 +1213,7 @@ class VTCmd(BaseCommand):
       socket_path = expand_path(address)
       track("dispatch serve_socket(%r,...)", socket_path)
       with defaults.S:
-        srv = serve_socket(
-            socket_path=socket_path, exports=exports, runstate=runstate
-        )
+        srv = serve_socket(socket_path=socket_path, exports=exports)
       srv.join()
     else:
       # [host]:port
@@ -1229,9 +1226,7 @@ class VTCmd(BaseCommand):
           host = '127.0.0.1'
         port = int(port)
         with defaults.S:
-          srv = serve_tcp(
-              bind_addr=(host, port), exports=exports, runstate=runstate
-          )
+          srv = serve_tcp(bind_addr=(host, port), exports=exports)
           runstate.notify_cancel.add(lambda runstate: srv.shutdown_now())
         srv.join()
       else:
