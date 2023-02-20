@@ -508,6 +508,7 @@ class Config(SingletonMixin, HasThreadState):
       max_data = scaled_value(max_data)
     return MemoryCacheStore(store_name, max_data, hashclass=hashclass)
 
+  @promote
   def platonic_Store(
       self,
       store_name,
@@ -516,7 +517,7 @@ class Config(SingletonMixin, HasThreadState):
       path=None,
       basedir=None,
       follow_symlinks=False,
-      meta=None,
+      meta_store: Optiona[Store] = None,
       archive=None,
       hashclass=None,
   ):
@@ -540,12 +541,6 @@ class Config(SingletonMixin, HasThreadState):
         debug("longpath(basedir) ==> %r", basedir)
         path = joinpath(basedir, path)
         debug("path ==> %r", path)
-    if follow_symlinks is None:
-      follow_symlinks = False
-    if meta is None:
-      meta_store = None
-    elif isinstance(meta, str):
-      meta_store = Store(meta, self)
     if isinstance(archive, str):
       archive = longpath(archive)
     return PlatonicStore(
