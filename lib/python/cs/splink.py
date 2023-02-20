@@ -663,7 +663,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
         )
       else:
         for label, series, extra in plot_ps:
-          if runstate.canclled:
+          if runstate.cancelled:
             break
           ax.plot(indices, series, label=label, **extra)
       if ax_title is not None:
