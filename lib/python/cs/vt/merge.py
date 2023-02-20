@@ -52,77 +52,78 @@ def merge(
   else:
     proxy_cmgr = nullcontext()
   with proxy_cmgr as proxy:
-    for rpath, dirnames, filenames in source_root.walk():
-      with Pfx(rpath):
-        if runstate.cancelled:
-          warning("cancelled")
-          break
-        if proxy is not None:
-          proxy.prefix = rpath + '/'
-          proxy.text = ' ...'
-        source = source_root.resolve(rpath)
-        if source is None:
-          warning("no longer resolves, pruning this branch")
-          ok = False
-          dirnames[:] = []
-          filenames[:] = []
-          continue
-        target = target_root.resolve(rpath)
-        if target is None:
-          # new in target tree: mkdir the target node
-          rpath_up = dirname(rpath)
-          rpath_base = basename(rpath)
-          target_up = target_root.resolve(rpath_up)
-          target = target_up.mkdir(rpath_base)
-        elif target.isdir:
-          pass
-        else:
-          warning("conflicting item in target: not a directory")
-          ok = False
-          continue
-        # import files
-        for filename in filenames:
-          with Pfx(filename):
-            if runstate.cancelled:
-              warning("cancelled")
-              break
-            if proxy is not None:
-              proxy.text = filename
-            sourcef = source.get(filename)
-            if sourcef is None:
-              # no longer available
-              continue
-            if sourcef.isdir:
-              warning("source file is now a directory, skipping")
-              ok = False
-              continue
-            targetf = target.get(filename)
-            if targetf is None:
-              # new file
-              if isinstance(target, Dir):
-                # we can put a file in target
-                if isinstance(sourcef, FileDirent):
-                  # create FileDirent from block
-                  target[filename] = FileDirent(sourcef.block)
+    with runstate:
+      for rpath, dirnames, filenames in source_root.walk():
+        with Pfx(rpath):
+          if runstate.cancelled:
+            warning("cancelled")
+            break
+          if proxy is not None:
+            proxy.prefix = rpath + '/'
+            proxy.text = ' ...'
+          source = source_root.resolve(rpath)
+          if source is None:
+            warning("no longer resolves, pruning this branch")
+            ok = False
+            dirnames[:] = []
+            filenames[:] = []
+            continue
+          target = target_root.resolve(rpath)
+          if target is None:
+            # new in target tree: mkdir the target node
+            rpath_up = dirname(rpath)
+            rpath_base = basename(rpath)
+            target_up = target_root.resolve(rpath_up)
+            target = target_up.mkdir(rpath_base)
+          elif target.isdir:
+            pass
+          else:
+            warning("conflicting item in target: not a directory")
+            ok = False
+            continue
+          # import files
+          for filename in filenames:
+            with Pfx(filename):
+              if runstate.cancelled:
+                warning("cancelled")
+                break
+              if proxy is not None:
+                proxy.text = filename
+              sourcef = source.get(filename)
+              if sourcef is None:
+                # no longer available
+                continue
+              if sourcef.isdir:
+                warning("source file is now a directory, skipping")
+                ok = False
+                continue
+              targetf = target.get(filename)
+              if targetf is None:
+                # new file
+                if isinstance(target, Dir):
+                  # we can put a file in target
+                  if isinstance(sourcef, FileDirent):
+                    # create FileDirent from block
+                    target[filename] = FileDirent(sourcef.block)
+                  else:
+                    # copy data
+                    targetf = target.file_fromchunks(
+                        filename, sourcef.datafrom()
+                    )
+                elif isinstance(target, OSDir):
+                  filepath = target.pathto(filename)
+                  assert not existspath(filepath)
+                  with pfx_call(open, filepath, 'wb') as f:
+                    for bs in sourcef.datafrom():
+                      assert f.write(bs) == len(bs)
                 else:
-                  # copy data
-                  targetf = target.file_fromchunks(
-                      filename, sourcef.datafrom()
+                  raise RuntimeError(
+                      "do not know how to write a file to %s[filename=%r]" %
+                      (r(target), filename)
                   )
-              elif isinstance(target, OSDir):
-                filepath = target.pathto(filename)
-                assert not existspath(filepath)
-                with pfx_call(open, filepath, 'wb') as f:
-                  for bs in sourcef.datafrom():
-                    assert f.write(bs) == len(bs)
               else:
-                raise RuntimeError(
-                    "do not know how to write a file to %s[filename=%r]" %
-                    (r(target), filename)
-                )
-            else:
-              warning("conflicting target file")
-              ok = False
+                warning("conflicting target file")
+                ok = False
 
   if runstate.cancelled:
     ok = False
