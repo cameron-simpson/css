@@ -115,6 +115,7 @@ DEFAULT_BASEDIR = '~/.local/share/vt'
 DEFAULT_CONFIG_ENVVAR = 'VT_CONFIG'
 DEFAULT_CONFIG_PATH = '~/.vtrc'
 VT_STORE_ENVVAR = 'VT_STORE'
+VT_STORE_DEFAULT = '[default]'
 VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
 DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
 
@@ -234,10 +235,17 @@ def Store(
     hashclass=None
 ):
   ''' Factory to construct Stores from string specifications.
+
+      Parameters:
+      * `spec`: optiona specification, default from the
+        ${VT_STORE_ENVVAR} environment variable, or {VT_STORE_DEFAULT!r}
+      * `config`: optional `Config`
+      * `hashclass`: optional `HashCode` subclass
+      * `runstate`: optional `RunState`
   '''
   from .config import Config
   if spec is None:
-    spec = os.environ.get(VT_STORE_ENVVAR, '[default]')
+    spec = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
   if config is None:
     config = Config()
   return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
