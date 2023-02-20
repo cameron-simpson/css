@@ -62,7 +62,7 @@ from .transcribe import parse
 from cs.py.func import trace
 
 # pylint: disable=too-many-public-methods
-class Config(SingletonMixin):
+class Config(SingletonMixin, HasThreadState):
   ''' A configuration specification.
 
       This can be driven by any mapping of mappings: {clause_name => {param => value}}.
@@ -72,6 +72,8 @@ class Config(SingletonMixin):
       * `config_map`: either a mapping of mappings: `{clause_name: {param: value}}`
         or the filename of a file in `.ini` format
   '''
+
+  perthread_state = ThreadState()
 
   @classmethod
   @require(

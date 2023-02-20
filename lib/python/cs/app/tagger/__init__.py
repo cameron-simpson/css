@@ -81,7 +81,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
 
   TAG_PREFIX = TAGGER_TAG_PREFIX_DEFAULT
 
-  state = ThreadState(current=None)
+  perthread_state = ThreadState(current=None)
 
   @promote
   def __init__(self, fspath: str, fstags=None, ont: Optional[Ont] = None):

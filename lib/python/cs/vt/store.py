@@ -99,9 +99,7 @@ class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
 
   _seq = Seq()
 
-  THREAD_STATE_ATTR = 'basicstore_perthread_state'
-
-  basicstore_perthread_state = ThreadState()
+  perthread_state = ThreadState()
 
   @uses_runstate
   @pfx_method

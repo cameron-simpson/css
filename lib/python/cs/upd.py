@@ -127,7 +127,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
       The default backend is `sys.stderr`.
   '''
 
-  state = ThreadState()
+  perthread_state = ThreadState()
 
   # pylint: disable=unused-argument
   @staticmethod
