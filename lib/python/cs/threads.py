@@ -102,7 +102,7 @@ class HasThreadState(ContextManagerMixin):
   _HasThreadState_classes = set()
 
   # the default name for the Thread state attribute
-  THREAD_STATE_ATTR = 'state'
+  THREAD_STATE_ATTR = 'perthread_state'
 
   @classmethod
   def default(cls, factory=None, raise_on_None=False):
