@@ -222,16 +222,16 @@ class _Defaults(ThreadState):
 
 defaults = _Defaults()
 
-class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
+class Store(Mapping, HasThreadState, MultiOpenMixin,
                         HashCodeUtilsMixin, RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
-      Subclasses should not subclass this class but BasicStoreSync
-      or BasicStoreAsync; these provide the *_bg or non-*_bg sibling
+      Subclasses should not subclass this class but StoreSyncBase
+      or StoreAsyncBase; these provide the *_bg or non-*_bg sibling
       methods of those described below so that a subclass need only
       implement the synchronous or asynchronous forms. Most local
-      Stores will derive from BasicStoreSync and remote Stores
-      derive from BasicStoreAsync.
+      Stores will derive from StoreSyncBase and remote Stores
+      derive from StoreAsyncBase.
 
       A subclass should provide thread-safe implementations of the following
       methods:
@@ -599,7 +599,7 @@ class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
 
   @fmtdoc
   def promote(cls, obj):
-    ''' Promote `obj` to a `_BasicStoreCommon` instance.
+    ''' Promote `obj` to a `Store` instance.
         Existing instances are returned unchanged.
         A `str` is promoted via `Config.Store_from_spec`
         using the default `Config`.
@@ -617,9 +617,9 @@ class _BasicStoreCommon(Mapping, HasThreadState, MultiOpenMixin,
       return config.Store_from_spec(obj)
     raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))
 
-class BasicStoreSync(_BasicStoreCommon):
-  ''' Subclass of _BasicStoreCommon expecting synchronous operations
-      and providing asynchronous hooks, dual of BasicStoreAsync.
+class StoreSyncBase(Store):
+  ''' Subclass of Store expecting synchronous operations
+      and providing asynchronous hooks, dual of StoreAsyncBase.
   '''
 
   #####################################
@@ -638,9 +638,9 @@ class BasicStoreSync(_BasicStoreCommon):
   def flush_bg(self):
     return self._defer(self.flush)
 
-class BasicStoreAsync(_BasicStoreCommon):
-  ''' Subclass of _BasicStoreCommon expecting asynchronous operations
-      and providing synchronous hooks, dual of BasicStoreSync.
+class StoreAsyncBase(Store):
+  ''' Subclass of Store expecting asynchronous operations
+      and providing synchronous hooks, dual of StoreSyncBase.
   '''
 
   #####################################

@@ -59,7 +59,7 @@ class StoreError(Exception):
         s += ":%s=%r" % (k, getattr(self, k))
     return s
 
-class MappingStore(BasicStoreSync):
+class MappingStore(StoreSyncBase):
   ''' A Store built on an arbitrary mapping object.
   '''
 
@@ -138,7 +138,7 @@ class MappingStore(BasicStoreSync):
       Q.put(h)
     return True
 
-class ProxyStore(BasicStoreSync):
+class ProxyStore(StoreSyncBase):
   ''' A Store managing various subsidiary Stores.
 
       Three classes of Stores are managed:
@@ -594,7 +594,7 @@ class _PlatonicStore(MappingStore):
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
 
-class ProgressStore(BasicStoreSync):
+class ProgressStore(StoreSyncBase):
   ''' A shim for another Store to do progress reporting.
 
       TODO: planning to redo basic store methods as shims, with

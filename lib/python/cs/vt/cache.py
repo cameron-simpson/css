@@ -25,12 +25,12 @@ from cs.result import Result
 from cs.threads import bg as bg_thread
 
 from . import defaults, MAX_FILE_SIZE, Lock, RLock
-from .store import _BasicStoreCommon, BasicStoreSync, MappingStore
+from .store import Store, StoreSyncBase, MappingStore
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
 DEFAULT_MAX_CACHEFILES = 3
 
-class FileCacheStore(BasicStoreSync):
+class FileCacheStore(StoreSyncBase):
   ''' A Store wrapping another Store that provides fast access to
       previously fetched data and fast storage of new data,
       using asynchronous updates to the backing Store (which may be `None`).
@@ -42,7 +42,7 @@ class FileCacheStore(BasicStoreSync):
   @require(lambda name: isinstance(name, str))
   @require(
       lambda backend: backend is None or
-      isinstance(backend, _BasicStoreCommon)
+      isinstance(backend, Store)
   )
   @require(lambda dirpath: isinstance(dirpath, str))
   def __init__(
@@ -64,7 +64,7 @@ class FileCacheStore(BasicStoreSync):
           time
         * `dirpath`: directory to hold the cache files
 
-        Other keyword arguments are passed to `BasicStoreSync.__init__`.
+        Other keyword arguments are passed to `StoreSyncBase.__init__`.
     '''
     super().__init__(name, runstate=runstate, **kw)
     self._str_attrs.update(backend=backend)
