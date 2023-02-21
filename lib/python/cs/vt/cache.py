@@ -24,8 +24,8 @@ from cs.resources import MultiOpenMixin, RunState, RunStateMixin
 from cs.result import Result
 from cs.threads import bg as bg_thread
 
-from . import defaults, MAX_FILE_SIZE, Lock, RLock
-from .store import Store, StoreSyncBase, MappingStore
+from . import defaults, MAX_FILE_SIZE, Lock, RLock, Store
+from .store import StoreSyncBase, MappingStore
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
 DEFAULT_MAX_CACHEFILES = 3
@@ -40,10 +40,7 @@ class FileCacheStore(StoreSyncBase):
   '''
 
   @require(lambda name: isinstance(name, str))
-  @require(
-      lambda backend: backend is None or
-      isinstance(backend, Store)
-  )
+  @require(lambda backend: backend is None or isinstance(backend, Store))
   @require(lambda dirpath: isinstance(dirpath, str))
   def __init__(
       self,
@@ -212,6 +209,7 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     self.cached = {}  # map h => data
     self.saved = {}  # map h => _CachedData(cachefile, offset, length)
     self._lock = Lock()
+    self._workQ = None
     self.cachefiles = []
     self._add_cachefile()
     self.runstate.notify_cancel.add(lambda rs: self.close())
