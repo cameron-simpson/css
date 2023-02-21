@@ -39,20 +39,35 @@
     which is also a system based on variable sized blocks.
 '''
 
-from contextlib import contextmanager
+from abc import ABC, abstractmethod
+from contextlib import closing, contextmanager
 import os
+from threading import Thread
 from types import SimpleNamespace as NS
-from typing import Optional
+from typing import Mapping, Tuple
 
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, promote
+from cs.deco import default_params, fmtdoc
+from cs.later import Later
 from cs.lex import r
-from cs.logutils import error, warning
-from cs.progress import Progress, OverProgress
-from cs.py.stack import stack_dump
-import cs.resources
-from cs.resources import RunState
-from cs.threads import State as ThreadState
+from cs.logutils import warning
+from cs.progress import Progress, OverProgress, progressbar
+from cs.queues import IterableQueue, QueueIterator
+from cs.pfx import Pfx, pfx_method
+from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
+from cs.seq import Seq
+from cs.threads import bg as bg_thread, State as ThreadState, HasThreadState
+
+from icontract import require
+from typeguard import typechecked
+
+from .hash import (
+    DEFAULT_HASHCLASS,
+    HASHCLASS_BY_NAME,
+    HashCode,
+    HashCodeUtilsMixin,
+    MissingHashcodeError,
+)
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -153,6 +168,7 @@ if False:
     return DebuggingLock()
 
   # monkey patch MultiOpenMixin
+  import cs.resources
   cs.resources._mom_lockclass = RLock
 else:
   from threading import (
@@ -497,7 +513,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin,
     warning("no get_Archive for %s", type(self).__name__)
     return None  # pylint: disable=useless-return
 
-  @prop
+  @property
   def config(self):
     ''' The configuration for use with this Store.
         Falls back to `defaults.config`.
@@ -512,7 +528,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin,
 
   ##########################################################################
   # Blockmaps.
-  @prop
+  @property
   def blockmapdir(self):
     ''' The path to this Store's blockmap directory, if specified.
         Falls back too the Config.blockmapdir.
@@ -572,7 +588,6 @@ class Store(Mapping, HasThreadState, MultiOpenMixin,
         * `srcS`: the source Store from which to obtain block data
         * `dstS`: the target Store to which to push Blocks
     '''
-    lock = Lock()
     with srcS:
       for item in progressbar(blocks, f'{self.name}.pushto',
                               update_frequency=64):
