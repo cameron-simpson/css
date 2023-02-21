@@ -234,8 +234,8 @@ class _Defaults(ThreadState):
 
 defaults = _Defaults()
 
-class Store(Mapping, HasThreadState, MultiOpenMixin,
-                        HashCodeUtilsMixin, RunStateMixin, ABC):
+class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
+            RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
       Subclasses should not subclass this class but StoreSyncBase
