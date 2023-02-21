@@ -624,6 +624,132 @@ def VTDStore(name, path, *, hashclass, index=None, preferred_indexclass=None):
         CompressibleBackingFile(path, hashclass=hashclass, index=index),
         hashclass=hashclass
     )
+
+class FileCacheStore(StoreSyncBase):
+  ''' A Store wrapping another Store that provides fast access to
+      previously fetched data and fast storage of new data,
+      using asynchronous updates to the backing Store (which may be `None`).
+
+      This class is a thin Store shaped shim over a `FileDataMappingProxy`,
+      which does the heavy lifting of storing data.
+  '''
+
+  @require(lambda name: isinstance(name, str))
+  @require(lambda backend: backend is None or isinstance(backend, Store))
+  @require(lambda dirpath: isinstance(dirpath, str))
+  def __init__(
+      self,
+      name,
+      backend,
+      dirpath,
+      max_cachefile_size=None,
+      max_cachefiles=None,
+      runstate=None,
+      **kw
+  ):
+    ''' Initialise the `FileCacheStore`.
+
+        Parameters:
+        * `name`: the Store name
+        * `backend`: the backing Store; this may be `None`, and the
+          property .backend may be switched to another Store at any
+          time
+        * `dirpath`: directory to hold the cache files
+
+        Other keyword arguments are passed to `StoreSyncBase.__init__`.
+    '''
+    super().__init__(name, runstate=runstate, **kw)
+    self._str_attrs.update(backend=backend)
+    self._backend = None
+    self.cache = FileDataMappingProxy(
+        backend,
+        dirpath=dirpath,
+        max_cachefile_size=max_cachefile_size,
+        max_cachefiles=max_cachefiles,
+        runstate=runstate,
+    )
+    self._str_attrs.update(
+        cachefiles=self.cache.max_cachefiles,
+        cachesize=self.cache.max_cachefile_size
+    )
+    self.backend = backend
+
+  def __getattr__(self, attr):
+    return getattr(self.backend, attr)
+
+  @property
+  def backend(self):
+    ''' Return the current backend Store.
+    '''
+    return self._backend
+
+  @backend.setter
+  def backend(self, new_backend):
+    ''' Switch backends.
+    '''
+    old_backend = self._backend
+    if old_backend is not new_backend:
+      if old_backend:
+        old_backend.close()
+      self._backend = new_backend
+      cache = self.cache
+      if cache:
+        cache.backend = new_backend
+      self._str_attrs.update(backend=new_backend)
+      if new_backend:
+        new_backend.open()
+
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      self.cache.open()
+      try:
+        yield
+      finally:
+        self.cache.close()
+        self.cache = None
+        self.backend = None
+
+  def flush(self):
+    ''' Dummy flush operation.
+    '''
+
+  def sync(self):
+    ''' Dummy sync operation.
+    '''
+
+  def __len__(self):
+    return len(self.cache) + len(self.backend)
+
+  def keys(self):
+    hashclass = self.hashclass
+    # pylint: disable=unidiomatic-typecheck
+    return (h for h in self.cache.keys() if type(h) is hashclass)
+
+  def __iter__(self):
+    return self.keys()
+
+  def contains(self, h):
+    return h in self.cache
+
+  def add(self, data):
+    h = self.hash(data)
+    self.cache[h] = data
+    return h
+
+  # add is deliberately very fast; just return a completed Result directly
+  def add_bg(self, data):
+    return Result(result=self.add(data))
+
+  def get(self, h):
+    try:
+      data = self.cache[h]
+    except KeyError:
+      data = None
+    else:
+      pass
+    return data
+
 class ProgressStore(StoreSyncBase):
   ''' A shim for another Store to do progress reporting.
 
