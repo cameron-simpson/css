@@ -56,7 +56,7 @@ from cs.py.func import prop
 from cs.resources import uses_runstate
 from cs.threads import locked
 
-from . import defaults, RLock, uses_Store
+from . import RLock, Store, uses_Store
 from .hash import HashCode, io_fail
 from .transcribe import (
     Transcriber, register as register_transcriber, hexify, parse
@@ -889,7 +889,7 @@ class IndirectBlock(_Block):
     return cls(superB, span), offset
 
   @uses_Store
-  def datafrom(self, *, start=0, end=None, S):
+  def datafrom(self, start=0, end=None, *, S):
     ''' Yield data from a point in the Block.
     '''
     if end is None:
