@@ -674,4 +674,4 @@ class StoreAsyncBase(Store):
 def uses_Store(func):
   ''' Decorator to provide the default Store as the parameter `S`.
   '''
-  return default_params(func, S=Store.default())
+  return default_params(func, S=Store.default)
