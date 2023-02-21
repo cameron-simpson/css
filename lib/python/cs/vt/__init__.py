@@ -608,6 +608,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin,
             data = item.data
             dstS.add_bg(data)
 
+  @classmethod
   @fmtdoc
   def promote(cls, obj):
     ''' Promote `obj` to a `Store` instance.
