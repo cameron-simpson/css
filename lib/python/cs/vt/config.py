@@ -22,11 +22,13 @@ from os.path import (
     realpath,
     splitext,
 )
+from typing import Optional
 
 from icontract import require
 
+from cs.deco import promote
 from cs.fs import shortpath, longpath
-from cs.lex import get_ini_clausename, get_ini_clause_entryname, r
+from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, pfx, pfx_method
@@ -59,8 +61,6 @@ from .dir import Dir
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 from .transcribe import parse
-
-from cs.py.func import trace
 
 # pylint: disable=too-many-public-methods
 class Config(SingletonMixin, HasThreadState):
@@ -517,7 +517,7 @@ class Config(SingletonMixin, HasThreadState):
       path=None,
       basedir=None,
       follow_symlinks=False,
-      meta_store: Optiona[Store] = None,
+      meta_store: Optional[Store] = None,
       archive=None,
       hashclass=None,
   ):
