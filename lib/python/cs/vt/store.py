@@ -594,6 +594,36 @@ class _PlatonicStore(MappingStore):
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
 
+
+@pfx_method
+def VTDStore(name, path, *, hashclass, index=None, preferred_indexclass=None):
+  ''' Factory to return a `MappingStore` using a `BackingFile`
+      using a single `.vtd` file.
+  '''
+  if hashclass is None:
+    hashclass = DEFAULT_HASHCLASS
+  with Pfx(path):
+    if not path.endswith('.vtd'):
+      warning("does not end with .vtd")
+    if not isfilepath(path):
+      raise ValueError("missing path %r" % (path,))
+    pathbase, _ = splitext(path)
+    if index is None:
+      index_basepath = f"{pathbase}-index-{hashclass.hashname}"
+      indexclass = choose_indexclass(
+          index_basepath, preferred_indexclass=preferred_indexclass
+      )
+      binary_index = indexclass(index_basepath)
+      index = BinaryHashCodeIndex(
+          hashclass=hashclass,
+          binary_index=binary_index,
+          index_entry_class=BackingFileIndexEntry
+      )
+    return MappingStore(
+        name,
+        CompressibleBackingFile(path, hashclass=hashclass, index=index),
+        hashclass=hashclass
+    )
 class ProgressStore(StoreSyncBase):
   ''' A shim for another Store to do progress reporting.
 
