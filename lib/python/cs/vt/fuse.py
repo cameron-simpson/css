@@ -49,11 +49,12 @@ PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 # notional I/O blocksize for stat.st_blksize
 FS_IO_BLOCKSIZE = 4096
 
+@uses_Store
 def mount(
     mnt,
     E,
     *,
-    S=None,
+    S,
     archive=None,
     subpath=None,
     readonly=None,
@@ -65,7 +66,7 @@ def mount(
       Parameters:
       * `mnt`: mount point
       * `E`: Dirent of root Store directory
-      * `S`: optional backing Store, default from defaults.S
+      * `S`: backing Store
       * `archive`: if not `None`, an Archive or similar, with a
         `.update(Dirent[,when])` method
       * `subpath`: relative path from `E` to the directory to attach
@@ -226,11 +227,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
+  @uses_Store
   def __init__(
       self,
       E,
       *,
-      S=None,
+      S,
       archive=None,
       subpath=None,
       options=None,
@@ -242,7 +244,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         Parameters:
         * `E`: the root directory reference
-        * `S`: optional backing Store, default from defaults.S
+        * `S`: backing Store
         * `archive`: if not None, an Archive or similar, with a
           .update(Dirent[,when]) method
         * `subpath`: relative path to mount Dir

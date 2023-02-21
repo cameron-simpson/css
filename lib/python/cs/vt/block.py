@@ -619,7 +619,8 @@ class HashCodeBlock(_Block):
         if hashcode is None:
           raise ValueError("added=%s but no hashcode supplied" % (added,))
       else:
-        h = defaults.S.add(data)
+        S = Store.default()
+        h = S.add(data)
         if hashcode is None:
           hashcode = h
         elif h != hashcode:
@@ -651,7 +652,8 @@ class HashCodeBlock(_Block):
     with self._lock:
       data = self._data
       if data is None:
-        data = self._data = defaults.S[self.hashcode]
+        S = Store.default()
+        data = self._data = S[self.hashcode]
     return data
 
   @classmethod
@@ -659,7 +661,6 @@ class HashCodeBlock(_Block):
   def need_direct_data(cls, blocks, *, S):
     ''' Bulk request the direct data for `blocks`.
     '''
-    S = defaults.S
     Rs = []
     for B in blocks:
       try:
@@ -741,13 +742,14 @@ class HashCodeBlock(_Block):
     return B, offset
 
   @io_fail
-  def fsck(self, recurse=False):  # pylint: disable=unused-argument
+  @uses_Store
+  def fsck(self, *, recurse=False, S):  # pylint: disable=unused-argument
     ''' Check this HashCodeBlock.
     '''
     ok = True
     hashcode = self.hashcode
     with Pfx(hashcode):
-      with defaults.S as S:
+      with S:
         try:
           data = S[hashcode]
         except KeyError:
@@ -886,14 +888,15 @@ class IndirectBlock(_Block):
     superB, offset = parse(s, offset, T)
     return cls(superB, span), offset
 
-  def datafrom(self, start=0, end=None):
+  @uses_Store
+  def datafrom(self, *, start=0, end=None, S):
     ''' Yield data from a point in the Block.
     '''
     if end is None:
       end = self.span
     if start >= end:
       return
-    block_cache = defaults.S.block_cache
+    block_cache = S.block_cache
     if block_cache:
       try:
         bm = block_cache[self.hashcode]

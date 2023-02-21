@@ -1075,7 +1075,7 @@ class PlatonicDir(FilesDir):
         data directory path.
     '''
     if meta_store is None:
-      meta_store = defaults.S
+      meta_store = Store.default()
     super().__init__(topdirpath, hashclass=hashclass, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path

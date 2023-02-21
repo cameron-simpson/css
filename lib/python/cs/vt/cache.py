@@ -531,7 +531,8 @@ class BlockTempfile:
         tempf.seek(offset)
       return tempf.write(data)
 
-  def append_block(self, block, runstate):
+  @uses_Store
+  def append_block(self, block, runstate, *, S):
     ''' Add a Block to this tempfile.
 
         Parameters:
@@ -554,7 +555,7 @@ class BlockTempfile:
     T = Thread(
         name="%s._infill(%s)" % (type(self).__name__, block),
         target=self._infill,
-        args=(defaults.S, bm, offset, block, runstate)
+        args=(S, bm, offset, block, runstate)
     )
     T.daemon = True
     T.start()

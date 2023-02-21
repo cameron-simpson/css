@@ -232,7 +232,7 @@ class _Defaults(ThreadState):
     with stackattrs(common, S=S):
       yield
 
-defaults = _Defaults()
+NOdefaults = _Defaults()
 
 class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             RunStateMixin, ABC):
@@ -674,4 +674,4 @@ class StoreAsyncBase(Store):
 def uses_Store(func):
   ''' Decorator to provide the default Store as the parameter `S`.
   '''
-  return default_params(func, S=lambda: defaults.S)
+  return default_params(func, S=Store.default())

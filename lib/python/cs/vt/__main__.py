@@ -289,8 +289,8 @@ class VTCmd(BaseCommand):
               else:
                 add_bar_cmgr = nullcontext()
                 get_bar_cmgr = nullcontext()
-              with defaults(common_S=S):
-                with S:
+              with S:
+                with stackattrs(options, S=S):
                   with add_bar_cmgr:
                     with get_bar_cmgr:
                       yield
@@ -747,7 +747,7 @@ class VTCmd(BaseCommand):
         else:
           raise RuntimeError("unhandled option: %r" % (opt,))
     # special is either a D{dir} or [clause] or an archive pathname
-    mount_store = defaults.S
+    mount_store = Store.default()
     special_basename = None
     # the special may derive directly from a config Store clause
     try:
@@ -1038,7 +1038,7 @@ class VTCmd(BaseCommand):
     if not argv:
       raise GetoptError("missing other_store")
     srcS = self.popStore(argv, "other_store")
-    dstS = defaults.S
+    dstS = options.S
     if not argv:
       pushables = (srcS,)
     else:
@@ -1065,7 +1065,7 @@ class VTCmd(BaseCommand):
     options = self.options
     if not argv:
       raise GetoptError("missing other_store")
-    srcS = defaults.S
+    srcS = options.S
     dstS = self.popStore(argv, "other_store")
     if not argv:
       # default is to push the entire source Store to the destination
@@ -1161,6 +1161,7 @@ class VTCmd(BaseCommand):
           otherwise the named Stores are exported with the first being
           served initially.
     '''
+    options = self.options
     if argv:
       address = argv.pop(0)
     else:
@@ -1178,7 +1179,7 @@ class VTCmd(BaseCommand):
       except KeyError:
         raise GetoptError("[server] clause: no address field")
     if not argv:
-      exports = {'': defaults.S}
+      exports = {'': options.S}
     else:
       exports = {}
       for named_store_spec in argv:
@@ -1219,7 +1220,7 @@ class VTCmd(BaseCommand):
       # path/to/socket
       socket_path = expand_path(address)
       track("dispatch serve_socket(%r,...)", socket_path)
-      with defaults.S:
+      with options.S:
         srv = serve_socket(socket_path=socket_path, exports=exports)
       srv.join()
     else:
@@ -1232,7 +1233,7 @@ class VTCmd(BaseCommand):
         if not host:
           host = '127.0.0.1'
         port = int(port)
-        with defaults.S:
+        with options.S:
           srv = serve_tcp(bind_addr=(host, port), exports=exports)
           runstate.notify_cancel.add(lambda runstate: srv.shutdown_now())
         srv.join()
