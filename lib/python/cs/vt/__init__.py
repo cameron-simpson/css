@@ -217,10 +217,6 @@ class _Defaults(ThreadState):
     self.block_cache = None
     self.show_progress = False
 
-  @property
-  def config(self):
-    return Config.default(factory=True)
-
   def __getattr__(self, attr):
     if attr == 'S':
       S = common.S
