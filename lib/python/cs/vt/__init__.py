@@ -408,8 +408,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def __enter_exit__(self):
     with HasThreadState.as_contextmanager(self):
       with MultiOpenMixin.as_contextmanager(self):
-        with defaults(S=self):
-          yield
+        yield
 
   ##########################
   ## MultiOpenMixin methods.
@@ -514,7 +513,8 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     ''' The configuration for use with this Store.
         Falls back to `defaults.config`.
     '''
-    return self._config or defaults.config
+    from .config import Config
+    return self._config or Config.default()
 
   @config.setter
   def config(self, new_config):
