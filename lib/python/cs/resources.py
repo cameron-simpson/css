@@ -13,6 +13,8 @@ import sys
 from threading import Condition, Lock, RLock, current_thread, main_thread
 import time
 
+from typeguard import typechecked
+
 from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
 from cs.deco import default_params
 from cs.gimmicks import error, warning, nullcontext
@@ -745,7 +747,7 @@ class RunStateMixin(object):
       Provides: `.runstate`, `.cancelled`, `.running`, `.stopping`, `.stopped`.
   '''
 
-  @uses_runstate
+  @typechecked
   def __init__(self, runstate: RunState):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
