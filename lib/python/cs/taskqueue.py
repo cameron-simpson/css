@@ -20,7 +20,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import funcname
 from cs.queues import ListQueue
-from cs.resources import RunState, RunStateMixin
+from cs.resources import RunState, RunStateMixin, uses_runstate
 from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, State as ThreadState, HasThreadState
@@ -108,6 +108,7 @@ class BaseTask(FSM, RunStateMixin):
       definition to provide this default in the usual way.
   '''
 
+  @uses_runstate
   def __init__(self, *, state=None, runstate=None):
     FSM.__init__(self, state)
     RunStateMixin.__init__(self, runstate)
