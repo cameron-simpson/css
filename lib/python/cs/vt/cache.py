@@ -13,18 +13,15 @@ from os.path import isdir as isdirpath
 from tempfile import TemporaryFile
 from threading import Thread
 
-from icontract import require
-
 from cs.context import stackattrs
 from cs.fileutils import RWFileBlockCache, datafrom_fd
 from cs.logutils import error
 from cs.pfx import pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin
-from cs.result import Result
 from cs.threads import bg as bg_thread
 
-from . import MAX_FILE_SIZE, Lock, RLock, Store, uses_Store, StoreSyncBase
+from . import MAX_FILE_SIZE, Lock, RLock, uses_Store
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
 DEFAULT_MAX_CACHEFILES = 3
@@ -40,6 +37,7 @@ class CachedData(_CachedData):
     '''
     return self.cachefile.get(self.offset, self.length)
 
+# pylint: disable=too-many-instance-attributes
 class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
   ''' Mapping-like class to cache data chunks to bypass gdbm indices and the like.
       Data are saved immediately into an in memory cache and an asynchronous
@@ -430,6 +428,7 @@ class BlockTempfile:
     T.start()
     return bm
 
+  # pylint: disable=too-many-arguments
   def _infill(self, S, bm, offset, block, runstate):
     ''' Load the Block data into the tempfile,
         updating the `BlockMapping.filled` attribute as we go.
@@ -451,7 +450,7 @@ class BlockCache:
   ''' A temporary file based cache for whole Blocks.
 
       This is to support filesystems' and files' direct read/write
-      actions by passing them straight through to this cache is
+      actions by passing them straight through to this cache if
       there's a mapping.
 
       We accrue complete Block contents in unlinked files.
