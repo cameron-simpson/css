@@ -11,17 +11,45 @@
 '''
 
 from contextlib import contextmanager
+from json import JSONDecodeError
 from threading import RLock
 import time
-from typing import Mapping
+from typing import Mapping, Set
 
+from icontract import require
 import requests
 
 from cs.context import stackattrs
 from cs.deco import promote
 from cs.fstags import FSTags
+from cs.logutils import warning
+from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin
-from cs.sqltags import SQLTags
+from cs.sqltags import SQLTags, SQLTagSet
+from cs.upd import uses_upd
+
+__version__ = '20230217-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 3 - Alpha",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.context',
+        'cs.deco',
+        'cs.fstags',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.resources',
+        'cs.sqltags',
+        'cs.upd',
+        'icontract',
+        'requests',
+    ],
+}
 
 class ServiceAPI(MultiOpenMixin):
   ''' `SewrviceAPI` base class for other APIs talking to services.
@@ -63,27 +91,115 @@ class ServiceAPI(MultiOpenMixin):
     '''
     return None
 
-  @property
-  def login_state(self):
-    ''' The login state, a mapping. Performs a login if necessary.
+  def get_login_state(self, do_refresh=False) -> SQLTagSet:
+    ''' The login state, a mapping. Performs a login if necessary
+        or if `do_refresh` is true (default `False`).
     '''
     with self._lock:
-      state = self.login_state_mapping
-      if not state or (
+      state = self.sqltags['login.state']
+      if do_refresh or not state or (
           self.API_AUTH_GRACETIME is not None
-          and time.time() + self.API_AUTH_GRACETIME >= self.login_expiry):
-        self.login_state_mapping = None
-        # not logged in or login about to expire
-        state = self.login_state_mapping = self.login()
+          and time.time() + self.API_AUTH_GRACETIME >= state.expiry):
+        for k, v in self.login().items():
+          if k not in ('id', 'name'):
+            state[k] = v
     return state
 
+  @property
+  def login_state(self) -> SQLTagSet:
+    ''' The login state, a mapping. Performs a login if necessary.
+    '''
+    return self.get_login_state()
+
+  def available(self) -> Set[SQLTagSet]:
+    ''' Return a set of the `SQLTagSet` instances representing available
+        items at the service, for example purchased books
+        available to your login.
+    '''
+    raise NotImplementedError
+
 class HTTPServiceAPI(ServiceAPI):
-  ''' `HTTPSewrviceAPI` base class for other APIs talking to HTTP services.
+  ''' `HTTPServiceAPI` base class for other APIs talking to HTTP services.
+
+      Subclasses must define:
+      * `API_BASE`: the base URL of API calls.
+        For example, the `PlayOnAPI` defines this as `f'https://{API_HOSTNAME}/v3/'`.
   '''
 
-  def __init__(self, **kw):
+  def __init__(self, api_hostname=None, *, default_headers=None, **kw):
+    if api_hostname is None:
+      api_hostname = self.API_HOSTNAME
+    else:
+      self.API_HOSTNAME = api_hostname
+      self.API_BASE = f'https://{api_hostname}/'
+    if default_headers is None:
+      default_headers = {}
     super().__init__(**kw)
-    self._cookies = requests.cookies.RequestsCookieJar()
+    session = self.session = requests.Session()
+    # mapping of method names to requests convenience calls
+    self.REQUESTS_METHOD_CALLS = {
+        'GET': session.get,
+        'POST': session.post,
+        'HEAD': session.head,
+    }
+    self.cookies = session.cookies
+    self.default_headers = default_headers
+
+  @uses_upd
+  @require(lambda suburl: not suburl.startswith('/'))
+  def suburl(
+      self,
+      suburl,
+      *,
+      _base_url=None,
+      _method='GET',
+      _no_raise_for_status=False,
+      cookies=None,
+      headers=None,
+      upd,
+      **rqkw,
+  ):
+    ''' Request `suburl` from the service, by default using a `GET`.
+        The `suburl` must be a URL subpath not commencing with `'/'`.
+
+        Keyword parameters:
+        * `_base_url`: the base request domain, default from `self.API_BASE`
+        * `_method`: the request method, default `'GET'`
+        * `_no_raise_for_status`: do not raise an HTTP error if the
+          response status is not 200, default `False` (raise if not 200)
+        * `cookies`: optional cookie jar, default from `self.cookies`
+        Other keyword parameters are passed to the requests method.
+    '''
+    rqm = self.REQUESTS_METHOD_CALLS[_method]
+    if _base_url is None:
+      _base_url = self.API_BASE
+    if cookies is None:
+      cookies = self.cookies
+    url = _base_url + suburl
+    rq_headers = {}
+    rq_headers.update(self.default_headers)
+    if headers is not None:
+      rq_headers.update(headers)
+    with upd.run_task(f'{_method} {url}'):
+      rsp = pfx_call(rqm, url, cookies=cookies, headers=rq_headers, **rqkw)
+    if not _no_raise_for_status:
+      rsp.raise_for_status()
+    return rsp
+
+  def json(self, suburl, _response_encoding=None, **kw):
+    ''' Request `suburl` from the service, by default using a `GET`.
+        Return the result decoded as JSON.
+
+        Parameters are as for `HTTPServiceAPI.suburl`.
+    '''
+    rsp = self.suburl(suburl, **kw)
+    if _response_encoding is not None:
+      rsp.encoding = _response_encoding
+    try:
+      return rsp.json()
+    except JSONDecodeError as e:
+      warning("response is not JSON: %s\n%r", e, rsp)
+      raise
 
 # pylint: disable=too-few-public-methods
 class RequestsNoAuth(requests.auth.AuthBase):

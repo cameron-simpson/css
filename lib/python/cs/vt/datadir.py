@@ -49,8 +49,8 @@ from os import (
     SEEK_END,
 )
 from os.path import (
-    basename, exists as existspath, isdir as isdirpath, isfile as isfilepath,
-    join as joinpath, realpath, relpath
+    basename, exists as existspath, isfile as isfilepath, join as joinpath,
+    realpath, relpath
 )
 import sqlite3
 import stat
@@ -59,7 +59,7 @@ from time import time, sleep
 from types import SimpleNamespace
 from uuid import uuid4
 
-from icontract import ensure, require
+from icontract import require
 from typeguard import typechecked
 
 from cs.app.flag import DummyFlags, FlaggedMixin
@@ -80,24 +80,24 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress, progressbar
 from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
-from cs.resources import MultiOpenMixin, RunStateMixin
+from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.seq import imerge
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
-from cs.upd import upd_proxy, state as upd_state, print
+from cs.upd import with_upd_proxy, UpdProxy, uses_upd
 
 from . import MAX_FILE_SIZE, Lock, RLock, defaults
 from .archive import Archive
 from .block import Block
 from .blockify import (
-    DEFAULT_SCAN_SIZE, blocked_chunks_of2, spliced_blocks, top_block_for
+    DEFAULT_SCAN_SIZE, blocked_chunks_of, spliced_blocks, top_block_for
 )
 from .datafile import DataRecord, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
 from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
 from .index import choose as choose_indexclass, FileDataIndexEntry
 from .parsers import scanner_from_filename
-from .util import createpath, openfd_read, openfd_append
+from .util import createpath, openfd_read
 
 ##_sleep = sleep
 ##
@@ -200,7 +200,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     '''
     if indexclass is None:
       indexclass = choose_indexclass(
-          cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.HASHNAME)
+          cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.hashname)
       )
     if rollover is None:
       rollover = cls.DATA_ROLLOVER
@@ -305,7 +305,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     self.indexclass = resolved.indexclass
     self.rollover = resolved.rollover
     self.hashclass = hashclass
-    self.hashname = hashclass.HASHNAME
+    self.hashname = hashclass.hashname
     self.statefilepath = self.pathto(
         self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
     )
@@ -342,13 +342,13 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     needdir(self.datapath, log=warning)
 
   @contextmanager
-  def startup_shutdown(self):
+  @uses_upd
+  @uses_runstate
+  def startup_shutdown(self, *, upd, runstate: RunState):
     ''' Start up and shut down the `FilesDir`: take locks, start worker threads etc.
     '''
     with super().startup_shutdown():
       self.initdir()
-      upd = upd_state.upd
-      runstate = self.runstate
       hashname = self.hashname
       # cache of open DataFiles
       cache = LRU_Cache(
@@ -840,8 +840,8 @@ class DataDir(FilesDir):
     bfr = CornuCopyBuffer.from_filename(filepath, offset=offset)
     yield from DataRecord.scan_with_offsets(bfr)
 
-  @upd_proxy
-  def _monitor_datafiles(self):
+  @with_upd_proxy
+  def _monitor_datafiles(self, *, upd_proxy: UpdProxy):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
 
         This is what supports shared use of the data area. Other clients
@@ -849,7 +849,6 @@ class DataDir(FilesDir):
         and new data in existing files and scans them, adding the index
         information to the local state.
     '''
-    proxy = self._monitor_proxy
     index = self.index
     filemap = self._filemap
     datadirpath = self.datapath
@@ -858,7 +857,7 @@ class DataDir(FilesDir):
         sleep(0.1)
         continue
       # scan for new datafiles
-      with proxy.extend_prefix(" check datafiles"):
+      with upd_proxy.extend_prefix(" check datafiles"):
         with Pfx("listdir(%r)", datadirpath):
           try:
             listing = list(os.listdir(datadirpath))
@@ -872,7 +871,7 @@ class DataDir(FilesDir):
           if (not filename.startswith('.')
               and filename.endswith(DATAFILE_DOT_EXT)
               and filename not in filemap):
-            with proxy.extend_prefix(" add " + filename):
+            with upd_proxy.extend_prefix(" add " + filename):
               info("MONITOR: add new filename %r", filename)
               filemap.add_path(filename)
       # now scan known datafiles for new data
@@ -1143,10 +1142,10 @@ class PlatonicDir(FilesDir):
     return DF
 
   @pfx_method(use_str=True)
-  def _monitor_datafiles(self):
+  @with_upd_proxy
+  def _monitor_datafiles(self, *, upd_proxy: UpdProxy):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
-    proxy = self._monitor_proxy
     datadirpath = self.datapath
     disabled = False
     while not self.cancelled:
@@ -1159,14 +1158,14 @@ class PlatonicDir(FilesDir):
       if disabled:
         info("scan %r ENABLED", shortpath(datadirpath))
         disabled = False
-      self._scan_datatree(proxy=proxy)
+      self._scan_datatree(upd_proxy=upd_proxy)
 
-  def _scan_datatree(self, *, proxy):
+  def _scan_datatree(self, *, upd_proxy: UpdProxy):
     topdir = self.topdir
     # scan for new datafiles
     seen = set()
     info("scan %s ... ", self.datapath)
-    with proxy.extend_prefix("walk "):
+    with upd_proxy.extend_prefix("walk "):
       updated = False
       for dirpath, dirnames, filenames in os.walk(self.datapath,
                                                   followlinks=True):
@@ -1213,7 +1212,7 @@ class PlatonicDir(FilesDir):
                 info("del %r", name)
                 del D[name]
           if filenames:
-            with (proxy.extend_prefix(f'{rdirpath}/ ')
+            with (upd_proxy.extend_prefix(f'{rdirpath}/ ')
                   if filenames else nullcontext()):
               for filename in filenames:
                 with Pfx(filename):
@@ -1225,10 +1224,10 @@ class PlatonicDir(FilesDir):
                   filepath = joinpath(dirpath, filename)
                   if not isfilepath(filepath):
                     continue
-                  proxy.text = f'scan {filename!r}'
+                  upd_proxy.text = f'scan {filename!r}'
                   try:
                     updated |= self._scan_datafile(
-                        D, filename, rfilepath, proxy=proxy
+                        D, filename, rfilepath, upd_proxy=upd_proxy
                     )
                   except Exception as e:
                     warning(
@@ -1241,7 +1240,7 @@ class PlatonicDir(FilesDir):
           updated = False
     self.flush()
 
-  def _scan_datafile(self, D, filename, rfilepath, *, proxy):
+  def _scan_datafile(self, D, filename, rfilepath, *, upd_proxy: UpdProxy):
     ''' Scan the data file at `data/{rfilepath}`, record as `D[filename]`.
         Return a Boolean indicating whether `D` was updated.
     '''
@@ -1269,7 +1268,7 @@ class PlatonicDir(FilesDir):
     if new_size is None:
       # skip non files
       debug("SKIP non-file")
-      return
+      return updated
     try:
       E = D[filename]
     except KeyError:
@@ -1289,7 +1288,8 @@ class PlatonicDir(FilesDir):
           "DFstate.scanned_to:%s != len(E.block):%s" %
           (DFstate.scanned_to, len(current_block))
       )
-      R = self.meta_store._defer(
+      # splice the newly scanned data into the existing data
+      top_block_result = self.meta_store._defer(
           lambda B, Q: top_block_for(spliced_blocks(B, Q)), current_block,
           blockQ
       )
@@ -1299,12 +1299,12 @@ class PlatonicDir(FilesDir):
       if 1:
         scanner = progressbar(
             scanner,
-            "scan " + rfilepath[:max(16, proxy.width - 60)],
+            "scan " + rfilepath[:max(16, upd_proxy.width - 60)],
             position=DFstate.scanned_to,
             total=new_size,
             itemlenfunc=lambda t3: t3[2] - t3[0],
             update_frequency=256,
-            proxy=proxy,
+            proxy=upd_proxy,
             units_scale=BINARY_BYTES_SCALE,
             report_print=True,
         )
@@ -1324,9 +1324,10 @@ class PlatonicDir(FilesDir):
         DFstate.scanned_to = post_offset
         if self.cancelled or self.flag_scan_disable:
           break
+      # now collect the top block of the spliced data
       blockQ.close()
       try:
-        top_block = R()
+        top_block = top_block_result()
       except MissingHashcodeError as e:
         error("missing data, forcing rescan: %s", e)
         DFstate.scanned_to = 0
@@ -1363,8 +1364,8 @@ class PlatonicDir(FilesDir):
     scanner = scanner_from_filename(filepath)
     with open(filepath, 'rb') as fp:
       fp.seek(offset)
-      for data in blocked_chunks_of2(read_from(fp, DEFAULT_SCAN_SIZE),
-                                     scanner=scanner):
+      for data in blocked_chunks_of(read_from(fp, DEFAULT_SCAN_SIZE),
+                                    scanner=scanner):
         post_offset = offset + len(data)
         yield offset, data, post_offset
         offset = post_offset

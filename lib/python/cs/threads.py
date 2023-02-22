@@ -13,9 +13,10 @@ from contextlib import contextmanager
 from heapq import heappush, heappop
 from inspect import ismethod
 import sys
-from threading import Semaphore, Thread, Lock, local as thread_local
+from threading import Semaphore, Thread as builtin_Thread, Lock, local as thread_local
+from typing import Any, Mapping, Optional
 
-from cs.context import ContextManagerMixin, stackattrs
+from cs.context import ContextManagerMixin, stackattrs, stackset
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
 from cs.gimmicks import error, warning
@@ -23,7 +24,7 @@ from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
 
-__version__ = '20221228-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'description':
@@ -31,7 +32,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -84,28 +84,124 @@ class State(thread_local):
     with stackattrs(self, **kw) as prev_attrs:
       yield prev_attrs
 
+# TODO: what to do about overlapping HasThreadState usage of a particular class?
 class HasThreadState(ContextManagerMixin):
   ''' A mixin for classes with a `cs.threads.State` instance as `.state`
       providing a context manager which pushes `current=self` onto that state
       and a `default()` class method returning `cls.state.current`
       as the default instance of that class.
+
+      *NOTE*: the documentation here refers to `cls.state`, but in
+      fact we honour the `cls.THREAD_STATE_ATTR` attribute to name
+      the state attribute which allows perclass state attributes,
+      and also use with classes which already use `.state` for
+      another purpose.
   '''
+
+  _HasThreadState_lock = Lock()
+  _HasThreadState_classes = set()
 
   # the default name for the Thread state attribute
   THREAD_STATE_ATTR = 'state'
 
   @classmethod
-  def default(cls):
+  def default(cls, raise_on_None=False):
     ''' The default instance of this class from `cls.state.current`.
+
+        The optional `raise_on_None` parameter may be true
+        in which case a `RuntimeError` will be raised
+        if `cls.state.current` is `None` or missing.
     '''
-    return getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
+    current = getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
+    if current is None:
+      if raise_on_None:
+        raise RuntimeError(
+            "%s.default: %s.%s.current is missing/None and ifNone is None" %
+            (cls.__name__, cls.__name__, cls.THREAD_STATE_ATTR)
+        )
+    return current
 
   def __enter_exit__(self):
     ''' Push `self.state.current=self` as the `Thread` local current instance.
+
+        Include `self.__class__` in the set of currently active classes for the duration.
     '''
-    state = getattr(self, self.THREAD_STATE_ATTR)
-    with state(current=self):
+    cls = self.__class__
+    with cls._HasThreadState_lock:
+      stacked = stackset(cls._HasThreadState_classes, cls)
+    with stacked:
+      state = getattr(cls, cls.THREAD_STATE_ATTR)
+      with state(current=self):
+        yield
+
+  @classmethod
+  def thread_states(cls):
+    ''' Return a mapping of `class`->*current_instance*`
+        for use with `HasThreadState.with_thread_states`.
+    '''
+    with cls._HasThreadState_lock:
+      currency = {
+          htscls: getattr(htscls, htscls.THREAD_STATE_ATTR).current
+          for htscls in cls._HasThreadState_classes
+      }
+    return currency
+
+  @classmethod
+  @contextmanager
+  def with_thread_states(
+      cls, thread_states: Optional[Mapping[type, Any]] = None
+  ):
+    ''' Context manager to push all the current objects from `thread_states`
+        by calling each as a context manager.
+
+        The default `thread_states` comes from `HasThreadState.thread_states()`.
+    '''
+    if thread_states is None:
+      thread_states = cls.thread_states()
+    if not thread_states:
       yield
+    else:
+      state_iter = iter(list(thread_states.values()))
+
+      def with_thread_states_pusher():
+        try:
+          htsobj = next(state_iter)
+        except StopIteration:
+          yield
+        else:
+          with htsobj:
+            yield from with_thread_states_pusher()
+
+      yield from with_thread_states_pusher()
+
+  @classmethod
+  def Thread(cls, *Thread_a, target, thread_states=None, **Thread_kw):
+    ''' Factory for a `Thread` to push the `.current` state for the
+        currently active classes.
+
+        The optional parameter `thread_states`
+        may be used to pass an explicit mapping of thread states to use;
+        the default states come from `HasThreadState.thread_states()`.
+        A boolean value may also be passed meaning:
+        * `False`: do not apply any thread states
+        * `True`: apply the default thread states
+    '''
+    # snapshot the .current states in the source Thread
+    if thread_states is None or thread_states is True:
+      thread_states = cls.thread_states()
+    if thread_states:
+
+      def target_wrapper(*a, **kw):
+        ''' Wrapper for the `Thread.target` to push the source `.current`
+            states in the new Thread before running the target.
+        '''
+        with cls.with_thread_states(thread_states):
+          return target(*a, **kw)
+    else:
+      # no state to prepare, eschew the wrapper
+      target_wrapper = target
+
+    return builtin_Thread(*Thread_a, target=target_wrapper, **Thread_kw)
 
 # pylint: disable=too-many-arguments
 def bg(
@@ -114,6 +210,7 @@ def bg(
     name=None,
     no_start=False,
     no_logexc=False,
+    thread_states=None,
     args=None,
     kwargs=None
 ):
@@ -128,6 +225,7 @@ def bg(
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
+      * `thread_states`: passed to `HasThreadState.Thread`
       * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
@@ -144,7 +242,11 @@ def bg(
     with Pfx(thread_prefix):
       return func(*args, **kwargs)
 
-  T = Thread(name=thread_prefix, target=thread_body)
+  T = HasThreadState.Thread(
+      name=thread_prefix,
+      target=thread_body,
+      thread_states=thread_states,
+  )
   if not no_logexc:
     func = logexc(func)
   if daemon is not None:

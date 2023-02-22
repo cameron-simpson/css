@@ -5,25 +5,30 @@
 '''
 
 from contextlib import nullcontext
-from os.path import basename, dirname
+from os.path import basename, dirname, exists as existspath
 
 from typeguard import typechecked
 
+from cs.lex import r
 from cs.logutils import warning
-from cs.pfx import Pfx
-from cs.resources import RunState
-from cs.upd import state as upd_state
+from cs.pfx import Pfx, pfx_call
+from cs.resources import RunState, uses_runstate
+from cs.upd import Upd, uses_upd
 
 from . import defaults
 from .dir import Dir, FileDirent
-from .paths import DirLike
+from .paths import DirLike, OSDir
 
+@uses_upd
+@uses_runstate
+@uses_upd
 @typechecked
 def merge(
     target_root: DirLike,
     source_root: DirLike,
     *,
     runstate: RunState,
+    upd: Upd,
 ):
   ''' Merge contents of the DirLike `source_root`
       into the DirLike `target_root`.
@@ -32,6 +37,7 @@ def merge(
       * `target_root`: a `DirLike` to receive contents
       * `source_root`: a `DirLike` from which to obtain contents
       * `runstate`: a `RunState` to support cancellation
+      * `upd`: an `Upd` for displaying progress
 
       TODO: apply .stat results to merge targets.
       TODO: many modes for conflict resolution.
@@ -42,7 +48,7 @@ def merge(
   if not target_root.exists():
     target_root.create()
   if defaults.show_progress:
-    proxy_cmgr = upd_state.upd.insert(1)
+    proxy_cmgr = upd.insert(1)
   else:
     proxy_cmgr = nullcontext()
   with proxy_cmgr as proxy:
@@ -73,6 +79,7 @@ def merge(
         else:
           warning("conflicting item in target: not a directory")
           ok = False
+          continue
         # import files
         for filename in filenames:
           with Pfx(filename):
@@ -92,12 +99,27 @@ def merge(
             targetf = target.get(filename)
             if targetf is None:
               # new file
-              if isinstance(target, Dir) and isinstance(sourcef, FileDirent):
-                # create FileDirent from block
-                target[filename] = FileDirent(sourcef.block)
+              if isinstance(target, Dir):
+                # we can put a file in target
+                if isinstance(sourcef, FileDirent):
+                  # create FileDirent from block
+                  target[filename] = FileDirent(sourcef.block)
+                else:
+                  # copy data
+                  targetf = target.file_fromchunks(
+                      filename, sourcef.datafrom()
+                  )
+              elif isinstance(target, OSDir):
+                filepath = target.pathto(filename)
+                assert not existspath(filepath)
+                with pfx_call(open, filepath, 'wb') as f:
+                  for bs in sourcef.datafrom():
+                    assert f.write(bs) == len(bs)
               else:
-                # copy data
-                targetf = target.file_fromchunks(filename, sourcef.datafrom())
+                raise RuntimeError(
+                    "do not know how to write a file to %s[filename=%r]" %
+                    (r(target), filename)
+                )
             else:
               warning("conflicting target file")
               ok = False

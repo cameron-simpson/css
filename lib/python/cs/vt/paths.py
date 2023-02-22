@@ -12,10 +12,14 @@ import errno
 import os
 from os.path import dirname, join as joinpath, exists as pathexists
 from stat import S_ISDIR
+
 from cs.buffer import CornuCopyBuffer
+from cs.deco import promote
 from cs.fileutils import datafrom
+from cs.fs import HasFSPath
 from cs.logutils import warning
 from cs.pfx import Pfx
+
 from . import PATHSEP
 from .transcribe import parse
 
@@ -169,15 +173,16 @@ class DirLike(ABC):
     raise NotImplementedError("no %s.mkdir" % (type(self),))
 
   @abstractmethod
-  def file_frombuffer(self, name, bfr):
+  def file_frombuffer(self, name, bfr: CornuCopyBuffer):
     ''' Contruct a new file containing data from `bfr`.
     '''
     raise NotImplementedError("no %s.file_frombuffer" % (type(self),))
 
-  def file_fromchunks(self, name, chunks):
-    ''' Create a new file named `name` from the data in `chunks`.
+  @promote
+  def file_fromchunks(self, name, bfr: CornuCopyBuffer):
+    ''' Create a new file named `name` from the data in `bfr`.
     '''
-    return self.file_frombuffer(name, CornuCopyBuffer(chunks))
+    return self.file_frombuffer(name, bfr)
 
   def resolve(self, rpath):
     ''' Resolve `rpath` relative to `self`, return resolved node or `None`.
@@ -257,18 +262,22 @@ class FileLike(ABC):
     '''
     return CornuCopyBuffer(self.datafrom())
 
-class OSDir(DirLike):
+class OSDir(DirLike, HasFSPath):
   ''' DirLike class for an OS directory.
   '''
 
-  def __init__(self, path):
-    if not path:
-      path = '.'
+  def __init__(self, fspath):
+    if not fspath:
+      fspath = '.'
     DirLike.__init__(self)
-    self.path = path
+    HasFSPath.__init__(self, fspath)
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.path)
+
+  @property
+  def path(self):
+    return self.fspath
 
   def keys(self):
     ''' Directory entry names.
@@ -281,7 +290,7 @@ class OSDir(DirLike):
   def __getitem__(self, name):
     if name not in self.keys():
       raise KeyError(name)
-    namepath = joinpath(self.path, name)
+    namepath = self.pathto(name)
     try:
       S = os.stat(namepath)
     except OSError as e:
@@ -294,7 +303,7 @@ class OSDir(DirLike):
 
   def __delitem__(self, name):
     self.check_subname(name)
-    os.remove(joinpath(self.path, name))
+    os.remove(self.pathto(name))
 
   def lstat(self):
     with Pfx("lstat(%r)", self.path):
@@ -330,32 +339,36 @@ class OSDir(DirLike):
       raise ValueError(
           "name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name)
       )
-    subpath = joinpath(self.path, name)
+    subpath = self.pathto(name)
     with Pfx("mkdir(%r)", subpath):
       os.mkdir(subpath)
     return OSDir(subpath)
 
-  def file_frombuffer(self, name, bfr):
+  def file_frombuffer(self, name, bfr: CornuCopyBuffer):
     ''' Create a new file from data from a `CornuCopyBuffer`.
     '''
     if not name or PATHSEP in name:
       raise ValueError(
           "name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name)
       )
-    subpath = joinpath(self.path, name)
+    subpath = self.pathto(name)
     with Pfx('write %r', subpath):
       with open(subpath, 'wb') as f:
         for data in bfr:
           f.write(data)
     return OSFile(subpath)
 
-class OSFile(FileLike):
+class OSFile(FileLike, HasFSPath):
   ''' FileLike class for an OS file.
   '''
 
-  def __init__(self, path):
+  def __init__(self, fspath):
     FileLike.__init__(self)
-    self.path = path
+    HasFSPath.__init__(self, fspath)
+
+  @property
+  def path(self):
+    return self.fspath
 
   def lstat(self):
     with Pfx("lstat(%r)", self.path):

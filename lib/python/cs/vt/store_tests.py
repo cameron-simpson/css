@@ -22,7 +22,7 @@ from cs.debug import thread_dump
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
-from . import _TestAdditionsMixin
+
 from .cache import FileCacheStore, MemoryCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashCode, HASHCLASS_BY_NAME
@@ -32,6 +32,7 @@ from .socket import (
 )
 from .store import MappingStore, DataDirStore, ProxyStore
 from .stream import StreamStore
+from .testsutil import _TestAdditionsMixin
 
 HASHCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__HASHCLASS_NAMES'
 INDEXCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__INDEXCLASS_NAMES'

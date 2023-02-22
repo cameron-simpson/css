@@ -1282,7 +1282,7 @@ def parse_action(action, do_trace):
     def substitute(P):
       ''' Perform a regexp substitution on the source string.
           `repl_format` is a format string for the replacement text
-          using the str.format method.
+          using the `str.format` method.
           The matched groups from the regexp take the positional arguments 1..n,
           with 0 used for the whole matched string.
           The keyword arguments consist of '_' for the whole matched string
@@ -1312,7 +1312,7 @@ def parse_action(action, do_trace):
       strs.append(src[offset:])
       result = ''.join(strs)
       debug("SUBSTITUTE: src=%r, result=%r", src, result)
-      if isURL(src):
+      if isinstance(src, URL):
         result = URL(result, src.referer)
       return result
 

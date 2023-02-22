@@ -88,7 +88,7 @@ from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
 from cs.context import stackattrs
 from cs.csvutils import csv_import
-from cs.deco import cachedmethod, decorator, promote
+from cs.deco import cachedmethod, decorator, promote, Promotable
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
@@ -103,7 +103,7 @@ from cs.resources import MultiOpenMixin
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220918-post'
+__version__ = '20230217-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -133,7 +133,7 @@ DISTINFO = {
         'cs.resources',
         'cs.result',
         'cs.upd',
-        'dateutil',
+        'python-dateutil',
         'icontract',
         'matplotlib',
         'numpy',
@@ -161,7 +161,7 @@ pfx_listdir = partial(pfx_call, os.listdir)
 pfx_mkdir = partial(pfx_call, os.mkdir)
 pfx_open = partial(pfx_call, open)
 
-class TypeCode(str):
+class TypeCode(str, Promotable):
   ''' A valid `array` typecode with convenience methods.
   '''
 
@@ -203,14 +203,14 @@ class TypeCode(str):
         * `int`: `array` type code `q` (signed 64 bit)
         * `float`: `array` type code `d` (double float)
     '''
-    if not isinstance(t, cls):
-      if isinstance(t, (str, type)):
-        t = cls(t)
-      else:
-        raise TypeError(
-            "cannot promote %s to %s, expect str or type" % (r(t), cls)
-        )
-    return t
+    if isinstance(t, cls):
+      return t
+    if isinstance(t, (str, type)):
+      return cls(t)
+    raise TypeError(
+        "%s.promote: cannot promote %s, expect str or type" %
+        (cls.__name__, r(t))
+    )
 
   @property
   def type(self):
@@ -1006,13 +1006,14 @@ def plot_events(
   ax.scatter(xaxis, yaxis, **scatter_kw)
   return ax
 
-class PlotSeries(namedtuple('PlotSeries', 'label series extra')):
+class PlotSeries(namedtuple('PlotSeries', 'label series extra'), Promotable):
   ''' Information about a series to be plotted:
       - `label`: the label for this series
       - `series`: an series
       - `extra`: a `dict` of extra information such as plot styling
   '''
 
+  @classmethod
   @timerange
   def promote(cls, data, tsmap=None, extra=None):
     ''' Promote `data` to a `PlotSeries`.
@@ -1020,13 +1021,16 @@ class PlotSeries(namedtuple('PlotSeries', 'label series extra')):
     if isinstance(data, str):
       # label from tsmap
       if tsmap is None:
-        raise ValueError("cannot promote str to %s without a tsmap" % (cls,))
+        raise TypeError(
+            "%s.promote: cannot promote str without a tsmap" % (cls.__name__,)
+        )
       label = data
       series = self[label].as_pd_series
       series = tsmap.as_pd_series(start, stop, utcoffset=utcoffset)
       extra = {}
     else:
       label, series = data
+    raise NotImplementedError
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
@@ -1177,7 +1181,7 @@ class TimeStepsMixin:
         for offset_step in self.offset_range(start, stop)
     )
 
-class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
+class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin, Promotable):
   ''' The basis of time references with a starting UNIX time `start`
       and a `step` defining the width of a time slot.
   '''
@@ -1226,43 +1230,42 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
 
         A 2-tuple of `(start,step)` will be used to construct a new `Epoch` directly.
     '''
-    if epochy is not None and not isinstance(epochy, Epoch):
-      if isinstance(epochy, (int, float)):
-        # just the step value, start the epoch at 0
-        epochy = 0, epochy
-      if isinstance(epochy, tuple):
-        start, step = epochy
-        if isinstance(start, float) and isinstance(step, int):
-          step0 = step
-          step = float(step)
-          if step != step0:
+    if epochy is None or isinstance(epochy, cls):
+      return epochy
+    if isinstance(epochy, (int, float)):
+      # just the step value, start the epoch at 0
+      epochy = 0, epochy
+    if isinstance(epochy, tuple):
+      start, step = epochy
+      if isinstance(start, float) and isinstance(step, int):
+        step0 = step
+        step = float(step)
+        if step != step0:
+          raise ValueError(
+              "promoted step:%r to float to match start, but new value %r is not equal"
+              % (step0, step)
+          )
+      elif isinstance(start, int) and isinstance(step, float):
+        # ints have unbound precision in Python and 63 bits in storage
+        # so if we can work in ints, use ints
+        step_i = int(step)
+        if step_i == step:
+          # demote step to an int to match start
+          step = step_i
+        else:
+          # promote start to float to match step
+          start0 = start
+          start = float(start)
+          if start != start0:
             raise ValueError(
-                "promoted step:%r to float to match start, but new value %r is not equal"
-                % (step0, step)
+                "promoted start:%r to float to match start, but new value %r is not equal"
+                % (start0, start)
             )
-        elif isinstance(start, int) and isinstance(step, float):
-          # ints have unbound precision in Python and 63 bits in storage
-          # so if we can work in ints, use ints
-          step_i = int(step)
-          if step_i == step:
-            # demote step to an int to match start
-            step = step_i
-          else:
-            # promote start to float to match step
-            start0 = start
-            start = float(start)
-            if start != start0:
-              raise ValueError(
-                  "promoted start:%r to float to match start, but new value %r is not equal"
-                  % (start0, start)
-              )
-        epochy = cls(start, step)
-      else:
-        raise TypeError(
-            "%s.promote: do not know how to promote %s" %
-            (cls.__name__, r(epochy))
-        )
-    return epochy
+      return cls(start, step)
+    raise TypeError(
+        "%s.promote: do not know how to promote %s" %
+        (cls.__name__, r(epochy))
+    )
 
 class HasEpochMixin(TimeStepsMixin):
   ''' A `TimeStepsMixin` with `.start` and `.step` derived from `self.epoch`.
@@ -2217,7 +2220,7 @@ class TimePartition(namedtuple('TimePartition',
     '''
     return range(self.start_offset, self.end_offset)
 
-class TimespanPolicy(DBC, HasEpochMixin):
+class TimespanPolicy(DBC, HasEpochMixin, Promotable):
   ''' A class implementing a policy allocating times to named time spans.
 
       The `TimeSeriesPartitioned` uses these policies
@@ -2294,7 +2297,7 @@ class TimespanPolicy(DBC, HasEpochMixin):
       else:
         raise TypeError(
             "%s.promote: do not know how to promote %s" %
-            (cls.__name__, policy)
+            (cls.__name__, r(policy))
         )
     assert epoch is None or policy.epoch == epoch
     return policy
@@ -3197,12 +3200,12 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def startup_shutdown(self):
     ''' Close the subsidiary `TimeSeries` instances.
     '''
-    try:
-      with self.fstags:
+    with self.fstags:
+      try:
         yield
-    finally:
-      for ts in self._ts_by_partition.values():
-        ts.close()
+      finally:
+        for ts in self._ts_by_partition.values():
+          ts.close()
 
   @property
   @cachedmethod

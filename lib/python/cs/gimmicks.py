@@ -7,6 +7,7 @@ less demanding of others.
 '''
 
 # pylint: disable=wrong-import-position
+# pylint: disable=unnecessary-lambda-assignment
 
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import
@@ -24,7 +25,7 @@ import subprocess
 try:
   DEVNULL = subprocess.DEVNULL
 except AttributeError:
-  DEVNULL = open(os.devnull, 'wb')  # pylint: disable=consider-using-with
+  DEVNULL = open(os.devnull, 'r+b')  # pylint: disable=consider-using-with
 
 import sys
 
@@ -78,7 +79,13 @@ except NameError:
           )
         Exception.__init__(self, msg)
 
-__version__ = '20221228-post'
+try:
+  from cs.lex import r, s  # pylint: disable=unused-import
+except ImportError:
+  r = repr
+  s = lambda obj: "%s:%s" % (obj.__class__.__name__, str(obj))
+
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -94,8 +101,10 @@ class _logging_map(dict):
 
   def __missing__(self, func_name):
     try:
+      # pylint: disable=import-outside-toplevel
       import cs.logutils as logging_module
     except ImportError:
+      # pylint: disable=import-outside-toplevel
       import logging as logging_module
     func = getattr(logging_module, func_name)
     self[func_name] = func

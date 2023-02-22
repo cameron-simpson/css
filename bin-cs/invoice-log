@@ -31,7 +31,7 @@ then
           logs=
           for host in $hosts
           do  log=$host-$yyyy-$mm-ALL.log
-              set-x envssh $host invoice-log $org $yyyy-$mm $yyyy2-$mm2 $* >"$log"
+              set-x envssh $host env "TZ=$TZ" invoice-log $org $yyyy-$mm $yyyy2-$mm2 $* >"$log"
               logs="$logs $log"
           done
           set-x sort -u -o MERGED-$yyyy-$mm.log $logs
