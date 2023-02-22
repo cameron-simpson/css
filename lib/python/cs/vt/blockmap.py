@@ -27,7 +27,7 @@ from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import with_upd_proxy, UpdProxy
 
-from . import defaults
+from . import uses_Store
 from .block import HashCodeBlock, IndirectBlock
 
 from cs.x import X
