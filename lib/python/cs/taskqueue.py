@@ -176,7 +176,7 @@ class BaseTask(FSM, RunStateMixin):
 BaseTaskSubType = TypeVar('BaseTaskSubType', bound=BaseTask)
 
 # pylint: disable=too-many-instance-attributes
-class Task(FSM, RunStateMixin, HasThreadState):
+class Task(BaseTask, HasThreadState):
   ''' A task which may require the completion of other tasks.
 
       The model here may not be quite as expected; it is aimed at
