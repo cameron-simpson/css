@@ -14,8 +14,7 @@ from typing import Any, Optional, Union, List, Tuple
 
 from icontract import require
 from sqlalchemy import Column, Integer, create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker as sqla_sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker as sqla_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
 from typeguard import typechecked
@@ -42,7 +41,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'icontract',
-        'sqlalchemy',
+        'sqlalchemy>=2.0',
         'typeguard',
         'cs.deco',
         'cs.fileutils',
