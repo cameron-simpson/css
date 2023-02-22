@@ -24,8 +24,7 @@ from cs.resources import MultiOpenMixin, RunState, RunStateMixin
 from cs.result import Result
 from cs.threads import bg as bg_thread
 
-from . import defaults, MAX_FILE_SIZE, Lock, RLock, Store
-from .store import StoreSyncBase, MappingStore
+from . import MAX_FILE_SIZE, Lock, RLock, Store, uses_Store, StoreSyncBase
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
 DEFAULT_MAX_CACHEFILES = 3
@@ -222,11 +221,6 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
         backend = self.backend
         if backend:
           self.backend[h] = data
-
-def MemoryCacheStore(name, max_data, hashclass=None):
-  ''' Factory to make a MappingStore of a MemoryCacheMapping.
-  '''
-  return MappingStore(name, MemoryCacheMapping(max_data), hashclass=hashclass)
 
 class MemoryCacheMapping:
   ''' A lossy MT-safe in-memory mapping of hashcode->data.

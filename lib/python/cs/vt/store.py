@@ -594,6 +594,10 @@ class _PlatonicStore(MappingStore):
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
 
+def MemoryCacheStore(name, max_data, hashclass=None):
+  ''' Factory to make a MappingStore of a MemoryCacheMapping.
+  '''
+  return MappingStore(name, MemoryCacheMapping(max_data), hashclass=hashclass)
 
 @pfx_method
 def VTDStore(name, path, *, hashclass, index=None, preferred_indexclass=None):
