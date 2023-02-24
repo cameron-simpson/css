@@ -14,7 +14,7 @@ import os
 from os.path import (
     abspath,
     basename,
-    exists as pathexists,
+    exists as existspath,
     expanduser,
     isabs as isabspath,
     isfile as isfilepath,
@@ -22,16 +22,17 @@ from os.path import (
     realpath,
     splitext,
 )
-from typing import Optional
+from typing import Mapping, Optional, Union
 
 from icontract import require
+from typeguard import typechecked
 
-from cs.deco import promote
+from cs.deco import fmtdoc, promote
 from cs.fs import shortpath, longpath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
-from cs.logutils import debug, warning, error
+from cs.logutils import debug, warning
 from cs.obj import SingletonMixin, singleton
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.resources import RunState, uses_runstate
 from cs.result import OnDemandResult
 from cs.threads import HasThreadState, State as ThreadState
@@ -45,8 +46,6 @@ from . import (
     DEFAULT_CONFIG_PATH,
 )
 from .archive import Archive, FilePathArchive
-from .backingfile import VTDStore
-from .cache import FileCacheStore, MemoryCacheStore
 from .compose import (
     parse_store_specs,
     get_archive_path,
@@ -58,7 +57,14 @@ from .convert import (
     truthy_word,
 )
 from .dir import Dir
-from .store import PlatonicStore, ProxyStore, DataDirStore
+from .store import (
+    DataDirStore,
+    FileCacheStore,
+    MemoryCacheStore,
+    PlatonicStore,
+    ProxyStore,
+    VTDStore,
+)
 from .socket import TCPClientStore, UNIXSocketClientStore
 from .transcribe import parse
 
@@ -164,7 +170,7 @@ class Config(SingletonMixin, HasThreadState):
     ''' Return the Store defined by the named clause.
     '''
     with self._lock:
-      is_new, R = singleton(
+      _, R = singleton(
           self._clause_stores,
           clause_name,
           OnDemandResult,
