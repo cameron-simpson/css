@@ -77,48 +77,68 @@ class Config(SingletonMixin, HasThreadState):
   perthread_state = ThreadState()
 
   @classmethod
-  @require(
-      lambda config_map: config_map is None or
-      isinstance(config_map, (str, dict))
-  )
-  @require(
-      lambda default_config:
-      (default_config is None or isinstance(default_config, dict))
-  )
-  def _singleton_key(cls, config_map=None, default_config=None):
-    if config_map is None:
-      config_map = cls.default_config_map()
-    return (
-        config_map if isinstance(config_map, str) else id(config_map),
-        id(DEFAULT_CONFIG_MAP)
-        if default_config is None else id(default_config)
-    )
+  @fmtdoc
+  @typechecked
+  def resolve_config_spec(
+      cls,
+      config_spec: Optional[Union[str, Mapping]] = None,
+      default_config_map: Optional[Mapping] = None
+  ) -> Union[str, dict]:
+    ''' Resolve a `Config` specification. with fallback to a default.
+        This returns the filesystem path of a configuration file
+        or a mapping such as a `dict`.
 
-  def __init__(self, config_map=None, default_config=None):
-    if config_map is None:
-      config_map = self.default_config_map()
-    if default_config is None:
-      default_config = DEFAULT_CONFIG_MAP
+        Parameters:
+        * `config_spec`: optional configuration specification
+        * `default_config_map`: optional fallback configuration
+
+        If supplied, `config_spec` may be a filesystem path (`str`)
+        or a mapping of *clause_name*->*param*->*value*.
+        If not supplied, the environment variable ${DEFAULT_CONFIG_ENVVAR}
+        is looked up, defaulting to {DEFAULT_CONFIG_PATH!r};
+        if that is not an existing filesystem path
+        then `default_config_map` is used.
+
+        The `default_config_map` parameter may be used to specify a fallback
+        mapping; it defaults to `DEFAULT_CONFIG_MAP`.
+    '''
+    if config_spec is None:
+      # look for configuration file
+      config_spec = os.environ.get(
+          DEFAULT_CONFIG_ENVVAR, expanduser(DEFAULT_CONFIG_PATH)
+      )
+      if not existspath(config_spec):
+        if default_config_map is None:
+          default_config_map = DEFAULT_CONFIG_MAP
+        config_spec = default_config_map
+    return config_spec
+
+  @classmethod
+  @typechecked
+  def _singleton_key(
+      cls,
+      config_spec: Optional[Union[str, Mapping]] = None,
+      default_config_map: Optional[Mapping] = None
+  ):
+    config_spec = cls.resolve_config_spec(config_spec, default_config_map)
+    return config_spec if isinstance(config_spec, str) else id(config_spec)
+
+  @typechecked
+  def __init__(
+      self,
+      config_spec: Optional[Union[str, dict]] = None,
+      default_config_map: Optional[dict] = None
+  ):
+    if hasattr(self, 'map'):
+      return
+    config_spec = self.resolve_config_spec(config_spec, default_config_map)
     config = ConfigParser()
-    if isinstance(config_map, str):
-      self.path = path = config_map
-      with Pfx(path):
-        read_ok = False
-        if pathexists(path):
-          try:
-            config.read(path)
-          except OSError as e:
-            error("read error: %s", e)
-          else:
-            read_ok = True
-        else:
-          warning("missing config file")
-        if not read_ok:
-          warning("falling back to default configuration")
-          config.read_dict(default_config)
+    if isinstance(config_spec, str):
+      self.path = path = config_spec
+      pfx_call(config.read, path)
     else:
       self.path = None
-      config.read_dict(config_map)
+      config.read_dict(config_spec)
     self.map = config
     self._clause_stores = {}  # clause_name => Result->Store
     self._lock = Lock()
@@ -139,18 +159,6 @@ class Config(SingletonMixin, HasThreadState):
     ''' Write the config to a file.
     '''
     self.map.write(f)
-
-  @classmethod
-  def default_config_map(cls):
-    ''' Return the default `Config`.
-    '''
-    # look for configuration file
-    config_map = os.environ.get(
-        DEFAULT_CONFIG_ENVVAR, expanduser(DEFAULT_CONFIG_PATH)
-    )
-    if not pathexists(config_map):
-      config_map = DEFAULT_CONFIG_MAP
-    return config_map
 
   def __getitem__(self, clause_name):
     ''' Return the Store defined by the named clause.
