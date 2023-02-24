@@ -1051,7 +1051,7 @@ class UpdProxy(object):
       '_text_auto':
       'An optional callable to generate the text if _text is empty.',
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
-      '_update_period': 'Update time interval.',
+      'update_period': 'Update time interval.',
       'last_update': 'Time of last update.',
   }
 
@@ -1082,9 +1082,8 @@ class UpdProxy(object):
     self._text = ''
     self._text_auto = text_auto
     self._suffix = suffix or ''
-    self._update_period = update_period
-    if update_period:
-      self.last_update = time.time()
+    self.update_period = update_period
+    self.last_update = None
     if index is None:
       self.upd = upd
     else:
@@ -1118,10 +1117,11 @@ class UpdProxy(object):
     upd = self.upd
     if upd is None:
       return
-    update_period = self._update_period
+    update_period = self.update_period
     if update_period:
       now = time.time()
-      if now - self.last_update < update_period:
+      if (self.last_update is not None
+          and now - self.last_update < update_period):
         return
     with upd._lock:  # pylint: disable=protected-access
       index = self.index
