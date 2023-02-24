@@ -7,23 +7,32 @@
 ''' BlockMap unit tests.
 '''
 
+from contextlib import contextmanager
 import sys
 from random import randint
 import unittest
+
 from cs.randutils import randomish_chunks
+from cs.testutils import SetupTeardownMixin
+
 from .block import IndirectBlock, HashCodeBlock
 from .blockmap import BlockMap
+from .config import Config
 from .store import MappingStore
 
-class TestBlockMap(unittest.TestCase):
+class TestBlockMap(SetupTeardownMixin, unittest.TestCase):
   ''' Tests for BlockMaps.
   '''
 
-  def setUp(self):
+  @contextmanager
+  def setupTeardown(self):
     ''' Unit test setup.
     '''
+    self.config = Config()
     self.S = MappingStore("TestAll", {})
     self.chunk_source = randomish_chunks(1, 16384)
+    with self.S:
+      yield
 
   def _gen_data(self, depth, width):
     ''' Generate a block tree of the specified width and height filled with random data.
