@@ -685,7 +685,7 @@ class SqliteFilemap:
     return self.conn.execute(sql, *a)
 
   @pfx_method(use_str=True)
-  def _modify(self, sql, *a, return_cursor=False):
+  def _modify(self, sql, *a, return_cursor=False, quiet=False):
     sql = sql.strip()
     conn = self.conn
     try:
@@ -694,7 +694,7 @@ class SqliteFilemap:
         sqlite3.OperationalError,
         sqlite3.IntegrityError,
     ) as e:
-      error("%s: %s [SQL=%r %r]", type(e).__name__, e, sql, a)
+      quiet or error("%s: %s [SQL=%r %r]", type(e).__name__, e, sql, a)
       conn.rollback()
     else:
       conn.commit()
@@ -753,7 +753,8 @@ class SqliteFilemap:
       c = self._modify(
           'INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)',
           (new_path, 0),
-          return_cursor=True
+          return_cursor=True,
+          quiet=True,
       )
       if c:
         filenum = c.lastrowid
