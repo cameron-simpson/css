@@ -86,7 +86,7 @@ from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
 from cs.upd import with_upd_proxy, UpdProxy, uses_upd
 
-from . import MAX_FILE_SIZE, Lock, RLock, defaults
+from . import MAX_FILE_SIZE, Lock, RLock, Store
 from .archive import Archive
 from .block import Block
 from .blockify import (
