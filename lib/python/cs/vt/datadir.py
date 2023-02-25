@@ -385,32 +385,37 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                       _data_progress=data_progress,
                       _data_proxy=data_proxy,
                       _dataQ=dataQ,
-                      _data_Thread=bg_thread(
-                          self._process_data_queue,
-                          name="%s._process_data_queue" % (self,),
-                          args=(dataQ,),
-                      ),
-                      _monitor_Thread=bg_thread(
-                          self._monitor_datafiles,
-                          name="%s-datafile-monitor" % (self,),
-                      ),
                   ):
-                    try:
-                      yield
-                    finally:
-                      self.runstate.cancel()
-                      self._monitor_Thread.join()
-                      self.flush()
-                      # drain the data queue
-                      self._dataQ.close()
-                      self._dataQ = None
-                      self._data_Thread.join()
-                    # update state to substrate
-                    self._filemap.close()
-                    # close the read file descriptors
-                    for rfd in self._rfds.values():
-                      with Pfx("os.close(rfd:%d)", rfd):
-                        os.close(rfd)
+                    _data_Thread = bg_thread(
+                        self._process_data_queue,
+                        name="%s._process_data_queue" % (self,),
+                        args=(dataQ,),
+                    )
+                    _monitor_Thread = bg_thread(
+                        self._monitor_datafiles,
+                        name="%s-datafile-monitor" % (self,),
+                    )
+                    with stackattrs(
+                        self,
+                        _data_Thread=_data_Thread,
+                        _monitor_Thread=_monitor_Thread,
+                    ):
+                      try:
+                        yield
+                      finally:
+                        self.runstate.cancel()
+                        self._monitor_Thread.join()
+                        self.flush()
+                        # drain the data queue
+                        self._dataQ.close()
+                        self._dataQ = None
+                        self._data_Thread.join()
+                      # update state to substrate
+                      self._filemap.close()
+                      # close the read file descriptors
+                      for rfd in self._rfds.values():
+                        with Pfx("os.close(rfd:%d)", rfd):
+                          os.close(rfd)
 
   @typechecked
   def new_datafile(self) -> DataFileState:
