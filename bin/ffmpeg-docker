@@ -6,7 +6,8 @@
 
 set -ue
 
-use_tmux=${FFMPEG_DOCKER_TMUX:-''}
+use_tmux=
+[ -n "${FFMPEG_DOCKER_TMUX:-''}" ] && use_tmux=1
 image=linuxserver/ffmpeg
 runopts=--rm
 ffopts=
