@@ -19,7 +19,7 @@ from typing import Any, Mapping, Optional
 from cs.context import ContextManagerMixin, stackattrs, stackset
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.gimmicks import error, warning
+from cs.gimmicks import error, warning, nullcontext
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
@@ -150,7 +150,8 @@ class HasThreadState(ContextManagerMixin):
     '''
     with cls._HasThreadState_lock:
       currency = {
-          htscls: getattr(htscls, htscls.THREAD_STATE_ATTR).current
+          htscls:
+          getattr(getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None)
           for htscls in cls._HasThreadState_classes
       }
     return currency
@@ -178,6 +179,8 @@ class HasThreadState(ContextManagerMixin):
         except StopIteration:
           yield
         else:
+          if htsobj is None:
+            htsobj = nullcontext()
           with htsobj:
             yield from with_thread_states_pusher()
 
