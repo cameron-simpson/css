@@ -967,6 +967,7 @@ class CornuCopyBuffer(Promotable):
         * `int`: assumed to be a file descriptor of a file open for binary read
         * `str`: assumed to be a filesystem pathname
         * `bytes` and `bytes`like objects: data
+        * has a `.read1` or `.read` method: assume a file open for binary read
         * iterable: assumed to be an iterable of `bytes`like objects
     '''
     if isinstance(obj, cls):
@@ -977,6 +978,8 @@ class CornuCopyBuffer(Promotable):
       obj = cls.from_filename(obj)
     elif isinstance(obj, (bytes, bytearray, mmap.mmap, memoryview)):
       obj = cls.from_bytes(obj)
+    elif hasattr(obj, 'read1') or hasattr(obj, 'read'):
+      obj = cls.from_file(obj)
     try:
       iter(obj)
     except TypeError:
