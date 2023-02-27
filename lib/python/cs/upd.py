@@ -258,17 +258,21 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
   def shutdown(self, preserve_display=False):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
     '''
+    try:
+      lock = self._lock
+    except AttributeError:
+      return
     slots = getattr(self, '_slot_text', None)
     if not preserve_display:
       # remove the Upd display
-      with self._lock:
+      with lock:
         while len(slots) > 1:
           del self[len(slots) - 1]
         self[0] = ''
     elif not self._disabled and self._backend is not None:
       # preserve the display for debugging purposes
       # move to the bottom and emit a newline
-      with self._lock:
+      with lock:
         txts = self._move_to_slot_v(self._current_slot, 0)
         if slots[0]:
           # preserve the last status line if not empty
