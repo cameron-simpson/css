@@ -1269,8 +1269,12 @@ def with_upd_proxy(func, prefix=None, insert_at=1):
 
   return upd_with_proxy_wrapper
 
-# always create a default Upd() in open state
-Upd().open()
+# Always create a default Upd() in open state.
+# Keep a module level name, which avoids the singleton weakref array
+# losing track of it.
+# TODO: this indicates a bug in this, the singleton stuff and/or
+# the multiopenmixin stuff.
+_main_upd = Upd().open()
 
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.
