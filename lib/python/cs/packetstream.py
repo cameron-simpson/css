@@ -89,6 +89,9 @@ class Packet(SimpleBinary):
         )
     )
 
+  def __repr__(self):
+    return str(self)
+
   def __eq__(self, other):
     return (
         bool(self.is_request) == bool(other.is_request)
