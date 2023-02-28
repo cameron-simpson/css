@@ -137,7 +137,9 @@ class HasThreadState(ContextManagerMixin):
     '''
     cls = self.__class__
     with cls._HasThreadState_lock:
-      stacked = stackset(cls._HasThreadState_classes, cls)
+      stacked = stackset(
+          cls._HasThreadState_classes, cls, cls._HasThreadState_lock
+      )
     with stacked:
       state = getattr(cls, cls.THREAD_STATE_ATTR)
       with state(current=self):
