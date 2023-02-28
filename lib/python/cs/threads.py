@@ -86,15 +86,15 @@ class State(thread_local):
 
 # TODO: what to do about overlapping HasThreadState usage of a particular class?
 class HasThreadState(ContextManagerMixin):
-  ''' A mixin for classes with a `cs.threads.State` instance as `.state`
+  ''' A mixin for classes with a `cs.threads.State` instance as `.perthread_state`
       providing a context manager which pushes `current=self` onto that state
-      and a `default()` class method returning `cls.state.current`
+      and a `default()` class method returning `cls.perthread_state.current`
       as the default instance of that class.
 
-      *NOTE*: the documentation here refers to `cls.state`, but in
+      *NOTE*: the documentation here refers to `cls.perthread_state`, but in
       fact we honour the `cls.THREAD_STATE_ATTR` attribute to name
       the state attribute which allows perclass state attributes,
-      and also use with classes which already use `.state` for
+      and also use with classes which already use `.perthread_state` for
       another purpose.
   '''
 
@@ -106,13 +106,13 @@ class HasThreadState(ContextManagerMixin):
 
   @classmethod
   def default(cls, factory=None, raise_on_None=False):
-    ''' The default instance of this class from `cls.state.current`.
+    ''' The default instance of this class from `cls.perthread_state.current`.
 
         Parameters:
         * `factory`: optional callable to create an instance of `cls`
-          if `cls.state.current` is `None` or missing;
+          if `cls.perthread_state.current` is `None` or missing;
           if `factory` is `True` then `cls` is used as the factory
-        * `raise_on_None`: if `cls.state.current` is `None` or missing
+        * `raise_on_None`: if `cls.perthread_state.current` is `None` or missing
           and `factory` is false and `raise_on_None` is true,
           raise a `RuntimeError`;
           this is primarily a debugging aid
@@ -131,7 +131,7 @@ class HasThreadState(ContextManagerMixin):
     return current
 
   def __enter_exit__(self):
-    ''' Push `self.state.current=self` as the `Thread` local current instance.
+    ''' Push `self.perthread_state.current=self` as the `Thread` local current instance.
 
         Include `self.__class__` in the set of currently active classes for the duration.
     '''
