@@ -203,7 +203,7 @@ class Result(FSM):
 
   @property
   def ready(self):
-    ''' True if `Result` state is `DONE` or `CANCLLED`..
+    ''' True if the `Result` state is `DONE` or `CANCELLED`..
     '''
     return self.fsm_state in (self.DONE, self.CANCELLED)
 

@@ -275,8 +275,6 @@ class Task(FSM, RunStateMixin, HasThreadState):
 
   _seq = Seq()
 
-  THREAD_STATE_ATTR = 'perthread_state'
-
   perthread_state = ThreadState(initial_state=FSM_DEFAULT_STATE)
 
   def __init__(

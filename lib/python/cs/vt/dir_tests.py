@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Dir tests.
 #       - Cameron Simpson <cs@cskk.id.au> 25aug2015

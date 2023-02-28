@@ -236,59 +236,66 @@ class VTCmd(BaseCommand):
       options = self.options
       config = options.config
       show_progress = options.show_progress
-      with stackattrs(common, config=config):
-        # redo these because defaults is already initialised
-        with stackattrs(defaults, show_progress=show_progress):
-          if cmd in ("config", "dump", "help", "init", "profile", "scan"):
-            yield
-          else:
-            # open the default Store
-            if options.store_spec is None:
-              if cmd == "serve":
-                options.store_spec = store_spec
-            try:
-              S = pfx_call(Store, options.store_spec, options.config)
-            except (KeyError, ValueError) as e:
-              raise GetoptError(f"unusable Store specification: {e}") from e
-            except Exception as e:
-              exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
-              raise GetoptError(f"unusable Store specification: {e}") from e
-            if options.cache_store_spec == 'NONE':
-              cacheS = None
+      with config:
+        with stackattrs(common, config=config):
+          # redo these because defaults is already initialised
+          with stackattrs(defaults, show_progress=show_progress):
+            if cmd in ("config", "dump", "help", "init", "profile", "scan"):
+              yield
             else:
+              # open the default Store
+              if options.store_spec is None:
+                if cmd == "serve":
+                  options.store_spec = store_spec
               try:
-                cacheS = pfx_call(
-                    Store, options.cache_store_spec, options.config
-                )
+                S = pfx_call(Store, options.store_spec, options.config)
               except (KeyError, ValueError) as e:
-                ##warning("foo")
                 raise GetoptError(f"unusable Store specification: {e}") from e
               except Exception as e:
-                exception(f"UNEXPECTED EXCEPTION: can't open cache store: {e}")
+                exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
                 raise GetoptError(f"unusable Store specification: {e}") from e
-              S = ProxyStore(
-                  "%s:%s" % (cacheS.name, S.name),
-                  read=(cacheS,),
-                  read2=(S,),
-                  copy2=(cacheS,),
-                  save=(cacheS, S),
-                  archives=((S, '*'),),
-              )
-              S.config = options.config
-            if show_progress:
-              S = ProgressStore(S)
-              add_bar_cmgr = S.progress_add.bar("ADD")
-              get_bar_cmgr = S.progress_get.bar("GET")
-            else:
-              add_bar_cmgr = nullcontext()
-              get_bar_cmgr = nullcontext()
-            with defaults(common_S=S):
+              if options.cache_store_spec == 'NONE':
+                cacheS = None
+              else:
+                try:
+                  cacheS = pfx_call(
+                      Store, options.cache_store_spec, options.config
+                  )
+                except (KeyError, ValueError) as e:
+                  ##warning("foo")
+                  raise GetoptError(
+                      f"unusable Store specification: {e}"
+                  ) from e
+                except Exception as e:
+                  exception(
+                      f"UNEXPECTED EXCEPTION: can't open cache store: {e}"
+                  )
+                  raise GetoptError(
+                      f"unusable Store specification: {e}"
+                  ) from e
+                S = ProxyStore(
+                    "%s:%s" % (cacheS.name, S.name),
+                    read=(cacheS,),
+                    read2=(S,),
+                    copy2=(cacheS,),
+                    save=(cacheS, S),
+                    archives=((S, '*'),),
+                )
+                S.config = options.config
+              if show_progress:
+                S = ProgressStore(S)
+                add_bar_cmgr = S.progress_add.bar("ADD")
+                get_bar_cmgr = S.progress_get.bar("GET")
+              else:
+                add_bar_cmgr = nullcontext()
+                get_bar_cmgr = nullcontext()
               with S:
-                with add_bar_cmgr:
-                  with get_bar_cmgr:
-                    yield
-            if cacheS:
-              cacheS.backend = None
+                with stackattrs(options, S=S):
+                  with add_bar_cmgr:
+                    with get_bar_cmgr:
+                      yield
+              if cacheS:
+                cacheS.backend = None
       if ifdebug():
         dump_debug_threads()
 
@@ -605,7 +612,7 @@ class VTCmd(BaseCommand):
         elif not dst.isdir:
           error('target name %r is not a directory', srcbase)
           xit = 1
-        elif not merge(dst, src, runstate=runstate):
+        elif not merge(dst, src):
           error("merge failed")
           xit = 1
       elif isfilepath(srcpath):
@@ -740,7 +747,7 @@ class VTCmd(BaseCommand):
         else:
           raise RuntimeError("unhandled option: %r" % (opt,))
     # special is either a D{dir} or [clause] or an archive pathname
-    mount_store = defaults.S
+    mount_store = Store.default()
     special_basename = None
     # the special may derive directly from a config Store clause
     try:
@@ -990,7 +997,8 @@ class VTCmd(BaseCommand):
     return obj
 
   @staticmethod
-  def _push(srcS, dstS, *pushables, progress=None, runstate=None):
+  @uses_runstate
+  def _push(srcS, dstS, *pushables, progress=None, runstate: RunState):
     ''' Push data from the source Store `srcS` to destination Store `dstS`
         to ensure that `dstS` has all the Blocks needs to support
         the `pushables`.
@@ -1001,16 +1009,14 @@ class VTCmd(BaseCommand):
       try:
         for pushable in pushables:
           with Pfx("push %s", pushable):
-            if runstate and runstate.cancelled:
+            if runstate.cancelled:
               xit = 1
               break
             with Pfx(pushable):
               progress = Progress(str(pushable))
               pushq = pushable.pushto_queue
               try:
-                pushed_ok = pfx_call(
-                    pushq, Q, runstate=runstate, progress=progress
-                )
+                pushed_ok = pfx_call(pushq, Q, progress=progress)
                 assert isinstance(pushed_ok, bool)
               except Exception as e:
                 error("push fails: %s", e)
@@ -1032,7 +1038,7 @@ class VTCmd(BaseCommand):
     if not argv:
       raise GetoptError("missing other_store")
     srcS = self.popStore(argv, "other_store")
-    dstS = defaults.S
+    dstS = options.S
     if not argv:
       pushables = (srcS,)
     else:
@@ -1049,7 +1055,7 @@ class VTCmd(BaseCommand):
             pushables.append(obj)
       if not ok:
         raise GetoptError("unrecognised pushables")
-    return self._push(srcS, dstS, *pushables, runstate=options.runstate)
+    return self._push(srcS, dstS, *pushables)
 
   def cmd_pushto(self, argv):
     ''' Usage: {cmd} other_store [objects...]
@@ -1059,7 +1065,7 @@ class VTCmd(BaseCommand):
     options = self.options
     if not argv:
       raise GetoptError("missing other_store")
-    srcS = defaults.S
+    srcS = options.S
     dstS = self.popStore(argv, "other_store")
     if not argv:
       # default is to push the entire source Store to the destination
@@ -1078,7 +1084,7 @@ class VTCmd(BaseCommand):
             pushables.append(obj)
       if not ok:
         raise GetoptError("unrecognised pushables")
-    return self._push(srcS, dstS, *pushables, runstate=options.runstate)
+    return self._push(srcS, dstS, *pushables)
 
   def cmd_save(self, argv):
     ''' Usage: {cmd} [-F] [{{ospath|-}}...]
@@ -1113,7 +1119,7 @@ class VTCmd(BaseCommand):
         elif isdirpath(ospath):
           target = Dir(basename(ospath))
           source = OSDir(ospath)
-          merge(target, source, runstate=runstate)
+          merge(target, source)
           print(target, ospath)
           continue
         else:
@@ -1155,6 +1161,7 @@ class VTCmd(BaseCommand):
           otherwise the named Stores are exported with the first being
           served initially.
     '''
+    options = self.options
     if argv:
       address = argv.pop(0)
     else:
@@ -1172,7 +1179,7 @@ class VTCmd(BaseCommand):
       except KeyError:
         raise GetoptError("[server] clause: no address field")
     if not argv:
-      exports = {'': defaults.S}
+      exports = {'': options.S}
     else:
       exports = {}
       for named_store_spec in argv:
@@ -1213,10 +1220,8 @@ class VTCmd(BaseCommand):
       # path/to/socket
       socket_path = expand_path(address)
       track("dispatch serve_socket(%r,...)", socket_path)
-      with defaults.S:
-        srv = serve_socket(
-            socket_path=socket_path, exports=exports, runstate=runstate
-        )
+      with options.S:
+        srv = serve_socket(socket_path=socket_path, exports=exports)
       srv.join()
     else:
       # [host]:port
@@ -1228,10 +1233,8 @@ class VTCmd(BaseCommand):
         if not host:
           host = '127.0.0.1'
         port = int(port)
-        with defaults.S:
-          srv = serve_tcp(
-              bind_addr=(host, port), exports=exports, runstate=runstate
-          )
+        with options.S:
+          srv = serve_tcp(bind_addr=(host, port), exports=exports)
           runstate.notify_cancel.add(lambda runstate: srv.shutdown_now())
         srv.join()
       else:

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Parsers for data streams, emitting data and offsets.
 # These sit in front of the core rolling hash blockifier.

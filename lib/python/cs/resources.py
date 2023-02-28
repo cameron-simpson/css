@@ -514,9 +514,7 @@ class RunState(HasThreadState):
         to be called whenever `.cancel` is called.
   '''
 
-  THREAD_STATE_ATTR = 'runstate_perthread_state'
-
-  runstate_perthread_state = ThreadState()
+  perthread_state = ThreadState()
 
   def __init__(
       self, name=None, signals=None, handle_signal=None, verbose=False

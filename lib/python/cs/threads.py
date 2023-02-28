@@ -19,7 +19,7 @@ from typing import Any, Mapping, Optional
 from cs.context import ContextManagerMixin, stackattrs, stackset
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.gimmicks import error, warning
+from cs.gimmicks import error, warning, nullcontext
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
@@ -102,18 +102,27 @@ class HasThreadState(ContextManagerMixin):
   _HasThreadState_classes = set()
 
   # the default name for the Thread state attribute
-  THREAD_STATE_ATTR = 'state'
+  THREAD_STATE_ATTR = 'perthread_state'
 
   @classmethod
-  def default(cls, raise_on_None=False):
+  def default(cls, factory=None, raise_on_None=False):
     ''' The default instance of this class from `cls.state.current`.
 
-        The optional `raise_on_None` parameter may be true
-        in which case a `RuntimeError` will be raised
-        if `cls.state.current` is `None` or missing.
+        Parameters:
+        * `factory`: optional callable to create an instance of `cls`
+          if `cls.state.current` is `None` or missing;
+          if `factory` is `True` then `cls` is used as the factory
+        * `raise_on_None`: if `cls.state.current` is `None` or missing
+          and `factory` is false and `raise_on_None` is true,
+          raise a `RuntimeError`;
+          this is primarily a debugging aid
     '''
     current = getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
     if current is None:
+      if factory:
+        if factory is True:
+          factory = cls
+        return factory()
       if raise_on_None:
         raise RuntimeError(
             "%s.default: %s.%s.current is missing/None and ifNone is None" %
@@ -141,7 +150,8 @@ class HasThreadState(ContextManagerMixin):
     '''
     with cls._HasThreadState_lock:
       currency = {
-          htscls: getattr(htscls, htscls.THREAD_STATE_ATTR).current
+          htscls:
+          getattr(getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None)
           for htscls in cls._HasThreadState_classes
       }
     return currency
@@ -169,6 +179,8 @@ class HasThreadState(ContextManagerMixin):
         except StopIteration:
           yield
         else:
+          if htsobj is None:
+            htsobj = nullcontext()
           with htsobj:
             yield from with_thread_states_pusher()
 

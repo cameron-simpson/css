@@ -127,7 +127,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
       The default backend is `sys.stderr`.
   '''
 
-  state = ThreadState()
+  perthread_state = ThreadState()
 
   # pylint: disable=unused-argument
   @staticmethod
@@ -258,17 +258,21 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
   def shutdown(self, preserve_display=False):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
     '''
+    try:
+      lock = self._lock
+    except AttributeError:
+      return
     slots = getattr(self, '_slot_text', None)
     if not preserve_display:
       # remove the Upd display
-      with self._lock:
+      with lock:
         while len(slots) > 1:
           del self[len(slots) - 1]
         self[0] = ''
     elif not self._disabled and self._backend is not None:
       # preserve the display for debugging purposes
       # move to the bottom and emit a newline
-      with self._lock:
+      with lock:
         txts = self._move_to_slot_v(self._current_slot, 0)
         if slots[0]:
           # preserve the last status line if not empty
@@ -1051,7 +1055,7 @@ class UpdProxy(object):
       '_text_auto':
       'An optional callable to generate the text if _text is empty.',
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
-      '_update_period': 'Update time interval.',
+      'update_period': 'Update time interval.',
       'last_update': 'Time of last update.',
   }
 
@@ -1082,9 +1086,8 @@ class UpdProxy(object):
     self._text = ''
     self._text_auto = text_auto
     self._suffix = suffix or ''
-    self._update_period = update_period
-    if update_period:
-      self.last_update = time.time()
+    self.update_period = update_period
+    self.last_update = None
     if index is None:
       self.upd = upd
     else:
@@ -1118,10 +1121,11 @@ class UpdProxy(object):
     upd = self.upd
     if upd is None:
       return
-    update_period = self._update_period
+    update_period = self.update_period
     if update_period:
       now = time.time()
-      if now - self.last_update < update_period:
+      if (self.last_update is not None
+          and now - self.last_update < update_period):
         return
     with upd._lock:  # pylint: disable=protected-access
       index = self.index
@@ -1265,8 +1269,12 @@ def with_upd_proxy(func, prefix=None, insert_at=1):
 
   return upd_with_proxy_wrapper
 
-# always create a default Upd() in open state
-Upd().open()
+# Always create a default Upd() in open state.
+# Keep a module level name, which avoids the singleton weakref array
+# losing track of it.
+# TODO: this indicates a bug in this, the singleton stuff and/or
+# the multiopenmixin stuff.
+_main_upd = Upd().open()
 
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.

@@ -580,7 +580,7 @@ def PfxThread(target, **kw):
   ''' Factory function returning a `Thread`
       which presents the current prefix as context.
   '''
-  from cs.threads import HasThreadState
+  from cs.threads import HasThreadState # pylint: disable=import-outside-toplevel
 
   current_prefix = prefix()
 

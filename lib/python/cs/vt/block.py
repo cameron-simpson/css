@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # pylint: disable=too-many-lines
 #
@@ -56,7 +56,7 @@ from cs.py.func import prop
 from cs.resources import uses_runstate
 from cs.threads import locked
 
-from . import defaults, RLock, uses_Store
+from . import RLock, Store, uses_Store
 from .hash import HashCode, io_fail
 from .transcribe import (
     Transcriber, register as register_transcriber, hexify, parse
@@ -404,7 +404,8 @@ class _Block(Transcriber, ABC):
     )
 
   @uses_Store
-  def pushto_queue(self, Q, *, S, runstate=None, progress=None):
+  @uses_runstate
+  def pushto_queue(self, Q, *, S, runstate, progress=None):
     ''' Push this Block and any implied subblocks to a queue.
 
         Parameters:
@@ -427,11 +428,12 @@ class _Block(Transcriber, ABC):
       Q.put(self)
       if self.indirect:
         # recurse, reusing the Queue
-        for subB in self.subblocks:
-          if runstate and runstate.cancelled:
-            warning("%s: push cancelled", self)
-            break
-          subB.pushto_queue(Q, runstate=runstate, progress=progress)
+        with runstate:
+          for subB in self.subblocks:
+            if runstate.cancelled:
+              warning("%s: push cancelled", self)
+              break
+            subB.pushto_queue(Q, progress=progress)
 
 class BlockRecord(BinarySingleValue):
   ''' Support for binary parsing and transcription of blockrefs.
@@ -617,7 +619,8 @@ class HashCodeBlock(_Block):
         if hashcode is None:
           raise ValueError("added=%s but no hashcode supplied" % (added,))
       else:
-        h = defaults.S.add(data)
+        S = Store.default()
+        h = S.add(data)
         if hashcode is None:
           hashcode = h
         elif h != hashcode:
@@ -649,7 +652,8 @@ class HashCodeBlock(_Block):
     with self._lock:
       data = self._data
       if data is None:
-        data = self._data = defaults.S[self.hashcode]
+        S = Store.default()
+        data = self._data = S[self.hashcode]
     return data
 
   @classmethod
@@ -657,7 +661,6 @@ class HashCodeBlock(_Block):
   def need_direct_data(cls, blocks, *, S):
     ''' Bulk request the direct data for `blocks`.
     '''
-    S = defaults.S
     Rs = []
     for B in blocks:
       try:
@@ -739,13 +742,14 @@ class HashCodeBlock(_Block):
     return B, offset
 
   @io_fail
-  def fsck(self, recurse=False):  # pylint: disable=unused-argument
+  @uses_Store
+  def fsck(self, *, recurse=False, S):  # pylint: disable=unused-argument
     ''' Check this HashCodeBlock.
     '''
     ok = True
     hashcode = self.hashcode
     with Pfx(hashcode):
-      with defaults.S as S:
+      with S:
         try:
           data = S[hashcode]
         except KeyError:
@@ -884,14 +888,15 @@ class IndirectBlock(_Block):
     superB, offset = parse(s, offset, T)
     return cls(superB, span), offset
 
-  def datafrom(self, start=0, end=None):
+  @uses_Store
+  def datafrom(self, start=0, end=None, *, S):
     ''' Yield data from a point in the Block.
     '''
     if end is None:
       end = self.span
     if start >= end:
       return
-    block_cache = defaults.S.block_cache
+    block_cache = S.block_cache
     if block_cache:
       try:
         bm = block_cache[self.hashcode]
@@ -922,14 +927,15 @@ class IndirectBlock(_Block):
       error("span:%d != sum(subblocks.span):%d", span, subspan)
       ok = False
     if recurse:
-      for subB in self.subblocks:
-        if runstate.cancelled:
-          error("cancelled")
-          ok = False
-          break
-        with Pfx(str(subB)):
-          if not subB.fsck(recurse=True, runstate=runstate):
+      with runstate:
+        for subB in self.subblocks:
+          if runstate.cancelled:
+            error("cancelled")
             ok = False
+            break
+          with Pfx(str(subB)):
+            if not subB.fsck(recurse=True):
+              ok = False
     return ok
 
 class RLEBlock(_Block):

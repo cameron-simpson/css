@@ -18,6 +18,7 @@ from icontract import ensure
 
 from cs.binary import SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
+from cs.deco import promote
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import debug, warning, error, exception
@@ -88,6 +89,9 @@ class Packet(SimpleBinary):
         )
     )
 
+  def __repr__(self):
+    return str(self)
+
   def __eq__(self, other):
     return (
         bool(self.is_request) == bool(other.is_request)
@@ -154,9 +158,10 @@ class PacketConnection(object):
   )
 
   # pylint: disable=too-many-arguments
+  @promote
   def __init__(
       self,
-      recv,
+      recv: CornuCopyBuffer,
       send,
       request_handler=None,
       name=None,
@@ -210,12 +215,7 @@ class PacketConnection(object):
     if name is None:
       name = str(seq())
     self.name = name
-    if isinstance(recv, int):
-      self._recv = CornuCopyBuffer.from_fd(recv)
-    elif isinstance(recv, CornuCopyBuffer):
-      self._recv = recv
-    else:
-      self._recv = CornuCopyBuffer.from_file(recv)
+    self._recv = recv
     if isinstance(send, int):
       self._send = os.fdopen(os.dup(send), 'wb')
     else:

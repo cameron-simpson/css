@@ -46,6 +46,7 @@ from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
+from cs.resources import uses_runstate
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
@@ -614,6 +615,7 @@ def make_files_property(
   return made_files_property
 
 # pylint: disable=too-many-branches
+@uses_runstate
 def makelockfile(
     path, ext=None, poll_interval=None, timeout=None, runstate=None
 ):
@@ -647,7 +649,7 @@ def makelockfile(
   lockpath = path + ext
   with Pfx("makelockfile: %r", lockpath):
     while True:
-      if runstate is not None and runstate.cancelled:
+      if runstate.cancelled:
         warning(
             "%s cancelled; pid %d waited %ds", runstate, os.getpid(),
             0 if start is None else time.time() - start
@@ -691,6 +693,7 @@ def makelockfile(
     return lockpath
 
 @contextmanager
+@uses_runstate
 def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   ''' A context manager which takes and holds a lock file.
 
