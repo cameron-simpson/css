@@ -50,7 +50,7 @@ from cs.mplutils import axes, remove_decorations, print_figure, save_figure, Fig
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
