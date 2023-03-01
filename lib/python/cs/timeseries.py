@@ -1679,7 +1679,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       fstags = FSTags()
     self.fstags = fstags
     try:
-      header, = TimeSeriesFileHeader.scan_fspath(self.fspath, max_count=1)
+      header, = TimeSeriesFileHeader.scan(self.fspath, max_count=1)
     except FileNotFoundError:
       # a missing file is ok, other exceptions are not
       ok = True
