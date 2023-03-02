@@ -16,7 +16,7 @@ from cs.py.stack import caller
 from cs.py3 import raise_from
 from cs.x import X
 
-__version__ = '20221207-post'
+__version__ = '20230210-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -166,6 +166,8 @@ def trace(
             log_cite,
             (pformat if use_pformat else repr)(result),
         )
+      else:
+        xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
       _trace_indent = old_indent
       return result
 

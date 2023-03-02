@@ -10,6 +10,7 @@
 '''
 
 from __future__ import print_function, absolute_import
+from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
@@ -18,10 +19,9 @@ from os.path import basename
 from signal import SIGHUP, SIGINT, SIGTERM
 import sys
 from types import SimpleNamespace
-from typing import List
+from typing import List, Optional
 
 from cs.context import stackattrs
-from cs.gimmicks import nullcontext
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -33,25 +33,25 @@ from cs.lex import (
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
-from cs.resources import RunState
+from cs.resources import RunState, uses_runstate
+from cs.upd import Upd
 
-__version__ = '20221228-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.context',
-        'cs.gimmicks',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
         'cs.py.doc',
         'cs.resources',
+        'cs.upd',
     ],
 }
 
@@ -372,7 +372,16 @@ class BaseCommand:
     cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
+  @uses_runstate
+  def __init__(
+      self,
+      argv=None,
+      *,
+      cmd=None,
+      options=None,
+      runstate: Optional[RunState],
+      **kw_options
+  ):
     ''' Initialise the command line.
         Raises `GetoptError` for unrecognised options.
 
@@ -448,8 +457,11 @@ class BaseCommand:
         argv0 = cmd
     if cmd is None:
       cmd = basename(argv0)
+    if runstate is None:
+      runstate = RunState(cmd)
     self.cmd = cmd
     options = self.options = self.OPTIONS_CLASS()
+    options.runstate = runstate
     options.runstate_signals = self.DEFAULT_SIGNALS
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
@@ -996,7 +1008,7 @@ class BaseCommand:
 
         Any keyword arguments are used to override `self.options` attributes
         for the duration of the run,
-        for example to presupply a shared `RunState` from an outer context.
+        for example to presupply a shared `Upd` from an outer context.
 
         If the first command line argument *foo*
         has a corresponding method `cmd_`*foo*
@@ -1070,7 +1082,8 @@ class BaseCommand:
     return True
 
   @contextmanager
-  def run_context(self):
+  @uses_runstate
+  def run_context(self, runstate: RunState):
     ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
 
         This default does several things, and subclasses should
@@ -1088,25 +1101,26 @@ class BaseCommand:
     # redundant try/finally to remind subclassers of correct structure
     try:
       options = self.options
-      try:
-        runstate = options.runstate
-      except AttributeError:
-        runstate = RunState(
-            self.cmd,
-            signals=options.runstate_signals,
-            handle_signal=getattr(self, 'handle_signal', None),
-        )
-      upd = getattr(options, 'upd', self.loginfo.upd)
-      upd_context = nullcontext() if upd is None else upd
-      with upd_context:
-        with stackattrs(self, cmd=self._subcmd or self.cmd):
-          with stackattrs(
-              options,
-              runstate=runstate,
-              upd=upd,
-          ):
+      if runstate is None:
+        runstate = getattr(options, 'runstate', None)
+        if runstate is None:
+          runstate = RunState(self.cmd)
+      handle_signal = getattr(
+          self, 'handle_signal', lambda *_: runstate.cancel()
+      )
+      upd = getattr(options, 'upd', self.loginfo.upd) or Upd()
+      with stackattrs(self, cmd=self._subcmd or self.cmd):
+        with stackattrs(
+            options,
+            runstate=runstate,
+            upd=upd,
+        ):
+          with upd:
             with options.runstate:
-              yield
+              with runstate.catch_signal(options.runstate_signals,
+                                         call_previous=False,
+                                         handle_signal=handle_signal):
+                yield
     finally:
       pass
 
@@ -1149,3 +1163,49 @@ class BaseCommand:
     if unknown:
       warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit
+
+  def shell(self, *argv, banner=None, local=None):
+    ''' Run an interactive Python prompt with some predefined local names.
+
+        Parameters:
+        * `argv`: any notional command line arguments
+        * `banner`: optional banner string
+        * `local`: optional local names mapping
+
+        The default `local` mapping is a `dict` containing:
+        * `argv`: from `argv`
+        * `options`: from `self.options`
+        * `self`: from `self`
+        * the attributes of `options`
+        * the attributes of `self`
+
+        This is not presented automatically as a subcommand, but
+        commands wishing such a command should provide something
+        like this:
+
+            def cmd_shell(self, argv):
+              """ Usage: {cmd}
+                    Run an interactive Python prompt with some predefined local names.
+              """
+              return self.shell(*argv)
+    '''
+    options = self.options
+    if banner is None:
+      banner = f'{self.cmd}: {options.sqltags}'
+    if local is None:
+      local = dict(self.__dict__)
+      local.update(options.__dict__)
+      local.update(argv=argv, cmd=self.cmd, options=options, self=self)
+    try:
+      # pylint: disable=import-outside-toplevel
+      from bpython import embed
+    except ImportError:
+      return interact(
+          banner=banner,
+          local=local,
+      )
+    else:
+      return embed(
+          banner=banner,
+          locals_=local,
+      )

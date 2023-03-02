@@ -32,15 +32,18 @@ import sys
 from textwrap import dedent
 from threading import Lock
 
+from dateutil.tz import tzlocal
+from icontract import require
 from typeguard import typechecked
 
+from cs.dateutils import unixtime2datetime, UTC
 from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20220918-post'
+__version__ = '20230217.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -49,11 +52,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
         'cs.seq>=20200914',
+        'python-dateutil',
+        'icontract',
         'typeguard',
     ],
 }
@@ -429,60 +435,61 @@ def stripped_dedent(s):
   adjusted = dedent('\n'.join(lines))
   return line1 + '\n' + adjusted
 
-# pylint: disable=redefined-outer-name
-def strip_prefix_n(s, prefix, n=None):
-  ''' Strip a leading `prefix` and numeric value `n` from the start of a
-      string.  Return the remaining string, or the original string if the
-      prefix or numeric value do not match.
+@require(lambda offset: offset >= 0)
+def get_prefix_n(s, prefix, n=None, *, offset=0):
+  ''' Strip a leading `prefix` and numeric value `n` from the string `s`
+      starting at `offset` (default `0`).
+      Return the matched prefix, the numeric value and the new offset.
+      Returns `(None,None,offset)` on no match.
 
       Parameters:
-      * `s`: the string to strip
-      * `prefix`: the prefix string which must appear at the start of `s`
+      * `s`: the string to parse
+      * `prefix`: the prefix string which must appear at `offset`
+        or an object with a `match(str,offset)` method
+        such as an `re.Pattern` regexp instance
       * `n`: optional integer value;
         if omitted any value will be accepted, otherwise the numeric
         part must match `n`
 
+      If `prefix` is a `str`, the "matched prefix" return value is `prefix`.
+      Otherwise the "matched prefix" return value is the result of
+      the `prefix.match(s,offset)` call. The result must also support
+      a `.end()` method returning the offset in `s` beyond the match,
+      used to locate the following numeric portion.
+
       Examples:
 
-         >>> strip_prefix_n('s03e01--', 's', 3)
-         'e01--'
-         >>> strip_prefix_n('s03e01--', 's', 4)
-         's03e01--'
-         >>> strip_prefix_n('s03e01--', 's')
-         'e01--'
+         >>> import re
+         >>> get_prefix_n('s03e01--', 's')
+         ('s', 3, 3)
+         >>> get_prefix_n('s03e01--', 's', 3)
+         ('s', 3, 3)
+         >>> get_prefix_n('s03e01--', 's', 4)
+         (None, None, 0)
+         >>> get_prefix_n('s03e01--', re.compile('[es]',re.I))
+         (<re.Match object; span=(0, 1), match='s'>, 3, 3)
+         >>> get_prefix_n('s03e01--', re.compile('[es]',re.I), offset=3)
+         (<re.Match object; span=(3, 4), match='e'>, 1, 6)
   '''
-  s0 = s
-  if prefix:
-    s = cutprefix(s, prefix)
-    if s is s0:
-      # no match, return unchanged
-      return s0
-  else:
-    s = s0
-  if not s or not s[0].isdigit():
-    # no following digits, return unchanged
-    return s0
-  if n is None:
-    # strip all following digits
-    s = s.lstrip(digits)
-  else:
-    # evaluate the numeric part
-    s = s.lstrip('0')  # pylint: disable=no-member
-    if not s or not s[0].isdigit():
-      # all zeroes, leading value is 0
-      sn = 0
-      pos = 0
+  no_match = None, None, offset
+  if isinstance(prefix, str):
+    if s.startswith(prefix, offset):
+      matched = prefix
+      offset += len(prefix)
     else:
-      pos = 1
-      slen = len(s)
-      while pos < slen and s[pos].isdigit():
-        pos += 1
-      sn = int(s[:pos])
-    if sn != n:
-      # wrong numeric value
-      return s0
-    s = s[pos:]
-  return s
+      # no match, return unchanged
+      return no_match
+  else:
+    matched = pfx_call(prefix.match, s, offset)
+    if not matched:
+      return no_match
+    offset = matched.end()
+  if offset >= len(s) or not s[offset].isdigit():
+    return no_match
+  gn, offset = get_decimal_value(s, offset)
+  if n is not None and gn != n:
+    return no_match
+  return matched, gn, offset
 
 # pylint: disable=redefined-outer-name
 def get_nonwhite(s, offset=0):
@@ -697,7 +704,7 @@ def get_sloshed_text(
         )
       special_starts.add(special[0])
       special_seqs.append(special)
-    special_starts = u''.join(special_starts)
+    special_starts = ''.join(special_starts)
     special_seqs = sorted(special_seqs, key=lambda s: -len(s))
   chunks = []
   slen = len(s)
@@ -1008,7 +1015,7 @@ def as_lines(chunks, partials=None):
   '''
   if partials is None:
     partials = []
-  if any(['\n' in p for p in partials]):
+  if any('\n' in p for p in partials):
     raise ValueError("newline in partials: %r" % (partials,))
   for chunk in chunks:
     pos = 0
@@ -1223,7 +1230,7 @@ def snakecase(camelcased):
   '''
   strs = []
   was_lower = False
-  for i, c in enumerate(camelcased):
+  for _, c in enumerate(camelcased):
     if c.isupper():
       c = c.lower()
       if was_lower:
@@ -1327,7 +1334,7 @@ def format_as(
 _format_as = format_as  # for reuse in the format_as method below
 
 def format_attribute(method):
-  ''' Mark a method as available as a format method.
+  ''' A decorator to mark a method as available as a format method.
       Requires the enclosing class to be decorated with `@has_format_attributes`.
 
       For example,
@@ -1352,12 +1359,37 @@ def format_attribute(method):
   method.is_format_attribute = True
   return method
 
-def has_format_attributes(cls):
+@decorator
+def has_format_attributes(cls, inherit=()):
   ''' Class decorator to walk this class for direct methods
       marked as for use in format strings
       and to include them in `cls.format_attributes()`.
+
+      Methods are normally marked with the `@format_attribute` decorator.
+
+      If `inherit` is true the base format attributes will be
+      obtained from other classes:
+      * `inherit` is `True`: use `cls.__mro__`
+      * `inherit` is a class: use that class
+      * otherwise assume `inherit` is an iterable of classes
+      For each class `otherclass`, update the initial attribute
+      mapping from `otherclass.get_format_attributes()`.
   '''
   attributes = cls.get_format_attributes()
+  if inherit:
+    if inherit is True:
+      classes = cls.__mro__
+    elif isinstance(inherit, type):
+      classes = (inherit,)
+    else:
+      classes = inherit
+    for superclass in classes:
+      try:
+        super_attributes = superclass.get_format_attributes()
+      except AttributeError:
+        pass
+      else:
+        attributes.update(super_attributes)
   for attr in dir(cls):
     try:
       attribute = getattr(cls, attr)
@@ -1458,14 +1490,14 @@ class FormatableFormatter(Formatter):
 
   # pylint: disable=arguments-differ
   @pfx_method
-  def get_field(self, field_name, a, kw):
+  def get_field(self, field_name, args, kwargs):
     ''' Get the object referenced by the field text `field_name`.
         Raises `KeyError` for an unknown `field_name`.
     '''
-    assert not a
-    with Pfx("field_name=%r: kw=%r", field_name, kw):
+    assert not args
+    with Pfx("field_name=%r: kwargs=%r", field_name, kwargs):
       arg_name, offset = self.get_arg_name(field_name)
-      arg_value, _ = self.get_value(arg_name, a, kw)
+      arg_value, _ = self.get_value(arg_name, args, kwargs)
       # resolve the rest of the field
       subfield = self.get_subfield(arg_value, field_name[offset:])
       return subfield, field_name
@@ -1499,15 +1531,15 @@ class FormatableFormatter(Formatter):
       value = fmt.format(value=value)
     return value
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   @pfx_method
-  def get_value(self, arg_name, a, kw):
+  def get_value(self, arg_name, args, kwargs):
     ''' Get the object with index `arg_name`.
 
-        This default implementation returns `(kw[arg_name],arg_name)`.
+        This default implementation returns `(kwargs[arg_name],arg_name)`.
     '''
-    assert not a
-    return kw[arg_name], arg_name
+    assert not args
+    return kwargs[arg_name], arg_name
 
   @classmethod
   def get_format_subspecs(cls, format_spec):
@@ -1831,6 +1863,32 @@ class FStr(FormatableMixin, str):
     ''' Convert to a Windows filesystem `pathlib.Path`.
     '''
     return PureWindowsPath(self)
+
+class FNumericMixin(FormatableMixin):
+  ''' A `FormatableMixin` subclass.
+  '''
+
+  @format_attribute
+  def utctime(self):
+    ''' Treat this as a UNIX timestamp and return a UTC `datetime`.
+    '''
+    return unixtime2datetime(self, tz=UTC)
+
+  @format_attribute
+  def localtime(self):
+    ''' Treat this as a UNIX timestamp and return a localtime `datetime`.
+    '''
+    return unixtime2datetime(self, tz=tzlocal())
+
+@has_format_attributes
+class FFloat(FNumericMixin, float):
+  ''' Formattable `float`.
+  '''
+
+@has_format_attributes
+class FInt(FNumericMixin, int):
+  ''' Formattable `int`.
+  '''
 
 if __name__ == '__main__':
   import cs.lex_tests

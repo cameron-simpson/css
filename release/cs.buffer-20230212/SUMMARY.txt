@@ -1,0 +1,1 @@
+CornuCopyBuffer: new promote() method to promote int,str,bytes, also assumes nonspecific iterables yield byteslike instances.

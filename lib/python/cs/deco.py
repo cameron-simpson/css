@@ -8,9 +8,10 @@ r'''
 Assorted decorator functions.
 '''
 
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
-from inspect import isgeneratorfunction, signature, Parameter
+from inspect import isgeneratorfunction, ismethod, signature, Parameter
 import sys
 import time
 import traceback
@@ -18,7 +19,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20221214-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -109,8 +110,8 @@ def decorator(deco):
         "deco:%r(func:%r,...) -> None" % (deco, func)
     )
     if decorated is not func:
-      # we got a wrapper function back, pretty up the returned wrapper
-      # try functools.update_wrapper, otherwise do stuff by hand
+      # We got a wrapper function back, pretty up the returned wrapper.
+      # Try functools.update_wrapper, otherwise do stuff by hand.
       try:
         from functools import update_wrapper  # pylint: disable=import-outside-toplevel
         update_wrapper(decorated, func)
@@ -803,13 +804,10 @@ def default_params(func, _strict=False, **param_defaults):
   )
   return defaulted_func
 
+# pylint: disable=too-many-statements
 @decorator
 def promote(func, params=None, types=None):
-  ''' A decorator to promote argument values automaticaly in annotated functions.
-      For any parameter with a type annotation, if that type has a
-      `.promote(value)` class method and the function is called with a
-      value not of the type of the annotation, the `.promote` method
-      will be called to promote the value to the expected type.
+  ''' A decorator to promote argument values automatically in annotated functions.
 
       If the annotation is `Optional[some_type]` or `Union[some_type,None]`
       then the promotion will be to `some_type` but a value of `None`
@@ -820,6 +818,31 @@ def promote(func, params=None, types=None):
         be promoted
       * `types`: if supplied, only types in this list will be
         considered for promotion
+
+      For any parameter with a type annotation, if that type has a
+      `.promote(value)` class method and the function is called with a
+      value not of the type of the annotation, the `.promote` method
+      will be called to promote the value to the expected type.
+
+      Additionally, if the `.promote(value)` class method raises a `TypeError`
+      and `value` has a `.as_`*typename* attribute
+      where *typename* is the name of the type annotation,
+      if that attribute is an instance method of `value`
+      then promotion will be attempted by calling `value.as_`*typename*`()`
+      otherwise the attribute will be used directly
+      on the presumption that it is a property.
+
+      A typical `promote(cls, obj)` method looks like this:
+
+          @classmethod
+          def promote(cls, obj):
+              if isinstance(obj, cls):
+                  return obj
+              ... recognise various types ...
+              ... and return a suitable instance of cls ...
+              raise TypeError(
+                  "%s.promote: cannot promote %s:%r",
+                  cls.__name__, obj.__class__.__name__, obj)
 
       Example:
 
@@ -833,6 +856,29 @@ def promote(func, params=None, types=None):
           ...
           >>> f([1,2,3], epoch=12.0)
           epoch = <class 'cs.timeseries.Epoch'> Epoch(start=0, step=12)
+
+      Example using a class with an `as_P` instance method:
+
+          >>> class P:
+          ...   def __init__(self, x):
+          ...     self.x = x
+          ...   @classmethod
+          ...   def promote(cls, obj):
+          ...     raise TypeError("dummy promote method")
+          ...
+          >>> class C:
+          ...   def __init__(self, n):
+          ...     self.n = n
+          ...   def as_P(self):
+          ...     return P(self.n + 1)
+          ...
+          >>> @promote
+          ... def p(p: P):
+          ...   print("P =", type(p), p.x)
+          ...
+          >>> c = C(1)
+          >>> p(c)
+          P = <class 'cs.deco.P'> 2
 
       *Note*: one issue with this is due to the conflict in name
       between this decorator and the method it looks for in a class.
@@ -887,6 +933,7 @@ def promote(func, params=None, types=None):
           and anno_args[-1] is type(None)):
         optional = True
         annotation, _ = anno_args
+        optional = True
     if types is not None and annotation not in types:
       continue
     try:
@@ -895,7 +942,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (optional, annotation, promote_method)
+    promotions[param_name] = (annotation, promote_method, optional)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -903,18 +950,67 @@ def promote(func, params=None, types=None):
   def promoting_func(*a, **kw):
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
-    for param_name, (optional, annotation,
-                     promote_method) in promotions.items():
+    # we don't import cs.pfx (many dependencies!)
+    # pylint: disable=unnecessary-lambda-assignment
+    get_context = lambda: (
+        "@promote(%s.%s)(%s=%s:%r)" % (
+            func.__module__, func.__name__, param_name, arg_value.__class__.
+            __name__, arg_value
+        )
+    )
+    for param_name, (annotation, promote_method,
+                     optional) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
+        # parameter not supplied
         continue
       if optional and arg_value is None:
+        # skip omitted optional value
         continue
-      if isinstance(param_name, annotation):
+      if isinstance(arg_value, annotation):
+        # already of the desired type
         continue
-      arg_value = promote_method(arg_value)
+      try:
+        promoted_value = promote_method(arg_value)
+      except TypeError as te:
+        # see if the value has an as_TypeName() method
+        as_method_name = "as_" + annotation.__name__
+        try:
+          as_annotation = getattr(arg_value, as_method_name)
+        except AttributeError:
+          # no .as_TypeName, reraise the original TypeError
+          raise te  # pylint: disable=raise-missing-from
+        else:
+          if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
+            # bound instance method of arg_value
+            try:
+              as_value = as_annotation()
+            except (TypeError, ValueError) as e:
+              raise TypeError(
+                  "%s: %s.%s(): %s" %
+                  (get_context(), param_name, as_method_name, e)
+              ) from e
+          else:
+            # assuming a property or even a plain attribute
+            as_value = as_annotation
+          arg_value = as_value
+      else:
+        arg_value = promoted_value
       arg_mapping[param_name] = arg_value
     return func(*bound_args.args, **bound_args.kwargs)
 
   return promoting_func
+
+# pylint: disable=too-few-public-methods
+class Promotable(ABC):
+  ''' A class which supports the `@promote` decorator.
+  '''
+
+  @classmethod
+  @abstractmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
+        This method supports the `@promote` decorator.
+    '''
+    raise NotImplementedError

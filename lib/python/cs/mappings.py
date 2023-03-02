@@ -1370,6 +1370,7 @@ class RemappedMappingProxy:
   def key(self, subk):
     ''' Return the external key for `subk`.
     '''
+    X("%s.key(subk=%r)...", self.__class__.__name__, subk)
     try:
       k = self._mapped_subkeys[subk]
     except KeyError:

@@ -4,7 +4,6 @@
 '''
 
 from contextlib import contextmanager
-import threading
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
@@ -15,7 +14,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20230125-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -96,7 +95,7 @@ def stackattrs(o, **attr_values):
 
       See `stackkeys` for a flavour of this for mappings.
 
-      See `cs.context.StackableState` for a convenient wrapper class.
+      See `cs.threads.State` for a convenient wrapper class.
 
       Example of fiddling a programme's "verbose" mode:
 
@@ -152,56 +151,6 @@ def stackattrs(o, **attr_values):
     yield old_values
   finally:
     popattrs(o, attr_values.keys(), old_values)
-
-class StackableState(threading.local):
-  ''' An object which can be called as a context manager
-      to push changes to its attributes.
-
-      Example:
-
-          >>> state = StackableState(a=1, b=2)
-          >>> state.a
-          1
-          >>> state.b
-          2
-          >>> state
-          StackableState(a=1,b=2)
-          >>> with state(a=3, x=4):
-          ...     print(state)
-          ...     print("a", state.a)
-          ...     print("b", state.b)
-          ...     print("x", state.x)
-          ...
-          StackableState(a=3,b=2,x=4)
-          a 3
-          b 2
-          x 4
-          >>> state.a
-          1
-          >>> state
-          StackableState(a=1,b=2)
-  '''
-
-  def __init__(self, **kw):
-    super().__init__()
-    for k, v in kw.items():
-      setattr(self, k, v)
-
-  def __str__(self):
-    return "%s(%s)" % (
-        type(self).__name__,
-        ','.join(["%s=%s" % (k, v) for k, v in sorted(self.__dict__.items())])
-    )
-
-  __repr__ = __str__
-
-  @contextmanager
-  def __call__(self, **kw):
-    ''' Calling an instance is a context manager yielding `self`
-        with attributes modified by `kw`.
-    '''
-    with stackattrs(self, **kw):
-      yield self
 
 def pushkeys(d, **key_values):
   ''' The "push" part of `stackkeys`.
@@ -291,6 +240,20 @@ def stackkeys(d, **key_values):
     yield old_values
   finally:
     popkeys(d, key_values.keys(), old_values)
+
+@contextmanager
+def stackset(s, element):
+  ''' Context manager to add `element` to the set `s` and remove it on return.
+      The element is neither added nor removed if it is already present.
+  '''
+  if element in s:
+    yield
+  else:
+    s.add(element)
+    try:
+      yield
+    finally:
+      s.remove(element)
 
 def twostep(cmgr):
   ''' Return a generator which operates the context manager `cmgr`.
@@ -450,6 +413,7 @@ def push_cmgr(o, attr, cmgr):
   '''
   cmgr_twostep = twostep(cmgr)
   enter_value = next(cmgr_twostep)
+  # pylint: disable=unnecessary-lambda-assignment
   pop_func = lambda: (popattrs(o, (attr,), pushed), next(cmgr_twostep))[1]
   pop_func_attr = '_push_cmgr__popfunc__' + attr
   pushed = pushattrs(o, **{attr: enter_value, pop_func_attr: pop_func})

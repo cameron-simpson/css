@@ -14,7 +14,7 @@ import sys
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, Promotable
 from cs.fs import HasFSPath
 from cs.fstags import TagFile
 from cs.lex import cutsuffix, r
@@ -85,7 +85,7 @@ class OntCommand(TagsOntologyCommand):
     for tn in type_names:
       print(tn)
 
-class Ont(TagsOntology, HasFSPath):
+class Ont(TagsOntology, HasFSPath, Promotable):
   ''' A `TagsOntology` based on a persistent store.
   '''
 
@@ -172,15 +172,14 @@ class Ont(TagsOntology, HasFSPath):
         falling back to `ONTTAGS_PATH_DEFAULT` (`'{ONTTAGS_PATH_DEFAULT}'`).
         After that, a `str` is taken to the the filesystem path to an ontology file.
     '''
-    if not isinstance(ont, cls):
-      if ont is None:
-        ont = os.environ.get(ONTTAGS_PATH_ENVVAR
-                             ) or expanduser(ONTTAGS_PATH_DEFAULT)
-      if isinstance(ont, str):
-        ont = cls(ont)
-      else:
-        raise TypeError("%s: cannot promote %s" % (cls, r(ont)))
-    return ont
+    if isinstance(ont, cls):
+      return ont
+    if ont is None:
+      ont = os.environ.get(ONTTAGS_PATH_ENVVAR
+                           ) or expanduser(ONTTAGS_PATH_DEFAULT)
+    if isinstance(ont, str):
+      return cls(ont)
+    raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(ont)))
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

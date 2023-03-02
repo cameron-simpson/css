@@ -25,7 +25,7 @@ from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, State as ThreadState, HasThreadState
 
-__version__ = '20221207-post'
+__version__ = '20230217-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -274,8 +274,6 @@ class Task(FSM, RunStateMixin, HasThreadState):
   }
 
   _seq = Seq()
-
-  THREAD_STATE_ATTR = 'perthread_state'
 
   perthread_state = ThreadState(initial_state=FSM_DEFAULT_STATE)
 

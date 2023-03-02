@@ -14,8 +14,7 @@ from typing import Any, Optional, Union, List, Tuple
 
 from icontract import require
 from sqlalchemy import Column, Integer, create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker as sqla_sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker as sqla_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
 from typeguard import typechecked
@@ -29,7 +28,7 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-__version__ = '20220606-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'description':
@@ -42,7 +41,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'icontract',
-        'sqlalchemy',
+        'sqlalchemy>=2.0',
         'typeguard',
         'cs.deco',
         'cs.fileutils',
@@ -297,7 +296,7 @@ class ORM(MultiOpenMixin, ABC):
       self._sessionmaker_raw = None
     self.db_url = db_url
     self.engine_keywords = dict(
-        case_sensitive=True,
+        ##case_sensitive=True,
         echo='SQL' in map(str.upper,
                           os.environ.get('DEBUG', '').split(',')),
     )

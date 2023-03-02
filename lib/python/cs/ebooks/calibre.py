@@ -381,16 +381,17 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
                 "no AZW3, AZW or MOBI format from which to construct a CBZ"
             )
 
+      @uses_runstate
       def pull(
           self,
           obook,
           *,
           doit=True,
           formats=None,
-          runstate=None,
           force=False,
           quiet=False,
           verbose=False,
+          runstate: RunState,
       ):
         ''' Pull formats from another `CalibreBook`.
 
@@ -399,7 +400,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             * `doit`: optional flag, default `True`;
               import formats if true, report actions otherwise
             * `formats`: optional list of Calibre format keys to pull if present
-            * `runstate`: optional `RunState` for early termination
             * `force`: optional flag, default `False`;
               if true import formats even if already present
             * `quiet`: optional flag, default `False`;
@@ -411,7 +411,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           formats = sorted(obook.formats.keys())
         with Pfx("%s <= %s", self, obook):
           for fmtk in formats:
-            if runstate and runstate.cancelled:
+            if runstate.cancelled:
               break
             ofmtpath = obook.formatpath(fmtk)
             if ofmtpath is None:
@@ -1699,7 +1699,6 @@ class CalibreCommand(BaseCommand):
                   cbook, = cbooks
                 cbook.pull(
                     obook,
-                    runstate=runstate,
                     doit=doit,
                     force=force,
                     quiet=quiet,
@@ -1711,7 +1710,7 @@ class CalibreCommand(BaseCommand):
 
   def cmd_shell(self, argv):
     ''' Usage: {cmd}
-          Run an interactive Python prompt with some predefined named:
+          Run an interactive Python prompt with some predefined names:
           calibre: the CalibreTree
           options: self.options
     '''

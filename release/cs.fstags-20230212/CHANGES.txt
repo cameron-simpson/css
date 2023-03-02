@@ -1,0 +1,14 @@
+lib/python/cs/fstags.py: merge default ==> tagger
+lib/python/cs/fstags.py: cs.fstags: new FSTags.keypath(fspath) and TaggedPath.keypath
+lib/python/cs/fstags.py: cs.fstags: TaggedPath: always have an FSTags
+lib/python/cs/fstags.py: cs.fstags: new TaggedPath.parent property
+lib/python/cs/fstags.py: cs.fstags: new TaggedPath.findup(check) method
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.__init__: make everything after fspath keyword only
+lib/python/cs/fstags.py: merge vt ==> tagger
+lib/python/cs/fstags.py: cs.fstags: shuffle around the definitions of DEFAULT_FSTAGS and @uses_fstags
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand: cmd_find,cmd_ls: abort if runstate.cancelled
+lib/python/cs/fstags.py: cs.fstags: add a type annotation
+lib/python/cs/fstags.py: merge default ==> fstags
+lib/python/cs/fstags.py: merge fstags ==> tagger
+lib/python/cs/fstags.py: cs.*: use @uses_upd instead of accessing Upd.state
+lib/python/cs/fstags.py: cs.fstags: FSTags.key: fix parameter spelling

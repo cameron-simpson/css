@@ -117,10 +117,10 @@ class FileHandle:
     '''
     return self.fs.bg(func, *a, **kw)
 
-  def close(self):
+  @uses_Store
+  def close(self, *, S):
     ''' Close the file, mark its parent directory as changed.
     '''
-    S = defaults.S
     R = self.E.flush()
     self.E.parent.changed = True
     S.open()
@@ -368,11 +368,12 @@ class FileSystem:
       or the like.
   '''
 
+  @uses_Store
   def __init__(
       self,
       E,
       *,
-      S=None,
+      S,
       archive=None,
       subpath=None,
       readonly=None,
@@ -395,8 +396,6 @@ class FileSystem:
     '''
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
-    if S is None:
-      S = defaults.S
     self._old_S_block_cache = S.block_cache
     self.block_cache = S.block_cache or defaults.block_cache or BlockCache()
     S.block_cache = self.block_cache
@@ -492,8 +491,8 @@ class FileSystem:
   @logexc
   def _sync(self):
     with Pfx("_sync"):
-      if defaults.S is None:
-        raise RuntimeError("RUNTIME: defaults.S is None!")
+      if Store.defaults() is None:
+        raise RuntimeError("RUNTIME: Store.defaults() is None!")
       archive = self.archive
       if not self.readonly and archive is not None:
         with self._lock:

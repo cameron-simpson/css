@@ -10,12 +10,12 @@
 from __future__ import print_function
 from contextlib import contextmanager
 import sys
-from threading import Condition, Lock, RLock
+from threading import Condition, Lock, RLock, current_thread, main_thread
 import time
 
 from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
 from cs.deco import default_params
-from cs.gimmicks import error, warning
+from cs.gimmicks import error, warning, nullcontext
 from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
@@ -23,7 +23,7 @@ from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 from cs.threads import State as ThreadState, HasThreadState
 
-__version__ = '20230125-post'
+__version__ = '20230217-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -78,6 +78,9 @@ class _mom_state(object):
     self._lock = RLock()
     self._finalise_later = False
     self._finalise = None
+
+  def __repr__(self):
+    return "%s:%r" % (self.__class__.__name__, self.__dict__)
 
 ## debug: TrackedClassMixin
 class MultiOpenMixin(ContextManagerMixin):
@@ -511,9 +514,7 @@ class RunState(HasThreadState):
         to be called whenever `.cancel` is called.
   '''
 
-  THREAD_STATE_ATTR = 'runstate_perthread_state'
-
-  runstate_perthread_state = ThreadState()
+  perthread_state = ThreadState()
 
   def __init__(
       self, name=None, signals=None, handle_signal=None, verbose=False
@@ -560,19 +561,35 @@ class RunState(HasThreadState):
         * `yield self` => run
         * cancel on exception during run
         * stop
+
+        Note that if the `RunState` is already runnings we do not
+        do any of that stuff apart from the `yield self` because
+        we assume whatever setup should have been done has already
+        been done.
+        In particular, the `HasThreadState.Thread` factory calls this
+        in the "running" state.
     '''
     with HasThreadState.as_contextmanager(self):
-      with self.catch_signal(self._signals, call_previous=False,
-                             handle_signal=self._sighandler) as sigstack:
-        with stackattrs(self, _sigstack=sigstack):
-          self.start(running_ok=True)
-          try:
-            yield self
-          except Exception:
-            self.cancel()
-            raise
-          finally:
-            self.stop()
+      if self.running:
+        # we're already running - do not change states or push signal handlers
+        # typical situation is HasThreadState.Thread setting up the "current" RunState
+        yield self
+      else:
+        # if we're not in the main thread we suppress the signal shuffling as well
+        in_main = current_thread() is main_thread()
+        with (self.catch_signal(self._signals, call_previous=False,
+                                handle_signal=self._sighandler)
+              if in_main else nullcontext()) as sigstack:
+          with (stackattrs(self, _sigstack=sigstack)
+                if sigstack is not None else nullcontext()):
+            self.start(running_ok=True)
+            try:
+              yield self
+            except Exception:
+              self.cancel()
+              raise
+            finally:
+              self.stop()
 
   @prop
   def state(self):
@@ -704,7 +721,7 @@ class RunState(HasThreadState):
     if handle_signal is None:
       handle_signal = self.handle_signal
     sigs = (sig,) if isinstance(sig, int) else sig
-    sig_hnds = map(lambda signum: (signum, handle_signal), sigs)
+    sig_hnds = {signum: handle_signal for signum in sigs}
     with signal_handlers(sig_hnds,
                          call_previous=call_previous) as old_handler_map:
       yield old_handler_map
@@ -718,7 +735,7 @@ class RunState(HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
-uses_runstate = default_params(runstate=RunState.default)
+uses_runstate = default_params(runstate=RunState)
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
@@ -726,16 +743,16 @@ class RunStateMixin(object):
       Provides: `.runstate`, `.cancelled`, `.running`, `.stopping`, `.stopped`.
   '''
 
-  def __init__(self, runstate=None):
+  @uses_runstate
+  def __init__(self, runstate: RunState):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
         Parameters:
         * `runstate`: optional `RunState` instance or name.
           If a `str`, a new `RunState` with that name is allocated.
+          If omitted, the default `RunState` is used.
     '''
-    if runstate is None:
-      runstate = RunState(type(self).__name__)
-    elif isinstance(runstate, str):
+    if isinstance(runstate, str):
       runstate = RunState(runstate)
     self.runstate = runstate
 
