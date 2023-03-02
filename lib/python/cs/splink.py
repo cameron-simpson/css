@@ -64,7 +64,7 @@ from cs.timeseries import (
     timerange,
     tzfor,
 )
-from cs.upd import uses_upd, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20230217-post'
 
@@ -588,7 +588,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       event_labels=None,
       mode_patterns=None,
       stacked=False,
-      upd=None,
+      upd: Upd,
       runstate: RunState,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
