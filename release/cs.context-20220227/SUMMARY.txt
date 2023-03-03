@@ -1,0 +1,1 @@
+New stack_signals context manager to push signal handlers.

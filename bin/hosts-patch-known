@@ -69,4 +69,5 @@ do
     esac
   done
   echo
-done | rlr -f "^## BEGIN $marker" -t "^## END $marker" "$hosts"
+done \
+| rlr -f "^## BEGIN $marker" -t "^## END $marker" "$hosts"

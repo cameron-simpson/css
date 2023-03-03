@@ -1,0 +1,1 @@
+New strip_prefix_n() function to strip a leading `prefix` and numeric value `n` from the start of a string.

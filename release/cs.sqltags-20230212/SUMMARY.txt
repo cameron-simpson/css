@@ -1,0 +1,7 @@
+@promote support for SQLTags, promoting a filesystem path to a .sqlite db.
+Simpler SQLTagsORM.search comparison implementation.
+SQLTagSet: inherit format attributes from superclasses (TagSet).
+New BaseSQLTagsCommand.cmd_shell method.
+New BaseSQLTagsCommand.cmd_orm method with "define_schema" subcommand to update the db schema.
+SQLTagsORM.__init__: drop case_sensitive, no longer supported?
+SQLTagsORM.__init__: always call define_schema, it seems there are scenarios where this does some necessary sqlalchemy prep.

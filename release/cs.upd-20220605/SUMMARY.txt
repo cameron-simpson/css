@@ -1,0 +1,2 @@
+New Upd.run_task to add a status line for the duration of some task.
+UpdProxy.extend_prefix: new optional print_elapsed parameter.

@@ -1,0 +1,1 @@
+SingletonMixin: if cls._singleton_key returns None we always make a new instance and do not register it.

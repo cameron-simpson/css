@@ -1,0 +1,11 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: fold dots in argv[0] into underscores, supports subcommandslike "setup.py"
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new popargv(argv[,help_text[,parse[,validate]]]) helper class method; minor lint clean
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popargv: accept optional unvalidated_message after validate function, improve context prefix
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popargv: update docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: type annotation
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.subcommands: bugfix check for ._subcommands attribute - go directly to __dict__, otherwise the superclass attr gets found
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: push self.cmd=self._subcmd around the subcommand run
+lib/python/cs/cmdutils.py: cs.cmdutils: debugging improvement for the _BaseSubCommand usage string computation
+lib/python/cs/cmdutils.py: cs.cmdutils: accept dashed-form of the underscored_form subcommandname
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new self.options.runstate_signals=SIGINT,SIGTERM specifying singals to catch-and-cancel, shuffle run() context managers, tweak docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: polish a little lint

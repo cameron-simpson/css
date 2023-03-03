@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+#
+
+''' Extract the images from a Mobi formatted ebook into a CBZ file
+    on the premise that the ebook is a comic.
+'''
+
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+
+from cs.ebooks import Mobi2CBZCommand
+
+sys.exit(Mobi2CBZCommand(sys.argv).run())

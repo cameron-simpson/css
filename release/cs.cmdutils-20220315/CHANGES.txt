@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: use the term "instance method" for subcommands and also mention using another BaseCommand to implemenet a subcommand
+lib/python/cs/cmdutils.py: cs.cmdutils: _BaseSubCommand.__init__: hook in the class USAGE_KEYWORDS for methods

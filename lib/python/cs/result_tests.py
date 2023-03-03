@@ -5,10 +5,12 @@
 #
 
 from __future__ import print_function
+
 import sys
 import threading
 import time
 import unittest
+
 from cs.result import Result, after, bg
 
 class TestResult(unittest.TestCase):
@@ -56,9 +58,9 @@ class TestResult(unittest.TestCase):
     self.assertFalse(R2.ready)
 
     def delayed_completion():
-      time.sleep(2)
+      time.sleep(0.2)
       R.result = 1
-      time.sleep(2)
+      time.sleep(0.2)
       R2.result = 2
 
     threading.Thread(target=delayed_completion).start()
@@ -73,27 +75,38 @@ class TestResult(unittest.TestCase):
     self.assertFalse(R.ready)
 
     def f(n):
-      time.sleep(1)
+      time.sleep(0.1)
       return n
 
     T = R.bg(f, 3)
     self.assertTrue(type(T) == threading.Thread)
     self.assertFalse(R.ready)
-    time.sleep(2)
+    time.sleep(0.2)
     self.assertTrue(R.ready)
     self.assertEqual(R.result, 3)
 
   def test02bg2(self):
 
     def f(n):
-      time.sleep(1)
+      time.sleep(0.1)
       return n
 
     R = bg(f, 3)
     self.assertFalse(R.ready)
-    time.sleep(2)
+    time.sleep(0.2)
     self.assertTrue(R.ready)
     self.assertEqual(R.result, 3)
+
+  def test00join(self):
+    R = self.R
+    R.result = 1
+    R.join()
+    R.join()
+
+  def test01post_notify(self):
+    R = self.R
+    R2 = R.post_notify(lambda r2: print("r2 =", r2))
+    R.result = 1
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

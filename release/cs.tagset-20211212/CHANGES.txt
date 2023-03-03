@@ -1,0 +1,29 @@
+lib/python/cs/tagset.py: cs.tagset: Tag: new fallback_parse parameter for value parsing, default get_nonwhite; new from_arg factory with fallback_parse grabbing the whole string for command line arguments, thus supporting unquoted strings for ease of use
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion: new optional fallback_parse parameter and from_arg method as for the Tag factories
+lib/python/cs/tagset.py: cs.tagset: clean a little lint
+lib/python/cs/tagset.py: cs.tagset: Tag.transcribe_value: accept optional json_options to control the JSON encoder, used for human friendly multiline edits in cs.app.tagger
+lib/python/cs/tagset.py: cs.tagset: Tag.__repr__: omit the ontology if it is None
+lib/python/cs/tagset.py: cs.{fstags,sqltags,tagset}: rename edit_many to edit_tagsets
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.metadata: bugfix subtagsets lookup and typedef lookup
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.__str__: friendlier output
+lib/python/cs/tagset.py: cs.tagset: _TagsOntology_SubTagSets.__repr__: include the context tagsets
+lib/python/cs/tagset.py: cs.tagset: BaseTagSets: redefine __repr__ to honour subclass overrides of __str__
+lib/python/cs/tagset.py: cs.tagset: Tag.transcribe_value: remove debug
+lib/python/cs/tagset.py: cs.tagset: TagSet.set: guard against accidental instantiation by verbose code
+lib/python/cs/tagset.py: cs.tagset: TagSetsSubdomain: docstring update
+lib/python/cs/tagset.py: cs.tagset: tweak import
+lib/python/cs/tagset.py: cs.tagset: new TagsOntology.type_values() method to return values for a type (derived from their metadata entries); new Tag.alt_values() method returning its TagsOntology.type_values
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion.from_str2: clearify parse logic, no semantic effect
+lib/python/cs/tagset.py: merge default => tagger
+lib/python/cs/tagset.py: cs.tagset: _TagsOntology_SubTagSets: reuse the PrefixedMappingProxy prefixify and unprefixify methods for prefix based subTagSets
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: add missing __getitem__ method
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: mapping methods: use the external name directly on the subTagSets, they know how to convert
+lib/python/cs/tagset.py: cs.tagset: TagsCommandMixin.parse_tag_addremove: doctest improvements
+lib/python/cs/tagset.py: cs.tagset: new _FormatStringTagProxy which proxies a Tag but uses str(self.__proxied.value) for __str__ to support format strings; TagSet.get_value: if arg_name matches a Tag, return a _FormatStringTagProxy, add docstring
+lib/python/cs/tagset.py: cs.tagset: TagSet.tag: add docstring
+lib/python/cs/tagset.py: cs.tagset: Tag: doctests: Tag() is a constructor, we always get a new Tag
+lib/python/cs/tagset.py: cs.tagset: Tag.__new__: accept (tag_name,value) or (Tag) as initialisation parameters
+lib/python/cs/tagset.py: cs.tagset: _FormatStringTagProxy: check that proxied is a Tag
+lib/python/cs/tagset.py: cs.tagset: TagSet.get_value: return a _FormatStringTagProxy for direct tag names
+lib/python/cs/tagset.py: cs.tagset: TagSet.get_value: disable prolematic assert
+lib/python/cs/tagset.py: cs.tagset: TagSet: get_arg_name,get_value: improve FormattableMixin override docstrings

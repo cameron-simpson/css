@@ -1,0 +1,4 @@
+BaseCommand.run: apply optional keyword arguments to self.options during the run.
+Look for self.SUBCOMMAND_ARGV_DEFAULT if no subcommand is supplied.
+Bugfix case for "main" method and no "cmd_*" methods.
+Bugfix BaseCommand.cmd_help.

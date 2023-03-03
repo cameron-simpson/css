@@ -1,0 +1,1 @@
+CornuCopyBuffer.__init__: bugfix for self.input_data when copy_chunks is not None.

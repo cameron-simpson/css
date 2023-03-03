@@ -1,0 +1,1 @@
+Upd.cursor_visible,cursor_invisible: actually send the escape sequence.

@@ -1,0 +1,1 @@
+New TagSetCriterion.promote(obj)->TagSetCriterion class method.

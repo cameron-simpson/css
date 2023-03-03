@@ -1,0 +1,3 @@
+Usage: show only the per subcommand usage for in-subcommand GetoptError.
+Usage: show terse usage when the subcommand cannot be recognised.
+Usage: support bare -h, -help, --help.

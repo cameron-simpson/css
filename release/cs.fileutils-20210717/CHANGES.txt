@@ -1,0 +1,3 @@
+lib/python/cs/fileutils.py: cs.mappings: rename LoadableMappingMixin to IndexedSetMixin and make it abstract, rename .scan_mapping to .scan, .add_to_mapping to .add etc; adjust other modules to match
+lib/python/cs/fileutils.py: cs.mappings: IndexedSetMixin: rename .append_to_mapping to .add_backend; cs.fileutils: UUIDNDJSONMapping: rename .rewrite_mapping to .rewrite_backend; adjust callers
+lib/python/cs/fileutils.py: cs.fileutils: update cs.mappings requirement for recent changes

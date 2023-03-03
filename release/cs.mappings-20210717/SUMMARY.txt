@@ -1,0 +1,2 @@
+New IndexedMapping: wrapper for another mapping providing LoadableMappingMixin stype .by_* attributes.
+Rename LoadableMappingMixin to IndexedSetMixin and make it abstract, rename .scan_mapping to .scan, .add_to_mapping to .add etc.

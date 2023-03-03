@@ -1,0 +1,4 @@
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: pfx_call context
+lib/python/cs/lex.py: cs.lex: @format_attribute: extend the docstring with examples
+lib/python/cs/lex.py: cs.lex: docstring fixes
+lib/python/cs/lex.py: cs.lex: docstring typo fix

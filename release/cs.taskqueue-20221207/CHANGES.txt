@@ -1,0 +1,6 @@
+lib/python/cs/taskqueue.py: cs.taskqueue: pull out core stuff from Task into BaseTask, aids subclassing
+lib/python/cs/taskqueue.py: cs.taskqueue: formatting
+lib/python/cs/taskqueue.py: cs.taskqueue: BaseTask: explainatory docustring about unusual FSM_DEFAULT_STATE design choice
+lib/python/cs/taskqueue.py: cs.taskqueue: replace TaskSubType with BaseTaskSubType
+lib/python/cs/taskqueue.py: cs.taskqueue: BaseTask.tasks_as_dot: express the edges using the node ids instead of their labels
+lib/python/cs/taskqueue.py: cs.taskqueue: BaseTask: new tasks_as_svg() method like tasks_as_dot() but returning SVG

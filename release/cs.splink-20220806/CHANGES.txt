@@ -1,0 +1,2 @@
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: events prescan: use _without_tags=True and rely on distinct timestamps - they all seem to be at least 0.3ms apart
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: drop "already imported" message, too noisy

@@ -1,0 +1,5 @@
+lib/python/cs/ndjson.py: cs.fileutils,cs.ndjson: move NDJSON code from cs.fileutils to cs.ndjson
+lib/python/cs/ndjson.py: cs.ndjson: clean lint
+lib/python/cs/ndjson.py: cs.ndjson: used gzifopen for file opens to support gzipping an NDJSON file
+lib/python/cs/ndjson.py: cs.ndjson: update @strable to use gzifopen, check both filename and filename.gz, rewrite in place using gzifopen instead of rewrite_cmgr (which has no gz support)
+lib/python/cs/ndjson.py: cs.ndjson: set up DISTINFO

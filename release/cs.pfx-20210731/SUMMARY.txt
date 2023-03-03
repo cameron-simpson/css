@@ -1,0 +1,2 @@
+Pfx.__exit__: special handling for some exception types.
+New pfx_call(func,*a,**kw) function to concisely wrap single function calls.

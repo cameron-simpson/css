@@ -1,0 +1,2 @@
+New FigureSize class.
+axes(): accept a FigureSize for figure.

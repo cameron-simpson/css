@@ -1,0 +1,7 @@
+TagSetPrefixView: new as_dict() method.
+TagSetPrefixView.__str__: behave like TagSet.__str__.
+TagFile.save_tagsets: do not try to save if the file is missing and the tagsets are empty.
+New TagSet.from_tags(tags) factory to make a new TagSet from an iterable of tags.
+TagSetPrefixView: add .get and .setdefault mapping methods.
+RegexpTagRule: accept optional tag_prefix parameter.
+Tagset: new from_ini() and save_as_ini() methods to support cs.timeseries config files, probably handy elsewhere.

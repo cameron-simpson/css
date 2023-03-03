@@ -1,0 +1,5 @@
+New HasFSPath and FSPathBasedSingleton.
+Add longpath and shortpath from cs.fileutils.
+New is_clean_subpath(subpath).
+New needdir(path).
+New fnmatchdir(dirpath,fnglob) pulled out from HasFSPath.fnmatch(fnglob).

@@ -1,0 +1,1 @@
+module_doc: class members no longer rendered as headings, too verbose.

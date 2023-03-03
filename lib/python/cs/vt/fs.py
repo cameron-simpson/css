@@ -117,10 +117,10 @@ class FileHandle:
     '''
     return self.fs.bg(func, *a, **kw)
 
-  def close(self):
+  @uses_Store
+  def close(self, *, S):
     ''' Close the file, mark its parent directory as changed.
     '''
-    S = defaults.S
     R = self.E.flush()
     self.E.parent.changed = True
     S.open()
@@ -166,19 +166,15 @@ class FileHandle:
     ''' Commit file contents to Store.
         Chooses a scanner based on the Dirent.name.
     '''
-    X("FileHandle.flush: self.E.name=%r", self.E.name)
     mime_type = self.E.meta.mime_type
     if mime_type is None:
       scanner = None
     else:
-      X("look up scanner from mime_type %r", mime_type)
       scanner = scanner_from_mime_type(mime_type)
     if scanner is None:
-      X("look up scanner from filename %r", self.E.name)
       scanner = scanner_from_filename(self.E.name)
     self.E.flush(scanner, dispatch=self.bg)
     ## no touch, already done by any writes
-    X("FileHandle.Flush DONE")
 
 @mapping_transcriber(
     prefix="Ino",
@@ -372,11 +368,12 @@ class FileSystem:
       or the like.
   '''
 
+  @uses_Store
   def __init__(
       self,
       E,
       *,
-      S=None,
+      S,
       archive=None,
       subpath=None,
       readonly=None,
@@ -399,8 +396,6 @@ class FileSystem:
     '''
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
-    if S is None:
-      S = defaults.S
     self._old_S_block_cache = S.block_cache
     self.block_cache = S.block_cache or defaults.block_cache or BlockCache()
     S.block_cache = self.block_cache
@@ -496,8 +491,8 @@ class FileSystem:
   @logexc
   def _sync(self):
     with Pfx("_sync"):
-      if defaults.S is None:
-        raise RuntimeError("RUNTIME: defaults.S is None!")
+      if Store.defaults() is None:
+        raise RuntimeError("RUNTIME: Store.defaults() is None!")
       archive = self.archive
       if not self.readonly and archive is not None:
         with self._lock:

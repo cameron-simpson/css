@@ -1,0 +1,2 @@
+lib/python/cs/py/func.py: cs.py.func: funcname: spcial case functools.partial, return concise name
+lib/python/cs/py/func.py: cs.py.func: DISTINFO+cs.deco

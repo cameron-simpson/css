@@ -1,0 +1,5 @@
+lib/python/cs/pfx.py: cs.pfx: Pfx.__exit__: start on special casing certain exception types, starting with OSError.args
+lib/python/cs/pfx.py: cs.pfx: new pfx_call(func,*a,**kw) function to concisely wrap specific function calls
+lib/python/cs/pfx.py: cs.pfx: @pfx: use pfx_cal for straight function calls with no supplied message; tweak logic; fix docstring typo
+lib/python/cs/pfx.py: cs.pfx: Pfx.__exit__: probe .strerror (found on OSError instances)
+lib/python/cs/pfx.py: cs.pfx: @pfx_method: use _func_a_kw_fmt to construct the Pfx context

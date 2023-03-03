@@ -1,0 +1,3 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: handle main() method in the New Scheme
+lib/python/cs/cmdutils.py: cs.cmdutils: _MethodSubCommand.usage_format: bugfix extraction of non-Usage message from method docstring
+lib/python/cs/cmdutils.py: merge ebooks ==> default: general updates, including some more cs.cmdutils bugfixes

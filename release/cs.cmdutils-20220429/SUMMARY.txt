@@ -1,0 +1,4 @@
+BaseCommand: fold dots in argv[0] into underscores, supports subcommands like "setup.py".
+BaseCommand: new popargv(argv[,help_text[,parse[,validate[,unvalidated_message]]]]) helper class method.
+BaseCommand: accept dashed-form of the underscored_form subcommand name.
+BaseCommand: new self.options.runstate_signals=SIGINT,SIGTERM specifying singals to catch-and-cancel, shuffle run() context managers.

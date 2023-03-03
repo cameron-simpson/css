@@ -1,0 +1,2 @@
+lib/python/cs/seq.py: cs.seq: isordered: rename parameter for readability
+lib/python/cs/seq.py: cs.seq: new unrepeated() generator removing duplicates from an iterable

@@ -1,0 +1,1 @@
+When there is no total just report position and no ETA.

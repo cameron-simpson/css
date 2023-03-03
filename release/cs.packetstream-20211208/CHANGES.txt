@@ -1,0 +1,3 @@
+lib/python/cs/packetstream.py: cs.packetstream: Packet.__eq__: only test .rq_type if .is_request
+lib/python/cs/packetstream_tests.py: cs.packetstream_tests: update Packet construction, update serialisation idiom
+lib/python/cs/packetstream_tests.py: cs.packetstream_tests: slight test class refactor, make Python 3 only (cs.binary already is), add docstrings, clean lint

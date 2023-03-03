@@ -1,0 +1,7 @@
+lib/python/cs/splink.py: cs.splink,cs.timeseries: rename @plotrange to @timerange since it is not inherently associated with plotting
+lib/python/cs/splink.py: cs.pplinks: use mplutils.axes() to plumb optional figure and axes arguments to plot functions
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: new --bare option to strip legends, axes etc from a graph
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: adjust usage message
+lib/python/cs/splink.py: cs.splink: update DISTINFO
+lib/python/cs/splink.py: cs.splink: drop matplotlib import (still implied by cs.mplutils)
+lib/python/cs/splink.py: cs.splink: ignore a little lint

@@ -4,6 +4,7 @@
 ''' Implementation of directories (Dir) and their entries (FileDirent, etc).
 '''
 
+from contextlib import contextmanager
 from enum import IntEnum, IntFlag
 from functools import partial
 import grp
@@ -15,14 +16,17 @@ import sys
 from threading import Lock
 import time
 from uuid import UUID, uuid4
+
 from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import debug, error, warning, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
+from cs.resources import uses_runstate
 from cs.threads import locked
+
 from . import PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
 from .blockify import top_block_for, blockify
@@ -83,8 +87,8 @@ class DirentRecord(BinarySingleValue):
     '''
     return self.value
 
-  @staticmethod
-  def parse_value(bfr):
+  @classmethod
+  def parse_value(cls, bfr):
     ''' Unserialise a serialised Dirent.
     '''
     type_ = BSUInt.parse_value(bfr)
@@ -401,7 +405,7 @@ class _Dirent(Transcriber):
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is None:
       return None
-    bfr = CornuCopyBuffer(prev_blockref.datafrom())
+    bfr = CornuCopyBuffer(prev_blockref)
     E = _Dirent.from_buffer(bfr)
     if not bfr.at_eof():
       warning(
@@ -524,8 +528,7 @@ class _Dirent(Transcriber):
         perm_bits = 0o600
     st_mode = self.unix_typemode | perm_bits
     st_ino = I.inum if I else -1
-    # TODO: dev from FileSystem
-    st_dev = fs.device_id
+    st_dev = None if fs is None else fs.device_id
     if self.isdir:
       # TODO: should nlink for Dirs count its subdirs?
       st_nlink = 1
@@ -743,37 +746,38 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
   # FileLike.lstat uses the common stat method
   lstat = stat
 
-  @locked
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Set up .open_file on first open.
     '''
-    self._check()
-    if self.open_file is not None:
-      raise RuntimeError(
-          "first open, but .open_file is not None: %r" % (self.open_file,)
-      )
-    if self._block is None:
-      raise RuntimeError("first open, but ._block is None")
-    self.open_file = RWBlockFile(self._block)
-    self._block = None
-    self._check()
-
-  @locked
-  def shutdown(self):
-    ''' On final close, close .open_file and save result as ._block.
-    '''
-    self._check()
-    if self._block is not None:
-      error(
-          "final close, but ._block is not None;"
-          " replacing with self.open_file.close(), was: %s", self._block
-      )
-    f = self.open_file
-    f.filename = self.name
-    self._block = f.sync()
-    f.close()
-    self.open_file = None
-    self._check()
+    with super().startup_shutdown():
+      with self._lock:
+        self._check()
+        if self.open_file is not None:
+          raise RuntimeError(
+              "first open, but .open_file is not None: %r" % (self.open_file,)
+          )
+        if self._block is None:
+          raise RuntimeError("first open, but ._block is None")
+        self.open_file = RWBlockFile(self._block)
+        self._block = None
+        self._check()
+      try:
+        yield
+      finally:
+        with self._lock:
+          self._check()
+          if self._block is not None:
+            error(
+                "final close, but ._block is not None;"
+                " replacing with self.open_file.close(), was: %s", self._block
+            )
+          f = self.open_file
+          f.filename = self.name
+          self._block = f.sync()
+          f.close()
+          self.open_file = None
+          self._check()
 
   def _check(self):
     ''' Internal consistency check.
@@ -821,7 +825,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     '''
     f = self.open_file
     if f is None:
-      return self.block.datafrom()
+      return iter(self.block)
     return f.datafrom()
 
   @property
@@ -893,7 +897,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     '''
     return _Dirent.transcribe_inner(self, T, fp, {})
 
-  def pushto_queue(self, Q, runstate=None, progress=None):
+  def pushto_queue(self, Q, progress=None):
     ''' Push the Block with the file contents to a queue.
 
         Parameters:
@@ -904,7 +908,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
 
         Semantics are as for `cs.vt.block.Block.pushto_queue`.
     '''
-    return self.block.pushto_queue(Q, runstate=runstate, progress=progress)
+    return self.block.pushto_queue(Q, progress=progress)
 
   @io_fail
   def fsck(self, recurse=False):
@@ -1273,7 +1277,9 @@ class Dir(_Dirent, DirLike):
   def transcribe_inner(self, T, fp):
     return _Dirent.transcribe_inner(self, T, fp, {})
 
-  def pushto_queue(self, Q, runstate=None, progress=None):
+  @pfx_method
+  @uses_runstate
+  def pushto_queue(self, Q, *, runstate, progress=None):
     ''' Push the Dir Blocks to a queue.
 
         Parameters:
@@ -1287,18 +1293,19 @@ class Dir(_Dirent, DirLike):
     # push the Dir block data
     B.pushto_queue(Q, runstate=runstate, progress=progress)
     # and recurse into contents
-    for E in DirentRecord.parse_buffer_values(B.bufferfrom()):
-      if runstate and runstate.cancelled:
-        warning("push cancelled")
-        return False
-      E.pushto_queue(Q, runstate=runstate, progress=progress)
+    with runstate:
+      for E in DirentRecord.scan_values(B.bufferfrom()):
+        if runstate.cancelled:
+          warning("push cancelled")
+          return False
+        E.pushto_queue(Q, progress=progress)
     return True
 
   @io_fail
-  def fsck(self, recurse=False):
+  @uses_runstate
+  def fsck(self, *, recurse=False, runstate):
     ''' Check this Dir.
     '''
-    runstate = defaults.runstate
     ok = True
     B = self.block
     if not B.fsck(recurse=recurse):

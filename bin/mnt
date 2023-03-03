@@ -11,6 +11,9 @@ set -ue
 rcfile=$HOME/.mntrc
 umount=
 mount_point=
+trace=
+use_tmux=1
+[ -t 2 ] && trace=set-x
 
 cmd=$(basename "$0")
 usage="Usage:
@@ -19,9 +22,11 @@ usage="Usage:
   $cmd [-u] {mount-path|/mount/point}...
     -f rcfile   Specify config file. Default: $rcfile
     -u          Unmount the mount-path.
+    -X          Run the mount directly, not in tmux.
+    -x          Trace the executed command.
     mount-path
         ALL
-          Scan the file
+          Scan the file $rcfile
         ssh://host/path or host:path
           Note that the remote path commences _after_ the slash
           separating the host from the path, so an absolute path will
@@ -37,6 +42,8 @@ do
   case "$1" in
     -f) rcfile=$1; shift ;;
     -u) umount=1 ;;
+    -X) use_tmux= ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -120,6 +127,7 @@ mount_path2mount_point(){
     mount_path=$1
     # shellcheck disable=SC2046
     set -- $( parse_mount_path "$mount_path" )
+    [ $# = 3 ]
     type=$1 host=$2 path=$3
     # shellcheck disable=SC2030
     pathbase=$( printf '%s\n' "$path" | sed 's|//$||; s|//*|__|g; s/\./_/g' )
@@ -144,13 +152,17 @@ do_mount(){
     set -ue
     case "$type" in
       ssh | sshfs )
-        set -x
-        tm "MNT_${host}_${pathbase}" set-x sshfs -f -o reconnect -- "$host:$path" "$mount_point"
+        set -- \
+          set-x sshfs -f -o reconnect -o ssh_command='datethen 2 set-x ssh' \
+            -- "$host:$path/" "$mount_point"
+        [ $use_tmux ] && set -- tm use-session -d "MNT_${host}_${pathbase}" "$@"
+        set -- $trace "$@"
         ;;
       *)echo "$cmd: $mount_point: unsupported type: $type" >&2
         exit 1
         ;;
     esac
+    exec "$@"
   )
 }
 
@@ -189,7 +201,7 @@ then
     exit 2
   }
   # shellcheck disable=SC2094
-  while read -r path mnt
+  while read -r path mnt <&3
   do
     case "$path" in
       '' | \#* ) ;;

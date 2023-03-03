@@ -18,8 +18,8 @@ from .fileutils import compare, rewrite, rewrite_cmgr, Pathname, \
                         file_property, \
                         make_files_property, \
                         BackedFile, BackedFile_TestMethods
-from .logutils import D
-from .timeutils import TimeoutError, sleep
+from .gimmicks import TimeoutError
+from .timeutils import sleep
 from .x import X
 
 class ThingWithFileProperty(object):
@@ -44,7 +44,6 @@ class ThingWithFileProperty(object):
   def test1(self, filename):
     with open(filename) as fp:
       data = fp.read()
-    ##D("test1 loads \"%s\" => %s", path, data)
     return data
 
 class ThingWithFilesProperty(object):

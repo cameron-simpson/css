@@ -16,9 +16,10 @@ Presupplied scales:
 '''
 
 from collections import namedtuple
+from cs.deco import OBSOLETE
 from cs.lex import get_chars, get_decimal, skipwhite
 
-__version__ = '20201025-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -27,7 +28,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.lex'],
+    'install_requires': ['cs.deco', 'cs.lex'],
 }
 
 class UnitStep(namedtuple('UnitStep', 'factor unit max_width')):
@@ -85,9 +86,9 @@ DECIMAL_SCALE = (
     UnitStep(0, 'P', 3),
 )
 
-def human(n, scale):
+def decompose(n, scale):
   ''' Decompose a nonnegative integer `n` into counts by unit from `scale`.
-      Returns a list of `(modulus,UnitStep)`.
+      Returns a list of `(modulus,UnitStep)` in order from smallest unit upward.
 
       Parameters:
       * `n`: a nonnegative integer.
@@ -111,28 +112,46 @@ def human(n, scale):
     raise ValueError("invalid scale, final factor must be 0: %r" % (scale,))
   return components
 
+@OBSOLETE(suggestion="decompose")  # pylint: disable=no-value-for-parameter
+def human(n, scale):
+  ''' Obsolete shim for `decompose()`.
+  '''
+  return decompose(n, scale)
+
 def geek_bytes(n):
   ''' Decompose a nonnegative integer `n` into counts by unit
       from `BINARY_BYTES_SCALE`.
   '''
-  return human(n, BINARY_BYTES_SCALE)
+  return decompose(n, BINARY_BYTES_SCALE)
 
-def human_bytes(n):
+def decompose_bytes(n):
   ''' Decompose a nonnegative integer `n` into counts by unit
       from `DECIMAL_BYTES_SCALE`.
   '''
-  return human(n, DECIMAL_BYTES_SCALE)
+  return decompose(n, DECIMAL_BYTES_SCALE)
 
-def human_time(n, scale=None):
+@OBSOLETE(suggestion="decompose_bytes")  # pylint: disable=no-value-for-parameter
+def human_bytes(n):
+  ''' Obsolete shim for `decompose_bytes()`.
+  '''
+  return decompose_bytes(n)
+
+def decompose_time(n, scale=None):
   ''' Decompose a nonnegative integer `n` into counts by unit
       from `TIME_SCALE`.
   '''
   if scale is None:
     scale = TIME_SCALE
-  return human(n, scale)
+  return decompose(n, scale)
+
+@OBSOLETE(suggestion="decompose_time")  # pylint: disable=no-value-for-parameter
+def human_time(n, scale=None):
+  ''' Obsolete shim for `decompose_time()`.
+  '''
+  return decompose_time(n, scale=scale)
 
 def combine(components, scale):
-  ''' Combine a sequence of value components as from `human()` into an integer.
+  ''' Combine a sequence of value components as from `decompose()` into an integer.
   '''
   factors = {}
   current_factor = 1
@@ -162,7 +181,7 @@ def transcribe(
       * `skip_zero`: omit components of value 0.
       * `sep`: separator between words, default: `''`.
   '''
-  components = human(n, scale)
+  components = decompose(n, scale)
   text = []
   for count, step in reversed(components):
     if skip_zero and count == 0:
@@ -170,8 +189,8 @@ def transcribe(
     count_i = int(count)
     count_s = str(count_i) if count_i == count else "%.1f" % count
     if not no_pad and step.max_width > len(count_s):
-      count_s=" " * (step.max_width - len(count_s))+count_s
-    count_s+=step.unit
+      count_s = " " * (step.max_width - len(count_s)) + count_s
+    count_s += step.unit
     text.append(count_s)
     if max_parts is not None and len(text) == max_parts:
       break
@@ -182,7 +201,7 @@ def transcribe_bytes_geek(n, max_parts=1, **kw):
   '''
   return transcribe(n, BINARY_BYTES_SCALE, max_parts=max_parts, **kw)
 
-def transcribe_bytes_human(n, max_parts=1, **kw):
+def transcribe_bytes_decompose(n, max_parts=1, **kw):
   ''' Transcribe a nonnegative integer `n` against `DECIMAL_BYTES_SCALE`.
   '''
   return transcribe(n, DECIMAL_BYTES_SCALE, max_parts=max_parts, **kw)
@@ -214,12 +233,12 @@ def parse(s, scale, offset=0):
     if vunit:
       vunit0 = vunit
       vunit = vunit.lower()
-      for factor, unit in scale:
-        if unit.lower() == vunit:
+      for unit in scale:
+        if unit.unit.lower() == vunit:
           break
-        if not factor:
+        if not unit.factor:
           raise ValueError("unrecognised unit: %r" % (vunit0,))
-        value *= factor
+        value *= unit.factor
   return value, offset
 
 def multiparse(s, scales, offset=0):

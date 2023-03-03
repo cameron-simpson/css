@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Trite wrapper for pdftohtml to generate text.
+# - Cameron Simpson <cs@cskk.id.au> 04sep2020
+#
+
+pdftohtml -stdout ${1+"$@"} | unhtml
