@@ -7,6 +7,7 @@
 
 from binascii import unhexlify
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
@@ -29,7 +30,6 @@ import signal
 from stat import S_IFMT, S_ISDIR, S_ISREG, S_ISLNK
 from tempfile import TemporaryDirectory
 from threading import RLock
-from types import SimpleNamespace
 from uuid import UUID, uuid4
 import hashlib
 import os
@@ -37,8 +37,10 @@ import shutil
 import sys
 import termios
 import time
+
 from icontract import require
 from typeguard import typechecked
+
 from cs.buffer import CornuCopyBuffer
 from cs.cloud import CloudArea, validate_subpath
 from cs.cloud.crypt import (
@@ -106,13 +108,11 @@ class CloudBackupCommand(BaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = ('status',)
 
   # pylint: disable=too-few-public-methods
-  class OPTIONS_CLASS(SimpleNamespace):
+  @dataclass
+  class Options(BaseCommand.Options):
     ''' Options namespace with convenience methods.
     '''
-
-    def __init__(self, **kw):
-      super().__init__(**kw)
-      self._lock = RLock()
+    _lock: bool = field(default_factory=RLock)
 
     @property
     @locked
@@ -633,6 +633,7 @@ class CloudBackupCommand(BaseCommand):
     for envvar in 'CLOUDBACKUP_AREA', 'CLOUDBACKUP_KEYNAME':
       print("  $" + envvar, os.environ.get(envvar, ''))
 
+# TODO: use the new cs.hashutils stuff
 class HashCode(bytes):
   ''' The base class for various flavours of hashcodes.
   '''
@@ -1106,6 +1107,7 @@ class BackupRun(RunStateMixin):
     )
     status_proxy.prefix = "backup %s: " % (backup_record.uuid)
 
+    # TODO: this is all done by the outermost "with runstate:" these days
     def cancel_runstate(signum, frame):
       ''' Receive signal, cancel the `RunState`.
       '''
@@ -1862,8 +1864,8 @@ class NamedBackup(SingletonMixin):
               "uploaded content changed: original hashcode %s, uploaded content %s",
               hashcode, up_hashcode
           )
-        assert not new_upload or bfr.offset == fstat.st_size, "bfr.offset=%d but fstat.st_size=%d" % (
-            bfr.offset, fstat.st_size
+        assert not new_upload or bfr.offset == fstat.st_size, (
+            "bfr.offset=%d but fstat.st_size=%d" % (bfr.offset, fstat.st_size)
         )
         return hashcode, fstat
 
