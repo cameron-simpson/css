@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 import os
 import sys
 from threading import RLock
-from types import SimpleNamespace
 
 from cs.cmdutils import BaseCommand
 from cs.pfx import Pfx
@@ -34,14 +33,11 @@ class CloudCommand(BaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'stat'
 
   # pylint: disable=too-few-public-methods
+  @dataclass
   class Options(BaseCommand.Options):
     ''' Options namespace with convenience methods.
     '''
     _lock: bool = field(default_factory=RLock)
-
-    def __init__(self, **kw):
-      super().__init__(**kw)
-      self._lock = RLock()
 
     @property
     @locked
