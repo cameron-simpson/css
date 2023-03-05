@@ -35,6 +35,7 @@ from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState, uses_runstate
+from cs.typingutils import subtype
 from cs.upd import Upd
 
 __version__ = '20230212-post'
@@ -1261,3 +1262,5 @@ class BaseCommand:
           banner=banner,
           locals_=local,
       )
+
+BaseCommandSubType = subtype(BaseCommand)
