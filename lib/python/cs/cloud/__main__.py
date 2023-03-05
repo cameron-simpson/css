@@ -3,15 +3,18 @@
 ''' Command line implementation for the cs.cloud module.
 '''
 
+from dataclasses import dataclass, field
 import os
 import sys
 from threading import RLock
 from types import SimpleNamespace
+
 from cs.cmdutils import BaseCommand
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.threads import locked
+
 from . import CloudArea
 
 def main(argv=None):
@@ -31,9 +34,10 @@ class CloudCommand(BaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'stat'
 
   # pylint: disable=too-few-public-methods
-  class OPTIONS_CLASS(SimpleNamespace):
+  class Options(BaseCommand.Options):
     ''' Options namespace with convenience methods.
     '''
+    _lock: bool = field(default_factory=RLock)
 
     def __init__(self, **kw):
       super().__init__(**kw)

@@ -7,6 +7,7 @@
 
 from code import interact
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import filecmp
 from functools import total_ordering
@@ -1036,41 +1037,36 @@ class CalibreCommand(BaseCommand):
       'EPUB': (['MOBI', 'AZW', 'AZW3'], ()),
   }
 
-  class OPTIONS_CLASS(BaseCommand.OPTIONS_CLASS):
+  @dataclass
+  class Options(BaseCommand.Options):
     ''' Special class for `self.options` with various properties.
     '''
 
-    def __init__(
-        self,
-        kindle_path=None,
-        calibre_path=None,
-        calibre_path_other=None,
-        linkto_dirpath=None,
-        **kw,
-    ):
-      super().__init__(**kw)
-      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-      try:
-        # pylint: disable=protected-access
-        kindle_path = KindleTree._resolve_fspath(kindle_path)
-      except ValueError:
-        kindle_path = None
-      try:
-        # pylint: disable=protected-access
-        calibre_path_other = CalibreTree._resolve_fspath(
-            calibre_path_other,
-            envvar=CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR
+    calibre_path: str = field(
+        default_factory=lambda: CalibreTree.
+        _resolve_fspath(None, CalibreTree.FSPATH_ENVVAR)
+    )
+    other_calibre_path: Optional[str] = field(
+        default_factory=lambda: (
+            CalibreTree.
+            _resolve_fspath(None, CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR)
+            if CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR in os.environ else None
         )
-      except ValueError:
-        calibre_path_other = None
-      self.kindle_path = kindle_path
-      self.calibre_path = calibre_path
-      self.calibre_path_other = calibre_path_other
-      self.linkto_dirpath = (
-          linkto_dirpath
-          or os.environ.get(CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR)
-          or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
+    )
+
+    def _default_kindle_path():
+      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
+      return (
+          KindleTree._resolve_fspath(None)
+          if KindleTree.FSPATH_ENVVAR in os.environ else None
       )
+
+    kindle_path: Optional[str] = field(default_factory=_default_kindle_path)
+    linkto_dirpath: str = field(
+        default_factory=lambda: os.environ.get(
+            CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR
+        ) or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
+    )
 
     @property
     def calibre(self):

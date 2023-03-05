@@ -13,6 +13,7 @@ from __future__ import print_function, absolute_import
 from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
+from dataclasses import dataclass
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
 from os.path import basename
@@ -211,12 +212,15 @@ class _ClassSubCommand(_BaseSubCommand):
     subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
     return subusage_format
 
-# pylint: disable=too-few-public-methods
-class BaseCommandOptions(SimpleNamespace):
+@dataclass
+class BaseCommandOptions:
   ''' A base class for the `BaseCommand` `options` object.
 
       This is the default class for the `self.options` object
-      available during `BaseCommand.run()`.
+      available during `BaseCommand.run()`,
+      and available as the `BaseCommand.Options` attribute.
+
+      Any keyword arguments are applied as field updates to the instance.
 
       It comes prefilled with:
       * `.dry_run=False`
@@ -224,14 +228,62 @@ class BaseCommandOptions(SimpleNamespace):
       * `.quiet=False`
       * `.verbose=False`
       and a `.doit` property which is the inverse of `.dry_run`.
+
+      It is recommended that if ``BaseCommand` subclasses use a
+      different type for their `Options` that it should be a
+      subclass of `BaseCommandOptions`.
+      Since `BaseCommandOptions` is a data class, this typically looks like:
+
+          @dataclass
+          class Options(BaseCOmmand.Options):
+              ... optional extra fields etc ...
   '''
 
-  def __init__(self, **kw):
-    kw.setdefault('dry_run', False)
-    kw.setdefault('force', False)
-    kw.setdefault('quiet', False)
-    kw.setdefault('verbose', False)
-    super().__init__(**kw)
+  cmd: Optional[str] = None
+  dry_run: bool = False
+  force: bool = False
+  quiet: bool = False
+  verbose: bool = False
+
+  def copy(self, **updates):
+    ''' Return a new instance of `BaseCommandOptions` (well, `type(self)`)
+        which is a shallow copy of the public attributes from `self.__dict__`.
+
+        Any keyword arguments are applied as attribute updates to the copy.
+    '''
+    copied = type(self)(
+        **{k: v
+           for k, v in self.__dict__.items()
+           if not k.startswith('_')}
+    )
+    for k, v in updates.items():
+      setattr(copied, k, v)
+    return copied
+
+  @contextmanager
+  def __call__(self, **updates):
+    ''' Calling the options object returns a context manager whose
+        value is a copy of the options with any `suboptions` applied.
+
+        Example showing the semantics:
+
+            >>> from cs.cmdutils import BaseCommandOptions
+            >>> options = BaseCommandOptions(x=1)
+            >>> assert options.x == 1
+            >>> assert not options.verbose
+            >>> with options(verbose=True) as subopts:
+            ...     assert options is not subopts
+            ...     assert options.x == 1
+            ...     assert not options.verbose
+            ...     assert subopts.x == 1
+            ...     assert subopts.verbose
+            ...
+            >>> assert options.x == 1
+            >>> assert not options.verbose
+
+    '''
+    suboptions = self.copy(**updates)
+    yield suboptions
 
   @property
   def doit(self):
@@ -355,7 +407,7 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = None
-  OPTIONS_CLASS = BaseCommandOptions
+  Options = BaseCommandOptions
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGTERM
 
   def __init_subclass__(cls):
@@ -397,9 +449,9 @@ class BaseCommand:
           if this is not specified it is taken from `argv.pop(0)`.
         * `options`:
           an optional keyword providing object for command state and context.
-          If not specified a new `self.OPTIONS_CLASS` instance
+          If not specified a new `self.Options` instance
           is allocated for use as `options`.
-          The default `OPTIONS_CLASS` is `BaseCommandOptions`,
+          The default `Options` is `BaseCommandOptions`,
           a `SimpleNamespace` with some prefilled attributes and properties
           to aid use later.
           These can be further updated by the `.apply_default()` method.
@@ -460,7 +512,7 @@ class BaseCommand:
     if runstate is None:
       runstate = RunState(cmd)
     self.cmd = cmd
-    options = self.options = self.OPTIONS_CLASS()
+    options = self.options = self.Options()
     options.runstate = runstate
     options.runstate_signals = self.DEFAULT_SIGNALS
     log_level = getattr(options, 'log_level', None)
