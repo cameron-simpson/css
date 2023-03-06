@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Command line stuff. - Cameron Simpson <cs@cskk.id.au> 03sep2015
 #
@@ -9,7 +9,7 @@
     and other command line related stuff.
 '''
 
-from __future__ import print_function, absolute_import
+from abc import ABC, abstractmethod
 from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
@@ -103,7 +103,9 @@ def docmd(dofunc):
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
 
-class _BaseSubCommand:
+class _BaseSubCommand(ABC):
+  ''' The basis for the classes implementing subcommands.
+  '''
 
   def __init__(self, cmd, method, *, usage_mapping=None):
     self.cmd = cmd
