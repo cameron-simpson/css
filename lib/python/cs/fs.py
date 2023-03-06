@@ -194,7 +194,12 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   '''
 
   @classmethod
-  def _resolve_fspath(cls, fspath, envvar=None, default_attr=None):
+  def _resolve_fspath(
+      cls,
+      fspath: Optional[str],
+      envvar: Optional[str] = None,
+      default_attr=None
+  ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
 
         Parameters:
