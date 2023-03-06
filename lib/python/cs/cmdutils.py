@@ -15,6 +15,7 @@ from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import partial
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
 from os.path import basename
@@ -25,7 +26,6 @@ except ImportError:
 import shlex
 from signal import SIGHUP, SIGINT, SIGTERM
 import sys
-from types import SimpleNamespace
 from typing import Callable, List, Mapping, Optional
 
 from cs.context import stackattrs
@@ -124,7 +124,7 @@ class _BaseSubCommand(ABC):
     )
 
   @staticmethod
-  def from_class(command_cls):
+  def from_class(command_cls: "BaseCommandSubType") -> Mapping[str, Callable]:
     ''' Return a mapping of subcommand names to subcommand specifications
         for class attributes which commence with
         `command_cls.SUBCOMMAND_METHOD_PREFIX`,
@@ -149,7 +149,11 @@ class _BaseSubCommand(ABC):
         )
     return subcommands_map
 
-  def usage_text(self, short, usage_format_mapping=None):
+  def usage_text(
+      self,
+      short: bool,
+      usage_format_mapping: Optional[Mapping] = None
+  ) -> str:
     ''' Return the filled out usage text for this subcommand.
     '''
     usage_format_mapping = usage_format_mapping or {}
@@ -175,13 +179,15 @@ class _MethodSubCommand(_BaseSubCommand):
   ''' A class to represent a subcommand implemented with a method.
   '''
 
-  def __call__(self, subcmd, command, argv):
+  def __call__(
+      self, subcmd: str, command: "BaseCommandSubType", argv: List[str]
+  ):
     with Pfx(subcmd):
       method = self.method
       if ismethod(method):
         # already bound
         return method(argv)
-      # unbound - supply the instance
+      # unbound - supply the instance for use as self
       return method(command, argv)
 
   def usage_format(self):
@@ -214,7 +220,7 @@ class _ClassSubCommand(_BaseSubCommand):
   def __call__(self, cmd, command, argv):
     return self.method(argv, cmd=cmd, **command.options.__dict__).run()
 
-  def usage_format(self):
+  def usage_format(self) -> str:
     ''' Return the usage format string from the class.
     '''
     doc = self.method.usage_text(cmd=self.cmd)
@@ -411,6 +417,7 @@ class BaseCommand:
       Primarily because when incorrectly invoked
       an argparse command line prints the help/usage messgae
       and aborts the whole programme with `SystemExit`.
+      But also, I find the whole argparse `add_argument` thing cumbersome.
   '''
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
