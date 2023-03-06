@@ -10,6 +10,7 @@
 '''
 
 from abc import ABC, abstractmethod
+from cmd import Cmd
 from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
@@ -17,10 +18,15 @@ from dataclasses import dataclass
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
 from os.path import basename
+try:
+  import readline
+except ImportError:
+  pass
+import shlex
 from signal import SIGHUP, SIGINT, SIGTERM
 import sys
 from types import SimpleNamespace
-from typing import List, Optional
+from typing import Callable, List, Mapping, Optional
 
 from cs.context import stackattrs
 from cs.lex import (
@@ -1098,6 +1104,14 @@ class BaseCommand:
         return 2
       raise
 
+  @classmethod
+  def cmdloop(cls, intor=None):
+    ''' Use `cmd.Cmd` to run a command loop which calls the `cmd_`* methods.
+    '''
+    # TODO: get intro from usage/help
+    cmdobj = BaseCommandCmd(cls)
+    cmdobj.cmdloop()
+
   # pylint: disable=unused-argument
   @staticmethod
   def getopt_error_handler(cmd, options, e, usage, subcmd=None):  # pylint: disable=unused-argument
@@ -1219,8 +1233,15 @@ class BaseCommand:
       warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit
 
-  def shell(self, *argv, banner=None, local=None):
+  def cmd_shell(self, argv):
+    ''' Usage: {cmd}
+            Run a command prompt via cmd.Cmd using this command's subcommands.
+      '''
+    self.cmdloop()
+
+  def repl(self, *argv, banner=None, local=None):
     ''' Run an interactive Python prompt with some predefined local names.
+        Aka REPL (Read Evaluate Print Loop).
 
         Parameters:
         * `argv`: any notional command line arguments
@@ -1238,11 +1259,11 @@ class BaseCommand:
         commands wishing such a command should provide something
         like this:
 
-            def cmd_shell(self, argv):
+            def cmd_repl(self, argv):
               """ Usage: {cmd}
                     Run an interactive Python prompt with some predefined local names.
               """
-              return self.shell(*argv)
+              return self.repl(*argv)
     '''
     options = self.options
     if banner is None:
@@ -1266,3 +1287,39 @@ class BaseCommand:
       )
 
 BaseCommandSubType = subtype(BaseCommand)
+
+class BaseCommandCmd(Cmd):
+  ''' A `cmd.Cmd` subclass used to provide interactive use of a
+      command's subcommands.
+
+      The `BaseCommand.cmdloop()` class method instantiates an
+      instance of this cand calls its `.cmdloop()` method
+      i.e. `cmd.Cmd.cmdloop`.
+  '''
+
+  def __init__(self, command_class: BaseCommandSubType):
+    super().__init__()
+    self.command_class = command_class
+
+  @typechecked
+  def _doarg(self, subcmd: str, arg: str):
+    cls = self.command_class
+    argv = trace(shlex.split)(arg)
+    command = trace(cls)([cls.__name__, subcmd] + argv)
+    with stackattrs(command, _subcmd=subcmd):
+      command.run()
+
+  def __getattr__(self, attr):
+    cls = self.command_class
+    subcmd = cutprefix(attr, 'do_')
+    if subcmd is not attr:
+      method_name = cls.SUBCOMMAND_METHOD_PREFIX + subcmd
+      X("method_name=%s", method_name)
+      if hasattr(cls, method_name):
+
+        def do_cmdsub(arg):
+          return trace(self._doarg)(subcmd, arg)
+
+        return do_cmdsub
+        return trace(docmd(partial(self._doarg, subcmd)))
+    raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
