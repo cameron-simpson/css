@@ -23,7 +23,7 @@ from cs.queues import ListQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
-from cs.threads import bg as bg_thread, locked, State as ThreadState, HasThreadState
+from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
 
 __version__ = '20230217-post'
 

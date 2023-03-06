@@ -74,7 +74,7 @@ from cs.tagset import (
     TagSet, Tag, TagFile, TagSetCriterion, TagBasedTest, TagsCommandMixin,
     TagsOntology, BaseTagSets, tag_or_tag_value, as_unixtime
 )
-from cs.threads import locked, State as ThreadState
+from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
 __version__ = '20230217-post'

@@ -47,7 +47,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
 from cs.py.func import prop
 from cs.tagset import TagSet, Tag
-from cs.threads import locked_property, State as ThreadState
+from cs.threads import locked_property, ThreadState
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 

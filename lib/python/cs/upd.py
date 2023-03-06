@@ -81,7 +81,7 @@ from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
 from cs.resources import MultiOpenMixin
-from cs.threads import HasThreadState, State as ThreadState
+from cs.threads import HasThreadState, ThreadState
 from cs.tty import ttysize
 from cs.units import transcribe, TIME_SCALE
 
