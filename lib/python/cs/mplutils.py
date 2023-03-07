@@ -4,7 +4,7 @@
 '''
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from os.path import (
     basename,
@@ -23,6 +23,7 @@ from matplotlib.figure import Axes, Figure
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import fmtdoc
+from cs.env import getenv
 from cs.lex import r
 from cs.pfx import pfx_call
 
