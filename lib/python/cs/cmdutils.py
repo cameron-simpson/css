@@ -508,7 +508,7 @@ class BaseCommand:
         and with `cmd=None` for `main`.
     '''
     subcmds = self.subcommands()
-    has_subcmds = subcmds and list(subcmds) != ['help']
+    has_subcmds = subcmds and sorted(subcmds) != ['help', 'shell']
     if argv is None:
       # using sys.argv:
       # argv0 comes from sys.argv[0], which is discarded
