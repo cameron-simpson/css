@@ -363,7 +363,7 @@ class DebuggingRLock(DebugWrapper):
       `threading.RLock` otherwise.
   '''
 
-  def __init__(self, dkw):
+  def __init__(self, **dkw):
     D("dkw = %r", dkw)
     DebugWrapper.__init__(self, **dkw)
     self.debug('__init__')

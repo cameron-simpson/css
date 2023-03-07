@@ -1,0 +1,4 @@
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: make the start-time option, default to 5; fix uninitialised stop
+lib/python/cs/splink.py: merge solar ==> default
+lib/python/cs/splink.py: cs.*: update implementations of BaseCommand.run_context to use super().run_context()
+lib/python/cs/splink.py: cs.lex,cs.splink,cs.timeseries: DISTINFO: fix PyPI package name for dateutil

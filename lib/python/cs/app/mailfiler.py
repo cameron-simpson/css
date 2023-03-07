@@ -431,7 +431,7 @@ class MailFiler(NS):
     debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
     idle = 0
-    while not runstate or not runstate.cancelled:
+    while not runstate.cancelled:
       these_folders = folders
       if not these_folders:
         these_folders = op_cfg.get('folders', '').split()

@@ -50,7 +50,7 @@ from cs.mplutils import axes, remove_decorations, print_figure, save_figure, Fig
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
@@ -66,7 +66,7 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220918-post'
+__version__ = '20230217-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -92,7 +92,7 @@ DISTINFO = {
         'cs.tagset',
         'cs.timeseries',
         'cs.upd',
-        'dateutil',
+        'python-dateutil',
         'typeguard',
     ],
     'entry_points': {
@@ -571,6 +571,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
 
   # pylint: disable=too-many-branches,too-many-locals
   @timerange
+  @uses_runstate
   def plot(
       self,
       start,
@@ -587,7 +588,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       mode_patterns=None,
       stacked=False,
       upd=None,
-      runstate=None,
+      runstate: RunState,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
@@ -662,7 +663,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
         )
       else:
         for label, series, extra in plot_ps:
-          if runstate and runstate.canclled:
+          if runstate.cancelled:
             break
           ax.plot(indices, series, label=label, **extra)
       if ax_title is not None:

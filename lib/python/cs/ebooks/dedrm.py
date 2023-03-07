@@ -8,83 +8,34 @@
     It does not yet work.
 '''
 
-from code import interact
 from contextlib import contextmanager, redirect_stdout
-from datetime import datetime, timezone
-import filecmp
-from functools import total_ordering
+from datetime import datetime
 from getopt import GetoptError
 import importlib
-from itertools import chain
 import json
 import os
 from os.path import (
     basename,
-    exists as existspath,
-    expanduser,
-    isabs as isabspath,
     isdir as isdirpath,
-    isfile as isfilepath,
     join as joinpath,
     normpath,
     realpath,
     splitext,
 )
-import re
-import shlex
-from subprocess import DEVNULL
 import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 import time
 from typing import Iterable, List, Optional
 
-from icontract import require
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-)
-from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.orm import declared_attr, relationship
-from typeguard import typechecked
-
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import cachedmethod, fmtdoc
+from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
-from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
-from cs.lex import (
-    cutprefix,
-    get_dotted_identifier,
-    FormatableMixin,
-    FormatAsError,
-    stripped_dedent,
-)
-from cs.logutils import warning, error
-from cs.numeric import intif
-from cs.obj import SingletonMixin
+from cs.lex import r, stripped_dedent
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
-from cs.progress import progressbar
-from cs.psutils import run
-from cs.resources import MultiOpenMixin
-from cs.seq import unrepeated
-from cs.sqlalchemy_utils import (
-    ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
-)
 from cs.sqltags import SQLTags
-from cs.tagset import TagSet
-from cs.threads import locked
-from cs.units import transcribe_bytes_geek
-from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
-
-from pprint import pformat
-import time
-from cs.lex import r, s
-from cs.x import X
+from cs.upd import print  # pylint: disable=redefined-builtin
 
 DEDRM_PACKAGE_PATH_ENVVAR = 'DEDRM_PACKAGE_PATH'
 
@@ -209,7 +160,7 @@ class DeDRMCommand(BaseCommand):
         )
         pfx_call(dedrm.remove, filename, output_filename, exists_ok=exists_ok)
 
-class DeDRMWrapper:
+class DeDRMWrapper(Promotable):
   ''' Class embodying the DeDRM/noDRM package actions.
   '''
 
@@ -391,7 +342,6 @@ class DeDRMWrapper:
         * `exists_ok`: if true then `dstpath` may already exist; default `False`
     '''
     with atomic_filename(dstpath, exists_ok=exists_ok) as T:
-      tmpfilename = T.name
       dedrm = self.dedrm
       # monkey patch temporary_file method to return tmpfilename
       with stackattrs(dedrm, temporary_file=lambda ext: T):
@@ -455,7 +405,6 @@ class DeDRMWrapper:
     ''' Update the cached kindle keys from the current environment
         by calling `dedrm.kindlekey.kindlekeys(filepaths)`.
     '''
-    dedrm = self.dedrm
     if filepaths is None:
       filepaths = []
     new_kks = self.base_kindlekeys(filepaths)
@@ -480,12 +429,11 @@ class DeDRMWrapper:
 
         If `obj` is `None` or a `str` return `DeDRMWrapper(dedrm_package_path=obj)`.
     '''
-    if not isinstance(obj, cls):
-      if obj is None or isinstance(obj, str):
-        obj = cls(dedrm_package_path=obj)
-      else:
-        raise TypeError("cannot promote %s", r(obj))
-    return obj
+    if isinstance(obj, cls):
+      return obj
+    if obj is None or isinstance(obj, str):
+      return cls(dedrm_package_path=obj)
+    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
 
 class DeDRMOverride:
   ''' A collection of override methods from the DeDRM/noDRM `DeDRM` class

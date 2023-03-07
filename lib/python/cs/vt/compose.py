@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # The generic Store factory and parser for Store specifications.
 #   - Cameron Simpson <cs@cskk.id.au> 20dec2016

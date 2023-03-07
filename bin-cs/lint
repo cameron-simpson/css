@@ -20,7 +20,7 @@ pycodestyle_ignore=E111,E114,E124,E125,E126,E129,E201,E202,E127,E221,E226,E227,E
 # pylint no longer supports: bad-whitespace,bad-continuation
 pylint_disable=bad-indentation,invalid-name,useless-object-inheritance,consider-using-f-string
 pylintrc=$( findup .pylintrc || echo "$HOME/.pylintrc" )
-shellcheck_exclusions=SC1007,SC2244,SC2250
+shellcheck_exclusions=SC1007,SC2244,SC2250,SC2268
 
 cmd=$0
 usage="Usage: $cmd [-2] [-3] filenames...

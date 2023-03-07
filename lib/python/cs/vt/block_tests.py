@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Block tests.
 #       - Cameron Simpson <cs@cskk.id.au>
@@ -7,13 +7,16 @@
 ''' Unit testst for cs.vt.block.
 '''
 
+from contextlib import contextmanager
 import sys
-
-sys.setrecursionlimit(10000)
+##sys.setrecursionlimit(10000)
 from random import choice
 import unittest
+
 from cs.binary_tests import _TestPacketFields
 from cs.randutils import rand0, randomish_chunks
+from cs.testutils import SetupTeardownMixin
+
 from . import block as block_module
 from .block import (
     Block, _Block, IndirectBlock, RLEBlock, LiteralBlock, SubBlock, BlockType,
@@ -31,15 +34,18 @@ class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
     '''
     self.module = block_module
 
-class TestAll(unittest.TestCase):
+class TestAll(SetupTeardownMixin, unittest.TestCase):
   ''' All Block tests.
   '''
 
-  def setUp(self):
+  @contextmanager
+  def setupTeardown(self):
     ''' Make a dict backed MappingStore.
     '''
     self.S = MappingStore("TestAll", {})
     self.random_chunk_source = randomish_chunks(16, 16384)
+    with self.S:
+      yield
 
   def _verify_block(self, B, **kw):
     with self.subTest(task="_verify_block", block=B, **kw):

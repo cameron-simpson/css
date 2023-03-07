@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # File interfaces.      - Cameron Simpson <cs@cskk.id.au>
 #
@@ -158,7 +158,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       dispatch = bg
     syncer = self._syncer
     if syncer is None:
-      S = defaults.S
+      S = Store.default()
       S.open()
       syncer = self._syncer = dispatch(self._sync_file, S, scanner=scanner)
 

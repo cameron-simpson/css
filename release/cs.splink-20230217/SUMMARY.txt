@@ -1,0 +1,1 @@
+SPLinkCommand.cmd_plot: make the start-time optional, default to 5.
