@@ -8,10 +8,9 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from functools import partial
 from getopt import getopt, GetoptError
-from json import JSONDecodeError
 from netrc import netrc
 import os
 from os import environ
@@ -23,7 +22,7 @@ import re
 import sys
 from threading import Semaphore
 import time
-from typing import Set
+from typing import Optional, Set
 from urllib.parse import unquote as unpercent
 
 import requests
@@ -32,7 +31,6 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
-from cs.fstags import FSTags
 from cs.fileutils import atomic_filename
 from cs.lex import has_format_attributes, format_attribute, get_prefix_n
 from cs.logutils import warning
@@ -44,7 +42,7 @@ from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import uses_upd, print  # pylint: disable=redefined-builtin
+from cs.upd import print  # pylint: disable=redefined-builtin
 
 __version__ = '20230217-post'
 
@@ -143,12 +141,18 @@ class PlayOnCommand(BaseCommand):
                     case insensitive.
   '''
 
-  def apply_defaults(self):
-    options = self.options
-    options.user = environ.get('PLAYON_USER', environ.get('EMAIL'))
-    options.password = environ.get('PLAYON_PASSWORD')
-    options.filename_format = environ.get(
-        'PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT
+  @dataclass
+  class Options(BaseCommand.Options):
+    user: Optional[str] = field(
+        default_factory=lambda: environ.
+        get('PLAYON_USER', environ.get('EMAIL'))
+    )
+    password: Optional[str] = field(
+        default_factory=lambda: environ.get('PLAYON_PASSWORD')
+    )
+    filename_format: str = field(
+        default_factory=lambda: environ.
+        get('PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT)
     )
 
   @contextmanager
@@ -837,7 +841,7 @@ class PlayOnAPI(HTTPServiceAPI):
       for entry in entries:
         entry_id = entry['ID']
         with Pfx(entry_id):
-          for field, conv in sorted(dict(
+          for r_field, conv in sorted(dict(
               Episode=int,
               ReleaseYear=int,
               Season=int,
@@ -846,20 +850,20 @@ class PlayOnAPI(HTTPServiceAPI):
               ##Updated=self.from_playon_date,
           ).items()):
             try:
-              value = entry[field]
+              value = entry[r_field]
             except KeyError:
               pass
             else:
-              with Pfx("%s=%r", field, value):
+              with Pfx("%s=%r", r_field, value):
                 if value is None:
-                  del entry[field]
+                  del entry[r_field]
                 else:
                   try:
                     value2 = conv(value)
                   except ValueError as e:
                     warning("%r: %s", value, e)
                   else:
-                    entry[field] = value2
+                    entry[r_field] = value2
           recording = self[entry_id]
           # sometimes the name is spuriously prefixed with the seaon and episode
           playon_name = entry['Name']
@@ -910,26 +914,26 @@ class PlayOnAPI(HTTPServiceAPI):
         entry_id = entry['ID']
         with Pfx(entry_id):
           # pylint: disable=use-dict-literal
-          for field, conv in sorted(dict(
+          for e_field, conv in sorted(dict(
               ##Created=self.from_playon_date,
               ##Expires=self.from_playon_date,
               ##Updated=self.from_playon_date,
           ).items()):
             try:
-              value = entry[field]
+              value = entry[e_field]
             except KeyError:
               pass
             else:
-              with Pfx("%s=%r", field, value):
+              with Pfx("%s=%r", e_field, value):
                 if value is None:
-                  del entry[field]
+                  del entry[e_field]
                 else:
                   try:
                     value2 = conv(value)
                   except ValueError as e:
                     warning("%r: %s", value, e)
                   else:
-                    entry[field] = value2
+                    entry[e_field] = value2
           service = self.service(entry_id)
           service.update(entry, prefix='playon')
           service.update(dict(last_updated=now))

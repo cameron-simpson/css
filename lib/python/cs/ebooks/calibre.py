@@ -1053,6 +1053,9 @@ class CalibreCommand(BaseCommand):
             if CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR in os.environ else None
         )
     )
+    dedrm_package_path: Optional[str] = field(
+        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+    )
 
     def _default_kindle_path():
       from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
@@ -1090,12 +1093,6 @@ class CalibreCommand(BaseCommand):
         raise AttributeError(".kindle: no .kindle_path")
       from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
       return KindleTree(self.kindle_path)
-
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    options = self.options
-    options.dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.

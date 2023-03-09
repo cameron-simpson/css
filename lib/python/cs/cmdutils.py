@@ -28,6 +28,8 @@ from signal import SIGHUP, SIGINT, SIGTERM
 import sys
 from typing import Callable, List, Mapping, Optional
 
+from typeguard import typechecked
+
 from cs.context import stackattrs
 from cs.lex import (
     cutprefix,
@@ -467,10 +469,9 @@ class BaseCommand:
           an optional keyword providing object for command state and context.
           If not specified a new `self.Options` instance
           is allocated for use as `options`.
-          The default `Options` is `BaseCommandOptions`,
-          a `SimpleNamespace` with some prefilled attributes and properties
+          The default `Options` class is `BaseCommandOptions`,
+          a dataclass with some prefilled attributes and properties
           to aid use later.
-          These can be further updated by the `.apply_default()` method.
         Other keyword arguments are applied to `self.options`
         as attributes.
 

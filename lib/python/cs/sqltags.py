@@ -29,6 +29,7 @@ from builtins import id as builtin_id
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
@@ -1970,13 +1971,12 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
       'DBURL_ENVVAR': DBURL_ENVVAR,
   }
 
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    options = self.options
-    db_url = self.TAGSETS_CLASS.infer_db_url()
-    options.db_url = db_url
-    options.sqltags = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    db_url: str = field(
+        default_factory=lambda: BaseSQLTagsCommand.TAGSETS_CLASS.infer_db_url()
+    )
+    sqltags: Optional[SQLTags] = None
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.

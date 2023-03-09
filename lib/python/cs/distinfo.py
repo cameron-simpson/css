@@ -8,6 +8,7 @@
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime
 from fnmatch import fnmatch
 from getopt import GetoptError
@@ -31,6 +32,7 @@ from shutil import rmtree
 from subprocess import run, DEVNULL
 import sys
 from types import SimpleNamespace
+from typing import Any
 
 from icontract import ensure
 import tomli_w
@@ -115,22 +117,24 @@ class CSReleaseCommand(BaseCommand):
       -v  Verbose.
   '''
 
-  def apply_defaults(self):
-    options = self.options
-    cmd = basename(self.cmd)
-    if cmd.endswith('.py'):
-      cmd = 'cs-release'
-    self.cmd = cmd
-    try:
-      is_tty = sys.stderr.isatty()
-    except AttributeError:
-      is_tty = False
-    options.verbose = is_tty
-    options.colourise = is_tty
-    options.force = False
-    options.vcs = VCS_Hg()
-    options.pkg_tagsets = TagFile(joinpath(options.vcs.get_topdir(), PKG_TAGS))
-    options.modules = Modules(options=options)
+  @dataclass
+  class Options(BaseCommand.Options):
+    cmd: str = 'cs-release'
+
+    def stderr_isatty():
+      try:
+        return sys.stderr.isatty()
+      except AttributeError:
+        return False
+
+    verbose: bool = field(default_factory=stderr_isatty)
+    colourise: bool = field(default_factory=stderr_isatty)
+    vcs: Any = VCS_Hg()
+    pkg_tagsets: TagFile = field(
+        default_factory=lambda:
+        TagFile(joinpath(VCS_Hg().get_topdir(), PKG_TAGS))
+    )
+    modules: "Modules" = field(default_factory=lambda: Modules(vcs=VCS_Hg()))
 
   def apply_opts(self, opts):
     ''' Apply the command line options mapping `opts` to `options`.
@@ -802,9 +806,9 @@ class Modules(defaultdict):
   ''' An autopopulating dict of mod_name->Module.
   '''
 
-  def __init__(self, *, options):
+  def __init__(self, *, vcs):
     super().__init__()
-    self.options = options
+    self.vcs = vcs
 
   def __missing__(self, mod_name):
     assert isinstance(mod_name, str), "mod_name=%s:%r" % (
@@ -814,7 +818,7 @@ class Modules(defaultdict):
     assert is_dotted_identifier(
         mod_name, extras='_-'
     ), ("not a dotted identifier: %r" % (mod_name,))
-    M = Module(mod_name, self.options)
+    M = Module(mod_name, self)
     self[mod_name] = M
     return M
 
@@ -833,10 +837,10 @@ class Module:
   ''' Metadata about a Python module/package.
   '''
 
-  def __init__(self, name, options):
+  def __init__(self, name, modules):
     self.name = name
     self._module = None
-    self.options = options
+    self.modules = modules
     self._distinfo = None
     self._checking = False
     self._module_problems = None
@@ -845,16 +849,10 @@ class Module:
     return "%s(%r)" % (type(self).__name__, self.name)
 
   @property
-  def modules(self):
-    ''' The modules from `self.options`.
-    '''
-    return self.options.modules
-
-  @property
   def vcs(self):
-    ''' The VCS from `self.options`.
+    ''' The VCS from `self.modules.vcs`.
     '''
-    return self.options.vcs
+    return self.modules.vcs
 
   @property
   @pfx_method(use_str=True)
@@ -954,7 +952,7 @@ class Module:
   def pkg_tags(self):
     ''' The `TagSet` for this package.
     '''
-    return self.options.pkg_tagsets[self.name]
+    return self.vcs.pkg_tagsets[self.name]
 
   @pfx_method
   def named_features(self):
@@ -1040,8 +1038,8 @@ class Module:
   def save_pkg_tags(self):
     ''' Sync the package `Tag`s `TagFile`, return the pathname of the tag file.
     '''
-    self.options.pkg_tagsets.save()
-    return self.options.pkg_tagsets.fspath
+    self.vcs.pkg_tagsets.save()
+    return self.vcs.pkg_tagsets.fspath
 
   @tag_or_tag_value
   def set_tag(self, tag_name, value, *, msg):

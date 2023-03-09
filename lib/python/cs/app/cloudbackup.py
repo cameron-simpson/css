@@ -30,6 +30,7 @@ import signal
 from stat import S_IFMT, S_ISDIR, S_ISREG, S_ISLNK
 from tempfile import TemporaryDirectory
 from threading import RLock
+from typing import Optional
 from uuid import UUID, uuid4
 import hashlib
 import os
@@ -113,6 +114,16 @@ class CloudBackupCommand(BaseCommand):
     ''' Options namespace with convenience methods.
     '''
     _lock: bool = field(default_factory=RLock)
+    cloud_area_path: Optional[str] = field(
+        default_factory=lambda: os.environ.get('CLOUDBACKUP_AREA')
+    )
+    job_max: int = DEFAULT_JOB_MAX
+    key_name: Optional[str] = field(
+        default_factory=lambda: os.environ.get('CLOUDBACKUP_KEYNAME')
+    )
+    state_dirpath: str = field(
+        default_factory=lambda: joinpath(os.environ['HOME'], '.cloudbackup')
+    )
 
     @property
     @locked
@@ -126,13 +137,6 @@ class CloudBackupCommand(BaseCommand):
       return CloudArea.from_cloudpath(
           self.cloud_area_path, max_connections=self.job_max
       )
-
-  def apply_defaults(self):
-    options = self.options
-    options.cloud_area_path = os.environ.get('CLOUDBACKUP_AREA')
-    options.job_max = DEFAULT_JOB_MAX
-    options.key_name = os.environ.get('CLOUDBACKUP_KEYNAME')
-    options.state_dirpath = joinpath(os.environ['HOME'], '.cloudbackup')
 
   def apply_opts(self, opts):
     ''' Apply main command line options.
@@ -263,8 +267,8 @@ class CloudBackupCommand(BaseCommand):
           public_key_name=options.key_name,
           file_parallel=options.job_max,
       )
-    for field, _, value_s in backup.report():
-      print(field, ':', value_s)
+    for bfield, _, value_s in backup.report():
+      print(bfield, ':', value_s)
 
   def cmd_dirstate(self, argv):
     ''' Usage: {cmd} {{ /dirstate/file/path.ndjson | backup_name subpath }} [subcommand ...]
@@ -365,9 +369,9 @@ class CloudBackupCommand(BaseCommand):
               backup_record.root_path,
           )
           if long_mode:
-            for field, value, value_s in backup_record.report(
+            for bfield, value, value_s in backup_record.report(
                 omit_fields=('uuid', 'root_path', 'timestamp_start')):
-              print('   ', field, ':', value_s)
+              print('   ', bfield, ':', value_s)
       return 0
     backup_name = argv.pop(0)
     if not is_identifier(backup_name):
