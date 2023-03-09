@@ -13,7 +13,12 @@ from contextlib import contextmanager
 from heapq import heappush, heappop
 from inspect import ismethod
 import sys
-from threading import Semaphore, Thread as builtin_Thread, Lock, local as thread_local
+from threading import (
+    Semaphore,
+    Thread as builtin_Thread,
+    Lock,
+    local as thread_local,
+)
 from typing import Any, Mapping, Optional
 
 from cs.context import ContextManagerMixin, stackattrs, stackset
@@ -45,15 +50,15 @@ DISTINFO = {
     ],
 }
 
-class State(thread_local):
+class ThreadState(thread_local):
   ''' A `Thread` local object with attributes
       which can be used as a context manager to stack attribute values.
 
       Example:
 
-          from cs.threads import State
+          from cs.threads import ThreadState
 
-          S = State(verbose=False)
+          S = ThreadState(verbose=False)
 
           with S(verbose=True) as prev_attrs:
               if S.verbose:
@@ -61,7 +66,7 @@ class State(thread_local):
   '''
 
   def __init__(self, **kw):
-    ''' Initiale the `State`, providing the per-Thread initial values.
+    ''' Initiale the `ThreadState`, providing the per-Thread initial values.
     '''
     thread_local.__init__(self)
     for k, v in kw.items():
@@ -77,16 +82,19 @@ class State(thread_local):
 
   @contextmanager
   def __call__(self, **kw):
-    ''' Calling a `State` returns a context manager which stacks some state.
+    ''' Calling a `ThreadState` returns a context manager which stacks some state.
         The context manager yields the previous values
         for the attributes which were stacked.
     '''
     with stackattrs(self, **kw) as prev_attrs:
       yield prev_attrs
 
+# backward compatible deprecated name
+State = ThreadState
+
 # TODO: what to do about overlapping HasThreadState usage of a particular class?
 class HasThreadState(ContextManagerMixin):
-  ''' A mixin for classes with a `cs.threads.State` instance as `.perthread_state`
+  ''' A mixin for classes with a `cs.threads.ThreadState` instance as `.state`
       providing a context manager which pushes `current=self` onto that state
       and a `default()` class method returning `cls.perthread_state.current`
       as the default instance of that class.

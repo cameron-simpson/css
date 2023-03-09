@@ -21,7 +21,7 @@ from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
-from cs.threads import State as ThreadState, HasThreadState
+from cs.threads import ThreadState, HasThreadState
 
 __version__ = '20230217-post'
 

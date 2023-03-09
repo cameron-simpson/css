@@ -53,7 +53,7 @@ from cs.queues import IterableQueue, TimerQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, report, after
 from cs.seq import seq
-from cs.threads import State as ThreadState, HasThreadState
+from cs.threads import ThreadState, HasThreadState
 
 __version__ = '20230212.1-post'
 

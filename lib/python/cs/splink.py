@@ -12,6 +12,7 @@
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 from getopt import GetoptError
@@ -31,7 +32,7 @@ from pprint import pprint
 import shlex
 import sys
 import time
-from typing import List
+from typing import List, Optional
 
 import arrow
 from dateutil.tz import tzlocal
@@ -50,7 +51,7 @@ from cs.mplutils import axes, remove_decorations, print_figure, save_figure, Fig
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
@@ -697,15 +698,18 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       'DEFAULT_FETCH_SOURCE_ENVVAR': DEFAULT_FETCH_SOURCE_ENVVAR,
   }
 
-  def apply_defaults(self):
-    ''' Set the default `spdpath`.
-    '''
-    self.options.fetch_source = os.environ.get(
-        self.DEFAULT_FETCH_SOURCE_ENVVAR
+  @dataclass
+  class Options(TimeSeriesBaseCommand.Options):
+    fetch_source: Optional[str] = field(
+        default_factory=lambda: os.environ.
+        get(TimeSeriesBaseCommand.DEFAULT_FETCH_SOURCE_ENVVAR)
     )
-    self.options.fstags = FSTags()
-    self.options.spdpath = os.environ.get(
-        self.DEFAULT_SPDPATH_ENVVAR, self.DEFAULT_SPDPATH
+    fstags: FSTags = field(default_factory=FSTags)
+    spdpath: str = field(
+        default_factory=lambda: os.environ.get(
+            TimeSeriesBaseCommand.DEFAULT_SPDPATH_ENVVAR, TimeSeriesBaseCommand
+            .DEFAULT_SPDPATH
+        )
     )
 
   def apply_opt(self, opt, val):
