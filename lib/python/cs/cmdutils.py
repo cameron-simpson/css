@@ -387,9 +387,6 @@ class BaseCommand:
               ... do the "ls" subcommand ...
 
       The subclass is customised by overriding the following methods:
-      * `apply_defaults()`:
-        prepare the initial state of `self.options`
-        before any command line options are applied.
       * `apply_opt(opt,val)`:
         apply an individual getopt global command line option
         to `self.options`.
@@ -529,14 +526,13 @@ class BaseCommand:
     if runstate is None:
       runstate = RunState(cmd)
     self.cmd = cmd
-    options = self.options = self.Options()
-    options.runstate = runstate
-    options.runstate_signals = self.DEFAULT_SIGNALS
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
-    self.apply_defaults()
+    options = self.options = self.Options()
+    options.runstate = runstate
+    options.runstate_signals = self.DEFAULT_SIGNALS
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
@@ -748,12 +744,6 @@ class BaseCommand:
       mapping.update(cmd=subcmd)
       subusage = subusage_format.format_map(mapping)
     return subusage or None
-
-  def apply_defaults(self):
-    ''' Stub `apply_defaults` method.
-
-        Subclasses can override this to set up the initial state of `self.options`.
-    '''
 
   @pfx_method
   # pylint: disable=no-self-use
