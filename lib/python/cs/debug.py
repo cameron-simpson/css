@@ -371,18 +371,33 @@ class DebuggingRLock(DebugWrapper):
   '''
 
   def __init__(self, **dkw):
-    D("dkw = %r", dkw)
-    DebugWrapper.__init__(self, **dkw)
+    owner = caller()
+    DebugWrapper.__init__(
+        self, filename=owner.filename, lineno=owner.lineno, **dkw
+    )
     self.debug('__init__')
     self.lock = threading.RLock()
     self.stack = None
 
   def __str__(self):
-    return "%s%r" % (
-        type(self).__name__, [
-            "%s:%s:%s" % (f.filename, f.lineno, f.code_context[0].strip())
-            for f in self.stack
-        ] if self.stack else "NO_STACK"
+    if self.stack is None:
+      code_context = "NO_STACK"
+    else:
+      f = self.stack[0]
+      code_context = f.code_context
+      code_context = "NO_CODE_CONTEXT" if code_context is None else code_context[
+          0].strip()
+    return "%s[%s:%s]%s" % (
+        type(self).__name__,
+        self.filename,
+        self.lineno,
+        "\n  ".join(
+            [
+                "%s:%s:%s" % (f.filename, f.lineno,
+                              code_context)  ##f.code_context[0].strip())
+                for f in self.stack
+            ] if self.stack else "NO_STACK"
+        ),
     )
 
   def __enter__(self):
