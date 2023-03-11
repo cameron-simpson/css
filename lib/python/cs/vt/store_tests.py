@@ -264,6 +264,11 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.S = None
     self.keys1 = None
 
+  def setUp(self):
+    S = self.S
+    if S is not None:
+      S.open()
+
   def tearDown(self):
     if self.S is not None:
       self.S.close()
