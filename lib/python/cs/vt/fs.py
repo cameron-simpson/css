@@ -14,15 +14,17 @@ from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O
 import shlex
 from types import SimpleNamespace as NS
 from uuid import UUID
+
 from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import exception, error, warning, info, debug
 from cs.pfx import Pfx
 from cs.range import Range
-from cs.threads import locked
+from cs.threads import locked, HasThreadState, State as ThreadState
 from cs.x import X
-from . import defaults, Lock, RLock
+
+from . import Lock, RLock, uses_Store
 from .block import isBlock
 from .cache import BlockCache
 from .dir import _Dirent, Dir, FileDirent
@@ -355,7 +357,7 @@ class Inodes:
       return False
     return True
 
-class FileSystem:
+class FileSystem(HasThreadState):
   ''' The core filesystem functionality supporting FUSE operations
       and in principle other filesystem-like access.
 
@@ -367,6 +369,8 @@ class FileSystem:
       to support non-FUSE operation, for example a VT FTP client
       or the like.
   '''
+
+  perthread_state = ThreadState()
 
   @uses_Store
   def __init__(
