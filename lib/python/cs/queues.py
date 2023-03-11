@@ -89,8 +89,10 @@ class QueueIterator(MultiOpenMixin):
     ''' `MultiOpenMixin` support; puts the sentinel onto the underlying queue
         on the final close.
     '''
-    yield
-    self._put(self.sentinel)
+    try:
+      yield
+    finally:
+      self._put(self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
