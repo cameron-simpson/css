@@ -13,6 +13,7 @@ from cmd import Cmd
 import inspect
 import logging
 import os
+from pprint import pformat
 from subprocess import Popen, PIPE
 import sys
 import threading
@@ -20,10 +21,13 @@ import time
 import traceback
 from types import SimpleNamespace as NS
 
+from cs.deco import decorator
+from cs.lex import s
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
+from cs.py.func import funccite, func_a_kw_fmt
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
@@ -39,9 +43,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
+        'cs.lex',
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py.func',
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
@@ -610,7 +617,6 @@ def trace(
         )
       else:
         ##xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
-        from cs.lex import s
         xlog("%sRETURN %s <= %s", _trace_indent, s(result), log_cite)
       _trace_indent = old_indent
       return result
