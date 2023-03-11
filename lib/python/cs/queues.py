@@ -62,7 +62,7 @@ class QueueIterator(MultiOpenMixin):
     self._item_count = 0
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.name)
+    return "%s(%r:q=%s)" % (type(self).__name__, self.name, self.q)
 
   @not_closed
   def put(self, item, *args, **kw):
