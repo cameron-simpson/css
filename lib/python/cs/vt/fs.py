@@ -401,7 +401,7 @@ class FileSystem(HasThreadState):
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
     self._old_S_block_cache = S.block_cache
-    self.block_cache = S.block_cache or defaults.block_cache or BlockCache()
+    self.block_cache = S.block_cache or BlockCache.default() or BlockCache()
     S.block_cache = self.block_cache
     S.open()
     if readonly is None:
