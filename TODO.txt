@@ -1,3 +1,4 @@
+cs.debug: Lock and RLock to be the same class with a different underlying lock class
 default_params: supply modified sugnature for wrapper function indicating the param is optional
 Pfx: reimplement as a linked list, use HasThreadState
 CornuCopyBuffer: improve docstring - replace references to .buf etc
