@@ -634,8 +634,8 @@ class PriorityLock(object):
 def monitor(cls, attrs=None, initial_timeout=10.0, lockattr='_lock'):
   ''' Turn a class into a monitor, all of whose public methods are `@locked`.
 
-      This is a simple approach requires class instances to have a `._lock`
-      which is an `RLock` or compatible
+      This is a simple approach which requires class instances to have a
+      `._lock` which is an `RLock` or compatible
       because methods may naively call each other.
 
       Parameters:
