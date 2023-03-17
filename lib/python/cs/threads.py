@@ -7,13 +7,13 @@
 ''' Thread related convenience classes and functions.
 '''
 
-from __future__ import with_statement
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from heapq import heappush, heappop
 from inspect import ismethod
 import sys
 from threading import (
+    current_thread,
     Semaphore,
     Thread as builtin_Thread,
     Lock,
@@ -276,6 +276,23 @@ def bg(
   if not no_start:
     T.start()
   return T
+
+def joinif(T: builtin_Thread):
+  ''' Call `T.join()` if `T` is not the current `Thread`.
+
+      Unlike `threading.Thread.join`, this function is a no-op if
+      `T` is the current `Thread.
+
+      The use case is situations such as the shutdown phase of the
+      `MultiOpenMixin.startup_shutdown` context manager. Because
+      the "initial open" startup phase is not necessarily run in
+      the same thread as the "final close" shutdown phase, it is
+      possible for example for a worker `Thread` to execute the
+      shutdown phase and try to join itself. Using this function
+      allows that scenario.
+  '''
+  if T is not current_thread():
+    T.join()
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
