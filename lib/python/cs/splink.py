@@ -1051,19 +1051,19 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     stacked = options.stacked
     event_labels = options.event_labels
     detailed = spd.DetailedData
-    det_data = lambda field: detailed[field].as_pd_series(
+    detail_series_cropped = lambda field: detailed[field].as_pd_series(
         start, stop, pad=True, tz=tz
     )
     if data_specs == ['POWER']:
-      grid = det_data('ac_input_power_average_kw')
+      grid = detail_series_cropped('ac_input_power_average_kw')
       grid_in = -grid.clip(upper=0.0)
       grid_out = grid.clip(lower=0.0)
-      pv = det_data('total_ac_coupled_power_average_kw')
-      battery = det_data('inverter_ac_power_average_kw')
+      pv = detail_series_cropped('total_ac_coupled_power_average_kw')
+      battery = detail_series_cropped('inverter_ac_power_average_kw')
       battery_drain = -battery.clip(upper=0.0)
       battery_charge = battery.clip(lower=0.0)
-      battery_state_of_charge = det_data('state_of_charge_sample')
-      load = det_data('load_ac_power_average_kw')
+      battery_state_of_charge = detail_series_cropped('state_of_charge_sample')
+      load = detail_series_cropped('load_ac_power_average_kw')
       figure, (power_ax, usage_ax) = plt.subplots(
           2,
           1,
