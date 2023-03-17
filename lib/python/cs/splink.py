@@ -1054,132 +1054,141 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     detail_series_cropped = lambda field: detailed[field].as_pd_series(
         start, stop, pad=True, tz=tz
     )
-    if data_specs == ['POWER']:
-      grid = detail_series_cropped('ac_input_power_average_kw')
-      grid_in = -grid.clip(upper=0.0)
-      grid_out = grid.clip(lower=0.0)
-      pv = detail_series_cropped('total_ac_coupled_power_average_kw')
-      battery = detail_series_cropped('inverter_ac_power_average_kw')
-      battery_drain = -battery.clip(upper=0.0)
-      battery_charge = battery.clip(lower=0.0)
-      battery_state_of_charge = detail_series_cropped('state_of_charge_sample')
-      load = detail_series_cropped('load_ac_power_average_kw')
-      figure, (power_ax, usage_ax) = plt.subplots(
-          2,
-          1,
-          figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
-          label=f'Power: {spd}',
-      )
-      # stack the power consumption
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'load [load_ac_power_average_kw]',
-                  load,
-                  dict(color='grey'),
-              ),
-              PS(
-                  'battery charge [inverter_ac_power_average_kw]',
-                  battery_charge,
-                  dict(color='blue'),
-              ),
-              PS(
-                  'grid out [ac_input_power_average_kw]',
-                  grid_out,
-                  dict(color='green'),
-              ),
-          ],
-          ax=usage_ax,
-          ax_title="Power Usage",
-          stacked=True,
-          tz=tz,
-      )
-      ax2 = usage_ax.twinx()
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'battery % [state_of_charge_sample]',
-                  battery_state_of_charge,
-                  dict(color='orange'),
-              ),
-          ],
-          ax=ax2,
-          tz=tz,
-      )
-      usage_ax.legend()
-      ax2.legend()
-      # stack the power sources
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'pv [total_ac_coupled_power_average_kw]',
-                  pv,
-                  dict(color='yellow'),
-              ),
-              PS(
-                  'battery drain [-inverter_ac_power_average_kw]',
-                  battery_drain,
-                  dict(color='blue'),
-              ),
-              PS(
-                  'grid in [-ac_input_power_average_kw]',
-                  grid_in,
-                  dict(color='red'),
-              ),
-          ],
-          ax=power_ax,
-          ax_title="Power Supply",
-          stacked=True,
-          tz=tz,
-      )
-      ax2 = power_ax.twinx()
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'battery % [state_of_charge_sample]',
-                  battery_state_of_charge,
-                  dict(color='orange'),
-              ),
-          ],
-          ax=ax2,
-          tz=tz,
-      )
-      # overlay the load as a line
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'load [load_ac_power_average_kw]',
-                  load,
-                  dict(color='black'),
-              ),
-          ],
-          ax=power_ax,
-          tz=tz,
-      )
-      power_ax.legend()
-      ax2.legend()
+    # list of graph specifications
+    graphs = {}
+    for data_spec in data_specs:
+      if data_spec == 'POWER':
+        grid = detail_series_cropped('ac_input_power_average_kw')
+        grid_in = -grid.clip(upper=0.0)
+        grid_out = grid.clip(lower=0.0)
+        pv = detail_series_cropped('total_ac_coupled_power_average_kw')
+        battery = detail_series_cropped('inverter_ac_power_average_kw')
+        battery_drain = -battery.clip(upper=0.0)
+        battery_charge = battery.clip(lower=0.0)
+        battery_state_of_charge = detail_series_cropped(
+            'state_of_charge_sample'
+        )
+        load = detail_series_cropped('load_ac_power_average_kw')
+        figure, (power_ax, usage_ax) = plt.subplots(
+            2,
+            1,
+            figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
+            label=f'Power: {spd}',
+        )
+        graphs["Power Usage"] = [
+            # stack the power consumption
+            dict(
+                data=[
+                    PS(
+                        'load [load_ac_power_average_kw]',
+                        load,
+                        dict(color='grey'),
+                    ),
+                    PS(
+                        'battery charge [inverter_ac_power_average_kw]',
+                        battery_charge,
+                        dict(color='blue'),
+                    ),
+                    PS(
+                        'grid out [ac_input_power_average_kw]',
+                        grid_out,
+                        dict(color='green'),
+                    ),
+                ],
+                stacked=True,
+            ),
+            # overlay the load as a line
+            dict(
+                data=[
+                    PS(
+                        'load [load_ac_power_average_kw]',
+                        load,
+                        dict(color='black'),
+                    ),
+                ],
+            ),
+            dict(
+                data=[
+                    PS(
+                        'battery % [state_of_charge_sample]',
+                        battery_state_of_charge,
+                        dict(color='orange'),
+                    ),
+                ],
+                twinx=True,
+            ),
+        ]
+        graphs["Power Supply"] = [
+            # stack the power sources
+            dict(
+                data=[
+                    PS(
+                        'pv [total_ac_coupled_power_average_kw]',
+                        pv,
+                        dict(color='yellow'),
+                    ),
+                    PS(
+                        'battery drain [-inverter_ac_power_average_kw]',
+                        battery_drain,
+                        dict(color='blue'),
+                    ),
+                    PS(
+                        'grid in [-ac_input_power_average_kw]',
+                        grid_in,
+                        dict(color='red'),
+                    ),
+                ],
+                stacked=True,
+            ),
+            dict(
+                data=[
+                    PS(
+                        'battery % [state_of_charge_sample]',
+                        battery_state_of_charge,
+                        dict(color='orange'),
+                    ),
+                ],
+                twinx=True,
+            ),
+        ]
+      else:
+        graph_n = 1
+        graph_name_1 = graph_name = data_spec
+        while graph_name in graphs:
+          graph_n += 1
+          graph_name = f'{graph_name_1} {graph_n}'
+        graphs[graph_name] = [
+            dict(data=spd.plot_data_from_spec(start, stop, data_spec, tz=tz)),
+        ]
+    assert len(graphs) > 0
+    if len(graphs) > 1:
+      label = f'{spd}: {", ".join(graphs.keys())}'
     else:
-      plot_data = []
-      while data_specs:
-        plot_data.extend(self.popdata(start, stop, data_specs, tz=tz))
-      figure = spd.plot(
-          start,
-          stop,
-          plot_data,
-          tz=tz,
-          event_labels=event_labels,
-          stacked=stacked,
-      )
+      label = f'{spd}'
+    figure, axes = plt.subplots(
+        len(graphs),
+        1,
+        figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
+        label=label,
+    )
+    if len(graphs) == 1:
+      axes = axes,
+    for ax, (gkey, gplots) in zip(axes, graphs.items()):
+      gtitle = gkey
+      for gplot in gplots:
+        plot_ax = ax
+        if gplot.get('twinx', False):
+          plot_ax = plot_ax.twinx()
+        spd.plot(
+            start,
+            stop,
+            gplot['data'],
+            ax=plot_ax,
+            ax_title=gplot.get('title', gtitle),
+            stacked=gplot.get('stacked', False),
+            tz=tz,
+        )
+        plot_ax.legend()
     if bare:
       remove_decorations(figure)
     if imgpath:
