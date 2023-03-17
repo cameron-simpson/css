@@ -112,7 +112,6 @@ class QueueIterator(MultiOpenMixin):
           self, e
       )
       self._put(self.sentinel)
-      self.finalise()
       # pylint: disable=raise-missing-from
       raise StopIteration("Queue_Empty: %s" % (e,))
     if item is self.sentinel:
