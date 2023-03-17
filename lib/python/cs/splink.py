@@ -1055,111 +1055,133 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         start, stop, pad=True, tz=tz
     )
     # list of graph specifications
+    had_failed_specs = False
     graphs = {}
     for data_spec in data_specs:
-      if data_spec == 'POWER':
-        grid = detail_series_cropped('ac_input_power_average_kw')
-        grid_in = -grid.clip(upper=0.0)
-        grid_out = grid.clip(lower=0.0)
-        pv = detail_series_cropped('total_ac_coupled_power_average_kw')
-        battery = detail_series_cropped('inverter_ac_power_average_kw')
-        battery_drain = -battery.clip(upper=0.0)
-        battery_charge = battery.clip(lower=0.0)
-        battery_state_of_charge = detail_series_cropped(
-            'state_of_charge_sample'
-        )
-        load = detail_series_cropped('load_ac_power_average_kw')
-        figure, (power_ax, usage_ax) = plt.subplots(
-            2,
-            1,
-            figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
-            label=f'Power: {spd}',
-        )
-        graphs["Power Usage"] = [
-            # stack the power consumption
-            dict(
-                data=[
-                    PS(
-                        'load [load_ac_power_average_kw]',
-                        load,
-                        dict(color='grey'),
-                    ),
-                    PS(
-                        'battery charge [inverter_ac_power_average_kw]',
-                        battery_charge,
-                        dict(color='blue'),
-                    ),
-                    PS(
-                        'grid out [ac_input_power_average_kw]',
-                        grid_out,
-                        dict(color='green'),
-                    ),
-                ],
-                stacked=True,
-            ),
-            # overlay the load as a line
-            dict(
-                data=[
-                    PS(
-                        'load [load_ac_power_average_kw]',
-                        load,
-                        dict(color='black'),
-                    ),
-                ],
-            ),
-            dict(
-                data=[
-                    PS(
-                        'battery % [state_of_charge_sample]',
-                        battery_state_of_charge,
-                        dict(color='orange'),
-                    ),
-                ],
-                twinx=True,
-            ),
-        ]
-        graphs["Power Supply"] = [
-            # stack the power sources
-            dict(
-                data=[
-                    PS(
-                        'pv [total_ac_coupled_power_average_kw]',
-                        pv,
-                        dict(color='yellow'),
-                    ),
-                    PS(
-                        'battery drain [-inverter_ac_power_average_kw]',
-                        battery_drain,
-                        dict(color='blue'),
-                    ),
-                    PS(
-                        'grid in [-ac_input_power_average_kw]',
-                        grid_in,
-                        dict(color='red'),
-                    ),
-                ],
-                stacked=True,
-            ),
-            dict(
-                data=[
-                    PS(
-                        'battery % [state_of_charge_sample]',
-                        battery_state_of_charge,
-                        dict(color='orange'),
-                    ),
-                ],
-                twinx=True,
-            ),
-        ]
-      else:
-        graph_n = 1
-        graph_name_1 = graph_name = data_spec
-        while graph_name in graphs:
-          graph_n += 1
-          graph_name = f'{graph_name_1} {graph_n}'
-        graphs[graph_name] = [
-            dict(data=spd.plot_data_from_spec(start, stop, data_spec, tz=tz)),
-        ]
+      with Pfx("specification %r", data_spec):
+        if data_spec == 'POWER':
+          grid = detail_series_cropped('ac_input_power_average_kw')
+          grid_in = -grid.clip(upper=0.0)
+          grid_out = grid.clip(lower=0.0)
+          pv = detail_series_cropped('total_ac_coupled_power_average_kw')
+          battery = detail_series_cropped('inverter_ac_power_average_kw')
+          battery_drain = -battery.clip(upper=0.0)
+          battery_charge = battery.clip(lower=0.0)
+          battery_state_of_charge = detail_series_cropped(
+              'state_of_charge_sample'
+          )
+          load = detail_series_cropped('load_ac_power_average_kw')
+          figure, (power_ax, usage_ax) = plt.subplots(
+              2,
+              1,
+              figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
+              label=f'Power: {spd}',
+          )
+          graphs["Power Usage"] = [
+              # stack the power consumption
+              dict(
+                  data=[
+                      PS(
+                          'load [load_ac_power_average_kw]',
+                          load,
+                          dict(color='grey'),
+                      ),
+                      PS(
+                          'battery charge [inverter_ac_power_average_kw]',
+                          battery_charge,
+                          dict(color='blue'),
+                      ),
+                      PS(
+                          'grid out [ac_input_power_average_kw]',
+                          grid_out,
+                          dict(color='green'),
+                      ),
+                  ],
+                  stacked=True,
+              ),
+              # overlay the load as a line
+              dict(
+                  data=[
+                      PS(
+                          'load [load_ac_power_average_kw]',
+                          load,
+                          dict(color='black'),
+                      ),
+                  ],
+              ),
+              dict(
+                  data=[
+                      PS(
+                          'battery % [state_of_charge_sample]',
+                          battery_state_of_charge,
+                          dict(color='orange'),
+                      ),
+                  ],
+                  twinx=True,
+              ),
+          ]
+          graphs["Power Supply"] = [
+              # stack the power sources
+              dict(
+                  data=[
+                      PS(
+                          'pv [total_ac_coupled_power_average_kw]',
+                          pv,
+                          dict(color='yellow'),
+                      ),
+                      PS(
+                          'battery drain [-inverter_ac_power_average_kw]',
+                          battery_drain,
+                          dict(color='blue'),
+                      ),
+                      PS(
+                          'grid in [-ac_input_power_average_kw]',
+                          grid_in,
+                          dict(color='red'),
+                      ),
+                  ],
+                  stacked=True,
+              ),
+              dict(
+                  data=[
+                      PS(
+                          'battery % [state_of_charge_sample]',
+                          battery_state_of_charge,
+                          dict(color='orange'),
+                      ),
+                  ],
+                  twinx=True,
+              ),
+          ]
+        else:
+          graph_n = 1
+          graph_name_1 = graph_name = data_spec
+          while graph_name in graphs:
+            graph_n += 1
+            graph_name = f'{graph_name_1} {graph_n}'
+          try:
+            plot_data = spd.plot_data_from_spec(start, stop, data_spec, tz=tz)
+          except ValueError as e:
+            warning("bad data spec: %s", e)
+            had_failed_specs = True
+          else:
+            graphs[graph_name] = [
+                dict(
+                    data=spd
+                    .plot_data_from_spec(start, stop, data_spec, tz=tz)
+                ),
+            ]
+    if had_failed_specs:
+      warning("some data specifications did not match")
+      print("Known datasets:")
+      for dsname in spd.TIMESERIES_DATASETS:
+        tsd = getattr(spd, dsname)
+        print(" ", dsname)
+        for key in sorted(tsd.keys()):
+          print("   ", key)
+    if not graphs:
+      warning("nothing to plot")
+      return 1
     assert len(graphs) > 0
     if len(graphs) > 1:
       label = f'{spd}: {", ".join(graphs.keys())}'
@@ -1197,6 +1219,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         os.system(shlex.join(['open', imgpath]))
     else:
       print_figure(figure)
+    return 0
 
   def cmd_pull(self, argv):
     ''' Usage: {cmd} [-d dataset,...] [-F rsync-source] [-nx]
