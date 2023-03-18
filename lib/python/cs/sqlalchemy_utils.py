@@ -28,6 +28,19 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import ThreadState
 
+##def CHECK():
+##  ''' Debug function to check for open sqltags.sqlite files,
+##      called when there should be done.
+##  '''
+##  X("CHECK")
+##  if os.system(
+##      f'lsof -n -p {os.getpid()} | fgrep "/Users/cameron/var/sqltags.sqlite"'
+##  ) == 0:
+##    os.system(f'lsof -n -p {os.getpid()}')
+##    raise RuntimeError
+##  from cs.py.stack import caller
+##  X("CHECK from %r", caller())
+
 __version__ = '20230212-post'
 
 DISTINFO = {
