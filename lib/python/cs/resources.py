@@ -98,7 +98,7 @@ class _mom_state(object):
       if opens == 1:
         self.join_lock = Lock()
         self.join_lock.acquire()
-      self._teardown = setup_cmgr(self.mom.startup_shutdown())
+        self._teardown = setup_cmgr(self.mom.startup_shutdown())
       self.opened = True
     return opens
 
