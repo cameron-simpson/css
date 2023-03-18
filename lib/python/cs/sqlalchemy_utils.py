@@ -83,6 +83,7 @@ class SQLAState(ThreadState):
       with session.begin_nested():
         with self(orm=orm, session=session):
           yield session
+    session.close()
 
   @contextmanager
   def auto_session(self, *, orm=None):
@@ -94,6 +95,7 @@ class SQLAState(ThreadState):
       # new session required
       with self.new_session(orm=orm) as session:
         yield session
+      session.close()
     else:
       with session.begin_nested():
         yield session
@@ -403,6 +405,7 @@ class ORM(MultiOpenMixin, ABC):
         new_session = self._sessionmaker()
         with new_session.begin_nested():
           yield new_session
+        new_session.close()
 
   @property
   def default_session(self):
