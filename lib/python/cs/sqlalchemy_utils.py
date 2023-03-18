@@ -79,7 +79,7 @@ class SQLAState(ThreadState):
             "%s.new_session: no orm supplied and no self.orm" %
             (type(self).__name__,)
         )
-    with orm.arranged_session() as session:
+    with orm.orchestrated_session() as session:
       with session.begin_nested():
         with self(orm=orm, session=session):
           yield session
@@ -379,8 +379,9 @@ class ORM(MultiOpenMixin, ABC):
 
   @contextmanager
   @pfx_method(use_str=True)
-  def arranged_session(self):
-    ''' Arrange a new session for this `Thread`.
+  def orchestrated_session(self):
+    ''' Orchestrate a new session for this `Thread`,
+        honouring `self.serial_session`.
     '''
     orm_state = self.sqla_state
     with self:
