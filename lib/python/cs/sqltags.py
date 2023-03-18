@@ -1587,8 +1587,7 @@ class SQLTags(BaseTagSets, Promotable):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Empty stub startup/shutdown since we use autosessions.
-        Particularly, we do not want to keep SQLite dbs open.
+    ''' Open the ORM while the `SQLTags` is open.
     '''
     with self.orm:
       yield self
