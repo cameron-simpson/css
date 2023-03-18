@@ -1062,6 +1062,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = time.time()
     else:
       stop = time.time()
+    if stop < start:
+      start, stop = stop, start
     if len(argv) == 1 and argv[0] in ('?', 'help'):
       self.print_known_datasets()
       return 0
