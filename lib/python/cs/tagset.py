@@ -3516,16 +3516,23 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     with self._lock:
       if self.is_modified():
         # there are modified TagSets
-        self.save_tagsets(
-            self.fspath,
-            tagsets,
-            self.unparsed,
-            extra_types=extra_types,
-            prune=prune,
-            update_mapping=self.update_mapping,
-            update_prefix=self.update_prefix,
-            update_uuid_tag_name=self.update_uuid_tag_name,
-        )
+        update_mapping_close = getattr(self.update_mapping, 'close', None)
+        if update_mapping_close:
+          self.update_mapping.open()
+        try:
+          self.save_tagsets(
+              self.fspath,
+              tagsets,
+              self.unparsed,
+              extra_types=extra_types,
+              prune=prune,
+              update_mapping=self.update_mapping,
+              update_prefix=self.update_prefix,
+              update_uuid_tag_name=self.update_uuid_tag_name,
+          )
+        finally:
+          if update_mapping_close:
+            pfx_call(update_mapping_close)
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
           tagset.modified = False

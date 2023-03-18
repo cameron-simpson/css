@@ -1082,13 +1082,11 @@ class FSTags(MultiOpenMixin):
       tagsfile_basename = TAGSFILE_BASENAME
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
-    update_mapping_close = None
     if update_mapping is None:
       update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR) or None
       if update_mapping:
         from cs.sqltags import SQLTags
         update_mapping = SQLTags(update_mapping)
-        update_mapping_close = update_mapping.close
       if update_prefix is None:
         update_prefix = os.environ.get(
             FSTAGS_UPDATE_MAPPING_PREFIX_ENVVAR, __name__
@@ -1100,7 +1098,6 @@ class FSTags(MultiOpenMixin):
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
     self.update_mapping = update_mapping
-    self.update_mapping_close = update_mapping_close
     self.update_prefix = update_prefix
     self.update_uuid_tag_name = update_uuid_tag_name
     self._lock = RLock()
@@ -1109,15 +1106,9 @@ class FSTags(MultiOpenMixin):
   def startup_shutdown(self):
     ''' Sync tag files and db mapping on final close.
     '''
-    if self.update_mapping_close:
-      self.update_mapping.open()
-    try:
-      yield
-    finally:
-      # save any modified tag files on shutdown.
-      self.sync()
-      if self.update_mapping_close:
-        pfx_call(self.update_mapping_close)
+    yield
+    # save any modified tag files on shutdown.
+    self.sync()
 
   @locked
   @pfx_method
