@@ -20,7 +20,9 @@ except ImportError:
     '''
     yield None
 
+from io import UnsupportedOperation
 import os
+import stat
 import subprocess
 try:
   DEVNULL = subprocess.DEVNULL
