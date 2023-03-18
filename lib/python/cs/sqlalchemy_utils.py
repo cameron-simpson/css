@@ -20,13 +20,13 @@ from sqlalchemy.pool import NullPool
 from typeguard import typechecked
 
 from cs.deco import decorator, contextdecorator
-from cs.fileutils import makelockfile
+from cs.fileutils import lockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
-from cs.threads import State
+from cs.threads import ThreadState
 
 __version__ = '20230212-post'
 
@@ -54,7 +54,7 @@ DISTINFO = {
     ],
 }
 
-class SQLAState(State):
+class SQLAState(ThreadState):
   ''' Thread local state for SQLAlchemy ORM and session.
   '''
 
@@ -284,7 +284,6 @@ class ORM(MultiOpenMixin, ABC):
             is_sqlite,
         )
     self.serial_sessions = serial_sessions or is_sqlite
-    self._lockfilepath = None
     self.Base = declarative_base()
     self.sqla_state = SQLAState(
         orm=self, engine=None, sessionmaker=None, session=None
@@ -343,11 +342,10 @@ class ORM(MultiOpenMixin, ABC):
         current set only for filesystem SQLite database URLs.
     '''
     if self.db_fspath:
-      self._lockfilepath = makelockfile(self.db_fspath, poll_interval=0.2)
-    yield
-    if self._lockfilepath is not None:
-      pfx_call(os.remove, self._lockfilepath)
-      self._lockfilepath = None
+      with lockfile(self.db_fspath, poll_interval=0.2):
+        yield
+    else:
+      yield
 
   @property
   def engine(self):
