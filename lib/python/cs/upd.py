@@ -76,12 +76,12 @@ import time
 from typing import Optional, Union
 
 from cs.context import stackattrs
-from cs.deco import decorator, default_params
-from cs.gimmicks import warning
+from cs.deco import decorator, default_params, fmtdoc
+from cs.gimmicks import open_append, warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
 from cs.resources import MultiOpenMixin
-from cs.threads import HasThreadState, State as ThreadState
+from cs.threads import HasThreadState, ThreadState
 from cs.tty import ttysize
 from cs.units import transcribe, TIME_SCALE
 
@@ -112,6 +112,8 @@ DISTINFO = {
     ],
 }
 
+CS_UPD_BACKEND_ENVVAR = 'CS_UPD_BACKEND'
+
 def _cleanup():
   ''' Cleanup function called at programme exit to clear the status lines.
   '''
@@ -137,11 +139,13 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     return id(backend)
 
   # pylint: disable=too-many-branches
+  @fmtdoc
   def __init__(self, backend=None, columns=None, disabled=None):
     ''' Initialise the `Upd`.
 
         Parameters:
-        * `backend`: the output file, default `sys.stderr`
+        * `backend`: the output file, default from the environment
+          variable `${CS_UPD_BACKEND_ENVVAR}` otherwise `sys.stderr`
         * `columns`: the width of the output,
           default from the width of the `backend` tty if it is a tty,
           `80` otherwise
@@ -152,7 +156,12 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     if hasattr(self, '_backend'):
       return
     if backend is None:
-      backend = sys.stderr
+      try:
+        backend_path = os.environ[CS_UPD_BACKEND_ENVVAR]
+      except KeyError:
+        backend = sys.stderr
+      else:
+        backend = open_append(backend_path)
     self._backend = backend
     assert self._backend is not None
     # test isatty and the associated file descriptor

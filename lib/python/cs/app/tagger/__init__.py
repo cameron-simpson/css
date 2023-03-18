@@ -33,7 +33,7 @@ from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
-from cs.threads import locked, State as ThreadState, HasThreadState
+from cs.threads import locked, ThreadState, HasThreadState
 from cs.upd import run_task, print
 
 __version__ = None

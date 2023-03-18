@@ -35,7 +35,7 @@ from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.resources import RunState, uses_runstate
 from cs.result import OnDemandResult
-from cs.threads import HasThreadState, State as ThreadState
+from cs.threads import HasThreadState, ThreadState
 
 from . import (
     Lock,

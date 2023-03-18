@@ -19,7 +19,7 @@ from cs.logutils import error
 from cs.pfx import pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin
-from cs.threads import bg as bg_thread
+from cs.threads import bg as bg_thread, ThreadState, HasThreadState
 
 from . import MAX_FILE_SIZE, Lock, RLock, uses_Store
 
@@ -446,7 +446,7 @@ class BlockTempfile:
         bm.filled += written
 
 # pylint: disable=too-many-instance-attributes
-class BlockCache:
+class BlockCache(HasThreadState):
   ''' A temporary file based cache for whole Blocks.
 
       This is to support filesystems' and files' direct read/write
@@ -455,6 +455,8 @@ class BlockCache:
 
       We accrue complete Block contents in unlinked files.
   '''
+
+  perthread_state = ThreadState()
 
   # default cace size
   MAX_FILES = 32
@@ -487,13 +489,13 @@ class BlockCache:
         tempf.close()
       self._tempfiles = []
 
-  def __getitem__(self, hashcode):
-    ''' Fetch BlockMapping associated with `hashcode`, raise KeyError if missing.
+  def __getitem__(self, hashcode) -> BlockMapping:
+    ''' Fetch the `BlockMapping` associated with `hashcode`, raise `KeyError` if missing.
     '''
     return self.blockmaps[hashcode]
 
-  def get_blockmap(self, block):
-    ''' Add the specified Block to the cache, return the BlockMapping.
+  def get_blockmap(self, block) -> BlockMapping:
+    ''' Add the specified Block to the cache, return the `BlockMapping`.
     '''
     blockmaps = self.blockmaps
     h = block.hashcode

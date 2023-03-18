@@ -42,7 +42,7 @@ from cs.fs import shortpath
 from cs.gimmicks import TimeoutError
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
@@ -616,6 +616,7 @@ def make_files_property(
 
 # pylint: disable=too-many-branches
 @uses_runstate
+@pfx
 def makelockfile(
     path, ext=None, poll_interval=None, timeout=None, runstate=None
 ):
@@ -716,8 +717,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   try:
     yield lockpath
   finally:
-    with Pfx("remove %r", lockpath):
-      os.remove(lockpath)
+    pfx_call(os.remove, lockpath)
 
 def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.
