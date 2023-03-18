@@ -141,3 +141,31 @@ error = lambda *a, **kw: _logging_stub('error', *a, **kw)
 
 # Wrapper for `exception()` which does a deferred import.
 exception = lambda *a, **kw: _logging_stub('exception', *a, **kw)
+
+def open_append(path):
+  ''' Ghastly hack to open something for append
+      entirely because some Linux systems do not let you open a
+      character device for append.
+      Tries sane `'a'` and falls back through 'r+' and finally to
+      'w' only if `path` refers to a character device.
+  '''
+  # Linux+Python makes it insanely difficult to open /dev/tty
+  # for append or even read/write/no-truncate, thus this
+  # elaborate fallback, trying write+truncate only if /dev/tty
+  # is a character device.
+  try:
+    f = open(path, 'a')
+  except (OSError, UnsupportedOperation):
+    try:
+      f = open(path, 'r+')
+    except (OSError, UnsupportedOperation):
+      S = os.stat(path)
+      if stat.S_ISCHR(S.st_mode):
+        f = open(path, 'w')
+      else:
+        raise
+    try:
+      f.seek(0, os.SEEK_END)
+    except (OSError, UnsupportedOperation):
+      pass
+  return f

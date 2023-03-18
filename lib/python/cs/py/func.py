@@ -112,69 +112,6 @@ def callif(doit, func, *a, **kw):
   modes['print'](fmt % tuple(av))
   return None
 
-_trace_indent = ""
-
-@decorator
-# pylint: disable=too-many-arguments
-def trace(
-    func,
-    call=True,
-    retval=False,
-    exception=True,
-    use_pformat=False,
-    with_caller=False,
-    with_pfx=False,
-):
-  ''' Decorator to report the call and return of a function.
-  '''
-
-  citation = funccite(func)
-
-  def traced_function_wrapper(*a, **kw):
-    ''' Wrapper for `func` to trace call and return.
-    '''
-    global _trace_indent  # pylint: disable=global-statement
-    if with_pfx:
-      # late import so that we can use this in modules we import
-      # pylint: disable=import-outside-toplevel
-      try:
-        from cs.pfx import XP as xlog
-      except ImportError:
-        xlog = X
-    else:
-      xlog = X
-    log_cite = citation
-    if with_caller:
-      log_cite = log_cite + "from[%s]" % (caller(),)
-    if call:
-      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("%sCALL " + fmt, _trace_indent, *av)
-    old_indent = _trace_indent
-    _trace_indent += '  '
-    try:
-      result = func(*a, **kw)
-    except Exception as e:
-      if exception:
-        xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
-      _trace_indent = old_indent
-      raise
-    else:
-      if retval:
-        xlog(
-            "%sCALL %s RETURN %s",
-            _trace_indent,
-            log_cite,
-            (pformat if use_pformat else repr)(result),
-        )
-      else:
-        xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
-      _trace_indent = old_indent
-      return result
-
-  traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
-  traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
-  return traced_function_wrapper
-
 def callmethod_if(o, method, default=None, a=None, kw=None):
   ''' Call the named `method` on the object `o` if it exists.
 

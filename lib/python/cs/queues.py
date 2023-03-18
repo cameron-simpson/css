@@ -62,7 +62,7 @@ class QueueIterator(MultiOpenMixin):
     self._item_count = 0
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.name)
+    return "%s(%r:q=%s)" % (type(self).__name__, self.name, self.q)
 
   @not_closed
   def put(self, item, *args, **kw):
@@ -89,8 +89,10 @@ class QueueIterator(MultiOpenMixin):
     ''' `MultiOpenMixin` support; puts the sentinel onto the underlying queue
         on the final close.
     '''
-    yield
-    self._put(self.sentinel)
+    try:
+      yield
+    finally:
+      self._put(self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
@@ -110,7 +112,6 @@ class QueueIterator(MultiOpenMixin):
           self, e
       )
       self._put(self.sentinel)
-      self.finalise()
       # pylint: disable=raise-missing-from
       raise StopIteration("Queue_Empty: %s" % (e,))
     if item is self.sentinel:

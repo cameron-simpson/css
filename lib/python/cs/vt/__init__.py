@@ -56,7 +56,7 @@ from cs.queues import IterableQueue, QueueIterator
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.seq import Seq
-from cs.threads import bg as bg_thread, State as ThreadState, HasThreadState
+from cs.threads import bg as bg_thread, ThreadState, HasThreadState
 
 from icontract import require
 from typeguard import typechecked
@@ -214,7 +214,6 @@ class _Defaults(ThreadState):
     super().__init__()
     self.progress = common.progress
     self.fs = None
-    self.block_cache = None
     self.show_progress = False
 
   def __getattr__(self, attr):

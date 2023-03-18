@@ -36,6 +36,7 @@ from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta, tzinfo
 from fnmatch import fnmatch
 from functools import partial
@@ -505,9 +506,10 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       'iso8601': lambda d: pfx_call(arrow.get, d, tzinfo='local').timestamp(),
   }
 
-  def apply_defaults(self):
-    self.options.ts_step = None  # the time series step
-    self.options.ts = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    ts_step: Optional[float] = None  # the time series step
+    ts: Optional["TimeSeries"] = None
 
   def apply_opt(self, opt, val):
     if opt == '-s':

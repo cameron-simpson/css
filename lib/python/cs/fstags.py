@@ -74,6 +74,7 @@
 from configparser import ConfigParser
 from contextlib import contextmanager
 import csv
+from dataclasses import dataclass
 import errno
 from getopt import getopt, GetoptError
 import json
@@ -203,11 +204,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   -P            Physical. Resolve pathnames through symlinks.
                 Default ~/.fstagsrc[general]physical or False.'''
 
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    self.options.ontology_path = os.environ.get('FSTAGS_ONTOLOGY')
-    self.options.physical = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    ontology_path: Optional[str] = os.environ.get('FSTAGS_ONTOLOGY')
+    physical: Optional[bool] = None
 
   def apply_opt(self, opt, val):
     ''' Apply command line option.
