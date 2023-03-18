@@ -247,7 +247,7 @@ class ORM(MultiOpenMixin, ABC):
   def __init__(self, db_url, serial_sessions=None):
     ''' Initialise the ORM.
 
-        If `serial_sessions` is true (default `False`)
+        If `serial_sessions` is true (default `True` for SQLite, `False` otherwise)
         then allocate a lock to serialise session allocation.
         This might be chosen with SQL backends which do not support
         concurrent sessions such as SQLite.
@@ -341,7 +341,7 @@ class ORM(MultiOpenMixin, ABC):
         If you actually expect this to be common
         you should try to keep the `ORM` "open" as briefly as possible.
         The lock file is only operated if `self.db_fspath`,
-        current set only for filesystem SQLite database URLs.
+        currently set only for filesystem SQLite database URLs.
     '''
     if self.db_fspath:
       with lockfile(self.db_fspath, poll_interval=0.2):
@@ -401,6 +401,7 @@ class ORM(MultiOpenMixin, ABC):
           new_session = self._sessionmaker()
           with new_session.begin_nested():
             yield new_session
+          new_session.close()
       else:
         new_session = self._sessionmaker()
         with new_session.begin_nested():
