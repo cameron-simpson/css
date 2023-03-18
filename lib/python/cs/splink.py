@@ -44,7 +44,7 @@ from cs.context import stackattrs
 from cs.csvutils import csv_import
 from cs.deco import cachedmethod
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
-from cs.fstags import FSTags
+from cs.fstags import FSTags, DEFAULT_FSTAGS
 from cs.lex import s
 from cs.logutils import warning, error
 from cs.mplutils import axes, remove_decorations, print_figure, save_figure, FigureSize
@@ -703,7 +703,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         default_factory=lambda: os.environ.
         get(SPLinkCommand.DEFAULT_FETCH_SOURCE_ENVVAR)
     )
-    fstags: FSTags = field(default_factory=FSTags)
+    fstags: FSTags = field(default_factory=lambda: DEFAULT_FSTAGS)
     spdpath: str = field(
         default_factory=lambda: os.environ.get(
             SPLinkCommand.DEFAULT_SPDPATH_ENVVAR,
