@@ -724,6 +724,17 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     else:
       raise RuntimeError("unhandled pre-option")
 
+  def print_known_datasets(self, file=None):
+    ''' Print the known datasets and their fields to `file`.
+    '''
+    spd = self.options.spd
+    print("Known datasets:")
+    for dsname in spd.TIMESERIES_DATASETS:
+      tsd = getattr(spd, dsname)
+      print(" ", dsname, file=file)
+      for key in sorted(tsd.keys()):
+        print("   ", key, file=file)
+
   @timerange
   @typechecked
   def popdata(
@@ -1015,6 +1026,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                             or any datetime specification recognised by
                             dateutil.parser.parse.
             mode            A named graph mode, implying a group of fields.
+                            Providing '?' or 'help' prints the available
+                            datasets and field names.
     '''
     options = self.options
     options.bare = False
@@ -1034,6 +1047,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         tz_=('tz', tzfor),
     )
     tz = options.tz
+    if len(argv) == 1 and argv[0] in ('?', 'help'):
+      self.print_known_datasets()
+      return 0
     # start time
     if not argv:
       argv = ['5']
@@ -1046,6 +1062,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = time.time()
     else:
       stop = time.time()
+    if len(argv) == 1 and argv[0] in ('?', 'help'):
+      self.print_known_datasets()
+      return 0
     data_specs = argv if argv else ['POWER']
     bare = options.bare
     force = options.force
@@ -1177,12 +1196,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             ]
     if had_failed_specs:
       warning("some data specifications did not match")
-      print("Known datasets:")
-      for dsname in spd.TIMESERIES_DATASETS:
-        tsd = getattr(spd, dsname)
-        print(" ", dsname)
-        for key in sorted(tsd.keys()):
-          print("   ", key)
+      self.print_known_datasets(file=sys.stderr)
     if not graphs:
       warning("nothing to plot")
       return 1
