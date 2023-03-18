@@ -3156,7 +3156,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def __str__(self):
     return "%s(%s,%r,%s,%s)" % (
         type(self).__name__,
-        shortpath(self.fspath),
+        getattr(self, 'shortpath', 'NO_FSPATH'),
         getattr(self, 'typecode', 'NO_TYPECODE_YET'),
         getattr(self, 'epoch', 'NO_EPOCH_YET'),
         getattr(self, 'policy', 'NO_POLICY_YET'),
