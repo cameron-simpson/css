@@ -1590,7 +1590,8 @@ class SQLTags(BaseTagSets, Promotable):
     ''' Empty stub startup/shutdown since we use autosessions.
         Particularly, we do not want to keep SQLite dbs open.
     '''
-    yield self
+    with self.orm:
+      yield self
 
   @contextmanager
   def db_session(self, *, new=False):
