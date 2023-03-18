@@ -92,7 +92,7 @@ from cs.csvutils import csv_import
 from cs.deco import cachedmethod, decorator, promote, Promotable
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
-from cs.fstags import FSTags
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning
 from cs.mappings import column_name_to_identifier
@@ -1645,6 +1645,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -1654,7 +1655,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       *,
       epoch: Optional[Epoch] = None,
       fill=None,
-      fstags=None,
+      fstags: FSTags,
   ):
     ''' Prepare a new time series stored in the file at `fspath`
         containing machine native data for the time series values.
@@ -1675,8 +1676,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           and `float('nan')` for `'d'`
     '''
     HasFSPath.__init__(self, fspath)
-    if fstags is None:
-      fstags = FSTags()
     self.fstags = fstags
     try:
       header, = TimeSeriesFileHeader.scan(self.fspath, max_count=1)
@@ -2920,6 +2919,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -2929,12 +2929,10 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       epoch: Optional[Epoch] = None,
       policy=None,  # :TimespanPolicy
       tz: Optional[str] = None,
-      fstags: Optional[FSTags] = None,
+      fstags: FSTags,
   ):
     HasConfigIni.__init__(self, self.CONFIG_SECTION_NAME)
     HasFSPath.__init__(self, fspath)
-    if fstags is None:
-      fstags = FSTags()
     self.fstags = fstags
     config = self.config
     if not isdirpath(fspath):
@@ -3104,6 +3102,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       which dictates which partition holds the datum for a UNIX time.
   '''
 
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -3113,7 +3112,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       *,
       epoch: Optional[Epoch] = None,
       policy,  # :TimespanPolicy,
-      fstags: Optional[FSTags] = None,
+      fstags: FSTags,
   ):
     ''' Initialise the `TimeSeriesPartitioned` instance.
 
@@ -3145,8 +3144,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     policy = TimespanPolicy.promote(policy, epoch)
     HasFSPath.__init__(self, dirpath)
-    if fstags is None:
-      fstags = FSTags()
     if typecode is None:
       typecode = TypeCode(self.tags.typecode)
     policy = TimespanPolicy.promote(policy, epoch=epoch)
