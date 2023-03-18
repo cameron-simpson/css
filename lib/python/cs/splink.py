@@ -701,13 +701,13 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   class Options(TimeSeriesBaseCommand.Options):
     fetch_source: Optional[str] = field(
         default_factory=lambda: os.environ.
-        get(TimeSeriesBaseCommand.DEFAULT_FETCH_SOURCE_ENVVAR)
+        get(SPLinkCommand.DEFAULT_FETCH_SOURCE_ENVVAR)
     )
     fstags: FSTags = field(default_factory=FSTags)
     spdpath: str = field(
         default_factory=lambda: os.environ.get(
-            TimeSeriesBaseCommand.DEFAULT_SPDPATH_ENVVAR, TimeSeriesBaseCommand
-            .DEFAULT_SPDPATH
+            SPLinkCommand.DEFAULT_SPDPATH_ENVVAR,
+            SPLinkCommand.DEFAULT_SPDPATH,
         )
     )
 
