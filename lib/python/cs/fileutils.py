@@ -37,21 +37,21 @@ from threading import Lock, RLock
 import time
 from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
-from cs.env import envsub
 from cs.filestate import FileState
-from cs.fs import longpath, shortpath
+from cs.fs import shortpath
 from cs.gimmicks import TimeoutError
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
+from cs.resources import uses_runstate
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20220429-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -63,9 +63,8 @@ DISTINFO = {
     'install_requires': [
         'cs.buffer',
         'cs.deco',
-        'cs.env',
         'cs.filestate',
-        'cs.fs>=longpath,shortpath',
+        'cs.fs>=shortpath',
         'cs.gimmicks>=TimeoutError',
         'cs.lex>=20200914',
         'cs.logutils',
@@ -616,6 +615,8 @@ def make_files_property(
   return made_files_property
 
 # pylint: disable=too-many-branches
+@uses_runstate
+@pfx
 def makelockfile(
     path, ext=None, poll_interval=None, timeout=None, runstate=None
 ):
@@ -649,7 +650,7 @@ def makelockfile(
   lockpath = path + ext
   with Pfx("makelockfile: %r", lockpath):
     while True:
-      if runstate is not None and runstate.cancelled:
+      if runstate.cancelled:
         warning(
             "%s cancelled; pid %d waited %ds", runstate, os.getpid(),
             0 if start is None else time.time() - start
@@ -693,6 +694,7 @@ def makelockfile(
     return lockpath
 
 @contextmanager
+@uses_runstate
 def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   ''' A context manager which takes and holds a lock file.
 
@@ -715,8 +717,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   try:
     yield lockpath
   finally:
-    with Pfx("remove %r", lockpath):
-      os.remove(lockpath)
+    pfx_call(os.remove, lockpath)
 
 def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.
@@ -1698,13 +1699,22 @@ def atomic_filename(
       with open(filename, 'ab' if exists_ok else 'xb'):
         pass
     yield T
-    if placeholder:
+    mtime = pfx_call(os.stat, T.name).st_mtime
+    try:
+      pfx_call(shutil.copystat, filename, T.name)
+    except FileNotFoundError:
+      pass
+    except OSError as e:
+      warning(
+          "defaut modes not copied from from placeholder %r: %s", filename, e
+      )
+    else:
+      # we make the attribute like the original, now bump the mtime
       try:
-        pfx_call(shutil.copymode, filename, T.name)
-      except OSError as e:
-        warning(
-            "defaut modes not copied from from placeholder %r: %s", filename, e
-        )
+        atime = pfx_call(os.stat, filename).st_atime
+      except FileNotFoundError:
+        atime = mtime
+      pfx_call(os.utime, T.name, (atime, mtime))
     pfx_call(rename, T.name, filename)
 
 class RWFileBlockCache(object):

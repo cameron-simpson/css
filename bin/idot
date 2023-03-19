@@ -72,8 +72,13 @@ case "$lang" in
     conv(){ cat; }
     ;;
   *)conv(){
-      gm convert "$lang:-" -trim -bordercolor "$bg" -border 20 - \
-      | img2sixel
+      if [ -t 1 ]
+      then
+        gm convert "$lang:-" -trim -bordercolor "$bg" -border 20 - \
+        | img2sixel
+      else
+        cat
+      fi
     }
     ;;
 esac

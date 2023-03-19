@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 
-''' A general purpose task queue for running tasks in parallel with
-    dependencies and failure/retry.
+''' A general purpose Task and TaskQueue for running tasks with
+    dependencies and failure/retry, potentially in parallel.
 '''
 
+from itertools import chain
 import sys
 from threading import RLock
 import time
-from typing import Callable, TypeVar, Union
+from typing import Callable, Union
 
 from icontract import require
 from typeguard import typechecked
 
 from cs.deco import decorator
 from cs.fsm import FSM, FSMError
+from cs.gvutils import quote as gvq, gvprint, gvsvg
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import funcname
@@ -21,17 +23,53 @@ from cs.queues import ListQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
-from cs.threads import bg as bg_thread, locked, State as ThreadState
+from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
+from cs.typeutils import subtype
 
-def main(_):
+__version__ = '20230217-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 3 - Alpha",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.deco',
+        'cs.fsm',
+        'cs.gvutils',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.queues',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+        'cs.threads',
+        'icontract',
+        'typeguard',
+    ],
+}
+
+def main(argv):
   ''' Dummy main programme to exercise something.
   '''
+  cmd = argv.pop(0)
+  layout = argv.pop(0) if argv else 'dot'
   t1 = Task("t1", lambda: print("t1"), track=True)
   t2 = t1.then("t2", lambda: print("t2"), track=True)
+  t3 = t1.then("t3", lambda: print("t3"), track=True)
+  t2b = t2.then("t2b", lambda: print("t2b"), track=True)
   ##q = TaskQueue(t1, t2)
-  q = TaskQueue(t1, run_dependent_tasks=True)
-  for t in q.run():
-    print("completed", t)
+  q = TaskQueue(t1, t2, t3, t2b, run_dependent_tasks=True)
+  t1.dispatch()
+  dot = t1.as_dot("T1", follow_blocking=True)
+  print(dot)
+  gvprint(dot, layout=layout, fmt='svg')
+  gvprint(dot, layout=layout, fmt='cmapx')
+  gvprint(dot, layout=layout)
+  ##for t in q.run():
+  ##  print("completed", t)
 
 class TaskError(FSMError):
   ''' Raised by `Task` related errors.
@@ -39,7 +77,7 @@ class TaskError(FSMError):
 
   # pylint: disable=redefined-outer-name
   @typechecked
-  def __init__(self, msg: str, task: 'TaskSubType'):
+  def __init__(self, msg: str, task: 'BaseTaskSubType'):
     super().__init__(msg, task)
 
 class BlockedError(TaskError):
@@ -49,13 +87,97 @@ class BlockedError(TaskError):
   # pylint: disable=redefined-outer-name
   @typechecked
   def __init__(
-      self, msg: str, task: 'TaskSubType', blocking_task: 'TaskSubType'
+      self, msg: str, task: 'BaseTaskSubType', blocking_task: 'BaseTaskSubType'
   ):
     super().__init__(msg, task)
     self.blocking_task = blocking_task
 
+class BaseTask(FSM, RunStateMixin):
+  ''' A base class subclassing `cs.fsm.FSM` with a `RunStateMixin`.
+
+      Note that this class and the `FSM` base class does not provide
+      a `FSM_DEFAULT_STATE` attribute; a default `state` value of
+      `None` will leave `.fsm_state` _unset_.
+
+      This behaviour is is chosen mostly to support subclasses
+      with unusual behaviour, particularly Django's `Model` class
+      whose `refresh_from_db` method seems to not refresh fields
+      which already exist, and setting `.fsm_state` from a
+      `FSM_DEFAULT_STATE` class attribute thus breaks this method.
+      Subclasses of this class and `Model` should _not_ provide a
+      `FSM_DEFAULT_STATE` attribute, instead relying on the field
+      definition to provide this default in the usual way.
+  '''
+
+  def __init__(self, *, state=None, runstate=None):
+    FSM.__init__(self, state)
+    RunStateMixin.__init__(self, runstate)
+
+  @classmethod
+  def tasks_as_dot(
+      cls,
+      tasks,
+      name=None,
+      *,
+      follow_blocking=False,
+      sep=None,
+  ):
+    ''' Return a DOT syntax digraph of the iterable `tasks`.
+        Nodes will be coloured according to `DOT_NODE_FILLCOLOR_PALETTE`
+        based on their state.
+
+        Parameters:
+        * `tasks`: an iterable of `Task`s to populate the graph
+        * `name`: optional graph name
+        * `follow_blocking`: optional flag to follow each `Task`'s
+          `.blocking` attribute recursively and also render those
+          `Task`s
+        * `sep`: optional node seprator, default `'\n'`
+    '''
+    if sep is None:
+      sep = '\n'
+    digraph = [
+        f'digraph {gvq(name)} {{' if name else 'digraph {',
+        ##'graph[orientation=land]',
+    ]
+    q = ListQueue(unrepeated(tasks))
+    for qtask in unrepeated(q):
+      nodedef = qtask.dot_node()
+      digraph.append(f'  {nodedef};')
+      blocking = sorted(qtask.blocking, key=lambda t: t.name)
+      for subt in blocking:
+        digraph.append(f'  {gvq(qtask.dot_node_id)}->{gvq(subt.dot_node_id)};')
+      if follow_blocking:
+        q.extend(blocking)
+    digraph.append('}')
+    return sep.join(digraph)
+
+  @classmethod
+  def tasks_as_svg(cls, tasks, name=None, **kw):
+    ''' Return an SVG diagram of the iterable `tasks`.
+        This takes the same parameters as `tasks_as_dot`.
+    '''
+    return gvsvg(cls.tasks_as_dot(tasks, name=name, **kw))
+
+  def as_dot(self, name=None, **kw):
+    ''' Return a DOT syntax digraph starting at this `Task`.
+        Parameters are as for `Task.tasks_as_dot`.
+    '''
+    return self.tasks_as_dot(
+        [self],
+        name=name,
+        **kw,
+    )
+
+  def dot_node_label(self):
+    ''' The default DOT node label.
+    '''
+    return f'{self.name}\n{self.fsm_state}'
+
+BaseTaskSubType = subtype(BaseTask)
+
 # pylint: disable=too-many-instance-attributes
-class Task(FSM, RunStateMixin):
+class Task(FSM, RunStateMixin, HasThreadState):
   ''' A task which may require the completion of other tasks.
 
       The model here may not be quite as expected; it is aimed at
@@ -115,9 +237,14 @@ class Task(FSM, RunStateMixin):
       },
       'PENDING': {
           'dispatch': 'RUNNING',
+          'queue': 'QUEUED',
           'cancel': 'CANCELLED',
           'error': 'FAILED',
           'abort': 'ABORT',
+      },
+      'QUEUED': {
+          'cancel': 'CANCELLED',
+          'dispatch': 'RUNNING',
       },
       'RUNNING': {
           'done': 'DONE',
@@ -125,7 +252,7 @@ class Task(FSM, RunStateMixin):
           'cancel': 'CANCELLED',
       },
       'CANCELLED': {
-          'requeue': 'PENDING',
+          'retry': 'PENDING',
           'abort': 'ABORT',
       },
       'DONE': {},
@@ -138,9 +265,18 @@ class Task(FSM, RunStateMixin):
 
   FSM_DEFAULT_STATE = 'PENDING'
 
+  DOT_NODE_FILLCOLOR_PALETTE = {
+      'RUNNING': 'yellow',
+      'DONE': 'green',
+      'FAILED': 'red',
+      'CANCELLED': 'gray',
+      'ABORT': 'darkred',
+      None: 'white',
+  }
+
   _seq = Seq()
 
-  _state = ThreadState(current_task=None, initial_state=FSM_DEFAULT_STATE)
+  perthread_state = ThreadState(initial_state=FSM_DEFAULT_STATE)
 
   def __init__(
       self,
@@ -162,16 +298,14 @@ class Task(FSM, RunStateMixin):
     self.name = name
     if a:
       raise ValueError(
-          "unexpected positional parameters after func: %r" % (a,)
+          "unexpected positional parameters after func:%r: %r" % (func, a)
       )
     if state is None:
-      state = type(self)._state.initial_state
+      state = type(self).perthread_state.initial_state
     if func_kwargs is None:
       func_kwargs = {}
     self._lock = RLock()
-    FSM.__init__(self, state)
-    runstate = RunState(name)
-    RunStateMixin.__init__(self, runstate)
+    super().__init__(state=state, runstate=RunState(name))
     self.required = set()
     self.blocking = set()
     self.cancel_on_exception = cancel_on_exception
@@ -204,15 +338,6 @@ class Task(FSM, RunStateMixin):
         by calling `self.result()`.
     '''
     return self.result()
-
-  @classmethod
-  def current_task(cls):
-    ''' The current `Task`, valid while the task is running.
-        This allows the function called by the `Task` to access the
-        task, typically to poll its `.runstate` attribute.
-        This is a `Thread` local value.
-    '''
-    return cls._state.current_task  # pylint: disable=no-member
 
   @typechecked
   def then(
@@ -357,7 +482,7 @@ class Task(FSM, RunStateMixin):
         *WARNING*: this _ignores_ the current state and any blocking `Task`s.
         You should usually use `dispatch` or `make`.
 
-        During the run the thread local `self.state.current_task`
+        During the run the thread local `Task.default()`
         will be `self` and the `self.runstate` will be running.
 
         Otherwise run `func_result=self.func(*self.func_args,**self.func_kwargs)`
@@ -375,9 +500,8 @@ class Task(FSM, RunStateMixin):
     '''
     if not self.is_running:
       warning(f'.run() when state is not {self.RUNNING!r}')
-    state = type(self)._state
     R = self.result
-    with state(current_task=self):
+    with self:
       try:
         with self.runstate:
           func_result = self.func(*self.func_args, **self.func_kwargs)
@@ -396,8 +520,8 @@ class Task(FSM, RunStateMixin):
       else:
         # if the runstate was cancelled or the result indicates
         # cancellation cancel the task otherwise complete `self.result`
-        if (self.runstate.cancelled
-            or (self.cancel_on_result and self.cancel_on_result(func_result))):
+        if self.runstate.cancelled or (self.cancel_on_result
+                                       and self.cancel_on_result(func_result)):
           # cancel the task, ready for retry
           self.fsm_event('cancel')
         else:
@@ -419,7 +543,7 @@ class Task(FSM, RunStateMixin):
       return bg_thread(self.dispatch, name=self.name)
 
   def make(self, fail_fast=False):
-    ''' Generator to complete `self` and its prerequisites.
+    ''' Complete `self` and its prerequisites.
         This calls the global `make()` function with `self`.
         It returns a Boolean indicating whether this task completed.
     '''
@@ -432,10 +556,10 @@ class Task(FSM, RunStateMixin):
     '''
     self.result.join()
 
-TaskSubType = TypeVar('TaskSubType', bound=Task)
+TaskSubType = subtype(Task)
 
 # pylint: disable=too-many-branches
-def make(*tasks, fail_fast=False):
+def make(*tasks, fail_fast=False, queue=None):
   ''' Generator which completes all the supplied `tasks` by dispatching them
       once they are no longer blocked.
       Yield each task from `tasks` as it completes (or becomes cancelled).
@@ -444,10 +568,12 @@ def make(*tasks, fail_fast=False):
       * `tasks`: `Task`s as positional parameters
       * `fail_fast`: default `False`; if true, cease evaluation as soon as a
         task completes in a state with is not `DONE`
+      * `queue`: optional callable to submit a task for execution later
+        via some queue such as `Later` or celery
 
       The following rules are applied by this function:
       - if a task is being prepared, raise an `FSMError`
-      - if a task is already running, wait for its completion
+      - if a task is already running or queued, wait for its completion
       - if a task is pending:
         * if any prerequisite has failed, fail this task
         * if any prerequisite is cancelled, cancel this task
@@ -475,7 +601,8 @@ def make(*tasks, fail_fast=False):
     with Pfx(qtask):
       if qtask.is_prepare:
         raise FSMError(f'cannot make a {qtask.fsm_state} task', qtask)
-      if qtask.is_running:
+      if qtask.is_running or qtask.is_queued:
+        # task is already running, or queued and will be run
         qtask.join()
         assert qtask.iscompleted()
       elif qtask.is_pending:
@@ -520,13 +647,42 @@ def make(*tasks, fail_fast=False):
               )
             else:
               # prerequsites all done, run the task
-              qtask.dispatch()
+              if queue is None:
+                # run the task directly
+                qtask.dispatch()
+              else:
+                # queue the task via some runner such as a Later
+                qtask.queue()
+                queue(qtask.dispatch)
+                q.append(qtask)
+                continue
       assert qtask.iscompleted() or qtask.is_cancelled()
       if qtask in tasks0:
         yield qtask
         tasks0.remove(qtask)
       if fail_fast and not qtask.is_done:
         return
+
+def make_now(*tasks, fail_fast=False, queue=None):
+  ''' Run the generator `make(*tasks)` to completion and return the
+      list of completed tasks.
+  '''
+  return list(make(*tasks, fail_fast=fail_fast, queue=queue))
+
+def make_later(L, *tasks, fail_fast=False):
+  ''' Dispatch the `tasks` via `L:Later` for asynchronous execution
+      if it is not already completed.
+      The caller can wait on `t.result` for completion.
+
+      This calls `make_now()` in a thread and uses `L.defer` to
+      queue the task and its prerequisites for execution.
+  '''
+  bg_thread(
+      make_now,
+      name=f'make({",".join(t.name for t in tasks)})',
+      args=tasks,
+      kwargs=dict(fail_fast=fail_fast, queue=L.defer),
+  )
 
 class TaskQueue:
   ''' A task queue for managing and running a set of related tasks.
@@ -557,7 +713,6 @@ class TaskQueue:
       Example 2, put 1 task in a queue with `run_dependent_tasks=True` and run.
       The queue pulls in the dependencies of completed tasks and also runs those:
 
-
            >>> t1 = Task("t1", lambda: print("t1"))
            >>> t2 = t1.then("t2", lambda: print("t2"))
            >>> q = TaskQueue(t1, run_dependent_tasks=True)
@@ -578,6 +733,19 @@ class TaskQueue:
     self._lock = RLock()
     for t in tasks:
       self.add(t)
+
+  def as_dot(self, name=None, **kw):
+    ''' Compute a DOT syntax graph description of the tasks in the queue.
+    '''
+    return Task.tasks_as_dot(
+        chain(
+            sorted(self._ready, key=lambda t: t.name),
+            sorted(self._up, key=lambda t: t.name),
+            sorted(self._unready, key=lambda t: t.name),
+        ),
+        name,
+        **kw,
+    )
 
   # pylint: disable=redefined-outer-name
   @locked
@@ -685,6 +853,105 @@ class TaskQueue:
       yield task
       if once:
         break
+
+##################################################
+#
+# decorator under development
+#
+
+@decorator
+def _task(func, task_class=Task):
+  ''' Decorator for a function which runs it as a `Task`.
+      The function may still be called directly.
+
+      The following function attributes are provided:
+      * `dispatch(after=(),deferred=False,delay=0.0)`: run this function
+        after the completion of the tasks specified by `after`
+        and after at least `delay` seconds;
+        return the `Task` for the queued function
+
+      ##Examples:
+
+      ##    >>> import time
+      ##    >>> @task
+      ##    ... def f(x):
+      ##    ...     return x * 2
+      ##    ...
+      ##    >>> print(f(3))  # call the function normally
+      ##    6
+      ##    >>> # dispatch f(5) after 0.5s, get Task
+      ##    >>> t0 = time.time()
+      ##    >>> ft = f.dispatch((5,), delay=0.5)
+      ##    >>> # calling a Task, as with a Result, is like calling the function
+      ##    >>> print(ft())
+      ##    10
+      ##    >>> # check that we were blocked for 0.5s
+      ##    >>> now = time.time()
+      ##    >>> now - t0 >= 0.5
+      ##    True
+  '''
+
+  def make_task(func, a, kw):
+    ft_name = f'{task_class.__name__}({funcname(func)})'
+    if a:
+      ft_name = ft_name + ':' + repr(a)
+    if kw:
+      ft_name = ft_name + ':' + repr(kw)
+    return task_class(name=ft_name, func=func, func_args=a, func_kwargs=kw)
+
+  def task_func_wrapper(*a, **kw):
+    ''' Run the function via a `Task`.
+    '''
+    ft = make_task(func, a, kw)
+    ft.run()
+    return ft()
+
+  # pylint: disable=redefined-outer-name
+  def dispatch(a=None, kw=None, after=(), deferred=False, delay=0.0):
+    ''' Dispatch the function asynchronously.
+        Return the `Task`.
+
+        Optional positional parameters:
+        * `a`: an iterable of positional arguments for `func`
+        * `kw`: a mapping of keyword arguments for `func`
+
+        Keyword parameters:
+        * `after`: optional iterable of `Task`s;
+          `func` will not be dispatched until these are complete.
+        * `deferred`: (default `False`); if true,
+          block the task on `after` but do not trigger a call on
+          their completion.
+          This thus creates the `Task` but does not dispatch it.
+        * `delay`: delay the dispatch of `func` by at least `delay` seconds,
+          default `0.0`s.
+    '''
+    if a is None:
+      a = ()
+    if kw is None:
+      kw = {}
+    if not isinstance(after, list):
+      after = list(after)
+    if delay > 0.0:
+      delay_task = task_class(
+          name="sleep(%s)" % (delay,), func=time.sleep, func_args=(delay,)
+      )
+      delay_task.bg()
+      after.append(delay_task)
+    ft = make_task(func, a, kw)
+    if after:
+      for otask in after:
+        ft.require(otask)
+    if not deferred:
+      if after:
+        for otask in after:
+          otask.notify(lambda _: ft.callif())
+      else:
+        # dispatch the task immediately, but in another Thread
+        ft.bg(ft.call, func, *a, **kw)
+    return ft
+
+  task_func_wrapper.dispatch = dispatch
+  return task_func_wrapper
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

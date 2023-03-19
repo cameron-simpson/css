@@ -18,7 +18,7 @@ from cs.pfx import Pfx
 import cs.sh
 from cs.xml import etree
 
-__version__ = '20220606-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -171,6 +171,7 @@ def ingest_plist_dict(pd):
   if pd.tag != 'dict':
     raise ValueError("not a <dict>: %r" % (pd,))
   d = PListDict()
+  key = None
   for i, e in enumerate(pd):
     if i % 2 == 0:
       if e.tag == 'key':

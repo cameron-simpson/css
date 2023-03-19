@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python3 -tt
 #
 # TCP and UNIX socket client/server code.
 # - Cameron Simpson <cs@cskk.id.au> 07dec2007
@@ -7,13 +7,18 @@
 ''' Support for connections over TCP and UNIX domain sockets.
 '''
 
+from contextlib import contextmanager
 import os
+from os.path import exists as existspath
 from socket import socket, AF_INET, AF_UNIX
-from socketserver import TCPServer, UnixStreamServer, \
-    ThreadingMixIn, StreamRequestHandler
+from socketserver import (
+    TCPServer, UnixStreamServer, ThreadingMixIn, StreamRequestHandler
+)
 import sys
-from threading import Thread
+
 from icontract import require
+
+from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.logutils import error
 from cs.pfx import Pfx, pfx_method
@@ -21,7 +26,9 @@ from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
-from . import defaults
+from cs.threads import bg as bg_thread
+
+from . import Store
 from .stream import StreamStore
 
 class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
@@ -45,7 +52,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
         the default Store has key `''`.
 
         If `local_store` is not None, `exports['']` is set to
-        `local_store` otherwise to `defaults.S`.
+        `local_store` otherwise to `Store.defaults()`.
         It is an error to provide both `local_store` and a prefilled
         `exports['']`.
     '''
@@ -54,7 +61,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     if local_store is not None:
       exports[''] = local_store
     if '' not in exports:
-      exports[''] = defaults.S
+      exports[''] = Store.defaults()
     MultiOpenMixin.__init__(self)
     RunStateMixin.__init__(self, runstate=runstate)
     self.exports = exports
@@ -68,26 +75,30 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   def __str__(self):
     return "%s[%s](S=%s)" % (type(self).__name__, self.runstate.state, self.S)
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Start up the server.
+        Subclasses' `startup_shutdown` must setup and clear `self.socker_server`
+        around a call to this method.
     '''
-    self.socket_server_thread = Thread(
-        name="%s(%s)[server-thread]" % (type(self), self.S),
-        target=self.socket_server.serve_forever,
-        kwargs={'poll_interval': 0.5}
-    )
-    self.socket_server_thread.daemon = False
-    self.socket_server_thread.start()
-
-  def shutdown(self):
-    ''' Shut down the server.
-    '''
-    if self.socket_server:
-      self.socket_server.shutdown()
-    self.socket_server_thread.join()
-    if self.socket_server and self.socket_server.socket is not None:
-      self.socket_server.socket.close()
-    self.socket_server = None
+    with super().startup_shutdown():
+      with stackattrs(
+          self,
+          socket_server_thread=bg_thread(
+              self.socket_server.serve_forever,
+              kwargs={'poll_interval': 0.5},
+              name="%s(%s)[server-thread]" % (type(self), self.S),
+              daemon=False,
+          ),
+      ):
+        try:
+          yield
+        finally:
+          if self.socket_server:
+            self.socket_server.shutdown()
+          self.socket_server_thread.join()
+          if self.socket_server and self.socket_server.socket is not None:
+            self.socket_server.socket.close()
 
   def shutdown_now(self):
     ''' Issue closes until all current opens have been consumed.
@@ -96,7 +107,6 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
       self.socket_server.shutdown()
       if self.socket_server.socket is not None:
         self.socket_server.socket.close()
-      self.socket_server = None
 
   def flush(self):
     ''' Flush the backing Store.
@@ -133,9 +143,9 @@ class _ClientConnectionHandler(StreamRequestHandler):
         local_store=self.S,
         exports=self.exports,
     )
-    remoteS.startup()
+    remoteS.open()
     remoteS.join()
-    remoteS.shutdown()
+    remoteS.close()
 
 class _TCPServer(ThreadingMixIn, TCPServer):
 
@@ -160,7 +170,19 @@ class TCPStoreServer(_SocketStoreServer):
   def __init__(self, bind_addr, **kw):
     super().__init__(**kw)
     self.bind_addr = bind_addr
-    self.socket_server = _TCPServer(self, bind_addr)
+    self.socket_server = None
+
+  @contextmanager
+  def startup_shutdown(self):
+    with stackattrs(
+        self,
+        socket_server=_TCPServer(self, self.bind_addr),
+    ):
+      try:
+        with super().startup_shutdown():
+          yield
+      finally:
+        self.socket_server.shutdown()
 
 class TCPClientStore(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
@@ -175,11 +197,15 @@ class TCPClientStore(StreamStore):
         self, name, None, None, addif=addif, connect=self._tcp_connect, **kw
     )
 
-  def shutdown(self):
-    StreamStore.shutdown(self)
-    if self.sock is not None:
-      self.sock.close()
-      self.sock = None
+  @contextmanager
+  def startup_shutdown(self):
+    try:
+      with super().startup_shutdown():
+        yield
+    finally:
+      if self.sock is not None:
+        self.sock.close()
+        self.sock = None
 
   @pfx_method
   @require(lambda self: not self.sock)
@@ -226,11 +252,22 @@ class UNIXSocketStoreServer(_SocketStoreServer):
   def __init__(self, socket_path, **kw):
     super().__init__(**kw)
     self.socket_path = socket_path
-    self.socket_server = _UNIXSocketServer(self, socket_path)
+    self.socket_server = None
 
-  def shutdown(self):
-    super().shutdown()
-    os.remove(self.socket_path)
+  @contextmanager
+  def startup_shutdown(self):
+    if existspath(self.socket_path):
+      raise RuntimeError("socket already exists: %r" % (self.socket_path,))
+    with stackattrs(
+        self,
+        socket_server=_UNIXSocketServer(self, self.socket_path),
+    ):
+      try:
+        with super().startup_shutdown():
+          yield
+      finally:
+        self.socket_server.shutdown()
+        os.remove(self.socket_path)
 
 class UNIXSocketClientStore(StreamStore):
   ''' A Store attached to a remote Store at `socket_path`.

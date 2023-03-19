@@ -5,7 +5,6 @@ r'''
 Assorted process and subprocess management functions.
 '''
 
-from builtins import print as builtin_print
 from contextlib import contextmanager
 import errno
 import io
@@ -17,12 +16,10 @@ from subprocess import PIPE, Popen, run as subprocess_run
 import sys
 import time
 
-from cs.gimmicks import DEVNULL
-from cs.logutils import trace, warning
+from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220626-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -33,9 +30,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.gimmicks>=devnull',
-        'cs.logutils',
         'cs.pfx',
-        'cs.upd',
     ],
 }
 
@@ -141,7 +136,7 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
     it = iter(sig_hnds)
   else:
     # (sig,hnd),... from mapping
-    it = items()
+    it = iter(items())
   try:
     sig, handler = next(it)
   except StopIteration:
@@ -150,7 +145,7 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
     with signal_handler(sig, handler,
                         call_previous=call_previous) as old_handler:
       _stacked[sig] = old_handler
-      with signal_handlers(sig_hnds, call_previous=call_previous,
+      with signal_handlers(it, call_previous=call_previous,
                            _stacked=_stacked) as stacked:
         yield stacked
     return
@@ -219,21 +214,17 @@ def run(argv, doit=True, logger=None, quiet=True, **subp_options):
       if logger:
         trace("skip: %s", shlex.join(argv))
       else:
-        with Upd().above():
-          print_argv(*argv, fold=True)
+        print_argv(*argv, fold=True)
     return None
-  with Upd().above():
-    if not quiet:
-      if logger:
-        trace("+ %s", shlex.join(argv))
-      else:
-        print_argv(*argv)
-    cp = pfx_call(subprocess_run, argv, **subp_options)
-    if cp.stdout and not quiet:
-      builtin_print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
-    if cp.stderr:
-      builtin_print(" stderr:")
-      builtin_print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
+  if not quiet:
+    if logger:
+      trace("+ %s", shlex.join(argv))
+    else:
+      print_argv(*argv, indent="+ ", file=sys.stderr)
+  cp = pfx_call(subprocess_run, argv, **subp_options)
+  if cp.stderr:
+    print(" stderr:")
+    print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
   if cp.returncode != 0:
     warning(
         "run fails, exit code %s from %s",
@@ -343,8 +334,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   else:
     pre_argv = list(pre_argv)
     post_argv = list(post_argv)
-  pre_nbytes = sum([len(arg) + 1 for arg in pre_argv])
-  post_nbytes = sum([len(arg) + 1 for arg in post_argv])
+  pre_nbytes = sum(len(arg) + 1 for arg in pre_argv)
+  post_nbytes = sum(len(arg) + 1 for arg in post_argv)
   argvs = []
   available = max_argv - pre_nbytes - post_nbytes
   per = []

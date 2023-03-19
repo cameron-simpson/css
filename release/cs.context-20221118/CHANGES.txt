@@ -1,0 +1,2 @@
+lib/python/cs/context.py: cs.context: tweak docstrings
+lib/python/cs/context.py: cs.context: stackattrs: improve docstring

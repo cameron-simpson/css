@@ -1,0 +1,2 @@
+lib/python/cs/queues.py: cs.queues: ListQueue: add "append" synonym for "put" in keeping with the list-ish flavour
+lib/python/cs/queues.py: cs.queues: ignore a little lint

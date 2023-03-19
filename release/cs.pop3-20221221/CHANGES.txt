@@ -1,0 +1,2 @@
+lib/python/cs/pop3.py: cs.pop3: fix stray %s in format string
+lib/python/cs/pop3.py: cs.pop3: POP3: modernise MultiOpenMixin startup/shutdown; POP3Command.cmd_dl: catch ConnectionRefusedError and report succintly, also improve command line parse

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Transcribe objects as text.
 #   - Cameron Simpson <cs@cskk.id.au> 14jan2018
@@ -35,15 +35,11 @@ from string import ascii_letters, digits
 import sys
 from uuid import UUID
 
-from typeguard import typechecked
-
 from cs.deco import decorator
 from cs.lex import get_identifier, is_identifier, \
                    get_decimal_or_float_value, get_qstr, \
                    texthexify
 from cs.pfx import Pfx, pfx_call, pfx_method
-
-from cs.x import X
 
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
@@ -84,7 +80,7 @@ class Transcriber(ABC):
         * `T`: the Transcribe context
         * `fp`: the output file
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @staticmethod
   @abstractmethod
@@ -99,7 +95,7 @@ class Transcriber(ABC):
         * `stopchar`: the end of object marker, usually '}'
         * `prefix`: the active prefix
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
 class UUIDTranscriber:
   ''' A transcriber for uuid.UUID instances.
@@ -156,7 +152,9 @@ class Transcribe:
       prefixes = (prefixes,)
     for prefix in prefixes:
       if prefix in self.prefix_map:
-        raise ValueError("prefix %r already taken" % (prefix,))
+        raise ValueError(
+            "prefix %r already taken: %r" % (prefix, self.prefix_map[prefix])
+        )
       if (not isinstance(baseclass, Transcriber)
           and (not hasattr(baseclass, 'transcribe_inner')
                or not hasattr(baseclass, 'parse_inner'))):

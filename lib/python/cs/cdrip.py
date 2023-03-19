@@ -13,6 +13,7 @@
 #
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from getopt import GetoptError
 import os
 from os.path import (
@@ -26,9 +27,12 @@ import subprocess
 import sys
 from tempfile import NamedTemporaryFile
 import time
+from typing import Optional
 from uuid import UUID
+
 import discid
 import musicbrainzngs
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
@@ -89,15 +93,18 @@ class CDRipCommand(BaseCommand):
 
   SUBCOMMAND_ARGV_DEFAULT = 'rip'
 
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    options = self.options
-    options.force = False
-    options.device = os.environ.get(CDRIP_DEV_ENVVAR) or CDRIP_DEV_DEFAULT
-    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR
-                                     ) or expanduser(CDRIP_DIR_DEFAULT)
-    options.mbdb_path = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    force: bool = False
+    device: str = field(
+        default_factory=lambda: os.environ.get(CDRIP_DEV_ENVVAR) or
+        CDRIP_DEV_DEFAULT
+    )
+    dirpath: str = field(
+        default_factory=lambda: os.environ.get(CDRIP_DIR_ENVVAR) or
+        expanduser(CDRIP_DIR_DEFAULT)
+    )
+    mbdb_path: Optional[str] = None
 
   def apply_opts(self, opts):
     ''' Apply the command line options.
@@ -124,12 +131,14 @@ class CDRipCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    fstags = FSTags()
-    mbdb = MBDB(mbdb_path=self.options.mbdb_path)
-    with fstags:
-      with mbdb:
-        with stackattrs(self.options, fstags=fstags, mbdb=mbdb, verbose=True):
-          yield
+    with super().run_context():
+      fstags = FSTags()
+      mbdb = MBDB(mbdb_path=self.options.mbdb_path)
+      with fstags:
+        with mbdb:
+          with stackattrs(self.options, fstags=fstags, mbdb=mbdb,
+                          verbose=True):
+            yield
 
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...

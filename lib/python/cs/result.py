@@ -63,12 +63,12 @@ from cs.fsm import FSM
 from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
 from cs.pfx import pfx_method
-from cs.py.func import funcname
+from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20220311-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -80,12 +80,11 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.fsm',
-        'cs.logutils',
+        'cs.gimmicks',
         'cs.mappings',
         'cs.pfx',
         'cs.py.func',
         'cs.py3',
-        'cs.resources',
         'cs.seq',
         'cs.threads',
         'icontract',
@@ -96,12 +95,21 @@ class CancellationError(Exception):
   ''' Raised when accessing `result` or `exc_info` after cancellation.
   '''
 
-  def __init__(self, msg=None):
-    if msg is None:
-      msg = "cancelled"
-    elif not isinstance(msg, StringTypes):
-      msg = "%s: cancelled" % (msg,)
-    Exception.__init__(self, msg)
+  def __init__(self, message=None, **kw):
+    ''' Initialise the `CancellationError`.
+
+        The optional `message` parameter (default `"cancelled"`)
+        is set as the `message` attribute.
+        Other keyword parameters set their matching attributes.
+    '''
+    if message is None:
+      message = "cancelled"
+    elif not isinstance(message, StringTypes):
+      message = "cancelled: %s" % (message,)
+    Exception.__init__(self, message)
+    self.message = message
+    for k, v in kw.items():
+      setattr(self, k, v)
 
 # pylint: disable=too-many-instance-attributes
 class Result(FSM):
@@ -195,7 +203,7 @@ class Result(FSM):
 
   @property
   def ready(self):
-    ''' True if `Result` state is `DONE` or `CANCLLED`..
+    ''' True if the `Result` state is `DONE` or `CANCELLED`..
     '''
     return self.fsm_state in (self.DONE, self.CANCELLED)
 
@@ -246,7 +254,7 @@ class Result(FSM):
       raise AttributeError("%s not ready: no .result attribute" % (self,))
     self.collected = True
     if state == self.CANCELLED:
-      raise CancellationError()
+      raise CancellationError
     return self._result
 
   @result.setter
@@ -271,7 +279,7 @@ class Result(FSM):
     self.collected = True
     if state == self.CANCELLED:
       self.collected = True
-      raise CancellationError()
+      raise CancellationError
     return self._exc_info
 
   @exc_info.setter
@@ -291,9 +299,7 @@ class Result(FSM):
         self.exc_info = sys.exc_info()
 
   def run_func(self, func, *a, **kw):
-    ''' Have the `Result` run `func(*a,**kw)` and store its return value as
-        `self.result`.
-        If `func` raises an exception, store it as `self.exc_info`.
+    ''' Fulfil the `Result` by running `func(*a,**kw)`.
     '''
     self.fsm_event('dispatch')
     try:
@@ -318,6 +324,18 @@ class Result(FSM):
         self.run_func, name=self.name, args=[func] + list(a), kwargs=kw
     )
 
+  def run_func_in_thread(self, func, *a, **kw):
+    ''' Fulfil the `Result` by running `func(*a,**kw)`
+        in a separate `Thread`.
+
+        This exists to step out of the current `Thread's` thread
+        local context, such as a database transaction associated
+        with Django's implicit per-`Thread` database context.
+    '''
+    T = self.bg(func, *a, **kw)
+    T.join()
+    return self()
+
   @require(
       lambda self: self.fsm_state in
       (self.PENDING, self.RUNNING, self.CANCELLED)
@@ -337,6 +355,7 @@ class Result(FSM):
       if state in (self.PENDING, self.RUNNING, self.CANCELLED):
         self._result = result  # pylint: disable=attribute-defined-outside-init
         self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+        self._get_lock.release()
         if state != self.CANCELLED:
           self.fsm_event('complete')
       elif state == self.DONE:
@@ -352,13 +371,11 @@ class Result(FSM):
             "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE)"
             % (self, self.fsm_state)
         )
-      self._get_lock.release()
 
   @pfx_method
   def join(self):
     ''' Calling the `.join()` method waits for the function to run to
-        completion and returns a tuple as for the `WorkerThreadPool`'s
-        `.dispatch()` return queue, a tuple of `(result,exc_info)`.
+        completion and returns a tuple of `(result,exc_info)`.
 
         On completion the sequence `(result,None)` is returned.
         If an exception occurred computing the result the sequence
@@ -369,7 +386,7 @@ class Result(FSM):
     '''
     self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._get_lock.release()
-    return self.result, self.exc_info
+    return self._result, self._exc_info
 
   def get(self, default=None):
     ''' Wait for readiness; return the result if `self.exc_info` is `None`,
@@ -397,10 +414,10 @@ class Result(FSM):
     return result
 
   def notify(self, notifier):
-    ''' After the function completes, call `notifier(self)`.
+    ''' After the `Result` completes, call `notifier(self)`.
 
-        If the function has already completed this will happen immediately.
-        example: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
+        If the `Result` has already completed this will happen immediately.
+        If you'd rather `self` got put on some queue `Q`, supply `Q.put`.
     '''
 
     # TODO: adjust all users of .notify() to use fsm_callback and
@@ -415,8 +432,65 @@ class Result(FSM):
     with self._lock:
       self.fsm_callback('CANCELLED', callback)
       self.fsm_callback('DONE', callback)
-      if self.fsm_state in (self.CANCELLED, self.DONE):
-        notifier(self)
+      state = self.fsm_state
+    # already cancelled or done? call the notifier immediately
+    if state in (self.CANCELLED, self.DONE):
+      self.collected = True
+      notifier(self)
+
+  def post_notify(self, post_func) -> "Result":
+    ''' Return a secondary `Result` which processes the result of `self`.
+
+        After the `self` completes, call `post_func(retval)` where
+        `retval` is the result of `self`, and use that to complete
+        the secondary `Result`.
+
+        Example:
+
+            # submit packet to data stream
+            R = submit_packet()
+            # arrange that when the response is received, decode the response
+            R2 = R.post_notify(lambda response: decode(response))
+            # collect decoded response
+            decoded = R2()
+
+        If the `Result` has already completed this will happen immediately.
+    '''
+    post_R = Result(f'POST_RESULT[{self.name}]')
+
+    def notifier(preR):
+      retval = preR()
+      post_R.run_func(post_func, retval)
+
+    self.notify(notifier)
+    return post_R
+
+def in_thread(func):
+  ''' Decorator to evaluate `func` in a separate `Thread`.
+      Return or exception is as for the original function.
+
+      This exists to step out of the current `Thread's` thread
+      local context, such as a database transaction associated
+      with Django's implicit per-`Thread` database context.
+  '''
+
+  def run_in_thread(*a, **kw):
+    ''' Create a `Result`, fulfil it by running `func(*a,**kw)`
+        in a separate `Thread`, return the function result (or exception).
+    '''
+    desc_fmt, desc_fmt_args = func_a_kw_fmt(func, *a, **kw)
+    R = Result(name=desc_fmt % tuple(desc_fmt_args))
+    return R.run_func_in_thread(func, *a, **kw)
+
+  # expose a reference to the original function
+  run_in_thread.direct = func
+  return run_in_thread
+
+def call_in_thread(func, *a, **kw):
+  ''' Run `func(*a,**kw)` in a separate `Thread` via the `@in_thread` decorator.
+      Return or exception is as for the original function.
+  '''
+  return in_thread(func)(*a, **kw)
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
@@ -542,7 +616,7 @@ class OnDemandResult(Result):
           (self, a, kw)
       )
     with self._lock:
-      if self.state == self.PENDING:
+      if self.is_pending:
         self.run_func(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()
 

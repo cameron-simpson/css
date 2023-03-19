@@ -50,12 +50,14 @@ import logging
 import sys
 import threading
 import traceback
+
 from cs.deco import decorator, contextdecorator, fmtdoc, logging_wrapper
 from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
+
 from cs.x import X
 
-__version__ = '20220523-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'description':
@@ -85,7 +87,7 @@ def unpfx(s, sep=None):
       (default from `DEFAULT_SEPARATOR`: `{DEFAULT_SEPARATOR!r}`).
 
       This is a simple hack to support reporting error messages
-      which have had a preifx applied,
+      which have had a prefix applied,
       and fails accordingly if the base message itself contains the separator.
   '''
   if sep is None:
@@ -124,7 +126,6 @@ class _PfxThreadState(threading.local):
 
   def __init__(self):
     threading.local.__init__(self)
-    self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
     self.trace = None
@@ -261,7 +262,6 @@ class Pfx(object):
     '''
     state = cls._state
     state.append(P)
-    state.raise_needs_prefix = True
     if state.trace:
       state.trace(state.prefix)
 
@@ -274,14 +274,18 @@ class Pfx(object):
   def __exit__(self, exc_type, exc_value, _):
     _state = self._state
     if exc_value is not None:
-      if _state.raise_needs_prefix:
+      try:
+        exc_value._pfx_prefix
+      except AttributeError:
+        exc_value._pfx_prefix = self._state.prefix
         # prevent outer Pfx wrappers from hacking stuff as well
-        _state.raise_needs_prefix = False
         # now hack the exception attributes
         if not self.prefixify_exception(exc_value):
           True or print(
-              "warning: %s: %s:%s: message not prefixed" %
-              (self._state.prefix, type(exc_value).__name__, exc_value),
+              "warning: %s: %s:%s: message not prefixed: dir=%r" % (
+                  self._state.prefix, type(exc_value).__name__, exc_value,
+                  dir(exc_value)
+              ),
               file=sys.stderr
           )
     try:
@@ -369,8 +373,15 @@ class Pfx(object):
         else:
           value = (value0, cls.prefixify(value1))
       elif attr == 'args' and isinstance(e, LookupError):
-        # args[0] is the key, do not fiddle with it
-        continue
+        if (isinstance(value, tuple) and value):
+          value0 = value[0]
+          if (isinstance(value0, str) and value0.startswith("'")
+              and value0.endswith("'")):
+            # args[0] is the key, do not fiddle with it
+            continue
+          value = (cls.prefixify(value0), *value[1:])
+        else:
+          continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
@@ -413,10 +424,10 @@ class Pfx(object):
 
   def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
-        within a surrounding Pfx context with the current mark string.
+        within a surrounding `Pfx` context with the current mark string.
 
         This is intended for deferred call facilities like
-        WorkerThreadPool, Later, and futures.
+        `Later` and `futures`.
     '''
     pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
 
@@ -567,18 +578,19 @@ class PfxCallInfo(Pfx):
         caller[2], grandcaller[0], grandcaller[1], grandcaller[2]
     )
 
-def PfxThread(target=None, **kw):
-  ''' Factory function returning a Thread
+def PfxThread(target, **kw):
+  ''' Factory function returning a `Thread`
       which presents the current prefix as context.
   '''
+  from cs.threads import HasThreadState  # pylint: disable=import-outside-toplevel
+
   current_prefix = prefix()
 
-  def run(*a, **kw):
+  def PfxThread_run(*a, **kw):
     with Pfx(current_prefix):
-      if target is not None:
-        target(*a, **kw)
+      return target(*a, **kw)
 
-  return threading.Thread(target=run, **kw)
+  return HasThreadState.Thread(target=PfxThread_run, **kw)
 
 @decorator
 def pfx(func, message=None, message_args=()):

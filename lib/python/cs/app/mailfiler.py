@@ -33,11 +33,12 @@
 from __future__ import print_function
 from collections import namedtuple
 from copy import deepcopy
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email import message_from_file
 from email.header import decode_header, make_header
 from email.utils import getaddresses
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import logging
 import os
 import os.path
@@ -49,6 +50,7 @@ from threading import Lock, RLock
 import time
 from time import sleep
 from types import SimpleNamespace as NS
+from typing import Any, Optional
 
 from cs.app.maildb import MailDB
 from cs.cmdutils import BaseCommand
@@ -58,7 +60,8 @@ import cs.env
 from cs.env import envsub
 from cs.excutils import LogExceptions
 from cs.filestate import FileState
-from cs.fileutils import abspath_from_file, longpath, Pathname
+from cs.fileutils import abspath_from_file, Pathname
+from cs.fs import longpath
 import cs.lex
 from cs.lex import (
     get_white, get_nonwhite, skipwhite, get_other_chars, get_qstr,
@@ -72,8 +75,7 @@ from cs.mailutils import (
     ismaildir, make_maildir
 )
 from cs.obj import singleton
-from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop
+from cs.pfx import Pfx
 from cs.py.modules import import_module_name
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
@@ -145,16 +147,14 @@ class MailFilerCommand(BaseCommand):
           Maildir names.
           Default: {DEFAULT_RULES_PATTERN}'''
 
-  def apply_defaults(self):
-    ''' Set up default options.
-    '''
-    options = self.options
-    options.stdin = sys.stdin
-    options.config_path = None
-    options.maildb_path = None
-    options.msgiddb_path = None
-    options.maildir = None
-    options.rules_pattern = DEFAULT_RULES_PATTERN
+  @dataclass
+  class Options(BaseCommand.Options):
+    stdin: Any = field(default_factory=lambda: sys.stdin)
+    config_path: Optional[str] = None
+    maildb_path: Optional[str] = None
+    msgiddb_path: Optional[str] = None
+    maildir: Optional[str] = None
+    rules_pattern: str = DEFAULT_RULES_PATTERN
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -395,9 +395,7 @@ class MailFiler(NS):
   def maildir_from_folderspec(self, folderspec):
     ''' Return the Maildir from `folderspec`.
     '''
-    return Pathname(
-        longpath(folderspec, None, ((self.maildir_path + '/', '+'),))
-    )
+    return Pathname(longpath(folderspec, ((self.maildir_path + '/', '+'),)))
 
   def maildir_watcher(self, folderspec):
     ''' Return the singleton WatchedMaildir indicated by the `folderspec`.
@@ -433,7 +431,7 @@ class MailFiler(NS):
     debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
     idle = 0
-    while not runstate or not runstate.cancelled:
+    while not runstate.cancelled:
       these_folders = folders
       if not these_folders:
         these_folders = op_cfg.get('folders', '').split()

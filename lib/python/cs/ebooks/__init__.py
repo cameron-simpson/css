@@ -6,7 +6,7 @@
     These form the basis of my personal Kindle and Calibre workflow.
 '''
 
-__version__ = '20220626-post'
+__version__ = '20230110-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -15,6 +15,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.app.osx.defaults',
         'cs.app.osx.plist',
         'cs.cmdutils',
         'cs.context',
@@ -31,12 +32,14 @@ DISTINFO = {
         'cs.psutils',
         'cs.resources',
         'cs.sqlalchemy_utils',
+        'cs.sqltags',
         'cs.tagset',
         'cs.threads',
         'cs.units',
         'cs.upd',
         'icontract',
         'mobi',
+        'pycryptodomex',
         'sqlalchemy',
         'typeguard',
     ],
