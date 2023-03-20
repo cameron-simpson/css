@@ -1,3 +1,4 @@
+static JPEG to MJPEG converter/streamer
 cs.cdrip: discid tag is a row id, needs to be the libdiscid value
 ydl: issue alerts for completed downloads
 divert itunes cover tags to a file? they are very bulky
