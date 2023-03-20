@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 import filecmp
 from getopt import GetoptError
 import os
@@ -16,6 +17,7 @@ from os.path import (
     join as joinpath,
 )
 import sys
+from typing import Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -631,24 +633,34 @@ class KindleCommand(BaseCommand):
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
-  def apply_defaults(self):
+  @dataclass
+  class Options(BaseCommand.Options):
     ''' Set up the default values in `options`.
     '''
-    options = self.options
-    try:
-      # pylint: disable=protected-access
-      kindle_path = KindleTree._resolve_fspath(None)
-    except ValueError:
-      kindle_path = None
-    from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
-    try:
-      # pylint: disable=protected-access
-      calibre_path = CalibreTree._resolve_fspath(None)
-    except ValueError:
-      calibre_path = None
-    options.kindle_path = kindle_path
-    options.calibre_path = calibre_path
-    options.dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+
+    def _kindle_path():
+      try:
+        # pylint: disable=protected-access
+        kindle_path = KindleTree._resolve_fspath(None)
+      except ValueError:
+        kindle_path = None
+      return kindle_path
+
+    kindle_path: Optional[str] = field(default_factory=_kindle_path)
+
+    def _calibre_path():
+      from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
+      try:
+        # pylint: disable=protected-access
+        calibre_path = CalibreTree._resolve_fspath(None)
+      except ValueError:
+        calibre_path = None
+      return calibre_path
+
+    calibre_path: Optional[str] = field(default_factory=_calibre_path)
+    dedrm_package_path: Optional[str] = field(
+        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+    )
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -667,7 +679,7 @@ class KindleCommand(BaseCommand):
           break
       else:
         raise GetoptError(
-            "cannot find db at %s" % (" or ".join(map(repr, dbsubpaths)),)
+            "cannot find db at %s" % (" or ".join(map(repr, db_subpaths)),)
         )
       options.kindle_path = dirname(db_fspath)
     else:

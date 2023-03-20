@@ -1,7 +1,8 @@
 static JPEG to MJPEG converter/streamer
 cs.cdrip: discid tag is a row id, needs to be the libdiscid value
+cs.iso14496: a HasSubBoxes mixin for things with .boxes, provides __len__, .length, __iter__ and whatever else
 ydl: issue alerts for completed downloads
-divert itunes cover tags to a file? they are very bulky
+divert itunes cover tags to a file? they are very bulky ==> VT
 moov.trak.mdia.minf.stbl.stsd.avc1 field decode
 moov.trak.mdia.minf.stbl.stsd.avc1 field decode
 mconvert: hook to rename converted media srcs to subdir, one for success, one for failure

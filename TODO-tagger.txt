@@ -1,3 +1,4 @@
+autotag to use the fstags autotag support, merge?
 bulk select thuymbnails
 gui - moving the LH file list does not switch images or move the scrubber
 gui - tag input accepting "tag=blah" and "-tag"

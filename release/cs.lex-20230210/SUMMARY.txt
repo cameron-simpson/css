@@ -1,0 +1,2 @@
+@has_format_attributes: new optional inherit parameter to inherit superclass (or other) format attributes, default False.
+New FNumericMixin, FFloat, FInt FormatableMixin subclasses like FStr - they add .localtime and .utctime formattable attributes.

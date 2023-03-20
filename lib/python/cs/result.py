@@ -68,7 +68,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20221207-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -203,7 +203,7 @@ class Result(FSM):
 
   @property
   def ready(self):
-    ''' True if `Result` state is `DONE` or `CANCLLED`..
+    ''' True if the `Result` state is `DONE` or `CANCELLED`..
     '''
     return self.fsm_state in (self.DONE, self.CANCELLED)
 
@@ -386,7 +386,7 @@ class Result(FSM):
     '''
     self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._get_lock.release()
-    return self.result, self.exc_info
+    return self._result, self._exc_info
 
   def get(self, default=None):
     ''' Wait for readiness; return the result if `self.exc_info` is `None`,

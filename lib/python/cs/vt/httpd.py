@@ -23,14 +23,15 @@ def main(argv=None):
     host, port = argv
   else:
     host, port = '127.0.0.1', 5000
-  app = StoreApp(name, defaults.S)
+  app = StoreApp(name)
   app.run(host=host, port=port)
 
 class _StoreApp(Flask, RunStateMixin):
   ''' A Flask application with a `.store` attribute.
   '''
 
-  def __init__(self, name, S):
+  @uses_Store
+  def __init__(self, name, *, S):
     Flask.__init__(self, name)
     RunStateMixin.__init__(self)
     self.store = S

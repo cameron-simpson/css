@@ -1,0 +1,19 @@
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: drop __tstate, unused
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: supply a .promote method supporting an fs path to a .sqlite db file
+lib/python/cs/sqltags.py: merge default ==> playon
+lib/python/cs/sqltags.py: cs.sqltags: docstring updates
+lib/python/cs/sqltags.py: merge playon ==> default
+lib/python/cs/sqltags.py: cs.sqltags: constraint SQLTags.search to "tagged" mode for now
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.search: choose comparison field according to the value type, drop complex SQL_ID_VALUE_COMPARISON_FUNCS, SQL_NAME_VALUE_COMPARISON_FUNCS, SQL_UNIXTIME_VALUE_COMPARISON_FUNCS etc
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: override TagSet.__getitem__ to provide name,id,unixtime
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: inherit format attributes from superclasses (TagSet); adjust "sqltags find" default format to match
+lib/python/cs/sqltags.py: merge default -> sqltags
+lib/python/cs/sqltags.py: merge default ==> sqltags
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand: new cmd_shell method, uses bpython if available otherwise code.interact
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand.cmd_shell: use BaseCommand.shell()
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand: new "orm define_schema" subcommand to update the db schema
+lib/python/cs/sqltags.py: cs.sqltags: fix exception message
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.search: allow the other modes again, we use "entity" in cs.splink
+lib/python/cs/sqltags.py: merge sqltags ==> default
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.__init__: drop case_sensitive, no longer supported?
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.__init__: always call define_schema, does some necessary sqlalchemy prep which can sometimes be missed

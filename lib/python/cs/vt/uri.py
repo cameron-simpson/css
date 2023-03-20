@@ -7,12 +7,14 @@ from dataclasses import dataclass
 import re
 from typing import Optional, Union
 
+from cs.deco import Promotable
+
 from .block import HashCodeBlock, IndirectBlock
 from .blockify import block_for
 from .hash import HashCode
 
 @dataclass
-class VTURI:
+class VTURI(Promotable):
   ''' A representation of a `HashCodeBlock` as a URI.
   '''
 

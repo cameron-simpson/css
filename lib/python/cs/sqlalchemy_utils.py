@@ -14,22 +14,34 @@ from typing import Any, Optional, Union, List, Tuple
 
 from icontract import require
 from sqlalchemy import Column, Integer, create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker as sqla_sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker as sqla_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
 from typeguard import typechecked
 
 from cs.deco import decorator, contextdecorator
-from cs.fileutils import makelockfile
+from cs.fileutils import lockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
-from cs.threads import State
+from cs.threads import ThreadState
 
-__version__ = '20220606-post'
+##def CHECK():
+##  ''' Debug function to check for open sqltags.sqlite files,
+##      called when there should be done.
+##  '''
+##  X("CHECK")
+##  if os.system(
+##      f'lsof -n -p {os.getpid()} | fgrep "/Users/cameron/var/sqltags.sqlite"'
+##  ) == 0:
+##    os.system(f'lsof -n -p {os.getpid()}')
+##    raise RuntimeError
+##  from cs.py.stack import caller
+##  X("CHECK from %r", caller())
+
+__version__ = '20230212-post'
 
 DISTINFO = {
     'description':
@@ -42,7 +54,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'icontract',
-        'sqlalchemy',
+        'sqlalchemy>=2.0',
         'typeguard',
         'cs.deco',
         'cs.fileutils',
@@ -55,7 +67,7 @@ DISTINFO = {
     ],
 }
 
-class SQLAState(State):
+class SQLAState(ThreadState):
   ''' Thread local state for SQLAlchemy ORM and session.
   '''
 
@@ -80,10 +92,11 @@ class SQLAState(State):
             "%s.new_session: no orm supplied and no self.orm" %
             (type(self).__name__,)
         )
-    with orm.arranged_session() as session:
+    with orm.orchestrated_session() as session:
       with session.begin_nested():
         with self(orm=orm, session=session):
           yield session
+    session.close()
 
   @contextmanager
   def auto_session(self, *, orm=None):
@@ -95,6 +108,7 @@ class SQLAState(State):
       # new session required
       with self.new_session(orm=orm) as session:
         yield session
+      session.close()
     else:
       with session.begin_nested():
         yield session
@@ -246,7 +260,7 @@ class ORM(MultiOpenMixin, ABC):
   def __init__(self, db_url, serial_sessions=None):
     ''' Initialise the ORM.
 
-        If `serial_sessions` is true (default `False`)
+        If `serial_sessions` is true (default `True` for SQLite, `False` otherwise)
         then allocate a lock to serialise session allocation.
         This might be chosen with SQL backends which do not support
         concurrent sessions such as SQLite.
@@ -285,7 +299,6 @@ class ORM(MultiOpenMixin, ABC):
             is_sqlite,
         )
     self.serial_sessions = serial_sessions or is_sqlite
-    self._lockfilepath = None
     self.Base = declarative_base()
     self.sqla_state = SQLAState(
         orm=self, engine=None, sessionmaker=None, session=None
@@ -297,7 +310,7 @@ class ORM(MultiOpenMixin, ABC):
       self._sessionmaker_raw = None
     self.db_url = db_url
     self.engine_keywords = dict(
-        case_sensitive=True,
+        ##case_sensitive=True,
         echo='SQL' in map(str.upper,
                           os.environ.get('DEBUG', '').split(',')),
     )
@@ -341,14 +354,13 @@ class ORM(MultiOpenMixin, ABC):
         If you actually expect this to be common
         you should try to keep the `ORM` "open" as briefly as possible.
         The lock file is only operated if `self.db_fspath`,
-        current set only for filesystem SQLite database URLs.
+        currently set only for filesystem SQLite database URLs.
     '''
     if self.db_fspath:
-      self._lockfilepath = makelockfile(self.db_fspath, poll_interval=0.2)
-    yield
-    if self._lockfilepath is not None:
-      pfx_call(os.remove, self._lockfilepath)
-      self._lockfilepath = None
+      with lockfile(self.db_fspath, poll_interval=0.2):
+        yield
+    else:
+      yield
 
   @property
   def engine(self):
@@ -382,8 +394,9 @@ class ORM(MultiOpenMixin, ABC):
 
   @contextmanager
   @pfx_method(use_str=True)
-  def arranged_session(self):
-    ''' Arrange a new session for this `Thread`.
+  def orchestrated_session(self):
+    ''' Orchestrate a new session for this `Thread`,
+        honouring `self.serial_session`.
     '''
     orm_state = self.sqla_state
     with self:
@@ -401,10 +414,12 @@ class ORM(MultiOpenMixin, ABC):
           new_session = self._sessionmaker()
           with new_session.begin_nested():
             yield new_session
+          new_session.close()
       else:
         new_session = self._sessionmaker()
         with new_session.begin_nested():
           yield new_session
+        new_session.close()
 
   @property
   def default_session(self):

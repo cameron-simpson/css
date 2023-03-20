@@ -46,6 +46,7 @@ umask 077
 set -x
 exec mpv \
   "--watch-later-directory=$MPV_WATCH_LATER_DIR" \
+  "--ignore-path-in-watch-later-config" \
   "--screenshot-directory=$sssubdir" \
   "--screenshot-format=png" \
   "--screenshot-template=%F--%P" \

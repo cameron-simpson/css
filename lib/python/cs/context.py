@@ -14,7 +14,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20230125-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -240,6 +240,28 @@ def stackkeys(d, **key_values):
     yield old_values
   finally:
     popkeys(d, key_values.keys(), old_values)
+
+@contextmanager
+def stackset(s, element, lock=None):
+  ''' Context manager to add `element` to the set `s` and remove it on return.
+      The element is neither added nor removed if it is already present.
+  '''
+  if element in s:
+    yield
+  else:
+    if lock:
+      with lock:
+        s.add(element)
+    else:
+      s.add(element)
+    try:
+      yield
+    finally:
+      if lock:
+        with lock:
+          s.remove(element)
+      else:
+        s.remove(element)
 
 def twostep(cmgr):
   ''' Return a generator which operates the context manager `cmgr`.

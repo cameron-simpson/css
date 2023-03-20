@@ -75,12 +75,13 @@ from types import SimpleNamespace
 from typing import List, Union
 
 from cs.buffer import CornuCopyBuffer
+from cs.deco import OBSOLETE, promote, strable
 from cs.gimmicks import warning, debug
-from cs.lex import cropped, cropped_repr, typed_str as s
+from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
-__version__ = '20221206-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -91,6 +92,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.buffer',
+        'cs.deco',
         'cs.gimmicks',
         'cs.lex',
         'cs.pfx',
@@ -184,6 +186,7 @@ def pt_spec(pt, name=None):
     f_transcribe_value = pt.transcribe_value
   except AttributeError:
     if isinstance(pt, int):
+      # pylint: disable=unnecessary-lambda-assignment
       f_parse_value = lambda bfr: bfr.take(pt)
       f_transcribe_value = lambda value: value
     else:
@@ -327,16 +330,27 @@ class BinaryMixin:
   __len__ = transcribed_length
 
   @classmethod
-  def scan(cls, bfr, count=None, min_count=None, max_count=None):
+  @promote
+  def scan(
+      cls,
+      bfr: CornuCopyBuffer,
+      count=None,
+      *,
+      min_count=None,
+      max_count=None,
+      with_offsets=False,
+  ):
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
         until end of input and yield them.
 
         Parameters:
-        * `bfr`: the buffer to scan
+        * `bfr`: the buffer to scan, or any object suitable for `CornuCopyBuffer.promote`
         * `count`: the required number of instances to scan,
           equivalent to setting `min_count=count` and `max_count=count`
         * `min_count`: the minimum number of instances to scan
         * `max_count`: the maximum number of instances to scan
+        * `with_offsets`: optional flag, default `False`;
+          if true yield `(pre_offset,obj,post_offset)`, otherwise just `obj`
         It is in error to specify both `count` and one of `min_count` or `max_count`.
 
         Scanning stops after `max_count` instances (if specified).
@@ -380,7 +394,12 @@ class BinaryMixin:
         min_count = max_count = count
       scanned = 0
       while (max_count is None or scanned < max_count) and not bfr.at_eof():
-        yield cls.parse(bfr)
+        pre_offset = bfr.offset
+        obj = cls.parse(bfr)
+        if with_offsets:
+          yield pre_offset, obj, bfr.offset
+        else:
+          yield obj
         scanned += 1
       if min_count is not None and scanned < min_count:
         warning(
@@ -389,24 +408,31 @@ class BinaryMixin:
         )
 
   @classmethod
+  @OBSOLETE(suggestion="BinaryMixin.scan")
   def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
     ''' Wrapper for `scan()` which yields `(pre_offset,instance,post_offset)`
         indicating the start and end offsets of the yielded instances.
         All parameters are as for `scan()`.
+
+        *Deprecated; please just call `scan` with the `with_offsets=True` parameter.
     '''
-    pre_offset = bfr.offset
-    for instance in cls.scan(bfr, count=count, min_count=min_count,
-                             max_count=max_count):
-      post_offset = bfr.offset
-      yield pre_offset, instance, post_offset
-      pre_offset = post_offset
+    return cls.scan(
+        bfr,
+        count=count,
+        min_count=min_count,
+        max_count=max_count,
+        with_offsets=True
+    )
 
   @classmethod
+  @OBSOLETE(suggestion="BinaryMixin.scan")
   def scan_fspath(cls, fspath: str, *, with_offsets=False, **kw):
     ''' Open the file with filesystenm path `fspath` for read
         and yield from `self.scan(..,**kw)` or
         `self.scan_with_offsets(..,**kw)` according to the
         `with_offsets` parameter.
+
+        *Deprecated; please just call `scan` with a filesystem pathname.
 
         Parameters:
         * `fspath`: the filesystem path of the file to scan
@@ -470,22 +496,19 @@ class BinaryMixin:
   @classmethod
   def load(cls, f):
     ''' Load an instance from the file `f`
-        which may be a filename or an open file.
-        Return the instance.
+        which may be a filename or an open file as for `BinaryMixin.scan`.
+        Return the instance or `None` if the file is empty.
     '''
-    for instance in cls.scan_file(f):
+    for instance in cls.scan(f):
       return instance
     return None
 
+  @strable(open_func=lambda fspath: pfx_call(open, fspath, 'wb'))
   def save(self, f):
     ''' Save this instance to the file `f`
         which may be a filename or an open file.
         Return the length of the transcription.
     '''
-    if isinstance(f, str):
-      filename = f
-      with pfx_call(open, filename, 'wb') as f:
-        return self.save(f)
     length = 0
     for bs in self.transcribe_flat():
       while bs:
@@ -556,6 +579,7 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
     if attr_names is None:
       attr_names = sorted(self.__dict__.keys())
     if attr_choose is None:
+      # pylint: disable=unnecessary-lambda-assignment
       attr_choose = lambda attr: not attr.startswith('_')
     return "%s(%s)" % (
         type(self).__name__, ','.join(
@@ -1133,12 +1157,12 @@ class BSString(BinarySingleValue):
       bs = bs.tobytes()
     return bs.decode(encoding=encoding, errors=errors)
 
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   @staticmethod
-  def transcribe_value(s, encoding='utf-8'):
+  def transcribe_value(value: str, encoding='utf-8'):
     ''' Transcribe a string.
     '''
-    payload = s.encode(encoding)
+    payload = value.encode(encoding)
     return b''.join((BSUInt.transcribe_value(len(payload)), payload))
 
 class BSSFloat(BinarySingleValue):
