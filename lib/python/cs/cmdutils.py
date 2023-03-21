@@ -220,7 +220,10 @@ class _ClassSubCommand(_BaseSubCommand):
   '''
 
   def __call__(self, cmd, command, argv):
-    return self.method(argv, cmd=cmd, **command.options.__dict__).run()
+    mkw = dict(command.options.__dict__)
+    if cmd is not None:
+      mkw.update(cmd=cmd)
+    return self.method(argv, **mkw).run()
 
   def usage_format(self) -> str:
     ''' Return the usage format string from the class.
