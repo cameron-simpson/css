@@ -1,3 +1,4 @@
+cs.vt.debug: fold DebuggingLock into cs.debug with the other debugging locks
 replace defaults.config with Config.default(factory=True)
 replace defaults.* with Store.default() etc
 FilesDir et al to accept optional index, bypassing indexclass if supplied

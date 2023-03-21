@@ -15,7 +15,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.typingutils import subtype
 
-from cs.py.func import trace
+from cs.debug import trace
 from cs.lex import r, s
 from cs.x import X
 

@@ -214,7 +214,6 @@ class _Defaults(ThreadState):
     super().__init__()
     self.progress = common.progress
     self.fs = None
-    self.block_cache = None
     self.show_progress = False
 
   def __getattr__(self, attr):

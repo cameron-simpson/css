@@ -7,13 +7,13 @@
 ''' Thread related convenience classes and functions.
 '''
 
-from __future__ import with_statement
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from heapq import heappush, heappop
 from inspect import ismethod
 import sys
 from threading import (
+    current_thread,
     Semaphore,
     Thread as builtin_Thread,
     Lock,
@@ -96,13 +96,13 @@ State = ThreadState
 class HasThreadState(ContextManagerMixin):
   ''' A mixin for classes with a `cs.threads.ThreadState` instance as `.state`
       providing a context manager which pushes `current=self` onto that state
-      and a `default()` class method returning `cls.state.current`
+      and a `default()` class method returning `cls.perthread_state.current`
       as the default instance of that class.
 
-      *NOTE*: the documentation here refers to `cls.state`, but in
+      *NOTE*: the documentation here refers to `cls.perthread_state`, but in
       fact we honour the `cls.THREAD_STATE_ATTR` attribute to name
       the state attribute which allows perclass state attributes,
-      and also use with classes which already use `.state` for
+      and also use with classes which already use `.perthread_state` for
       another purpose.
   '''
 
@@ -114,13 +114,13 @@ class HasThreadState(ContextManagerMixin):
 
   @classmethod
   def default(cls, factory=None, raise_on_None=False):
-    ''' The default instance of this class from `cls.state.current`.
+    ''' The default instance of this class from `cls.perthread_state.current`.
 
         Parameters:
         * `factory`: optional callable to create an instance of `cls`
-          if `cls.state.current` is `None` or missing;
+          if `cls.perthread_state.current` is `None` or missing;
           if `factory` is `True` then `cls` is used as the factory
-        * `raise_on_None`: if `cls.state.current` is `None` or missing
+        * `raise_on_None`: if `cls.perthread_state.current` is `None` or missing
           and `factory` is false and `raise_on_None` is true,
           raise a `RuntimeError`;
           this is primarily a debugging aid
@@ -139,13 +139,15 @@ class HasThreadState(ContextManagerMixin):
     return current
 
   def __enter_exit__(self):
-    ''' Push `self.state.current=self` as the `Thread` local current instance.
+    ''' Push `self.perthread_state.current=self` as the `Thread` local current instance.
 
         Include `self.__class__` in the set of currently active classes for the duration.
     '''
     cls = self.__class__
     with cls._HasThreadState_lock:
-      stacked = stackset(cls._HasThreadState_classes, cls)
+      stacked = stackset(
+          cls._HasThreadState_classes, cls, cls._HasThreadState_lock
+      )
     with stacked:
       state = getattr(cls, cls.THREAD_STATE_ATTR)
       with state(current=self):
@@ -274,6 +276,23 @@ def bg(
   if not no_start:
     T.start()
   return T
+
+def joinif(T: builtin_Thread):
+  ''' Call `T.join()` if `T` is not the current `Thread`.
+
+      Unlike `threading.Thread.join`, this function is a no-op if
+      `T` is the current `Thread.
+
+      The use case is situations such as the shutdown phase of the
+      `MultiOpenMixin.startup_shutdown` context manager. Because
+      the "initial open" startup phase is not necessarily run in
+      the same thread as the "final close" shutdown phase, it is
+      possible for example for a worker `Thread` to execute the
+      shutdown phase and try to join itself. Using this function
+      allows that scenario.
+  '''
+  if T is not current_thread():
+    T.join()
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
@@ -615,8 +634,8 @@ class PriorityLock(object):
 def monitor(cls, attrs=None, initial_timeout=10.0, lockattr='_lock'):
   ''' Turn a class into a monitor, all of whose public methods are `@locked`.
 
-      This is a simple approach requires class instances to have a `._lock`
-      which is an `RLock` or compatible
+      This is a simple approach which requires class instances to have a
+      `._lock` which is an `RLock` or compatible
       because methods may naively call each other.
 
       Parameters:

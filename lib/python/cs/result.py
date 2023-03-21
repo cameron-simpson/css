@@ -386,7 +386,7 @@ class Result(FSM):
     '''
     self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._get_lock.release()
-    return self.result, self.exc_info
+    return self._result, self._exc_info
 
   def get(self, default=None):
     ''' Wait for readiness; return the result if `self.exc_info` is `None`,

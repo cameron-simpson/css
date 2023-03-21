@@ -1183,7 +1183,7 @@ class BaseCommand:
             upd=upd,
         ):
           with upd:
-            with options.runstate:
+            with runstate:
               with runstate.catch_signal(options.runstate_signals,
                                          call_previous=False,
                                          handle_signal=handle_signal):

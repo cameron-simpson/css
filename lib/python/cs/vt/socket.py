@@ -28,7 +28,7 @@ from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
 from cs.threads import bg as bg_thread
 
-from . import defaults
+from . import Store
 from .stream import StreamStore
 
 class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
