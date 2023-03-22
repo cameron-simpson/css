@@ -24,7 +24,7 @@ from cs.resources import RunState, RunStateMixin, uses_runstate
 from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
-from cs.typeutils import subtype
+from cs.typingutils import subtype
 
 __version__ = '20230217-post'
 
