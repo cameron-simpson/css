@@ -27,6 +27,7 @@
     without tedious manual `cd`ing.
 '''
 
+from dataclasses import dataclass, field
 from getopt import GetoptError
 import logging
 from os.path import splitext
@@ -37,6 +38,7 @@ from youtube_dl.utils import DownloadError
 from cs.cmdutils import BaseCommand
 from cs.excutils import logexc
 from cs.fstags import FSTags
+import cs.logutils
 from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
@@ -102,11 +104,12 @@ class YDLCommand(BaseCommand):
       'DEFAULT_PARALLEL': DEFAULT_PARALLEL,
   }
 
-  def apply_defaults(self):
-    ''' Initial defaults options.
-    '''
-    self.options.parallel = DEFAULT_PARALLEL
-    self.options.ydl_opts = dict(logger=self.loginfo.logger)
+  @dataclass
+  class Options(BaseCommand.Options):
+    parallel: int = DEFAULT_PARALLEL
+    ydl_opts: dict = field(
+        default_factory=lambda: dict(logger=cs.logutils.loginfo.logger)
+    )
 
   def apply_opts(self, opts):
     ''' Command line main switches.

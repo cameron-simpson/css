@@ -44,7 +44,7 @@ from .hash import (
     HashCodeField,
 )
 from .pushpull import missing_hashcodes_by_checksum
-from .store import StoreError, BasicStoreSync
+from .store import StoreError, StoreSyncBase
 from .transcribe import parse
 
 class RqType(IntEnum):
@@ -61,7 +61,7 @@ class RqType(IntEnum):
   ARCHIVE_LIST = 8  # (count,archive_name) -> (when,E)...
   LENGTH = 9  # () -> remote-store-length
 
-class StreamStore(BasicStoreSync):
+class StreamStore(StoreSyncBase):
   ''' A Store connected to a remote Store via a `PacketConnection`.
       Optionally accept a local store to facilitate bidirectional activities
       or simply to implement the server side.
@@ -109,7 +109,7 @@ class StreamStore(BasicStoreSync):
           if false a `.add()` will queue the add packet and return
           the hashcode immediately
 
-        Other keyword arguments are passed to `BasicStoreSync.__init__`.
+        Other keyword arguments are passed to `StoreSyncBase.__init__`.
     '''
     if capacity is None:
       capacity = 1024

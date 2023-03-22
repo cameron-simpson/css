@@ -77,7 +77,7 @@ def main(argv=None, *, upd: Upd):
     else:
       # new dirpath - note its mtime, queue it for a revisit
       # queue its subdirectories
-      # stat its files
+      # stat its files and bump the mtime for the directory
       dirpath_maxmtimes[dirpath] = S.st_mtime
       dirpaths.append(dirpath)
       for entry in pfx_call(os.scandir, dirpath):

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Transcribe objects as text.
 #   - Cameron Simpson <cs@cskk.id.au> 14jan2018

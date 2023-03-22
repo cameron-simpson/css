@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Operations on pathnames using a vt store.
 #       - Cameron Simpson <cs@cskk.id.au> 07may2013

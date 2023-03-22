@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python3 -tt
 #
 # - Cameron Simpson <cs@cskk.id.au>
 #

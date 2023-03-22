@@ -36,6 +36,7 @@ from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta, tzinfo
 from fnmatch import fnmatch
 from functools import partial
@@ -91,7 +92,7 @@ from cs.csvutils import csv_import
 from cs.deco import cachedmethod, decorator, promote, Promotable
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
-from cs.fstags import FSTags
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning
 from cs.mappings import column_name_to_identifier
@@ -99,7 +100,7 @@ from cs.mplutils import axes, remove_decorations, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
@@ -440,13 +441,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
             "fields:%r should not be suppplied for a %s" % (argv, s(ts))
         )
       ax = ts.plot(
-          start,
-          stop,
-          ax=ax,
-          runstate=runstate,
-          tz=tz,
-          figsize=(plot_dx, plot_dy),
-          **plot_kw
+          start, stop, ax=ax, tz=tz, figsize=(plot_dx, plot_dy), **plot_kw
       )  # pylint: disable=missing-kwoa
     elif isinstance(ts, TimeSeriesMapping):
       # multiple timeseries each with their own key
@@ -469,7 +464,6 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           start,
           stop,
           keys,
-          runstate=runstate,
           tz=tz,
           ax=ax,
           **plot_kw,
@@ -512,9 +506,10 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       'iso8601': lambda d: pfx_call(arrow.get, d, tzinfo='local').timestamp(),
   }
 
-  def apply_defaults(self):
-    self.options.ts_step = None  # the time series step
-    self.options.ts = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    ts_step: Optional[float] = None  # the time series step
+    ts: Optional["TimeSeries"] = None
 
   def apply_opt(self, opt, val):
     if opt == '-s':
@@ -1009,7 +1004,7 @@ def plot_events(
 class PlotSeries(namedtuple('PlotSeries', 'label series extra'), Promotable):
   ''' Information about a series to be plotted:
       - `label`: the label for this series
-      - `series`: an series
+      - `series`: a `Series`
       - `extra`: a `dict` of extra information such as plot styling
   '''
 
@@ -1219,9 +1214,7 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin, Promotable):
 
   @classmethod
   def promote(cls, epochy):
-    ''' Promote `epochy` to an `Epoch` (except for `None`).
-
-        `None` remains `None`.
+    ''' Promote `epochy` to an `Epoch`.
 
         An `Epoch` remains unchanged.
 
@@ -1459,7 +1452,6 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
       figure=None,
       ax=None,
       label=None,
-      runstate=None,  # pylint: disable=unused-argument
       utcoffset,
       **plot_kw,
   ) -> Axes:
@@ -1469,7 +1461,6 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
         Parameters:
         * `start`,`stop`: the time range
         * `label`: optional label for the graph
-        * `runstate`: optional `RunState`, ignored in this implementation
         * `utcoffset`: optional timestamp skew from UTC in seconds
         * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
@@ -1654,6 +1645,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -1663,7 +1655,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       *,
       epoch: Optional[Epoch] = None,
       fill=None,
-      fstags=None,
+      fstags: FSTags,
   ):
     ''' Prepare a new time series stored in the file at `fspath`
         containing machine native data for the time series values.
@@ -1684,11 +1676,9 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           and `float('nan')` for `'d'`
     '''
     HasFSPath.__init__(self, fspath)
-    if fstags is None:
-      fstags = FSTags()
     self.fstags = fstags
     try:
-      header, = TimeSeriesFileHeader.scan_fspath(self.fspath, max_count=1)
+      header, = TimeSeriesFileHeader.scan(self.fspath, max_count=1)
     except FileNotFoundError:
       # a missing file is ok, other exceptions are not
       ok = True
@@ -2257,9 +2247,8 @@ class TimespanPolicy(DBC, HasEpochMixin, Promotable):
   def from_name(
       cls, policy_name: str, epoch: Optional[Epoch] = None, **policy_kw
   ):
-    ''' Factory method to return a new `TimespanPolicy` instance
-        from the policy name,
-        which indexes `TimespanPolicy.FACTORIES`.
+    ''' Factory method to return a new `cls` instance from the policy name,
+        which indexes `cls.FACTORIES`.
     '''
     if cls is not TimespanPolicy:
       raise TypeError(
@@ -2291,7 +2280,7 @@ class TimespanPolicy(DBC, HasEpochMixin, Promotable):
       if epoch is None:
         raise ValueError("epoch may not be None if promotion is required")
       if isinstance(policy, str):
-        policy = TimespanPolicy.from_name(policy, epoch=epoch, **policy_kw)
+        policy = cls.from_name(policy, epoch=epoch, **policy_kw)
       elif isinstance(policy, type) and issubclass(policy, TimespanPolicy):
         policy = policy(epoch=epoch, **policy_kw)
       else:
@@ -2691,6 +2680,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     return 'd'
 
   @pfx
+  @uses_runstate
   @typechecked
   def as_pd_dataframe(
       self,
@@ -2699,7 +2689,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       df_data: Optional[Iterable[Union[str, Tuple[str, Any]]]] = None,
       *,
       key_map=None,
-      runstate=None,
+      runstate: RunState,
       utcoffset=None,
   ):
     ''' Return a `numpy.DataFrame` containing the specified data.
@@ -2736,7 +2726,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
       for data in progressbar(df_data, "gather fields"):
-        if runstate and runstate.cancelled:
+        if runstate.cancelled:
           raise CancellationError
         pfx_context = (
             data
@@ -2753,7 +2743,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
             key, series = data
           data_key = key_map.get(key, key)
           data_dict[data_key] = series
-    if runstate and runstate.cancelled:
+    if runstate.cancelled:
       raise CancellationError
     return pfx_call(
         pd.DataFrame,
@@ -2793,6 +2783,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     df.to_csv(f, **to_csv_kw)
 
   @timerange
+  @uses_runstate
   @typechecked
   def plot(
       self,
@@ -2803,7 +2794,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       figure=None,
       ax=None,
       label=None,
-      runstate=None,
+      runstate: RunState,
       utcoffset,
       stacked=False,
       kind=None,
@@ -2819,7 +2810,6 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         * `plot_data`: optional iterable of plot data,
           default `sorted(self.keys())`
         * `label`: optional label for the graph
-        * `runstate`: optional `RunState` to allow interruption
         * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
 
@@ -2840,7 +2830,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         runstate=runstate,
         utcoffset=utcoffset,
     )
-    if runstate and runstate.cancelled:
+    if runstate.cancelled:
       raise CancellationError
     return df.plot(ax=ax, kind=kind, stacked=stacked, **plot_kw)
 
@@ -2929,6 +2919,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -2938,12 +2929,10 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       epoch: Optional[Epoch] = None,
       policy=None,  # :TimespanPolicy
       tz: Optional[str] = None,
-      fstags: Optional[FSTags] = None,
+      fstags: FSTags,
   ):
     HasConfigIni.__init__(self, self.CONFIG_SECTION_NAME)
     HasFSPath.__init__(self, fspath)
-    if fstags is None:
-      fstags = FSTags()
     self.fstags = fstags
     config = self.config
     if not isdirpath(fspath):
@@ -3113,6 +3102,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       which dictates which partition holds the datum for a UNIX time.
   '''
 
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -3122,7 +3112,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       *,
       epoch: Optional[Epoch] = None,
       policy,  # :TimespanPolicy,
-      fstags: Optional[FSTags] = None,
+      fstags: FSTags,
   ):
     ''' Initialise the `TimeSeriesPartitioned` instance.
 
@@ -3154,8 +3144,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     policy = TimespanPolicy.promote(policy, epoch)
     HasFSPath.__init__(self, dirpath)
-    if fstags is None:
-      fstags = FSTags()
     if typecode is None:
       typecode = TypeCode(self.tags.typecode)
     policy = TimespanPolicy.promote(policy, epoch=epoch)
@@ -3168,7 +3156,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def __str__(self):
     return "%s(%s,%r,%s,%s)" % (
         type(self).__name__,
-        shortpath(self.fspath),
+        getattr(self, 'shortpath', 'NO_FSPATH'),
         getattr(self, 'typecode', 'NO_TYPECODE_YET'),
         getattr(self, 'epoch', 'NO_EPOCH_YET'),
         getattr(self, 'policy', 'NO_POLICY_YET'),
@@ -3415,7 +3403,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       figure=None,
       ax=None,
       label=None,
-      runstate=None,
       **plot_kw,
   ) -> Axes:
     ''' Convenience shim for `DataFrame.plot` to plot data from
@@ -3432,13 +3419,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     if label is None:
       label = self.tags.get('csv.header')
     return super().plot(
-        start,
-        stop,
-        figure=figure,
-        ax=ax,
-        label=label,
-        runstate=runstate,
-        **plot_kw
+        start, stop, figure=figure, ax=ax, label=label, **plot_kw
     )
 
 @promote

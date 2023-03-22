@@ -24,7 +24,7 @@ class MykeCommand(BaseCommand):
 
   GETOPT_SPEC = 'dD:eEf:ij:kmNnpqrRsS:tuvx'
   USAGE_FORMAT = "Usage: {cmd} [options...] [macro=value...] [targets...]"
-  OPTIONS_CLASS = Maker
+  Options = Maker
 
   # pylint: disable=too-many-branches
   def apply_opt(self, opt, val):

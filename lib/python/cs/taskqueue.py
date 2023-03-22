@@ -8,7 +8,7 @@ from itertools import chain
 import sys
 from threading import RLock
 import time
-from typing import Callable, TypeVar, Union
+from typing import Callable, Union
 
 from icontract import require
 from typeguard import typechecked
@@ -23,7 +23,8 @@ from cs.queues import ListQueue
 from cs.resources import RunState, RunStateMixin, uses_runstate
 from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
-from cs.threads import bg as bg_thread, locked, State as ThreadState, HasThreadState
+from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
+from cs.typeutils import subtype
 
 __version__ = '20230217-post'
 
@@ -174,7 +175,7 @@ class BaseTask(FSM, RunStateMixin):
     '''
     return f'{self.name}\n{self.fsm_state}'
 
-BaseTaskSubType = TypeVar('BaseTaskSubType', bound=BaseTask)
+BaseTaskSubType = subtype(BaseTask)
 
 # pylint: disable=too-many-instance-attributes
 class Task(BaseTask, HasThreadState):
@@ -275,8 +276,6 @@ class Task(BaseTask, HasThreadState):
   }
 
   _seq = Seq()
-
-  THREAD_STATE_ATTR = 'perthread_state'
 
   perthread_state = ThreadState(initial_state=FSM_DEFAULT_STATE)
 
@@ -558,7 +557,7 @@ class Task(BaseTask, HasThreadState):
     '''
     self.result.join()
 
-TaskSubType = TypeVar('TaskSubType', bound=Task)
+TaskSubType = subtype(Task)
 
 # pylint: disable=too-many-branches
 def make(*tasks, fail_fast=False, queue=None):
