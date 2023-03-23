@@ -759,7 +759,10 @@ class RunState(HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
-uses_runstate = default_params(runstate=RunState)
+# use the prevailing RunState or make a fresh one
+uses_runstate = default_params(
+    runstate=lambda: RunState.default() or RunState()
+)
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
