@@ -5,6 +5,8 @@
 
 from typing import TypeVar
 
+__version__ = '20230331'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
