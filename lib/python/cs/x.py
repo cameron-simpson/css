@@ -49,7 +49,7 @@ import sys
 from cs.ansi_colour import colourise
 from cs.gimmicks import open_append
 
-__version__ = '20230331'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
