@@ -14,6 +14,8 @@ from threading import Condition, Lock, RLock, current_thread, main_thread
 import time
 from typing import Any, Tuple
 
+from typeguard import typechecked
+
 from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
 from cs.deco import default_params
 from cs.gimmicks import error, warning, nullcontext
@@ -757,7 +759,10 @@ class RunState(HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
-uses_runstate = default_params(runstate=RunState)
+# use the prevailing RunState or make a fresh one
+uses_runstate = default_params(
+    runstate=lambda: RunState.default() or RunState()
+)
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
@@ -765,7 +770,7 @@ class RunStateMixin(object):
       Provides: `.runstate`, `.cancelled`, `.running`, `.stopping`, `.stopped`.
   '''
 
-  @uses_runstate
+  @typechecked
   def __init__(self, runstate: RunState):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
