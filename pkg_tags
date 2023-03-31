@@ -83,7 +83,7 @@ cs.queues pypi.release="20221228" ok_revision="97fbf6f3143f6a584dce58d67eb769139
 cs.range pypi.release=20190102 ok_revision="71250a2041fc87831ffcbbddeaa20316d64d3a5f"
 cs.release
 cs.resources pypi.release="20230217" ok_revision="56882b9e35dbea59827901195111889ae9d76324" features={"20220429":["catch_signal"],"20220918":["openif"]}
-cs.result pypi.release="20230212" ok_revision=ed748fd9422b1fe93428cc3a27dc7bf90c52d795 features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"]}
+cs.result pypi.release="20230212" ok_revision=cbe8b33c19196929af7d229a5209e95e4174c3cb features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"]}
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e75882d2 featu
