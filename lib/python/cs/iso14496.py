@@ -137,8 +137,7 @@ class MP4Command(BaseCommand):
                 xit = 1
     return xit
 
-  @staticmethod
-  def cmd_deref(argv):
+  def cmd_deref(self, argv):
     ''' Dereference a Box specification against ISO14496 files.
     '''
     spec = argv.pop(0)
@@ -154,8 +153,7 @@ class MP4Command(BaseCommand):
           B = deref_box(over_box, path)
           print(path, "offset=%d" % B.offset, B)
 
-  @staticmethod
-  def cmd_extract(argv):
+  def cmd_extract(self, argv):
     ''' Usage: {cmd} extract [-H] filename boxref output
           Extract the referenced Box from the specified filename into output.
           -H  Skip the Box header.
@@ -208,8 +206,7 @@ class MP4Command(BaseCommand):
             need -= len(chunk)
       os.close(fd)
 
-  @staticmethod
-  def cmd_info(argv):
+  def cmd_info(self, argv):
     ''' Usage: {cmd} info [{{-|filename}}]...]
           Print informative report about each source.
     '''
@@ -234,8 +231,7 @@ class MP4Command(BaseCommand):
                 else:
                   print('   ', tag, repr(tag.value))
 
-  @staticmethod
-  def cmd_parse(argv):
+  def cmd_parse(self, argv):
     ''' Usage: {cmd} [parse [{{-|filename}}]...]
           Parse the named files (or stdin for "-").
     '''
