@@ -2736,7 +2736,7 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
   fp.write('\n')
   boxes = getattr(B, 'boxes', None)
   body = getattr(B, 'body', None)
-  if body:
+  if body is not None:
     for field_name in sorted(filter(lambda name: not name.startswith('_'),
                                     body.__dict__.keys())):
       if field_name == 'boxes':
