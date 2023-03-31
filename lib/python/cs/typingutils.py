@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 
-''' Hacks for use with typing.
+''' Trite hacks for use with typing.
 '''
 
 from typing import TypeVar
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [],
+}
 
 def subtype(t, name=None):
   ''' Construct a `TypeVar` for subtypes of the type `t`.
@@ -14,5 +23,5 @@ def subtype(t, name=None):
         default `t.__name__ + 'SubType'`
   '''
   if name is None:
-      name = t.__name__ + 'SubType'
+    name = t.__name__ + 'SubType'
   return TypeVar(name, bound=t)
