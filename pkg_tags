@@ -74,7 +74,7 @@ cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550c
 cs.progress pypi.release="20230212" ok_revision=eea75bde3232cb2dc043fc59788196997f5207bb features={"20210803":["progress_runstate"],"20230212":["update_period"]}
 cs.psutils pypi.release="20221228" ok_revision="93ebe336b3667941be456a66bc839fdf647d8a92" features={"20220429":["signal_handler"],"20220531":["print_argv"]}
 cs.py.doc pypi.release="20220311" ok_revision="5f879c6cede60f3878cfe95e303a529b273f306f"
-cs.py.func pypi.release="20230210" ok_revision=a39f0a67f78cfebdcf8e25b9f5251530db41fad6 features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
+cs.py.func pypi.release="20230210" ok_revision="20ff01187c10d3b05188f4ee21bb3a7e9a4348b6" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
 cs.py.modules pypi.release="20220606" ok_revision=fd5fb79b631471b12933a424fcf8dba48d990a90 features={"20220606":["import_extra"]}
 cs.py.stack pypi.release="20220918" ok_revision=e6f8eeb64d1b0179955564df7164e2502130adb5
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"
