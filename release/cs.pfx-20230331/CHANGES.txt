@@ -1,0 +1,3 @@
+lib/python/cs/pfx.py: cs.pfx: PfxThread: use HasThreadState.Thread, make target mandatory
+lib/python/cs/pfx.py: cs.pfx: lint
+lib/python/cs/pfx.py: cs.pfx: autoformat
