@@ -99,7 +99,7 @@ cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"2
 cs.threads ok_revision="1a7c0a36acf500424b8925d2ca49f3ff24b84841" pypi.release="20230212" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"]}
 cs.timeseries ok_revision=cd00aff2217b6f85c07f1eb19116933a77ec01e8 pypi.release="20230217"
 cs.tty
-cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]}
+cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
 cs.units
 cs.upd ok_revision="79e6360644ba4ae2af0b1a7091749ccf2e6e086b" pypi.release="20230217" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"]}
 cs.x ok_revision=ea9636194c0a7f6de0eab9aa10aa47fd67a1f9d1 pypi.release="20230218"
