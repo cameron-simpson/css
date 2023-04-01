@@ -1,3 +1,9 @@
+cs.distinfo: cs-release seems to ignore SIGINT at least during a "rel"
+cs.debug: Lock and RLock to be the same class with a different underlying lock class
+default_params: supply modified sugnature for wrapper function indicating the param is optional
+Pfx: reimplement as a linked list, use HasThreadState
+CornuCopyBuffer: improve docstring - replace references to .buf etc
+cs.cmdutils:BaseCommand - help should include the top level usage as well, currently omitted
 frename needs to be a mode of fstags to move the tags
 "Because" class containing a bool and an explaintion, start using in the SvcD test function and elsewhere
 @promote: make @strable wrap this, using params=[0],promote[0]=open

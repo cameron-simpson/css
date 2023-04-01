@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Blockify tests.
 #       - Cameron Simpson <cs@cskk.id.au>
@@ -12,13 +12,14 @@ import os
 import os.path
 import sys
 import unittest
+
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import read_from
 from cs.randutils import randomish_chunks
+
 from .blockify import (
     blockify,
     blocked_chunks_of,
-    blocked_chunks_of2,
     DEFAULT_SCAN_SIZE,
 )
 from .parsers import scan_text, scan_mp3, scan_mp4
@@ -43,7 +44,7 @@ def scanner_testfile(parser):
     return None
   return os.environ.get(envvar, default_filename)
 
-class BlockifyTestMixin:
+class TestBlockedChunksOf(unittest.TestCase):
   ''' All the unit tests.
   '''
 
@@ -97,14 +98,14 @@ class BlockifyTestMixin:
           self._test_blocked_chunks_of(parser, testfilename, input_chunks)
 
   def _test_blocked_chunks_of(self, parser, input_desc, input_chunks):
-    with self.subTest(self.BLOCKED.__name__, parser=parser, source=input_desc):
+    with self.subTest(parser=parser, source=input_desc):
       source_chunks = list(input_chunks)
       src_total = sum(map(len, source_chunks))
       chunk_total = 0
       nchunks = 0
       all_chunks = []
       offset = 0
-      for chunk in self.BLOCKED(source_chunks, scanner=parser):
+      for chunk in blocked_chunks_of(source_chunks, scanner=parser):
         nchunks += 1
         chunk_total += len(chunk)
         all_chunks.append(chunk)
@@ -138,26 +139,6 @@ class BlockifyTestMixin:
           data, data2,
           "data mismatch: data and data2 same length but contents differ"
       )
-
-class TestBlockedChunksOf(unittest.TestCase, BlockifyTestMixin):
-  ''' Run the tests against blocked_chunks_of.
-  '''
-
-  @staticmethod
-  def BLOCKED(*a, **kw):
-    ''' Call `blocked_chunks_of` for this subclass.
-    '''
-    return blocked_chunks_of(*a, **kw)
-
-class TestBlockedChunksOf2(unittest.TestCase, BlockifyTestMixin):
-  ''' Run the tests against blocked_chunks_of2.
-  '''
-
-  @staticmethod
-  def BLOCKED(*a, **kw):
-    ''' Call `blocked_chunks_of2` for this subclass.
-    '''
-    return blocked_chunks_of2(*a, **kw)
 
 def selftest(argv):
   ''' Run the unit tests.

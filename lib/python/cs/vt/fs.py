@@ -14,15 +14,17 @@ from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O
 import shlex
 from types import SimpleNamespace as NS
 from uuid import UUID
+
 from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import exception, error, warning, info, debug
 from cs.pfx import Pfx
 from cs.range import Range
-from cs.threads import locked
+from cs.threads import locked, HasThreadState, State as ThreadState
 from cs.x import X
-from . import defaults, Lock, RLock
+
+from . import Lock, RLock, uses_Store
 from .block import isBlock
 from .cache import BlockCache
 from .dir import _Dirent, Dir, FileDirent
@@ -117,10 +119,10 @@ class FileHandle:
     '''
     return self.fs.bg(func, *a, **kw)
 
-  def close(self):
+  @uses_Store
+  def close(self, *, S):
     ''' Close the file, mark its parent directory as changed.
     '''
-    S = defaults.S
     R = self.E.flush()
     self.E.parent.changed = True
     S.open()
@@ -355,7 +357,7 @@ class Inodes:
       return False
     return True
 
-class FileSystem:
+class FileSystem(HasThreadState):
   ''' The core filesystem functionality supporting FUSE operations
       and in principle other filesystem-like access.
 
@@ -368,11 +370,14 @@ class FileSystem:
       or the like.
   '''
 
+  perthread_state = ThreadState()
+
+  @uses_Store
   def __init__(
       self,
       E,
       *,
-      S=None,
+      S,
       archive=None,
       subpath=None,
       readonly=None,
@@ -395,10 +400,8 @@ class FileSystem:
     '''
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
-    if S is None:
-      S = defaults.S
     self._old_S_block_cache = S.block_cache
-    self.block_cache = S.block_cache or defaults.block_cache or BlockCache()
+    self.block_cache = S.block_cache or BlockCache.default() or BlockCache()
     S.block_cache = self.block_cache
     S.open()
     if readonly is None:
@@ -492,8 +495,8 @@ class FileSystem:
   @logexc
   def _sync(self):
     with Pfx("_sync"):
-      if defaults.S is None:
-        raise RuntimeError("RUNTIME: defaults.S is None!")
+      if Store.defaults() is None:
+        raise RuntimeError("RUNTIME: Store.defaults() is None!")
       archive = self.archive
       if not self.readonly and archive is not None:
         with self._lock:

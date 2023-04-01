@@ -6,6 +6,7 @@
 
 import builtins
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from getopt import GetoptError
 import os
 from os.path import (
@@ -50,17 +51,17 @@ class PlexCommand(BaseCommand):
 
   GETOPT_SPEC = ''
 
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    self.options.fstags = FSTags()
+  @dataclass
+  class Options(BaseCommand.Options):
+    fstags: FSTags = field(default_factory=FSTags)
 
   @contextmanager
   def run_context(self):
     ''' Use the FSTags context.
     '''
-    with self.options.fstags:
-      yield
+    with super().run_context():
+      with self.options.fstags:
+        yield
 
   def cmd_linktree(self, argv):
     ''' Usage: {cmd} srctrees... dsttree

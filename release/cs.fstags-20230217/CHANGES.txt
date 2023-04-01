@@ -1,0 +1,4 @@
+lib/python/cs/fstags.py: cs.fstags: clean up the cs.upd usage
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_rename: use -o for the format string as for other commands, -n is for "no action"
+lib/python/cs/fstags.py: cs.fstags: simplify test
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_rename: define variable

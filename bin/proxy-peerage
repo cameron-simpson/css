@@ -363,6 +363,10 @@ class Pattern(_Pattern):
         if style == 'proxy.pac': return 'shExpMatch(hosts, %r)' % (pattern,)
         if style == 'squid_acl': return 'dstdomain -n %s' % (pattern[1:],)
         raise ValueError('unsupported .domain pattern')
+      # http://...
+      if pattern.startswith('http://'):
+        if style == 'squid_acl': return 'url_regex -i ^%s' % (pattern,)
+        raise ValueError('unsupported http:// pattern')
       # hostname or fqdn
       if pattern[0].isalpha():
         if style == 'haproxy_acl':

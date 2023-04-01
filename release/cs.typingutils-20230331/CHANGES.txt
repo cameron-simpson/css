@@ -1,0 +1,2 @@
+lib/python/cs/typingutils.py: cs.typingutils: hacks for typing, initially just subtype()
+lib/python/cs/typingutils.py: cs.typingutils: DISTINFO

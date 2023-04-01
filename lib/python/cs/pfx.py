@@ -50,12 +50,14 @@ import logging
 import sys
 import threading
 import traceback
+
 from cs.deco import decorator, contextdecorator, fmtdoc, logging_wrapper
 from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
+
 from cs.x import X
 
-__version__ = '20221118-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'description':
@@ -576,18 +578,19 @@ class PfxCallInfo(Pfx):
         caller[2], grandcaller[0], grandcaller[1], grandcaller[2]
     )
 
-def PfxThread(target=None, **kw):
-  ''' Factory function returning a Thread
+def PfxThread(target, **kw):
+  ''' Factory function returning a `Thread`
       which presents the current prefix as context.
   '''
+  from cs.threads import HasThreadState  # pylint: disable=import-outside-toplevel
+
   current_prefix = prefix()
 
-  def run(*a, **kw):
+  def PfxThread_run(*a, **kw):
     with Pfx(current_prefix):
-      if target is not None:
-        target(*a, **kw)
+      return target(*a, **kw)
 
-  return threading.Thread(target=run, **kw)
+  return HasThreadState.Thread(target=PfxThread_run, **kw)
 
 @decorator
 def pfx(func, message=None, message_args=()):

@@ -6,6 +6,7 @@
 
 from collections import namedtuple
 from configparser import ConfigParser
+from dataclasses import dataclass, field
 import os
 import os.path
 import errno
@@ -91,12 +92,12 @@ class PilferCommand(BaseCommand):
       -u  Unbuffered. Flush print actions as they occur.
       -x  Trace execution.'''
 
-  def apply_defaults(self):
-    options = self.options
-    options.pilfer = Pilfer()
-    options.quiet = False
-    options.jobs = DEFAULT_JOBS
-    options.flagnames = DEFAULT_FLAGS_CONJUNCTION
+  @dataclass
+  class Options(BaseCommand.Options):
+    pilfer: "Pilfer" = field(default_factory=lambda: Pilfer)
+    quiet: bool = False
+    jobs: int = DEFAULT_JOBS
+    flagnames: str = DEFAULT_FLAGS_CONJUNCTION
 
   def apply_opts(self, opts):
     options = self.options
@@ -1282,7 +1283,7 @@ def parse_action(action, do_trace):
     def substitute(P):
       ''' Perform a regexp substitution on the source string.
           `repl_format` is a format string for the replacement text
-          using the str.format method.
+          using the `str.format` method.
           The matched groups from the regexp take the positional arguments 1..n,
           with 0 used for the whole matched string.
           The keyword arguments consist of '_' for the whole matched string
@@ -1312,7 +1313,7 @@ def parse_action(action, do_trace):
       strs.append(src[offset:])
       result = ''.join(strs)
       debug("SUBSTITUTE: src=%r, result=%r", src, result)
-      if isURL(src):
+      if isinstance(src, URL):
         result = URL(result, src.referer)
       return result
 

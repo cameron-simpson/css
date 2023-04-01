@@ -68,9 +68,8 @@ from cs.lex import is_dotted_identifier
 import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
-from cs.upd import Upd
 
-__version__ = '20220531-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -215,7 +214,8 @@ def setup_logging(
   if main_log is None:
     main_log = sys.stderr
   elif isinstance(main_log, str):
-    main_log = open(main_log, "a")
+    # pylint: disable=consider-using-with
+    main_log = open(main_log, "a", encoding='utf-8')
 
   # determine some attributes of main_log
   try:
@@ -268,7 +268,10 @@ def setup_logging(
 
     signal.signal(signal.SIGHUP, handler)
 
-  upd_ = Upd()
+  upd_ = None
+  if upd_mode:
+    from cs.upd import Upd  # pylint: disable=import-outside-toplevel
+    upd_ = Upd()
 
   root_logger = logging.getLogger()
   if root_logger.handlers:
@@ -439,29 +442,27 @@ class PfxFormatter(Formatter):
         ''' Call the former `formatter.format` method
             and prepend the current `Pfx` prefix to the start.
         '''
-        msg0 = record.msg
-        args0 = record.args
+        ##msg0 = record.msg
+        ##args0 = record.args
         cur_pfx = Pfx._state.prefix
         if not cur_pfx:
           return old_format(record)
         if not isinstance(record.args, tuple):
           # TODO: dict support
           return old_format(record)
+        if record.args:
+          new_msg = '%s' + str(record.msg)
+          new_args = (cur_pfx + cs.pfx.DEFAULT_SEPARATOR,) + tuple(record.args)
         else:
-          if record.args:
-            new_msg = '%s' + str(record.msg)
-            new_args = (cur_pfx +
-                        cs.pfx.DEFAULT_SEPARATOR,) + tuple(record.args)
-          else:
-            new_msg = cur_pfx + cs.pfx.DEFAULT_SEPARATOR + str(record.msg)
-            new_args = record.args
-          try:
-            with stackattrs(record, msg=new_msg, args=new_args):
-              return old_format(record)
-          except Exception as e:
-            # unsupported in some way, fall back to the original
-            # and lose the prefix
+          new_msg = cur_pfx + cs.pfx.DEFAULT_SEPARATOR + str(record.msg)
+          new_args = record.args
+        try:
+          with stackattrs(record, msg=new_msg, args=new_args):
             return old_format(record)
+        except Exception as e:  # pylint: disable=broad-except
+          # unsupported in some way, fall back to the original
+          # and lose the prefix
+          return old_format(record)
 
       formatter.format = new_format
       formatter.PfxFormatter__monkey_patched = True
@@ -806,6 +807,7 @@ class UpdHandler(StreamHandler):
           A true value causes the handler to colour certain logging levels
           using ANSI terminal sequences.
     '''
+    from cs.upd import Upd  # pylint: disable=import-outside-toplevel
     if strm is None:
       strm = sys.stderr
     if upd_level is None:

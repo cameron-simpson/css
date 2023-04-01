@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python33
 #
 # Map block to leaves and offsets.
 # - Cameron Simpson <cs@cskk.id.au> 07feb2018
@@ -25,10 +25,12 @@ from cs.py.func import prop
 from cs.resources import RunStateMixin
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import upd_proxy, state as upd_state
-from cs.x import X
-from . import defaults
+from cs.upd import with_upd_proxy, UpdProxy
+
+from . import uses_Store
 from .block import HashCodeBlock, IndirectBlock
+
+from cs.x import X
 
 # The record format uses 4 byte integer offsets
 # so this is the maximum (and default) scale for the memory maps.
@@ -84,7 +86,7 @@ class MappedFD:
         original file to be closed by the caller.
     '''
     self.hashclass = hashclass
-    self.rec_size = OFF_STRUCT.size + hashclass.HASHLEN
+    self.rec_size = OFF_STRUCT.size + hashclass.hashlen
     if isinstance(f, str):
       with Pfx("open(%r)", f):
         fd = os.open(f, os.O_RDONLY)
@@ -152,7 +154,8 @@ class MappedFD:
       yield self.entry(i)
       i += 1
 
-  def entry(self, i):
+  @uses_Store
+  def entry(self, i, *, S):
     ''' Fetch the `MapEntry` at index `i`.
     '''
     i0 = i
@@ -171,7 +174,7 @@ class MappedFD:
         mapped[hash_offset:next_rec_offset]
     )
     if i == self.record_count - 1:
-      span = len(defaults.S[hashcode])
+      span = len(S[hashcode])
     else:
       next_hash_offset = next_rec_offset + OFF_STRUCT.size
       next_offset, = OFF_STRUCT.unpack(
@@ -206,7 +209,10 @@ class BlockMap(RunStateMixin):
   ''' A fast mapping of offsets to leaf block hashcodes.
   '''
 
-  def __init__(self, block, mapsize=None, blockmapdir=None, runstate=None):
+  @uses_Store
+  def __init__(
+      self, block, *, mapsize=None, blockmapdir=None, runstate=None, S
+  ):
     ''' Initialise the `BlockMap`, dispatch the index generator.
 
         Parameters:
@@ -224,7 +230,7 @@ class BlockMap(RunStateMixin):
       )
     # DEBUGGING
     if blockmapdir is None:
-      blockmapdir = defaults.S.blockmapdir
+      blockmapdir = S.blockmapdir
     if not isinstance(block, IndirectBlock):
       raise TypeError(
           "block needs to be an IndirectBlock, got a %s instead" %
@@ -244,7 +250,7 @@ class BlockMap(RunStateMixin):
         with Pfx("makedirs(%r)", mappath):
           os.makedirs(mappath)
     self.block = block
-    self.S = defaults.S
+    self.S = S
     nsubmaps = len(block) // mapsize + 1
     submaps = [None] * nsubmaps
     self.maps = submaps
@@ -266,7 +272,7 @@ class BlockMap(RunStateMixin):
       self.runstate.start()
       self._worker = bg_thread(
           self._load_maps,
-          args=(defaults.S,),
+          args=(S,),
           daemon=True,
           name="%s._load_maps" % (self,)
       )
@@ -300,12 +306,11 @@ class BlockMap(RunStateMixin):
         submap.close()
         maps[i] = None
 
-  @upd_proxy
+  @with_upd_proxy
   @pfx_method(use_str=True)
-  def _load_maps(self, S):
+  def _load_maps(self, S, upd_proxy: UpdProxy):
     ''' Load leaf offsets and hashcodes into the unfilled portion of the blockmap.
     '''
-    proxy = upd_state.proxy
     offset = self.mapped_to
     mapsize = self.mapsize
     submap_index = offset // mapsize - 1
@@ -318,14 +323,14 @@ class BlockMap(RunStateMixin):
       submap_fp = None
       submap_path = None
       nleaves = 0
-      proxy.prefix = "%s(%s) leaves " % (type(self).__name__, block)
+      upd_proxy.prefix = "%s(%s) leaves " % (type(self).__name__, block)
       for leaf, start, length in progressbar(
           block.slices(offset, blocklen),
           position=offset,
           total=blocklen,
           itemlenfunc=(lambda leaf_start_length: leaf_start_length[2] -
                        leaf_start_length[1]),
-          proxy=proxy,
+          proxy=upd_proxy,
           update_frequency=16,
           units_scale=BINARY_BYTES_SCALE,
       ):
@@ -399,7 +404,7 @@ class BlockMap(RunStateMixin):
               "processed %d leaves in %gs (%d leaves/s)", nleaves,
               runstate.run_time, nleaves // runstate.run_time
           )
-      proxy("")
+      upd_proxy("")
       log_info("leaf scan finished")
       # attach final submap after the loop if one is in progress
       if submap_fp is not None:

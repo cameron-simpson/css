@@ -11,10 +11,11 @@ Convenience facilities for managing exceptions.
 import sys
 import traceback
 from cs.deco import decorator
-from cs.logutils import error, exception, warning
+from cs.gimmicks import exception, warning
 from cs.py.func import funcname
+from cs.py3 import raise_from
 
-__version__ = '20221207-post'
+__version__ = '20230212.1-post'
 
 DISTINFO = {
     'description':
@@ -25,7 +26,12 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.logutils', 'cs.py.func'],
+    'install_requires': [
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.py.func',
+        'cs.py3',
+    ],
 }
 
 if sys.hexversion >= 0x03000000:
@@ -79,6 +85,7 @@ def noexc(func):
   '''
 
   def noexc_wrapper(*args, **kwargs):
+    from cs.x import X  # pylint: disable=import-outside-toplevel
     # pylint: disable=broad-except
     try:
       return func(*args, **kwargs)
@@ -89,7 +96,6 @@ def noexc(func):
         )
       except Exception as e:
         try:
-          from cs.x import X  # pylint: disable=import-outside-toplevel
           X(
               "exception calling %s(%s, **(%s)): %s", func.__name__, args,
               kwargs, e
@@ -183,7 +189,6 @@ def transmute(func, exc_from, exc_to=None):
               (type(src_exc), src_exc, exc_to)
           )
       )
-      # TODO: raise from for py3
       raise_from(src_exc, dst_exc)  # pylint: disable=undefined-variable
       raise RuntimeError("NOTREACHED")  # pylint: disable=raise-missing-from
 
@@ -294,8 +299,7 @@ def exc_fold(func, exc_types=None, exc_return=False):
   def wrapped(*a, **kw):
     try:
       return func(*a, **kw)
-    except exc_types as e:
-      error("%s", e)
+    except exc_types:
       return exc_return
 
   wrapped.__name__ = (

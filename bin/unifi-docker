@@ -1,0 +1,131 @@
+#!/bin/sh
+#
+# Run the Unifi controller software via the
+# lscr.io/linuxserver/unifi-controller:latest Docker image.
+# - Cameron Simpson <cs@cskk.id.au> 24feb2023
+#
+
+set -ue
+
+doit=1
+use_tmux=
+[ -n "${UNIFI_DOCKER_TMUX:-}" ] && use_tmux=1
+tm_session_name=${UNIFI_DOCKER_TM_SESSION:-"UNIFI_CONTROLLER_$$"}
+image=lscr.io/linuxserver/unifi-controller:latest
+configdir=${UNIFI_DOCKER_CONFIGDIR:-unifi-config}
+exposeips=${UNIFI_DOCKER_IPS:-''}
+network=${UNIFI_DOCKER_NETWORK:-''}
+expose_ports='
+    8443:8443
+    3478:3478/udp
+    10001:10001/udp
+    1900:1900/udp
+    8080:8080
+    8843:8843
+    8880:8880
+    6789:6789
+    5514:5514/udp
+'
+
+cmd=$0
+usage="Usage: $cmd [--ips ip,...] [--tm]
+  Run the Unifi controller software via \"docker run ... $image ...\".
+
+  Leading options:
+  --ip  Expose the controler on the specified comma separated IP addresses.
+        Default from \$UNIFI_DOCKER_IPS: ${UNIFI_DOCKER_IPS:-}
+        If this is empty, the default network is \"host\",
+        exposing the controller on the local network.
+        Otherwise the default network is \"unifi-net\"
+        and the controller is exposed only on the specified IPs.
+  -n, --dry-run
+        No action. Recite the constructed command.
+  --tm  Run the \"docker run ...\" in a tmux(1) session via the tm(1cs) command."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    --ip)   exposeips=$2; shift ;;
+    -n | --dry-dry)
+            doit= ;;
+    --tm)   use_tmux=1 ;;
+    --)     shift; break ;;
+    -?*)    echo "$cmd: unrecognised option: $1" >&2
+            badopts=1
+            ;;
+    *)      break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+case "$configdir" in
+  /*) ;; *) configdir=$(pwd)/$configdir ;;
+esac
+case "$configdir" in
+  *,*)  echo "$cmd: configdir may not contain a comma: $configdir" >&2
+        badopts=1
+        ;;
+  *)    [ -d "$configdir/" ] || {
+          echo "$cmd: configdir is not a directory: $configdir" >&2
+          badopts=1
+        }
+        ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+uid=$( id -u )
+gid=$( id -g )
+
+set -- docker run
+
+if [ -n "$exposeips" ]
+then
+  set -- "$@" "--network=${network:-unifi-net}"
+  for exposeip in $( printf '%s\n' "$exposeips" | tr , ' ' )
+  do
+      for port in $expose_ports
+      do
+        set -- "$@" -p "$exposeip:$port"
+      done
+  done
+else
+  # host network, wildcard expose
+  network=${network:-"host"}
+  set -- "$@" "--network=${network:-host}"
+  for port in $expose_ports
+  do
+    set -- "$@" -p "$port"
+  done
+fi
+
+runopts=${UNIFI_DOCKER_OPTS:-''}
+
+set -- "$@" $runopts \
+    -e "PUID=$uid" \
+    -e "PGID=$gid" \
+    -e TZ=Etc/UTC \
+    -e MEM_LIMIT=1024 \
+    -e MEM_STARTUP=512 \
+    --mount "type=bind,source=$configdir,destination=/config" \
+    --restart unless-stopped
+
+if [ $use_tmux ]
+then
+  set -- tm -x "$tm_session_name" "$@"
+fi
+
+# append the image
+set -- "$@" "$image"
+
+if [ $doit ]
+then
+  set -x
+  exec "$@"
+else
+  echo "$*"
+fi
