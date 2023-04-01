@@ -1,0 +1,1 @@
+stackset: accept optional lock to guard modification of the set.
