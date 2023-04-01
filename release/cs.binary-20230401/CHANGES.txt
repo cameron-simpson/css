@@ -1,0 +1,4 @@
+lib/python/cs/binary.py: cs.binary: BinaryMixin.scan: `bfr` parameter may be any object acceptable to CornuCopyBuffer.promote
+lib/python/cs/binary.py: cs.binary: clean lint
+lib/python/cs/binary.py: cs.binary: BinaryMixin.scan: accept new optional with_offsets parameter; deprecate scan_with_offsets and scan_fspathi in favour of scan
+lib/python/cs/binary.py: merge default => vt
