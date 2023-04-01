@@ -5,7 +5,6 @@
 ''' My Python package release script.
 '''
 
-from __future__ import print_function
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
 from contextlib import contextmanager
@@ -32,6 +31,7 @@ from shutil import rmtree
 from subprocess import run, DEVNULL
 import sys
 from types import SimpleNamespace
+from typing import Iterable, List, Tuple
 
 from icontract import ensure
 import tomli_w
@@ -1263,7 +1263,7 @@ class Module:
       *,
       pypi_package_name=None,
       pypi_package_version=None,
-  ):
+  ) -> dict:
     ''' Compute the contents for the `pyproject.toml` file,
         return a `dict` for transcription as TOML.
     '''
@@ -1407,13 +1407,13 @@ class Module:
     return self.name.split('.')[-1]
 
   @property
-  def basepath(self):
+  def basepath(self) -> str:
     ''' The base path for this package, *PYLIBTOP*`/`*pkg*`/'*name*.
     '''
     return os.sep.join([PYLIBTOP] + self.name.split('.'))
 
   @property
-  def toppath(self):
+  def toppath(self) -> str:
     ''' The top file of the package:
         *basepath*`/__init__.py` for packages,
         *basepath*`.py` for modules.
@@ -1424,7 +1424,7 @@ class Module:
     return basepath + '.py'
 
   @pfx_method(use_str=True)
-  def paths(self, top_dirpath='.'):
+  def paths(self, top_dirpath: Optional[str] = '.') -> List[str]:
     ''' Return a list of the paths associated with this package
         relative to `top_dirpath` (default `'.'`).
 
@@ -1458,7 +1458,7 @@ class Module:
       raise ValueError("no paths for %s" % (self,))
     return pathlist
 
-  def resolve_requirements(self, requirement_specs):
+  def resolve_requirements(self, requirement_specs) -> List[str]:
     ''' Resolve the requirement specifications from `requirement_specs`
         into valid `install_requires` specifications.
     '''
@@ -1468,7 +1468,7 @@ class Module:
     ]
 
   @staticmethod
-  def reldistfiles(pkg_dir):
+  def reldistfiles(pkg_dir) -> List[str]:
     ''' Return the relative paths existing within `pkg_dir`.
 
         TODO: does not recurse: should this just run listdir?
@@ -1479,7 +1479,7 @@ class Module:
     ]
 
   @pfx_method
-  def upload_dist(self, pkg_dir, repo=None):
+  def upload_dist(self, pkg_dir, repo=None) -> None:
     ''' Upload the package to PyPI using twine.
     '''
     if repo is None:
@@ -1488,7 +1488,9 @@ class Module:
     cd_run(pkg_dir, 'twine', 'upload', '--repository', repo, *distfiles)
 
   @pfx_method(use_str=True)
-  def log_since(self, vcstag=None, ignored=False):
+  def log_since(self,
+                vcstag=None,
+                ignored=False) -> Iterable[Tuple[List[str], str]]:
     ''' Generator yielding (files, line) tuples
         for log lines since the last release for the supplied `prefix`.
 
