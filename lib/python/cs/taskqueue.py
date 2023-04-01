@@ -46,6 +46,7 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
+        'cs.typingutils',
         'icontract',
         'typeguard',
     ],
