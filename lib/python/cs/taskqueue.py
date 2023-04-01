@@ -26,7 +26,7 @@ from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
 from cs.typingutils import subtype
 
-__version__ = '20230401'
+__version__ = '20230401-post'
 
 DISTINFO = {
     'keywords': ["python3"],
