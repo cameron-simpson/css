@@ -46,7 +46,7 @@ from cs.resources import RunState, uses_runstate
 from cs.typingutils import subtype
 from cs.upd import Upd
 
-__version__ = '20230212-post'
+__version__ = '20230407'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
