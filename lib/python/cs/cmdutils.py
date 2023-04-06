@@ -61,7 +61,9 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.doc',
         'cs.resources',
+        'cs.typingutils',
         'cs.upd',
+        'typeguard',
     ],
 }
 
