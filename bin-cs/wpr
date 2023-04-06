@@ -6,24 +6,33 @@
 
 set -ue
 
-set -x
 : "${SSV_DIR=$HOME/im/screencaps}"
 : "${WPDIR:=$HOME/im/wp}"
 : "${WPLINKDIR:=$HOME/var/im/wp}"
 : "${WPPATH:=$WPDIR:$SSV_DIR}"
 
+nwp=128
+
 cmd=$( basename "$0" )
-usage="Usage: $cmd word"
+usage="Usage: $cmd words...
+    Select up to ${nwp} wallpapers from the directories in \$WPPATH,
+    default from \$WPDIR:\$SSV_DIR: $WPPATH
+    at random matching the sed-regexps \"words\".
+    Construct a scratch directoy in \$WPLINKDIR: $WPLINKDIR
+    and symlink the selected images into it, then set that directory
+    as the wallpaper directory for the current space."
 
 badopts=
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing word" >&2
+  echo "$cmd: missing words" >&2
   badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
 
 rd=$WPLINKDIR/$( echo "$*" | tr ' /' -- )/random
 
@@ -37,7 +46,7 @@ cd "$rd"
   done \
   | grepall -- "$@" \
   | shuffle \
-  | sed 128q
+  | sed "${nwp}q"
 ) \
 | {
   first=1
