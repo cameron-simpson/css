@@ -93,7 +93,7 @@ cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.releas
 cs.splink ok_revision="25f7e005ab498fe2b54ad5f4f40da14559abe892" pypi.release="20230217"
 cs.sqlalchemy_utils ok_revision="8c6eb6904bd805ba7a3e51e0d94373d148e72496" pypi.release="20230212"
 cs.sqltags ok_revision="208af27b32446612bfda5e4c99f4dcf897bfef0d" pypi.release="20230217"
-cs.tagset ok_revision="7b47efb82fd0391380d508a515d65fa869ca5349" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20230212"
+cs.tagset ok_revision="518fa4c385d4d6168f66ce4a9dfd7530c5e3ef93" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20230212"
 cs.taskqueue ok_revision="756fea6faa3095c3fdb3d79a103c95428fdf0dec" features={"20221207":["BaseTask"]} pypi.release="20230331"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
 cs.threads ok_revision=d6f3c6ce6435e32e92ccb7ae279840c8d5166142 pypi.release="20230331" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"]}
