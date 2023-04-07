@@ -60,7 +60,7 @@ cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcf
 cs.mappings pypi.release="20220912.4" ok_revision=ed240ae3d6f3b86b747f9a82a63003b0652bfd56 features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"]}
 cs.mediainfo
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
-cs.mplutils ok_revision="58ff8b4668fb153629d847388703be4e27ca6b85" pypi.release="20220918" features={"20220918":["FigureSize"]}
+cs.mplutils ok_revision="24a1ebf5b45d44a734462ba8fd3120331bce0173" pypi.release="20220918" features={"20220918":["FigureSize"]}
 cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783" pypi.release="20211208"
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release="20220606" ok_revision="59303dd747cbf52f6fdf1777c1f6979d1085156d" features={"20220606":["intif"]}
