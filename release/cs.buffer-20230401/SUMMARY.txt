@@ -1,0 +1,3 @@
+CornuCopyBuffer.promote: document accepting an iterable as an iterable of bytes.
+CornuCopyBuffer: new readline() method to return a binary line from the buffer.
+CornuCopyBuffer.promote: assume objects with a .read1 or .read are files.

@@ -23,7 +23,7 @@ from cs.deco import Promotable
 from cs.gimmicks import r
 from cs.py3 import pread
 
-__version__ = '20230212.2-post'
+__version__ = '20230401-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -490,9 +490,11 @@ class CornuCopyBuffer(Promotable):
     ''' Push the chunk `bs` onto the front of the buffered data.
         Rewinds the logical `.offset` by the length of `bs`.
     '''
-    self.bufs.insert(0, bs)
-    self.buflen += len(bs)
-    self.offset -= len(bs)
+    blen = len(bs)
+    if blen > 0:
+      self.bufs.insert(0, bs)
+      self.buflen += blen
+      self.offset -= blen
 
   @property
   def end_offset(self):
@@ -646,6 +648,34 @@ class CornuCopyBuffer(Promotable):
     if len(taken) == 1:
       return bytes(taken[0])
     return b''.join(taken)
+
+  def readline(self):
+    ''' Return a binary "line" from `self`, where a line is defined by
+        its ending `b'\n'` delimiter.
+        The final line from a buffer might not have a trailing newline;
+        `b''` is returned at EOF.
+
+        Example:
+
+            >>> bfr = CornuCopyBuffer([b'abc', b'def\nhij'])
+            >>> bfr.readline()
+            b'abcdef\n'
+            >>> bfr.readline()
+            b'hij'
+            >>> bfr.readline()
+            b''
+            >>> bfr.readline()
+            b''
+    '''
+    pending = []
+    for bs in self:
+      nlpos = bs.find(b'\n')
+      if nlpos >= 0:
+        pending.append(bs[:nlpos + 1])
+        self.push(bs[nlpos + 1:])
+        break
+      pending.append(bs)
+    return b''.join(pending)
 
   def peek(self, size, short_ok=False):
     ''' Examine the leading bytes of the buffer without consuming them,
@@ -935,8 +965,10 @@ class CornuCopyBuffer(Promotable):
 
         Promotes:
         * `int`: assumed to be a file descriptor of a file open for binary read
-        * `str`: assed to the a filesystem pathname
+        * `str`: assumed to be a filesystem pathname
         * `bytes` and `bytes`like objects: data
+        * has a `.read1` or `.read` method: assume a file open for binary read
+        * iterable: assumed to be an iterable of `bytes`like objects
     '''
     if isinstance(obj, cls):
       return obj
@@ -946,6 +978,8 @@ class CornuCopyBuffer(Promotable):
       obj = cls.from_filename(obj)
     elif isinstance(obj, (bytes, bytearray, mmap.mmap, memoryview)):
       obj = cls.from_bytes(obj)
+    elif hasattr(obj, 'read1') or hasattr(obj, 'read'):
+      obj = cls.from_file(obj)
     try:
       iter(obj)
     except TypeError:

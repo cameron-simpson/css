@@ -26,16 +26,16 @@
 
 from abc import abstractmethod
 from builtins import id as builtin_id
-from code import interact
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
 import operator
 import os
-from os.path import expanduser, exists as existspath, isabs as isabspath
+from os.path import expanduser, isabs as isabspath
 import re
 import sys
 from subprocess import run
@@ -62,8 +62,8 @@ from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import shortpath
-from cs.lex import FormatAsError, has_format_attributes, format_attribute, get_decimal_value, r
-from cs.logutils import error, warning, track, info, ifverbose
+from cs.lex import FormatAsError, has_format_attributes, get_decimal_value, r
+from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.sqlalchemy_utils import (
@@ -75,10 +75,10 @@ from cs.tagset import (
     TagSet, Tag, TagFile, TagSetCriterion, TagBasedTest, TagsCommandMixin,
     TagsOntology, BaseTagSets, tag_or_tag_value, as_unixtime
 )
-from cs.threads import locked, State as ThreadState
+from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230212.1-post'
+__version__ = '20230217-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -674,7 +674,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       )
     else:
       # general tag_name
-      sqlp = SQLTagProxy(orm, tag.self.tag_name).by_op_text(
+      sqlp = SQLTagProxy(orm, tag_name).by_op_text(
           self.comparison, tag_value, alias=alias
       )
     return sqlp
@@ -1106,7 +1106,14 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             "not an SQTCriterion: %s:%r" %
             (type(criterion).__name__, criterion)
         )
-        if isinstance(criterion, TagBasedTest):
+        if isinstance(criterion, SQTCriterion):
+          try:
+            sqlp = criterion.sql_parameters(self)
+          except ValueError:
+            warning("SKIP, cannot compute sql_parameters")
+            continue
+          sqlps.append(sqlp)
+        elif isinstance(criterion, TagBasedTest):
           # we know how to treat these efficiently
           # by mergeing conditions on the same tag name
           tag = criterion.tag
@@ -1166,6 +1173,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             try:
               op_func = op_map[criterion.comparison]
             except KeyError as e:
+              # pylint: disable=raise-missing-from
               raise TypeError(
                   "no implementation of op %r for %s=%s" %
                   (op, tag_name, r(tag_value))
@@ -1579,10 +1587,10 @@ class SQLTags(BaseTagSets, Promotable):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Empty stub startup/shutdown since we use autosessions.
-        Particularly, we do not want to keep SQLite dbs open.
+    ''' Open the ORM while the `SQLTags` is open.
     '''
-    yield self
+    with self.orm:
+      yield self
 
   @contextmanager
   def db_session(self, *, new=False):
@@ -1963,13 +1971,12 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
       'DBURL_ENVVAR': DBURL_ENVVAR,
   }
 
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    options = self.options
-    db_url = self.TAGSETS_CLASS.infer_db_url()
-    options.db_url = db_url
-    options.sqltags = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    db_url: str = field(
+        default_factory=lambda: BaseSQLTagsCommand.TAGSETS_CLASS.infer_db_url()
+    )
+    sqltags: Optional[SQLTags] = None
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.

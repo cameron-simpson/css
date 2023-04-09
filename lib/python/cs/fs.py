@@ -31,7 +31,7 @@ from cs.deco import decorator
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
-__version__ = '20221221-post'
+__version__ = '20230401-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -176,7 +176,10 @@ class HasFSPath:
   def shortpath(self):
     ''' The short version of `self.fspath`.
     '''
-    return shortpath(self.fspath)
+    try:
+      return shortpath(self.fspath)
+    except AttributeError:
+      return "<no-fspath>"
 
   @require(lambda subpath: not isabspath(subpath))
   def pathto(self, subpath):
@@ -194,7 +197,12 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   '''
 
   @classmethod
-  def _resolve_fspath(cls, fspath, envvar=None, default_attr=None):
+  def _resolve_fspath(
+      cls,
+      fspath: Optional[str],
+      envvar: Optional[str] = None,
+      default_attr=None
+  ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
 
         Parameters:

@@ -1,0 +1,11 @@
+lib/python/cs/service_api.py: cs.service_api: new module pulling out som core things from cs.app.playon.PlayOnAPI
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI: new suburl method to request an API suburl, new json method require a JSON endpoint (both more or less pulled from PlayOnAPI)
+lib/python/cs/service_api.py: cs.service_api: ServiceAPI.login_state: persist the state as the 'login.state' SQLTags entry, update refresh logic accordingly
+lib/python/cs/service_api.py: cs.app.playon,cs.service_api: new ServiceAPI.available() method; new PlayOnAPI.available alias for PlayOnAPI.recordings
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI: cookie support: establish a Session for the API, set up self.REQUESTS_METHOD_CALLS to run via that Session
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI: support for specialise api_hostname and some default heders
+lib/python/cs/service_api.py: cs.service_api: initial DISTINFO, needs review before release
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI.json: new optional _response_encoding parameter to explicitly set the response encoding before decode, not actually used
+lib/python/cs/service_api.py: cs.service_api: ServiceAPI.login_state: drop unusable parameter, provide get_login_state method as adjunct
+lib/python/cs/service_api.py: cs.service_api: update DISTINFO
+lib/python/cs/service_api.py: cs.service_api: mark as alpha

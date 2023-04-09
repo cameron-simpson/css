@@ -1,0 +1,10 @@
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.save_to: use atomic_filename() to create the updated file
+lib/python/cs/timeseries.py: cs.timeseries: define TypeCodeish to match types which may be promoted to a TypeCode
+lib/python/cs/timeseries.py: cs.timeseries: missing diff from the atomic_filename commit
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: accept any TypeCodeish value for typecode
+lib/python/cs/timeseries.py: cs.timeseries: use @promote to remove some promotion boilerplate
+lib/python/cs/timeseries.py: cs.timeseries: remove Epochy and OptionalEpochy, no longer used since @promote
+lib/python/cs/timeseries.py: cs.timeseries: fix spelling of canonical
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.startup_shutdown: open/close the FSTags at the outside, enclosing the shutodnw code
+lib/python/cs/timeseries.py: cs.*: mark classes supporting @promote as Promotable
+lib/python/cs/timeseries.py: cs.lex,cs.splink,cs.timeseries: DISTINFO: fix PyPI package name for dateutil

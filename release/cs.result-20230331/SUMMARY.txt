@@ -1,0 +1,1 @@
+Result.join: access self._result instead of the property.

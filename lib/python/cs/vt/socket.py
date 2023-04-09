@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python3 -tt
 #
 # TCP and UNIX socket client/server code.
 # - Cameron Simpson <cs@cskk.id.au> 07dec2007
@@ -28,7 +28,7 @@ from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
 from cs.threads import bg as bg_thread
 
-from . import defaults
+from . import Store
 from .stream import StreamStore
 
 class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
@@ -52,7 +52,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
         the default Store has key `''`.
 
         If `local_store` is not None, `exports['']` is set to
-        `local_store` otherwise to `defaults.S`.
+        `local_store` otherwise to `Store.defaults()`.
         It is an error to provide both `local_store` and a prefilled
         `exports['']`.
     '''
@@ -61,7 +61,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     if local_store is not None:
       exports[''] = local_store
     if '' not in exports:
-      exports[''] = defaults.S
+      exports[''] = Store.defaults()
     MultiOpenMixin.__init__(self)
     RunStateMixin.__init__(self, runstate=runstate)
     self.exports = exports

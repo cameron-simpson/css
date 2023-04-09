@@ -1,0 +1,3 @@
+QueueIterator.startup_shutdown: try/finally for the terminating _put(self.sentinel).
+QueueIterator.__str__: show the underlying queue.
+QueueIterator: drop call to self.finalise(), no longer available or needed.

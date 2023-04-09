@@ -13,17 +13,27 @@ from cmd import Cmd
 import inspect
 import logging
 import os
+from pprint import pformat
 from subprocess import Popen, PIPE
 import sys
-import threading
+from threading import (
+    enumerate as enumerate_threads,
+    Lock as threading_Lock,
+    RLock as threading_RLock,
+    Thread as threading_Thread,
+)
 import time
 import traceback
 from types import SimpleNamespace as NS
 
+from cs.deco import decorator
+from cs.fs import shortpath
+from cs.lex import s
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
+from cs.py.func import funccite, func_a_kw_fmt
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
@@ -39,9 +49,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
+        'cs.lex',
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py.func',
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
@@ -53,30 +66,12 @@ DISTINFO = {
 # This is how often it polls for function completion.
 DEBUG_POLL_RATE = 0.25
 
-def Lock():
-  ''' Factory function: if `cs.logutils.loginfo.level<=logging.DEBUG`
-      then return a `DebuggingLock`, otherwise a `threading.Lock`.
-  '''
-  if not ifdebug():
-    return threading.Lock()
-  filename, lineno = inspect.stack()[1][1:3]
-  return DebuggingLock({'filename': filename, 'lineno': lineno})
-
-def RLock():
-  ''' Factory function: if `cs.logutils.loginfo.level<=logging.DEBUG`
-      then return a `DebuggingRLock`, otherwise a `threading.RLock`.
-  '''
-  if not ifdebug():
-    return threading.RLock()
-  filename, lineno = inspect.stack()[1][1:3]
-  return DebuggingRLock({'filename': filename, 'lineno': lineno})
-
 class TimingOutLock(object):
   ''' A `Lock` replacement which times out, used for locating deadlock points.
   '''
 
   def __init__(self, deadlock_timeout=20.0, recursive=False):
-    self._lock = threading.RLock() if recursive else threading.Lock()
+    self._lock = threading_RLock() if recursive else threading_Lock()
     self._deadlock_timeout = deadlock_timeout
 
   def acquire(self, blocking=True, timeout=-1, name=None):
@@ -125,7 +120,7 @@ class TraceSuite(object):
 
 def Thread(*a, **kw):
   if not ifdebug():
-    return threading.Thread(*a, **kw)
+    return threading_Thread(*a, **kw)
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingThread({'filename': filename, 'lineno': lineno}, *a, **kw)
 
@@ -137,7 +132,7 @@ def thread_dump(Ts=None, fp=None):
       * `fp`: the file to which to write; if unspecified use `sys.stderr`.
   '''
   if Ts is None:
-    Ts = threading.enumerate()
+    Ts = enumerate_threads()
   if fp is None:
     fp = sys.stderr
   with Pfx("thread_dump"):
@@ -190,7 +185,7 @@ def DEBUG(f, force=False):
     filename, lineno = inspect.stack()[1][1:3]
     n = seq()
     R = Result()
-    T = threading.Thread(
+    T = threading_Thread(
         target=_debug_watcher, args=(filename, lineno, n, f.__name__, R)
     )
     T.daemon = True
@@ -268,13 +263,13 @@ class DebuggingLock(DebugWrapper):
       `threading.Lock` otherwise.
   '''
 
-  def __init__(self, dkw, slow=2):
+  def __init__(self, *, slow=2, **dkw):
     DebugWrapper.__init__(self, **dkw)
     self.debug("__init__(slow=%r)", slow)
     if slow <= 0:
       raise ValueError("slow must be positive, received: %r" % (slow,))
     self.slow = slow
-    self.lock = threading.Lock()
+    self.lock = threading_Lock()
     self.held = None
 
   def __enter__(self):
@@ -363,50 +358,67 @@ class DebuggingRLock(DebugWrapper):
       `threading.RLock` otherwise.
   '''
 
-  def __init__(self, dkw):
-    D("dkw = %r", dkw)
-    DebugWrapper.__init__(self, **dkw)
+  def __init__(self, owner=None, **dkw):
+    if owner is None:
+      owner = caller()
+    DebugWrapper.__init__(
+        self, filename=owner.filename, lineno=owner.lineno, **dkw
+    )
     self.debug('__init__')
-    self.lock = threading.RLock()
-    self.stack = None
+    self.lock = threading_RLock()
+    self.stack = []
 
   def __str__(self):
-    return "%s%r" % (
-        type(self).__name__, [
-            "%s:%s:%s" % (f.filename, f.lineno, f.code_context[0].strip())
-            for f in self.stack
-        ] if self.stack else "NO_STACK"
+    return "%s[%s:%s]%s" % (
+        type(self).__name__,
+        shortpath(self.filename),
+        self.lineno,
+        "->".join(
+            ["%s:%s" % filename_lineno for filename_lineno in self.stack]
+        ),
     )
 
-  def __enter__(self):
-    filename, lineno = inspect.stack()[1][1:3]
-    self.debug('from %s:%d: __enter__ ...', filename, lineno)
-    self.lock.__enter__()
-    self.stack = inspect.stack()
-    self.debug('from %s:%d: __enter__ ENTERED', filename, lineno)
-    return self
+  def __enter__(self, locker=None):
+    if locker is None:
+      locker = caller()
+    filename_lineno = locker.filename, locker.lineno
+    self.debug('from %s:%d: __enter__ ...', locker.filename, locker.lineno)
+    entry = self.lock.__enter__()
+    self.stack.append(filename_lineno)
+    return entry
 
-  def __exit__(self, *a):
-    filename, lineno = inspect.stack()[1][1:3]
-    self.debug('%s:%d: __exit__(*%s) ...', filename, lineno, a)
-    return self.lock.__exit__(*a)
+  def __exit__(self, *a, exiter=None):
+    if exiter is None:
+      exiter = caller()
+    self.debug('%s:%d: __exit__(*%s) ...', exiter.filename, exiter.lineno, a)
+    exited = self.lock.__exit__(*a)
+    self.stack.pop()
+    return exited
 
-  def acquire(self, blocking=True, timeout=-1):
-    filename, lineno = inspect.stack()[0][1:3]
-    self.debug('%s:%d: acquire(blocking=%s)', filename, lineno, blocking)
+  def acquire(self, blocking=True, timeout=-1, acquirer=None):
+    if acquirer is None:
+      acquirer = caller()
+    self.debug(
+        '%s:%d: acquire(blocking=%s)', acquirer.filename, acquirer.lineno,
+        blocking
+    )
     if timeout < 0:
       ret = self.lock.acquire(blocking)
     else:
       ret = self.lock.acquire(blocking, timeout)
     if ret:
-      self.stack = inspect.stack()
+      self.stack.append((acquirer.filename, acquirer.lineno))
     return ret
 
-  def release(self):
-    filename, lineno = inspect.stack()[0][1:3]
-    self.debug('%s:%d: release()', filename, lineno)
+  def release(self, releaser=None):
+    if releaser is None:
+      releaser = caller()
+    self.debug('%s:%d: release()', releaser.filename, releaser.lineno)
     self.lock.release()
-    self.stack = None
+    self.stack.pop()
+
+Lock = DebuggingLock
+RLock = DebuggingRLock
 
 _debug_threads = set()
 
@@ -416,18 +428,18 @@ def dump_debug_threads():
     D("dump_debug_threads: thread %r: %r", T.name, T.debug_label)
   D("dump_debug_threads done")
 
-class DebuggingThread(threading.Thread, DebugWrapper):
+class DebuggingThread(threading_Thread, DebugWrapper):
 
   def __init__(self, dkw, *a, **kw):
     DebugWrapper.__init__(self, **dkw)
     self.debug("NEW THREAD(*%r, **%r)", a, kw)
     _debug_threads.add(self)
-    threading.Thread.__init__(self, *a, **kw)
+    threading_Thread.__init__(self, *a, **kw)
 
   @DEBUG
   def join(self, timeout=None):
     self.debug("join(timeout=%r)...", timeout)
-    retval = threading.Thread.join(self, timeout=timeout)
+    retval = threading_Thread.join(self, timeout=timeout)
     self.debug("join(timeout=%r) completed", timeout)
     _debug_threads.discard(self)
     return retval
@@ -553,6 +565,70 @@ def debug_object_shell(o, prompt=None):
   intro += '\n'
   C.prompt = prompt
   C.cmdloop(intro)
+
+_trace_indent = ""
+
+@decorator
+# pylint: disable=too-many-arguments
+def trace(
+    func,
+    call=True,
+    retval=False,
+    exception=True,
+    use_pformat=False,
+    with_caller=False,
+    with_pfx=False,
+):
+  ''' Decorator to report the call and return of a function.
+  '''
+
+  citation = funccite(func)
+
+  def traced_function_wrapper(*a, **kw):
+    ''' Wrapper for `func` to trace call and return.
+    '''
+    global _trace_indent  # pylint: disable=global-statement
+    if with_pfx:
+      # late import so that we can use this in modules we import
+      # pylint: disable=import-outside-toplevel
+      try:
+        from cs.pfx import XP as xlog
+      except ImportError:
+        xlog = X
+    else:
+      xlog = X
+    log_cite = citation
+    if with_caller:
+      log_cite = log_cite + "from[%s]" % (caller(),)
+    if call:
+      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
+      xlog("%sCALL " + fmt, _trace_indent, *av)
+    old_indent = _trace_indent
+    _trace_indent += '  '
+    try:
+      result = func(*a, **kw)
+    except Exception as e:
+      if exception:
+        xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
+      _trace_indent = old_indent
+      raise
+    else:
+      if retval:
+        xlog(
+            "%sCALL %s RETURN %s",
+            _trace_indent,
+            log_cite,
+            (pformat if use_pformat else repr)(result),
+        )
+      else:
+        ##xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
+        xlog("%sRETURN %s <= %s", _trace_indent, s(result), log_cite)
+      _trace_indent = old_indent
+      return result
+
+  traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
+  traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
+  return traced_function_wrapper
 
 def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.

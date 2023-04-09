@@ -19,7 +19,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20230212-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -809,6 +809,10 @@ def default_params(func, _strict=False, **param_defaults):
 def promote(func, params=None, types=None):
   ''' A decorator to promote argument values automatically in annotated functions.
 
+      If the annotation is `Optional[some_type]` or `Union[some_type,None]`
+      then the promotion will be to `some_type` but a value of `None`
+      will be passed through unchanged.
+
       The decorator accepts optional parameters:
       * `params`: if supplied, only parameters in this list will
         be promoted
@@ -827,6 +831,18 @@ def promote(func, params=None, types=None):
       then promotion will be attempted by calling `value.as_`*typename*`()`
       otherwise the attribute will be used directly
       on the presumption that it is a property.
+
+      A typical `promote(cls, obj)` method looks like this:
+
+          @classmethod
+          def promote(cls, obj):
+              if isinstance(obj, cls):
+                  return obj
+              ... recognise various types ...
+              ... and return a suitable instance of cls ...
+              raise TypeError(
+                  "%s.promote: cannot promote %s:%r",
+                  cls.__name__, obj.__class__.__name__, obj)
 
       Example:
 
@@ -867,9 +883,10 @@ def promote(func, params=None, types=None):
       *Note*: one issue with this is due to the conflict in name
       between this decorator and the method it looks for in a class.
       The `promote` _method_ must appear after any methods in the
-      class which are decorated with `@promote`, otherwise the the
-      decorator method supplants the name `promote` making it
-      unavailable as the decorater.
+      class which are decorated with `@promote`, otherwise the
+      `promote` method supplants the name `promote` making it
+      unavailable as the decorator.
+      I usually just make `.promote` the last method.
 
       Failing example:
 
@@ -908,12 +925,15 @@ def promote(func, params=None, types=None):
     if annotation is Parameter.empty:
       continue
     # recognise optional parameters and use their primary type
+    optional = False
     if param.default is not Parameter.empty:
       anno_origin = typing.get_origin(annotation)
       anno_args = typing.get_args(annotation)
       if (anno_origin is typing.Union and len(anno_args) == 2
           and anno_args[-1] is type(None)):
+        optional = True
         annotation, _ = anno_args
+        optional = True
     if types is not None and annotation not in types:
       continue
     try:
@@ -922,7 +942,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (annotation, promote_method)
+    promotions[param_name] = (annotation, promote_method, optional)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -938,12 +958,18 @@ def promote(func, params=None, types=None):
             __name__, arg_value
         )
     )
-    for param_name, (annotation, promote_method) in promotions.items():
+    for param_name, (annotation, promote_method,
+                     optional) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
+        # parameter not supplied
         continue
-      if isinstance(param_name, annotation):
+      if optional and arg_value is None:
+        # skip omitted optional value
+        continue
+      if isinstance(arg_value, annotation):
+        # already of the desired type
         continue
       try:
         promoted_value = promote_method(arg_value)

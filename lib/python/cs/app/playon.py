@@ -8,10 +8,9 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from functools import partial
 from getopt import getopt, GetoptError
-from json import JSONDecodeError
 from netrc import netrc
 import os
 from os import environ
@@ -23,7 +22,7 @@ import re
 import sys
 from threading import Semaphore
 import time
-from typing import Set
+from typing import Optional, Set
 from urllib.parse import unquote as unpercent
 
 import requests
@@ -32,20 +31,20 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
-from cs.fstags import FSTags
 from cs.fileutils import atomic_filename
-from cs.lex import has_format_attributes, format_attribute
+from cs.lex import has_format_attributes, format_attribute, get_prefix_n
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
-from cs.result import bg as bg_result, report as report_results
+from cs.resources import RunState, uses_runstate
+from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import uses_upd, print  # pylint: disable=redefined-builtin
+from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20221228-post'
+__version__ = '20230217-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -71,6 +70,7 @@ DISTINFO = {
         'cs.progress',
         'cs.resources',
         'cs.result',
+        'cs.service_api',
         'cs.sqltags',
         'cs.threads',
         'cs.units',
@@ -85,7 +85,7 @@ DBURL_DEFAULT = '~/var/playon.sqlite'
 
 FILENAME_FORMAT_ENVVAR = 'PLAYON_FILENAME_FORMAT'
 DEFAULT_FILENAME_FORMAT = (
-    '{playon.Series}--{playon.Name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
+    '{series_prefix}{playon.Name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
 # download parallelism
@@ -141,12 +141,18 @@ class PlayOnCommand(BaseCommand):
                     case insensitive.
   '''
 
-  def apply_defaults(self):
-    options = self.options
-    options.user = environ.get('PLAYON_USER', environ.get('EMAIL'))
-    options.password = environ.get('PLAYON_PASSWORD')
-    options.filename_format = environ.get(
-        'PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT
+  @dataclass
+  class Options(BaseCommand.Options):
+    user: Optional[str] = field(
+        default_factory=lambda: environ.
+        get('PLAYON_USER', environ.get('EMAIL'))
+    )
+    password: Optional[str] = field(
+        default_factory=lambda: environ.get('PLAYON_PASSWORD')
+    )
+    filename_format: str = field(
+        default_factory=lambda: environ.
+        get('PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT)
     )
 
   @contextmanager
@@ -290,9 +296,15 @@ class PlayOnCommand(BaseCommand):
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
         recording = sqltags[dl_id]
-        if not R():
-          warning("FAILED download of %d", dl_id)
+        try:
+          dl = R()
+        except CancellationError as e:
+          warning("%s: download interrupted: %s", recording.nice_name(), e)
           xit = 1
+        else:
+          if not dl:
+            warning("FAILED download of %d", dl_id)
+            xit = 1
 
     return xit
 
@@ -471,6 +483,26 @@ class Recording(SQLTagSet):
       if getattr(self, f'is_{status_label}')():
         return status_label
     raise RuntimeError("cannot infer a status string: %s" % (self,))
+
+  @format_attribute
+  def series_prefix(self):
+    ''' Return a series prefix for recording containing the series name
+        and season and episode, or `''`.
+    '''
+    sep = '--'
+    parts = []
+    if self.playon.Series:
+      parts.append(self.playon.Series)
+    se_parts = []
+    if self.playon.Season is not None:
+      se_parts.append(f's{self.playon.Season:02d}')
+    if self.playon.Episode:
+      se_parts.append(f'e{self.playon.Episode:02d}')
+    if se_parts:
+      parts.append(''.join(se_parts))
+    if not parts:
+      return ''
+    return sep.join(parts) + sep
 
   @format_attribute
   def is_available(self):
@@ -809,7 +841,7 @@ class PlayOnAPI(HTTPServiceAPI):
       for entry in entries:
         entry_id = entry['ID']
         with Pfx(entry_id):
-          for field, conv in sorted(dict(
+          for r_field, conv in sorted(dict(
               Episode=int,
               ReleaseYear=int,
               Season=int,
@@ -818,21 +850,34 @@ class PlayOnAPI(HTTPServiceAPI):
               ##Updated=self.from_playon_date,
           ).items()):
             try:
-              value = entry[field]
+              value = entry[r_field]
             except KeyError:
               pass
             else:
-              with Pfx("%s=%r", field, value):
+              with Pfx("%s=%r", r_field, value):
                 if value is None:
-                  del entry[field]
+                  del entry[r_field]
                 else:
                   try:
                     value2 = conv(value)
                   except ValueError as e:
                     warning("%r: %s", value, e)
                   else:
-                    entry[field] = value2
+                    entry[r_field] = value2
           recording = self[entry_id]
+          # sometimes the name is spuriously prefixed with the seaon and episode
+          playon_name = entry['Name']
+          season = entry.get('Season')
+          spfx, sn, offset = get_prefix_n(playon_name, 's', season)
+          if spfx:
+            episode = entry.get('Episode')
+            epfx, en, offset = get_prefix_n(
+                playon_name, 'e', episode, offset=offset
+            )
+            if epfx:
+              entry['Season'] = sn
+              entry['Episode'] = en
+              entry['Name'] = playon_name[offset:].lstrip(' -')
           recording.update(entry, prefix='playon')
           recording.update(dict(last_updated=now))
           recordings.add(recording)
@@ -869,26 +914,26 @@ class PlayOnAPI(HTTPServiceAPI):
         entry_id = entry['ID']
         with Pfx(entry_id):
           # pylint: disable=use-dict-literal
-          for field, conv in sorted(dict(
+          for e_field, conv in sorted(dict(
               ##Created=self.from_playon_date,
               ##Expires=self.from_playon_date,
               ##Updated=self.from_playon_date,
           ).items()):
             try:
-              value = entry[field]
+              value = entry[e_field]
             except KeyError:
               pass
             else:
-              with Pfx("%s=%r", field, value):
+              with Pfx("%s=%r", e_field, value):
                 if value is None:
-                  del entry[field]
+                  del entry[e_field]
                 else:
                   try:
                     value2 = conv(value)
                   except ValueError as e:
                     warning("%r: %s", value, e)
                   else:
-                    entry[field] = value2
+                    entry[e_field] = value2
           service = self.service(entry_id)
           service.update(entry, prefix='playon')
           service.update(dict(last_updated=now))
@@ -909,8 +954,9 @@ class PlayOnAPI(HTTPServiceAPI):
 
   # pylint: disable=too-many-locals
   @pfx_method
+  @uses_runstate
   @typechecked
-  def download(self, download_id: int, filename=None):
+  def download(self, download_id: int, filename=None, *, runstate: RunState):
     ''' Download the file with `download_id` to `filename_basis`.
         Return the `TagSet` for the recording.
 
@@ -957,6 +1003,8 @@ class PlayOnAPI(HTTPServiceAPI):
             itemlenfunc=len,
             report_print=True,
         ):
+          if runstate.cancelled:
+            raise CancellationError
           offset = 0
           length = len(chunk)
           while offset < length:

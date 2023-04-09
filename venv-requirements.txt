@@ -13,6 +13,9 @@ matplotlib
 mobi
 mypy
 musicbrainzngs
+numpy
+objc
+pandas
 pillow
 pycodestyle
 # used by dedrm
@@ -22,6 +25,7 @@ pyicontract-lint
 pylint
 pytest
 python-dateutil
+railroad-diagrams
 requests
 sqlalchemy
 tkmacosx
