@@ -219,7 +219,7 @@ from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
-    has_format_attributes, format_attribute, FStr, r
+    has_format_attributes, format_attribute, FStr, r, s
 )
 from cs.logutils import setup_logging, debug, warning, error, ifverbose
 from cs.mappings import (
@@ -3496,7 +3496,13 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
                     d = tags.as_dict()
                     del d[update_uuid_tag_name]
                     d['fspath'] = joinpath(dirname(filepath), name)
-                    update_mapping[key].update(d)
+                    try:
+                      update_mapping[key].update(d)
+                    except Exception as e:
+                      warning(
+                          "update_mapping:%s[%r].update(%r): %s",
+                          s(update_mapping), key, d, e
+                      )
                 f.write(
                     cls.tags_line(
                         name, tags, extra_types=extra_types, prune=prune
