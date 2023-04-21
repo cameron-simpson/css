@@ -1690,8 +1690,8 @@ def atomic_filename(
     prefix = '.' + fprefix
   if suffix is None:
     suffix = fsuffix
-  if existspath(filename) and not exists_ok:
-    raise ValueError("already exists: %r" % (filename,))
+  if not exists_ok and existspath(filename):
+    raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), filename)
   with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, delete=False,
                           **kw) as T:
     if placeholder:
