@@ -41,7 +41,7 @@ import sys
 from subprocess import run
 from threading import RLock
 import time
-from typing import List, Optional
+from typing import List, Mapping, Optional, Sequence
 
 from icontract import ensure, require
 from sqlalchemy import (
@@ -1442,6 +1442,38 @@ class SQLTagSet(SingletonMixin, TagSet):
     return js
 
   @classmethod
+  @pfx_method
+  def jsonable(cls, value):
+    ''' Convert `value` to a form which can be directly JSON serialised.
+
+        In particular this converts non-list/set/tuple Sequences to lists
+        and non-dict Mappings to dicts.
+
+        Warning: this is not robust against cycles.
+    '''
+    if value is None:
+      return None
+    if isinstance(value, (int, str, float)):
+      return value
+    # mapping?
+    if (isinstance(value, Mapping)
+        or hasattr(value, 'items') and callable(value.items)):
+      # mapping
+      return {
+          str(field): cls.jsonable(subvalue)
+          for field, subvalue in value.items()
+      }
+    if isinstance(value, (set, tuple, list, Sequence)):
+      return [cls.jsonable(subvalue) for subvalue in value]
+    try:
+      d = value._asdict()
+    except AttributeError:
+      pass
+    else:
+      return cls.jsonable(d)
+    raise TypeError('no JSONable value for %s:%r' % (type(value), value))
+
+  @classmethod
   @typechecked
   @ensure(lambda result: result.is_valid())
   def to_polyvalue(cls, tag_name: str, tag_value) -> PolyValue:
@@ -1461,7 +1493,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     if isinstance(tag_value, str):
       return PolyValue(None, tag_value, None)
     if isinstance(tag_value, (list, tuple, dict)):
-      return PolyValue(None, None, tag_value)
+      return PolyValue(None, None, cls.jsonable(tag_value))
     # convert to a special string
     return PolyValue(None, None, cls.to_js_str(tag_name, tag_value))
 
