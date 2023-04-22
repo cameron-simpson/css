@@ -35,4 +35,5 @@ twine
 typeguard
 watchdog
 yapf
-youtube-dl
+##youtube-dl
+-e git+https://github.com/ytdl-org/youtube-dl.git@26035bde4#egg=youtube-dl
