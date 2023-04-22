@@ -3498,10 +3498,12 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
                     d['fspath'] = joinpath(dirname(filepath), name)
                     try:
                       update_mapping[key].update(d)
+                    except AttributeError:
+                      raise
                     except Exception as e:
                       warning(
-                          "update_mapping:%s[%r].update(%r): %s",
-                          s(update_mapping), key, d, e
+                          "update_mapping:%s[%r].update(%s): %s",
+                          s(update_mapping), key, cropped_repr(d), e
                       )
                 f.write(
                     cls.tags_line(
