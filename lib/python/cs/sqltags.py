@@ -781,8 +781,8 @@ class PolyValueColumnMixin:
         structured_value=self.structured_value,
     )
 
-  @typechecked
   @require(lambda pv: pv.is_valid())
+  @typechecked
   def set_polyvalue(self, pv: PolyValue):
     ''' Set all the value fields.
     '''
@@ -1416,8 +1416,8 @@ class SQLTagSet(SingletonMixin, TagSet):
     return from_str(js_s)
 
   @classmethod
-  @typechecked
   @require(lambda pv: pv.is_valid())
+  @typechecked
   def from_polyvalue(cls, tag_name: str, pv: PolyValue):
     ''' Convert an SQL `PolyValue` to a tag value.
 
@@ -1474,8 +1474,8 @@ class SQLTagSet(SingletonMixin, TagSet):
     raise TypeError('no JSONable value for %s:%r' % (type(value), value))
 
   @classmethod
-  @typechecked
   @ensure(lambda result: result.is_valid())
+  @typechecked
   def to_polyvalue(cls, tag_name: str, tag_value) -> PolyValue:
     ''' Normalise `Tag` values for storage via SQL.
         Preserve things directly expressable in JSON.
