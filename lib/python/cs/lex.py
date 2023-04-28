@@ -43,7 +43,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20230217.1-post'
+__version__ = '20230401-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1440,7 +1440,7 @@ class FormatableFormatter(Formatter):
         mode = self.__dict__['format_mode']
       except KeyError:
         # pylint: disable=import-outside-toplevel
-        from cs.threads import State as ThreadState
+        from cs.threads import ThreadState
         mode = self.__dict__['format_mode'] = ThreadState(strict=False)
     return mode
 

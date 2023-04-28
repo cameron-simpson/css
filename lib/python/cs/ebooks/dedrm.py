@@ -9,6 +9,7 @@
 '''
 
 from contextlib import contextmanager, redirect_stdout
+from dataclasses import dataclass, field
 from datetime import datetime
 from getopt import GetoptError
 import importlib
@@ -55,10 +56,11 @@ class DeDRMCommand(BaseCommand):
         or place that value in the $DEDRM_PACKAGE_PATH environment variable.
   '''
 
-  def apply_defaults(self):
-    super().apply_defaults()
-    options = self.options
-    options.dedrm_package_path = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    dedrm_package_path: Optional[str] = field(
+        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+    )
 
   def apply_opt(self, opt, val):
     badopt = False
@@ -314,7 +316,7 @@ class DeDRMWrapper(Promotable):
         import builtins
         with stackattrs(builtins, print=print):
           with redirect_stdout(sys.stderr):
-            import prefs
+            import prefs  # imported for its side effect
             yield
 
   def import_name(self, module_name, name=None, *, package=None):
@@ -458,8 +460,10 @@ def getLibCrypto():
 
   # interface to needed routines in openssl's libcrypto
   def _load_crypto_libcrypto():
-    from ctypes import CDLL, byref, POINTER, c_void_p, c_char_p, c_int, c_long, \
-        Structure, c_ulong, create_string_buffer, addressof, string_at, cast
+    from ctypes import (
+        CDLL, byref, POINTER, c_void_p, c_char_p, c_int, c_long, Structure,
+        c_ulong, create_string_buffer, addressof, string_at, cast
+    )
     from ctypes.util import find_library
 
     libcrypto = find_library('crypto')

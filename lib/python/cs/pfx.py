@@ -50,12 +50,14 @@ import logging
 import sys
 import threading
 import traceback
+
 from cs.deco import decorator, contextdecorator, fmtdoc, logging_wrapper
 from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
+
 from cs.x import X
 
-__version__ = '20221118-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'description':
@@ -580,7 +582,7 @@ def PfxThread(target, **kw):
   ''' Factory function returning a `Thread`
       which presents the current prefix as context.
   '''
-  from cs.threads import HasThreadState # pylint: disable=import-outside-toplevel
+  from cs.threads import HasThreadState  # pylint: disable=import-outside-toplevel
 
   current_prefix = prefix()
 
@@ -691,7 +693,7 @@ def pfx_method(method, use_str=False, with_args=False):
                   ....
   '''
 
-  fname = method.__name__
+  fname = getattr(method, '__name__', repr(method))
 
   def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".

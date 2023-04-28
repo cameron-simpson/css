@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from getopt import GetoptError
 import os
 from os.path import (
@@ -50,11 +51,11 @@ class OntCommand(TagsOntologyCommand):
 
   SUBCOMMAND_ARGV_DEFAULT = 'type'
 
-  def apply_defaults(self):
-    ''' Provide a default `self.options.ont_path`.
-    '''
-    options = self.options
-    options.ont_path = os.environ.get(ONTTAGS_PATH_ENVVAR)
+  @dataclass
+  class Options(OntCommand.Options):
+    ont_path: str = field(
+        default_factory=lambda: os.environ.get(ONTTAGS_PATH_ENVVAR)
+    )
 
   def apply_opt(self, opt, val):
     options = self.options

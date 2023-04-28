@@ -34,7 +34,7 @@ from cs.resources import (
 )
 from cs.result import report, bg as bg_result
 from cs.seq import Seq
-from cs.threads import bg as bg_thread, HasThreadState, State as ThreadState
+from cs.threads import bg as bg_thread, HasThreadState, ThreadState
 
 from . import defaults, Lock, RLock, VT_STORE_ENVVAR, VT_STORE_DEFAULT
 from .datadir import DataDir, RawDataDir, PlatonicDir

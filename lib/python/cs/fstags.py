@@ -74,6 +74,7 @@
 from configparser import ConfigParser
 from contextlib import contextmanager
 import csv
+from dataclasses import dataclass
 import errno
 from getopt import getopt, GetoptError
 import json
@@ -114,7 +115,7 @@ from cs.lex import (
 )
 from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
-from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.resources import MultiOpenMixin, RunState
 from cs.tagset import (
     Tag,
     TagSet,
@@ -129,7 +130,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import Upd, UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20230407-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -203,11 +204,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   -P            Physical. Resolve pathnames through symlinks.
                 Default ~/.fstagsrc[general]physical or False.'''
 
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    self.options.ontology_path = os.environ.get('FSTAGS_ONTOLOGY')
-    self.options.physical = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    ontology_path: Optional[str] = os.environ.get('FSTAGS_ONTOLOGY')
+    physical: Optional[bool] = None
 
   def apply_opt(self, opt, val):
     ''' Apply command line option.
@@ -238,13 +238,13 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           yield
 
   @uses_upd
-  @uses_runstate
-  def cmd_autotag(self, argv, *, runstate: RunState, upd: Upd):
+  def cmd_autotag(self, argv, *, upd: Upd):
     ''' Usage: {cmd} paths...
           Tag paths based on rules from the rc file.
     '''
     options = self.options
     fstags = options.fstags
+    runstate = options.runstate
     if not argv:
       argv = ['.']
     filename_rules = fstags.config.filename_rules
@@ -252,6 +252,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       with UpdProxy() as proxy:
         for top_path in argv:
           for isdir, path in rpaths(top_path, yield_dirs=True):
+            if runstate.cancelled:
+              return 1
             spath = shortpath(path)
             proxy.text = spath
             with Pfx(spath):
@@ -336,7 +338,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_export(self, argv):
     ''' Usage: {cmd} [-a] [--direct] path {{tag[=value]|-tag}}...
-          Export tags for files from path matching all the constraints.
+          Export tags for files from paths matching all the constraints.
           -a        Export all paths, not just those with tags.
           --direct  Export the direct tags instead of the computed tags.
           The output is in the same CSV format as that from "sqltags export",
@@ -348,6 +350,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
+    runstate = options.runstate
     badopts = False
     all_paths = False
     use_direct_tags = False
@@ -375,6 +378,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     csvw = csv.writer(sys.stdout)
     for fspath in fstags.find(realpath(path), tag_choices,
                               use_direct_tags=use_direct_tags):
+      if runstate.cancelled:
+        return 1
       tagged_path = fstags[fspath]
       # pylint: disable=superfluous-parens
       if (not all_paths
@@ -385,8 +390,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return xit
 
   # pylint: disable=too-many-branches
-  @uses_runstate
-  def cmd_find(self, argv, *, runstate: RunState):
+  def cmd_find(self, argv):
     ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
           List files from path matching all the constraints.
           --direct    Use direct tags instead of all tags.
@@ -401,6 +405,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
+    runstate = options.runstate
     badopts = False
     use_direct_tags = False
     as_rsync_includes = False
@@ -580,8 +585,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             )
     return 0
 
-  @uses_runstate
-  def cmd_ls(self, argv, *, runstate: RunState):
+  def cmd_ls(self, argv):
     ''' Usage: {cmd} [-d] [--direct] [-o output_format] [paths...]
           List files from paths and their tags.
           -d          Treat directories like files, do not recurse.
@@ -594,6 +598,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
+    runstate = options.runstate
     directories_like_files = False
     use_direct_tags = False
     long_format = False
@@ -1097,13 +1102,12 @@ class FSTags(MultiOpenMixin):
     self.update_uuid_tag_name = update_uuid_tag_name
     self._lock = RLock()
 
-  def startup(self):
-    ''' Stub for startup.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Sync tag files and db mapping on final close.
     '''
-
-  def shutdown(self):
-    ''' Save any modified tag files on shutdown.
-    '''
+    yield
+    # save any modified tag files on shutdown.
     self.sync()
 
   @locked
@@ -1896,11 +1900,11 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
     self.__dict__.update(_fstags=fstags)
     super().__init__(fspath, ontology=ontology, **kw)
 
-  @typechecked
   @require(
       lambda name: is_valid_basename(name),  # pylint: disable=unnecessary-lambda
       "name should be a clean file basename"
   )
+  @typechecked
   def TagSetClass(self, name: str) -> TaggedPath:
     ''' factory to create a `TaggedPath` from a `name`.
     '''

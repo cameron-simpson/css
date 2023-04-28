@@ -27,7 +27,7 @@ from cs.queues import MultiOpenMixin
 from cs.resources import uses_runstate
 from cs.threads import locked
 
-from . import PATHSEP, defaults, RLock
+from . import PATHSEP, RLock
 from .block import Block, _Block, BlockRecord
 from .blockify import top_block_for, blockify
 from .file import RWBlockFile
@@ -517,7 +517,8 @@ class _Dirent(Transcriber):
     ''' Return this Dirent's POSIX stat structure.
     '''
     if fs is None:
-      fs = defaults.fs
+      from .fs import FileSystem
+      fs = FileSystem.default()
     M = self.meta
     I = fs.E2inode(self) if fs else None
     perm_bits = M.unix_perm_bits
@@ -675,7 +676,8 @@ class IndirectDirent(_Dirent):
     ''' Dereference this IndirectDirent's UUID via a FileSystem.
     '''
     if fs is None:
-      fs = defaults.fs
+      from .fs import FileSystem
+      fs = FileSystem.default()
       if not fs:
         error("NO CURRENT FILESYSTEM")
         stack_dump()
