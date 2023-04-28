@@ -1046,7 +1046,7 @@ class CalibreCommand(BaseCommand):
         default_factory=lambda: CalibreTree.
         _resolve_fspath(None, CalibreTree.FSPATH_ENVVAR)
     )
-    other_calibre_path: Optional[str] = field(
+    calibre_path_other: Optional[str] = field(
         default_factory=lambda: (
             CalibreTree.
             _resolve_fspath(None, CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR)
