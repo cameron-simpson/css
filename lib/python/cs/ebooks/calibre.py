@@ -499,7 +499,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   def startup_shutdown(self):
     ''' Stub startup/shutdown.
     '''
-    yield
+    with self.db.session() as session:
+      yield
 
   @property
   @locked
