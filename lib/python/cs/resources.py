@@ -12,7 +12,7 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock, current_thread, main_thread
 import time
-from typing import Any, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 from typeguard import typechecked
 
@@ -541,7 +541,12 @@ class RunState(HasThreadState):
   perthread_state = ThreadState()
 
   def __init__(
-      self, name=None, signals=None, handle_signal=None, verbose=False
+      self,
+      name=None,
+      signals=None,
+      handle_signal=None,
+      poll_cancel: Optional[Callable] = None,
+      verbose=False,
   ):
     self.name = name
     self.verbose = verbose
@@ -551,7 +556,8 @@ class RunState(HasThreadState):
     self._sighandler = handle_signal or self.handle_signal
     # core state
     self._running = False
-    self.cancelled = False
+    self._cancelled = False
+    self.poll_cancel = poll_cancel
     # timing state
     self.start_time = None
     self.stop_time = None
@@ -662,6 +668,24 @@ class RunState(HasThreadState):
 
   # compatibility
   end = stop
+
+  @property
+  def cancelled(self):
+    ''' Test the .cancelled attribute, including a poll if supplied.
+    '''
+    if self._cancelled:
+      return True
+    if self.poll_cancel:
+      if self.poll_cancel():
+        self._cancelled = True
+        return True
+    return False
+
+  @cancelled.setter
+  def cancelled(self, cancel_status):
+    ''' Set the .cancelled attribute.
+    '''
+    self._cancelled = cancel_status
 
   @property
   def running(self):
