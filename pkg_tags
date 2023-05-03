@@ -82,7 +82,7 @@ cs.pyfunc
 cs.queues pypi.release="20230331" ok_revision="21372ad95a48270f7efb228877f3bda3111f40fd" features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"],"20220918":["QueueIterator"]}
 cs.range pypi.release=20190102 ok_revision="71250a2041fc87831ffcbbddeaa20316d64d3a5f"
 cs.release
-cs.resources pypi.release="20230331" ok_revision="0ee133a6fdae6a024fe4e29b6aa467c11c7f2d5f" features={"20220429":["catch_signal"],"20220918":["openif"]}
+cs.resources pypi.release="20230331" ok_revision="0ee133a6fdae6a024fe4e29b6aa467c11c7f2d5f" features={"20220429":["catch_signal"],"20220918":["openif"],"20230503":["RunState_poll_cancel"]}
 cs.result pypi.release="20230331" ok_revision=cbe8b33c19196929af7d229a5209e95e4174c3cb features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"]}
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
