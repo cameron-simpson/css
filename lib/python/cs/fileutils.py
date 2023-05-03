@@ -39,7 +39,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
-from cs.gimmicks import TimeoutError
+from cs.gimmicks import TimeoutError  # pylint: disable=redefined-builtin
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx, pfx, pfx_call
@@ -51,7 +51,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20230401-post'
+__version__ = '20230421-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -794,12 +794,12 @@ def mkdirn(path, sep=''):
             " with a trailing %r seems nonsensical" % (path, sep, os.sep)
         )
       dirpath = path[:-len(os.sep)]
-      pfx = ''
+      prefix = ''
     else:
       dirpath = dirname(path)
       if not dirpath:
         dirpath = '.'
-      pfx = basename(path) + sep
+      prefix = basename(path) + sep
 
     if not isdir(dirpath):
       error("parent not a directory: %r", dirpath)
@@ -808,7 +808,7 @@ def mkdirn(path, sep=''):
     # do a quick scan of the directory to find
     # if any names of the desired form already exist
     # in order to start after them
-    maxn = max_suffix(dirpath, pfx)
+    maxn = max_suffix(dirpath, prefix)
     if maxn is None:
       newn = 0
     else:
@@ -1000,10 +1000,10 @@ class Pathname(str):
     '''
     return self.shorten()
 
-  def shorten(self, environ=None, prefixes=None):
+  def shorten(self, prefixes=None):
     ''' Shorten a Pathname using ~ and ~user.
     '''
-    return shortpath(self, environ=environ, prefixes=prefixes)
+    return shortpath(self, prefixes=prefixes)
 
 def iter_fd(fd, **kw):
   ''' Iterate over data from the file descriptor `fd`.
@@ -1201,9 +1201,7 @@ class ReadMixin(object):
       else:
         offset = bfr.offset
     if size == -1:
-      size = len(self) - offset
-      if size < 0:
-        size = 0
+      size = max(len(self) - offset, 0)
     if size == 0:
       return b''
     if longread:
@@ -1690,8 +1688,8 @@ def atomic_filename(
     prefix = '.' + fprefix
   if suffix is None:
     suffix = fsuffix
-  if existspath(filename) and not exists_ok:
-    raise ValueError("already exists: %r" % (filename,))
+  if not exists_ok and existspath(filename):
+    raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), filename)
   with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, delete=False,
                           **kw) as T:
     if placeholder:
