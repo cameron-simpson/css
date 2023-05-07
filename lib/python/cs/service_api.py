@@ -56,6 +56,8 @@ class ServiceAPI(MultiOpenMixin):
   '''
 
   API_AUTH_GRACETIME = None
+  API_RETRY_COUNT = 3  # number of request attempts
+  APY_RETRY_DELAY = 5  # interval between request retries
 
   @promote
   def __init__(self, *, sqltags: SQLTags):
@@ -181,7 +183,16 @@ class HTTPServiceAPI(ServiceAPI):
     if headers is not None:
       rq_headers.update(headers)
     with upd.run_task(f'{_method} {url}'):
-      rsp = pfx_call(rqm, url, cookies=cookies, headers=rq_headers, **rqkw)
+      for retry in range(self.API_RETRY_COUNT, 0, -1):
+        try:
+          rsp = pfx_call(rqm, url, cookies=cookies, headers=rq_headers, **rqkw)
+          break
+        except requests.ConnectionError as e:
+          if retry <= 1:
+            # last retry
+            raise
+          warning("%s: %s, retrying in %ds", url, e, self.API_RETRY_DELAY)
+          time.sleep(self.API_RETRY_DELAY)
     if not _no_raise_for_status:
       rsp.raise_for_status()
     return rsp
