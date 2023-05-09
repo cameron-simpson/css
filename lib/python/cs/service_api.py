@@ -58,7 +58,7 @@ class ServiceAPI(MultiOpenMixin):
 
   API_AUTH_GRACETIME = None
   API_RETRY_COUNT = 3  # number of request attempts
-  APY_RETRY_DELAY = 5  # interval between request retries
+  API_RETRY_DELAY = 5  # interval between request retries
 
   @promote
   def __init__(self, *, sqltags: SQLTags):
