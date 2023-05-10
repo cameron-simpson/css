@@ -26,7 +26,7 @@ from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
 from cs.typingutils import subtype
 
-__version__ = '20230331-post'
+__version__ = '20230401-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -46,6 +46,7 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
+        'cs.typingutils',
         'icontract',
         'typeguard',
     ],
