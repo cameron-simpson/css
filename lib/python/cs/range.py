@@ -93,6 +93,10 @@ class Span(namedtuple('Span', 'start end')):
     '''
     return len(self)
 
+  def as_list(self):
+    ''' This `Span` as a 2 element `list`. '''
+    return [self.start, self.end]
+
 class Range(object):
   ''' A collection of ints that collates adjacent ints.
 
@@ -158,6 +162,22 @@ class Range(object):
     ''' Return the first `Span`; raises `IndexError` if there are no spans.
     '''
     return first(self.spans())
+
+  def as_list(self):
+    ''' This `Range` as a `list` of 2-element per-`Span` `list`s.
+
+            >>> R = Range(4, 8)
+            >>> R.as_list()
+            [[4, 8]]
+            >>> R.add(11, 14)
+            >>> R.as_list()
+            [[4, 8], [11, 14]]
+            >>> R.remove(12)
+            >>> R.as_list()
+            [[4, 8], [11, 12], [13, 14]]
+
+    '''
+    return [span.as_list() for span in self._spans]
 
   def _check(self):
     self._check_spans()
