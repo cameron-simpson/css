@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python3 -tt
 #
 # Data stores based on local files.
 # - Cameron Simpson <cs@cskk.id.au>
@@ -86,7 +86,7 @@ from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
 from cs.upd import with_upd_proxy, UpdProxy, uses_upd
 
-from . import MAX_FILE_SIZE, Lock, RLock, defaults
+from . import MAX_FILE_SIZE, Lock, RLock, Store
 from .archive import Archive
 from .block import Block
 from .blockify import (
@@ -200,7 +200,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     '''
     if indexclass is None:
       indexclass = choose_indexclass(
-          cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.HASHNAME)
+          cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.hashname)
       )
     if rollover is None:
       rollover = cls.DATA_ROLLOVER
@@ -305,7 +305,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     self.indexclass = resolved.indexclass
     self.rollover = resolved.rollover
     self.hashclass = hashclass
-    self.hashname = hashclass.HASHNAME
+    self.hashname = hashclass.hashname
     self.statefilepath = self.pathto(
         self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
     )
@@ -385,32 +385,37 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                       _data_progress=data_progress,
                       _data_proxy=data_proxy,
                       _dataQ=dataQ,
-                      _data_Thread=bg_thread(
-                          self._process_data_queue,
-                          name="%s._process_data_queue" % (self,),
-                          args=(dataQ,),
-                      ),
-                      _monitor_Thread=bg_thread(
-                          self._monitor_datafiles,
-                          name="%s-datafile-monitor" % (self,),
-                      ),
                   ):
-                    try:
-                      yield
-                    finally:
-                      self.runstate.cancel()
-                      self._monitor_Thread.join()
-                      self.flush()
-                      # drain the data queue
-                      self._dataQ.close()
-                      self._dataQ = None
-                      self._data_Thread.join()
-                    # update state to substrate
-                    self._filemap.close()
-                    # close the read file descriptors
-                    for rfd in self._rfds.values():
-                      with Pfx("os.close(rfd:%d)", rfd):
-                        os.close(rfd)
+                    _data_Thread = bg_thread(
+                        self._process_data_queue,
+                        name="%s._process_data_queue" % (self,),
+                        args=(dataQ,),
+                    )
+                    _monitor_Thread = bg_thread(
+                        self._monitor_datafiles,
+                        name="%s-datafile-monitor" % (self,),
+                    )
+                    with stackattrs(
+                        self,
+                        _data_Thread=_data_Thread,
+                        _monitor_Thread=_monitor_Thread,
+                    ):
+                      try:
+                        yield
+                      finally:
+                        self.runstate.cancel()
+                        self._monitor_Thread.join()
+                        self.flush()
+                        # drain the data queue
+                        self._dataQ.close()
+                        self._dataQ = None
+                        self._data_Thread.join()
+                      # update state to substrate
+                      self._filemap.close()
+                      # close the read file descriptors
+                      for rfd in self._rfds.values():
+                        with Pfx("os.close(rfd:%d)", rfd):
+                          os.close(rfd)
 
   @typechecked
   def new_datafile(self) -> DataFileState:
@@ -680,7 +685,7 @@ class SqliteFilemap:
     return self.conn.execute(sql, *a)
 
   @pfx_method(use_str=True)
-  def _modify(self, sql, *a, return_cursor=False):
+  def _modify(self, sql, *a, return_cursor=False, quiet=False):
     sql = sql.strip()
     conn = self.conn
     try:
@@ -689,7 +694,7 @@ class SqliteFilemap:
         sqlite3.OperationalError,
         sqlite3.IntegrityError,
     ) as e:
-      error("%s: %s [SQL=%r %r]", type(e).__name__, e, sql, a)
+      quiet or error("%s: %s [SQL=%r %r]", type(e).__name__, e, sql, a)
       conn.rollback()
     else:
       conn.commit()
@@ -748,7 +753,8 @@ class SqliteFilemap:
       c = self._modify(
           'INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)',
           (new_path, 0),
-          return_cursor=True
+          return_cursor=True,
+          quiet=True,
       )
       if c:
         filenum = c.lastrowid
@@ -1075,7 +1081,7 @@ class PlatonicDir(FilesDir):
         data directory path.
     '''
     if meta_store is None:
-      meta_store = defaults.S
+      meta_store = Store.default()
     super().__init__(topdirpath, hashclass=hashclass, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path

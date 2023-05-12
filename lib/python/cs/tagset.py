@@ -212,14 +212,14 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator, fmtdoc
+from cs.deco import decorator, fmtdoc, Promotable
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
-    has_format_attributes, format_attribute, FStr, r
+    has_format_attributes, format_attribute, FStr, r, s
 )
 from cs.logutils import setup_logging, debug, warning, error, ifverbose
 from cs.mappings import (
@@ -232,7 +232,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20230210-post'
+__version__ = '20230407-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -514,6 +514,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         attribute = kw.get_format_attribute(arg_name)
       except AttributeError:
         if self.format_mode.strict:
+          # pylint: disable=raise-missing-from
           raise KeyError(
               "%s.get_value: unrecognised arg_name %r" %
               (type(self).__name__, arg_name)
@@ -528,7 +529,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ################################################################
   # The magic attributes.
 
-  # pylint: disable=too-many-nested-blocks,too-many-return-statements
+  # pylint: disable=too-many-nested-blocks,too-many-return-statements,too-many-branches
   def __getattr__(self, attr):
     ''' Support access to dotted name attributes.
 
@@ -1729,7 +1730,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     except KeyError:
       raise AttributeError('member_type')  # pylint: disable=raise-missing-from
 
-class TagSetCriterion(ABC):
+class TagSetCriterion(Promotable):
   ''' A testable criterion for a `TagSet`.
   '''
 
@@ -1751,12 +1752,13 @@ class TagSetCriterion(ABC):
         Instances of `cls` are returned unchanged.
         Instances of s`str` are promoted via `cls.from_str`.
     '''
-    if not isinstance(criterion, cls):
-      if isinstance(criterion, str):
-        criterion = cls.from_str(criterion, fallback_parse=fallback_parse)
-      else:
-        raise TypeError("cannot promote to %s: %s" % (cls, r(criterion)))
-    return criterion
+    if isinstance(criterion, cls):
+      return criterion
+    if isinstance(criterion, str):
+      return cls.from_str(criterion, fallback_parse=fallback_parse)
+    raise TypeError(
+        "%s.promote: cannot promote to %s" % (cls.__name__, r(criterion))
+    )
 
   @classmethod
   @pfx_method
@@ -2024,8 +2026,8 @@ class TagSetPrefixView(FormatableMixin):
           TagSet:{'a': 1, 'b': 2, 'sub.x': 3, 'sub.y': 4, 'sub.z': 5}
   '''
 
-  @typechecked
   @require(lambda prefix: len(prefix) > 0)
+  @typechecked
   def __init__(self, tags, prefix: str):
     self.__dict__.update(_tags=tags, _prefix=prefix, _prefix_=prefix + '.')
 
@@ -2474,6 +2476,7 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
           ['prefix.bah']
   '''
 
+  # pylint: disable=unnecessary-lambda-assignment
   @typechecked
   def __init__(self, tagsets: BaseTagSets, match, unmatch=None):
     self.__match = match
@@ -3493,7 +3496,15 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
                     d = tags.as_dict()
                     del d[update_uuid_tag_name]
                     d['fspath'] = joinpath(dirname(filepath), name)
-                    update_mapping[key].update(d)
+                    try:
+                      update_mapping[key].update(d)
+                    except AttributeError:
+                      raise
+                    except Exception as e:
+                      warning(
+                          "update_mapping:%s[%r].update(%s): %s",
+                          s(update_mapping), key, cropped_repr(d), e
+                      )
                 f.write(
                     cls.tags_line(
                         name, tags, extra_types=extra_types, prune=prune
@@ -3513,16 +3524,23 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     with self._lock:
       if self.is_modified():
         # there are modified TagSets
-        self.save_tagsets(
-            self.fspath,
-            tagsets,
-            self.unparsed,
-            extra_types=extra_types,
-            prune=prune,
-            update_mapping=self.update_mapping,
-            update_prefix=self.update_prefix,
-            update_uuid_tag_name=self.update_uuid_tag_name,
-        )
+        update_mapping_close = getattr(self.update_mapping, 'close', None)
+        if update_mapping_close:
+          self.update_mapping.open()
+        try:
+          self.save_tagsets(
+              self.fspath,
+              tagsets,
+              self.unparsed,
+              extra_types=extra_types,
+              prune=prune,
+              update_mapping=self.update_mapping,
+              update_prefix=self.update_prefix,
+              update_uuid_tag_name=self.update_uuid_tag_name,
+          )
+        finally:
+          if update_mapping_close:
+            pfx_call(update_mapping_close)
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
           tagset.modified = False

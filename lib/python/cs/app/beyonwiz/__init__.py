@@ -98,6 +98,7 @@ def trailing_nul(bs):
     start += 1
   return start, bs[start:]
 
+# TODO: moved to cs.sqltags, can we obviate its use entirely in this package?
 @pfx
 def jsonable(value):
   if isinstance(value, (int, str, float)):

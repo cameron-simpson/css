@@ -44,7 +44,7 @@ from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.psutils import run
 from cs.queues import ListQueue
 from cs.seq import Seq, unrepeated
-from cs.threads import State as ThreadState
+from cs.threads import ThreadState
 
 
 # the default coordinate system to use in model files

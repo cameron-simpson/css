@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Command line stuff. - Cameron Simpson <cs@cskk.id.au> 03sep2015
 #
@@ -9,17 +9,26 @@
     and other command line related stuff.
 '''
 
-from __future__ import print_function, absolute_import
+from abc import ABC, abstractmethod
+from cmd import Cmd
 from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
+from dataclasses import dataclass
+from functools import partial
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
 from os.path import basename
+try:
+  import readline
+except ImportError:
+  pass
+import shlex
 from signal import SIGHUP, SIGINT, SIGTERM
 import sys
-from types import SimpleNamespace
-from typing import List
+from typing import Callable, List, Mapping, Optional
+
+from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.lex import (
@@ -34,15 +43,15 @@ from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState, uses_runstate
+from cs.typingutils import subtype
 from cs.upd import Upd
 
-__version__ = '20230211-post'
+__version__ = '20230407-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -52,6 +61,9 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.doc',
         'cs.resources',
+        'cs.typingutils',
+        'cs.upd',
+        'typeguard',
     ],
 }
 
@@ -101,7 +113,9 @@ def docmd(dofunc):
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
 
-class _BaseSubCommand:
+class _BaseSubCommand(ABC):
+  ''' The basis for the classes implementing subcommands.
+  '''
 
   def __init__(self, cmd, method, *, usage_mapping=None):
     self.cmd = cmd
@@ -114,7 +128,7 @@ class _BaseSubCommand:
     )
 
   @staticmethod
-  def from_class(command_cls):
+  def from_class(command_cls: "BaseCommandSubType") -> Mapping[str, Callable]:
     ''' Return a mapping of subcommand names to subcommand specifications
         for class attributes which commence with
         `command_cls.SUBCOMMAND_METHOD_PREFIX`,
@@ -139,7 +153,11 @@ class _BaseSubCommand:
         )
     return subcommands_map
 
-  def usage_text(self, short, usage_format_mapping=None):
+  def usage_text(
+      self,
+      short: bool,
+      usage_format_mapping: Optional[Mapping] = None
+  ) -> str:
     ''' Return the filled out usage text for this subcommand.
     '''
     usage_format_mapping = usage_format_mapping or {}
@@ -165,13 +183,15 @@ class _MethodSubCommand(_BaseSubCommand):
   ''' A class to represent a subcommand implemented with a method.
   '''
 
-  def __call__(self, subcmd, command, argv):
+  def __call__(
+      self, subcmd: str, command: "BaseCommandSubType", argv: List[str]
+  ):
     with Pfx(subcmd):
       method = self.method
       if ismethod(method):
         # already bound
         return method(argv)
-      # unbound - supply the instance
+      # unbound - supply the instance for use as self
       return method(command, argv)
 
   def usage_format(self):
@@ -202,21 +222,27 @@ class _ClassSubCommand(_BaseSubCommand):
   '''
 
   def __call__(self, cmd, command, argv):
-    return self.method(argv, cmd=cmd, **command.options.__dict__).run()
+    mkw = dict(command.options.__dict__)
+    if cmd is not None:
+      mkw.update(cmd=cmd)
+    return self.method(argv, **mkw).run()
 
-  def usage_format(self):
+  def usage_format(self) -> str:
     ''' Return the usage format string from the class.
     '''
     doc = self.method.usage_text(cmd=self.cmd)
     subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
     return subusage_format
 
-# pylint: disable=too-few-public-methods
-class BaseCommandOptions(SimpleNamespace):
+@dataclass
+class BaseCommandOptions:
   ''' A base class for the `BaseCommand` `options` object.
 
       This is the default class for the `self.options` object
-      available during `BaseCommand.run()`.
+      available during `BaseCommand.run()`,
+      and available as the `BaseCommand.Options` attribute.
+
+      Any keyword arguments are applied as field updates to the instance.
 
       It comes prefilled with:
       * `.dry_run=False`
@@ -224,14 +250,62 @@ class BaseCommandOptions(SimpleNamespace):
       * `.quiet=False`
       * `.verbose=False`
       and a `.doit` property which is the inverse of `.dry_run`.
+
+      It is recommended that if ``BaseCommand` subclasses use a
+      different type for their `Options` that it should be a
+      subclass of `BaseCommandOptions`.
+      Since `BaseCommandOptions` is a data class, this typically looks like:
+
+          @dataclass
+          class Options(BaseCOmmand.Options):
+              ... optional extra fields etc ...
   '''
 
-  def __init__(self, **kw):
-    kw.setdefault('dry_run', False)
-    kw.setdefault('force', False)
-    kw.setdefault('quiet', False)
-    kw.setdefault('verbose', False)
-    super().__init__(**kw)
+  cmd: Optional[str] = None
+  dry_run: bool = False
+  force: bool = False
+  quiet: bool = False
+  verbose: bool = False
+
+  def copy(self, **updates):
+    ''' Return a new instance of `BaseCommandOptions` (well, `type(self)`)
+        which is a shallow copy of the public attributes from `self.__dict__`.
+
+        Any keyword arguments are applied as attribute updates to the copy.
+    '''
+    copied = type(self)(
+        **{k: v
+           for k, v in self.__dict__.items()
+           if not k.startswith('_')}
+    )
+    for k, v in updates.items():
+      setattr(copied, k, v)
+    return copied
+
+  @contextmanager
+  def __call__(self, **updates):
+    ''' Calling the options object returns a context manager whose
+        value is a copy of the options with any `suboptions` applied.
+
+        Example showing the semantics:
+
+            >>> from cs.cmdutils import BaseCommandOptions
+            >>> options = BaseCommandOptions(x=1)
+            >>> assert options.x == 1
+            >>> assert not options.verbose
+            >>> with options(verbose=True) as subopts:
+            ...     assert options is not subopts
+            ...     assert options.x == 1
+            ...     assert not options.verbose
+            ...     assert subopts.x == 1
+            ...     assert subopts.verbose
+            ...
+            >>> assert options.x == 1
+            >>> assert not options.verbose
+
+    '''
+    suboptions = self.copy(**updates)
+    yield suboptions
 
   @property
   def doit(self):
@@ -318,9 +392,6 @@ class BaseCommand:
               ... do the "ls" subcommand ...
 
       The subclass is customised by overriding the following methods:
-      * `apply_defaults()`:
-        prepare the initial state of `self.options`
-        before any command line options are applied.
       * `apply_opt(opt,val)`:
         apply an individual getopt global command line option
         to `self.options`.
@@ -350,12 +421,13 @@ class BaseCommand:
       Primarily because when incorrectly invoked
       an argparse command line prints the help/usage messgae
       and aborts the whole programme with `SystemExit`.
+      But also, I find the whole argparse `add_argument` thing cumbersome.
   '''
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = None
-  OPTIONS_CLASS = BaseCommandOptions
+  Options = BaseCommandOptions
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGTERM
 
   def __init_subclass__(cls):
@@ -372,7 +444,16 @@ class BaseCommand:
     cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
+  @uses_runstate
+  def __init__(
+      self,
+      argv=None,
+      *,
+      cmd=None,
+      options=None,
+      runstate: Optional[RunState],
+      **kw_options
+  ):
     ''' Initialise the command line.
         Raises `GetoptError` for unrecognised options.
 
@@ -388,12 +469,11 @@ class BaseCommand:
           if this is not specified it is taken from `argv.pop(0)`.
         * `options`:
           an optional keyword providing object for command state and context.
-          If not specified a new `self.OPTIONS_CLASS` instance
+          If not specified a new `self.Options` instance
           is allocated for use as `options`.
-          The default `OPTIONS_CLASS` is `BaseCommandOptions`,
-          a `SimpleNamespace` with some prefilled attributes and properties
+          The default `Options` class is `BaseCommandOptions`,
+          a dataclass with some prefilled attributes and properties
           to aid use later.
-          These can be further updated by the `.apply_default()` method.
         Other keyword arguments are applied to `self.options`
         as attributes.
 
@@ -431,7 +511,7 @@ class BaseCommand:
         and with `cmd=None` for `main`.
     '''
     subcmds = self.subcommands()
-    has_subcmds = subcmds and list(subcmds) != ['help']
+    has_subcmds = subcmds and sorted(subcmds) != ['help', 'shell']
     if argv is None:
       # using sys.argv:
       # argv0 comes from sys.argv[0], which is discarded
@@ -448,14 +528,16 @@ class BaseCommand:
         argv0 = cmd
     if cmd is None:
       cmd = basename(argv0)
+    if runstate is None:
+      runstate = RunState(cmd)
     self.cmd = cmd
-    options = self.options = self.OPTIONS_CLASS()
-    options.runstate_signals = self.DEFAULT_SIGNALS
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
-    self.apply_defaults()
+    options = self.options = self.Options()
+    options.runstate = runstate
+    options.runstate_signals = self.DEFAULT_SIGNALS
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
@@ -667,12 +749,6 @@ class BaseCommand:
       mapping.update(cmd=subcmd)
       subusage = subusage_format.format_map(mapping)
     return subusage or None
-
-  def apply_defaults(self):
-    ''' Stub `apply_defaults` method.
-
-        Subclasses can override this to set up the initial state of `self.options`.
-    '''
 
   @pfx_method
   # pylint: disable=no-self-use
@@ -996,7 +1072,7 @@ class BaseCommand:
 
         Any keyword arguments are used to override `self.options` attributes
         for the duration of the run,
-        for example to presupply a shared `RunState` from an outer context.
+        for example to presupply a shared `Upd` from an outer context.
 
         If the first command line argument *foo*
         has a corresponding method `cmd_`*foo*
@@ -1030,6 +1106,14 @@ class BaseCommand:
         self._printed_usage = True
         return 2
       raise
+
+  @classmethod
+  def cmdloop(cls, intor=None):
+    ''' Use `cmd.Cmd` to run a command loop which calls the `cmd_`* methods.
+    '''
+    # TODO: get intro from usage/help
+    cmdobj = BaseCommandCmd(cls)
+    cmdobj.cmdloop()
 
   # pylint: disable=unused-argument
   @staticmethod
@@ -1104,7 +1188,7 @@ class BaseCommand:
             upd=upd,
         ):
           with upd:
-            with options.runstate:
+            with runstate:
               with runstate.catch_signal(options.runstate_signals,
                                          call_previous=False,
                                          handle_signal=handle_signal):
@@ -1152,8 +1236,15 @@ class BaseCommand:
       warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit
 
-  def shell(self, *argv, banner=None, local=None):
+  def cmd_shell(self, argv):
+    ''' Usage: {cmd}
+            Run a command prompt via cmd.Cmd using this command's subcommands.
+      '''
+    self.cmdloop()
+
+  def repl(self, *argv, banner=None, local=None):
     ''' Run an interactive Python prompt with some predefined local names.
+        Aka REPL (Read Evaluate Print Loop).
 
         Parameters:
         * `argv`: any notional command line arguments
@@ -1171,11 +1262,11 @@ class BaseCommand:
         commands wishing such a command should provide something
         like this:
 
-            def cmd_shell(self, argv):
+            def cmd_repl(self, argv):
               """ Usage: {cmd}
                     Run an interactive Python prompt with some predefined local names.
               """
-              return self.shell(*argv)
+              return self.repl(*argv)
     '''
     options = self.options
     if banner is None:
@@ -1185,6 +1276,7 @@ class BaseCommand:
       local.update(options.__dict__)
       local.update(argv=argv, cmd=self.cmd, options=options, self=self)
     try:
+      # pylint: disable=import-outside-toplevel
       from bpython import embed
     except ImportError:
       return interact(
@@ -1196,3 +1288,41 @@ class BaseCommand:
           banner=banner,
           locals_=local,
       )
+
+BaseCommandSubType = subtype(BaseCommand)
+
+class BaseCommandCmd(Cmd):
+  ''' A `cmd.Cmd` subclass used to provide interactive use of a
+      command's subcommands.
+
+      The `BaseCommand.cmdloop()` class method instantiates an
+      instance of this cand calls its `.cmdloop()` method
+      i.e. `cmd.Cmd.cmdloop`.
+  '''
+
+  def __init__(self, command_class: BaseCommandSubType):
+    super().__init__()
+    self.command_class = command_class
+
+  @typechecked
+  def _doarg(self, subcmd: str, arg: str):
+    cls = self.command_class
+    argv = trace(shlex.split)(arg)
+    command = trace(cls)([cls.__name__, subcmd] + argv)
+    with stackattrs(command, _subcmd=subcmd):
+      command.run()
+
+  def __getattr__(self, attr):
+    cls = self.command_class
+    subcmd = cutprefix(attr, 'do_')
+    if subcmd is not attr:
+      method_name = cls.SUBCOMMAND_METHOD_PREFIX + subcmd
+      X("method_name=%s", method_name)
+      if hasattr(cls, method_name):
+
+        def do_cmdsub(arg):
+          return trace(self._doarg)(subcmd, arg)
+
+        return do_cmdsub
+        return trace(docmd(partial(self._doarg, subcmd)))
+    raise AttributeError("%s.%s" % (self.__class__.__name__, attr))

@@ -44,7 +44,7 @@ from .hash import (
     HashCodeField,
 )
 from .pushpull import missing_hashcodes_by_checksum
-from .store import StoreError, BasicStoreSync
+from .store import StoreError, StoreSyncBase
 from .transcribe import parse
 
 class RqType(IntEnum):
@@ -61,7 +61,7 @@ class RqType(IntEnum):
   ARCHIVE_LIST = 8  # (count,archive_name) -> (when,E)...
   LENGTH = 9  # () -> remote-store-length
 
-class StreamStore(BasicStoreSync):
+class StreamStore(StoreSyncBase):
   ''' A Store connected to a remote Store via a `PacketConnection`.
       Optionally accept a local store to facilitate bidirectional activities
       or simply to implement the server side.
@@ -109,7 +109,7 @@ class StreamStore(BasicStoreSync):
           if false a `.add()` will queue the add packet and return
           the hashcode immediately
 
-        Other keyword arguments are passed to `BasicStoreSync.__init__`.
+        Other keyword arguments are passed to `StoreSyncBase.__init__`.
     '''
     if capacity is None:
       capacity = 1024
@@ -327,7 +327,7 @@ class StreamStore(BasicStoreSync):
     if self.mode_addif:
       if self.contains(h):
         return h
-    rq = AddRequest(data=data, hashenum=self.hashclass.HASHENUM)
+    rq = AddRequest(data=data, hashenum=self.hashclass.hashenum)
     if self.mode_sync:
       flags, payload = self.do(rq)
       h2, offset = hash_decode(payload)
@@ -765,7 +765,7 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
     )
 
   def transcribe(self):
-    yield BSString.transcribe_value(self.hashclass.HASHNAME)
+    yield BSString.transcribe_value(self.hashclass.hashname)
     start_hashcode = self.start_hashcode
     if start_hashcode is not None:
       yield HashCodeField.transcribe_value(start_hashcode)

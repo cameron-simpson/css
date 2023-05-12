@@ -27,7 +27,7 @@ from cs.queues import MultiOpenMixin
 from cs.resources import uses_runstate
 from cs.threads import locked
 
-from . import PATHSEP, defaults, RLock
+from . import PATHSEP, RLock
 from .block import Block, _Block, BlockRecord
 from .blockify import top_block_for, blockify
 from .file import RWBlockFile
@@ -517,7 +517,8 @@ class _Dirent(Transcriber):
     ''' Return this Dirent's POSIX stat structure.
     '''
     if fs is None:
-      fs = defaults.fs
+      from .fs import FileSystem
+      fs = FileSystem.default()
     M = self.meta
     I = fs.E2inode(self) if fs else None
     perm_bits = M.unix_perm_bits
@@ -675,7 +676,8 @@ class IndirectDirent(_Dirent):
     ''' Dereference this IndirectDirent's UUID via a FileSystem.
     '''
     if fs is None:
-      fs = defaults.fs
+      from .fs import FileSystem
+      fs = FileSystem.default()
       if not fs:
         error("NO CURRENT FILESYSTEM")
         stack_dump()
@@ -897,7 +899,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     '''
     return _Dirent.transcribe_inner(self, T, fp, {})
 
-  def pushto_queue(self, Q, runstate=None, progress=None):
+  def pushto_queue(self, Q, progress=None):
     ''' Push the Block with the file contents to a queue.
 
         Parameters:
@@ -908,7 +910,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
 
         Semantics are as for `cs.vt.block.Block.pushto_queue`.
     '''
-    return self.block.pushto_queue(Q, runstate=runstate, progress=progress)
+    return self.block.pushto_queue(Q, progress=progress)
 
   @io_fail
   def fsck(self, recurse=False):
@@ -1278,7 +1280,8 @@ class Dir(_Dirent, DirLike):
     return _Dirent.transcribe_inner(self, T, fp, {})
 
   @pfx_method
-  def pushto_queue(self, Q, runstate=None, progress=None):
+  @uses_runstate
+  def pushto_queue(self, Q, *, runstate, progress=None):
     ''' Push the Dir Blocks to a queue.
 
         Parameters:
@@ -1292,11 +1295,12 @@ class Dir(_Dirent, DirLike):
     # push the Dir block data
     B.pushto_queue(Q, runstate=runstate, progress=progress)
     # and recurse into contents
-    for E in DirentRecord.scan_values(B.bufferfrom()):
-      if runstate and runstate.cancelled:
-        warning("push cancelled")
-        return False
-      E.pushto_queue(Q, runstate=runstate, progress=progress)
+    with runstate:
+      for E in DirentRecord.scan_values(B.bufferfrom()):
+        if runstate.cancelled:
+          warning("push cancelled")
+          return False
+        E.pushto_queue(Q, progress=progress)
     return True
 
   @io_fail

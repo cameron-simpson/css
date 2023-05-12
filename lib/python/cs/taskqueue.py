@@ -8,7 +8,7 @@ from itertools import chain
 import sys
 from threading import RLock
 import time
-from typing import Callable, TypeVar, Union
+from typing import Callable, Union
 
 from icontract import require
 from typeguard import typechecked
@@ -20,12 +20,13 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import funcname
 from cs.queues import ListQueue
-from cs.resources import RunState, RunStateMixin
+from cs.resources import RunState, RunStateMixin, uses_runstate
 from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
-from cs.threads import bg as bg_thread, locked, State as ThreadState, HasThreadState
+from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
+from cs.typingutils import subtype
 
-__version__ = '20221207-post'
+__version__ = '20230401-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -45,6 +46,7 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
+        'cs.typingutils',
         'icontract',
         'typeguard',
     ],
@@ -108,6 +110,7 @@ class BaseTask(FSM, RunStateMixin):
       definition to provide this default in the usual way.
   '''
 
+  @uses_runstate
   def __init__(self, *, state=None, runstate=None):
     FSM.__init__(self, state)
     RunStateMixin.__init__(self, runstate)
@@ -173,10 +176,10 @@ class BaseTask(FSM, RunStateMixin):
     '''
     return f'{self.name}\n{self.fsm_state}'
 
-BaseTaskSubType = TypeVar('BaseTaskSubType', bound=BaseTask)
+BaseTaskSubType = subtype(BaseTask)
 
 # pylint: disable=too-many-instance-attributes
-class Task(FSM, RunStateMixin, HasThreadState):
+class Task(BaseTask, HasThreadState):
   ''' A task which may require the completion of other tasks.
 
       The model here may not be quite as expected; it is aimed at
@@ -274,8 +277,6 @@ class Task(FSM, RunStateMixin, HasThreadState):
   }
 
   _seq = Seq()
-
-  THREAD_STATE_ATTR = 'perthread_state'
 
   perthread_state = ThreadState(initial_state=FSM_DEFAULT_STATE)
 
@@ -557,7 +558,7 @@ class Task(FSM, RunStateMixin, HasThreadState):
     '''
     self.result.join()
 
-TaskSubType = TypeVar('TaskSubType', bound=Task)
+TaskSubType = subtype(Task)
 
 # pylint: disable=too-many-branches
 def make(*tasks, fail_fast=False, queue=None):

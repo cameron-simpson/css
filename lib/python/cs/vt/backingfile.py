@@ -22,9 +22,9 @@ from cs.lex import cropped_repr
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin, openif
+
 from .hash import HashCode, HashCodeUtilsMixin, DEFAULT_HASHCLASS
 from .index import choose as choose_indexclass
-from .store import MappingStore
 from .util import openfd_append, openfd_read
 
 class BackingFileIndexEntry(BinaryMultiValue('BackingFileIndexEntry',
@@ -64,7 +64,7 @@ class BackingFile(MutableMapping, MultiOpenMixin):
 
   def __str__(self):
     return "%s:%s:%s(%r,index=%s)" % (
-        type(self).__name__, self.hashclass.HASHNAME,
+        type(self).__name__, self.hashclass.hashname,
         self.data_record_class.__name__, shortpath(self.path), self.index
     )
 
@@ -340,7 +340,7 @@ class BinaryHashCodeIndex(Mapping, HashCodeUtilsMixin, MultiOpenMixin):
 
   def __str__(self):
     return "%s(hashclass=%s,index_entry_class=%s,binary_index=%s)" % (
-        type(self).__name__, self.hashclass.HASHNAME,
+        type(self).__name__, self.hashclass.hashname,
         type(self.index_entry_class).__name__, self.binary_index
     )
 
@@ -379,33 +379,3 @@ class BinaryHashCodeIndex(Mapping, HashCodeUtilsMixin, MultiOpenMixin):
       offset, length = index_entry
       index_entry = index_entry_class(offset=offset, length=length)
     self.binary_index[hashcode] = bytes(index_entry)
-
-@pfx_method
-def VTDStore(name, path, *, hashclass, index=None, preferred_indexclass=None):
-  ''' Factory to return a `MappingStore` using a `BackingFile`
-      using a single `.vtd` file.
-  '''
-  if hashclass is None:
-    hashclass = DEFAULT_HASHCLASS
-  with Pfx(path):
-    if not path.endswith('.vtd'):
-      warning("does not end with .vtd")
-    if not isfilepath(path):
-      raise ValueError("missing path %r" % (path,))
-    pathbase, _ = splitext(path)
-    if index is None:
-      index_basepath = f"{pathbase}-index-{hashclass.HASHNAME}"
-      indexclass = choose_indexclass(
-          index_basepath, preferred_indexclass=preferred_indexclass
-      )
-      binary_index = indexclass(index_basepath)
-      index = BinaryHashCodeIndex(
-          hashclass=hashclass,
-          binary_index=binary_index,
-          index_entry_class=BackingFileIndexEntry
-      )
-    return MappingStore(
-        name,
-        CompressibleBackingFile(path, hashclass=hashclass, index=index),
-        hashclass=hashclass
-    )

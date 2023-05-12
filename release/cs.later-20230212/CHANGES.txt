@@ -1,0 +1,5 @@
+lib/python/cs/later.py: cs.later: LateFunction.__init__: new no_context=False parameter to suppress use of HasThreadState.Thread to prepare the work Thread
+lib/python/cs/later.py: cs.later: Later: @submittable: rename the special "force" parameter to "_force_submit"; startup_shutdown: use no_context=True and _force_submit=True to submit the self.finished_event.set finalisation call
+lib/python/cs/later.py: cs.later: Later.__str__: include the class name ("Later") for clarity
+lib/python/cs/later.py: cs.later: Later.submit: plumb the no_context=False parameter through to the LateFunction; Later.defer: fix use of _force_submit parameter after earlier change
+lib/python/cs/later.py: cs.later: SubLater.reaper: use HasThreadState.Thread to prepare the reap Thread

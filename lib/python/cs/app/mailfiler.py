@@ -33,6 +33,7 @@
 from __future__ import print_function
 from collections import namedtuple
 from copy import deepcopy
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email import message_from_file
 from email.header import decode_header, make_header
@@ -49,6 +50,7 @@ from threading import Lock, RLock
 import time
 from time import sleep
 from types import SimpleNamespace as NS
+from typing import Any, Optional
 
 from cs.app.maildb import MailDB
 from cs.cmdutils import BaseCommand
@@ -145,16 +147,14 @@ class MailFilerCommand(BaseCommand):
           Maildir names.
           Default: {DEFAULT_RULES_PATTERN}'''
 
-  def apply_defaults(self):
-    ''' Set up default options.
-    '''
-    options = self.options
-    options.stdin = sys.stdin
-    options.config_path = None
-    options.maildb_path = None
-    options.msgiddb_path = None
-    options.maildir = None
-    options.rules_pattern = DEFAULT_RULES_PATTERN
+  @dataclass
+  class Options(BaseCommand.Options):
+    stdin: Any = field(default_factory=lambda: sys.stdin)
+    config_path: Optional[str] = None
+    maildb_path: Optional[str] = None
+    msgiddb_path: Optional[str] = None
+    maildir: Optional[str] = None
+    rules_pattern: str = DEFAULT_RULES_PATTERN
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -431,7 +431,7 @@ class MailFiler(NS):
     debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
     idle = 0
-    while not runstate or not runstate.cancelled:
+    while not runstate.cancelled:
       these_folders = folders
       if not these_folders:
         these_folders = op_cfg.get('folders', '').split()

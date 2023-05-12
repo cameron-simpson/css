@@ -4,7 +4,7 @@
 '''
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from os.path import (
     basename,
@@ -23,10 +23,11 @@ from matplotlib.figure import Axes, Figure
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import fmtdoc
+from cs.env import getenv
 from cs.lex import r
 from cs.pfx import pfx_call
 
-__version__ = '20220918-post'
+__version__ = '20230407-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -48,15 +49,32 @@ DISTINFO = {
 class FigureSize:
   ''' Specifications for a `Figure`'s dimensions.
   '''
+
   DEFAULT_DX = 14
+  DEFAULT_DX_ENVVAR = 'FIGURE_SIZE_DX'
   DEFAULT_DY = 8
+  DEFAULT_DY_ENVVAR = 'FIGURE_SIZE_DY'
   DEFAULT_DPI = 100
+  DEFAULT_DPI_ENVVAR = 'FIGURE_SIZE_DPI'
+
   # width in inches
-  dx: Union[int, float]
+  dx: Union[int, float] = field(
+      default_factory=getenv(
+          DEFAULT_DX_ENVVAR, default=DEFAULT_DX, parse=float
+      )
+  )
   # height in inches
-  dy: Union[int, float]
+  dy: Union[int, float] = field(
+      default_factory=getenv(
+          DEFAULT_DY_ENVVAR, default=DEFAULT_DY, parse=float
+      )
+  )
   # dots (pixels) per inch
-  dpi: Union[int, float] = DEFAULT_DPI
+  dpi: Union[int, float] = field(
+      default_factory=getenv(
+          DEFAULT_DPI_ENVVAR, default=DEFAULT_DPI, parse=float
+      )
+  )
 
   def Figure(self, **kw):
     ''' Return a new `Figure` of this size.
@@ -94,10 +112,9 @@ def axes(figure=None, ax=None, **fig_kw) -> Axes:
   if not isinstance(ax, Axes):
     # we need a figure
     if figure is None:
+      figsize = FigureSize()
       figure = Figure(
-          figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY),
-          dpi=FigureSize.DEFAULT_DPI,
-          **fig_kw
+          figsize=(figsize.dx, figsize.dy), dpi=figsize.dpi, **fig_kw
       )
       figure.add_subplot()
     elif isinstance(figure, FigureSize):

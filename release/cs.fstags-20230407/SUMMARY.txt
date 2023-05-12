@@ -1,0 +1,2 @@
+FSTags: support open/close of self.update_mapping, update startup/shutdown to startup_shutdown.
+Move the (optional) ORM open/close from FSTags.startup_shutdown to TagFile.save, greatly shortens the ORM lock.
