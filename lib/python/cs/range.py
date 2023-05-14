@@ -107,7 +107,7 @@ class Range(object):
   ''' A collection of `int`s that collates adjacent ints.
 
       The interface is as for a `set` with additional methods:
-      * `spans()`: return an iterable of `Spans`, with `.start`
+      * `spans()`: return an iterable of `Span`s, with `.start`
         included in each `Span` and `.end` just beyond
 
       Additionally, the update/remove/etc methods have a secondary
