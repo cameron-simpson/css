@@ -17,6 +17,7 @@ import json
 import os
 from os.path import (
     basename,
+    dirname,
     exists as existspath,
     expanduser,
     isabs as isabspath,
@@ -1367,6 +1368,7 @@ class CalibreCommand(BaseCommand):
           name = (
               cbook.format_as(name_format).replace('_', '-').replace('/', ':')
           )
+          name_subdir = series_name if series_name and not link_format else ''
           for fmt in formats:
             if runstate.cancelled:
               break
@@ -1374,16 +1376,21 @@ class CalibreCommand(BaseCommand):
             srcpath = cbook.formatpath(fmt)
             if srcpath is None:
               continue
-            dstpath = joinpath(linkto_dirpath, name + '.' + fmt.lower())
+            dstpath = joinpath(
+                linkto_dirpath, name_subdir, name + '.' + fmt.lower()
+            )
             if existspath(dstpath):
               if force:
                 warning("dst already exists, will be replaced: %s", dstpath)
+                (verbose or not doit) and print("unlink", shortpath(dstpath))
+                doit and pfx_call(os.unlink, dstpath)
               else:
                 ##warning("dst already exists, skipped: %s", dstpath)
                 continue
-            if existspath(dstpath):
-              (verbose or not doit) and print("unlink", shortpath(dstpath))
-              doit and pfx_call(os.unlink, dstpath)
+            dstdir = dirname(dstpath)
+            if not isdirpath(dstdir) and doit:
+              verbose and print("mkdir", shortpath(dstdir))
+              pfx_call(os.mkdir, dstdir)
             (quiet and doit
              ) or print("link", shortpath(srcpath), '=>', shortpath(dstpath))
             doit and pfx_call(os.link, srcpath, dstpath)
