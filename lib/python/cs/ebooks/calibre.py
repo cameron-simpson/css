@@ -54,6 +54,7 @@ from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
     get_dotted_identifier,
+    lc_,
     FormatableMixin,
     FormatAsError,
 )
@@ -1361,6 +1362,8 @@ class CalibreCommand(BaseCommand):
         with Pfx(cbook):
           fmttags = cbook.format_tagset()
           series_name = fmttags.get('series.name')
+          if series_name:
+            series_name = series_name.strip()
           name_format = link_format or (
               '{series.name:lc}--{series.index}--{title:lc}'
               if series_name else '{title:lc}'
@@ -1368,7 +1371,10 @@ class CalibreCommand(BaseCommand):
           name = (
               cbook.format_as(name_format).replace('_', '-').replace('/', ':')
           )
-          name_subdir = series_name if series_name and not link_format else ''
+          name_subdir = (
+              lc_(series_name).replace('/', ':')
+              if series_name and not link_format else ''
+          )
           for fmt in formats:
             if runstate.cancelled:
               break
