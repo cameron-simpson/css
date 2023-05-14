@@ -127,8 +127,7 @@ def main(argv=None):
   return SPLinkCommand(argv).run()
 
 def ts2001_unixtime(tzname=None):
-  ''' Convert an SP-Link seconds-since-2001-01-01-local-time offset
-      into a UNIX time.
+  ''' Return the SP-Link 2001-01-01-local-time epoch as a UNIX time.
   '''
   if tzname is None:
     tzname = 'local'
