@@ -501,8 +501,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   def startup_shutdown(self):
     ''' Stub startup/shutdown.
     '''
-    with self.db.session() as session:
-      yield
+    yield
 
   @property
   @locked
@@ -512,6 +511,16 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         instantiated on demand.
     '''
     return CalibreMetadataDB(self)
+
+  @contextmanager
+  def db_session(self):
+    ''' Context manager for a database session.
+        This is not fired by `startup_shutdown` because any callout
+        to the Calibre command executables also want exclusive
+        access to the database.
+    '''
+    with self.db.session() as session:
+      yield session
 
   def dbshell(self):
     ''' Interactive db shell.
