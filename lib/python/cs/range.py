@@ -13,6 +13,8 @@ from collections import namedtuple
 from cs.logutils import ifdebug
 from cs.seq import first
 
+__version__ = '20230518'
+
 DISTINFO = {
     'description':
     "a Range class implementing compact integer ranges with a set-like API,"
