@@ -13,7 +13,7 @@ from collections import namedtuple
 from cs.logutils import ifdebug
 from cs.seq import first
 
-__version__ = '20230518'
+__version__ = '20230518-post'
 
 DISTINFO = {
     'description':
