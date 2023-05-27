@@ -1,0 +1,8 @@
+HasThreadState: new thread_states() method to snapshot the current states.
+HasThreadState: new with_thread_states() context manager to apply a set of states.
+HasThreadState: rename the default state from .state to .perthread_state.
+HasThreadState.__enter_exit__: pass cls._HasThreadState_lock to stackset as the modification guard lock, prevents race in thread_states.
+Rename State to ThreadState, which how I always use it anyway, and leave a compatibility name behind.
+New joinif(Thread) method to join a Thread unless we are that Thread - this is because MultiOpenMixin.startup_shutdown stuff may run the shutdown in a differ Thread from that which ran the startup.
+@uses_runstate: use the prevailing RunState or create one.
+Drop Python 2 support.

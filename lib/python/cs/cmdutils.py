@@ -46,7 +46,7 @@ from cs.resources import RunState, uses_runstate
 from cs.typingutils import subtype
 from cs.upd import Upd
 
-__version__ = '20230212-post'
+__version__ = '20230407-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -61,7 +61,9 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.doc',
         'cs.resources',
+        'cs.typingutils',
         'cs.upd',
+        'typeguard',
     ],
 }
 
@@ -220,7 +222,10 @@ class _ClassSubCommand(_BaseSubCommand):
   '''
 
   def __call__(self, cmd, command, argv):
-    return self.method(argv, cmd=cmd, **command.options.__dict__).run()
+    mkw = dict(command.options.__dict__)
+    if cmd is not None:
+      mkw.update(cmd=cmd)
+    return self.method(argv, **mkw).run()
 
   def usage_format(self) -> str:
     ''' Return the usage format string from the class.

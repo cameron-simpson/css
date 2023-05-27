@@ -40,6 +40,7 @@ from typeguard import typechecked
 
 from cs.ansi_colour import colourise
 from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
 from cs.fs import atomic_directory, rpaths
@@ -61,6 +62,8 @@ from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import Upd, print, uses_upd
 from cs.vcs import VCS
 from cs.vcs.hg import VCS_Hg
+
+from cs.x import X
 
 def main(argv=None):
   ''' Main command line.
@@ -129,12 +132,15 @@ class CSReleaseCommand(BaseCommand):
 
     verbose: bool = field(default_factory=stderr_isatty)
     colourise: bool = field(default_factory=stderr_isatty)
-    vcs: Any = VCS_Hg()
     pkg_tagsets: TagFile = field(
         default_factory=lambda:
         TagFile(joinpath(VCS_Hg().get_topdir(), PKG_TAGS))
     )
     modules: "Modules" = field(default_factory=lambda: Modules(vcs=VCS_Hg()))
+
+    @property
+    def vcs(self):
+      return self.modules.vcs
 
   def apply_opts(self, opts):
     ''' Apply the command line options mapping `opts` to `options`.
@@ -156,7 +162,9 @@ class CSReleaseCommand(BaseCommand):
     '''
     with super().run_context():
       with self.options.pkg_tagsets:
-        yield
+        with stackattrs(self.options.vcs,
+                        pkg_tagsets=self.options.pkg_tagsets):
+          yield
 
   ##  export      Export release to temporary directory, report directory.
   ##  freshmeat-submit Announce last release to freshmeat.
