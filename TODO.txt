@@ -1,3 +1,4 @@
+method for MultiOpenMixin to capture common open-in-caller-close-in-child idiom?
 cs.distinfo: cs-release seems to ignore SIGINT at least during a "rel"
 cs.debug: Lock and RLock to be the same class with a different underlying lock class
 default_params: supply modified sugnature for wrapper function indicating the param is optional
