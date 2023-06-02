@@ -1,0 +1,2 @@
+Upd.above: do a disable/enable around the yield, use try/finally for reliability.
+Upd.delete: just warn about index out of range, seems it can happen during interpreter shutdown; to be debugged later.

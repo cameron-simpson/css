@@ -28,7 +28,8 @@ from cs.threads import locked_property
 __version__ = '20210306-post'
 
 DISTINFO = {
-    'description': "functions and classes to work with email",
+    'description':
+    "functions and classes to work with email",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -47,10 +48,10 @@ DISTINFO = {
 
 # RFC5322 date-time format for use with datetime.strftime
 RFC5322_DATE_TIME = '%a, %d %b %Y %H:%M:%S %z'
-SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
+SHORTPATH_PREFIXES = (('$MAILDIR/', '+'), ('$HOME/', '~/'))
 
-def shortpath(path, environ=None):
-  return _shortpath(path, environ=environ, prefixes=SHORTPATH_PREFIXES)
+def shortpath(path):
+  return _shortpath(path, prefixes=SHORTPATH_PREFIXES)
 
 def Message(msgfile, headersonly=False):
   ''' Factory function to accept a file or filename and return an email.message.Message.
@@ -72,11 +73,12 @@ def message_addresses(M, header_names):
   for header_name in header_names:
     hdrs = M.get_all(header_name, ())
     for hdr in hdrs:
-      for realname, address in getaddresses( (hdr,) ):
+      for realname, address in getaddresses((hdr,)):
         if not address:
           debug(
               "message_addresses(M, %r): header_name %r: hdr=%r: getaddresses() => (%r, %r): DISCARDED",
-              header_names, header_name, hdr, realname, address)
+              header_names, header_name, hdr, realname, address
+          )
         else:
           yield realname, address
 
@@ -149,6 +151,7 @@ def make_maildir(path):
       raise
     made.append(subdirpath)
 
+# pylint: disable=too-many-public-methods
 class Maildir(mailbox.Maildir):
   ''' A faster Maildir interface.
       Trust os.listdir, don't fsync, etc.
@@ -237,7 +240,7 @@ class Maildir(mailbox.Maildir):
     '''
     now = time.time()
     secs = int(now)
-    subsecs = now-secs
+    subsecs = now - secs
     key = '%d.#%dM%dP%d' % (secs, seq(), subsecs * 1e6, self.pid)
     assert self.validkey(key), "invalid new key: %s" % (key,)
     return key
@@ -245,9 +248,7 @@ class Maildir(mailbox.Maildir):
   @staticmethod
   def validkey(key):
     return (
-        len(key) > 0
-        and not key.startswith('.')
-        and ':' not in key
+        len(key) > 0 and not key.startswith('.') and ':' not in key
         and '/' not in key
     )
 
@@ -346,19 +347,22 @@ class Maildir(mailbox.Maildir):
     except OSError as e:
       warning("%s: remove key %s: %s: %s", self, key, msgpath, e)
     del self.msgmap[key]
+
   discard = remove
   __delitem__ = remove
 
   def __contains__(self, key):
     return key in self.msgmap
+
   has_key = __contains__
 
   def __len__(self):
     return len(self.items())
 
   def clear(self):
-    for key in self.keys():
-      del self[key]
+    raise RuntimeError("I do not want to do this")
+    ##for key in self.keys():
+    ##  del self[key]
 
   def pop(self, key, *args):
     try:
@@ -389,6 +393,7 @@ class Maildir(mailbox.Maildir):
             the pathname to the message file.
     '''
     return Message(self.keypath(key))
+
   get_message = __getitem__
 
   def get_headers(self, key):
@@ -421,6 +426,7 @@ class Maildir(mailbox.Maildir):
   def itervalues(self):
     for key in self.iterkeys():
       return self[key]
+
   __iter__ = itervalues
 
   def values(self):
@@ -438,12 +444,6 @@ class Maildir(mailbox.Maildir):
     '''
     for key in self.iterkeys():
       return key, self.get_headers(key)
-
-  def lock(self):
-    self._lock.acquire()
-
-  def unlock(self):
-    self._lock.release()
 
   def close(self):
     pass

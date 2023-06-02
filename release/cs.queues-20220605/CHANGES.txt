@@ -1,0 +1,1 @@
+lib/python/cs/queues.py: cs.queues: ListQueue: extend/prepend: reject str explicitly - although iterable, it is almost never what is intended

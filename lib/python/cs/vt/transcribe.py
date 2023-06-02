@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Transcribe objects as text.
 #   - Cameron Simpson <cs@cskk.id.au> 14jan2018
@@ -34,11 +34,12 @@ import json
 from string import ascii_letters, digits
 import sys
 from uuid import UUID
+
 from cs.deco import decorator
 from cs.lex import get_identifier, is_identifier, \
                    get_decimal_or_float_value, get_qstr, \
                    texthexify
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call, pfx_method
 
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
@@ -79,7 +80,7 @@ class Transcriber(ABC):
         * `T`: the Transcribe context
         * `fp`: the output file
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
   @staticmethod
   @abstractmethod
@@ -94,7 +95,7 @@ class Transcriber(ABC):
         * `stopchar`: the end of object marker, usually '}'
         * `prefix`: the active prefix
     '''
-    raise NotImplementedError()
+    raise NotImplementedError
 
 class UUIDTranscriber:
   ''' A transcriber for uuid.UUID instances.
@@ -151,7 +152,9 @@ class Transcribe:
       prefixes = (prefixes,)
     for prefix in prefixes:
       if prefix in self.prefix_map:
-        raise ValueError("prefix %r already taken" % (prefix,))
+        raise ValueError(
+            "prefix %r already taken: %r" % (prefix, self.prefix_map[prefix])
+        )
       if (not isinstance(baseclass, Transcriber)
           and (not hasattr(baseclass, 'transcribe_inner')
                or not hasattr(baseclass, 'parse_inner'))):
@@ -238,6 +241,7 @@ class Transcribe:
         self.transcribe(v, None, fp)
         first = False
 
+  @pfx_method
   def parse(self, s, offset=0):
     ''' Parse an object from the string `s` starting at `offset`.
         Return the object and the new offset.
@@ -246,7 +250,6 @@ class Transcribe:
         * `s`: the source string
         * `offset`: optional string offset, default 0
     '''
-    ##X("parse %r ...", s[offset:])
     # strings
     value, offset2 = self.parse_qs(s, offset, optional=True)
     if value is not None:
@@ -257,7 +260,7 @@ class Transcribe:
     # {json}
     if s.startswith('{', offset):
       sub = s[offset:]
-      m, suboffset = json.JSONDecoder().raw_decode(sub)
+      m, suboffset = pfx_call(json.JSONDecoder().raw_decode, sub)
       offset += suboffset
       return m, offset
     # prefix{....}

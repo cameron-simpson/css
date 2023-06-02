@@ -1,0 +1,2 @@
+lib/python/cs/fstags.py: cs.fstags: new TaggedPath.infer_tags() method to compute and return the inferred TagSet; new "fstags infer pathname" command
+lib/python/cs/fstags.py: cs.fstags: remove debugging

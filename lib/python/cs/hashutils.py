@@ -1,47 +1,83 @@
 #!/usr/bin/python
 
-''' Convenience hash facilities.
-    Portably imports the names `sha1` and `md5`.
-    Provides hashfile(), to update a hash from a file's content.
+''' Convenience hashing facilities.
 '''
 
-from __future__ import with_statement
-try:
-  from hashlib import sha1
-except ImportError:
-  from sha import sha as sha1
-try:
-  from hashlib import md5
-except ImportError:
-  from md5 import md5
+import hashlib
+import mmap
+import os
 
-_iosize = 16384
+from cs.buffer import CornuCopyBuffer
 
-def hashfile(fp, H=None):
-  ''' Return a hash of the content of the file `fp`.
-      If `fp` is a str, open it as a file pathname.
-      If `H` is missing or None, allocate a new SHA1 hash object.
-      Returns the hash object updated from the file content.
+class BaseHashCode(bytes):
+  ''' Base class for hashcodes, subclassed by `SHA1`, `SHA256` et al.
   '''
-  if type(fp) is str:
-    with open(fp, "rb") as fp2:
-      return hashfile(fp2, H)
-  if H is None:
-    H = sha1()
-  while True:
-    s = fp.read(_iosize)
-    if len(s) == 0:
-      break
-    H.update(s)
-  return H
 
-def hashfiles(files, hashclass):
-  ''' Generator that iterates over `files` and yields
-        file, hash
-      for each file, `file` being the item from `files` and `hash`
-      being a hash object updated from the file content.  `file`
-      may be a filename string or an open file. An open file will
-      be consumed.
-  '''
-  for fp in files:
-    return fp, hashfile(fp, hashclass())
+  __slots__ = ()
+
+  def __init_subclass__(cls, *, hashfunc, hashname=None, **kw):
+    super().__init_subclass__(**kw)
+    if hashname is None:
+      hashname = cls.__name__.lower()
+    cls.hashname = hashname
+    cls.hashfunc = hashfunc
+    cls.hashlen = len(hashfunc(b'').digest())
+    if not cls.__doc__:
+      cls.__doc__ = f'{hashfunc.__name__} hashcode class, subclass of `bytes`.'
+
+  hashfunc = lambda bs=None: None  # pylint: disable=unnecessary-lambda-assignment
+
+  def __str__(self):
+    return f'{self.hashname}:{self.hex()}'
+
+  @property
+  def hashname(self):
+    ''' The hash code type name, derived from the class name.
+    '''
+    return self.__class__.__name__.lower()
+
+  @classmethod
+  def from_data(cls, bs):
+    ''' Compute hashcode from the data `bs`.
+    '''
+    return cls(cls.hashfunc(bs).digest())
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Compute hashcode from the contents of the `CornuCopyBuffer` `bfr`.
+    '''
+    h = cls.hashfunc()
+    for bs in bfr:
+      h.update(bs)
+    return cls(h.digest())
+
+  @classmethod
+  def from_fspath(cls, fspath, **kw):
+    ''' Compute hashcode from the contents of the file `fspath`.
+    '''
+    # try to mmap the file and hash the whole thing in one go
+    fd = None
+    try:
+      fd = os.open(fspath, os.O_RDONLY)
+    except OSError:
+      pass
+    else:
+      try:
+        with mmap.mmap(fd, 0, flags=mmap.MAP_PRIVATE,
+                       prot=mmap.PROT_READ) as mmapped:
+          return cls.from_data(mmapped)
+      except OSError:
+        pass
+    finally:
+      if fd is not None:
+        os.close(fd)
+    # mmap fails, try plain open of file
+    return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
+
+# pylint: disable=missing-class-docstring
+class SHA1(BaseHashCode, hashfunc=hashlib.sha1):
+  __slots__ = ()
+
+# pylint: disable=missing-class-docstring
+class SHA256(BaseHashCode, hashfunc=hashlib.sha256):
+  __slots__ = ()

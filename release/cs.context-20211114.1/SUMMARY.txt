@@ -1,0 +1,1 @@
+ContextManagerMixin: the default __enter__ return is self, supporting a trivial bare `yield` in the generator.

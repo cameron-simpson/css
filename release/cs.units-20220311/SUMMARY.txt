@@ -1,0 +1,1 @@
+Naming update: rename human* to decompose* to clarify that these decompose a number into a sequence of values on a scale.

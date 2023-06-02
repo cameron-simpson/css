@@ -7,24 +7,29 @@
 ''' Thread related convenience classes and functions.
 '''
 
-from __future__ import with_statement
-from collections import defaultdict, deque, namedtuple
+from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from heapq import heappush, heappop
 from inspect import ismethod
 import sys
-from threading import Semaphore, Thread, current_thread, Lock, local as thread_local
-from cs.context import stackattrs
+from threading import (
+    current_thread,
+    Semaphore,
+    Thread as builtin_Thread,
+    Lock,
+    local as thread_local,
+)
+from typing import Any, Mapping, Optional
+
+from cs.context import ContextManagerMixin, stackattrs, stackset
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.logutils import LogTime, error, warning, debug, exception
-from cs.pfx import Pfx, prefix
+from cs.gimmicks import error, warning, nullcontext
+from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
-from cs.py3 import raise3
-from cs.queues import IterableQueue, MultiOpenMixin, not_closed
-from cs.seq import seq, Seq
+from cs.seq import Seq
 
-__version__ = '20210306-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'description':
@@ -32,31 +37,28 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.context',
         'cs.deco',
         'cs.excutils',
-        'cs.logutils',
+        'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
-        'cs.py3',
-        'cs.queues',
         'cs.seq',
     ],
 }
 
-class State(thread_local):
+class ThreadState(thread_local):
   ''' A `Thread` local object with attributes
       which can be used as a context manager to stack attribute values.
 
       Example:
 
-          from cs.threads import State
+          from cs.threads import ThreadState
 
-          S = State(verbose=False)
+          S = ThreadState(verbose=False)
 
           with S(verbose=True) as prev_attrs:
               if S.verbose:
@@ -64,7 +66,7 @@ class State(thread_local):
   '''
 
   def __init__(self, **kw):
-    ''' Initiale the `State`, providing the per-Thread initial values.
+    ''' Initiale the `ThreadState`, providing the per-Thread initial values.
     '''
     thread_local.__init__(self)
     for k, v in kw.items():
@@ -80,12 +82,151 @@ class State(thread_local):
 
   @contextmanager
   def __call__(self, **kw):
-    ''' Calling a `State` returns a context manager which stacks some state.
+    ''' Calling a `ThreadState` returns a context manager which stacks some state.
         The context manager yields the previous values
         for the attributes which were stacked.
     '''
     with stackattrs(self, **kw) as prev_attrs:
       yield prev_attrs
+
+# backward compatible deprecated name
+State = ThreadState
+
+# TODO: what to do about overlapping HasThreadState usage of a particular class?
+class HasThreadState(ContextManagerMixin):
+  ''' A mixin for classes with a `cs.threads.ThreadState` instance as `.state`
+      providing a context manager which pushes `current=self` onto that state
+      and a `default()` class method returning `cls.perthread_state.current`
+      as the default instance of that class.
+
+      *NOTE*: the documentation here refers to `cls.perthread_state`, but in
+      fact we honour the `cls.THREAD_STATE_ATTR` attribute to name
+      the state attribute which allows perclass state attributes,
+      and also use with classes which already use `.perthread_state` for
+      another purpose.
+  '''
+
+  _HasThreadState_lock = Lock()
+  _HasThreadState_classes = set()
+
+  # the default name for the Thread state attribute
+  THREAD_STATE_ATTR = 'perthread_state'
+
+  @classmethod
+  def default(cls, factory=None, raise_on_None=False):
+    ''' The default instance of this class from `cls.perthread_state.current`.
+
+        Parameters:
+        * `factory`: optional callable to create an instance of `cls`
+          if `cls.perthread_state.current` is `None` or missing;
+          if `factory` is `True` then `cls` is used as the factory
+        * `raise_on_None`: if `cls.perthread_state.current` is `None` or missing
+          and `factory` is false and `raise_on_None` is true,
+          raise a `RuntimeError`;
+          this is primarily a debugging aid
+    '''
+    current = getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
+    if current is None:
+      if factory:
+        if factory is True:
+          factory = cls
+        return factory()
+      if raise_on_None:
+        raise RuntimeError(
+            "%s.default: %s.%s.current is missing/None and ifNone is None" %
+            (cls.__name__, cls.__name__, cls.THREAD_STATE_ATTR)
+        )
+    return current
+
+  def __enter_exit__(self):
+    ''' Push `self.perthread_state.current=self` as the `Thread` local current instance.
+
+        Include `self.__class__` in the set of currently active classes for the duration.
+    '''
+    cls = self.__class__
+    with cls._HasThreadState_lock:
+      stacked = stackset(
+          cls._HasThreadState_classes, cls, cls._HasThreadState_lock
+      )
+    with stacked:
+      state = getattr(cls, cls.THREAD_STATE_ATTR)
+      with state(current=self):
+        yield
+
+  @classmethod
+  def thread_states(cls):
+    ''' Return a mapping of `class`->*current_instance*`
+        for use with `HasThreadState.with_thread_states`.
+    '''
+    with cls._HasThreadState_lock:
+      currency = {
+          htscls:
+          getattr(getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None)
+          for htscls in cls._HasThreadState_classes
+      }
+    return currency
+
+  @classmethod
+  @contextmanager
+  def with_thread_states(
+      cls, thread_states: Optional[Mapping[type, Any]] = None
+  ):
+    ''' Context manager to push all the current objects from `thread_states`
+        by calling each as a context manager.
+
+        The default `thread_states` comes from `HasThreadState.thread_states()`.
+    '''
+    if thread_states is None:
+      thread_states = cls.thread_states()
+    if not thread_states:
+      yield
+    else:
+      state_iter = iter(list(thread_states.values()))
+
+      def with_thread_states_pusher():
+        try:
+          htsobj = next(state_iter)
+        except StopIteration:
+          yield
+        else:
+          if htsobj is None:
+            htsobj = nullcontext()
+          with htsobj:
+            yield from with_thread_states_pusher()
+
+      yield from with_thread_states_pusher()
+
+  @classmethod
+  def Thread(cls, *Thread_a, target, thread_states=None, **Thread_kw):
+    ''' Factory for a `Thread` to push the `.current` state for the
+        currently active classes.
+
+        The optional parameter `thread_states`
+        may be used to pass an explicit mapping of `type`->`instance`
+        of thread states to use;
+        the default states come from `HasThreadState.thread_states()`.
+        The values of this mapping are iterated over and used as context managers.
+
+        A boolean value may also be passed meaning:
+        * `False`: do not apply any thread states
+        * `True`: apply the default thread states
+    '''
+    # snapshot the .current states in the source Thread
+    if thread_states is None or thread_states is True:
+      thread_states = cls.thread_states()
+    if thread_states:
+
+      def target_wrapper(*a, **kw):
+        ''' Wrapper for the `Thread.target` to push the source `.current`
+            states in the new Thread before running the target.
+        '''
+        with cls.with_thread_states(thread_states):
+          return target(*a, **kw)
+    else:
+      # no state to prepare, eschew the wrapper
+      target_wrapper = target
+
+    return builtin_Thread(*Thread_a, target=target_wrapper, **Thread_kw)
 
 # pylint: disable=too-many-arguments
 def bg(
@@ -94,6 +235,7 @@ def bg(
     name=None,
     no_start=False,
     no_logexc=False,
+    thread_states=None,
     args=None,
     kwargs=None
 ):
@@ -108,6 +250,7 @@ def bg(
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
+      * `thread_states`: passed to `HasThreadState.Thread`
       * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
@@ -117,13 +260,18 @@ def bg(
   if kwargs is None:
     kwargs = {}
 
-  thread_prefix = prefix() + ': ' + name
+  ##thread_prefix = prefix() + ': ' + name
+  thread_prefix = name
 
   def thread_body():
     with Pfx(thread_prefix):
       return func(*args, **kwargs)
 
-  T = Thread(name=thread_prefix, target=thread_body)
+  T = HasThreadState.Thread(
+      name=thread_prefix,
+      target=thread_body,
+      thread_states=thread_states,
+  )
   if not no_logexc:
     func = logexc(func)
   if daemon is not None:
@@ -132,182 +280,22 @@ def bg(
     T.start()
   return T
 
-WTPoolEntry = namedtuple('WTPoolEntry', 'thread queue')
+def joinif(T: builtin_Thread):
+  ''' Call `T.join()` if `T` is not the current `Thread`.
 
-class WorkerThreadPool(MultiOpenMixin):
-  ''' A pool of worker threads to run functions.
+      Unlike `threading.Thread.join`, this function is a no-op if
+      `T` is the current `Thread.
+
+      The use case is situations such as the shutdown phase of the
+      `MultiOpenMixin.startup_shutdown` context manager. Because
+      the "initial open" startup phase is not necessarily run in
+      the same thread as the "final close" shutdown phase, it is
+      possible for example for a worker `Thread` to execute the
+      shutdown phase and try to join itself. Using this function
+      allows that scenario.
   '''
-
-  def __init__(self, name=None, max_spare=4):
-    ''' Initialise the WorkerThreadPool.
-
-        Parameters:
-        * `name`: optional name for the pool
-        * `max_spare`: maximum size of each idle pool (daemon and non-daemon)
-    '''
-    if name is None:
-      name = "WorkerThreadPool-%d" % (seq(),)
-    if max_spare < 1:
-      raise ValueError("max_spare(%s) must be >= 1" % (max_spare,))
-    MultiOpenMixin.__init__(self)
-    self.name = name
-    self.max_spare = max_spare
-    self.idle_fg = deque()  # nondaemon Threads
-    self.idle_daemon = deque()  # daemon Threads
-    self.all = set()
-    self._lock = Lock()
-
-  def __str__(self):
-    return "WorkerThreadPool:%s" % (self.name,)
-
-  __repr__ = __str__
-
-  def startup(self):
-    ''' Start the pool.
-    '''
-
-  def shutdown(self):
-    ''' Shut down the pool.
-
-        Close all the request queues.
-
-        Note: does not wait for all Threads to complete; call .join after close.
-    '''
-    with self._lock:
-      all_entries = list(self.all)
-    for entry in all_entries:
-      entry.queue.close()
-
-  def join(self):
-    ''' Wait for all outstanding Threads to complete.
-    '''
-    with self._lock:
-      all_entries = list(self.all)
-    for entry in all_entries:
-      T = entry.thread
-      if T is not current_thread():
-        T.join()
-
-  @not_closed
-  def dispatch(self, func, retq=None, deliver=None, pfx=None, daemon=None):
-    ''' Dispatch the callable `func` in a separate thread.
-
-        On completion the result is the sequence
-        `func_result, None, None, None`.
-        On an exception the result is the sequence
-        `None, exec_type, exc_value, exc_traceback`.
-
-        If `retq` is not None, the result is .put() on retq.
-        If `deliver` is not None, deliver(result) is called.
-        If the parameter `pfx` is not None, submit pfx.partial(func);
-        see the cs.logutils.Pfx.partial method for details.
-        If `daemon` is not None, set the .daemon attribute of the Thread to `daemon`.
-
-        TODO: high water mark for idle Threads.
-    '''
-    if self.closed:
-      raise ValueError("%s: closed, but dispatch() called" % (self,))
-    if pfx is not None:
-      func = pfx.partial(func)
-    if daemon is None:
-      daemon = current_thread().daemon
-    idle = self.idle_daemon if daemon else self.idle_fg
-    with self._lock:
-      debug("dispatch: idle = %s", idle)
-      if idle:
-        # use an idle thread
-        entry = idle.pop()
-        debug("dispatch: reuse %s", entry)
-      else:
-        debug("dispatch: need new thread")
-        # no available threads - make one
-        Targs = []
-        T = Thread(
-            target=self._handler,
-            args=Targs,
-            name=("%s:worker" % (self.name,))
-        )
-        T.daemon = daemon
-        Q = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
-        entry = WTPoolEntry(T, Q)
-        self.all.add(entry)
-        Targs.append(entry)
-        debug("%s: start new worker thread (daemon=%s)", self, T.daemon)
-        T.start()
-      entry.queue.put((func, retq, deliver))
-
-  @logexc
-  def _handler(self, entry):
-    ''' The code run by each handler thread.
-
-        Read a function `func`, return queue `retq` and delivery
-        function `deliver` from the function queue.
-        Run func().
-
-        On completion the result is the sequence:
-          func_result, None
-        On an exception the result is the sequence:
-          None, exc_info
-
-        If retq is not None, the result is .put() on retq.
-        If deliver is not None, deliver(result) is called.
-        If both are None and an exception occurred, it gets raised.
-    '''
-    T, Q = entry
-    idle = self.idle_daemon if T.daemon else self.idle_fg
-    for func, retq, deliver in Q:
-      oname = T.name
-      T.name = "%s:RUNNING:%s" % (oname, func)
-      result, exc_info = None, None
-      try:
-        debug("%s: worker thread: running task...", self)
-        result = func()
-        debug("%s: worker thread: ran task: result = %s", self, result)
-      except Exception:  # pylint: disable=broad-except
-        exc_info = sys.exc_info()
-        log_func = (
-            exception
-            if isinstance(exc_info[1],
-                          (TypeError, NameError, AttributeError)) else debug
-        )
-        log_func(
-            "%s: worker thread: ran task: exception! %r", self, sys.exc_info()
-        )
-        # don't let exceptions go unhandled
-        # if nobody is watching, raise the exception and don't return
-        # this handler to the pool
-        if retq is None and deliver is None:
-          error("%s: worker thread: reraise exception", self)
-          raise3(*exc_info)
-        debug("%s: worker thread: set result = (None, exc_info)", self)
-      T.name = oname
-      func = None  # release func+args
-      reuse = False and (len(idle) < self.max_spare)
-      if reuse:
-        # make available for another task
-        with self._lock:
-          idle.append(entry)
-        ##D("_handler released thread: idle = %s", idle)
-      # deliver result
-      result_info = result, exc_info
-      if retq is not None:
-        debug("%s: worker thread: %r.put(%s)...", self, retq, result_info)
-        retq.put(result_info)
-        debug("%s: worker thread: %r.put(%s) done", self, retq, result_info)
-        retq = None
-      if deliver is not None:
-        debug("%s: worker thread: deliver %s...", self, result_info)
-        deliver(result_info)
-        debug("%s: worker thread: delivery done", self)
-        deliver = None
-      # forget stuff
-      result = None
-      exc_info = None
-      result_info = None
-      if not reuse:
-        self.all.remove(entry)
-        break
-      debug("%s: worker thread: proceed to next function...", self)
+  if T is not current_thread():
+    T.join()
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
@@ -324,6 +312,7 @@ class AdjustableSemaphore(object):
     return "%s[%d]" % (self.__name, self.limit0)
 
   def __enter__(self):
+    from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
     with LogTime("%s(%d).__enter__: acquire", self.__name, self.__value):
       self.acquire()
 
@@ -344,7 +333,7 @@ class AdjustableSemaphore(object):
     if not blocking:
       return self.__sem.acquire(blocking)
     with self.__lock:
-      self.__sem.acquire(blocking)
+      self.__sem.acquire(blocking)  # pylint: disable=consider-using-with
     return True
 
   def adjust(self, newvalue):
@@ -372,10 +361,11 @@ class AdjustableSemaphore(object):
           self.__sem.release()
           delta -= 1
       else:
+        from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
         while delta < 0:
           with LogTime("AdjustableSemaphore(%s): acquire excess capacity",
                        self.__name):
-            self.__sem.acquire(True)
+            self.__sem.acquire(True)  # pylint: disable=consider-using-with
           delta += 1
       self.__value = newvalue
 
@@ -472,7 +462,7 @@ class LockableMixin(object):
     self._lock.acquire()
 
   # pylint: disable=unused-argument
-  def __exit(self, exc_type, exc_value, traceback):
+  def __exit__(self, exc_type, exc_value, traceback):
     self._lock.release()
 
   @property
@@ -506,6 +496,7 @@ class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
            type(self.lock).__name__, id(self.lock),
            str(self.priority_lock))
 
+# pylint: disable=too-many-instance-attributes
 class PriorityLock(object):
   ''' A priority based mutex which is acquired by and released to waiters
       in priority order.
@@ -646,8 +637,8 @@ class PriorityLock(object):
 def monitor(cls, attrs=None, initial_timeout=10.0, lockattr='_lock'):
   ''' Turn a class into a monitor, all of whose public methods are `@locked`.
 
-      This is a simple approach requires class instances to have a `._lock`
-      which is an `RLock` or compatible
+      This is a simple approach which requires class instances to have a
+      `._lock` which is an `RLock` or compatible
       because methods may naively call each other.
 
       Parameters:

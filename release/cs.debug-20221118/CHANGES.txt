@@ -1,0 +1,1 @@
+lib/python/cs/debug.py: cs.debug: stack_dump: cope when cs.logutils.setup_logging not run yet

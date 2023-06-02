@@ -8,12 +8,17 @@ import random
 import sys
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 import unittest
+
 from cs.randutils import rand0, make_randblock
+
 from .backingfile import (
-    RawBackingFile, CompressibleBackingFile, VTDStore, BinaryHashCodeIndex,
-    BackingFileIndexEntry
+    RawBackingFile,
+    CompressibleBackingFile,
+    BinaryHashCodeIndex,
+    BackingFileIndexEntry,
 )
 from .hash import HASHCLASS_BY_NAME
+from .store import VTDStore
 
 RUN_SIZE = 128
 MAX_BLOCK_SIZE = 65536  # should exercise 1, 2 and 3 bytes data length prefixes

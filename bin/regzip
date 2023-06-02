@@ -22,7 +22,7 @@ do
   case "$1" in
     -[nv1-9])
         gzopts="$gzopts $1" ;;
-    --fast|--best)
+    --fast|--best|--rsyncable)
         gzopts="$gzopts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2

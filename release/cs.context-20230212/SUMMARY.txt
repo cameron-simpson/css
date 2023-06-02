@@ -1,0 +1,2 @@
+BREAKING: drop StackableState, superceded by cs.threads.State.
+New stackset(set,element) to push and then pop an element to a set unless it is already there.

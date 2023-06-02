@@ -1,0 +1,3 @@
+lib/python/cs/progress.py: cs.progress: fix docstring typo
+lib/python/cs/progress.py: cs.progress: Progress.__init__: make the first optional positional parameter be "name", make other parameters keyword only
+lib/python/cs/progress.py: cs.progress: Progress.bar: make "label" the first optional positional parameter, make others keyword only

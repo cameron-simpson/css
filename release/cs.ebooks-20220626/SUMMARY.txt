@@ -1,0 +1,4 @@
+CalibreBook: new setter mode for .tags, CalibreCommand: new cmd_tags to update tags.
+CalibreBook.pull_format: AZW formats: also check for AZW4.
+CalibreCommand.books_from_spec: /regexp: search the tags as well.
+CalibreBook: subclass FormatableMixin; CalibreCommand.cmd_ls: new "-o ls_format" option for the top line format.

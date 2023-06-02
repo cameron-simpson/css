@@ -11,10 +11,11 @@ Convenience facilities for managing exceptions.
 import sys
 import traceback
 from cs.deco import decorator
-from cs.logutils import error
+from cs.gimmicks import exception, warning
 from cs.py.func import funcname
+from cs.py3 import raise_from
 
-__version__ = '20210123-post'
+__version__ = '20230212.1-post'
 
 DISTINFO = {
     'description':
@@ -25,13 +26,18 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.logutils', 'cs.py.func'],
+    'install_requires': [
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.py.func',
+        'cs.py3',
+    ],
 }
 
 if sys.hexversion >= 0x03000000:
-  exec("def raise_from(src_exc, dst_exc): raise dst_exc from src_exc")
+  exec("def raise_from(src_exc, dst_exc): raise dst_exc from src_exc")  # pylint: disable=exec-used
 else:
-  exec("def raise_from(src_exc, dst_exc): raise dst_exc")
+  exec("def raise_from(src_exc, dst_exc): raise dst_exc")  # pylint: disable=exec-used
 
 def return_exc_info(func, *args, **kwargs):
   ''' Run the supplied function and arguments.
@@ -44,6 +50,7 @@ def return_exc_info(func, *args, **kwargs):
       If you need to protect a whole suite and would rather not move it
       into its own function, consider the NoExceptions context manager.
   '''
+  # pylint: disable=broad-except
   try:
     result = func(*args, **kwargs)
   except Exception:
@@ -78,8 +85,8 @@ def noexc(func):
   '''
 
   def noexc_wrapper(*args, **kwargs):
-    from cs.logutils import exception
-    from cs.x import X
+    from cs.x import X  # pylint: disable=import-outside-toplevel
+    # pylint: disable=broad-except
     try:
       return func(*args, **kwargs)
     except Exception:
@@ -95,6 +102,7 @@ def noexc(func):
           )
         except Exception:
           pass
+    return None
 
   noexc_wrapper.__name__ = 'noexc(%s)' % (func.__name__,)
   return noexc_wrapper
@@ -106,10 +114,10 @@ def noexc_gen(func):
       My primary use case is wrapping generators chained in a pipeline,
       as in cs.later.Later.pipeline.
   '''
-  from cs.logutils import exception
-  from cs.x import X
+  from cs.x import X  # pylint: disable=import-outside-toplevel
 
   def noexc_gen_wrapper(*args, **kwargs):
+    # pylint: disable=broad-except
     try:
       it = iter(func(*args, **kwargs))
     except Exception as e0:
@@ -181,16 +189,15 @@ def transmute(func, exc_from, exc_to=None):
               (type(src_exc), src_exc, exc_to)
           )
       )
-      # TODO: raise from for py3
       raise_from(src_exc, dst_exc)  # pylint: disable=undefined-variable
-      raise RuntimeError("NOTREACHED")
+      raise RuntimeError("NOTREACHED")  # pylint: disable=raise-missing-from
 
   return transmute_transmutor_wrapper
 
 def unattributable(func):
   ''' Decorator to transmute `AttributeError` into a `RuntimeError`.
   '''
-  return transmute(AttributeError, RuntimeError)(func)
+  return transmute(func, AttributeError, RuntimeError)
 
 def safe_property(func):
   ''' Substitute for @property which lets AttributeErrors escape as RuntimeErrors.
@@ -236,7 +243,6 @@ class NoExceptions(object):
       if self.handler is not None:
         return self.handler(exc_type, exc_value, tb)
       # report handled exception
-      from cs.logutils import warning
       warning("IGNORE  " + str(exc_type) + ": " + str(exc_value))
       for line in traceback.format_tb(tb):
         warning("IGNORE> " + line[:-1])
@@ -246,9 +252,8 @@ def LogExceptions(conceal=False):
   ''' Wrapper for `NoExceptions` which reports exceptions and optionally
       suppresses them.
   '''
-  from cs.logutils import exception
 
-  def handler(exc_type, exc_value, exc_tb):
+  def handler(exc_type, exc_value, _):
     exception("EXCEPTION: <%s> %s", exc_type, exc_value)
     return conceal
 
@@ -294,8 +299,7 @@ def exc_fold(func, exc_types=None, exc_return=False):
   def wrapped(*a, **kw):
     try:
       return func(*a, **kw)
-    except exc_types as e:
-      error("%s", e)
+    except exc_types:
       return exc_return
 
   wrapped.__name__ = (

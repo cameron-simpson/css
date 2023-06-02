@@ -1,0 +1,1 @@
+lib/python/cs/x.py: cs.x: further tweak the unseekable handling, but open("/dev/tty","r+") _also_ says unseekable - ugh - unwilling to use "w" because it truncates

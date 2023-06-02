@@ -20,6 +20,7 @@ from datetime import datetime
 from getopt import getopt, GetoptError
 import os
 import sys
+
 from cs.binary import (
     UInt8,
     Int16BE,
@@ -40,18 +41,17 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.context import StackableState
-from cs.fstags import FSTags, rpaths
+from cs.fstags import FSTags, rpaths, uses_fstags
 from cs.lex import get_identifier, get_decimal_value, cropped_repr
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
 from cs.py.func import prop
 from cs.tagset import TagSet, Tag
-from cs.threads import locked_property
+from cs.threads import locked_property, ThreadState
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
-__version__ = '20210306-post'
+__version__ = '20230212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -66,7 +66,6 @@ DISTINFO = {
         'cs.binary',
         'cs.buffer',
         'cs.cmdutils',
-        'cs.context',
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
@@ -79,7 +78,7 @@ DISTINFO = {
     ],
 }
 
-PARSE_MODE = StackableState(copy_boxes=False, discard_data=False)
+PARSE_MODE = ThreadState(copy_boxes=False, discard_data=False)
 
 def main(argv=None):
   ''' Command line mode.
@@ -92,7 +91,8 @@ class MP4Command(BaseCommand):
 
   TAG_PREFIX = 'mp4'
 
-  def cmd_autotag(self, argv):
+  @uses_fstags
+  def cmd_autotag(self, argv, fstags):
     ''' Usage: {cmd} autotag [-n] [-p prefix] [--prefix=prefix] paths...
           Tag paths based on embedded MP4 metadata.
           -n  No action.
@@ -100,7 +100,6 @@ class MP4Command(BaseCommand):
               Set the prefix of added tags, default: 'mp4'
     '''
     xit = 0
-    fstags = FSTags()
     no_action = False
     tag_prefix = self.TAG_PREFIX
     opts, argv = getopt(argv, 'np:', longopts=['prefix'])
@@ -138,8 +137,7 @@ class MP4Command(BaseCommand):
                 xit = 1
     return xit
 
-  @staticmethod
-  def cmd_deref(argv):
+  def cmd_deref(self, argv):
     ''' Dereference a Box specification against ISO14496 files.
     '''
     spec = argv.pop(0)
@@ -155,8 +153,7 @@ class MP4Command(BaseCommand):
           B = deref_box(over_box, path)
           print(path, "offset=%d" % B.offset, B)
 
-  @staticmethod
-  def cmd_extract(argv):
+  def cmd_extract(self, argv):
     ''' Usage: {cmd} extract [-H] filename boxref output
           Extract the referenced Box from the specified filename into output.
           -H  Skip the Box header.
@@ -209,8 +206,7 @@ class MP4Command(BaseCommand):
             need -= len(chunk)
       os.close(fd)
 
-  @staticmethod
-  def cmd_info(argv):
+  def cmd_info(self, argv):
     ''' Usage: {cmd} info [{{-|filename}}]...]
           Print informative report about each source.
     '''
@@ -235,8 +231,7 @@ class MP4Command(BaseCommand):
                 else:
                   print('   ', tag, repr(tag.value))
 
-  @staticmethod
-  def cmd_parse(argv):
+  def cmd_parse(self, argv):
     ''' Usage: {cmd} [parse [{{-|filename}}]...]
           Parse the named files (or stdin for "-").
     '''
@@ -742,7 +737,7 @@ class Box(SimpleBinary):
       if length is Ellipsis:
         end_offset = Ellipsis
         bfr_tail = bfr
-        warning("Box.parse_buffer: Box %s has no length", header)
+        warning("Box.parse: Box %s has no length", header)
       else:
         end_offset = self.offset + length
         bfr_tail = bfr.bounded(end_offset)
@@ -833,7 +828,7 @@ class Box(SimpleBinary):
     super().self_check()
     # sanity check the supplied box_type
     # against the box types this class supports
-    with Pfx("%s", self):
+    with Pfx(self):
       box_type = self.header.type
       try:
         BOX_TYPE = self.BOX_TYPE
@@ -2523,7 +2518,8 @@ class ILSTBoxBody(ContainerBoxBody):
       }
   }
 
-  # pylint: disable=attribute-defined-outside-init,too-many-locals,too-many-statements
+  # pylint: disable=attribute-defined-outside-init,too-many-locals
+  # pylint: disable=too-many-statements,too-many-branches
   def parse_fields(self, bfr):
     super().parse_fields(bfr)
     self.tags = TagSet()
@@ -2704,9 +2700,7 @@ def parse(o):
     bfr = CornuCopyBuffer.from_file(o)
   over_box = OverBox.parse(bfr)
   if bfr.bufs:
-    warning(
-        "unparsed data in bfr: %r", list(map(lambda bs: len(bs), bfr.bufs))
-    )
+    warning("unparsed data in bfr: %r", list(map(len, bfr.bufs)))
   if fd is not None:
     os.close(fd)
   return over_box
@@ -2742,7 +2736,7 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
   fp.write('\n')
   boxes = getattr(B, 'boxes', None)
   body = getattr(B, 'body', None)
-  if body:
+  if body is not None:
     for field_name in sorted(filter(lambda name: not name.startswith('_'),
                                     body.__dict__.keys())):
       if field_name == 'boxes':

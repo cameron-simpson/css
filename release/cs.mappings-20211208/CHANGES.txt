@@ -1,0 +1,11 @@
+lib/python/cs/mappings.py: cs.mappings: PrefixedMappingProxy: split out the to_subkey and from_subkey functions as private methods, aids debugging, no semantic change
+lib/python/cs/mappings.py: cs.mappings: RemappedMappingProxy: upgrade context around .key() and .subkey(), improve sanity checking
+lib/python/cs/mappings.py: merge default => tagger
+lib/python/cs/mappings.py: cs.mappings: RemappedMappingProxy: new _self_check method returning True, raises AssertionError on failure
+lib/python/cs/mappings.py: cs.mappings: RemappedMappingProxy: rename "subkey" variable to "subk", "key_iter" to "subkey_iter", to reduce confusion
+lib/python/cs/mappings.py: cs.mappings: PrefixedMappingProxy: make the key and subkey conversion methods public static methods for reuse
+lib/python/cs/mappings.py: cs.mappings: improve assert message
+lib/python/cs/mappings.py: cs.mappings: fix some typos
+lib/python/cs/mappings.py: cs.mappings: PrefixedMappingProxy: decent assertion failure message
+lib/python/cs/mappings.py: cs.mappings: PrefixedMappingProxy: more informative __str__
+lib/python/cs/mappings.py: cs.mappings: PrefixedMappingProxy: swap to_subkey/from_subkey prefix/unprefix actions, were backwards

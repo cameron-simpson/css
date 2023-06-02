@@ -1,0 +1,3 @@
+lib/python/cs/logutils.py: cs.logutils: clean up log level logic, another minor tweak, no real semantic change
+lib/python/cs/logutils.py: cs.logutils: insert new QUIET log level between TRACK and STATUS, add new quiet() logging call
+lib/python/cs/logutils.py: cs.logutils: PfxFormatter.patch_formatter: bugfix handling of record.msg,record.args

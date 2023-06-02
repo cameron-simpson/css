@@ -1,0 +1,1 @@
+lib/python/cs/tagset.py: cs.fstags,tagset: move the ORM open/close from FSTags.startup_shutdown to TagFile.save, greatly shortens the ORM lock

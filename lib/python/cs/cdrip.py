@@ -13,6 +13,7 @@
 #
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from getopt import GetoptError
 import os
 from os.path import (
@@ -27,6 +28,7 @@ import subprocess
 import sys
 from tempfile import NamedTemporaryFile
 import time
+from typing import Optional
 from uuid import UUID
 
 import discid
@@ -95,15 +97,18 @@ class CDRipCommand(BaseCommand):
 
   SUBCOMMAND_ARGV_DEFAULT = 'rip'
 
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    options = self.options
-    options.force = False
-    options.device = os.environ.get(CDRIP_DEV_ENVVAR) or CDRIP_DEV_DEFAULT
-    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR
-                                     ) or expanduser(CDRIP_DIR_DEFAULT)
-    options.mbdb_path = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    force: bool = False
+    device: str = field(
+        default_factory=lambda: os.environ.get(CDRIP_DEV_ENVVAR) or
+        CDRIP_DEV_DEFAULT
+    )
+    dirpath: str = field(
+        default_factory=lambda: os.environ.get(CDRIP_DIR_ENVVAR) or
+        expanduser(CDRIP_DIR_DEFAULT)
+    )
+    mbdb_path: Optional[str] = None
 
   def apply_opts(self, opts):
     ''' Apply the command line options.
@@ -130,21 +135,22 @@ class CDRipCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    options = self.options
-    fstags = FSTags()
-    mbdb = MBDB(mbdb_path=options.mbdb_path, runstate=options.runstate)
-    with fstags:
-      with mbdb:
-        mbdb_attrs = {}
-        try:
-          dev_info = pfx_call(discid.read, device=options.device)
-        except discid.disc.DiscError as e:
-          warning("no disc information: %s", e)
-        else:
-          mbdb_attrs.update(dev_info=dev_info)
-        with stackattrs(mbdb, **mbdb_attrs):
-          with stackattrs(options, fstags=fstags, mbdb=mbdb,
-                          sqltags=mbdb.sqltags, verbose=True):
+    with super().run_context():
+      options = self.options
+      fstags = FSTags()
+      mbdb = MBDB(mbdb_path=options.mbdb_path, runstate=options.runstate)
+      with fstags:
+        with mbdb:
+          mbdb_attrs = {}
+          try:
+            dev_info = pfx_call(discid.read, device=options.device)
+          except discid.disc.DiscError as e:
+            warning("no disc information: %s", e)
+          else:
+            mbdb_attrs.update(dev_info=dev_info)
+          with stackattrs(mbdb, **mbdb_attrs):
+            with stackattrs(options, fstags=fstags, mbdb=mbdb,
+                            sqltags=mbdb.sqltags, verbose=True):
 
             def on_signal(sig, frame):
               ''' Note signal and cancel the `RunState`.

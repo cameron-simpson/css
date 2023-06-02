@@ -10,7 +10,7 @@ Command line tool to inspect and manipulate LSI MegaRAID adapters,
 such as used in IBM ServeRAID systems and Dell PowerEdge RAID Controller (PERC).
 
 This is the obsolete Python 2 version of the `cs.app.megacli` module
-preserved should someone need to un it on a Python 2 only system.
+preserved should someone need to run it on a Python 2 only system.
 '''
 
 DISTINFO = {

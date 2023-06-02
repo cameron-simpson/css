@@ -7,13 +7,15 @@
 ''' A few ad hoc numeric alogrithms: `factors` and `primes`.
 '''
 
+from typing import Union
+
+__version__ = '20220606-post'
+
 DISTINFO = {
-    'description': "some numeric functions; currently primes() and factors()",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Development Status :: 6 - Mature",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [],
@@ -44,3 +46,9 @@ def factors(n):
     while n % p == 0:
       yield p
       n //= p
+
+def intif(f: float) -> Union[int, float]:
+  ''' Return `int(f)` if that equals `f`, otherwise `f`.
+  '''
+  i = int(f)
+  return i if i == f else f
