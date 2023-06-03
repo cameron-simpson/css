@@ -152,14 +152,14 @@ class CDRipCommand(BaseCommand):
             with stackattrs(options, fstags=fstags, mbdb=mbdb,
                             sqltags=mbdb.sqltags, verbose=True):
 
-            def on_signal(sig, frame):
-              ''' Note signal and cancel the `RunState`.
-              '''
-              warning("signal %s at %s, cancelling runstate", sig, frame)
-              options.runstate.cancel()
+              def on_signal(sig, frame):
+                ''' Note signal and cancel the `RunState`.
+                '''
+                warning("signal %s at %s, cancelling runstate", sig, frame)
+                options.runstate.cancel()
 
-            with stack_signals([SIGINT, SIGTERM], on_signal):
-              yield
+              with stack_signals([SIGINT, SIGTERM], on_signal):
+                yield
 
   cmd_dbshell = SQLTagsCommand.cmd_dbshell
 
