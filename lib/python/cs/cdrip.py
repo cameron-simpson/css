@@ -38,10 +38,13 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs, stack_signals
 from cs.deco import fmtdoc
+from cs.fileutils import atomic_filename
+from cs.fs import needdir
 from cs.fstags import FSTags
 from cs.lex import cutsuffix, is_identifier, r
 from cs.logutils import error, warning, info
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.psutils import run
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
@@ -396,10 +399,13 @@ def rip(
     output_dirpath,
     disc_id=None,
     fstags=None,
-    no_action=False
+    no_action=False,
+    split_by_format=False,
 ):
   ''' Pull audio from `device` and save in `output_dirpath`.
   '''
+  if not isdirpath(output_dirpath):
+    raise ValueError(f'not a directory: {output_dirpath!r}')
   if disc_id is None:
     dev_info = discid.read(device=device)
     disc_id = dev_info.id
@@ -419,8 +425,7 @@ def rip(
     level2 = disc.title or "UNTITLED"
     if disc.medium_count > 1:
       level2 += f" ({disc.medium_position} of {disc.medium_count})"
-    subdir = joinpath(
-        output_dirpath,
+    disc_subpath = joinpath(
         level1.replace(os.sep, ':'),
         level2.replace(os.sep, ':'),
     )
@@ -430,74 +435,76 @@ def rip(
     fstags[subdir].update(
         TagSet(discid=disc.id, title=disc.title, artists=disc.artist_names)
     )
-    for tracknum, recording_id in enumerate(disc.recordings, 1):
-      recording = disc.ontology.metadata('recording', recording_id)
-      track_fstags = TagSet(
-          discid=disc.mbkey,
-          artists=recording.artist_names,
-          title=recording.title,
-          track=tracknum
-      )
-      track_artists = ", ".join(recording.artist_names)
-      track_base = f"{tracknum:02} - {recording.title} -- {track_artists}".replace(
-          os.sep, '-'
-      )
-      wav_filename = joinpath(subdir, track_base + '.wav')
-      mp3_filename = joinpath(subdir, track_base + '.mp3')
-      if existspath(mp3_filename):
-        warning("MP3 file already exists, skipping track: %r", mp3_filename)
-      else:
-        with NamedTemporaryFile(dir=subdir,
-                                prefix=f"cdparanoia--track{tracknum}--",
-                                suffix='.wav') as T:
-          if existspath(wav_filename):
-            info("using existing WAV file: %r", wav_filename)
-          else:
+    for tracknum, track in enumerate(recordings, 1):
+      with Pfx("track %d", tracknum):
+        recording = disc.ontology.metadata('recording', recording_id)
+        track_fstags = TagSet(
+            discid=disc.mbkey,
+            artists=recording.artist_names,
+            title=recording.title,
+            track=tracknum
+        )
+        track_artists = ", ".join(recording.artist_names)
+        track_base = f"{tracknum:02} - {recording.title} -- {track_artists}".replace(
+            os.sep, '-'
+        )
+        wav_filename = joinpath(
+            output_dirpath, 'wav' if split_by_format else '', disc_subpath,
+            track_base + '.wav'
+        )
+        mp3_filename = joinpath(
+            subdir, 'mp3' if split_by_format else '', disc_subpath,
+            track_base + '.mp3'
+        )
+        if existspath(mp3_filename):
+          warning("MP3 file already exists, skipping track: %r", mp3_filename)
+          continue
+        if existspath(wav_filename):
+          info("using existing WAV file: %r", wav_filename)
+        else:
+          no_action or needdir(dirname(wav_filename), use_makedirs=True)
+          with atomic_filename(wav_filename) as T:
             argv = ['cdparanoia', '-d', '1', '-w', str(tracknum), T.name]
-            if no_action:
-              print(*argv)
-            else:
-              with Pfx("+ %r", argv, print=True):
-                subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
-              with Pfx("%r => %r", T.name, wav_filename, print=True):
-                os.link(T.name, wav_filename)
+            run(argv, doit=not no_action, quiet=False, check=True)
+          if no_action:
+            os.unlink(wav_filename)
         if no_action:
           print("fstags[%r].update(%s)" % (wav_filename, track_fstags))
         else:
           fstags[wav_filename].update(track_fstags)
           fstags[wav_filename].rip_command = argv
-        argv = [
-            'lame',
-            '-q',
-            '7',
-            '-V',
-            '0',
-            '--tt',
-            recording.title or "UNTITLED",
-            '--ta',
-            track_artists or "NO ARTISTS",
-            '--tl',
-            level2,
-            ## '--ty',recording year
-            '--tn',
-            str(tracknum),
-            ## '--tg', recording genre
-            ## '--ti', album cover filename
-            wav_filename,
-            mp3_filename
-        ]
+        no_action or needdir(dirname(mp3_filename), use_makedirs=True)
+        with atomic_filename(mp3_filename) as T:
+          argv = [
+              'lame',
+              '-q',
+              '7',
+              '-V',
+              '0',
+              '--tt',
+              recording.title or "UNTITLED",
+              '--ta',
+              track_artists or "NO ARTISTS",
+              '--tl',
+              level2,
+              ## '--ty',recording year
+              '--tn',
+              str(tracknum),
+              ## '--tg', recording genre
+              ## '--ti', album cover filename
+              wav_filename,
+              T.name,
+          ]
+          run(argv, doit=not no_action, quiet=False, check=True)
         if no_action:
-          print(*argv)
+          os.unlink(mp3_filename)
+        if no_action:
+          print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
         else:
-          with Pfx("+ %r", argv, print=True):
-            subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
-        fstags[mp3_filename].conversion_command = argv
-      if no_action:
-        print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
-      else:
-        fstags[mp3_filename].update(track_fstags)
+          fstags[mp3_filename].conversion_command = argv
+          fstags[mp3_filename].update(track_fstags)
   if not no_action:
-    subprocess.run(['ls', '-la', subdir])  # pylint: disable=subprocess-run-check
+    run(['ls', '-la', subdir])  # pylint: disable=subprocess-run-check
     os.system("eject")
 
 # pylint: disable=too-many-ancestors
