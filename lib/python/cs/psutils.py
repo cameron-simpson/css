@@ -12,7 +12,7 @@ import logging
 import os
 import shlex
 from signal import SIGTERM, SIGKILL, signal
-from subprocess import PIPE, Popen, run as subprocess_run
+from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subprocess_run
 import sys
 import time
 
@@ -192,7 +192,14 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
-def run(argv, doit=True, logger=None, quiet=True, **subp_options):
+def run(
+    argv,
+    doit=True,
+    logger=None,
+    quiet=True,
+    stdin=subprocess_DEVNULL,
+    **subp_options,
+):
   ''' Run a command via `subprocess.run`.
       Return the `CompletedProcess` result or `None` if `doit` is false.
 
@@ -204,6 +211,8 @@ def run(argv, doit=True, logger=None, quiet=True, **subp_options):
         if `True`, use `logging.getLogger()`;
         if not `None` or `False` trace using `print_argv`
       * `quiet`: default `True`; if false, print the command and its output
+      * `stdin`: standard input for the subprocess, default `subprocess.DEVNULL`;
+        passed to subprocess.run`
       * `subp_options`: optional mapping of keyword arguments
         to pass to `subprocess.run`
   '''
@@ -221,7 +230,7 @@ def run(argv, doit=True, logger=None, quiet=True, **subp_options):
       trace("+ %s", shlex.join(argv))
     else:
       print_argv(*argv, indent="+ ", file=sys.stderr)
-  cp = pfx_call(subprocess_run, argv, **subp_options)
+  cp = pfx_call(subprocess_run, argv, stdin=stdin, **subp_options)
   if cp.stderr:
     print(" stderr:")
     print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
