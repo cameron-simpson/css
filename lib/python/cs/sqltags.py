@@ -737,7 +737,7 @@ class PolyValued:
 
   @require(lambda pv: pv.is_valid())
   @typechecked
-  def set_polyvalue(self, pv: PolyValue):
+  def set_polyvalue(self, pv: "PolyValued"):
     ''' Set all the value fields.
     '''
     self.float_value = pv.float_value
