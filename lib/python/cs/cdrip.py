@@ -533,6 +533,16 @@ class _MBTagSet(SQLTagSet):
   def __repr__(self):
     return "%s:%s:%r" % (type(self).__name__, self.name, self.as_dict())
 
+  def __getattr__(self, attr):
+    if attr not in self:
+      try:
+        mb_result = self['musicbrainzngs.api.query.result']
+        value = mb_result[attr.replace('_', '-')]
+        return value
+      except KeyError:
+        pass
+    return super().__getattr__(attr)
+
   def dump(self, keys=None, **kw):
     if keys is None:
       keys = sorted(
