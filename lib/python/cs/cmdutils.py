@@ -1269,7 +1269,13 @@ class BaseCommand:
     '''
     options = self.options
     if banner is None:
-      banner = f'{self.cmd}: {options.sqltags}'
+      banner = self.cmd
+      try:
+        sqltags = options.sqltags
+      except AttributeError:
+        pass
+      else:
+        banner += f': {sqltags}'
     if local is None:
       local = dict(self.__dict__)
       local.update(options.__dict__)
