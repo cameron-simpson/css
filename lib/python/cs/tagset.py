@@ -436,11 +436,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
               # handle a missing title tag
   '''
 
-  # Arrange to return None for missing mapping attributes
-  # supporting tags.foo being None if there is no 'foo' tag.
-  # Note: sometimes this has confusing effects.
-  ATTRABLE_MAPPING_DEFAULT = None
-
   @pfx_method
   @require(
       lambda _ontology: _ontology is None or
