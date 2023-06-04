@@ -147,7 +147,7 @@ class CDRipCommand(BaseCommand):
         with mbdb:
           mbdb_attrs = {}
           try:
-            dev_info = pfx_call(discid.read, device=options.device)
+            dev_info = pfx_call(discid.read, device=self.device_id)
           except discid.disc.DiscError as e:
             warning("no disc information: %s", e)
           else:
@@ -164,6 +164,19 @@ class CDRipCommand(BaseCommand):
 
               with stack_signals([SIGINT, SIGTERM], on_signal):
                 yield
+
+  @property
+  @fmtdoc
+  def device_id(self):
+    '''
+    The CD device id to use.
+    This is `self.options.device` unless that is `CDRIP_DEV_DEFAULT` ({CDRIP_DEV_DEFAULT!r})
+    in which case the value from `discid.get_default_device()` is used.
+    '''
+    return (
+        discid.get_default_device()
+        if self.options.device == CDRIP_DEV_DEFAULT else self.options.device
+    )
 
   cmd_dbshell = SQLTagsCommand.cmd_dbshell
 
@@ -258,7 +271,7 @@ class CDRipCommand(BaseCommand):
       raise GetoptError("extra arguments after disc_id: %r" % (argv,))
     options = self.options
     try:
-      probe_disc(options.device, options.mbdb, disc_id=disc_id)
+      probe_disc(self.device_id, options.mbdb, disc_id=disc_id)
     except DiscError as e:
       error("%s", e)
       return 1
@@ -284,7 +297,7 @@ class CDRipCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     try:
       rip(
-          options.device,
+          self.device_id,
           options.mbdb,
           output_dirpath=dirpath,
           disc_id=disc_id,
@@ -309,7 +322,7 @@ class CDRipCommand(BaseCommand):
     MB = options.mbdb
     if disc_id is None:
       try:
-        dev_info = discid.read(device=options.device)
+        dev_info = discid.read(device=self.device_id)
       except discid.disc.DiscError as e:
         error("disc error: %s", e)
         return 1
