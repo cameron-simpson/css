@@ -425,15 +425,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       you can also access tag values as attributes
       *provided* that they do not conflict with instance attributes
       or class methods or properties.
-      The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
-      as `None` which causes attribute access to return `None`
-      for missing tag names.
-      This supports code like:
-
-          if tags.title:
-              # use the title in something
-          else:
-              # handle a missing title tag
   '''
 
   @pfx_method
