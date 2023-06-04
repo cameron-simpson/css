@@ -736,6 +736,9 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       self.recordings = sqltags.subdomain('recording')
       ont['recordings'].update(type='list', member_type='recording')
 
+  def __str__(self):
+    return f'{self.__class__.__name__}({self.sqltags})'
+
   @contextmanager
   def startup_shutdown(self):
     ''' Context manager for open/close.
