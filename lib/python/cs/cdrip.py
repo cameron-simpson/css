@@ -246,12 +246,19 @@ class CDRipCommand(BaseCommand):
         print(' ', metaname, metadata)
 
   def cmd_probe(self, argv):
-    ''' Usage: {cmd}
-          Probe Musicbrainz about the current dsic.
+    ''' Usage: {cmd} [disc_id]
+          Probe Musicbrainz about the current disc.
+          disc_id   Optional disc id to query instead of obtaining
+                    one from the current inserted disc.
     '''
+    disc_id = None
+    if argv:
+      disc_id = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after disc_id: %r" % (argv,))
     options = self.options
     try:
-      probe_disc(options.device, options.mbdb)
+      probe_disc(options.device, options.mbdb, disc_id=disc_id)
     except DiscError as e:
       error("%s", e)
       return 1
@@ -319,12 +326,14 @@ class CDRipCommand(BaseCommand):
           )
     return 0
 
-def probe_disc(device, mbdb):
+def probe_disc(device, mbdb, disc_id=None):
   ''' Probe MusicBrainz about the disc in `device`.
   '''
   print("probe_disc: device", device, "mbdb", mbdb)
-  dev_info = discid.read(device=device)
-  disc_id = dev_info.id
+  if disc_id is None:
+    dev_info = discid.read(device=device)
+    disc_id = dev_info.id
+  print("probe_disc: disc_id", disc_id)
   if disc_id in mbdb.discs:
     disc = mbdb.discs[disc_id]
     print("  already present:", disc)
