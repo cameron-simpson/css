@@ -443,16 +443,7 @@ class BaseCommand:
     cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  @uses_runstate
-  def __init__(
-      self,
-      argv=None,
-      *,
-      cmd=None,
-      options=None,
-      runstate: Optional[RunState],
-      **kw_options
-  ):
+  def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
     ''' Initialise the command line.
         Raises `GetoptError` for unrecognised options.
 
@@ -527,15 +518,12 @@ class BaseCommand:
         argv0 = cmd
     if cmd is None:
       cmd = basename(argv0)
-    if runstate is None:
-      runstate = RunState(cmd)
     self.cmd = cmd
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
     options = self.options = self.Options()
-    options.runstate = runstate
     options.runstate_signals = self.DEFAULT_SIGNALS
     # override the default options
     for option, value in kw_options.items():
