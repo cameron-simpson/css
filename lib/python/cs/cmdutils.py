@@ -1172,10 +1172,7 @@ class BaseCommand:
     # redundant try/finally to remind subclassers of correct structure
     try:
       options = self.options
-      if runstate is None:
-        runstate = getattr(options, 'runstate', None)
-        if runstate is None:
-          runstate = RunState(self.cmd)
+      assert not hasattr(options, 'runstate')
       handle_signal = getattr(
           self, 'handle_signal', lambda *_: runstate.cancel()
       )
