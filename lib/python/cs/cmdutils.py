@@ -9,18 +9,17 @@
     and other command line related stuff.
 '''
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from cmd import Cmd
 from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass
-from functools import partial
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
 from os.path import basename
 try:
-  import readline
+  import readline  # pylint: disable=unused-import
 except ImportError:
   pass
 import shlex
@@ -444,16 +443,7 @@ class BaseCommand:
     cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  @uses_runstate
-  def __init__(
-      self,
-      argv=None,
-      *,
-      cmd=None,
-      options=None,
-      runstate: Optional[RunState],
-      **kw_options
-  ):
+  def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
     ''' Initialise the command line.
         Raises `GetoptError` for unrecognised options.
 
@@ -528,15 +518,12 @@ class BaseCommand:
         argv0 = cmd
     if cmd is None:
       cmd = basename(argv0)
-    if runstate is None:
-      runstate = RunState(cmd)
     self.cmd = cmd
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
     options = self.options = self.Options()
-    options.runstate = runstate
     options.runstate_signals = self.DEFAULT_SIGNALS
     # override the default options
     for option, value in kw_options.items():
@@ -1108,12 +1095,12 @@ class BaseCommand:
       raise
 
   @classmethod
-  def cmdloop(cls, intor=None):
+  def cmdloop(cls, intro=None):
     ''' Use `cmd.Cmd` to run a command loop which calls the `cmd_`* methods.
     '''
     # TODO: get intro from usage/help
     cmdobj = BaseCommandCmd(cls)
-    cmdobj.cmdloop()
+    cmdobj.cmdloop(intro)
 
   # pylint: disable=unused-argument
   @staticmethod
@@ -1173,10 +1160,7 @@ class BaseCommand:
     # redundant try/finally to remind subclassers of correct structure
     try:
       options = self.options
-      if runstate is None:
-        runstate = getattr(options, 'runstate', None)
-        if runstate is None:
-          runstate = RunState(self.cmd)
+      assert not hasattr(options, 'runstate')
       handle_signal = getattr(
           self, 'handle_signal', lambda *_: runstate.cancel()
       )
@@ -1270,7 +1254,13 @@ class BaseCommand:
     '''
     options = self.options
     if banner is None:
-      banner = f'{self.cmd}: {options.sqltags}'
+      banner = self.cmd
+      try:
+        sqltags = options.sqltags
+      except AttributeError:
+        pass
+      else:
+        banner += f': {sqltags}'
     if local is None:
       local = dict(self.__dict__)
       local.update(options.__dict__)
@@ -1307,8 +1297,8 @@ class BaseCommandCmd(Cmd):
   @typechecked
   def _doarg(self, subcmd: str, arg: str):
     cls = self.command_class
-    argv = trace(shlex.split)(arg)
-    command = trace(cls)([cls.__name__, subcmd] + argv)
+    argv = shlex.split(arg)
+    command = cls([cls.__name__, subcmd] + argv)
     with stackattrs(command, _subcmd=subcmd):
       command.run()
 
@@ -1317,12 +1307,10 @@ class BaseCommandCmd(Cmd):
     subcmd = cutprefix(attr, 'do_')
     if subcmd is not attr:
       method_name = cls.SUBCOMMAND_METHOD_PREFIX + subcmd
-      X("method_name=%s", method_name)
       if hasattr(cls, method_name):
 
         def do_cmdsub(arg):
-          return trace(self._doarg)(subcmd, arg)
+          return self._doarg(subcmd, arg)
 
         return do_cmdsub
-        return trace(docmd(partial(self._doarg, subcmd)))
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
