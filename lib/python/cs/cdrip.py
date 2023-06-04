@@ -32,6 +32,7 @@ from typing import Optional
 from uuid import UUID
 
 import discid
+from discid.disc import DiscError
 import musicbrainzngs
 from typeguard import typechecked
 
@@ -249,7 +250,12 @@ class CDRipCommand(BaseCommand):
           Probe Musicbrainz about the current dsic.
     '''
     options = self.options
-    probe_disc(options.device, options.mbdb)
+    try:
+      probe_disc(options.device, options.mbdb)
+    except DiscError as e:
+      error("%s", e)
+      return 1
+    return 0
 
   # pylint: disable=too-many-locals
   def cmd_rip(self, argv):
