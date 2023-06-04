@@ -9,18 +9,17 @@
     and other command line related stuff.
 '''
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from cmd import Cmd
 from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass
-from functools import partial
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
 from os.path import basename
 try:
-  import readline
+  import readline  # pylint: disable=unused-import
 except ImportError:
   pass
 import shlex
@@ -1307,8 +1306,8 @@ class BaseCommandCmd(Cmd):
   @typechecked
   def _doarg(self, subcmd: str, arg: str):
     cls = self.command_class
-    argv = trace(shlex.split)(arg)
-    command = trace(cls)([cls.__name__, subcmd] + argv)
+    argv = shlex.split(arg)
+    command = cls([cls.__name__, subcmd] + argv)
     with stackattrs(command, _subcmd=subcmd):
       command.run()
 
@@ -1317,12 +1316,10 @@ class BaseCommandCmd(Cmd):
     subcmd = cutprefix(attr, 'do_')
     if subcmd is not attr:
       method_name = cls.SUBCOMMAND_METHOD_PREFIX + subcmd
-      X("method_name=%s", method_name)
       if hasattr(cls, method_name):
 
         def do_cmdsub(arg):
-          return trace(self._doarg)(subcmd, arg)
+          return self._doarg(subcmd, arg)
 
         return do_cmdsub
-        return trace(docmd(partial(self._doarg, subcmd)))
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
