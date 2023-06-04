@@ -1107,12 +1107,12 @@ class BaseCommand:
       raise
 
   @classmethod
-  def cmdloop(cls, intor=None):
+  def cmdloop(cls, intro=None):
     ''' Use `cmd.Cmd` to run a command loop which calls the `cmd_`* methods.
     '''
     # TODO: get intro from usage/help
     cmdobj = BaseCommandCmd(cls)
-    cmdobj.cmdloop()
+    cmdobj.cmdloop(intro)
 
   # pylint: disable=unused-argument
   @staticmethod
