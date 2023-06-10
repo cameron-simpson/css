@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # A cache store, connected to a fast cache and a slower backend.
 #       - Cameron Simpson <cs@cskk.id.au> 07dec2007
@@ -7,152 +7,24 @@
 ''' Caching Stores and associated data structures.
 '''
 
-from __future__ import with_statement
 from collections import namedtuple
+from contextlib import contextmanager
 from os.path import isdir as isdirpath
 from tempfile import TemporaryFile
 from threading import Thread
-from icontract import require
+
+from cs.context import stackattrs
 from cs.fileutils import RWFileBlockCache, datafrom_fd
 from cs.logutils import error
 from cs.pfx import pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin
-from cs.result import Result
-from . import defaults, MAX_FILE_SIZE, Lock, RLock
-from .store import _BasicStoreCommon, BasicStoreSync, MappingStore
+from cs.threads import bg as bg_thread, ThreadState, HasThreadState
+
+from . import MAX_FILE_SIZE, Lock, RLock, uses_Store
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
 DEFAULT_MAX_CACHEFILES = 3
-
-class FileCacheStore(BasicStoreSync):
-  ''' A Store wrapping another Store that provides fast access to
-      previously fetched data and fast storage of new data,
-      using asynchronous updates to the backing Store (which may be `None`).
-
-      This class is a thin Store shaped shim over a `FileDataMappingProxy`,
-      which does the heavy lifting of storing data.
-  '''
-
-  @require(lambda name: isinstance(name, str))
-  @require(
-      lambda backend: backend is None or
-      isinstance(backend, _BasicStoreCommon)
-  )
-  @require(lambda dirpath: isinstance(dirpath, str))
-  def __init__(
-      self,
-      name,
-      backend,
-      dirpath,
-      max_cachefile_size=None,
-      max_cachefiles=None,
-      runstate=None,
-      **kw
-  ):
-    ''' Initialise the `FileCacheStore`.
-
-        Parameters:
-        * `name`: the Store name
-        * `backend`: the backing Store; this may be `None`, and the
-          property .backend may be switched to another Store at any
-          time
-        * `dirpath`: directory to hold the cache files
-
-        Other keyword arguments are passed to `BasicStoreSync.__init__`.
-    '''
-    super().__init__(name, runstate=runstate, **kw)
-    self._str_attrs.update(backend=backend)
-    self._backend = None
-    self.cache = FileDataMappingProxy(
-        backend,
-        dirpath=dirpath,
-        max_cachefile_size=max_cachefile_size,
-        max_cachefiles=max_cachefiles,
-        runstate=runstate,
-    )
-    self._str_attrs.update(
-        cachefiles=self.cache.max_cachefiles,
-        cachesize=self.cache.max_cachefile_size
-    )
-    self.backend = backend
-
-  def __getattr__(self, attr):
-    return getattr(self.backend, attr)
-
-  @property
-  def backend(self):
-    ''' Return the current backend Store.
-    '''
-    return self._backend
-
-  @backend.setter
-  def backend(self, new_backend):
-    ''' Switch backends.
-    '''
-    old_backend = self._backend
-    if old_backend is not new_backend:
-      if old_backend:
-        old_backend.close()
-      self._backend = new_backend
-      cache = self.cache
-      if cache:
-        cache.backend = new_backend
-      self._str_attrs.update(backend=new_backend)
-      if new_backend:
-        new_backend.open()
-
-  @pfx_method
-  def startup(self):
-    super().startup()
-    self.cache.open()
-
-  @pfx_method
-  def shutdown(self):
-    self.cache.close()
-    self.cache = None
-    self.backend = None
-    super().shutdown()
-
-  def flush(self):
-    ''' Dummy flush operation.
-    '''
-
-  def sync(self):
-    ''' Dummy sync operation.
-    '''
-
-  def __len__(self):
-    return len(self.cache) + len(self.backend)
-
-  def keys(self):
-    hashclass = self.hashclass
-    # pylint: disable=unidiomatic-typecheck
-    return (h for h in self.cache.keys() if type(h) is hashclass)
-
-  def __iter__(self):
-    return self.keys()
-
-  def contains(self, h):
-    return h in self.cache
-
-  def add(self, data):
-    h = self.hash(data)
-    self.cache[h] = data
-    return h
-
-  # add is deliberately very fast; just return a completed Result directly
-  def add_bg(self, data):
-    return Result(result=self.add(data))
-
-  def get(self, h):
-    try:
-      data = self.cache[h]
-    except KeyError:
-      data = None
-    else:
-      pass
-    return data
 
 _CachedData = namedtuple('CachedData', 'cachefile offset length')
 
@@ -165,6 +37,7 @@ class CachedData(_CachedData):
     '''
     return self.cachefile.get(self.offset, self.length)
 
+# pylint: disable=too-many-instance-attributes
 class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
   ''' Mapping-like class to cache data chunks to bypass gdbm indices and the like.
       Data are saved immediately into an in memory cache and an asynchronous
@@ -208,30 +81,28 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     self.cached = {}  # map h => data
     self.saved = {}  # map h => _CachedData(cachefile, offset, length)
     self._lock = Lock()
+    self._workQ = None
     self.cachefiles = []
     self._add_cachefile()
-    self._workQ = None
-    self._worker = None
     self.runstate.notify_cancel.add(lambda rs: self.close())
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Startup the proxy.
     '''
-    self._workQ = IterableQueue()
-    self._worker = Thread(name="%s WORKER" % (self,), target=self._work)
-    self._worker.start()
-
-  @pfx_method
-  def shutdown(self):
-    ''' Shut down the cache.
-        Stop the worker, close the file cache.
-    '''
-    self._workQ.close()
-    self._worker.join()
-    if self.cached:
-      error("blocks still in memory cache: %r", self.cached)
-    for cachefile in self.cachefiles:
-      cachefile.close()
+    with super().startup_shutdown():
+      workQ = IterableQueue()
+      worker = bg_thread(self._work, args=(workQ,), name="%s WORKER" % (self,))
+      with stackattrs(self, _workQ=workQ):
+        try:
+          yield
+        finally:
+          workQ.close()
+          worker.join()
+          if self.cached:
+            error("blocks still in memory cache: %r", self.cached)
+          for cachefile in self.cachefiles:
+            cachefile.close()
 
   def _add_cachefile(self):
     cachefile = RWFileBlockCache(dirpath=self.dirpath)
@@ -325,8 +196,8 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     # queue for file cache and backend
     self._workQ.put((h, data, True))
 
-  def _work(self):
-    for h, data, in_backend in self._workQ:
+  def _work(self, workQ):
+    for h, data, in_backend in workQ:
       with self._lock:
         if self._getref(h):
           # already in file cache, therefore already sent to backend
@@ -349,11 +220,6 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
         if backend:
           self.backend[h] = data
 
-def MemoryCacheStore(name, max_data, hashclass=None):
-  ''' Factory to make a MappingStore of a MemoryCacheMapping.
-  '''
-  return MappingStore(name, MemoryCacheMapping(max_data), hashclass=hashclass)
-
 class MemoryCacheMapping:
   ''' A lossy MT-safe in-memory mapping of hashcode->data.
   '''
@@ -367,6 +233,8 @@ class MemoryCacheMapping:
     self.max_data = max_data
     self.used_data = 0
     self.mapping = {}
+    # keep a revision/use counter for hashcodes, used to decide
+    # which hashcodes to purge when self.used_data > self.max_data
     self._ticker = 0
     self._tick = {}
     self._skip_flush = 32
@@ -530,7 +398,8 @@ class BlockTempfile:
         tempf.seek(offset)
       return tempf.write(data)
 
-  def append_block(self, block, runstate):
+  @uses_Store
+  def append_block(self, block, runstate, *, S):
     ''' Add a Block to this tempfile.
 
         Parameters:
@@ -553,12 +422,13 @@ class BlockTempfile:
     T = Thread(
         name="%s._infill(%s)" % (type(self).__name__, block),
         target=self._infill,
-        args=(defaults.S, bm, offset, block, runstate)
+        args=(S, bm, offset, block, runstate)
     )
     T.daemon = True
     T.start()
     return bm
 
+  # pylint: disable=too-many-arguments
   def _infill(self, S, bm, offset, block, runstate):
     ''' Load the Block data into the tempfile,
         updating the `BlockMapping.filled` attribute as we go.
@@ -576,15 +446,17 @@ class BlockTempfile:
         bm.filled += written
 
 # pylint: disable=too-many-instance-attributes
-class BlockCache:
+class BlockCache(HasThreadState):
   ''' A temporary file based cache for whole Blocks.
 
       This is to support filesystems' and files' direct read/write
-      actions by passing them straight through to this cache is
+      actions by passing them straight through to this cache if
       there's a mapping.
 
       We accrue complete Block contents in unlinked files.
   '''
+
+  perthread_state = ThreadState()
 
   # default cace size
   MAX_FILES = 32
@@ -617,13 +489,13 @@ class BlockCache:
         tempf.close()
       self._tempfiles = []
 
-  def __getitem__(self, hashcode):
-    ''' Fetch BlockMapping associated with `hashcode`, raise KeyError if missing.
+  def __getitem__(self, hashcode) -> BlockMapping:
+    ''' Fetch the `BlockMapping` associated with `hashcode`, raise `KeyError` if missing.
     '''
     return self.blockmaps[hashcode]
 
-  def get_blockmap(self, block):
-    ''' Add the specified Block to the cache, return the BlockMapping.
+  def get_blockmap(self, block) -> BlockMapping:
+    ''' Add the specified Block to the cache, return the `BlockMapping`.
     '''
     blockmaps = self.blockmaps
     h = block.hashcode

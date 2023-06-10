@@ -10,12 +10,12 @@ from typing import Optional, TypeVar
 
 from typeguard import typechecked
 
-from cs.gimmicks import warning
+from cs.gimmicks import exception
 from cs.gvutils import gvprint, quote as gvq, DOTNodeMixin
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 
-__version__ = '20220805.1-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -67,12 +67,13 @@ class FSM(DOTNodeMixin):
   # token representing "any state" in the callbacks
   FSM_ANY_STATE = object()
 
-  # allow state transitions
+  # allowed state transitions
   FSM_TRANSITIONS = {}
 
-  def __init__(self, state, *, history=None, lock=None, transitions=None):
+  def __init__(self, state=None, *, history=None, lock=None, transitions=None):
     ''' Initialise the `FSM` from:
-        * `state`: the initial state
+        * `state`: optional _positional_ parameter for the initial state,
+          default `self.FSM_DEFAULT_STATE`
         * `history`: an optional object to record state transition
           history, default `None`; if not `None` this should be an
           iterable object with a `.append(entry)` method such as a
@@ -83,20 +84,39 @@ class FSM(DOTNodeMixin):
           the default is a `Lock`, which is enough for `FSM` private use
         * `transitions`: optional *state*->*event*->*state* mapping;
           if provided, this will override the class `FSM_TRANSITIONS` mapping
+
+        Note that the `FSM` base class does not provide a
+        `FSM_DEFAULT_STATE` attribute; a default `state` value of
+        `None` will leave `.fsm_state` _unset_.
+
+        This behaviour is is chosen mostly to support subclasses
+        with unusual behaviour, particularly Django's `Model` class
+        whose `refresh_from_db` method seems to not refresh fields
+        which already exist, and setting `.fsm_state` from a
+        `FSM_DEFAULT_STATE` class attribute thus breaks this method.
+        Subclasses of this class and `Model` should _not_ provide a
+        `FSM_DEFAULT_STATE` attribute, instead relying on the field
+        definition to provide this default in the usual way.
     '''
+    if state is None:
+      try:
+        state = self.FSM_DEFAULT_STATE
+      except AttributeError:
+        pass
     if lock is None:
       lock = Lock()
     if transitions is not None:
       self.FSM_TRANSITIONS = transitions
-    if state not in self.FSM_TRANSITIONS:
-      raise ValueError(
-          "invalid initial state %r, expected one of %r" % (
-              state,
-              sorted(self.FSM_TRANSITIONS.keys()),
-          )
-      )
-    self.fsm_state = state
-    self.fsm_history = history
+    if state is not None:
+      if state not in self.FSM_TRANSITIONS:
+        raise ValueError(
+            "invalid initial state %r, expected one of %r" % (
+                state,
+                sorted(self.FSM_TRANSITIONS.keys()),
+            )
+        )
+      self.fsm_state = state
+    self._fsm_history = history
     self.__lock = lock
     self.__callbacks = defaultdict(list)
 
@@ -113,26 +133,46 @@ class FSM(DOTNodeMixin):
           is an event name for the current state
         Fall back to the superclass `__getattr__`.
     '''
-    if attr in self.FSM_TRANSITIONS:
-      return attr
-    in_state = cutprefix(attr, 'is_')
-    if in_state is not attr:
-      # relies on upper case state names
-      return self.fsm_state == in_state.upper()
-    try:
-      statedef = self.FSM_TRANSITIONS[self.fsm_state]
-    except KeyError:
-      pass
-    else:
-      if attr in statedef:
-        return lambda **kw: self.fsm_event(attr, **kw)
+    if not attr.startswith('_'):
+      if attr in self.FSM_TRANSITIONS:
+        return attr
+      try:
+        state = self.fsm_state
+      except AttributeError:
+        pass
+      else:
+        in_state = cutprefix(attr, 'is_')
+        if in_state is not attr:
+          # relies on upper case state names
+          return state == in_state.upper()
+        FSM_TRANSITIONS = self.FSM_TRANSITIONS
+        try:
+          statedef = FSM_TRANSITIONS[state]
+        except KeyError:
+          pass
+        else:
+          if attr in statedef:
+            return lambda **kw: self.fsm_event(attr, **kw)
     try:
       sga = super().__getattr__
     except AttributeError as e:
       raise AttributeError(
-          "no %s.%s attribute" % (type(self).__name__, attr)
+          "no %s.%s attribute" % (self.__class__.__name__, attr)
       ) from e
     return sga(attr)
+
+  @property
+  def fsm_history(self):
+    ''' History property wrapping private attribute.
+        This aids subclassing where the history is not a local attribute.
+    '''
+    return self._fsm_history
+
+  def fsm_event_is_allowed(self, event):
+    ''' Test whether `event` is permitted in the current state.
+        This can be handy as a pretest.
+    '''
+    return event in self.FSM_TRANSITIONS[self.fsm_state]
 
   def fsm_event(self, event, **extra):
     ''' Transition the FSM from the current state to a new state based on `event`.
@@ -172,12 +212,12 @@ class FSM(DOTNodeMixin):
       if self.fsm_history is not None:
         self.fsm_history.append(transition)
     with Pfx("%s->%s", old_state, new_state):
-      for callback in self.__callbacks[self.FSM_ANY_STATE
-                                       ] + self.__callbacks[new_state]:
+      for callback in (self.__callbacks[FSM.FSM_ANY_STATE] +
+                       self.__callbacks[new_state]):
         try:
           pfx_call(callback, self, transition)
         except Exception as e:  # pylint: disable=broad-except
-          warning("exception from callback %s: %s", callback, e)
+          exception("exception from callback %s: %s", callback, e)
     return new_state
 
   @property
@@ -249,37 +289,12 @@ class FSM(DOTNodeMixin):
     '''
     return self.fsm_transitions_as_dot(self.FSM_TRANSITIONS)
 
-  def dot_node_fillcolor(self) -> Optional[str]:
-    ''' The default DOT node `fillcolor`.
-        Return a color name or `None`.
-
-        This implementation looks up `self.fsm_state`
-        in `self.DOT_NODE_FILLCOLOR_PALETTE` if that exists.
-        A default color can be provided with the key `None`
-        in the palette mapping.
+  @property
+  def dot_node_palette_key(self):
+    ''' Default palette index is `self.fsm_state`,
+        overriding `DOTNodeMixin.dot_node_palette_key`.
     '''
-    fillcolor = None
-    try:
-      fill_palette = self.DOT_NODE_FILLCOLOR_PALETTE
-    except AttributeError:
-      # no colour palette
-      pass
-    else:
-      try:
-        fillcolor = fill_palette[self.fsm_state]
-      except KeyError:
-        fillcolor = fill_palette.get(None)
-    return fillcolor
-
-  def dot_node_attrs(self):
-    ''' DOT Node attributes.
-    '''
-    attrs = super().dot_node_attrs()
-    fillcolor = self.dot_node_fillcolor()
-    if fillcolor is not None:
-      attrs.update(style='filled')
-      attrs.update(fillcolor=fillcolor)
-    return attrs
+    return self.fsm_state
 
   def fsm_print(self, file=None, fmt=None, layout=None, **dot_kw):
     ''' Print the state transition diagram to `file`, default `sys.stdout`,

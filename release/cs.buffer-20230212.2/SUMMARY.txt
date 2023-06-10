@@ -1,0 +1,2 @@
+BREAKING: drop @chunky, superceded by @promote for CornuCopyBuffer parameters.
+CornuCopyBuffer: subclass Promotable.

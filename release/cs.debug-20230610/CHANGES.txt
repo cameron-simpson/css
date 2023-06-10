@@ -1,0 +1,7 @@
+lib/python/cs/debug.py: cs.debug: DebuggingRLock.__init__: fix keyword parameters
+lib/python/cs/debug.py: cs.debug: fix misplaced lines
+lib/python/cs/debug.py: cs.debug,cs.py.func: move @trace to cs.debug
+lib/python/cs/debug.py: cs.debug: update imports and DISTINFO
+lib/python/cs/debug.py: cs.debug: DebuggingRLock: pass filename and lineno to DebugWrapper, update __str__
+lib/python/cs/debug.py: cs.debug: drop Lock and RLock alias factories - imported should just use the debugging lock classes directly; rename threading.Thread to threading_Thread, simplify the debugging lock classes
+lib/python/cs/debug.py: cs.debug: update DISTINFO

@@ -1,0 +1,1 @@
+FSTags.__init__: treat empty $FSTAGS_UPDATE_MAPPING as missing i.e. None.

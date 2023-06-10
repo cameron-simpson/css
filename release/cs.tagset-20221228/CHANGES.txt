@@ -1,0 +1,5 @@
+lib/python/cs/tagset.py: cs.tagset: TagFile: drop _singleton_key, FSPathBasedSingleton provides a good default
+lib/python/cs/tagset.py: cs.tagset: TagFile.save_tagsets,tags_line: new optional prune=False parameter to drop empty top level dict/lists
+lib/python/cs/tagset.py: cs.tagset: TagFile.save: plumb prune=False parameter
+lib/python/cs/tagset.py: cs.*: update implementations of BaseCommand.run_context to use super().run_context()
+lib/python/cs/tagset.py: merge playon ==> default

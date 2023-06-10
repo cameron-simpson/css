@@ -1,0 +1,1 @@
+@promote: add support for .as_TypeName() instance method on the source object or a .as_TypeName property/attribut.

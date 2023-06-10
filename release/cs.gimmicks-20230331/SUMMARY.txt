@@ -1,0 +1,1 @@
+New open_append to handle idiotic Linux do-not-open-tty-for-append semantics.

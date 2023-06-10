@@ -199,25 +199,27 @@ from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
-from os.path import dirname, isdir as isdirpath, isfile as isfilepath
+from os.path import (
+    dirname, isdir as isdirpath, isfile as isfilepath, join as joinpath
+)
 import re
 import time
-from typing import Optional, Union
-from uuid import UUID
+from typing import Mapping, Optional, Union
+from uuid import UUID, uuid4
 
 from icontract import require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator, fmtdoc
+from cs.deco import decorator, fmtdoc, Promotable
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
-    has_format_attributes, format_attribute, FStr, r
+    has_format_attributes, format_attribute, FStr, r, s
 )
 from cs.logutils import setup_logging, debug, warning, error, ifverbose
 from cs.mappings import (
@@ -230,7 +232,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20220806-post'
+__version__ = '20230407-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -512,6 +514,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         attribute = kw.get_format_attribute(arg_name)
       except AttributeError:
         if self.format_mode.strict:
+          # pylint: disable=raise-missing-from
           raise KeyError(
               "%s.get_value: unrecognised arg_name %r" %
               (type(self).__name__, arg_name)
@@ -526,7 +529,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ################################################################
   # The magic attributes.
 
-  # pylint: disable=too-many-nested-blocks,too-many-return-statements
+  # pylint: disable=too-many-nested-blocks,too-many-return-statements,too-many-branches
   def __getattr__(self, attr):
     ''' Support access to dotted name attributes.
 
@@ -546,7 +549,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
         For example if a `TagSet` has the tag `artists=["fred","joe"]`
         and `attr` is `artist_names`
-        then the metadata entries for `"fred"` and `"joe"` looked up
+        then the metadata entries for `"fred"` and `"joe"` are looked up
         and their `artist_name` tags are returned,
         perhaps resulting in the list
         `["Fred Thing","Joe Thang"]`.
@@ -557,7 +560,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
         Otherwise, a superclass attribute access is performed.
 
-        Example:
+        Example of dotted access to tags like `c.x`:
 
             >>> tags=TagSet(a=1,b=2)
             >>> tags.a
@@ -879,7 +882,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   @property
   def unixtime(self):
-    ''' `unixtime` property, autosets to `time.time()` if accessed.
+    ''' `unixtime` property, autosets to `time.time()` if accessed and missing.
     '''
     ts = self.get('unixtime')
     if ts is None:
@@ -892,6 +895,32 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     ''' Set the `unixtime`.
     '''
     self['unixtime'] = new_unixtime
+
+  @property
+  def uuid(self) -> UUID:
+    ''' The `TagSet`'s `'uuid'` value as a UUID if present, otherwise `None`.
+    '''
+    try:
+      uuid_s = self['uuid']
+    except KeyError:
+      return None
+    else:
+      return UUID(uuid_s) if uuid_s else None
+
+  @format_attribute
+  def is_stale(self, max_age=None):
+    ''' Test whether this `TagSet` is stale
+        i.e. the time since `self.last_updated` UNIX time exceeds `max_age` seconds
+        (default from `self.STALE_AGE`).
+
+        This is a convenience function for `TagSet`s which cache external data.
+    '''
+    if max_age is None:
+      max_age = self.STALE_AGE
+    last_updated = self.get('last_updated', None)
+    if not last_updated:
+      return True
+    return time.time() >= last_updated + max_age
 
   #############################################################################
   # The '.auto' attribute space.
@@ -970,7 +999,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         try:
           tag = Tag.from_str(line)
         except ValueError as e:
-          warning("parse error, discarded: %s", line)
+          warning("parse error %s, discarded: %s", e, line)
           no_discard = True
         else:
           new_values[tag.name] = tag.value
@@ -1701,7 +1730,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     except KeyError:
       raise AttributeError('member_type')  # pylint: disable=raise-missing-from
 
-class TagSetCriterion(ABC):
+class TagSetCriterion(Promotable):
   ''' A testable criterion for a `TagSet`.
   '''
 
@@ -1723,12 +1752,13 @@ class TagSetCriterion(ABC):
         Instances of `cls` are returned unchanged.
         Instances of s`str` are promoted via `cls.from_str`.
     '''
-    if not isinstance(criterion, cls):
-      if isinstance(criterion, str):
-        criterion = cls.from_str(criterion, fallback_parse=fallback_parse)
-      else:
-        raise TypeError("cannot promote to %s: %s" % (cls, r(criterion)))
-    return criterion
+    if isinstance(criterion, cls):
+      return criterion
+    if isinstance(criterion, str):
+      return cls.from_str(criterion, fallback_parse=fallback_parse)
+    raise TypeError(
+        "%s.promote: cannot promote to %s" % (cls.__name__, r(criterion))
+    )
 
   @classmethod
   @pfx_method
@@ -1996,8 +2026,8 @@ class TagSetPrefixView(FormatableMixin):
           TagSet:{'a': 1, 'b': 2, 'sub.x': 3, 'sub.y': 4, 'sub.z': 5}
   '''
 
-  @typechecked
   @require(lambda prefix: len(prefix) > 0)
+  @typechecked
   def __init__(self, tags, prefix: str):
     self.__dict__.update(_tags=tags, _prefix=prefix, _prefix_=prefix + '.')
 
@@ -2285,6 +2315,9 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     for k in self.keys(prefix=prefix):
       yield k, self.get(k)
 
+  def __bool__(self):
+    return True
+
   def __contains__(self, name: str):
     ''' Test whether `name` is present in the underlying mapping.
     '''
@@ -2443,6 +2476,7 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
           ['prefix.bah']
   '''
 
+  # pylint: disable=unnecessary-lambda-assignment
   @typechecked
   def __init__(self, tagsets: BaseTagSets, match, unmatch=None):
     self.__match = match
@@ -2579,7 +2613,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       * the type is `role`, so the ontology entry for the metadata
         is `role.marvel.black_widow`
 
-      this requires type information about a `role`.
+      This requires type information about a `role`.
       Here are some type definitions supporting the above metadata:
 
           type.person type=str description="A person."
@@ -2931,11 +2965,12 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     subtagsets = self._subtagsets_for_type(type_name)
     return subtagsets.typedef(type_name)
 
+  @pfx_method
   def type_names(self):
     ''' Return defined type names i.e. all entries starting `type.`.
     '''
     return set(
-        subtagsets.key(subtype_name)
+        subtype_name  ## subtagsets.key(subtype_name)
         for subtagsets in self._subtagsetses
         for subtype_name in subtagsets.type_names()
     )
@@ -3197,12 +3232,23 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
   '''
 
   @typechecked
-  def __init__(self, fspath: str, *, ontology=None):
+  def __init__(
+      self,
+      fspath: str,
+      *,
+      ontology=None,
+      update_mapping: Optional[Mapping] = None,
+      update_prefix: Optional[str] = None,
+      update_uuid_tag_name: Optional[str] = None,
+  ):
     if hasattr(self, 'fspath'):
       return
     FSPathBasedSingleton.__init__(self, fspath)
     BaseTagSets.__init__(self, ontology=ontology)
     self._tagsets = None
+    self.update_mapping = update_mapping
+    self.update_prefix = update_prefix
+    self.update_uuid_tag_name = update_uuid_tag_name
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, shortpath(self.fspath))
@@ -3359,7 +3405,7 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       return tagsets, unparsed
 
   @classmethod
-  def tags_line(cls, name, tags, extra_types=None):
+  def tags_line(cls, name, tags, extra_types=None, prune=False):
     ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
     if extra_types is None:
@@ -3375,11 +3421,24 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
               cls.__name__, name, tags, tag.value
           )
         continue
+      if prune and isinstance(tag.value,
+                              (list, tuple, dict)) and not tag.value:
+        continue
       fields.append(str(tag))
     return ' '.join(fields)
 
   @classmethod
-  def save_tagsets(cls, filepath, tagsets, unparsed, extra_types=None):
+  def save_tagsets(
+      cls,
+      filepath,
+      tagsets,
+      unparsed,
+      extra_types=None,
+      prune=False,
+      update_mapping: Optional[Mapping] = None,
+      update_prefix: Optional[str] = None,
+      update_uuid_tag_name: Optional[str] = None,
+  ):
     ''' Save `tagsets` and `unparsed` to `filepath`.
 
         This method will create the required intermediate directories
@@ -3405,14 +3464,57 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
               f.write(line)
               f.write('\n')
             for name, tags in name_tags:
-              if not tags:
-                continue
-              f.write(cls.tags_line(name, tags, extra_types=extra_types))
-              f.write('\n')
+              with Pfx(name):
+                if not tags:
+                  continue
+                if update_mapping:
+                  # mirror tags to secondary mapping eg an SQLTags
+                  # this associates a UUID with the file
+                  try:
+                    uuid_s = tags[update_uuid_tag_name]
+                  except KeyError:
+                    uuid = uuid4()
+                    uuid_s = str(uuid)
+                    tags[update_uuid_tag_name] = uuid_s
+                  else:
+                    try:
+                      uuid = UUID(uuid_s)
+                    except ValueError as e:
+                      warning(
+                          "invalid UUID tag %r=%s: %s", update_uuid_tag_name,
+                          uuid_s, e
+                      )
+                      uuid = None
+                    else:
+                      uuid_s = str(uuid)
+                  if uuid is not None:
+                    # apply the tags to the secondary mapping
+                    key = (
+                        "%s.%s" %
+                        (update_prefix, uuid_s) if update_prefix else uuid_s
+                    )
+                    d = tags.as_dict()
+                    del d[update_uuid_tag_name]
+                    d['fspath'] = joinpath(dirname(filepath), name)
+                    try:
+                      update_mapping[key].update(d)
+                    except AttributeError:
+                      raise
+                    except Exception as e:
+                      warning(
+                          "update_mapping:%s[%r].update(%s): %s",
+                          s(update_mapping), key, cropped_repr(d), e
+                      )
+                f.write(
+                    cls.tags_line(
+                        name, tags, extra_types=extra_types, prune=prune
+                    )
+                )
+                f.write('\n')
         except OSError as e:
           error("save(%r) fails: %s", filepath, e)
 
-  def save(self, extra_types=None):
+  def save(self, extra_types=None, prune=False):
     ''' Save the tag map to the tag file if modified.
     '''
     tagsets = self._tagsets
@@ -3422,9 +3524,23 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     with self._lock:
       if self.is_modified():
         # there are modified TagSets
-        self.save_tagsets(
-            self.fspath, tagsets, self.unparsed, extra_types=extra_types
-        )
+        update_mapping_close = getattr(self.update_mapping, 'close', None)
+        if update_mapping_close:
+          self.update_mapping.open()
+        try:
+          self.save_tagsets(
+              self.fspath,
+              tagsets,
+              self.unparsed,
+              extra_types=extra_types,
+              prune=prune,
+              update_mapping=self.update_mapping,
+              update_prefix=self.update_prefix,
+              update_uuid_tag_name=self.update_uuid_tag_name,
+          )
+        finally:
+          if update_mapping_close:
+            pfx_call(update_mapping_close)
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
           tagset.modified = False
@@ -3441,8 +3557,9 @@ class TagsOntologyCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    with self.options.ontology:
-      yield
+    with super().run_context():
+      with self.options.ontology:
+        yield
 
   def cmd_edit(self, argv):
     ''' Usage: {cmd} [{{/name-regexp | entity-name}}]

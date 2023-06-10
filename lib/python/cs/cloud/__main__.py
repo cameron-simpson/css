@@ -3,15 +3,19 @@
 ''' Command line implementation for the cs.cloud module.
 '''
 
+from dataclasses import dataclass, field
+from getopt import GetoptError
 import os
 import sys
 from threading import RLock
-from types import SimpleNamespace
+from typing import Optional
+
 from cs.cmdutils import BaseCommand
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.threads import locked
+
 from . import CloudArea
 
 def main(argv=None):
@@ -31,13 +35,14 @@ class CloudCommand(BaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'stat'
 
   # pylint: disable=too-few-public-methods
-  class OPTIONS_CLASS(SimpleNamespace):
+  @dataclass
+  class Options(BaseCommand.Options):
     ''' Options namespace with convenience methods.
     '''
-
-    def __init__(self, **kw):
-      super().__init__(**kw)
-      self._lock = RLock()
+    _lock: bool = field(default_factory=RLock)
+    cloud_area_path: Optional[str] = field(
+        default_factory=lambda: os.environ.get('CS_CLOUD_AREA')
+    )
 
     @property
     @locked
@@ -49,9 +54,6 @@ class CloudCommand(BaseCommand):
             "no cloud area specified; requires -A option or $CS_CLOUD_AREA"
         )
       return CloudArea.from_cloudpath(self.cloud_area_path)
-
-  def apply_defaults(self):
-    self.options.cloud_area_path = os.environ.get('CS_CLOUD_AREA')
 
   def apply_opt(self, opt, val):
     ''' Handle an individual global command line option.
@@ -66,14 +68,13 @@ class CloudCommand(BaseCommand):
           Report the current settings.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r", argv)
+      raise GetoptError("extra arguments: %r" % (argv,))
     CAF = self.options.cloud_area
     print("Cloud area:")
     print("  cloud", CAF.cloud)
     print("  bucket_name", CAF.bucket_name)
     print("  basepath", CAF.basepath)
 
-  @staticmethod
   def cmd_download(self, argv):
     ''' Usage: {cmd} area_subpath dst
     '''
