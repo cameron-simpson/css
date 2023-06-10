@@ -50,6 +50,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.fs',
         'cs.lex',
         'cs.logutils',
         'cs.obj',
