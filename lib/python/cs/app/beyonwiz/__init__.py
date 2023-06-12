@@ -9,12 +9,9 @@ structures and to access Beyonwiz devices via the net.
 
 from abc import ABC, abstractmethod
 import datetime
-import errno
 import json
 import os.path
 from os.path import join as joinpath, isdir as isdirpath
-import re
-import shlex
 from threading import Lock
 from types import SimpleNamespace as NS
 
@@ -25,13 +22,11 @@ from cs.ffmpegutils import (
 )
 from cs.fileutils import crop_name
 from cs.fstags import HasFSTagsMixin
-from cs.logutils import info, warning, error
+from cs.logutils import error
 from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx, pfx, pfx_method
-from cs.psutils import print_argv
 from cs.py.func import prop
 from cs.tagset import Tag
-
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -99,6 +94,7 @@ def trailing_nul(bs):
 # TODO: moved to cs.sqltags, can we obviate its use entirely in this package?
 @pfx
 def jsonable(value):
+  ''' Return a JSON encodable version of `value`. '''
   if isinstance(value, (int, str, float)):
     return value
   # mapping?
@@ -142,7 +138,7 @@ class RecordingMetaData(NS):
     try:
       return self.raw[attr]
     except KeyError:
-      raise AttributeError(attr)
+      raise AttributeError(attr)  # pylint: disable=raise-missing-from
 
   def as_dict(self):
     ''' Return the metadata as a `dict`.
@@ -181,10 +177,10 @@ def Recording(path):
   ''' Factory function returning a TVWiz or Enigma2 `_Recording` object.
   '''
   if path.endswith('.tvwiz'):
-    from .tvwiz import TVWiz
+    from .tvwiz import TVWiz  # pylint: disable=import-outside-toplevel
     return TVWiz(path)
   if path.endswith('.ts'):
-    from .enigma2 import Enigma2
+    from .enigma2 import Enigma2  # pylint: disable=import-outside-toplevel
     return Enigma2(path)
   raise ValueError("don't know how to open recording %r" % (path,))
 
@@ -212,6 +208,7 @@ class _Recording(ABC, HasFSTagsMixin):
       return getattr(self.metadata, attr)
     raise AttributeError(attr)
 
+  # pylint: disable=redefined-builtin
   def filename(self, format=None, *, ext):
     ''' Compute a filename from `format` with extension `ext`.
 
@@ -231,7 +228,7 @@ class _Recording(ABC, HasFSTagsMixin):
     '''
     raise NotImplementedError('data')
 
-  @strable(open_func=lambda filename: open(filename, 'wb'))
+  @strable(open_func=lambda filename: open(filename, 'wb'))  # pylint: disable=consider-using-with
   def copyto(self, output):
     ''' Transcribe the uncropped content to a file named by output.
         Requires the .data() generator method to yield video data chunks.
@@ -266,6 +263,7 @@ class _Recording(ABC, HasFSTagsMixin):
         "no available --0..--%d variations: %r" % (max_n - 1, path)
     )
 
+  # pylint: disable=too-many-branches,too-many-locals
   def convert(
       self,
       dstpath,
@@ -383,7 +381,7 @@ class _Recording(ABC, HasFSTagsMixin):
         with Pfx("%r->%r", beymeta, ffmeta):
           if beymeta is None:
             continue
-          elif isinstance(beymeta, str):
+          if isinstance(beymeta, str):
             ffmetavalue = M.get(beymeta, '')
           elif callable(beymeta):
             ffmetavalue = beymeta(M)
