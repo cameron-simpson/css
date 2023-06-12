@@ -6,12 +6,16 @@
 
 from __future__ import print_function
 from getopt import GetoptError
+import json
 import os.path
 from pprint import pformat
 import sys
+
 from cs.cmdutils import BaseCommand
+from cs.ffmpegutils import convert as ffconvert, ffprobe
 from cs.logutils import warning
 from cs.pfx import Pfx
+
 from . import Recording, DEFAULT_MEDIAFILE_FORMAT
 from .tvwiz import TVWiz
 from .wizpnp import WizPnP
@@ -45,6 +49,7 @@ class BWizCmd(BaseCommand):
       stdout_bfp.close()
     return 0
 
+  # pylint: disable=too-many-branches,too-many-locals
   def cmd_convert(self, argv):
     ''' Convert a recording to MP4.
 
@@ -109,7 +114,7 @@ class BWizCmd(BaseCommand):
       raise GetoptError("bad invocation")
     R = Recording(srcpath)
     return (
-        0 if trace(R.convert)(
+        0 if R.convert(
             dstpath,
             doit=doit,
             acodec=acodec,
@@ -163,12 +168,6 @@ class BWizCmd(BaseCommand):
         print(R.DEFAULT_FILENAME_BASIS)
         print(R.filename(ext=DEFAULT_MEDIAFILE_FORMAT))
     return 0
-
-  def cmd_ff(self, argv):
-    srcpath, = argv
-    probed = ffprobe(srcpath)
-    print(probed.streams[0].codec_long_name)
-    ffconvert(srcpath, doit=False, dstpath='-')
 
   def cmd_ffprobe(self, argv):
     ''' Run `ffprobe` against a file.
