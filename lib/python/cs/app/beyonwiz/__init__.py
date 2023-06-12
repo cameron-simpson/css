@@ -18,12 +18,11 @@ import shlex
 from threading import Lock
 from types import SimpleNamespace as NS
 
-from cs.app.ffmpeg import (
-    multiconvert as ffmconvert,
-    MetaData as FFmpegMetaData,
-    ConversionSource as FFSource,
-)
 from cs.deco import strable
+from cs.ffmpegutils import (
+    MetaData as FFmpegMetaData,
+    convert as ffconvert,
+)
 from cs.fileutils import crop_name
 from cs.fstags import HasFSTagsMixin
 from cs.logutils import info, warning, error
@@ -33,7 +32,6 @@ from cs.psutils import print_argv
 from cs.py.func import prop
 from cs.tagset import Tag
 
-import ffmpeg
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -42,7 +40,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.app.ffmpeg',
+        'cs.ffmpegutils',
         'cs.binary',
         'cs.deco',
         'cs.fstags',
@@ -281,6 +279,8 @@ class _Recording(ABC, HasFSTagsMixin):
       extra_opts=None,
       overwrite=False,
       use_data=False,
+      acodec=None,
+      vcodec=None,
   ):
     ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
     '''
@@ -339,60 +339,18 @@ class _Recording(ABC, HasFSTagsMixin):
     if not doit:
       print(srcpath)
       print("  =>", dstpath)
-    # compute the metadata for the output format
-    # which may be passed with the input arguments
-    M = self.metadata
-    with Pfx("metadata for dstformat %r", dstfmt):
-      ffmeta_kw = dict(comment=f'Transcoded from {self.path!r} using ffmpeg.')
-      for ffmeta, beymeta in FFMPEG_METADATA_MAPPINGS[dstfmt].items():
-        with Pfx("%r->%r", beymeta, ffmeta):
-          if beymeta is None:
-            continue
-          elif isinstance(beymeta, str):
-            ffmetavalue = M.get(beymeta, '')
-          elif callable(beymeta):
-            ffmetavalue = beymeta(M)
-          else:
-            raise RuntimeError(
-                "unsupported beymeta %s:%r" %
-                (type(beymeta).__name__, beymeta)
-            )
-          assert isinstance(ffmetavalue, str), (
-              "ffmetavalue should be a str, got %s:%r" %
-              (type(ffmetavalue).__name__, ffmetavalue)
-          )
-          ffmeta_kw[ffmeta] = beymeta(M)
-    # set up the initial source path, options and metadata
-    ffinopts = {
-        'loglevel': 'repeat+error',
-        ##'strict': None,
-        ##'2': None,
-    }
-    ff = ffmpeg.input(srcpath, **ffinopts)
-    if timespans:
-      ffin = ff
-      ff = ffmpeg.concat(
-          *map(
-              lambda timespan: ffin.trim(start=timespan[0], end=timespan[1]),
-              timespans
-          )
-      )
-    ff = ff.output(
-        dstpath,
-        format=dstfmt,
-        metadata=list(map('='.join, ffmeta_kw.items()))
+    ffconvert(
+        srcpath,
+        dstpath=dstpath,
+        doit=doit,
+        conversions=None,
+        metadata=self.ffmetadata(dstfmt),
+        timespans=timespans,
+        overwrite=overwrite,
+        acodec=acodec,
+        vcodec=vcodec,
     )
-    if overwrite:
-      ff = ff.overwrite_output()
-    ff_args = ff.get_args()
-    if doit:
-      print_argv('ffmpeg', *ff_args)
-      fstags[dstpath]['ffmpeg.argv'] = ['ffmpeg', *ff_args]
-      fstags.sync()
-      ff.run()
-    else:
-      print_argv('ffmpeg', *ff_args, fold=True)
-    return ok
+    return True
 
   def ffmpeg_metadata(self, dstfmt=None):
     ''' Return a new `FFmpegMetaData` containing our metadata.
@@ -415,3 +373,30 @@ class _Recording(ABC, HasFSTagsMixin):
         network=M['file.channel'],
         comment=comment,
     )
+
+  def ffmetadata(self, dstfmt: str) -> dict:
+    ''' Compute the metadata for the output format
+        which may be passed with the input arguments.
+    '''
+    M = self.metadata
+    with Pfx("metadata for dstformat %r", dstfmt):
+      ffmeta_kw = dict(comment=f'Transcoded from {self.path!r} using ffmpeg.')
+      for ffmeta, beymeta in FFMPEG_METADATA_MAPPINGS[dstfmt].items():
+        with Pfx("%r->%r", beymeta, ffmeta):
+          if beymeta is None:
+            continue
+          elif isinstance(beymeta, str):
+            ffmetavalue = M.get(beymeta, '')
+          elif callable(beymeta):
+            ffmetavalue = beymeta(M)
+          else:
+            raise RuntimeError(
+                "unsupported beymeta %s:%r" %
+                (type(beymeta).__name__, beymeta)
+            )
+          assert isinstance(ffmetavalue, str), (
+              "ffmetavalue should be a str, got %s:%r" %
+              (type(ffmetavalue).__name__, ffmetavalue)
+          )
+          ffmeta_kw[ffmeta] = beymeta(M)
+    return ffmeta_kw
