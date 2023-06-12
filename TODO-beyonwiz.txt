@@ -1,3 +1,4 @@
+cs.ffmpegutils: convert: use atomic_filename
 mconvert: recognise host:path and convert to ssh-host-cat-path to pipeline data
 obsolete cs.app.ffmpeg, move to the nice looking pypi ffmpeg module
 media,beyonwiz: use ffmpeg-python for ffmpeg control, obsolete cs.ffmpeg or turn into a shim
