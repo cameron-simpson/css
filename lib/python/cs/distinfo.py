@@ -456,7 +456,7 @@ class CSReleaseCommand(BaseCommand):
       print(" ", ' '.join(files) + ': ' + firstline)
     print()
     with upd.above():
-      with pipefrom('readdottext', keep_stdin=True) as dotfp:
+      with pipefrom('readdottext', stdin=sys.stdin) as dotfp:
         release_message = dotfp.read().rstrip()
     if not release_message:
       error("empty release message, not making new release")
@@ -801,7 +801,7 @@ def ask(message, fin=None, fout=None):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output file object of a command.
   '''
-  with cs.psutils.pipefrom(argv, check=True, **kw) as P:
+  with cs.psutils.pipefrom(argv, **kw) as P:
     yield P.stdout
 
 class Modules(defaultdict):
