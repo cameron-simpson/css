@@ -249,18 +249,19 @@ def convert(
             timespans
         )
     )
+  extra_opts = {
+      'nostdin': None,
+      'c:a': acodec or 'copy',
+      'c:v': vcodec or 'copy',
+  }
+  if sys.stdout.isatty():
+    extra_opts.update(stats=None)
   ff = ff.output(
       dstpath,
       format=dstfmt,
       metadata=list(map('='.join, ffmeta_kw.items())),
-      **{
-          'c:a': acodec or 'copy',
-          'c:v': vcodec or 'copy',
-      },
+      **extra_opts,
   )
-  ff = ff.global_args('-nostdin')
-  if sys.stdout.isatty():
-    ff = ff.global_args('-stats')
   if overwrite:
     ff = ff.overwrite_output()
   ff_args = ff.get_args()
