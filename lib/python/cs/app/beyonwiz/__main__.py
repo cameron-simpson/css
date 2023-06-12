@@ -27,7 +27,7 @@ class BWizCmd(BaseCommand):
   ''' Command line handler.
   '''
 
-  def cmd_cat(self, args):
+  def cmd_cat(self, argv):
     ''' Output the tvwiz transport stream data.
 
         Usage: {cmd} tvwizdirs...
@@ -35,9 +35,9 @@ class BWizCmd(BaseCommand):
           standard output as MPEG2 transport Stream, acceptable to
           ffmpeg's "mpegts" format.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing tvwizdirs")
-    for arg in args:
+    for arg in argv:
       # NB: dup stdout so that close doesn't close real stdout
       stdout_bfd = os.dup(sys.stdout.fileno())
       stdout_bfp = os.fdopen(stdout_bfd, "wb")
@@ -45,7 +45,7 @@ class BWizCmd(BaseCommand):
       stdout_bfp.close()
     return 0
 
-  def cmd_convert(self, args):
+  def cmd_convert(self, argv):
     ''' Convert a recording to MP4.
 
         Usage: {cmd} [start..end]... recording [output.mp4]
@@ -59,8 +59,8 @@ class BWizCmd(BaseCommand):
     badopts = False
     # parse optional start..end arguments
     timespans = []
-    while args:
-      range_arg = args[0]
+    while argv:
+      range_arg = argv[0]
       with Pfx("timespan %r", range_arg):
         try:
           start, end = range_arg.split('..')
@@ -68,29 +68,28 @@ class BWizCmd(BaseCommand):
           end_s = float(end)
         except ValueError:
           break
-        else:
-          args.pop(0)
-          if start_s > end_s:
-            warning("start:%s > end:%s", start, end)
-            badopts = True
-          timespans.append((start_s, end_s))
-      if not args:
-        raise GetoptError("missing recording")
-      srcpath = args.pop(0)
-      # collect optional dstpath
-      if args:
-        dstpath = args.pop(0)
-      else:
-        dstpath = None
-      if args:
-        warning("extra arguments: %s", ' '.join(args))
-        badopts = True
       if badopts:
         raise GetoptError("bad invocation")
       R = Recording(srcpath)
       return 0 if R.convert(dstpath, max_n=TRY_N, timespans=timespans) else 1
+        argv.pop(0)
+        if start_s > end_s:
+          warning("start:%s > end:%s", start, end)
+          badopts = True
+        timespans.append((start_s, end_s))
+    if not argv:
+      raise GetoptError("missing recording")
+    srcpath = argv.pop(0)
+    # collect optional dstpath
+    if argv:
+      dstpath = argv.pop(0)
+    else:
+      dstpath = None
+    if argv:
+      warning("extra arguments: %s", ' '.join(argv))
+      badopts = True
 
-  def cmd_mconvert(self, args):
+  def cmd_mconvert(self, argv):
     ''' Usage: {cmd} [{{-n|--dry-run}}] recording...
           Convert multiple named recordings to automatically named .mp4 files
           in the current directory.
@@ -99,17 +98,17 @@ class BWizCmd(BaseCommand):
     '''
     options = self.options
     self.popopts(
-        args,
+        argv,
         options,
         n='dry_run',
         dry_run=None,
     )
     doit = options.doit
-    if not args:
+    if not argv:
       raise GetoptError("missing recordings")
     xit = 0
     runstate = options.runstate
-    for srcpath in args:
+    for srcpath in argv:
       if runstate.cancelled:
         break
       with Pfx(srcpath):
@@ -120,13 +119,13 @@ class BWizCmd(BaseCommand):
       return 1
     return xit
 
-  def cmd_meta(self, args):
+  def cmd_meta(self, argv):
     ''' Usage: {cmd} recording...
           Report metadata for the supplied recordings.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing recordings")
-    for filename in args:
+    for filename in argv:
       with Pfx(filename):
         R = Recording(filename)
         print(filename)
@@ -135,15 +134,33 @@ class BWizCmd(BaseCommand):
         print(R.filename(ext=DEFAULT_MEDIAFILE_FORMAT))
     return 0
 
-  def cmd_scan(self, args):
+  def cmd_ff(self, argv):
+    srcpath, = argv
+    probed = ffprobe(srcpath)
+    print(probed.streams[0].codec_long_name)
+    ffconvert(srcpath, doit=False, dstpath='-')
+
+  def cmd_ffprobe(self, argv):
+    ''' Run `ffprobe` against a file.
+
+        Usage: {cmd} media-file
+          Probe media-file with "ffprobe" and print the result.
+    '''
+    filename, = argv
+    probed = ffprobe(filename)
+    print(json.dumps(probed, sort_keys=True, indent=2))
+    ##pprint(ffprobe(filename))
+    print(probed.streams[0].codec_long_name)
+
+  def cmd_scan(self, argv):
     ''' Scan a TVWiz directory.
 
         Usage: {cmd} recording...
           Scan the data structures of the supplied recordings.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing tvwizdirs")
-    for tvwizdir in args:
+    for tvwizdir in argv:
       print(tvwizdir)
       total = 0
       chunkSize = 0
@@ -169,15 +186,15 @@ class BWizCmd(BaseCommand):
       print("  total %d" % total)
     return 0
 
-  def cmd_stat(self, args):
+  def cmd_stat(self, argv):
     ''' Report information about a recording.
 
         Usage: {cmd} tvwizdirs...
           Print some summary infomation for the named tvwiz directories.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing recordings")
-    for pathname in args:
+    for pathname in argv:
       R = Recording(pathname)
       print(pathname)
       for json_line in R.metadata._asjson(indent="  ").split("\n"):
@@ -185,12 +202,12 @@ class BWizCmd(BaseCommand):
           print(" ", json_line)
     return 0
 
-  def cmd_test(self, args):
+  def cmd_test(self, argv):
     ''' Usage: {cmd}
           Run unit tests.
     '''
-    host = args.pop(0)
-    print("host =", host, "args =", args)
+    host = argv.pop(0)
+    print("host =", host, "argv =", argv)
     WizPnP(host).test()
     return 0
 
