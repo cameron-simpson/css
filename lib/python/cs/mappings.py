@@ -1005,6 +1005,8 @@ class AttrableMappingMixin(object):
         `dict` at least seem not to consult that with attribute
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
+    if attr == 'ATTRABLE_MAPPING_DEFAULT':
+      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
     # try self.__dict__ first - this is because it appears that
     # getattr(dict,...) does not consult __dict__
     try:
