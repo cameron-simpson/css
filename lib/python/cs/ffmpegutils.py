@@ -147,4 +147,12 @@ class FFmpegSource:
       source = cls(source)
     return source
 
+# A mapping of ffmpeg codec_name values to default converted names.
+# If there's no entry here, use copy mode.
+DEFAULT_CONVERSIONS = {
+    'mp2': 'aac',
+    'mpeg2video': 'h264',
+}
+DEFAULT_MEDIAFILE_FORMAT = 'mp4'
+
         else:
