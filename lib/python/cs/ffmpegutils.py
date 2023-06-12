@@ -4,25 +4,43 @@
 #   - Cameron Simpson <cs@cskk.id.au> 30oct2016
 #
 
-r'''
-Wrapper for the ffmpeg command for video conversion.
+'''
+Convenience facilities for using FFmpeg (ffmpeg.org),
+with invocation via `ffmpeg-python`.
 '''
 
 from collections import namedtuple
-import os.path
-from subprocess import Popen, PIPE
+from dataclasses import dataclass
+import json
+from os.path import (
+    isfile as isfilepath,
+)
+import shlex
 import sys
-from cs.pfx import Pfx
+from typing import Any, List, Optional, Tuple
+
+import ffmpeg
+from typeguard import typechecked
+
+from cs.fstags import FSTags, uses_fstags
+from cs.logutils import warning
+from cs.mappings import attrable
+from cs.pfx import Pfx, pfx_call
+from cs.psutils import pipefrom, print_argv
 from cs.tagset import TagSet
 
 DISTINFO = {
-    'keywords': ["python2", "python3"],
+    'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.pfx'],
+    'install_requires': [
+        'cs.pfx',
+        'cs.tagset',
+        'ffmpeg-python',
+        ##'git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python',
+    ],
 }
 
 class MetaData(TagSet):
@@ -51,11 +69,13 @@ class MetaData(TagSet):
       ],
   }
 
+  # pylint: disable=redefined-builtin
   def __init__(self, format, **kw):
     super().__init__()
     try:
       allowed_fields = MetaData.FIELDNAMES[format]
     except KeyError:
+      # pylint: disable=raise-missing-from
       raise ValueError("unsupported target format %r" % (format,))
     self.__dict__.update(format=format, allow_fields=allowed_fields)
     for k, v in kw.items():
@@ -88,6 +108,8 @@ ConversionSource = namedtuple('ConversionSource', 'src srcfmt start_s end_s')
 
 @dataclass(init=False)
 class FFmpegSource:
+  ''' A representation of an `ffmpeg` input source. '''
+
   source: Any
   timespans: List[Tuple]
 
@@ -113,6 +135,7 @@ class FFmpegSource:
         host, hostpath = src.split(':', 1)
       except ValueError:
         if not isfilepath(src):
+          # pylint: disable=raise-missing-from
           raise ValueError("not a file: %r" % (src,))
         ff.input(src)
         fd = None
@@ -143,6 +166,7 @@ class FFmpegSource:
 
   @classmethod
   def promote(cls, source):
+    ''' Promote `source` to an `FFmpegSource`. '''
     if not isinstance(source, cls):
       source = cls(source)
     return source
@@ -155,8 +179,8 @@ DEFAULT_CONVERSIONS = {
 }
 DEFAULT_MEDIAFILE_FORMAT = 'mp4'
 
+# pylint: disable=too-many-branches,too-many-locals,too-many-statements
 @uses_fstags
-@trace
 @typechecked
 def convert(
     *srcs,
@@ -234,8 +258,6 @@ def convert(
           'c:v': vcodec or 'copy',
       },
   )
-  # TODO: -stats if stdout is a tty
-  # TODO: -nostdin
   ff = ff.global_args('-nostdin')
   if sys.stdout.isatty():
     ff = ff.global_args('-stats')
@@ -250,13 +272,13 @@ def convert(
   else:
     print_argv('ffmpeg', *ff_args, fold=True)
 
-def ffprobe(input_file, *, doit=True, ffprobe='ffprobe', quiet=False):
+def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
   ''' Run `ffprobe -print_format json` on `input_file`,
       return format, stream, program and chapter information
       as an `AttrableMapping` (a `dict` subclass).
   '''
   argv = [
-      ffprobe, '-v', '0', '-print_format', 'json', '-show_format',
+      ffprobe_exe, '-v', '0', '-print_format', 'json', '-show_format',
       '-show_streams', '-show_programs', '-show_chapters', '-i', input_file
   ]
   if not doit:
