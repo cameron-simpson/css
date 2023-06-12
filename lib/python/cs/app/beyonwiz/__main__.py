@@ -48,7 +48,7 @@ class BWizCmd(BaseCommand):
   def cmd_convert(self, argv):
     ''' Convert a recording to MP4.
 
-        Usage: {cmd} [start..end]... recording [output.mp4]
+        Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [start..end]... recording [output.mp4]
           Convert the video content of the named recording to
           the named output file (typically MP4, though the ffmpeg
           output format chosen is based on the extension).
@@ -57,6 +57,27 @@ class BWizCmd(BaseCommand):
             to crop the recording output.
     '''
     badopts = False
+    doit = True
+    acodec = None
+    vcodec = None
+    # parse options
+    while argv:
+      arg0 = argv.pop(0)
+      with Pfx(arg0):
+        if arg0 == '--':
+          break
+        if not arg0.startswith('-') or len(arg0) == 1:
+          argv.insert(0, arg0)
+          break
+        if arg0 == '-n':
+          doit = False
+        elif arg0.startswith('-a:'):
+          acodec = arg0[3:]
+        elif arg0.startswith('-v:'):
+          acodec = arg0[3:]
+        else:
+          warning('unexpected option')
+          badopts = True
     # parse optional start..end arguments
     timespans = []
     while argv:
@@ -68,10 +89,6 @@ class BWizCmd(BaseCommand):
           end_s = float(end)
         except ValueError:
           break
-      if badopts:
-        raise GetoptError("bad invocation")
-      R = Recording(srcpath)
-      return 0 if R.convert(dstpath, max_n=TRY_N, timespans=timespans) else 1
         argv.pop(0)
         if start_s > end_s:
           warning("start:%s > end:%s", start, end)
@@ -88,6 +105,19 @@ class BWizCmd(BaseCommand):
     if argv:
       warning("extra arguments: %s", ' '.join(argv))
       badopts = True
+    if badopts:
+      raise GetoptError("bad invocation")
+    R = Recording(srcpath)
+    return (
+        0 if trace(R.convert)(
+            dstpath,
+            doit=doit,
+            acodec=acodec,
+            vcodec=vcodec,
+            max_n=TRY_N,
+            timespans=timespans,
+        ) else 1
+    )
 
   def cmd_mconvert(self, argv):
     ''' Usage: {cmd} [{{-n|--dry-run}}] recording...
