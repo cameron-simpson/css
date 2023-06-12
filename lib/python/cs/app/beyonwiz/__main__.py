@@ -124,36 +124,6 @@ class BWizCmd(BaseCommand):
         ) else 1
     )
 
-  def cmd_mconvert(self, argv):
-    ''' Usage: {cmd} [{{-n|--dry-run}}] recording...
-          Convert multiple named recordings to automatically named .mp4 files
-          in the current directory.
-          Most metadata are preserved.
-          -n, --dry-run No action; print planned actions.
-    '''
-    options = self.options
-    self.popopts(
-        argv,
-        options,
-        n='dry_run',
-        dry_run=None,
-    )
-    doit = options.doit
-    if not argv:
-      raise GetoptError("missing recordings")
-    xit = 0
-    runstate = options.runstate
-    for srcpath in argv:
-      if runstate.cancelled:
-        break
-      with Pfx(srcpath):
-        R = Recording(srcpath)
-        if not R.convert(None, max_n=TRY_N, doit=doit):
-          xit = 1
-    if runstate.cancelled:
-      return 1
-    return xit
-
   def cmd_meta(self, argv):
     ''' Usage: {cmd} recording...
           Report metadata for the supplied recordings.
@@ -178,8 +148,6 @@ class BWizCmd(BaseCommand):
     filename, = argv
     probed = ffprobe(filename)
     print(json.dumps(probed, sort_keys=True, indent=2))
-    ##pprint(ffprobe(filename))
-    print(probed.streams[0].codec_long_name)
 
   def cmd_scan(self, argv):
     ''' Scan a TVWiz directory.
