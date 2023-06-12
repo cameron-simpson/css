@@ -1254,6 +1254,14 @@ class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
   '''
 
+def attrable(o):
+  ''' Like `jsonable`, return `o` with `dicts` replaced by `AttrableMapping`s. '''
+  if isinstance(o, dict):
+    o = AttrableMapping({k: attrable(v) for k, v in o.items()})
+  elif isinstance(o, list):
+    o = list(map(attrable, o))
+  return o
+
 class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
   ''' A handy `dict` subtype providing the basis for mapping classes
       indexed by `UUID`s.
