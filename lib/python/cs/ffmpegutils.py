@@ -155,4 +155,113 @@ DEFAULT_CONVERSIONS = {
 }
 DEFAULT_MEDIAFILE_FORMAT = 'mp4'
 
+@uses_fstags
+@trace
+@typechecked
+def convert(
+    *srcs,
+    dstpath: str,
+    doit=True,
+    dstfmt=None,
+    fstags: FSTags,
+    conversions=None,
+    metadata: Optional[dict] = None,
+    timespans=(),
+    overwrite=False,
+    acodec=None,
+    vcodec=None,
+):
+  ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
+  '''
+  if conversions is None:
+    conversions = DEFAULT_CONVERSIONS
+  if metadata is None:
+    metadata = {}
+  srcs = [FFmpegSource.promote(src) for src in srcs]
+  if not srcs:
+    raise ValueError("no srcs")
+  srcpath = srcs[0].source
+  if dstfmt is None:
+    dstfmt = DEFAULT_MEDIAFILE_FORMAT
+  # set up the initial source path, options and metadata
+  ffinopts = {
+      'loglevel': 'repeat+error',
+      ##'strict': None,
+      ##'2': None,
+  }
+  # choose output formats
+  probed = ffprobe(srcpath)
+  for i, stream in enumerate(probed.streams):
+    codec_type = stream.get('codec_type', 'unknown')
+    codec_key = stream.get('codec_name', stream.codec_tag)
+    with Pfx("stream[%d]: %s/%s", i, codec_type, codec_key, print=True):
+      if codec_type not in ('audio', 'video'):
+        warning("not audio or video, skipping")
+        continue
+      try:
+        new_codec = conversions[codec_key]
+      except KeyError:
+        warning("no conversion, skipping")
+      else:
+        warning("convert to %r", new_codec)
+        if codec_type == 'audio' and acodec is None:
+          acodec = new_codec
+        elif codec_type == 'video' and vcodec is None:
+          vcodec = new_codec
         else:
+          warning(
+              "no option to convert streams of type %r, ignoring new_codec=%r",
+              codec_type, new_codec
+          )
+  ffmeta_kw = dict(probed.format.get('tags', {}))
+  ffmeta_kw.update(metadata)
+  # construct ffmpeg command
+  ff = ffmpeg.input(srcpath, **ffinopts)
+  if timespans:
+    ffin = ff
+    ff = ffmpeg.concat(
+        *map(
+            lambda timespan: ffin.trim(start=timespan[0], end=timespan[1]),
+            timespans
+        )
+    )
+  ff = ff.output(
+      dstpath,
+      format=dstfmt,
+      metadata=list(map('='.join, ffmeta_kw.items())),
+      **{
+          'c:a': acodec or 'copy',
+          'c:v': vcodec or 'copy',
+      },
+  )
+  # TODO: -stats if stdout is a tty
+  # TODO: -nostdin
+  ff = ff.global_args('-nostdin')
+  if sys.stdout.isatty():
+    ff = ff.global_args('-stats')
+  if overwrite:
+    ff = ff.overwrite_output()
+  ff_args = ff.get_args()
+  if doit:
+    print_argv('ffmpeg', *ff_args)
+    fstags[dstpath]['ffmpeg.argv'] = ['ffmpeg', *ff_args]
+    fstags.sync()
+    ff.run()
+  else:
+    print_argv('ffmpeg', *ff_args, fold=True)
+
+def ffprobe(input_file, *, doit=True, ffprobe='ffprobe', quiet=False):
+  ''' Run `ffprobe -print_format json` on `input_file`,
+      return format, stream, program and chapter information
+      as an `AttrableMapping` (a `dict` subclass).
+  '''
+  argv = [
+      ffprobe, '-v', '0', '-print_format', 'json', '-show_format',
+      '-show_streams', '-show_programs', '-show_chapters', '-i', input_file
+  ]
+  if not doit:
+    print_argv(*argv, indent="+ ", end=" |\n")
+    return {}
+  P = pipefrom(argv, quiet=quiet, text=True)
+  probed = pfx_call(json.loads, pfx_call(P.stdout.read))
+  return attrable(probed)
