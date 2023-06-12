@@ -86,9 +86,65 @@ class MetaData(TagSet):
 #
 ConversionSource = namedtuple('ConversionSource', 'src srcfmt start_s end_s')
 
+@dataclass(init=False)
+class FFmpegSource:
+  source: Any
+  timespans: List[Tuple]
 
+  def __init__(self, source, timespans=()):
+    self.source = source
+    self.timespans = list(timespans)
 
+  def add_as_input(self, ff):
+    ''' Add as an input to `ff`.
+        Return `None` if `self.source` is a pathname,
+        otherwise return the file descriptor of the data sourc.
+
+        Note: because we rely on `ff.input('pipe:')` for nonpathnames,
+        you can only use a nonpathname `FFmpegSource` for one of the inputs.
+        This is not checked.
     '''
+    src = self.source
+    if isinstance(src, int):
+      fd = src
+      ff.input('pipe:')
+    elif isinstance(src, str):
+      try:
+        host, hostpath = src.split(':', 1)
+      except ValueError:
+        if not isfilepath(src):
+          raise ValueError("not a file: %r" % (src,))
+        ff.input(src)
+        fd = None
+      else:
+        if '/' in host:
+          if not isfilepath(src):
+            raise ValueError("not a file: %r" % (src,))
+          ff.input(src)
+          fd = None
         else:
+          # get input from an ssh pipeline
+          P = pipefrom(
+              ['ssh', '-b', '--', host, f'exec cat {shlex.quote(hostpath)}'],
+              text=False,
+          )
+          fd = P.stdout.fileno()
+          ff = ff.input('pipe:')
+          timespans = src.timespans
+          if timespans:
+            ffin = ff
+            ff = ffmpeg.concat(
+                *map(
+                    lambda timespan: ffin.
+                    trim(start=timespan[0], end=timespan[1]), timespans
+                )
             )
+    return fd
+
+  @classmethod
+  def promote(cls, source):
+    if not isinstance(source, cls):
+      source = cls(source)
+    return source
+
         else:
