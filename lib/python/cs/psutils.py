@@ -25,7 +25,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -233,45 +232,23 @@ def run(argv, doit=True, logger=None, quiet=True, **subp_options):
     )
   return cp
 
-def pipefrom(argv, quiet=False, binary=False, keep_stdin=False, **kw):
-  ''' Pipe text from a command.
-      Optionally trace invocation.
-      Return the `Popen` object with `.stdout` decoded as text.
+def pipefrom(argv, *, quiet=False, text=True, stdin=DEVNULL, **popen_kw):
+  ''' Pipe text (usually) from a command using `subprocess.Popen`.
+      Return the `Popen` object with `.stdout` as a pipe.
 
       Parameters:
       * `argv`: the command argument list
-      * `binary`: if true (default false)
-        return the raw stdout instead of a text wrapper
       * `quiet`: optional flag, default `False`;
-
-        if `trace` is `True`, recite invocation to stderr
-        otherwise presume that `trace` is a stream
-        to which to recite the invocation.
-      * `keep_stdin`: if true (default `False`)
-        do not attach the command's standard input to the null device.
-        The default behaviour is to do so,
-        preventing commands from accidentally
-        consuming the main process' input stream.
-
-      Other keyword arguments are passed to the `io.TextIOWrapper`
-      which wraps the command's output.
+        if true, print the command to `stderr`
+      * `text`: optional flag, default `True`; passed to `Popen`.
+      * `stdin`: optional value for `Popen`'s `stdin`, default `DEVNULL`
+      Other keyword arguments are passed to `Popen`.
   '''
   if not quiet:
     print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
-  popen_kw = {}
-  if not keep_stdin:
-    popen_kw['stdin'] = DEVNULL
-  P = Popen(argv, stdout=PIPE, **popen_kw)  # pylint: disable=consider-using-with
-  if binary:
-    if kw:
-      raise ValueError(
-          "binary mode: extra keyword arguments not supported: %r" % (kw,)
-      )
-  else:
-    P.stdout = io.TextIOWrapper(P.stdout, **kw)
-  return P
+  return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
 
-def pipeto(argv, quiet=False, **kw):
+def pipeto(argv, *, quiet=False, **kw):
   ''' Pipe text to a command.
       Optionally trace invocation.
       Return the Popen object with .stdin encoded as text.

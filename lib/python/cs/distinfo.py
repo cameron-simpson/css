@@ -801,14 +801,8 @@ def ask(message, fin=None, fout=None):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output file object of a command.
   '''
-  P = cs.psutils.pipefrom(argv, **kw)
-  yield P.stdout
-  if P.wait() != 0:
-    pipecmd = ' '.join(argv)
-    raise ValueError("%s: exit status %d" % (
-        pipecmd,
-        P.returncode,
-    ))
+  with cs.psutils.pipefrom(argv, check=True, **kw) as P:
+    yield P.stdout
 
 class Modules(defaultdict):
   ''' An autopopulating dict of mod_name->Module.
