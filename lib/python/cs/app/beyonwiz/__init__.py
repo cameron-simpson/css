@@ -178,7 +178,7 @@ class RecordingMetaData(NS):
     return self.start_dt.isoformat(' ')
 
 def Recording(path):
-  ''' Factory function returning a TVWiz or Enigma2 _Recording object.
+  ''' Factory function returning a TVWiz or Enigma2 `_Recording` object.
   '''
   if path.endswith('.tvwiz'):
     from .tvwiz import TVWiz
@@ -222,9 +222,7 @@ class _Recording(ABC, HasFSTagsMixin):
     if not ext.startswith('.'):
       ext = '.' + ext
     md = self.metadata
-    full_filename = self.metadata.format_as(format
-                                            ).replace('\r',
-                                                      '_').replace('\n', '_')
+    full_filename = md.format_as(format).replace('\r', '_').replace('\n', '_')
     return crop_name(full_filename + ext, ext=ext)
 
   @abstractmethod
