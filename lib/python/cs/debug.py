@@ -689,4 +689,4 @@ if builtin_names_s:
         )
         continue
       # pylint: disable=eval-used
-      eval('setattr(builtins,builtin_name,{%s})' % (builtin_name,))
+      eval('setattr(builtins,builtin_name,%s)' % (builtin_name,))
