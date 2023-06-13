@@ -59,6 +59,9 @@ class M3Command(BaseCommand):
         model.view(lighting=True)
 
   def cmd_material(self, argv):
+    ''' Usage: {cmd} scale
+          Render a `Material` of size scale x scale x 2.
+    '''
     xy_s, = argv
     xy = int(xy_s)
     options = self.options
@@ -69,6 +72,9 @@ class M3Command(BaseCommand):
     M.EggModel(model=model, texture=options.texture)
 
   def cmd_sol(self, argv):
+    ''' Usage: {cmd} scale
+          Render the sun and the earth at the specified scale.
+    '''
     xy_s, = argv
     xy = int(xy_s)
     options = self.options
@@ -80,6 +86,9 @@ class M3Command(BaseCommand):
     model.append(tnode)
 
   def cmd_pyramid(self, argv):
+    ''' Usage: {cmd} scale
+          Render a pyramid of the specified scale.
+    '''
     xy_s, = argv
     xy = int(xy_s)
     options = self.options
