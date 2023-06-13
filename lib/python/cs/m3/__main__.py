@@ -66,7 +66,7 @@ class M3Command(BaseCommand):
     M = M3Material(xy, xy, 2, mass=1.0)
     for t in progressbar(range(100), "step"):
       M.step()
-    M.EggModel(model=model)
+    M.EggModel(model=model, texture=options.texture)
 
   def cmd_sol(self, argv):
     xy_s, = argv
