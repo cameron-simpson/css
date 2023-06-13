@@ -1,3 +1,4 @@
+eeg output uses the texture itself in TRefs, not the Texture name
 Vertex: UV,AUX: optionally an iterable of UV,AUX instances with unique names
 lighting demo
 CameraProxy.zoomOut(node or bounding-box)
