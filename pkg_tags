@@ -33,7 +33,7 @@ cs.configutils pypi.release="20220606" ok_revision="646d06810607e97ae0aaefbcce18
 cs.context pypi.release="20230331" ok_revision=d12c5029c1de3db5b5323c2b3d273162490c16de features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"],"20230109":["contextif"],"20230125":["ContextManagerMixin_as_contextmanager"],"20230212":["stackset"]}
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
-cs.debug pypi.release="20230610" ok_revision=ba245bbf86649660673f6f53d8e5bbfd2ef6621c features={"20230613":["patch_builtins"]}
+cs.debug pypi.release="20230613" ok_revision="927d70161547e2044cba9503c87faa734a244bd6" features={"20230613":["patch_builtins"]}
 cs.deco pypi.release="20230331" ok_revision=eb5d81385662dc76869c9f7744441fe54e526afa features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"]}
 cs.distinfo
 cs.ebooks ok_revision="5e8f9a372bb95d1594a049cdcc8b8a41ba7f752a" pypi.release="20230110" features={"20230110":["dedrm"]}

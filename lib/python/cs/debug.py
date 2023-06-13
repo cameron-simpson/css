@@ -51,7 +51,7 @@ from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.x import X
 
-__version__ = '20230613-post'
+__version__ = '20230613.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -689,4 +689,4 @@ if builtin_names_s:
         )
         continue
       # pylint: disable=eval-used
-      eval('setattr(builtins,builtin_name,{%s})' % (builtin_name,))
+      eval('setattr(builtins,builtin_name,%s)' % (builtin_name,))
