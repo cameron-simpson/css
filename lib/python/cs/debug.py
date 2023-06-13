@@ -51,7 +51,7 @@ from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.x import X
 
-__version__ = '20230610-post'
+__version__ = '20230613'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
