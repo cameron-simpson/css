@@ -15,10 +15,6 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.typingutils import subtype
 
-from cs.debug import trace
-from cs.lex import r, s
-from cs.x import X
-
 from panda3d.core import Point3 as P3
 from direct.actor.Actor import Actor
 from direct.showbase.ShowBase import ShowBase
