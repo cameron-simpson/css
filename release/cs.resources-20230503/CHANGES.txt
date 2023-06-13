@@ -1,0 +1,1 @@
+lib/python/cs/resources.py: cs.resources: RunState: new optional poll_cancel Callable parameter, make .cancelled a property

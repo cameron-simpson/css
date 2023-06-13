@@ -6,14 +6,16 @@ from math import pi, sin, cos
 from os.path import abspath
 import sys
 from tkinter import Tk, Button, Toplevel
-from typing import Callable, Optional, Tuple, TypeVar, Union
+from typing import Callable, Optional, Tuple, Union
 
 from cs.cmdutils import BaseCommand
 from cs.context import ContextManagerMixin, stackattrs
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.resources import MultiOpenMixin
+from cs.typingutils import subtype
 
-from cs.py.func import trace
+from cs.debug import trace
 from cs.lex import r, s
 from cs.x import X
 
@@ -30,6 +32,9 @@ from .app import P3DApp
 from .egg import Material, Model, PointLight, RGBA
 from .geom import torus
 from .io import pzread
+
+Numeric = Union[int, float]
+Appish = subtype(ShowBase, 'Appish')
 
 def main(argv=None):
   ''' Run the `P3DCommand` command line implementation.

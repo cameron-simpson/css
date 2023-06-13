@@ -12,6 +12,7 @@
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 from getopt import GetoptError
@@ -31,7 +32,7 @@ from pprint import pprint
 import shlex
 import sys
 import time
-from typing import List
+from typing import List, Optional
 
 import arrow
 from dateutil.tz import tzlocal
@@ -43,14 +44,14 @@ from cs.context import stackattrs
 from cs.csvutils import csv_import
 from cs.deco import cachedmethod
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
-from cs.fstags import FSTags
+from cs.fstags import FSTags, DEFAULT_FSTAGS
 from cs.lex import s
 from cs.logutils import warning, error
 from cs.mplutils import axes, remove_decorations, print_figure, save_figure, FigureSize
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
@@ -64,9 +65,9 @@ from cs.timeseries import (
     timerange,
     tzfor,
 )
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220918-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -92,7 +93,8 @@ DISTINFO = {
         'cs.tagset',
         'cs.timeseries',
         'cs.upd',
-        'dateutil',
+        'matplotlib',
+        'python-dateutil',
         'typeguard',
     ],
     'entry_points': {
@@ -126,8 +128,7 @@ def main(argv=None):
   return SPLinkCommand(argv).run()
 
 def ts2001_unixtime(tzname=None):
-  ''' Convert an SP-Link seconds-since-2001-01-01-local-time offset
-      into a UNIX time.
+  ''' Return the SP-Link 2001-01-01-local-time epoch as a UNIX time.
   '''
   if tzname is None:
     tzname = 'local'
@@ -570,7 +571,9 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     return plot_data
 
   # pylint: disable=too-many-branches,too-many-locals
+  @uses_upd
   @timerange
+  @uses_runstate
   def plot(
       self,
       start,
@@ -586,8 +589,8 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       event_labels=None,
       mode_patterns=None,
       stacked=False,
-      upd=None,
-      runstate=None,
+      upd: Upd,
+      runstate: RunState,
   ):
     ''' The core logic of the `SPLinkCommand.cmd_plot` method
         to plot arbitrary parameters against a time range.
@@ -601,8 +604,6 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       event_labels = DEFAULT_PLOT_EVENT_LABELS
     if mode_patterns is None:
       mode_patterns = DEFAULT_PLOT_MODE_PATTERNS
-    if upd is None:
-      upd = Upd()
     if key_map is None:
       key_map = {}
     if color_map is None:
@@ -662,7 +663,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
         )
       else:
         for label, series, extra in plot_ps:
-          if runstate and runstate.canclled:
+          if runstate.cancelled:
             break
           ax.plot(indices, series, label=label, **extra)
       if ax_title is not None:
@@ -696,15 +697,18 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       'DEFAULT_FETCH_SOURCE_ENVVAR': DEFAULT_FETCH_SOURCE_ENVVAR,
   }
 
-  def apply_defaults(self):
-    ''' Set the default `spdpath`.
-    '''
-    self.options.fetch_source = os.environ.get(
-        self.DEFAULT_FETCH_SOURCE_ENVVAR
+  @dataclass
+  class Options(TimeSeriesBaseCommand.Options):
+    fetch_source: Optional[str] = field(
+        default_factory=lambda: os.environ.
+        get(SPLinkCommand.DEFAULT_FETCH_SOURCE_ENVVAR)
     )
-    self.options.fstags = FSTags()
-    self.options.spdpath = os.environ.get(
-        self.DEFAULT_SPDPATH_ENVVAR, self.DEFAULT_SPDPATH
+    fstags: FSTags = field(default_factory=lambda: DEFAULT_FSTAGS)
+    spdpath: str = field(
+        default_factory=lambda: os.environ.get(
+            SPLinkCommand.DEFAULT_SPDPATH_ENVVAR,
+            SPLinkCommand.DEFAULT_SPDPATH,
+        )
     )
 
   def apply_opt(self, opt, val):
@@ -719,6 +723,17 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       options.doit = False
     else:
       raise RuntimeError("unhandled pre-option")
+
+  def print_known_datasets(self, file=None):
+    ''' Print the known datasets and their fields to `file`.
+    '''
+    spd = self.options.spd
+    print("Known datasets:")
+    for dsname in spd.TIMESERIES_DATASETS:
+      tsd = getattr(spd, dsname)
+      print(" ", dsname, file=file)
+      for key in sorted(tsd.keys()):
+        print("   ", key, file=file)
 
   @timerange
   @typechecked
@@ -747,14 +762,15 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         * `tz`: the default local timezone
         * `spd`: the `SPLinkData` instance for `options.spdpath`
     '''
-    options = self.options
-    fstags = options.fstags
-    options.tz = tzlocal()
-    with fstags:
-      spd = SPLinkData(options.spdpath)
-      with stackattrs(options, spd=spd):
-        with spd:
-          yield
+    with super().run_context():
+      options = self.options
+      fstags = options.fstags
+      options.tz = tzlocal()
+      with fstags:
+        spd = SPLinkData(options.spdpath)
+        with stackattrs(options, spd=spd):
+          with spd:
+            yield
 
   def cmd_export(self, argv):
     ''' Usage: {cmd} dataset
@@ -1010,6 +1026,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                             or any datetime specification recognised by
                             dateutil.parser.parse.
             mode            A named graph mode, implying a group of fields.
+                            Providing '?' or 'help' prints the available
+                            datasets and field names.
     '''
     options = self.options
     options.bare = False
@@ -1029,6 +1047,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         tz_=('tz', tzfor),
     )
     tz = options.tz
+    if len(argv) == 1 and argv[0] in ('?', 'help'):
+      self.print_known_datasets()
+      return 0
     # start time
     if not argv:
       argv = ['5']
@@ -1041,6 +1062,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         stop = time.time()
     else:
       stop = time.time()
+    if stop < start:
+      start, stop = stop, start
+    if len(argv) == 1 and argv[0] in ('?', 'help'):
+      self.print_known_datasets()
+      return 0
     data_specs = argv if argv else ['POWER']
     bare = options.bare
     force = options.force
@@ -1050,135 +1076,161 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     stacked = options.stacked
     event_labels = options.event_labels
     detailed = spd.DetailedData
-    det_data = lambda field: detailed[field].as_pd_series(
+    detail_series_cropped = lambda field: detailed[field].as_pd_series(
         start, stop, pad=True, tz=tz
     )
-    if data_specs == ['POWER']:
-      grid = det_data('ac_input_power_average_kw')
-      grid_in = -grid.clip(upper=0.0)
-      grid_out = grid.clip(lower=0.0)
-      pv = det_data('total_ac_coupled_power_average_kw')
-      battery = det_data('inverter_ac_power_average_kw')
-      battery_drain = -battery.clip(upper=0.0)
-      battery_charge = battery.clip(lower=0.0)
-      battery_state_of_charge = det_data('state_of_charge_sample')
-      load = det_data('load_ac_power_average_kw')
-      figure, (power_ax, usage_ax) = plt.subplots(
-          2,
-          1,
-          figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
-          label=f'Power: {spd}',
-      )
-      # stack the power consumption
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'load [load_ac_power_average_kw]',
-                  load,
-                  dict(color='grey'),
+    # list of graph specifications
+    had_failed_specs = False
+    graphs = {}
+    for data_spec in data_specs:
+      with Pfx("specification %r", data_spec):
+        if data_spec == 'POWER':
+          grid = detail_series_cropped('ac_input_power_average_kw')
+          grid_in = -grid.clip(upper=0.0)
+          grid_out = grid.clip(lower=0.0)
+          pv = detail_series_cropped('total_ac_coupled_power_average_kw')
+          battery = detail_series_cropped('inverter_ac_power_average_kw')
+          battery_drain = -battery.clip(upper=0.0)
+          battery_charge = battery.clip(lower=0.0)
+          battery_state_of_charge = detail_series_cropped(
+              'state_of_charge_sample'
+          )
+          load = detail_series_cropped('load_ac_power_average_kw')
+          figure, (power_ax, usage_ax) = plt.subplots(
+              2,
+              1,
+              figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
+              label=f'Power: {spd}',
+          )
+          graphs["Power Usage"] = [
+              # stack the power consumption
+              dict(
+                  data=[
+                      PS(
+                          'load [load_ac_power_average_kw]',
+                          load,
+                          dict(color='grey'),
+                      ),
+                      PS(
+                          'battery charge [inverter_ac_power_average_kw]',
+                          battery_charge,
+                          dict(color='blue'),
+                      ),
+                      PS(
+                          'grid out [ac_input_power_average_kw]',
+                          grid_out,
+                          dict(color='green'),
+                      ),
+                  ],
+                  stacked=True,
               ),
-              PS(
-                  'battery charge [inverter_ac_power_average_kw]',
-                  battery_charge,
-                  dict(color='blue'),
+              # overlay the load as a line
+              dict(
+                  data=[
+                      PS(
+                          'load [load_ac_power_average_kw]',
+                          load,
+                          dict(color='black'),
+                      ),
+                  ],
               ),
-              PS(
-                  'grid out [ac_input_power_average_kw]',
-                  grid_out,
-                  dict(color='green'),
+              dict(
+                  data=[
+                      PS(
+                          'battery % [state_of_charge_sample]',
+                          battery_state_of_charge,
+                          dict(color='orange'),
+                      ),
+                  ],
+                  twinx=True,
               ),
-          ],
-          ax=usage_ax,
-          ax_title="Power Usage",
-          stacked=True,
-          tz=tz,
-      )
-      ax2 = usage_ax.twinx()
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'battery % [state_of_charge_sample]',
-                  battery_state_of_charge,
-                  dict(color='orange'),
+          ]
+          graphs["Power Supply"] = [
+              # stack the power sources
+              dict(
+                  data=[
+                      PS(
+                          'pv [total_ac_coupled_power_average_kw]',
+                          pv,
+                          dict(color='yellow'),
+                      ),
+                      PS(
+                          'battery drain [-inverter_ac_power_average_kw]',
+                          battery_drain,
+                          dict(color='blue'),
+                      ),
+                      PS(
+                          'grid in [-ac_input_power_average_kw]',
+                          grid_in,
+                          dict(color='red'),
+                      ),
+                  ],
+                  stacked=True,
               ),
-          ],
-          ax=ax2,
-          tz=tz,
-      )
-      usage_ax.legend()
-      ax2.legend()
-      # stack the power sources
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'pv [total_ac_coupled_power_average_kw]',
-                  pv,
-                  dict(color='yellow'),
+              dict(
+                  data=[
+                      PS(
+                          'battery % [state_of_charge_sample]',
+                          battery_state_of_charge,
+                          dict(color='orange'),
+                      ),
+                  ],
+                  twinx=True,
               ),
-              PS(
-                  'battery drain [-inverter_ac_power_average_kw]',
-                  battery_drain,
-                  dict(color='blue'),
-              ),
-              PS(
-                  'grid in [-ac_input_power_average_kw]',
-                  grid_in,
-                  dict(color='red'),
-              ),
-          ],
-          ax=power_ax,
-          ax_title="Power Supply",
-          stacked=True,
-          tz=tz,
-      )
-      ax2 = power_ax.twinx()
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'battery % [state_of_charge_sample]',
-                  battery_state_of_charge,
-                  dict(color='orange'),
-              ),
-          ],
-          ax=ax2,
-          tz=tz,
-      )
-      # overlay the load as a line
-      spd.plot(
-          start,
-          stop,
-          [
-              PS(
-                  'load [load_ac_power_average_kw]',
-                  load,
-                  dict(color='black'),
-              ),
-          ],
-          ax=power_ax,
-          tz=tz,
-      )
-      power_ax.legend()
-      ax2.legend()
+          ]
+        else:
+          graph_n = 1
+          graph_name_1 = graph_name = data_spec
+          while graph_name in graphs:
+            graph_n += 1
+            graph_name = f'{graph_name_1} {graph_n}'
+          try:
+            plot_data = spd.plot_data_from_spec(start, stop, data_spec, tz=tz)
+          except ValueError as e:
+            warning("bad data spec: %s", e)
+            had_failed_specs = True
+          else:
+            graphs[graph_name] = [
+                dict(
+                    data=spd
+                    .plot_data_from_spec(start, stop, data_spec, tz=tz)
+                ),
+            ]
+    if had_failed_specs:
+      warning("some data specifications did not match")
+      self.print_known_datasets(file=sys.stderr)
+    if not graphs:
+      warning("nothing to plot")
+      return 1
+    assert len(graphs) > 0
+    if len(graphs) > 1:
+      label = f'{spd}: {", ".join(graphs.keys())}'
     else:
-      plot_data = []
-      while data_specs:
-        plot_data.extend(self.popdata(start, stop, data_specs, tz=tz))
-      figure = spd.plot(
-          start,
-          stop,
-          plot_data,
-          tz=tz,
-          event_labels=event_labels,
-          stacked=stacked,
-      )
+      label = f'{spd}'
+    figure, axes = plt.subplots(
+        len(graphs),
+        1,
+        figsize=(FigureSize.DEFAULT_DX, FigureSize.DEFAULT_DY * 1),
+        label=label,
+    )
+    if len(graphs) == 1:
+      axes = axes,
+    for ax, (gkey, gplots) in zip(axes, graphs.items()):
+      gtitle = gkey
+      for gplot in gplots:
+        plot_ax = ax
+        if gplot.get('twinx', False):
+          plot_ax = plot_ax.twinx()
+        spd.plot(
+            start,
+            stop,
+            gplot['data'],
+            ax=plot_ax,
+            ax_title=gplot.get('title', gtitle),
+            stacked=gplot.get('stacked', False),
+            tz=tz,
+        )
+        plot_ax.legend()
     if bare:
       remove_decorations(figure)
     if imgpath:
@@ -1187,6 +1239,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         os.system(shlex.join(['open', imgpath]))
     else:
       print_figure(figure)
+    return 0
 
   def cmd_pull(self, argv):
     ''' Usage: {cmd} [-d dataset,...] [-F rsync-source] [-nx]

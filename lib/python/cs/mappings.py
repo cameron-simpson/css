@@ -31,7 +31,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20220912.4-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'description':
@@ -1005,6 +1005,8 @@ class AttrableMappingMixin(object):
         `dict` at least seem not to consult that with attribute
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
+    if attr == 'ATTRABLE_MAPPING_DEFAULT':
+      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
     # try self.__dict__ first - this is because it appears that
     # getattr(dict,...) does not consult __dict__
     try:
@@ -1252,6 +1254,14 @@ class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
   '''
 
+def attrable(o):
+  ''' Like `jsonable`, return `o` with `dicts` replaced by `AttrableMapping`s. '''
+  if isinstance(o, dict):
+    o = AttrableMapping({k: attrable(v) for k, v in o.items()})
+  elif isinstance(o, list):
+    o = list(map(attrable, o))
+  return o
+
 class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
   ''' A handy `dict` subtype providing the basis for mapping classes
       indexed by `UUID`s.
@@ -1370,6 +1380,7 @@ class RemappedMappingProxy:
   def key(self, subk):
     ''' Return the external key for `subk`.
     '''
+    X("%s.key(subk=%r)...", self.__class__.__name__, subk)
     try:
       k = self._mapped_subkeys[subk]
     except KeyError:
@@ -1434,15 +1445,18 @@ class PrefixedMappingProxy(RemappedMappingProxy):
   def prefixify_subkey(subk, prefix):
     ''' Return the external (prefixed) key from a subkey `subk`.
     '''
-    assert not subk.startswith(prefix)
+    assert not subk.startswith(prefix), (
+        "subkey %r already starts with the prefix %r" % (subk, prefix)
+    )
     return prefix + subk
 
   @staticmethod
   def unprefixify_key(key, prefix):
     ''' Return the internal subkey (unprefixed) from the external `key`.
     '''
-    assert key.startswith(prefix), \
+    assert key.startswith(prefix), (
         "key:%r does not start with prefix:%r" % (key, prefix)
+    )
     return cutprefix(key, prefix)
 
   # pylint: disable=arguments-differ

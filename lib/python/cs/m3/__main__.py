@@ -27,35 +27,36 @@ class M3Command(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    texture_path = expanduser('~/im/them/me/gravatar-crack-128.png')
-    texture = Texture(basename(texture_path), texture_path)
-    material = Material(
-        name="test-mat",
-        diffr=100,
-        diffg=100,
-        diffb=100,
-        diffa=100,
-        emitr=0,
-        emitg=0,
-        emitb=100,
-        ##ambr=40,
-        ##ambg=0,
-        ##ambb=0,
-        ##amba=0.5,
-        specr=0.5,
-        specg=50,
-        specb=0.5,
-        shininess=100,
-    )
-    with Model(self.cmd) as model:
-      model.append(material)
-      model.append(texture)
-      options = self.options
-      with stackattrs(self.options, model=model, texture_path=texture_path,
-                      texture=texture, material=material):
-        yield
-      print(model)
-      model.view(lighting=True)
+    with super().run_context():
+      texture_path = expanduser('~/im/them/me/gravatar-crack-128.png')
+      texture = Texture(basename(texture_path), texture_path)
+      material = Material(
+          name="test-mat",
+          diffr=100,
+          diffg=100,
+          diffb=100,
+          diffa=100,
+          emitr=0,
+          emitg=0,
+          emitb=100,
+          ##ambr=40,
+          ##ambg=0,
+          ##ambb=0,
+          ##amba=0.5,
+          specr=0.5,
+          specg=50,
+          specb=0.5,
+          shininess=100,
+      )
+      with Model(self.cmd) as model:
+        model.append(material)
+        model.append(texture)
+        options = self.options
+        with stackattrs(self.options, model=model, texture_path=texture_path,
+                        texture=texture, material=material):
+          yield
+        print(model)
+        model.view(lighting=True)
 
   def cmd_material(self, argv):
     xy_s, = argv

@@ -1,0 +1,3 @@
+lib/python/cs/deco.py: cs.deco: @decorator: sanity check decorated function
+lib/python/cs/deco.py: cs.deco: @decorator: handle failure to set __doc__, though this shouldn't happen
+lib/python/cs/deco.py: cs.deco: @promote docstring: add a note about making a class promote method the last method to avoid conflict with the @promote decorator

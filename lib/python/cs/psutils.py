@@ -5,7 +5,6 @@ r'''
 Assorted process and subprocess management functions.
 '''
 
-from builtins import print as builtin_print
 from contextlib import contextmanager
 import errno
 import io
@@ -17,25 +16,20 @@ from subprocess import PIPE, Popen, run as subprocess_run
 import sys
 import time
 
-from cs.gimmicks import DEVNULL
-from cs.logutils import trace, warning
+from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220805-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.gimmicks>=devnull',
-        'cs.logutils',
         'cs.pfx',
-        'cs.upd',
     ],
 }
 
@@ -141,7 +135,7 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
     it = iter(sig_hnds)
   else:
     # (sig,hnd),... from mapping
-    it = items()
+    it = iter(items())
   try:
     sig, handler = next(it)
   except StopIteration:
@@ -150,7 +144,7 @@ def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
     with signal_handler(sig, handler,
                         call_previous=call_previous) as old_handler:
       _stacked[sig] = old_handler
-      with signal_handlers(sig_hnds, call_previous=call_previous,
+      with signal_handlers(it, call_previous=call_previous,
                            _stacked=_stacked) as stacked:
         yield stacked
     return
@@ -219,19 +213,17 @@ def run(argv, doit=True, logger=None, quiet=True, **subp_options):
       if logger:
         trace("skip: %s", shlex.join(argv))
       else:
-        with Upd().above():
-          print_argv(*argv, fold=True)
+        print_argv(*argv, fold=True)
     return None
-  with Upd().above():
-    if not quiet:
-      if logger:
-        trace("+ %s", shlex.join(argv))
-      else:
-        print_argv(*argv, indent="+ ", file=sys.stderr)
-    cp = pfx_call(subprocess_run, argv, **subp_options)
-    if cp.stderr:
-      builtin_print(" stderr:")
-      builtin_print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
+  if not quiet:
+    if logger:
+      trace("+ %s", shlex.join(argv))
+    else:
+      print_argv(*argv, indent="+ ", file=sys.stderr)
+  cp = pfx_call(subprocess_run, argv, **subp_options)
+  if cp.stderr:
+    print(" stderr:")
+    print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
   if cp.returncode != 0:
     warning(
         "run fails, exit code %s from %s",
@@ -240,45 +232,23 @@ def run(argv, doit=True, logger=None, quiet=True, **subp_options):
     )
   return cp
 
-def pipefrom(argv, quiet=False, binary=False, keep_stdin=False, **kw):
-  ''' Pipe text from a command.
-      Optionally trace invocation.
-      Return the `Popen` object with `.stdout` decoded as text.
+def pipefrom(argv, *, quiet=False, text=True, stdin=DEVNULL, **popen_kw):
+  ''' Pipe text (usually) from a command using `subprocess.Popen`.
+      Return the `Popen` object with `.stdout` as a pipe.
 
       Parameters:
       * `argv`: the command argument list
-      * `binary`: if true (default false)
-        return the raw stdout instead of a text wrapper
       * `quiet`: optional flag, default `False`;
-
-        if `trace` is `True`, recite invocation to stderr
-        otherwise presume that `trace` is a stream
-        to which to recite the invocation.
-      * `keep_stdin`: if true (default `False`)
-        do not attach the command's standard input to the null device.
-        The default behaviour is to do so,
-        preventing commands from accidentally
-        consuming the main process' input stream.
-
-      Other keyword arguments are passed to the `io.TextIOWrapper`
-      which wraps the command's output.
+        if true, print the command to `stderr`
+      * `text`: optional flag, default `True`; passed to `Popen`.
+      * `stdin`: optional value for `Popen`'s `stdin`, default `DEVNULL`
+      Other keyword arguments are passed to `Popen`.
   '''
   if not quiet:
     print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
-  popen_kw = {}
-  if not keep_stdin:
-    popen_kw['stdin'] = DEVNULL
-  P = Popen(argv, stdout=PIPE, **popen_kw)  # pylint: disable=consider-using-with
-  if binary:
-    if kw:
-      raise ValueError(
-          "binary mode: extra keyword arguments not supported: %r" % (kw,)
-      )
-  else:
-    P.stdout = io.TextIOWrapper(P.stdout, **kw)
-  return P
+  return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
 
-def pipeto(argv, quiet=False, **kw):
+def pipeto(argv, *, quiet=False, **kw):
   ''' Pipe text to a command.
       Optionally trace invocation.
       Return the Popen object with .stdin encoded as text.
@@ -341,8 +311,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   else:
     pre_argv = list(pre_argv)
     post_argv = list(post_argv)
-  pre_nbytes = sum([len(arg) + 1 for arg in pre_argv])
-  post_nbytes = sum([len(arg) + 1 for arg in post_argv])
+  pre_nbytes = sum(len(arg) + 1 for arg in pre_argv)
+  post_nbytes = sum(len(arg) + 1 for arg in post_argv)
   argvs = []
   available = max_argv - pre_nbytes - post_nbytes
   per = []

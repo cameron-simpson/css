@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Hash tests.
 #       - Cameron Simpson <cs@cskk.id.au>
@@ -41,7 +41,7 @@ class TestHashing(unittest.TestCase):
         for _ in range(10):
           rs = bytes(random.randint(0, 255) for _ in range(100))
           H = cls.from_chunk(rs)
-          self.assertEqual(cls.HASHFUNC(rs).digest(), bytes(H))
+          self.assertEqual(cls.hashfunc(rs).digest(), bytes(H))
           self.assertTrue(isinstance(H, Transcriber))
           Hs = str(H)
           H2, offset = parse(Hs)

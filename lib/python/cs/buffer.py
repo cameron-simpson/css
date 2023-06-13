@@ -11,7 +11,6 @@
     an automatically refilling buffer to support parsing of data streams.
 '''
 
-from __future__ import print_function
 from contextlib import contextmanager
 import os
 from os import fstat, SEEK_SET, SEEK_CUR, SEEK_END
@@ -19,9 +18,12 @@ import mmap
 from stat import S_ISREG
 import sys
 from threading import Thread
+
+from cs.deco import Promotable
+from cs.gimmicks import r
 from cs.py3 import pread
 
-__version__ = '20211208-post'
+__version__ = '20230401-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -30,7 +32,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.deco', 'cs.gimmicks', 'cs.py3'],
 }
 
 DEFAULT_READSIZE = 131072
@@ -38,7 +40,7 @@ DEFAULT_READSIZE = 131072
 MEMORYVIEW_THRESHOLD = DEFAULT_READSIZE  # tweak if this gets larger
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
-class CornuCopyBuffer(object):
+class CornuCopyBuffer(Promotable):
   ''' An automatically refilling buffer intended to support parsing
       of data streams.
 
@@ -64,10 +66,11 @@ class CornuCopyBuffer(object):
 
       The primary methods supporting parsing of data streams are
       `.extend()` and `take()`.
-      Calling `.extend(min_size)` arranges that `.buf` contains at least
-      `min_size` bytes.
-      Calling `.take(size)` fetches exactly `size` bytes from `.buf` and the
-      input source if necessary and returns them, adjusting `.buf`.
+      Calling `.extend(min_size)` arranges that the internal buffer
+      contains at least `min_size` bytes.
+      Calling `.take(size)` fetches exactly `size` bytes from the
+      internal buffer and the input source if necessary and returns
+      them, adjusting the internal buffer.
 
       len(`CornuCopyBuffer`) returns the length of any buffered data.
 
@@ -77,8 +80,8 @@ class CornuCopyBuffer(object):
       returning an individual byte's value (an `int`).
 
       A `CornuCopyBuffer` is also iterable, yielding data in whatever
-      sizes come from its `input_data` source, preceeded by the
-      current `.buf` if not empty.
+      sizes come from its `input_data` source, preceeded by any
+      content in the internal buffer.
 
       A `CornuCopyBuffer` also supports the file methods `.read`,
       `.tell` and `.seek` supporting drop in use of the buffer in
@@ -335,7 +338,7 @@ class CornuCopyBuffer(object):
 
         Other keyword arguments are passed to the buffer constructor.
     '''
-    f = open(filename, 'rb')
+    f = open(filename, 'rb')  # pylint: disable=consider-using-with
     bfr = cls.from_file(f, close=f.close, **kw)
     if offset is not None:
       if offset < 0:
@@ -487,9 +490,11 @@ class CornuCopyBuffer(object):
     ''' Push the chunk `bs` onto the front of the buffered data.
         Rewinds the logical `.offset` by the length of `bs`.
     '''
-    self.bufs.insert(0, bs)
-    self.buflen += len(bs)
-    self.offset -= len(bs)
+    blen = len(bs)
+    if blen > 0:
+      self.bufs.insert(0, bs)
+      self.buflen += blen
+      self.offset -= blen
 
   @property
   def end_offset(self):
@@ -643,6 +648,34 @@ class CornuCopyBuffer(object):
     if len(taken) == 1:
       return bytes(taken[0])
     return b''.join(taken)
+
+  def readline(self):
+    ''' Return a binary "line" from `self`, where a line is defined by
+        its ending `b'\n'` delimiter.
+        The final line from a buffer might not have a trailing newline;
+        `b''` is returned at EOF.
+
+        Example:
+
+            >>> bfr = CornuCopyBuffer([b'abc', b'def\nhij'])
+            >>> bfr.readline()
+            b'abcdef\n'
+            >>> bfr.readline()
+            b'hij'
+            >>> bfr.readline()
+            b''
+            >>> bfr.readline()
+            b''
+    '''
+    pending = []
+    for bs in self:
+      nlpos = bs.find(b'\n')
+      if nlpos >= 0:
+        pending.append(bs[:nlpos + 1])
+        self.push(bs[nlpos + 1:])
+        break
+      pending.append(bs)
+    return b''.join(pending)
 
   def peek(self, size, short_ok=False):
     ''' Examine the leading bytes of the buffer without consuming them,
@@ -916,14 +949,45 @@ class CornuCopyBuffer(object):
     )
 
     def flush():
-      ''' Flush the contents of `bfr2.buf` back into `self.buf`, adjusting
-          the latter's `.offset` accordingly.
+      ''' Flush the internal buffer of `bfr2` back into `self`'s
+          internal buffer, adjusting the latter's `.offset` accordingly.
       '''
       for buf in reversed(bfr2.bufs):
         self.push(buf)
 
     bfr2.flush = flush  # pylint: disable=attribute-defined-outside-init
     return bfr2
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to a `CornuCopyBuffer`,
+        used by the @cs.deco.promote` decorator.
+
+        Promotes:
+        * `int`: assumed to be a file descriptor of a file open for binary read
+        * `str`: assumed to be a filesystem pathname
+        * `bytes` and `bytes`like objects: data
+        * has a `.read1` or `.read` method: assume a file open for binary read
+        * iterable: assumed to be an iterable of `bytes`like objects
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, int):
+      obj = cls.from_fd(obj)
+    elif isinstance(obj, str):
+      obj = cls.from_filename(obj)
+    elif isinstance(obj, (bytes, bytearray, mmap.mmap, memoryview)):
+      obj = cls.from_bytes(obj)
+    elif hasattr(obj, 'read1') or hasattr(obj, 'read'):
+      obj = cls.from_file(obj)
+    try:
+      iter(obj)
+    except TypeError:
+      pass
+    else:
+      # assume this iterates byteslike objects
+      return cls(obj)
+    raise TypeError("%s.promote: cannot promote %s" % (cls, r(obj)))
 
 class _BoundedBufferIterator(object):
   ''' An iterator over the data from a CornuCopyBuffer with an end
@@ -956,7 +1020,7 @@ class _BoundedBufferIterator(object):
       raise StopIteration("limit reached")
     # post: limit > 0
     buf = next(bfr)
-    # post: bfr.buf now empty, can be modified
+    # post: bfr's internal buffer now empty, can be modified
     length = len(buf)
     if length <= limit:
       return buf
@@ -1009,29 +1073,6 @@ class CopyingIterator(object):
   def __getattr__(self, attr):
     # proxy other attributes from the base iterator
     return getattr(self.it, attr)
-
-def chunky(bfr_func):
-  ''' Decorator for a function accepting a leading `CornuCopyBuffer`
-      parameter.
-      Returns a function accepting a leading data chunks parameter
-      (`bytes` instances) and optional `offset` and 'copy_offsets`
-      keywords parameters.
-
-      Example::
-
-          @chunky
-          def func(bfr, ...):
-  '''
-
-  def chunks_func(chunks, *a, **kw):
-    ''' Function accepting chunk iterator.
-    '''
-    offset = kw.pop('offset', 0)
-    copy_offsets = kw.pop('copy_offsets', None)
-    bfr = CornuCopyBuffer(chunks, offset=offset, copy_offsets=copy_offsets)
-    return bfr_func(bfr, *a, **kw)
-
-  return chunks_func
 
 class _Iterator(object):
   ''' A base class for iterators over seekable things.

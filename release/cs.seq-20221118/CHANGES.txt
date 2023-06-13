@@ -1,0 +1,3 @@
+lib/python/cs/seq.py: cs.seq: small docstring clarification
+lib/python/cs/seq.py: cs.seq: remove unnecessary "global" statement
+lib/python/cs/seq.py: cs.seq: unrepeated: improve the docstring

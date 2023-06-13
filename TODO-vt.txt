@@ -1,44 +1,39 @@
+cs.vt.debug: fold DebuggingLock into cs.debug with the other debugging locks
+replace defaults.config with Config.default(factory=True)
+replace defaults.* with Store.default() etc
 FilesDir et al to accept optional index, bypassing indexclass if supplied
-FilesDir et al to accept optional index, bypassing indexclass if supplied
-blocked_chunks_of2 seems SLOWER than blocked_chunks_of - check resulting block sizes and counts, and make other checks
 every use of os.mkdir to use needdir
-FilesDir: subclass HasFSPath, adjust uses of .topdirpath et al
 use import_extra for the FUSE stuff
+make a single NUL-filled bytes object, get literals to return memoryviews of it for various sized NUL blocks
+    NULBlock trite factory for RLEBlock(b'\0', length)
 vt.vhost vs vt.httpd
 cs.vt.merge: merge: implement trust_stat_type_size_mtime mode
+move to SHA-3-256, check hash size etc
+  v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
+    for k in S1: S2.add[S1[k]
+    for E in S1.walk(D):
+      E2 = copy of E using S2
+      flush E2
+    think about ways to work against 2 Stores, current per thread
+      default store doesn't work here; pipe info to another thread?
 DataDir: only show progress if defaults.show_progress is true
 revisit keys/hashcodes for the datadir stores - seem unreliable, maybe because of cache and queues - removed from unit tests for now
 dropped the histogram stuff for blocked_chunks_of2, need some QA tests to look at block size distributions
-scanbuf: should it do the min/max offset limiting - should be faster, particularly in C
-blocked_chunks_of: should it run pure-extra parser (with min/max or scanbuf of big chunks) until eof or error, then pure scanbuf? should be faster
-fast version of blocked_chunks_of for no parser and hardwired min/max block sizes
-_scan.c: the # for PyArg_ParseTuple is no longer valid - maybe only when PY_SSIZE_T_CLEAN is not defined - maybe drop that half of the ifdef in an error raising way
-_scan.c: the # for PyArg_ParseTuple is no longer valid - find out what to do - or is it only PyArg_Parse which breaks?
 file merge - dig through common ancestor data revisions? fork a copy if not direct ancestor?
 IndexClasses to be singletons based on their pathname
-replace HASHCLASS_BY_ENUM and HASHCLASS_BY_NAME with HasCode.by_index([int,str])
-replace HASHCLASS_BY_ENUM with HashCode.by_enum
-replace HASHCLASS_BY_NAME with HashCode.by_name
 drop hashenum throughout, just use hashname
-cs.iso14496: a HasSubBoxes mixin for things with .boxes, provides __len__, .length, __iter__ and whatever else
 is PEP590 - vector call - applicable to _scan.c?
-HashCode in clude metaclass to autoregister subclasses, and move the registry into the superclass
-hashcodeutils pure mixin, rely on self.hashclass
-drop ALL multihashclass support - everything is given a specific hashclass on instantiation
+HashCode include metaclass to autoregister subclasses, and move the registry into the superclass
 big refactor: ALL stores to subclass mappings eg dict or filesdir etc or the Mapping ABC - basicstore etc to become pure mixins, same for indexes
-make _all_ Stores use a single hashclass, drop options hashclass= from add et al
-move usage strings to subcommand docstrings
 make config-based Stores singletons, make datadirs singletons on the dir realpath
 completed-indirect-block index supporting efficient indirect-block completion code
 blockmap: lower Later priority than regular Store queries, seems to be starving normal queries a bit
 datadir SqliteFilemap: mappings with path=NULL, how? del_path does this, also sets indexed_to to NULL
 blockmap: continues running even after connection shutdown
-OverLine class to uses SharedWritable to manage stderr - insert a status line above the cursor line, maintain etxt string, scrolling: withdrawn status line, scroll, restore
 virtual vtfs layer with /dir-hashref/filename, and export for files giviing that so i can mount mnt/vt and symlink reference objects
 MMappedDataDir: do not mmap the write file, just pread it
 RawDataDir: do not mmap growing datafile as a remmap voids the memoryviews
 _FilesDir: close idle _rfd entries in DataDir and PlatonicDir to avoid unbounded fds - cannot do for RawDataDir as the mmaps must persist
-DataDirIndexEntry: use cs.binary?
 VTCmd.cmd_mount: pull out into its own BaseCommand
 maybe rename closed .vtd files as foo-closed.vtd on close to support easy push-and-delete from a pool store to a remote store
 http interface: hash based URLs to return a long or infinite expiry as their content is fixed
@@ -82,11 +77,9 @@ DataDir: scan progress: poll all files, keep .total = total size and .position =
 general purpose file tree monitor yielding (rpath, old_state, new_state), start with os.walk, switch to inotify andf fsevents later if available
 vt.fs.FileSystem: make the modes into a set, simplify the initialiser
 ShadowDir(dirpath, Dir, archive): make dirpath to be like Dir, apply updates from archive, push local changes to Dir and archive
-get rid of uses of totext/fromtext and dirent_fromtext etc
 sockets: clean up shutdown process: handlers to honour the shared runstate, not abort so much, kill shutdown_now
 Config: parser which returns pure dict of dicts, Config constructed from wired-in defaults plus config file
 streamstore: Client handler: make current Store local to it for independence
-move CancellationError into cs.resources, associate with RunState
 socket store: export = name[:storespec],... with default being "default:{defaults.S}"
 socket store: dflt socket_path = {basedir}/{clausename}.sock
 cs.vt.socket_tests: UNIX domain socket tests
@@ -97,7 +90,6 @@ readahead for CornuCopyBuffer?
 ReadMixin: some kind of optional readahead if bfr reused and emptier than some threshold at return from read
 Store.archive([name]) ==> an Archive instance for state updates for Dirs
 [clause].archives_from = glob:storespec ... to plumb archives to backend Stores, or simply other Stores, eg "*:[metadata]"
-default virtual .vtrc contents, option like ssh -G to dump config file maybe "vt config" or a -n option
 PlatonicStore:
   keep mapping of paths => (mtime, size) to monitor changes
   update should rescan whole file, toss old hashcode mapping for that file
@@ -144,8 +136,6 @@ vtfuse close file should not block, but update mtime and queue sync with callbac
   start syncing appended data immediately?
     => better file-close behaviour
 SIGINT clean shutdown of mount
-make a single NUL-filled bytes object, get literals to return memoryviews of it for various sized NUL blocks
-    NULBlock trite factory for RLEBlock(b'\0', length)
 salt entries for Dirs,
 stats in new vs existing blocks when adding blocks
 scanners:
@@ -181,14 +171,6 @@ BackedFile
   set change-on-close flag on write/truncate etc
   raw file with rfd and wfd for front file
   support _only_ pread and pwrite methods for I/O
-move to SHA-3-256, check hash size etc
-  v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
-    for k in S1: S2.add[S1[k]
-    for E in S1.walk(D):
-      E2 = copy of E using S2
-      flush E2
-    think about ways to work against 2 Stores, current per thread
-      default store doesn't work here; pipe info to another thread?
 support ranges on GET requests
 URIs:
   x-vt:[//host[:port]]/textblockref-of-Dir/path...
@@ -254,28 +236,9 @@ SyncProcess: context manager object performing some long operation
   SyncDir(Dirent): pull in contents of dir, optionally including file contents
 blockify
   sniff files to infer high level syntax
-  parsers:
-    blockify should cope with parsers which exception
-    should blockify dup the source chunks and verify that the
-      chunks from the parser match the chunks from the source?
-    would that imply the parsers need only consume the chunks and
-      emit offsets, and not need to emit chunks?
-      that would avoid needing verification, and possibly avoid
-        some chunk reblocking a parser might do, and also allow
-        us to cope with parsers that exception out
-      * still need to accomodate data generation with offsets, eg big
-        Dirents being emitted with Dirent boundaries
 control module
   vtftp to be an API to it
 BackedFile to set change-on-close flag on write/truncate etc
-move to SHA-3-256, check hash size etc
-  v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
-    for k in S1: S2.add[S1[k]
-    for E in S1.walk(D):
-      E2 = copy of E using S2
-      flush E2
-    think about ways to work against 2 Stores, current per thread
-      default store doesn't work here; pipe info to another thread?
 support ranges on GET requests
 URIs:
   x-vt:[//host[:port]]/textblockref-of-Dir/path...

@@ -4,16 +4,20 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 import filecmp
 from getopt import GetoptError
 import os
 from os.path import (
+    dirname,
     expanduser,
+    exists as existspath,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
 )
 import sys
+from typing import Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -50,6 +54,8 @@ from cs.sqlalchemy_utils import (
     RelationProxy,
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+
+from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 
 def main(argv=None):
   ''' Kindle command line mode.
@@ -110,6 +116,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       This actually knows very little about Kindle ebooks or its rather opaque database.
       This is mostly to aid keeping track of state using `cs.fstags`.
   '''
+
+  CONTENT_DIRNAME = 'My Kindle Content'
 
   FSPATH_DEFAULT = default_kindle_library()
 
@@ -181,6 +189,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
       @property
       def amazon_url(self):
+        ''' The Amazon product page for this book.
+        '''
         # https://www.amazon.com.au/Wonder-Woman-2016-xx-Liars-ebook/dp/B097KMW2VY/
         title = self.tags.get('calibre.title',
                               'title').replace(' ', '-').replace('/', '-')
@@ -240,6 +250,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
           self,
           calibre,
           *,
+          dedrm=None,
           doit=True,
           replace_format=False,
           force=False,
@@ -253,6 +264,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
             Parameters:
             * `calibre`: the `CalibreTree`
+            * `dedrm`: optional `DeDRMWrapper` instance
             * `doit`: optional flag, default `True`;
               if false just recite planned actions
             * `force`: optional flag, default `False`;
@@ -271,7 +283,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
           # new book
           # pylint: disable=expression-not-assigned
           quiet or print("new book <=", shortpath(azwpath))
-          dbid = calibre.add(azwpath, doit=doit, quiet=quiet)
+          dbid = calibre.add(azwpath, dedrm=dedrm, doit=doit, quiet=quiet)
           if dbid is None:
             added = not doit
             cbook = None
@@ -621,23 +633,34 @@ class KindleCommand(BaseCommand):
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
-  def apply_defaults(self):
+  @dataclass
+  class Options(BaseCommand.Options):
     ''' Set up the default values in `options`.
     '''
-    options = self.options
-    try:
-      # pylint: disable=protected-access
-      kindle_path = KindleTree._resolve_fspath(None)
-    except ValueError:
-      kindle_path = None
-    from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
-    try:
-      # pylint: disable=protected-access
-      calibre_path = CalibreTree._resolve_fspath(None)
-    except ValueError:
-      calibre_path = None
-    options.kindle_path = kindle_path
-    options.calibre_path = calibre_path
+
+    def _kindle_path():
+      try:
+        # pylint: disable=protected-access
+        kindle_path = KindleTree._resolve_fspath(None)
+      except ValueError:
+        kindle_path = None
+      return kindle_path
+
+    kindle_path: Optional[str] = field(default_factory=_kindle_path)
+
+    def _calibre_path():
+      from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
+      try:
+        # pylint: disable=protected-access
+        calibre_path = CalibreTree._resolve_fspath(None)
+      except ValueError:
+        calibre_path = None
+      return calibre_path
+
+    calibre_path: Optional[str] = field(default_factory=_calibre_path)
+    dedrm_package_path: Optional[str] = field(
+        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+    )
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -646,7 +669,19 @@ class KindleCommand(BaseCommand):
     if opt == '-C':
       options.calibre_path = val
     elif opt == '-K':
-      options.kindle_path = val
+      db_subpaths = (
+          KindleBookAssetDB.DB_FILENAME,
+          joinpath(KindleTree.CONTENT_DIRNAME, KindleBookAssetDB.DB_FILENAME),
+      )
+      for db_subpath in db_subpaths:
+        db_fspath = joinpath(val, db_subpath)
+        if existspath(db_fspath):
+          break
+      else:
+        raise GetoptError(
+            "cannot find db at %s" % (" or ".join(map(repr, db_subpaths)),)
+        )
+      options.kindle_path = dirname(db_fspath)
     else:
       super().apply_opt(opt, val)
 
@@ -655,11 +690,17 @@ class KindleCommand(BaseCommand):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
-    options = self.options
-    with KindleTree(options.kindle_path) as kt:
-      with CalibreTree(options.calibre_path) as cal:
-        with stackattrs(options, kindle=kt, calibre=cal):
-          yield
+    with super().run_context():
+      options = self.options
+      dedrm = (
+          DeDRMWrapper(options.dedrm_package_path)
+          if options.dedrm_package_path else None
+      )
+
+      with KindleTree(options.kindle_path) as kt:
+        with CalibreTree(options.calibre_path) as cal:
+          with stackattrs(options, kindle=kt, calibre=cal, dedrm=dedrm):
+            yield
 
   def cmd_app_path(self, argv):
     ''' Usage: {cmd} [content-path]
@@ -707,12 +748,14 @@ class KindleCommand(BaseCommand):
     calibre = options.calibre
     runstate = options.runstate
     self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
+    dedrm = options.dedrm
     doit = options.doit
     force = options.force
     quiet = options.quiet
     verbose = options.verbose
     asins = argv or sorted(kindle.asins())
     xit = 0
+    quiet or print("export", kindle.shortpath, "=>", calibre.shortpath)
     for asin in progressbar(asins, f"export to {calibre}"):
       if runstate.cancelled:
         break
@@ -721,6 +764,7 @@ class KindleCommand(BaseCommand):
         try:
           kbook.export_to_calibre(
               calibre,
+              dedrm=dedrm,
               doit=doit,
               force=force,
               replace_format=force,

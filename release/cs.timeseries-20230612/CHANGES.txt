@@ -1,0 +1,10 @@
+lib/python/cs/timeseries.py: cs.*: replace a lot of runstate plumbing with @uses_runstate
+lib/python/cs/timeseries.py: cs.timeseries: update obsolete method call
+lib/python/cs/timeseries.py: cs.timeseries: Epoch.promote: do not special case None, let Optional[Epoch] type annoations handle that
+lib/python/cs/timeseries.py: cs.timeseries: PlotSeries: fix docstring typo, mark PlotSeries.promote as incomplete (raises RuntimeError)
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy: from_name: update docstring; promote: use cls.from_name() instead of TimespanPolicy.from_name()
+lib/python/cs/timeseries.py: merge default => solar
+lib/python/cs/timeseries.py: cs.*: drop BaseCommand.apply_defaults in favour of the Options dataclass
+lib/python/cs/timeseries.py: merge vt ==> solar: assorted updates from the vt branch, mostly the cs.cmdutils ones
+lib/python/cs/timeseries.py: cs.timeseries: use @uses_fstags instead of hardwiring FSTags default
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.__str__: handle early call with no .fspath
