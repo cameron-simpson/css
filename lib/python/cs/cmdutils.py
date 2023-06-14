@@ -126,6 +126,19 @@ class _BaseSubCommand(ABC):
         type(self).__name__, self.cmd, self.method
     )
 
+  @abstractmethod
+  def __call__(
+      self, subcmd: str, base_command: "BaseCommandSubType", argv: List[str]
+  ):
+    ''' Run the subcommand.
+
+        Parameters:
+        * `subcmd`: the subcommand name
+        * `base_command`: the instance of `BaseCommand`
+        * `argv`: the command line arguments after the subcommand name
+    '''
+    raise NotImplementedError
+
   @staticmethod
   def from_class(command_cls: "BaseCommandSubType") -> Mapping[str, Callable]:
     ''' Return a mapping of subcommand names to subcommand specifications
@@ -220,11 +233,14 @@ class _ClassSubCommand(_BaseSubCommand):
   ''' A class to represent a subcommand implemented with a `BaseCommand` subclass.
   '''
 
-  def __call__(self, cmd, command, argv):
-    mkw = dict(command.options.__dict__)
-    if cmd is not None:
-      mkw.update(cmd=cmd)
-    return self.method(argv, **mkw).run()
+  def __call__(
+      self, subcmd: str, command: "BaseCommandSubType", argv: List[str]
+  ):
+    subcmd_class = self.method
+    updates = dict(command.options.__dict__)
+    updates.update(cmd=subcmd)
+    command = subcmd_class(argv, **updates)
+    return command.run()
 
   def usage_format(self) -> str:
     ''' Return the usage format string from the class.
