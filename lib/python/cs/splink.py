@@ -67,7 +67,7 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -93,6 +93,7 @@ DISTINFO = {
         'cs.tagset',
         'cs.timeseries',
         'cs.upd',
+        'matplotlib',
         'python-dateutil',
         'typeguard',
     ],
@@ -127,8 +128,7 @@ def main(argv=None):
   return SPLinkCommand(argv).run()
 
 def ts2001_unixtime(tzname=None):
-  ''' Convert an SP-Link seconds-since-2001-01-01-local-time offset
-      into a UNIX time.
+  ''' Return the SP-Link 2001-01-01-local-time epoch as a UNIX time.
   '''
   if tzname is None:
     tzname = 'local'

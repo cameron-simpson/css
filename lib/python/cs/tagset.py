@@ -219,7 +219,7 @@ from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
-    has_format_attributes, format_attribute, FStr, r
+    has_format_attributes, format_attribute, FStr, r, s
 )
 from cs.logutils import setup_logging, debug, warning, error, ifverbose
 from cs.mappings import (
@@ -232,7 +232,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20230212-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -2026,8 +2026,8 @@ class TagSetPrefixView(FormatableMixin):
           TagSet:{'a': 1, 'b': 2, 'sub.x': 3, 'sub.y': 4, 'sub.z': 5}
   '''
 
-  @typechecked
   @require(lambda prefix: len(prefix) > 0)
+  @typechecked
   def __init__(self, tags, prefix: str):
     self.__dict__.update(_tags=tags, _prefix=prefix, _prefix_=prefix + '.')
 
@@ -3496,7 +3496,15 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
                     d = tags.as_dict()
                     del d[update_uuid_tag_name]
                     d['fspath'] = joinpath(dirname(filepath), name)
-                    update_mapping[key].update(d)
+                    try:
+                      update_mapping[key].update(d)
+                    except AttributeError:
+                      raise
+                    except Exception as e:
+                      warning(
+                          "update_mapping:%s[%r].update(%s): %s",
+                          s(update_mapping), key, cropped_repr(d), e
+                      )
                 f.write(
                     cls.tags_line(
                         name, tags, extra_types=extra_types, prune=prune

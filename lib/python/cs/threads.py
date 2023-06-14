@@ -29,7 +29,7 @@ from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
 
-__version__ = '20230212-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'description':
@@ -202,8 +202,11 @@ class HasThreadState(ContextManagerMixin):
         currently active classes.
 
         The optional parameter `thread_states`
-        may be used to pass an explicit mapping of thread states to use;
+        may be used to pass an explicit mapping of `type`->`instance`
+        of thread states to use;
         the default states come from `HasThreadState.thread_states()`.
+        The values of this mapping are iterated over and used as context managers.
+
         A boolean value may also be passed meaning:
         * `False`: do not apply any thread states
         * `True`: apply the default thread states

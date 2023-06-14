@@ -68,7 +68,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20230212-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -185,7 +185,9 @@ class Result(FSM):
       if self.is_done:
         exc_info = self.exc_info
         if exc_info:
-          raise RuntimeError("UNREPORTED EXCEPTION: %r" % (exc_info,))
+          raise RuntimeError(
+              "UNREPORTED EXCEPTION at __del__: %r" % (exc_info,)
+          )
 
   def __hash__(self):
     return id(self)
