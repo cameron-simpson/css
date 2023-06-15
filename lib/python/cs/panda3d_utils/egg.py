@@ -44,7 +44,7 @@ from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.psutils import run
 from cs.queues import ListQueue
 from cs.seq import Seq, unrepeated
-from cs.threads import ThreadState
+from cs.threads import HasThreadState, ThreadState
 
 
 # the default coordinate system to use in model files
@@ -78,7 +78,12 @@ def quote(text):
       ('"' + text.replace('\\', '\\\\').replace('"', '\\"') + '"')
   )
 
-class EggRegistry(defaultdict, ContextManagerMixin):
+class EggRegistry(defaultdict, HasThreadState):
+  ''' A registry of Eggable instances.
+  '''
+
+  perthread_state = ThreadState()
+
   _seq = Seq()
 
   def __init__(self, name=None):
@@ -92,10 +97,6 @@ class EggRegistry(defaultdict, ContextManagerMixin):
 
   def __repr__(self):
     return str(self)
-
-  def __enter_exit__(self):
-    with state(registry=self):
-      yield self
 
   @typechecked
   def register(self, instance: 'Eggable'):
@@ -158,18 +159,8 @@ class EggRegistry(defaultdict, ContextManagerMixin):
 
 # a stackable state
 _registry0 = EggRegistry(__file__)
-state = ThreadState(registry=_registry0)
 
-@decorator
-def uses_registry(func):
-
-  @default_params(registry=lambda: state.registry)
-  def with_registry(*a, registry, **kw):
-    assert registry is not _registry0
-    with registry:
-      return func(*a, registry=registry, **kw)
-
-  return with_registry
+uses_registry = default_params(registry=lambda: EggRegistry.default())
 
 class EggMetaClass(type):
 
