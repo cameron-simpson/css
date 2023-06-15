@@ -392,19 +392,6 @@ class DCEggable(Eggable):
        method.
   '''
 
-  @classmethod
-  def promote(cls, obj):
-    ''' Promote `obj` to `cls`. Return the promoted object.
-    '''
-    if not isinstance(obj, cls):
-      if isinstance(obj, (list, tuple)):
-        obj = cls(*obj)
-      elif isinstance(obj, dict):
-        obj = cls(**obj)
-      else:
-        obj = super().promote(obj)
-    return obj
-
   def egg_name(self):
     ''' The Egg has a name if it has a `.name` which is not `None`.
     '''
@@ -454,6 +441,19 @@ class DCEggable(Eggable):
           yield EggNode(field_name, None, value)
     # yield named attrs if present
     yield from super().egg_contents()
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to `cls`. Return the promoted object.
+    '''
+    if not isinstance(obj, cls):
+      if isinstance(obj, (list, tuple)):
+        obj = pfx_call(cls, *obj)
+      elif isinstance(obj, dict):
+        obj = cls(**obj)
+      else:
+        obj = super().promote(obj)
+    return obj
 
 def dumps(obj, indent=""):
   ''' Return a string containing `obj` in Egg syntax.
