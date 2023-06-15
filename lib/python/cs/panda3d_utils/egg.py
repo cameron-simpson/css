@@ -225,20 +225,6 @@ class Eggable(metaclass=EggMetaClass):
 
   @classmethod
   @uses_registry
-  def promote(cls, obj, *, registry):
-    ''' Promote `obj` to an instance of `cls`.
-
-        This implementation promotes `str` to the named `Eggable`.
-    '''
-    if not isinstance(obj, cls):
-      if isinstance(obj, str):
-        obj = cls.instance(obj, registry=registry)
-      else:
-        raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
-    return obj
-
-  @classmethod
-  @uses_registry
   def transcribe(cls, item, indent='', *, registry):
     ''' A generator yielding `str`s which transcribe `item` in Egg syntax.
     '''
@@ -373,6 +359,21 @@ class Eggable(metaclass=EggMetaClass):
           if isinstance(subitem, Eggable):
             q.append(subitem)
 
+  @classmethod
+  @uses_registry
+  def promote(cls, obj, *, registry):
+    ''' Promote `obj` to an instance of `cls`.
+
+        Promotions:
+        * `str` to the `Eggable` registered with that name
+    '''
+    if not isinstance(obj, cls):
+      if isinstance(obj, str):
+        obj = cls.instance(obj, registry=registry)
+      else:
+        raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
+    return obj
+
 class EggableList(list, Eggable):
   ''' An `Eggable` which is just a list of items, such as `<Transform>`.
   '''
@@ -445,6 +446,11 @@ class DCEggable(Eggable):
   @classmethod
   def promote(cls, obj):
     ''' Promote `obj` to `cls`. Return the promoted object.
+
+        Promotions:
+        * `list` or `tuple` to `DCEggable(*obj)`
+        * `dict` to `DCEggable(**obj)`
+        Other types are promoted via `Eggable.promote`.
     '''
     if not isinstance(obj, cls):
       if isinstance(obj, (list, tuple)):
