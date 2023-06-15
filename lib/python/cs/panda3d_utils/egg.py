@@ -102,6 +102,8 @@ class EggRegistry(defaultdict, HasThreadState):
   def register(self, instance: 'Eggable'):
     ''' Register this `instance`.
         The same instance may be registered more than once.
+        Different instances of the same type must have different
+        `instance.egg_name()` values.
     '''
     name = instance.egg_name()
     egg_cls = type(instance)
@@ -139,7 +141,7 @@ class EggRegistry(defaultdict, HasThreadState):
 
         For example, since `<TRef> { name }` is defined as a reference
         type for `Texture` nodes, a `Texture("foo","foo_image.png")`
-        would return an `EggNode("TRef",None,"fpp")` if the `Texture`
+        would return an `EggNode("TRef",None,"foo")` if the `Texture`
         was in this registry.
     '''
     name = egg_node.egg_name()
