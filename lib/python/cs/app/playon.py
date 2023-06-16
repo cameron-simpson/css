@@ -363,6 +363,35 @@ class PlayOnCommand(BaseCommand):
             recording.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
 
+  def cmd_feature(self, argv, locale='en_US'):
+    ''' Usage: {cmd} [feature_id]
+          List features.
+    '''
+    long_mode = False
+    opts, argv = getopt(argv, 'l', '')
+    for opt, val in opts:
+      if opt == '-l':
+        long_mode = True
+      else:
+        raise RuntimeError("unhandled option: %r" % (opt,))
+    if argv:
+      feature_id = argv.pop(0)
+    else:
+      feature_id = None
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    for feature in sorted(api.features(), key=lambda svc: svc['playon.ID']):
+      playon = feature.subtags('playon', as_tagset=True)
+      if feature_id is not None and playon.ID != feature_id:
+        print("skip", playon.ID)
+        continue
+      print(playon.ID)
+      if feature_id is None and not long_mode:
+        continue
+      for tag in playon:
+        print(" ", tag)
+
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
