@@ -9,7 +9,7 @@
     and other command line related stuff.
 '''
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from cmd import Cmd
 from code import interact
 from collections import namedtuple
