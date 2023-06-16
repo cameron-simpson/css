@@ -985,6 +985,69 @@ class PlayOnAPI(HTTPServiceAPI):
     '''
     return self.sqltags[f'service.{service_id}']
 
+  @pfx_method
+  def _features_from_entries(self, entries):
+    ''' Return the feature `TagSet` instances from PlayOn data entries.
+    '''
+    with self.sqltags:
+      now = time.time()
+      features = set()
+      for entry in entries:
+        entry_id = entry['ID']
+        with Pfx(entry_id):
+          # pylint: disable=use-dict-literal
+          for e_field, conv in sorted(dict(
+              ##Created=self.from_playon_date,
+              ##Expires=self.from_playon_date,
+              ##Updated=self.from_playon_date,
+          ).items()):
+            try:
+              value = entry[e_field]
+            except KeyError:
+              pass
+            else:
+              with Pfx("%s=%r", e_field, value):
+                if value is None:
+                  del entry[e_field]
+                else:
+                  try:
+                    value2 = conv(value)
+                  except ValueError as e:
+                    warning("%r: %s", value, e)
+                  else:
+                    entry[e_field] = value2
+          feature = self.feature(entry_id)
+          feature.update(entry, prefix='playon')
+          feature.update(dict(last_updated=now))
+          features.add(feature)
+      return features
+
+  @pfx_method
+  def features(self):
+    ''' Fetch the list of featured shows.
+    '''
+    entries = self.cdsurl_data('content/featured')
+    return self._features_from_entries(entries)
+
+  def feature(self, feature_id):
+    ''' Return the feature `SQLTags` instance for `feature_id`.
+    '''
+    return self.sqltags[f'feature.{feature_id}']
+
+  def featured_image_url(self, feature_name: str):
+    ''' URL of the image for a featured show. '''
+    return self.suburl(
+        self, f'content/featured/{feature_name}/image', api_version=9
+    )
+
+  def service_image_url(self, service_id, large=True):
+    return self.suburl(
+        self,
+        f'content/{service_id}/image?size={"large" if large else "small"}',
+        _base_url=self.CDS_HOSTNAME,
+        api_version=9,
+    )
+
   # pylint: disable=too-many-locals
   @pfx_method
   @uses_runstate
