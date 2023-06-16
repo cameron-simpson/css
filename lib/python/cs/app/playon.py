@@ -810,13 +810,17 @@ class PlayOnAPI(HTTPServiceAPI):
     '''
     return self.sqltags[download_id]
 
-  def suburl(self, suburl, headers=None, **kw):
+  def suburl(
+      self, suburl, *, api_version=None, headers=None, _base_url=None, **kw
+  ):
     ''' Override `HTTPServiceAPI.suburl` with default
         `headers={'Authorization':self.jwt}`.
     '''
+    if _base_url is None:
+      _base_url = None if api_version is None else f'api/v{api_version}'
     if headers is None:
       headers = dict(Authorization=self.jwt)
-    return super().suburl(suburl, headers=headers, **kw)
+    return super().suburl(suburl, _base_url=_base_url, headers=headers, **kw)
 
   def suburl_data(self, suburl, *, raw=False, **kw):
     ''' Call `suburl` and return the `'data'` component on success.
