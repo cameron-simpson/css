@@ -25,6 +25,7 @@ import time
 from typing import Optional, Set
 from urllib.parse import unquote as unpercent
 
+from icontract import require
 import requests
 from typeguard import typechecked
 
@@ -937,12 +938,13 @@ class PlayOnAPI(HTTPServiceAPI):
   available = recordings
 
   @pfx_method
-  def _services_from_entries(self, entries):
-    ''' Return the service `TagSet` instances from PlayOn data entries.
+  @require(lambda type: type in ('feature', 'service'))
+  def _entry_tagsets(self, entries, type: str) -> set:
+    ''' Return a `set` of `TagSet` instances from PlayOn data entries.
     '''
     with self.sqltags:
       now = time.time()
-      services = set()
+      tes = set()
       for entry in entries:
         entry_id = entry['ID']
         with Pfx(entry_id):
@@ -967,11 +969,18 @@ class PlayOnAPI(HTTPServiceAPI):
                     warning("%r: %s", value, e)
                   else:
                     entry[e_field] = value2
-          service = self.service(entry_id)
-          service.update(entry, prefix='playon')
-          service.update(dict(last_updated=now))
-          services.add(service)
-      return services
+          te = self.sqltags[f'{type}.{entry_id}']
+          te = self.feature(entry_id)
+          te.update(entry, prefix='playon')
+          te.update(dict(last_updated=now))
+          tes.add(te)
+      return tes
+
+  @pfx_method
+  def _services_from_entries(self, entries):
+    ''' Return the service `TagSet` instances from PlayOn data entries.
+    '''
+    return self._entry_tagsets(entries, 'service')
 
   @pfx_method
   def services(self):
@@ -980,54 +989,17 @@ class PlayOnAPI(HTTPServiceAPI):
     entries = self.cdsurl_data('content')
     return self._services_from_entries(entries)
 
-  def service(self, service_id):
+  def service(self, service_id: str):
     ''' Return the service `SQLTags` instance for `service_id`.
     '''
     return self.sqltags[f'service.{service_id}']
-
-  @pfx_method
-  def _features_from_entries(self, entries):
-    ''' Return the feature `TagSet` instances from PlayOn data entries.
-    '''
-    with self.sqltags:
-      now = time.time()
-      features = set()
-      for entry in entries:
-        entry_id = entry['ID']
-        with Pfx(entry_id):
-          # pylint: disable=use-dict-literal
-          for e_field, conv in sorted(dict(
-              ##Created=self.from_playon_date,
-              ##Expires=self.from_playon_date,
-              ##Updated=self.from_playon_date,
-          ).items()):
-            try:
-              value = entry[e_field]
-            except KeyError:
-              pass
-            else:
-              with Pfx("%s=%r", e_field, value):
-                if value is None:
-                  del entry[e_field]
-                else:
-                  try:
-                    value2 = conv(value)
-                  except ValueError as e:
-                    warning("%r: %s", value, e)
-                  else:
-                    entry[e_field] = value2
-          feature = self.feature(entry_id)
-          feature.update(entry, prefix='playon')
-          feature.update(dict(last_updated=now))
-          features.add(feature)
-      return features
 
   @pfx_method
   def features(self):
     ''' Fetch the list of featured shows.
     '''
     entries = self.cdsurl_data('content/featured')
-    return self._features_from_entries(entries)
+    return self._entry_tagsets(entries, 'feature')
 
   def feature(self, feature_id):
     ''' Return the feature `SQLTags` instance for `feature_id`.
