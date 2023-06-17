@@ -866,65 +866,19 @@ class PlayOnAPI(HTTPServiceAPI):
     )
 
   @pfx_method
-  def _recordings_from_entries(self, entries) -> Set[SQLTagSet]:
-    ''' Return the recording `TagSet` instances from PlayOn data entries.
-    '''
-    with self.sqltags:
-      now = time.time()
-      recordings = set()
-      for entry in entries:
-        entry_id = entry['ID']
-        with Pfx(entry_id):
-          for r_field, conv in sorted(dict(
-              Episode=int,
-              ReleaseYear=int,
-              Season=int,
-              ##Created=self.from_playon_date,
-              ##Expires=self.from_playon_date,
-              ##Updated=self.from_playon_date,
-          ).items()):
-            try:
-              value = entry[r_field]
-            except KeyError:
-              pass
-            else:
-              with Pfx("%s=%r", r_field, value):
-                if value is None:
-                  del entry[r_field]
-                else:
-                  try:
-                    value2 = conv(value)
-                  except ValueError as e:
-                    warning("%r: %s", value, e)
-                  else:
-                    entry[r_field] = value2
-          recording = self[entry_id]
-          # sometimes the name is spuriously prefixed with the seaon and episode
-          playon_name = entry['Name']
-          season = entry.get('Season')
-          spfx, sn, offset = get_prefix_n(playon_name, 's', season)
-          if spfx:
-            episode = entry.get('Episode')
-            epfx, en, offset = get_prefix_n(
-                playon_name, 'e', episode, offset=offset
-            )
-            if epfx:
-              entry['Season'] = sn
-              entry['Episode'] = en
-              entry['Name'] = playon_name[offset:].lstrip(' -')
-          recording.update(entry, prefix='playon')
-          recording.update(dict(last_updated=now))
-          recordings.add(recording)
-      return recordings
-
-  @pfx_method
   def queue(self):
     ''' Return the `TagSet` instances for the queued recordings.
     '''
     with self.sqltags.db_session():
       data = self.suburl_data('queue')
       entries = data['entries']
-      return self._recordings_from_entries(entries)
+      return self._entry_tagsets(
+          entries, 'recording', dict(
+              Episode=int,
+              ReleaseYear=int,
+              Season=int,
+          )
+      )
 
   @pfx_method
   def recordings(self):
@@ -933,13 +887,21 @@ class PlayOnAPI(HTTPServiceAPI):
     with self.sqltags.db_session():
       data = self.suburl_data('library/all')
       entries = data['entries']
-      return self._recordings_from_entries(entries)
+      return self._entry_tagsets(
+          entries, 'recording', dict(
+              Episode=int,
+              ReleaseYear=int,
+              Season=int,
+          )
+      )
 
   available = recordings
 
   @pfx_method
-  @require(lambda type: type in ('feature', 'service'))
-  def _entry_tagsets(self, entries, type: str) -> set:
+  @require(lambda type: type in ('feature', 'recording', 'service'))
+  def _entry_tagsets(
+      self, entries, type: str, conversions: Optional[dict] = None
+  ) -> set:
     ''' Return a `set` of `TagSet` instances from PlayOn data entries.
     '''
     with self.sqltags:
@@ -949,26 +911,23 @@ class PlayOnAPI(HTTPServiceAPI):
         entry_id = entry['ID']
         with Pfx(entry_id):
           # pylint: disable=use-dict-literal
-          for e_field, conv in sorted(dict(
-              ##Created=self.from_playon_date,
-              ##Expires=self.from_playon_date,
-              ##Updated=self.from_playon_date,
-          ).items()):
-            try:
-              value = entry[e_field]
-            except KeyError:
-              pass
-            else:
-              with Pfx("%s=%r", e_field, value):
-                if value is None:
-                  del entry[e_field]
-                else:
-                  try:
-                    value2 = conv(value)
-                  except ValueError as e:
-                    warning("%r: %s", value, e)
+          if conversions:
+            for e_field, conv in sorted(conversions.items()):
+              try:
+                value = entry[e_field]
+              except KeyError:
+                pass
+              else:
+                with Pfx("%s=%r", e_field, value):
+                  if value is None:
+                    del entry[e_field]
                   else:
-                    entry[e_field] = value2
+                    try:
+                      value2 = conv(value)
+                    except ValueError as e:
+                      warning("%r: %s", value, e)
+                    else:
+                      entry[e_field] = value2
           te = self.sqltags[f'{type}.{entry_id}']
           te = self.feature(entry_id)
           te.update(entry, prefix='playon')
