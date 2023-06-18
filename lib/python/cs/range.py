@@ -1,5 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
+
 '''
 A Range is an object resembling a set but optimised for contiguous
 ranges of int members.
@@ -12,10 +13,12 @@ from collections import namedtuple
 from cs.logutils import ifdebug
 from cs.seq import first
 
+__version__ = '20230518-post'
+
 DISTINFO = {
     'description':
-        "a Range class implementing compact integer ranges with a set-like API,"
-        " and associated functions",
+    "a Range class implementing compact integer ranges with a set-like API,"
+    " and associated functions",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -65,12 +68,12 @@ def spans(items):
   prev = None
   for i in items:
     if prev is None:
-      prev = [i, i+1]
+      prev = [i, i + 1]
     elif i == prev[1]:
       prev[1] += 1
     else:
       yield Span(*prev)
-      prev = [i, i+1]
+      prev = [i, i + 1]
   if prev is not None:
     yield Span(*prev)
 
@@ -80,24 +83,33 @@ class Span(namedtuple('Span', 'start end')):
 
   def __str__(self):
     return "%d:%d" % (self.start, self.end)
+
   __repr__ = __str__
+
   def __eq__(self, other):
     return self[0] == other[0] and self[1] == other[1]
+
   def __lt__(self, other):
     return self[0] < other[0] or (self[0] == other[0] and self[1] < other[1])
+
   def __len__(self):
     return self.end - self.start
+
   @property
   def size(self):
     ''' The `.size` of a `Span` is its length: `end - start`.
     '''
     return len(self)
 
+  def as_list(self):
+    ''' This `Span` as a 2 element `list`. '''
+    return [self.start, self.end]
+
 class Range(object):
-  ''' A collection of ints that collates adjacent ints.
+  ''' A collection of `int`s that collates adjacent ints.
 
       The interface is as for a `set` with additional methods:
-      * `spans()`: return an iterable of `Spans`, with `.start`
+      * `spans()`: return an iterable of `Span`s, with `.start`
         included in each `Span` and `.end` just beyond
 
       Additionally, the update/remove/etc methods have a secondary
@@ -126,7 +138,9 @@ class Range(object):
         self.add_span(start, end)
 
   def __str__(self):
-    return "[%s]" % (",".join( [ "[%d:%d)" % (S.start, S.end) for S in self._spans ] ))
+    return "[%s]" % (
+        ",".join(["[%d:%d)" % (S.start, S.end) for S in self._spans])
+    )
     ##spans = [ "%d"%(start,) if start == end-1
     ##          else "%d,%d"%(start,end-1) if start == end-2
     ##          else "%d..%d"%(start,end-1) for start, end in self._spans ]
@@ -159,6 +173,22 @@ class Range(object):
     '''
     return first(self.spans())
 
+  def as_list(self):
+    ''' This `Range` as a `list` of 2-element per-`Span` `list`s.
+
+            >>> R = Range(4, 8)
+            >>> R.as_list()
+            [[4, 8]]
+            >>> R.add(11, 14)
+            >>> R.as_list()
+            [[4, 8], [11, 14]]
+            >>> R.remove(12)
+            >>> R.as_list()
+            [[4, 8], [11, 12], [13, 14]]
+
+    '''
+    return [span.as_list() for span in self._spans]
+
   def _check(self):
     self._check_spans()
 
@@ -172,25 +202,31 @@ class Range(object):
     ospan = None
     for span in _spans:
       if not isinstance(span, Span):
-        raise TypeError("._spans elements should be lists, found "+repr(span))
+        raise TypeError(
+            "._spans elements should be lists, found " + repr(span)
+        )
       start, end = span
       if not isinstance(start, int) or not isinstance(end, int):
-        raise TypeError("._spans elements should be a pair of ints, found "+repr(span))
+        raise TypeError(
+            "._spans elements should be a pair of ints, found " + repr(span)
+        )
       if start >= end:
-        raise ValueError("._spans elements should have low < high, found "+repr(span))
+        raise ValueError(
+            "._spans elements should have low < high, found " + repr(span)
+        )
       if ospan is not None:
         if ospan[1] >= start:
           raise ValueError(
               "._spans elements should be strictly greater than their"
-              " predecessors, found %s then %s"
-              % (ospan, span))
+              " predecessors, found %s then %s" % (ospan, span)
+          )
       ospan = span
 
   def __iter__(self):
     ''' Yield all the elements.
     '''
     for _span in self._spans:
-      for x in range( *_span ):
+      for x in range(*_span):
         yield x
 
   def __bool__(self):
@@ -199,7 +235,7 @@ class Range(object):
   __nonzero__ = __bool__
 
   def __len__(self):
-    return sum( [ end-start for start, end in self._spans ] )
+    return sum([end - start for start, end in self._spans])
 
   @property
   def start(self):
@@ -240,12 +276,12 @@ class Range(object):
       start = x.start
       end = x.end
     elif isinstance(x, int):
-      start, end = x, x+1
+      start, end = x, x + 1
     else:
       start, end = list(x)
     _spans = self._spans
     ndx = bisect_left(_spans, Span(start, start))
-    if ndx > 0 and _spans[ndx-1].end > start:
+    if ndx > 0 and _spans[ndx - 1].end > start:
       ndx -= 1
     elif ndx >= len(_spans):
       return False
@@ -265,7 +301,7 @@ class Range(object):
     _spans = self._spans
     i = bisect_left(_spans, Span(start, start))
     # check preceeding span
-    assert i == 0 or _spans[i-1].end <= start
+    assert i == 0 or _spans[i - 1].end <= start
     # check current span
     assert i == len(_spans) or _spans[i].start >= start
     raise RuntimeError("INCOMPLETE")
@@ -348,7 +384,7 @@ class Range(object):
     # locate start index: all affected spans start from here
     S0 = Span(start, start)
     i = bisect_left(_spans, S0)
-    if i > 0 and _spans[i-1].end >= start:
+    if i > 0 and _spans[i - 1].end >= start:
       i -= 1
     drop_from = i
     new_start = start
@@ -364,7 +400,7 @@ class Range(object):
     new_span = Span(new_start, new_end)
     if self._debug:
       self._check()
-    _spans[drop_from:drop_to] = [ new_span ]
+    _spans[drop_from:drop_to] = [new_span]
     if self._debug:
       self._check()
 
@@ -412,7 +448,8 @@ class Range(object):
       raise KeyError("span %s not entirely in Range" % (ospan,))
 
     drop_to = i
-    if (drop_from is not None and drop_from < drop_to) or len(insert_spans) > 0:
+    if (drop_from is not None
+        and drop_from < drop_to) or len(insert_spans) > 0:
       _spans[drop_from:drop_to] = insert_spans
     if self._debug:
       self._check()
@@ -426,7 +463,7 @@ class Range(object):
       for span in start.spans():
         self.add_span(*span)
     else:
-      self.add_span(start, start+1)
+      self.add_span(start, start + 1)
 
   def discard(self, start, end=None):
     ''' Like `set.discard` but with an extended signature.
@@ -437,7 +474,7 @@ class Range(object):
       for span in start.spans():
         self.discard_span(*span)
     else:
-      self.discard_span(start, start+1)
+      self.discard_span(start, start + 1)
 
   def remove(self, start, end=None):
     ''' Like `set.remove` but with an extended signature.
@@ -448,7 +485,7 @@ class Range(object):
       for span in start.spans():
         self.discard_span(*span, remove_mode=True)
     else:
-      self.discard_span(start, start+1, remove_mode=True)
+      self.discard_span(start, start + 1, remove_mode=True)
 
   def update(self, iterable):
     ''' Update the `Range` to include the values from `iterable`.

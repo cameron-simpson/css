@@ -8,6 +8,7 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime
 from getopt import getopt, GetoptError
 from os.path import expanduser
@@ -43,17 +44,13 @@ class DLogCommand(BaseCommand):
 
   CATS_RE = re.compile('^[A-Z][A-Z0-9]*(,+[A-Z][A-Z0-9]*)*:$')
 
-  def apply_defaults(self):
-    ''' Set default options:
-        * empty `.categories`, a `set`
-        * empty `.tags`, a `TagSet`
-        * `.when` = `time.time()`
-    '''
-    self.options.categories = set()
-    self.options.dbpath = expanduser(DEFAULT_DBPATH)
-    self.options.logpath = expanduser(DEFAULT_LOGPATH)
-    self.options.tags = TagSet()
-    self.options.when = time.time()
+  @dataclass
+  class Options(BaseCommand.Options):
+    categories: set = field(default_factory=set)
+    dbpath: str = field(default_factory=lambda: expanduser(DEFAULT_DBPATH))
+    logpath: str = field(default_factory=lambda: expanduser(DEFAULT_LOGPATH))
+    tags: TagSet = field(default_factory=TagSet)
+    when: float = field(default_factory=time.time)
 
   @contextmanager
   def run_context(self):

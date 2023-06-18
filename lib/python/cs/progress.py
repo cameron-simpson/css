@@ -32,9 +32,9 @@ from cs.units import (
     TIME_SCALE,
     UNSCALED_SCALE,
 )
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230212-post'
+__version__ = '20230401-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -451,10 +451,12 @@ class BaseProgress(object):
       )
 
   # pylint: disable=too-many-arguments,too-many-branches,too-many-locals
+  @uses_upd
   def iterbar(
       self,
       it,
       label=None,
+      *,
       upd=None,
       proxy=None,
       itemlenfunc=None,
@@ -540,8 +542,6 @@ class BaseProgress(object):
       label = self.name
     delete_proxy = False
     if proxy is None:
-      if upd is None:
-        upd = Upd()
       proxy = upd.insert(1, update_period=update_period)
       delete_proxy = True
     else:
@@ -1047,9 +1047,11 @@ class OverProgress(BaseProgress):
     '''
     return self._overmax(lambda P: P.eta)
 
+@uses_upd
 def progressbar(
     it,
     label=None,
+    *,
     position=None,
     total=None,
     units_scale=UNSCALED_SCALE,

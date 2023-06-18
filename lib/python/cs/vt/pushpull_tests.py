@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Pushpull tests. - Cameron Simpson <cs@cskk.id.au> (formerly cs@zip.com.au) 18dec2015
 #

@@ -47,7 +47,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
 from cs.py.func import prop
 from cs.tagset import TagSet, Tag
-from cs.threads import locked_property, State as ThreadState
+from cs.threads import locked_property, ThreadState
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
@@ -137,8 +137,7 @@ class MP4Command(BaseCommand):
                 xit = 1
     return xit
 
-  @staticmethod
-  def cmd_deref(argv):
+  def cmd_deref(self, argv):
     ''' Dereference a Box specification against ISO14496 files.
     '''
     spec = argv.pop(0)
@@ -154,8 +153,7 @@ class MP4Command(BaseCommand):
           B = deref_box(over_box, path)
           print(path, "offset=%d" % B.offset, B)
 
-  @staticmethod
-  def cmd_extract(argv):
+  def cmd_extract(self, argv):
     ''' Usage: {cmd} extract [-H] filename boxref output
           Extract the referenced Box from the specified filename into output.
           -H  Skip the Box header.
@@ -208,8 +206,7 @@ class MP4Command(BaseCommand):
             need -= len(chunk)
       os.close(fd)
 
-  @staticmethod
-  def cmd_info(argv):
+  def cmd_info(self, argv):
     ''' Usage: {cmd} info [{{-|filename}}]...]
           Print informative report about each source.
     '''
@@ -234,8 +231,7 @@ class MP4Command(BaseCommand):
                 else:
                   print('   ', tag, repr(tag.value))
 
-  @staticmethod
-  def cmd_parse(argv):
+  def cmd_parse(self, argv):
     ''' Usage: {cmd} [parse [{{-|filename}}]...]
           Parse the named files (or stdin for "-").
     '''
@@ -2740,7 +2736,7 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
   fp.write('\n')
   boxes = getattr(B, 'boxes', None)
   body = getattr(B, 'body', None)
-  if body:
+  if body is not None:
     for field_name in sorted(filter(lambda name: not name.startswith('_'),
                                     body.__dict__.keys())):
       if field_name == 'boxes':

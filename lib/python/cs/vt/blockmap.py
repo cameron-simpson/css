@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python33
 #
 # Map block to leaves and offsets.
 # - Cameron Simpson <cs@cskk.id.au> 07feb2018
@@ -27,7 +27,7 @@ from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import with_upd_proxy, UpdProxy
 
-from . import defaults
+from . import uses_Store
 from .block import HashCodeBlock, IndirectBlock
 
 from cs.x import X
@@ -86,7 +86,7 @@ class MappedFD:
         original file to be closed by the caller.
     '''
     self.hashclass = hashclass
-    self.rec_size = OFF_STRUCT.size + hashclass.HASHLEN
+    self.rec_size = OFF_STRUCT.size + hashclass.hashlen
     if isinstance(f, str):
       with Pfx("open(%r)", f):
         fd = os.open(f, os.O_RDONLY)
@@ -154,7 +154,8 @@ class MappedFD:
       yield self.entry(i)
       i += 1
 
-  def entry(self, i):
+  @uses_Store
+  def entry(self, i, *, S):
     ''' Fetch the `MapEntry` at index `i`.
     '''
     i0 = i
@@ -173,7 +174,7 @@ class MappedFD:
         mapped[hash_offset:next_rec_offset]
     )
     if i == self.record_count - 1:
-      span = len(defaults.S[hashcode])
+      span = len(S[hashcode])
     else:
       next_hash_offset = next_rec_offset + OFF_STRUCT.size
       next_offset, = OFF_STRUCT.unpack(
@@ -208,7 +209,10 @@ class BlockMap(RunStateMixin):
   ''' A fast mapping of offsets to leaf block hashcodes.
   '''
 
-  def __init__(self, block, mapsize=None, blockmapdir=None, runstate=None):
+  @uses_Store
+  def __init__(
+      self, block, *, mapsize=None, blockmapdir=None, runstate=None, S
+  ):
     ''' Initialise the `BlockMap`, dispatch the index generator.
 
         Parameters:
@@ -226,7 +230,7 @@ class BlockMap(RunStateMixin):
       )
     # DEBUGGING
     if blockmapdir is None:
-      blockmapdir = defaults.S.blockmapdir
+      blockmapdir = S.blockmapdir
     if not isinstance(block, IndirectBlock):
       raise TypeError(
           "block needs to be an IndirectBlock, got a %s instead" %
@@ -246,7 +250,7 @@ class BlockMap(RunStateMixin):
         with Pfx("makedirs(%r)", mappath):
           os.makedirs(mappath)
     self.block = block
-    self.S = defaults.S
+    self.S = S
     nsubmaps = len(block) // mapsize + 1
     submaps = [None] * nsubmaps
     self.maps = submaps
@@ -268,7 +272,7 @@ class BlockMap(RunStateMixin):
       self.runstate.start()
       self._worker = bg_thread(
           self._load_maps,
-          args=(defaults.S,),
+          args=(S,),
           daemon=True,
           name="%s._load_maps" % (self,)
       )

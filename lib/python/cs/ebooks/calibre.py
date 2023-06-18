@@ -7,6 +7,7 @@
 
 from code import interact
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import filecmp
 from functools import total_ordering
@@ -16,6 +17,7 @@ import json
 import os
 from os.path import (
     basename,
+    dirname,
     exists as existspath,
     expanduser,
     isabs as isabspath,
@@ -52,6 +54,7 @@ from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
     get_dotted_identifier,
+    lc_,
     FormatableMixin,
     FormatAsError,
 )
@@ -61,14 +64,14 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
 )
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import UpdProxy, run_task, uses_upd, print  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
 from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 
@@ -381,16 +384,17 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
                 "no AZW3, AZW or MOBI format from which to construct a CBZ"
             )
 
+      @uses_runstate
       def pull(
           self,
           obook,
           *,
           doit=True,
           formats=None,
-          runstate=None,
           force=False,
           quiet=False,
           verbose=False,
+          runstate: RunState,
       ):
         ''' Pull formats from another `CalibreBook`.
 
@@ -399,7 +403,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             * `doit`: optional flag, default `True`;
               import formats if true, report actions otherwise
             * `formats`: optional list of Calibre format keys to pull if present
-            * `runstate`: optional `RunState` for early termination
             * `force`: optional flag, default `False`;
               if true import formats even if already present
             * `quiet`: optional flag, default `False`;
@@ -411,7 +414,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           formats = sorted(obook.formats.keys())
         with Pfx("%s <= %s", self, obook):
           for fmtk in formats:
-            if runstate and runstate.cancelled:
+            if runstate.cancelled:
               break
             ofmtpath = obook.formatpath(fmtk)
             if ofmtpath is None:
@@ -509,6 +512,16 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return CalibreMetadataDB(self)
 
+  @contextmanager
+  def db_session(self):
+    ''' Context manager for a database session.
+        This is not fired by `startup_shutdown` because any callout
+        to the Calibre command executables also want exclusive
+        access to the database.
+    '''
+    with self.db.session() as session:
+      yield session
+
   def dbshell(self):
     ''' Interactive db shell.
     '''
@@ -599,7 +612,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
     calargv = [calcmd, *calargv]
     cp = run(calargv, doit=doit, quiet=quiet, **subp_options)
-    if cp.stdout and not quiet:
+    if cp is not None and cp.stdout and not quiet:
       print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
     return cp
 
@@ -1036,41 +1049,39 @@ class CalibreCommand(BaseCommand):
       'EPUB': (['MOBI', 'AZW', 'AZW3'], ()),
   }
 
-  class OPTIONS_CLASS(BaseCommand.OPTIONS_CLASS):
+  @dataclass
+  class Options(BaseCommand.Options):
     ''' Special class for `self.options` with various properties.
     '''
 
-    def __init__(
-        self,
-        kindle_path=None,
-        calibre_path=None,
-        calibre_path_other=None,
-        linkto_dirpath=None,
-        **kw,
-    ):
-      super().__init__(**kw)
-      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-      try:
-        # pylint: disable=protected-access
-        kindle_path = KindleTree._resolve_fspath(kindle_path)
-      except ValueError:
-        kindle_path = None
-      try:
-        # pylint: disable=protected-access
-        calibre_path_other = CalibreTree._resolve_fspath(
-            calibre_path_other,
-            envvar=CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR
+    calibre_path: str = field(
+        default_factory=lambda: CalibreTree.
+        _resolve_fspath(None, CalibreTree.FSPATH_ENVVAR)
+    )
+    calibre_path_other: Optional[str] = field(
+        default_factory=lambda: (
+            CalibreTree.
+            _resolve_fspath(None, CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR)
+            if CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR in os.environ else None
         )
-      except ValueError:
-        calibre_path_other = None
-      self.kindle_path = kindle_path
-      self.calibre_path = calibre_path
-      self.calibre_path_other = calibre_path_other
-      self.linkto_dirpath = (
-          linkto_dirpath
-          or os.environ.get(CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR)
-          or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
+    )
+    dedrm_package_path: Optional[str] = field(
+        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+    )
+
+    def _default_kindle_path():
+      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
+      return (
+          KindleTree._resolve_fspath(None)
+          if KindleTree.FSPATH_ENVVAR in os.environ else None
       )
+
+    kindle_path: Optional[str] = field(default_factory=_default_kindle_path)
+    linkto_dirpath: str = field(
+        default_factory=lambda: os.environ.get(
+            CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR
+        ) or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
+    )
 
     @property
     def calibre(self):
@@ -1094,12 +1105,6 @@ class CalibreCommand(BaseCommand):
         raise AttributeError(".kindle: no .kindle_path")
       from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
       return KindleTree(self.kindle_path)
-
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    options = self.options
-    options.dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -1366,12 +1371,18 @@ class CalibreCommand(BaseCommand):
         with Pfx(cbook):
           fmttags = cbook.format_tagset()
           series_name = fmttags.get('series.name')
+          if series_name:
+            series_name = series_name.strip()
           name_format = link_format or (
               '{series.name:lc}--{series.index}--{title:lc}'
               if series_name else '{title:lc}'
           )
           name = (
               cbook.format_as(name_format).replace('_', '-').replace('/', ':')
+          )
+          name_subdir = (
+              lc_(series_name).replace('/', ':')
+              if series_name and not link_format else ''
           )
           for fmt in formats:
             if runstate.cancelled:
@@ -1380,16 +1391,21 @@ class CalibreCommand(BaseCommand):
             srcpath = cbook.formatpath(fmt)
             if srcpath is None:
               continue
-            dstpath = joinpath(linkto_dirpath, name + '.' + fmt.lower())
+            dstpath = joinpath(
+                linkto_dirpath, name_subdir, name + '.' + fmt.lower()
+            )
             if existspath(dstpath):
               if force:
                 warning("dst already exists, will be replaced: %s", dstpath)
+                (verbose or not doit) and print("unlink", shortpath(dstpath))
+                doit and pfx_call(os.unlink, dstpath)
               else:
                 ##warning("dst already exists, skipped: %s", dstpath)
                 continue
-            if existspath(dstpath):
-              (verbose or not doit) and print("unlink", shortpath(dstpath))
-              doit and pfx_call(os.unlink, dstpath)
+            dstdir = dirname(dstpath)
+            if not isdirpath(dstdir) and doit:
+              verbose and print("mkdir", shortpath(dstdir))
+              pfx_call(os.mkdir, dstdir)
             (quiet and doit
              ) or print("link", shortpath(srcpath), '=>', shortpath(dstpath))
             doit and pfx_call(os.link, srcpath, dstpath)
@@ -1431,69 +1447,70 @@ class CalibreCommand(BaseCommand):
     verbose = options.verbose
     upd = options.upd
     xit = 0
-    cbooks = []
-    if argv:
-      try:
-        cbooks = self.popbooks(
-            argv, sortkey=cbook_sort_key, reverse=options.sort_reverse
-        )
-      except ValueError as e:
-        raise GetoptError("invalid book specifiers: %s") from e
-    else:
-      with contextif(verbose, upd.run_task, "sort calibre contents"):
-        calibre.preload()
-        cbooks = sorted(
-            calibre, key=cbook_sort_key, reverse=options.sort_reverse
-        )
-    runstate = options.runstate
-    for cbook in cbooks:
+    with calibre.db_session():
+      cbooks = []
+      if argv:
+        try:
+          cbooks = self.popbooks(
+              argv, sortkey=cbook_sort_key, reverse=options.sort_reverse
+          )
+        except ValueError as e:
+          raise GetoptError("invalid book specifiers: %s") from e
+      else:
+        with contextif(verbose, upd.run_task, "sort calibre contents"):
+          calibre.preload()
+          cbooks = sorted(
+              calibre, key=cbook_sort_key, reverse=options.sort_reverse
+          )
+      runstate = options.runstate
+      for cbook in cbooks:
+        if runstate.cancelled:
+          break
+        with Pfx(cbook):
+          if ls_format is None:
+            top_row = []
+            series_name = cbook.series_name
+            if series_name:
+              top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
+            top_row.append(cbook.title)
+            author_names = cbook.author_names
+            if author_names:
+              top_row.extend(
+                  ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
+              )
+            top_row.append(f"({cbook.dbid})")
+            if not longmode:
+              top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
+              top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
+            print(*top_row)
+          else:
+            try:
+              output = cbook.format_as(ls_format, error_sep='\n  ')
+            except FormatAsError as e:
+              error(str(e))
+              xit = 1
+              continue
+            print(output)
+          if longmode:
+            print(" ", cbook.path)
+            tags = cbook.tags
+            if tags:
+              print("   ", ", ".join(sorted(tags)))
+            identifiers = cbook.identifiers
+            if identifiers:
+              print("   ", TagSet(identifiers))
+            for fmt, subpath in cbook.formats.items():
+              with Pfx(fmt):
+                fspath = cbook.pathto(subpath)
+                try:
+                  size = pfx_call(os.stat, fspath).st_size
+                except OSError as e:
+                  warning("cannot stat: %s", e)
+                else:
+                  print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
       if runstate.cancelled:
-        break
-      with Pfx(cbook):
-        if ls_format is None:
-          top_row = []
-          series_name = cbook.series_name
-          if series_name:
-            top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
-          top_row.append(cbook.title)
-          author_names = cbook.author_names
-          if author_names:
-            top_row.extend(
-                ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
-            )
-          top_row.append(f"({cbook.dbid})")
-          if not longmode:
-            top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
-            top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
-          print(*top_row)
-        else:
-          try:
-            output = cbook.format_as(ls_format, error_sep='\n  ')
-          except FormatAsError as e:
-            error(str(e))
-            xit = 1
-            continue
-          print(output)
-        if longmode:
-          print(" ", cbook.path)
-          tags = cbook.tags
-          if tags:
-            print("   ", ", ".join(sorted(tags)))
-          identifiers = cbook.identifiers
-          if identifiers:
-            print("   ", TagSet(identifiers))
-          for fmt, subpath in cbook.formats.items():
-            with Pfx(fmt):
-              fspath = cbook.pathto(subpath)
-              try:
-                size = pfx_call(os.stat, fspath).st_size
-              except OSError as e:
-                warning("cannot stat: %s", e)
-              else:
-                print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
-    if runstate.cancelled:
-      xit = 1
-    return xit
+        xit = 1
+      return xit
 
   def cmd_make_cbz(self, argv):
     ''' Usage: {cmd} book_specs...
@@ -1699,7 +1716,6 @@ class CalibreCommand(BaseCommand):
                   cbook, = cbooks
                 cbook.pull(
                     obook,
-                    runstate=runstate,
                     doit=doit,
                     force=force,
                     quiet=quiet,

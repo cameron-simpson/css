@@ -28,27 +28,26 @@ from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.upd import uses_upd
 
+__version__ = '20230217-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
+        "Development Status :: 3 - Alpha",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.cmdutils>=20210404',
         'cs.context',
         'cs.deco',
-        'cs.fileutils',
-        'cs.fs>=HasFSPath',
-        'cs.lex',
+        'cs.fstags',
         'cs.logutils',
         'cs.pfx',
         'cs.resources',
-        'cs.tagset>=TagSet_is_stale',
-        'cs.threads',
+        'cs.sqltags',
         'cs.upd',
         'icontract',
-        'typeguard',
+        'requests',
     ],
 }
 

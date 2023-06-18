@@ -19,7 +19,6 @@ files with other files of the same size, and is hardlink aware - a
 partially hardlinked tree is processed efficiently and correctly.
 '''
 
-from __future__ import print_function
 from collections import defaultdict
 from getopt import GetoptError
 from hashlib import sha1 as hashfunc
@@ -34,6 +33,7 @@ from cs.logutils import status, warning, error
 from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
+from cs.resources import RunState, uses_runstate
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import UpdProxy, Upd, print, run_task  # pylint: disable=redefined-builtin
 
@@ -45,7 +45,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -103,11 +102,12 @@ class MKLinksCmd(BaseCommand):
           return 1
         step("scan " + path + ' ...')
         with Pfx(path):
-          linker.scan(path, runstate=runstate)
+          linker.scan(path)
       if runstate.cancelled:
         return 1
       step("merge ...")
-      linker.merge(dry_run=options.dry_run, runstate=runstate)
+      linker.merge(dry_run=options.dry_run)
+    return 0
 
 class FileInfo(object):
   ''' Information about a particular inode.
@@ -192,7 +192,8 @@ class FileInfo(object):
     '''
     return self.key == other.key  # pylint: disable=comparison-with-callable
 
-  def assimilate(self, other, dry_run=False, runstate=None):
+  @uses_runstate
+  def assimilate(self, other, *, dry_run=False, runstate: RunState):
     ''' Link our primary path to all the paths from `other`. Return success.
     '''
     ok = True
@@ -212,7 +213,7 @@ class FileInfo(object):
           return ok
         assert self.same_dev(other)
         for opath in sorted(opaths):
-          if runstate and runstate.cancelled:
+          if runstate.cancelled:
             break
           with Pfx(opath):
             if opath in self.paths:
@@ -257,13 +258,14 @@ class Linker:
     self.min_size = min_size
 
   @pfx_method
-  def scan(self, path, runstate=None):
+  @uses_runstate
+  def scan(self, path, *, runstate: RunState):
     ''' Scan the file tree.
     '''
-    with run_task(f'scan {path}: ', runstate=runstate) as proxy:
+    with run_task(f'scan {path}: ') as proxy:
       if isdir(path):
         for dirpath, dirnames, filenames in os.walk(path):
-          if runstate and runstate.cancelled:
+          if runstate.cancelled:
             break
           proxy("sweep " + relpath(dirpath, path))
           for filename in progressbar(
@@ -300,20 +302,21 @@ class Linker:
         self.sizemap[S.st_size][key] = FI
 
   @pfx_method
-  def merge(self, dry_run=False, runstate=None):
+  @uses_runstate
+  def merge(self, *, dry_run=False, runstate: RunState):
     ''' Merge files with equivalent content.
     '''
     # process FileInfo groups by size, largest to smallest
-    with run_task(f'merge ... ') as proxy:
+    with run_task('merge ... ') as proxy:
       for _, FImap in sorted(self.sizemap.items(), reverse=True):
-        if runstate and runstate.cancelled:
+        if runstate.cancelled:
           break
         # order FileInfos by mtime (newest first) and then path
         FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
         size = FIs[0].size
         with proxy.extend_prefix(f'size {size} '):
           for i, FI in enumerate(progressbar(FIs, f'size {size}')):
-            if runstate and runstate.cancelled:
+            if runstate.cancelled:
               break
             # skip FileInfos with no paths
             # this happens when a FileInfo has been assimilated
@@ -321,7 +324,7 @@ class Linker:
               ##warning("SKIP, no paths")
               continue
             for FI2 in FIs[i + 1:]:
-              if runstate and runstate.cancelled:
+              if runstate.cancelled:
                 break
               status(FI2.path)
               assert FI.size == FI2.size
@@ -334,7 +337,7 @@ class Linker:
                 # different content, skip
                 continue
               # FI2 is the younger, keep it
-              FI.assimilate(FI2, dry_run=dry_run, runstate=runstate)
+              FI.assimilate(FI2, dry_run=dry_run)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

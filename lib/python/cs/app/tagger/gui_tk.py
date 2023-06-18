@@ -27,7 +27,7 @@ from cs.gui_tk import (
 )
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
-from cs.resources import RunState
+from cs.resources import RunState, uses_runstate
 from cs.tagset import Tag, TagSet
 
 from . import Tagger, uses_tagger
@@ -206,12 +206,11 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
                         fspath=self.fspaths[0] if self.fspaths else None):
           yield app
 
-  def run(self, runstate=None):
+  @uses_runstate
+  def run(self, runstate: RunState):
     ''' Run the GUI.
     '''
     print("run...")
-    if runstate is None:
-      runstate = RunState(str(self))
     with runstate:
       print("before mainloop")
       self.app.mainloop()

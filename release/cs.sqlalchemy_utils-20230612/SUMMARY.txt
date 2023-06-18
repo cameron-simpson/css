@@ -1,0 +1,3 @@
+Use cs.fileutils.lockfile context manager instead of makelockfile.
+Rename arranged_session to orchestrated_session.
+Some tweaks around connection closes, still edging towards a good work practice for easily doing short lived stuff (for cs.ebooks.calibre).
