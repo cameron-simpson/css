@@ -31,9 +31,9 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import fmtdoc
+from cs.deco import decorator, fmtdoc
 from cs.fileutils import atomic_filename
-from cs.lex import has_format_attributes, format_attribute, get_prefix_n
+from cs.lex import has_format_attributes, format_attribute, get_prefix_n, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
@@ -41,7 +41,7 @@ from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
-from cs.threads import monitor, bg as bg_thread
+from cs.threads import monitor, bg as bg_thread, ThreadState, HasThreadState
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
@@ -710,7 +710,7 @@ class PlayOnSQLTags(SQLTags):
 
 # pylint: disable=too-many-instance-attributes
 @monitor
-class PlayOnAPI(HTTPServiceAPI):
+class PlayOnAPI(HTTPServiceAPI, HasThreadState):
   ''' Access to the PlayOn API.
   '''
 
@@ -724,12 +724,52 @@ class PlayOnAPI(HTTPServiceAPI):
   CDS_HOSTNAME_LOCAL = 'cds-au.playonrecorder.com'
   CDS_BASE_LOCAL = f'https://{CDS_HOSTNAME_LOCAL}/api/v6/'
 
+  perthread_state = ThreadState(hostname=API_HOSTNAME, api_version=3)
+
   def __init__(self, login, password, sqltags=None):
     if sqltags is None:
       sqltags = PlayOnSQLTags()
     super().__init__(sqltags=sqltags)
     self._login = login
     self._password = password
+
+  @property
+  def hostname(self):
+    return self.perthread_state.hostname
+
+  @property
+  def api_version(self):
+    return self.perthread_state.api_version
+
+  @property
+  def API_BASE(self):
+    if self.hostname == self.API_HOSTNAME:
+      # no api subtree on the api host itself
+      return f'https://{self.hostname}/v{self.api_version}/'
+    return f'https://{self.hostname}/api/v{self.api_version}/'
+
+  @decorator
+  def api(func, *da):
+    with Pfx("api(func=%r,*da=%r)", func, da):
+      stack = {}
+      if da:
+        with Pfx('@%s(%s)', func.__name__, ','.join(map(str, da))):
+          for darg in da:
+            if isinstance(darg, str):
+              stack.update(hostname=darg)
+            elif isinstance(darg, int):
+              stack.update(api_version=darg)
+            else:
+              raise TypeError(
+                  "expected str (for hostname) or int (for api version), got: %s",
+                  r(darg)
+              )
+
+      def api_wrapper(self, *a, **kw):
+        with stackattrs(self.perthread_state, **stack):
+          return func(*a, **kw)
+
+      return api_wrapper
 
   @pfx_method
   def login(self):
@@ -853,16 +893,12 @@ class PlayOnAPI(HTTPServiceAPI):
     '''
     return self.suburl_data('notification')
 
+  @api(CDS_BASE)
   def cdsurl_data(self, suburl, _method='GET', headers=None, **kw):
-    ''' Wrapper for `suburl_data` using `CDS_BASE` as the base URL.
+    ''' Wrapper for `suburl_data` using `CDS_BASE` as the base URL host.
     '''
     return self.suburl_data(
-        suburl,
-        _base_url=self.CDS_BASE,
-        _method=_method,
-        headers=headers,
-        raw=True,
-        **kw
+        suburl, _method=_method, headers=headers, raw=True, **kw
     )
 
   @pfx_method
@@ -971,12 +1007,10 @@ class PlayOnAPI(HTTPServiceAPI):
         self, f'content/featured/{feature_name}/image', api_version=9
     )
 
+  @api(CDS_HOSTNAME, 9)
   def service_image_url(self, service_id, large=True):
     return self.suburl(
-        self,
-        f'content/{service_id}/image?size={"large" if large else "small"}',
-        _base_url=self.CDS_HOSTNAME,
-        api_version=9,
+        f'content/{service_id}/image?size={"large" if large else "small"}'
     )
 
   # pylint: disable=too-many-locals
@@ -1051,5 +1085,18 @@ class PlayOnAPI(HTTPServiceAPI):
     self.fstags[fullpath].update(recording.subtags('playon'), prefix='playon')
     return recording
 
+
+  @api(CDS_HOSTNAME_LOCAL, 1)
+  def search_suggestions(self, service_id: str, partial_search: str):
+    ''' Return a list of suggested searches from `partial_search`. '''
+    result = self.json(f'{service_id}/{partial_search}')
+    return result
+
+  @api(CDS_BASE_LOCAL, 9)
+  def search(self, service_id: str, search_term: str):
+    result = self.json(f'content/{service_id}/search/{search_term}')
+    result_id = result['ID']
+    results = self._entry_tagsets(result['Results'], 'content')
+    return results
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
