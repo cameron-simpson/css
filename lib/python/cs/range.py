@@ -367,13 +367,42 @@ class Range(object):
         yield span
 
   def issubset(self, other):
-    ''' Test that self is a subset of other.
+    ''' Test that `self` is a subset of `other`.
     '''
-    # TODO: handle other Ranges specially
-    for x in self:
-      if x not in other:
-        return False
-    return True
+    if isinstance(other, Range):
+      # ordered comparison of spans
+      ospans = iter(other._spans)
+      try:
+        ospan = next(ospans)
+      except Stopiteration:
+        ospan = None
+      for span in self._spans:
+        assert span.start < span.end
+        # skip early other spans
+        while ospan is not None and span.start >= ospan.end:
+          try:
+            ospan = next(ospans)
+          except StopIteration:
+            ospan = None
+        if ospan is None:
+          # no other span we can be in
+          return False
+        assert span.start < ospan.end
+        if span.start < ospan.start:
+          # we have elements before the other span
+          return False
+        if span.end > ospan.end:
+          # we have elements beyond the other span
+          return False
+        # we are completely contained in the other span
+        # proceed to the next span
+      return True
+    else:
+      # expensive iteration based comparison
+      for x in self:
+        if x not in other:
+          return False
+      return True
 
   __le__ = issubset
 
