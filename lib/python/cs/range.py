@@ -117,6 +117,7 @@ class Span(namedtuple('Span', 'start end')):
     ''' This `Span` as a 2 element `list`. '''
     return [self.start, self.end]
 
+# pylint: disable=too-many-public-methods,protected-access
 class Range(object):
   ''' A collection of `int`s that collates adjacent ints.
 
@@ -209,7 +210,7 @@ class Range(object):
         Raises TypeError or ValueError on failure.
     '''
     _spans = self._spans
-    if type(_spans) is not list:
+    if type(_spans) is not list:  # pylint: disable=unidiomatic-typecheck
       raise TypeError("._spans should be a list")
     ospan = None
     for span in _spans:
@@ -257,8 +258,7 @@ class Range(object):
     spans = self._spans
     if len(spans) > 0:
       return spans[0].start
-    else:
-      return 0
+    return 0
 
   @property
   def end(self):
@@ -268,8 +268,7 @@ class Range(object):
     spans = self._spans
     if len(spans) > 0:
       return spans[-1].end
-    else:
-      return 0
+    return 0
 
   def isempty(self):
     ''' Test if the Range is empty.
@@ -315,6 +314,7 @@ class Range(object):
       return False
     return True
 
+  # pylint: disable=unused-argument
   def span_position(self, start, end):
     ''' Somewhat like `bisect_left`, return indices `(i,j)`
         such that all spans with indices < `i`
@@ -377,7 +377,7 @@ class Range(object):
       ospans = iter(other._spans)
       try:
         ospan = next(ospans)
-      except Stopiteration:
+      except StopIteration:
         ospan = None
       for span in self._spans:
         assert span.start < span.end
@@ -400,12 +400,11 @@ class Range(object):
         # we are completely contained in the other span
         # proceed to the next span
       return True
-    else:
-      # expensive iteration based comparison
-      for x in self:
-        if x not in other:
-          return False
-      return True
+    # expensive iteration based comparison
+    for x in self:
+      if x not in other:
+        return False
+    return True
 
   __le__ = issubset
 
