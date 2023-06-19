@@ -407,9 +407,11 @@ class Range(object):
   __le__ = issubset
 
   def issuperset(self, other):
-    ''' Test that self is a superset of other.
+    ''' Test that `self` is a superset of `other`.
     '''
-    # TODO: handle ranges specially
+    if isinstance(other, Range):
+      return other.issubset(self)
+    # expensive iteration based comparison
     for x in other:
       if x not in self:
         return False
@@ -479,18 +481,14 @@ class Range(object):
         if drop_from is None:
           drop_from = i
         # split span on cropping range
-        low_span = Span(span.start, start)
-        high_span = Span(end, span.end)
+        low_span = Span(span.start, start) if span.start < start else None
+        high_span = Span(end, span.end) if end < span.end else None
         start = max(start, span.end)
         # keep non-empty subspans
-        if low_span.start < low_span.end:
+        if low_span is not None:
           insert_spans.append(low_span)
-        else:
-          pass
-        if high_span.start < high_span.end:
+        if high_span is not None:
           insert_spans.append(high_span)
-        else:
-          pass
       i += 1
 
     if remove_mode and start < end:
