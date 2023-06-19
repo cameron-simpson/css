@@ -81,6 +81,15 @@ class Span(namedtuple('Span', 'start end')):
   ''' A namedtuple with `.start` and `.end` attributes.
   '''
 
+  def __new__(cls, start, end):
+    if not isinstance(start, int):
+      raise TypeError("start:%r must be an int" % (start,))
+    if not isinstance(end, int):
+      raise TypeError("end:%r must be an int" % (end,))
+    if start > end:
+      raise ValueError("start:%d > end:%d" % (start, end))
+    return super().__new__(cls, start, end)
+
   def __str__(self):
     return "%d:%d" % (self.start, self.end)
 
