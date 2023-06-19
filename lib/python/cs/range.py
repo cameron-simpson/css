@@ -278,6 +278,17 @@ class Range(object):
 
         `x` may be another `Range`, a `Span`, or a single `int` or an iterable
         yielding a pair of `int`s.
+
+        Example:
+
+            >>> R = Range(4,7)
+            >>> R.add(11,15)
+            >>> (3,7) in R
+            False
+            >>> (4,7) in R
+            True
+            >>> (4,8) in R
+            False
     '''
     if isinstance(x, Range):
       return self.issuperset(x)
@@ -287,7 +298,7 @@ class Range(object):
     elif isinstance(x, int):
       start, end = x, x + 1
     else:
-      start, end = list(x)
+      start, end = x
     _spans = self._spans
     ndx = bisect_left(_spans, Span(start, start))
     if ndx > 0 and _spans[ndx - 1].end > start:
