@@ -7,9 +7,11 @@ ranges of int members.
 '''
 
 from __future__ import print_function
-import sys
+
 from bisect import bisect_left
 from collections import namedtuple
+import sys
+
 from cs.logutils import ifdebug
 from cs.seq import first
 
@@ -96,6 +98,7 @@ class Span(namedtuple('Span', 'start end')):
   __repr__ = __str__
 
   def __eq__(self, other):
+    # equal spans
     return self[0] == other[0] and self[1] == other[1]
 
   def __lt__(self, other):
