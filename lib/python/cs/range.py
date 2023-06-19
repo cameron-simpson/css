@@ -99,7 +99,7 @@ class Span(namedtuple('Span', 'start end')):
     return self[0] == other[0] and self[1] == other[1]
 
   def __lt__(self, other):
-    return self[0] < other[0] or (self[0] == other[0] and self[1] < other[1])
+    return self[0] < other[0]
 
   def __len__(self):
     return self.end - self.start
