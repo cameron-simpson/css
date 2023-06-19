@@ -15,7 +15,7 @@ import sys
 from cs.logutils import ifdebug
 from cs.seq import first
 
-__version__ = '20230619'
+__version__ = '20230619-post'
 
 DISTINFO = {
     'description':
