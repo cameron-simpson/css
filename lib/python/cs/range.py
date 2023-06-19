@@ -62,7 +62,7 @@ def spans(items):
     pass
   else:
     # trust the .spans() method
-    for span in item_spans:
+    for span in item_spans():
       yield Span(*span)
     return
 
