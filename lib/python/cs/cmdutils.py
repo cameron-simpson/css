@@ -1160,7 +1160,7 @@ class BaseCommand:
     # redundant try/finally to remind subclassers of correct structure
     try:
       options = self.options
-      assert not hasattr(options, 'runstate')
+      ##assert not hasattr(options, 'runstate')
       handle_signal = getattr(
           self, 'handle_signal', lambda *_: runstate.cancel()
       )
