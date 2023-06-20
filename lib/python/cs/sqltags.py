@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1388,7 +1388,7 @@ class SQLTagSet(SingletonMixin, TagSet):
         as described at the top of this class
         or (for unusual requirements) override this method and also `from_js_str`.
     '''
-    with Pfx("as_js_str(%r, %s:%r)", tag_name, type(tag_value).__name__,
+    with Pfx("to_js_str(%r, %s:%r)", tag_name, type(tag_value).__name__,
              tag_value):
       for typelabel, (type_, to_str, from_str) in cls.TYPE_JS_MAPPING.items():
         assert ':' not in typelabel, "bad typelabel %r: colons forbidden" % (
