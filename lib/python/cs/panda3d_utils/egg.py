@@ -361,7 +361,8 @@ class Eggable(metaclass=EggMetaClass):
 
   @classmethod
   @uses_registry
-  def promote(cls, obj, *, registry):
+  @typechecked
+  def promote(cls, obj, *, registry) -> "Eggable":
     ''' Promote `obj` to an instance of `cls`.
 
         Promotions:
@@ -370,6 +371,8 @@ class Eggable(metaclass=EggMetaClass):
     if not isinstance(obj, cls):
       if isinstance(obj, str):
         obj = cls.instance(obj, registry=registry)
+      elif hasattr(obj, 'EggNode'):
+        obj = obj.EggNode()
       else:
         raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
     return obj
