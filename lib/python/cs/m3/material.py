@@ -436,5 +436,5 @@ class Material:
           if runstate and runstate.cancelled:
             return None
           surface = self.Surface(skip_dim, c, texture=texture)
-          model.append(surface.EggNode())
+          model.append(surface)
     return model

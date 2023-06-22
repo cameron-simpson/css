@@ -371,8 +371,6 @@ class Eggable(metaclass=EggMetaClass):
     if not isinstance(obj, cls):
       if isinstance(obj, str):
         obj = cls.instance(obj, registry=registry)
-      elif hasattr(obj, 'EggNode'):
-        obj = obj.EggNode()
       else:
         raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
     return obj

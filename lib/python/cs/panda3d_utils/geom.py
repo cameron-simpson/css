@@ -55,7 +55,7 @@ class Surface:
 
   @promote
   @typechecked
-  def EggNode(
+  def as_Eggable(
       self,
       *transforms,
       rotate: Optional[Rotate] = None,

@@ -82,7 +82,7 @@ class P3DCommand(BaseCommand):
             material=material,
             ##texture=texture,
         )
-        model.append(surface.EggNode())
+        model.append(surface)
         model.append(
             PointLight(
                 "light0",

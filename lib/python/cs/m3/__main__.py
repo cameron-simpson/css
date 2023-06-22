@@ -80,9 +80,9 @@ class M3Command(BaseCommand):
     options = self.options
     model = options.model
     sol = sphere(xy * 8, 20, material=options.material)
-    model.append(sol.EggNode())
+    model.append(sol)
     terra = sphere(xy, 20, texture=options.texture)
-    tnode = terra.EggNode(translate=(100, 0, 0))
+    tnode = terra.as_Eggable(translate=(100, 0, 0))
     model.append(tnode)
 
   def cmd_pyramid(self, argv):
@@ -100,7 +100,7 @@ class M3Command(BaseCommand):
         ##material=options.material,
         texture=options.texture,
     )
-    model.append(surface.EggNode())
+    model.append(surface)
 
   def cmd_sphere(self, argv):
     xy_s, = argv
@@ -109,7 +109,7 @@ class M3Command(BaseCommand):
     model = options.model
     texture = options.texture
     surface = sphere(xy, 40, texture=texture)
-    model.append(surface.EggNode())
+    model.append(surface)
 
   def cmd_torus(self, argv):
     ''' Usage: {cmd} radius1 radius2'''
@@ -128,7 +128,7 @@ class M3Command(BaseCommand):
         material=material,
         ##texture=texture,
     )
-    model.append(surface.EggNode())
+    model.append(surface)
     model.append(
         PointLight(
             "light0",
