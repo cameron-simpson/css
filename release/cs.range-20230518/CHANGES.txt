@@ -1,0 +1,4 @@
+lib/python/cs/range.py: cs.range: Range._check_spans: Span.__len__ is now end-start, the following assignment is as good a test
+lib/python/cs/range.py: cs.range: Span,Range: new as_list() methods
+lib/python/cs/range.py: cs.range: autoformat, tweak shebang, comments, docstring
+lib/python/cs/range.py: cs.range: tweak docstring

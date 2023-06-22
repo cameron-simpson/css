@@ -1,0 +1,1 @@
+Honour $CS_DEBUG_BUILTINS envvar to monkey patch the builtins module, constraints via a white list.

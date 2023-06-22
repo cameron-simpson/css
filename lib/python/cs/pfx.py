@@ -57,7 +57,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20230331-post'
+__version__ = '20230604-post'
 
 DISTINFO = {
     'description':
@@ -693,7 +693,7 @@ def pfx_method(method, use_str=False, with_args=False):
                   ....
   '''
 
-  fname = method.__name__
+  fname = getattr(method, '__name__', repr(method))
 
   def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".

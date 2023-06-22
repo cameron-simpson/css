@@ -17,6 +17,7 @@ import json
 import os
 from os.path import (
     basename,
+    dirname,
     exists as existspath,
     expanduser,
     isabs as isabspath,
@@ -53,6 +54,7 @@ from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
     get_dotted_identifier,
+    lc_,
     FormatableMixin,
     FormatAsError,
 )
@@ -510,6 +512,16 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return CalibreMetadataDB(self)
 
+  @contextmanager
+  def db_session(self):
+    ''' Context manager for a database session.
+        This is not fired by `startup_shutdown` because any callout
+        to the Calibre command executables also want exclusive
+        access to the database.
+    '''
+    with self.db.session() as session:
+      yield session
+
   def dbshell(self):
     ''' Interactive db shell.
     '''
@@ -600,7 +612,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
     calargv = [calcmd, *calargv]
     cp = run(calargv, doit=doit, quiet=quiet, **subp_options)
-    if cp.stdout and not quiet:
+    if cp is not None and cp.stdout and not quiet:
       print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
     return cp
 
@@ -1046,7 +1058,7 @@ class CalibreCommand(BaseCommand):
         default_factory=lambda: CalibreTree.
         _resolve_fspath(None, CalibreTree.FSPATH_ENVVAR)
     )
-    other_calibre_path: Optional[str] = field(
+    calibre_path_other: Optional[str] = field(
         default_factory=lambda: (
             CalibreTree.
             _resolve_fspath(None, CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR)
@@ -1112,8 +1124,10 @@ class CalibreCommand(BaseCommand):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     with super().run_context():
-      with self.options.calibre:
-        yield
+      calibre = self.options.calibre
+      with calibre:
+        with calibre.db_session():
+          yield
 
   @staticmethod
   def books_from_spec(calibre, book_spec):
@@ -1359,12 +1373,18 @@ class CalibreCommand(BaseCommand):
         with Pfx(cbook):
           fmttags = cbook.format_tagset()
           series_name = fmttags.get('series.name')
+          if series_name:
+            series_name = series_name.strip()
           name_format = link_format or (
               '{series.name:lc}--{series.index}--{title:lc}'
               if series_name else '{title:lc}'
           )
           name = (
               cbook.format_as(name_format).replace('_', '-').replace('/', ':')
+          )
+          name_subdir = (
+              lc_(series_name).replace('/', ':')
+              if series_name and not link_format else ''
           )
           for fmt in formats:
             if runstate.cancelled:
@@ -1373,16 +1393,21 @@ class CalibreCommand(BaseCommand):
             srcpath = cbook.formatpath(fmt)
             if srcpath is None:
               continue
-            dstpath = joinpath(linkto_dirpath, name + '.' + fmt.lower())
+            dstpath = joinpath(
+                linkto_dirpath, name_subdir, name + '.' + fmt.lower()
+            )
             if existspath(dstpath):
               if force:
                 warning("dst already exists, will be replaced: %s", dstpath)
+                (verbose or not doit) and print("unlink", shortpath(dstpath))
+                doit and pfx_call(os.unlink, dstpath)
               else:
                 ##warning("dst already exists, skipped: %s", dstpath)
                 continue
-            if existspath(dstpath):
-              (verbose or not doit) and print("unlink", shortpath(dstpath))
-              doit and pfx_call(os.unlink, dstpath)
+            dstdir = dirname(dstpath)
+            if not isdirpath(dstdir) and doit:
+              verbose and print("mkdir", shortpath(dstdir))
+              pfx_call(os.mkdir, dstdir)
             (quiet and doit
              ) or print("link", shortpath(srcpath), '=>', shortpath(dstpath))
             doit and pfx_call(os.link, srcpath, dstpath)
