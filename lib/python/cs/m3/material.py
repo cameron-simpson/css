@@ -415,7 +415,7 @@ class Material:
     '''
     rgba = RGBA(1, 1, 1, 1)
     if model is None:
-      mode = Model(str(self))
+      model = Model(str(self))
     with model:
       model.append(texture)
       data = self.data
