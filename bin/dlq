@@ -10,6 +10,7 @@ dlog=${DLOG_QUICK:-"$LOGDIR/dlog-quick"}
 
 [ $# -gt 0 ] || {
   echo "$0: missing ag arguments" >&2
+  echo "Usage: $0 ag-aguments..." >&2
   exit 2
 }
 
