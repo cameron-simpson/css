@@ -10,5 +10,5 @@ word1=$1; shift
 
 if [ $# = 0 ]
 then  find "$HOME/v/" "$HOME/vv/" -iname "*${word1}*"
-else  find "$HOME/v/" "$HOME/vv/" -iname "*${word1}*" | ga "$@"
+else  find "$HOME/v/" "$HOME/vv/" -iname "*${word1}*" | grepall "$@"
 fi
