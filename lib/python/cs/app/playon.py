@@ -549,9 +549,10 @@ class Recording(SQLTagSet):
   @format_attribute
   def is_downloaded(self):
     ''' Test whether this recording has been downloaded
-        based on the presence of a `download_path` `Tag`.
+        based on the presence of a `download_path` `Tag`
+        or a true `downloaded` `Tag`.
     '''
-    return self.download_path is not None
+    return self.download_path is not None or 'downloaded' in self
 
   @format_attribute
   def is_pending(self):
