@@ -364,6 +364,27 @@ class PlayOnCommand(BaseCommand):
             recording.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
 
+  def cmd_downloaded(self, argv, locale='en_US'):
+    ''' Usage: {cmd} recordings...
+          Mark the specified recordings as downloaded and no longer pending.
+    '''
+    if not argv:
+      raise GetoptError("missing recordings")
+    sqltags = self.options.sqltags
+    xit = 0
+    for spec in argv:
+      with Pfx(spec):
+        recording_ids = sqltags.recording_ids_from_str(spec)
+        if not recording_ids:
+          warning("no recording ids")
+          xit = 1
+          continue
+        for dl_id in recording_ids:
+          with Pfx("%s", dl_id):
+            recording = sqltags[dl_id]
+            print(dl_id, '+ downloaded')
+            recording.add("downloaded")
+
   def cmd_feature(self, argv, locale='en_US'):
     ''' Usage: {cmd} [feature_id]
           List features.
