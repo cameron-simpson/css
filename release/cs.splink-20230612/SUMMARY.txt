@@ -1,0 +1,3 @@
+SPLinkCommand: new print_known_datasets method, use in help.
+SPLinkCommand.cmd_plot: if the start/stop times are out of order, swap them.
+Assorted internal changes.
