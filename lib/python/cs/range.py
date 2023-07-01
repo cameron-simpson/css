@@ -63,7 +63,7 @@ def spans(items):
   else:
     # trust the .spans() method
     for span in item_spans():
-      yield Span(*span)
+      yield span
     return
 
   # otherwise compute by examination
@@ -177,8 +177,7 @@ class Range(object):
   def spans(self):
     ''' Return an iterable of `Spans` covering the `Range`.
     '''
-    for span in self._spans:
-      yield Span(*span)
+    return iter(self._spans)
 
   @property
   def span0(self):
@@ -510,7 +509,7 @@ class Range(object):
       self.add_span(start, end)
     elif isinstance(start, Range):
       for span in start.spans():
-        self.add_span(*span)
+        self.add_span(span.start, span.end)
     else:
       self.add_span(start, start + 1)
 
@@ -521,7 +520,7 @@ class Range(object):
       self.discard_span(start, end)
     elif isinstance(start, Range):
       for span in start.spans():
-        self.discard_span(*span)
+        self.discard_span(span.start, span.end)
     else:
       self.discard_span(start, start + 1)
 
@@ -532,7 +531,7 @@ class Range(object):
       self.discard_span(start, end, remove_mode=True)
     elif isinstance(start, Range):
       for span in start.spans():
-        self.discard_span(*span, remove_mode=True)
+        self.discard_span(span.start, span.end, remove_mode=True)
     else:
       self.discard_span(start, start + 1, remove_mode=True)
 
