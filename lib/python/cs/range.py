@@ -177,7 +177,7 @@ class Range(object):
   def spans(self):
     ''' Return an iterable of `Spans` covering the `Range`.
     '''
-    return iter(self._spans)
+    return list(self._spans)
 
   @property
   def span0(self):
