@@ -1507,8 +1507,8 @@ class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
   # step time
   HEADER_LENGTH = 24
 
-  @typechecked
   @require(lambda typecode: typecode in 'dq')
+  @typechecked
   def __init__(
       self,
       *,
@@ -2304,8 +2304,8 @@ class TimespanPolicy(DBC, HasEpochMixin, Promotable):
     factory.name = name
 
   @abstractmethod
-  @typechecked
   @ensure(lambda when, result: result[0] <= when < result[1])
+  @typechecked
   def raw_edges(self, when: Numeric):
     ''' Return the _raw_ start and end UNIX times
         (inclusive and exclusive respectively)
@@ -2472,8 +2472,8 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
     a = arrow.get(span_name, self.PARTITION_FORMAT, tzinfo=self.tz)
     return self.span_for_time(a.timestamp())
 
-  @typechecked
   @ensure(lambda when, result: result[0] <= when < result[1])
+  @typechecked
   def raw_edges(self, when: Numeric):
     ''' Return the _raw_ start and end UNIX times
         (inclusive and exclusive respectively)
