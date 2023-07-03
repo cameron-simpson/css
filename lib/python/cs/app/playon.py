@@ -75,6 +75,7 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'icontract',
         'requests',
         'typeguard',
     ],
