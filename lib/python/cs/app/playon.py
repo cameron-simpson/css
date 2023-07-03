@@ -951,7 +951,6 @@ class PlayOnAPI(HTTPServiceAPI):
                     else:
                       entry[e_field] = value2
           te = self.sqltags[f'{type}.{entry_id}']
-          te = self.feature(entry_id)
           te.update(entry, prefix='playon')
           te.update(dict(last_updated=now))
           tes.add(te)
