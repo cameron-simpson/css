@@ -64,7 +64,6 @@ DISTINFO = {
         'cs.context',
         'cs.deco',
         'cs.fileutils>=atomic_filename',
-        'cs.fstags',
         'cs.lex',
         'cs.logutils',
         'cs.pfx>=pfx_call',
