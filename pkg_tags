@@ -89,7 +89,7 @@ cs.result pypi.release="20230331" ok_revision=cbe8b33c19196929af7d229a5209e95e41
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e75882d2 featu
-cs.service_api ok_revision=fbbe7b8237dbb31a966b54a2a5c7dafc703a3be4 pypi.release="20230217"
+cs.service_api ok_revision=fbbe7b8237dbb31a966b54a2a5c7dafc703a3be4 pypi.release="20230703"
 cs.sh
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.splink ok_revision="2393282fa18a5db40b6312125703e7501d81a7c9" pypi.release="20230612"
