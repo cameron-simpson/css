@@ -1,0 +1,5 @@
+PlayOnAPI: features, feature, featured_image_url, service_image_url.
+PlayOnCommand: new cmd_feature like cmd_service but for featured shows.
+PlayOnAPI.suburl: infer _base_url from api_version if _base_url is None and api_version is provided.
+Recording.is_downloaded: also check for a 'downloaded' tag, fallback for when the downloaded_path is empty.
+PlayOnCommand.cmd_downloaded: add 'downloaded" tag to specified recordings.
