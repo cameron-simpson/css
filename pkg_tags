@@ -20,7 +20,7 @@ cs.app.solar
 cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9082bc3"
 cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
 cs.app.tagger
-cs.app.ydl pypi.release="20220318" ok_revision=c3034b39089e541de85a33496e6cb57d48b0436f
+cs.app.ydl pypi.release="20220318" ok_revision="6c4e9e800dde94ed935a1b31a532f68cbe63adb8"
 cs.asynchron pypi.release=20160828
 cs.beyonwiz
 cs.binary pypi.release="20230401" ok_revision=c9e700f49c0990f7e181e35c3616179a376e86f3 features={"20230212":["BinaryMixin_load","BinaryMixin_save"]}
