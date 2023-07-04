@@ -45,7 +45,7 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20230703-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -64,7 +64,6 @@ DISTINFO = {
         'cs.context',
         'cs.deco',
         'cs.fileutils>=atomic_filename',
-        'cs.fstags',
         'cs.lex',
         'cs.logutils',
         'cs.pfx>=pfx_call',
@@ -76,6 +75,7 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'icontract',
         'requests',
         'typeguard',
     ],

@@ -45,7 +45,7 @@ from cs.resources import RunState, uses_runstate
 from cs.typingutils import subtype
 from cs.upd import Upd
 
-__version__ = '20230612-post'
+__version__ = '20230703-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1176,7 +1176,7 @@ class BaseCommand:
     # redundant try/finally to remind subclassers of correct structure
     try:
       options = self.options
-      assert not hasattr(options, 'runstate')
+      ##assert not hasattr(options, 'runstate')
       handle_signal = getattr(
           self, 'handle_signal', lambda *_: runstate.cancel()
       )
