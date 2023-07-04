@@ -167,7 +167,7 @@
             Run a command prompt via cmd.Cmd using this command's subcommands.
 '''
 
-__version__ = '20230110-post'
+__version__ = '20230704'
 
 DISTINFO = {
     'keywords': ["python3"],
