@@ -2,7 +2,6 @@
 
 ''' Utilities and command line for working with EBooks.
     Basic support for talking to Apple Books, Calibre, Kindle, Mobi.
-
     These form the basis of my personal Kindle and Calibre workflow.
 
     The command `python -m cs.ebooks help -l` gives the basic usage information:
