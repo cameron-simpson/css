@@ -13,7 +13,7 @@ cs.app.nodedb
 cs.app.osx.defaults
 cs.app.osx.plist ok_revision="0113b8892ffcd70e3896af568ff8005f433dd81e" pypi.release="20221228"
 cs.app.osx.release
-cs.app.playon ok_revision=c7399d77d116b05c74f8077c40dfe45f807aecbc pypi.release="20230703" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
+cs.app.playon ok_revision=c7399d77d116b05c74f8077c40dfe45f807aecbc pypi.release="20230705" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
 cs.app.plyon
 cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
 cs.app.solar
