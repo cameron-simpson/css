@@ -556,7 +556,6 @@ class Recording(SQLTagSet):
     return sep.join(parts) + sep
 
   @format_attribute
-  @trace
   def series_episode_name(self):
     name = self.playon.Name
     name = name.strip()
