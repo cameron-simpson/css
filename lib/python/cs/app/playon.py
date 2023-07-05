@@ -86,7 +86,7 @@ DBURL_DEFAULT = '~/var/playon.sqlite'
 
 FILENAME_FORMAT_ENVVAR = 'PLAYON_FILENAME_FORMAT'
 DEFAULT_FILENAME_FORMAT = (
-    '{series_prefix}{playon.Name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
+    '{series_prefix}{series_episode_name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
 # download parallelism
@@ -554,6 +554,29 @@ class Recording(SQLTagSet):
     if not parts:
       return ''
     return sep.join(parts) + sep
+
+  @format_attribute
+  @trace
+  def series_episode_name(self):
+    name = self.playon.Name
+    name = name.strip()
+    if self.playon.Season is not None:
+      spfx, n, offset = get_prefix_n(name, 's', n=self.playon.Season)
+      if spfx is not None:
+        assert name.startswith(f's{self.playon.Season:02d}')
+        name = name[offset:]
+    if self.playon.Episode is not None:
+      epfx, n, offset = get_prefix_n(name, 'e', n=self.playon.Episode)
+      if epfx is not None:
+        assert name.startswith(f'e{self.playon.Episode:02d}')
+        name = name[offset:]
+      name = name.lstrip()
+      epfx, n, offset = get_prefix_n(
+          name.lower(), 'episode ', n=self.playon.Episode
+      )
+      if epfx is not None:
+        name = name[offset:]
+    return name.strip()
 
   @format_attribute
   def is_available(self):
