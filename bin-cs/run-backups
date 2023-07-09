@@ -11,7 +11,7 @@
 
 set -ue
 
-quiet=
+quiet=1
 rsvopts=
 trace=
 doit=1
@@ -26,7 +26,8 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd [-n] [srcs...]
   -n    No action. Passed -n to rsync for the rsync backups,
         and suppresses the histbackup runs.
-  -q    Quiet.
+  -q    Quiet (default).
+  -v    Verbose (not quiet, also passed to rsync).
   -x    Trace execution.
   srcs...
         Backup source paths; if specified, only these paths will be backed up.
@@ -57,6 +58,7 @@ do
         ;;
     -n) doit= dont=echo ;;
     -q) quiet=1 rsvopts= trace= ;;
+    -v) quiet= rsvopts="$rsvopts -v" ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
