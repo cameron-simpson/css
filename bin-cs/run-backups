@@ -14,6 +14,7 @@ set -ue
 quiet=1
 rsvopts=
 trace=
+targets=
 doit=1
 dont=
 isatty=
@@ -29,6 +30,8 @@ usage="Usage: $cmd [-n] [srcs...]
   -q    Quiet (default).
   -v    Verbose (not quiet, also passed to rsync).
   -x    Trace execution.
+  @target,...
+        Optional comma separated list of target hosts to constrain backup targets.
   srcs...
         Backup source paths; if specified, only these paths will be backed up.
 
@@ -68,6 +71,16 @@ do
   esac
   shift
 done
+
+# optional @target,...
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    @*) targets=$( expr "$1" : '^@\(.*\)' | tr , ' ' )
+        shift
+        ;;
+  esac
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -113,6 +126,15 @@ do
       *)      dst=$( basename "$src" )
               ;;
     esac
+    if [ -n "$targets" ]
+    then
+      case " $targets " in
+        *" $dsthost "*) ;;
+        *)    [ $quiet ] || echo "$0: $backups:$lineno: skip dsthost=$dsthost, not in targets $targets" >&2
+              continue
+              ;;
+      esac
+    fi
     case "$dst" in
       /*)     ;;
       *)      case "$mode" in
