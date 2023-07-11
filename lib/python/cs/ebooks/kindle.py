@@ -64,7 +64,7 @@ def main(argv=None):
 
 KINDLE_LIBRARY_ENVVAR = 'KINDLE_LIBRARY'
 
-KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.kindle.Kindle'
+KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.amazon.Kindle'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING = 'User Settings.CONTENT_PATH'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
     '~/Library/Containers/com.amazon.Kindle/Data/Library/'
