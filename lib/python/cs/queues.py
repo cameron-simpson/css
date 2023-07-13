@@ -520,6 +520,12 @@ class ListQueue:
       self.queued.extend(queued)
     self._lock = Lock()
 
+  def __str__(self):
+    return "%s:%d[]" % (self.__class__.__name__, len(self))
+
+  def __repr__(self):
+    return "%s(%r)" % (self.__class__.__name__, self.queued)
+
   def get(self):
     ''' Get pops from the start of the list.
     '''
@@ -576,6 +582,9 @@ class ListQueue:
     '''
     with self._lock:
       return bool(self.queued)
+
+  def __len__(self):
+    return len(self.queued)
 
   def __iter__(self):
     ''' A `ListQueue` is iterable.
