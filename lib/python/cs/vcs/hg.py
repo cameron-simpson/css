@@ -8,7 +8,7 @@ from cs.pfx import Pfx
 from . import VCS, ReleaseLogEntry
 
 class VCS_Hg(VCS):
-  ''' Mercurial implementation of cs.vcs.VCS.
+  ''' Mercurial implementation of `cs.vcs.VCS`.
   '''
 
   COMMAND_NAME = 'hg'

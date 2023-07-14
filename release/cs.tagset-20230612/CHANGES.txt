@@ -1,0 +1,3 @@
+lib/python/cs/tagset.py: cs.tagset: TagFile.save_tagsets: catch and warn about exceptions from update_mapping[key].update, something is wrong with my SQLTags usage
+lib/python/cs/tagset.py: cs.tagset: TagFile.save_tagsets: update_mapping: do not swallow AttributeError, shorten warning for other exceptions
+lib/python/cs/tagset.py: cs.fstags,tagset,sqltags: put @typechecked after @require

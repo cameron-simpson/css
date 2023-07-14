@@ -41,7 +41,7 @@ import sys
 from subprocess import run
 from threading import RLock
 import time
-from typing import List, Optional
+from typing import List, Mapping, Optional, Sequence
 
 from icontract import ensure, require
 from sqlalchemy import (
@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -674,7 +674,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       )
     else:
       # general tag_name
-      sqlp = SQLTagProxy(orm, tag.self.tag_name).by_op_text(
+      sqlp = SQLTagProxy(orm, tag_name).by_op_text(
           self.comparison, tag_value, alias=alias
       )
     return sqlp
@@ -781,8 +781,8 @@ class PolyValueColumnMixin:
         structured_value=self.structured_value,
     )
 
-  @typechecked
   @require(lambda pv: pv.is_valid())
+  @typechecked
   def set_polyvalue(self, pv: PolyValue):
     ''' Set all the value fields.
     '''
@@ -1388,7 +1388,7 @@ class SQLTagSet(SingletonMixin, TagSet):
         as described at the top of this class
         or (for unusual requirements) override this method and also `from_js_str`.
     '''
-    with Pfx("as_js_str(%r, %s:%r)", tag_name, type(tag_value).__name__,
+    with Pfx("to_js_str(%r, %s:%r)", tag_name, type(tag_value).__name__,
              tag_value):
       for typelabel, (type_, to_str, from_str) in cls.TYPE_JS_MAPPING.items():
         assert ':' not in typelabel, "bad typelabel %r: colons forbidden" % (
@@ -1416,8 +1416,8 @@ class SQLTagSet(SingletonMixin, TagSet):
     return from_str(js_s)
 
   @classmethod
-  @typechecked
   @require(lambda pv: pv.is_valid())
+  @typechecked
   def from_polyvalue(cls, tag_name: str, pv: PolyValue):
     ''' Convert an SQL `PolyValue` to a tag value.
 
@@ -1442,8 +1442,40 @@ class SQLTagSet(SingletonMixin, TagSet):
     return js
 
   @classmethod
-  @typechecked
+  @pfx_method
+  def jsonable(cls, value):
+    ''' Convert `value` to a form which can be directly JSON serialised.
+
+        In particular this converts non-list/set/tuple Sequences to lists
+        and non-dict Mappings to dicts.
+
+        Warning: this is not robust against cycles.
+    '''
+    if value is None:
+      return None
+    if isinstance(value, (int, str, float)):
+      return value
+    # mapping?
+    if (isinstance(value, Mapping)
+        or hasattr(value, 'items') and callable(value.items)):
+      # mapping
+      return {
+          str(field): cls.jsonable(subvalue)
+          for field, subvalue in value.items()
+      }
+    if isinstance(value, (set, tuple, list, Sequence)):
+      return [cls.jsonable(subvalue) for subvalue in value]
+    try:
+      d = value._asdict()
+    except AttributeError:
+      pass
+    else:
+      return cls.jsonable(d)
+    raise TypeError('no JSONable value for %s:%r' % (type(value), value))
+
+  @classmethod
   @ensure(lambda result: result.is_valid())
+  @typechecked
   def to_polyvalue(cls, tag_name: str, tag_value) -> PolyValue:
     ''' Normalise `Tag` values for storage via SQL.
         Preserve things directly expressable in JSON.
@@ -1461,7 +1493,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     if isinstance(tag_value, str):
       return PolyValue(None, tag_value, None)
     if isinstance(tag_value, (list, tuple, dict)):
-      return PolyValue(None, None, tag_value)
+      return PolyValue(None, None, cls.jsonable(tag_value))
     # convert to a special string
     return PolyValue(None, None, cls.to_js_str(tag_name, tag_value))
 
@@ -1587,10 +1619,10 @@ class SQLTags(BaseTagSets, Promotable):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Empty stub startup/shutdown since we use autosessions.
-        Particularly, we do not want to keep SQLite dbs open.
+    ''' Open the ORM while the `SQLTags` is open.
     '''
-    yield self
+    with self.orm:
+      yield self
 
   @contextmanager
   def db_session(self, *, new=False):

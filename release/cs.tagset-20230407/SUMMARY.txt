@@ -1,0 +1,1 @@
+Move the (optional) ORM open/close from FSTags.startup_shutdown to TagFile.save, greatly shortens the ORM lock.

@@ -22,7 +22,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20221228-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'description':
@@ -520,6 +520,12 @@ class ListQueue:
       self.queued.extend(queued)
     self._lock = Lock()
 
+  def __str__(self):
+    return "%s:%d[]" % (self.__class__.__name__, len(self))
+
+  def __repr__(self):
+    return "%s(%r)" % (self.__class__.__name__, self.queued)
+
   def get(self):
     ''' Get pops from the start of the list.
     '''
@@ -576,6 +582,9 @@ class ListQueue:
     '''
     with self._lock:
       return bool(self.queued)
+
+  def __len__(self):
+    return len(self.queued)
 
   def __iter__(self):
     ''' A `ListQueue` is iterable.

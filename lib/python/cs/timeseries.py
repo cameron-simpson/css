@@ -92,7 +92,7 @@ from cs.csvutils import csv_import
 from cs.deco import cachedmethod, decorator, promote, Promotable
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
-from cs.fstags import FSTags
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning
 from cs.mappings import column_name_to_identifier
@@ -104,7 +104,7 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1004,7 +1004,7 @@ def plot_events(
 class PlotSeries(namedtuple('PlotSeries', 'label series extra'), Promotable):
   ''' Information about a series to be plotted:
       - `label`: the label for this series
-      - `series`: an series
+      - `series`: a `Series`
       - `extra`: a `dict` of extra information such as plot styling
   '''
 
@@ -1214,9 +1214,7 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin, Promotable):
 
   @classmethod
   def promote(cls, epochy):
-    ''' Promote `epochy` to an `Epoch` (except for `None`).
-
-        `None` remains `None`.
+    ''' Promote `epochy` to an `Epoch`.
 
         An `Epoch` remains unchanged.
 
@@ -1509,8 +1507,8 @@ class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
   # step time
   HEADER_LENGTH = 24
 
-  @typechecked
   @require(lambda typecode: typecode in 'dq')
+  @typechecked
   def __init__(
       self,
       *,
@@ -1647,6 +1645,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -1656,7 +1655,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       *,
       epoch: Optional[Epoch] = None,
       fill=None,
-      fstags=None,
+      fstags: FSTags,
   ):
     ''' Prepare a new time series stored in the file at `fspath`
         containing machine native data for the time series values.
@@ -1677,8 +1676,6 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           and `float('nan')` for `'d'`
     '''
     HasFSPath.__init__(self, fspath)
-    if fstags is None:
-      fstags = FSTags()
     self.fstags = fstags
     try:
       header, = TimeSeriesFileHeader.scan(self.fspath, max_count=1)
@@ -2250,9 +2247,8 @@ class TimespanPolicy(DBC, HasEpochMixin, Promotable):
   def from_name(
       cls, policy_name: str, epoch: Optional[Epoch] = None, **policy_kw
   ):
-    ''' Factory method to return a new `TimespanPolicy` instance
-        from the policy name,
-        which indexes `TimespanPolicy.FACTORIES`.
+    ''' Factory method to return a new `cls` instance from the policy name,
+        which indexes `cls.FACTORIES`.
     '''
     if cls is not TimespanPolicy:
       raise TypeError(
@@ -2284,7 +2280,7 @@ class TimespanPolicy(DBC, HasEpochMixin, Promotable):
       if epoch is None:
         raise ValueError("epoch may not be None if promotion is required")
       if isinstance(policy, str):
-        policy = TimespanPolicy.from_name(policy, epoch=epoch, **policy_kw)
+        policy = cls.from_name(policy, epoch=epoch, **policy_kw)
       elif isinstance(policy, type) and issubclass(policy, TimespanPolicy):
         policy = policy(epoch=epoch, **policy_kw)
       else:
@@ -2308,8 +2304,8 @@ class TimespanPolicy(DBC, HasEpochMixin, Promotable):
     factory.name = name
 
   @abstractmethod
-  @typechecked
   @ensure(lambda when, result: result[0] <= when < result[1])
+  @typechecked
   def raw_edges(self, when: Numeric):
     ''' Return the _raw_ start and end UNIX times
         (inclusive and exclusive respectively)
@@ -2476,8 +2472,8 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
     a = arrow.get(span_name, self.PARTITION_FORMAT, tzinfo=self.tz)
     return self.span_for_time(a.timestamp())
 
-  @typechecked
   @ensure(lambda when, result: result[0] <= when < result[1])
+  @typechecked
   def raw_edges(self, when: Numeric):
     ''' Return the _raw_ start and end UNIX times
         (inclusive and exclusive respectively)
@@ -2923,6 +2919,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -2932,12 +2929,10 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       epoch: Optional[Epoch] = None,
       policy=None,  # :TimespanPolicy
       tz: Optional[str] = None,
-      fstags: Optional[FSTags] = None,
+      fstags: FSTags,
   ):
     HasConfigIni.__init__(self, self.CONFIG_SECTION_NAME)
     HasFSPath.__init__(self, fspath)
-    if fstags is None:
-      fstags = FSTags()
     self.fstags = fstags
     config = self.config
     if not isdirpath(fspath):
@@ -3107,6 +3102,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       which dictates which partition holds the datum for a UNIX time.
   '''
 
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -3116,7 +3112,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       *,
       epoch: Optional[Epoch] = None,
       policy,  # :TimespanPolicy,
-      fstags: Optional[FSTags] = None,
+      fstags: FSTags,
   ):
     ''' Initialise the `TimeSeriesPartitioned` instance.
 
@@ -3148,8 +3144,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     policy = TimespanPolicy.promote(policy, epoch)
     HasFSPath.__init__(self, dirpath)
-    if fstags is None:
-      fstags = FSTags()
     if typecode is None:
       typecode = TypeCode(self.tags.typecode)
     policy = TimespanPolicy.promote(policy, epoch=epoch)
@@ -3162,7 +3156,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def __str__(self):
     return "%s(%s,%r,%s,%s)" % (
         type(self).__name__,
-        shortpath(self.fspath),
+        getattr(self, 'shortpath', 'NO_FSPATH'),
         getattr(self, 'typecode', 'NO_TYPECODE_YET'),
         getattr(self, 'epoch', 'NO_EPOCH_YET'),
         getattr(self, 'policy', 'NO_POLICY_YET'),

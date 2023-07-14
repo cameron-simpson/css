@@ -14,12 +14,12 @@ import os.path
 from os.path import dirname, realpath
 from subprocess import Popen
 import sys
+from threading import RLock
 import time
 from types import SimpleNamespace as NS
 from typing import Any, Optional
 
 from cs.cmdutils import BaseCommandOptions
-from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later

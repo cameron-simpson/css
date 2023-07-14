@@ -12,7 +12,9 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock, current_thread, main_thread
 import time
-from typing import Any, Tuple
+from typing import Any, Callable, Optional, Tuple
+
+from typeguard import typechecked
 
 from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
 from cs.deco import default_params
@@ -24,7 +26,7 @@ from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20230217-post'
+__version__ = '20230503-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -98,7 +100,7 @@ class _mom_state(object):
       if opens == 1:
         self.join_lock = Lock()
         self.join_lock.acquire()
-      self._teardown = setup_cmgr(self.mom.startup_shutdown())
+        self._teardown = setup_cmgr(self.mom.startup_shutdown())
       self.opened = True
     return opens
 
@@ -539,7 +541,12 @@ class RunState(HasThreadState):
   perthread_state = ThreadState()
 
   def __init__(
-      self, name=None, signals=None, handle_signal=None, verbose=False
+      self,
+      name=None,
+      signals=None,
+      handle_signal=None,
+      poll_cancel: Optional[Callable] = None,
+      verbose=False,
   ):
     self.name = name
     self.verbose = verbose
@@ -549,7 +556,8 @@ class RunState(HasThreadState):
     self._sighandler = handle_signal or self.handle_signal
     # core state
     self._running = False
-    self.cancelled = False
+    self._cancelled = False
+    self.poll_cancel = poll_cancel
     # timing state
     self.start_time = None
     self.stop_time = None
@@ -662,6 +670,24 @@ class RunState(HasThreadState):
   end = stop
 
   @property
+  def cancelled(self):
+    ''' Test the .cancelled attribute, including a poll if supplied.
+    '''
+    if self._cancelled:
+      return True
+    if self.poll_cancel:
+      if self.poll_cancel():
+        self._cancelled = True
+        return True
+    return False
+
+  @cancelled.setter
+  def cancelled(self, cancel_status):
+    ''' Set the .cancelled attribute.
+    '''
+    self._cancelled = cancel_status
+
+  @property
   def running(self):
     ''' Property expressing whether the task is running.
     '''
@@ -757,7 +783,10 @@ class RunState(HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
-uses_runstate = default_params(runstate=RunState)
+# use the prevailing RunState or make a fresh one
+uses_runstate = default_params(
+    runstate=lambda: RunState.default() or RunState()
+)
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
@@ -765,7 +794,7 @@ class RunStateMixin(object):
       Provides: `.runstate`, `.cancelled`, `.running`, `.stopping`, `.stopped`.
   '''
 
-  @uses_runstate
+  @typechecked
   def __init__(self, runstate: RunState):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
