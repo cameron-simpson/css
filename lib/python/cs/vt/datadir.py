@@ -361,6 +361,9 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     self._monitor_Thread = None
     self._WDFstate = None
     self._lock = RLock()
+    # a lock to surround record modifications
+    # used by the modify_entry(hashcode) method
+    self._modify_lock = Lock()
 
   def __repr__(self):
     return (
@@ -490,6 +493,22 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       self._data_progress.total += len(data)
       self._dataQ.put(data)
     return hashcode
+
+  @contextmanager
+  def modify_entry(self, hashcode):
+    ''' Context manager to obtain and yield the `FileDataIndexEntry` for `hashcode`
+        and resave it on return.
+
+        Example:
+
+            with index.modify_entry(hashcode) as entry:
+                entry.flags |= FileDataIndexEntry.INDIRECT_COMPLETE
+    '''
+    with self._modify_lock:
+      entry_bs = self.index[hashcode]
+      entry = FileDataIndexEntry.from_bytes(entry_bs)
+      yield entry
+      self.index[hashcode] = bytes(entry)
 
   def _process_data_queue(self, dataQ):
     wf = None
