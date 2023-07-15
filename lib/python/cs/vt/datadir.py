@@ -99,6 +99,8 @@ from .index import choose as choose_indexclass
 from .parsers import scanner_from_filename
 from .util import createpath, openfd_read
 
+pfx_listdir = partial(pfx_call, os.listdir)
+
 ##_sleep = sleep
 ##
 ##def sleep(t):
@@ -925,15 +927,14 @@ class DataDir(FilesDir):
         continue
       # scan for new datafiles
       with upd_proxy.extend_prefix(" check datafiles"):
-        with Pfx("listdir(%r)", datadirpath):
-          try:
-            listing = list(os.listdir(datadirpath))
-          except OSError as e:
-            if e.errno == errno.ENOENT:
-              error("listing failed: %s", e)
-              sleep(2)
-              continue
-            raise
+        try:
+          listing = pfx_listdir(datadirpath))
+        except OSError as e:
+          ##if e.errno == errno.ENOENT:
+          ##  error("listing failed: %s", e)
+          ##  sleep(2)
+          ##  continue
+          raise
         for filename in listing:
           if (not filename.startswith('.')
               and filename.endswith(DATAFILE_DOT_EXT)
