@@ -95,7 +95,7 @@ from .blockify import (
 from .datafile import DataRecord, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
 from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
-from .index import choose as choose_indexclass, FileDataIndexEntry
+from .index import choose as choose_indexclass
 from .parsers import scanner_from_filename
 from .util import createpath, openfd_read
 
@@ -114,6 +114,48 @@ DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
 # flush the index after this many updates in the index updater worker thread
 INDEX_FLUSH_RATE = 16384
+
+class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
+    'filenum': BSUInt,
+    'data_offset': BSUInt,
+    'data_length': BSUInt,
+    'flags': BSUInt,
+})):
+  ''' An index entry describing a data chunk in a `DataDir`.
+
+      This has the following attributes:
+      * `filenum`: the file number of the file containing the block
+      * `data_offset`: the offset within the file of the data chunk
+      * `data_length`: the length of the chunk
+      * `flags`: information about the chunk
+
+      These enable direct access to the raw data component.
+
+      The only defined flag at present is `FLAG_COMPRESSED`,
+      indicating that the raw data should be obtained
+      by uncompressing the chunk using `zlib.uncompress`.
+  '''
+
+  FLAG_COMPRESSED = 0x01
+
+  @property
+  def is_compressed(self):
+    ''' Whether the chunk data are compressed.
+    '''
+    return self.flags & self.FLAG_COMPRESSED
+
+  def fetch_fd(self, rfd):
+    ''' Fetch the decompressed data from an open binary file.
+    '''
+    bs = pread(rfd, self.data_length, self.data_offset)
+    if len(bs) != self.data_length:
+      raise RuntimeError(
+          "%s.fetch_fd: pread(fd=%s) returned %d bytes, expected %d" %
+          (self, rfd, len(bs), self.data_length)
+      )
+    if self.is_compressed:
+      bs = decompress(bs)
+    return bs
 
 class DataFileState(SimpleNamespace):
   ''' General state information about a data file
