@@ -88,8 +88,7 @@ ffprobe_output=$( ffprobe "$input" 2>&1 ) || {
   badopts=1
 }
 
-set -- -map 0 ${1+"$@"}
-
+set -- -c copy ${1+"$@"}
 skip_streams=$(
   printf '%s\n' "$ffprobe_output" \
   | sed -n 's/^[^#]*#\([0-9][0-9]*:[0-9][0-9]*\).*Subtitle: eia_608 .*/\1/p'
@@ -97,9 +96,9 @@ skip_streams=$(
 for stream in $skip_streams
 do
   echo "$cmd: omitting stream $stream, unhandled" >&2
-  set -- -map "-$stream" ${1+"$@"}
+  set -- -map "-$stream" "$@"
 done
-set -- -map 0 ${1+"$@"}
+set -- -map 0 "$@"
 
 set -x
 "$ffmpeg_exe" -i "$input" "$@" "$output" || exit $?
