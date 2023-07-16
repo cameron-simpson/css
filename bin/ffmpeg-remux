@@ -42,9 +42,9 @@ else
     case "$inputbase" in
       *.*)  inputext=$( expr "x$inputbase" : 'x.*\(\..*\)' )
             inputpfx=$( expr "x$inputbase" : 'x\(.*\)\..*' )
-            outputbase=$inputpfx-remuxed-$ts$inputext
+            outputbase=$inputpfx--remuxed-$ts$inputext
             ;;
-      *)    outputbase=$inputbase-remuxed-$ts
+      *)    outputbase=$inputbase--remuxed-$ts
             ;;
     esac
     if [ $# = 0 ]
