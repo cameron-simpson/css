@@ -16,6 +16,8 @@ usage="Usage: $cmd input [output [ffmpeg-options...]]
 
 badopts=
 
+ffmpeg_exe=${FFMPEG_EXE:-ffmpeg}
+
 if [ $# = 0 ]
 then
   echo "$cmd: missing input" >&2
@@ -100,6 +102,6 @@ done
 set -- -map 0 ${1+"$@"}
 
 set -x
-ffmpeg -i "$input" "$@" "$output" || exit $?
+"$ffmpeg_exe" -i "$input" "$@" "$output" || exit $?
 exec >&3 3>&-
 printf '%s\n' "$output"
