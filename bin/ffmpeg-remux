@@ -11,12 +11,15 @@ set -ue
 exec 3>&1 1>&2
 
 cmd=$0
-usage="Usage: $cmd input [output [ffmpeg-options...]]
+usage="Usage: $cmd [--replace] input [output [ffmpeg-options...]]
   Write the output filename to standard output."
 
 badopts=
 
+do_replace=
 ffmpeg_exe=${FFMPEG_EXE:-ffmpeg}
+
+[ $# -gt 0 ] && [ "x$1" = 'x--replace' ] && { do_replace=1; shift; }
 
 if [ $# = 0 ]
 then
@@ -102,5 +105,16 @@ set -- -map 0 "$@"
 
 set -x
 "$ffmpeg_exe" -i "$input" "$@" "$output" || exit $?
+fstags cptags "$input" "$output" || :
 exec >&3 3>&-
-printf '%s\n' "$output"
+
+if [ $do_replace ]
+then
+  if mv "$input" "$input--SAFE-$$"
+  then
+    mv "$output" "$input"
+    rm "$input--SAFE-$$"
+  fi
+else
+  printf '%s\n' "$output"
+fi
