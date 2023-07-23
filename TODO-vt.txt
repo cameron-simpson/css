@@ -1,3 +1,4 @@
+cs.vt.debug: DebuggingLock: compare with cs.debugDebuggingLock and merge
 is_complete for indirect blocks, cached in the index db - might mean supporting flags in the index entry instead of just the hash?
 cs.vt.debug: fold DebuggingLock into cs.debug with the other debugging locks
 replace defaults.config with Config.default(factory=True)
