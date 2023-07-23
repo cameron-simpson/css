@@ -82,7 +82,7 @@ from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.seq import imerge
-from cs.threads import locked, bg as bg_thread
+from cs.threads import locked, bg as bg_thread, joinif
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
 from cs.upd import with_upd_proxy, UpdProxy, uses_upd
 
@@ -453,12 +453,12 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                         yield
                       finally:
                         self.runstate.cancel()
-                        self._monitor_Thread.join()
+                        joinif(_monitor_Thread)
                         self.flush()
                         # drain the data queue
                         self._dataQ.close()
+                        joinif(_data_Thread)
                         self._dataQ = None
-                        self._data_Thread.join()
                       # update state to substrate
                       self._filemap.close()
                       # close the read file descriptors
