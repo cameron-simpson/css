@@ -437,10 +437,12 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                         self._process_data_queue,
                         name="%s._process_data_queue" % (self,),
                         args=(dataQ,),
+                        thread_states=(),
                     )
                     _monitor_Thread = bg_thread(
                         self._monitor_datafiles,
-                        name="%s-datafile-monitor" % (self,),
+                        name="%s._monitor_datafiles" % (self,),
+                        thread_states=(),
                     )
                     with stackattrs(
                         self,
