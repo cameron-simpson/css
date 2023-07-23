@@ -529,7 +529,15 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
         # assemble up to 64 chunks at a time
         data_batch = [data]
         while not dataQ.empty() and len(data_batch) < batch_size:
-          data_batch.append(next(dataQ))
+          try:
+            data = next(dataQ)
+          except StopIteration as e:
+            warning(
+                "unexpected StopIteration:%s from next(dataQ=%r)", e, dataQ
+            )
+            break
+          else:
+            data_batch.append(next(dataQ))
         yield data_batch
         data_batch = None
 
