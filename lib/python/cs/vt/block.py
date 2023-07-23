@@ -49,7 +49,7 @@ from cs.binary import (
     BinarySingleValue, BSUInt, BSData, flatten as flatten_transcription
 )
 from cs.buffer import CornuCopyBuffer
-from cs.lex import untexthexify, get_decimal_value
+from cs.lex import untexthexify, get_decimal_value, r
 from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
@@ -797,7 +797,7 @@ class IndirectBlock(_Block):
   def __init__(self, superblock, span=None):
     if superblock.indirect:
       raise ValueError(
-          "superblock may not be indirect: superblock=%s" % (superblock,)
+          "superblock may not be indirect: superblock=%s" % (r(superblock),)
       )
     super().__init__(BlockType.BT_INDIRECT, 0)
     self.indirect = True
