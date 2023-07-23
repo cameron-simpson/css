@@ -307,6 +307,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       rollover=None,
       flags=None,
       flags_prefix=None,
+      runstate=None,
   ):
     ''' Initialise the `DataDir` at `topdirpath`.
 
@@ -341,7 +342,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
         flags_prefix=flags_prefix
     )
     HasFSPath.__init__(self, topdirpath)
-    RunStateMixin.__init__(self)
+    RunStateMixin.__init__(self, runstate=runstate)
     MultiOpenMixin.__init__(self)
     FlaggedMixin.__init__(
         self, flags=resolved.flags, prefix=resolved.flags_prefix
