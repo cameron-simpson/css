@@ -60,6 +60,7 @@ class QueueIterator(MultiOpenMixin):
     )
     # count of non-sentinel items
     self._item_count = 0
+    self._lock = Lock()
 
   def __str__(self):
     return "%s(%r:q=%s)" % (type(self).__name__, self.name, self.q)
@@ -76,7 +77,8 @@ class QueueIterator(MultiOpenMixin):
       raise ClosedError("QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
-    self._item_count += 1
+    with self._lock:
+      self._item_count += 1
     return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
@@ -107,10 +109,7 @@ class QueueIterator(MultiOpenMixin):
     try:
       item = q.get()
     except Queue_Empty as e:
-      warning(
-          "%s: Queue_Empty: %s, (SHOULD THIS HAPPEN?) calling finalise...",
-          self, e
-      )
+      warning("%s: Queue_Empty: %s", self, e)
       self._put(self.sentinel)
       # pylint: disable=raise-missing-from
       raise StopIteration("Queue_Empty: %s" % (e,))
@@ -120,7 +119,8 @@ class QueueIterator(MultiOpenMixin):
       # put the sentinel back for other iterators
       self._put(self.sentinel)
       raise StopIteration("SENTINEL")
-    self._item_count -= 1
+    with self._lock:
+      self._item_count -= 1
     return item
 
   next = __next__
@@ -137,6 +137,7 @@ class QueueIterator(MultiOpenMixin):
   def empty(self):
     ''' Test if the queue is empty.
     '''
+    # testing the count because the "close" sentinel makes the underlying queue not empty
     return self._item_count == 0
 
   def task_done(self):
