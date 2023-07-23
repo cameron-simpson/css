@@ -237,7 +237,7 @@ class MultiOpenMixin(ContextManagerMixin):
     try:
       yield
     finally:
-      self.close(caller_frame=caller())
+      self.close()  ##caller_frame=caller())
 
   @contextmanager
   def startup_shutdown(self):
