@@ -930,20 +930,21 @@ class DataDir(FilesDir):
     '''
     index = self.index
     filemap = self._filemap
+    if filemap is None:
+      return
     datadirpath = self.datapath
-    while not self.cancelled:
+    while not self.cancelled and not self.closed:
       if self.flag_scan_disable:
         sleep(0.1)
         continue
       # scan for new datafiles
       with upd_proxy.extend_prefix(" check datafiles"):
         try:
-          listing = pfx_listdir(datadirpath))
+          listing = pfx_listdir(datadirpath)
         except OSError as e:
-          ##if e.errno == errno.ENOENT:
-          ##  error("listing failed: %s", e)
-          ##  sleep(2)
-          ##  continue
+          if e.errno == errno.ENOENT:
+            error("listing failed, exiting _monitor_datafiles loop: %s", e)
+            break
           raise
         for filename in listing:
           if (not filename.startswith('.')
@@ -953,7 +954,7 @@ class DataDir(FilesDir):
               info("MONITOR: add new filename %r", filename)
               filemap.add_path(filename)
       # now scan known datafiles for new data
-      for filenum in self._filemap.filenums():
+      for filenum in filemap.filenums():
         if self.cancelled or self.flag_scan_disable:
           break
         # don't monitor the current datafile: our own actions will update it
