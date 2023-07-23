@@ -7,6 +7,7 @@
 ''' Tests for Stores.
 '''
 
+from contextlib import contextmanager
 import errno
 from itertools import accumulate
 import os
@@ -23,6 +24,7 @@ from cs.debug import thread_dump, trace
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
+from cs.testutils import SetupTeardownMixin
 
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashCode, HASHCLASS_BY_NAME
@@ -255,7 +257,7 @@ def multitest(method):
 
   return testMethod
 
-class TestStore(unittest.TestCase, _TestAdditionsMixin):
+class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
   ''' Tests for Stores.
   '''
 
@@ -264,14 +266,14 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.S = None
     self.keys1 = None
 
-  def setUp(self):
+  @contextmanager
+  def setupTeardown(self):
     S = self.S
     if S is not None:
-      S.open()
-
-  def tearDown(self):
-    if self.S is not None:
-      self.S.close()
+      with S:
+        yield
+    else:
+      yield
     Ts = [T for T in threading.enumerate() if not T.daemon]
     if len(Ts) > 1:
       with open('/dev/tty', 'w') as tty:
