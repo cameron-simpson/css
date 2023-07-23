@@ -423,8 +423,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                 total=0,
                 units_scale=BINARY_BYTES_SCALE,
             )
-            with (upd.insert(1)
-                  if defaults.show_progress else nullcontext()) as data_proxy:
+            with upd.insert(1) as data_proxy:
               with upd.run_task(str(self) + " monitor ") as monitor_proxy:
                 with stackattrs(self, _monitor_proxy=monitor_proxy):
                   dataQ = IterableQueue(65536)
