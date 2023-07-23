@@ -459,12 +459,12 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                         self._dataQ.close()
                         joinif(_data_Thread)
                         self._dataQ = None
-                      # update state to substrate
-                      self._filemap.close()
-                      # close the read file descriptors
-                      for rfd in self._rfds.values():
-                        with Pfx("os.close(rfd:%d)", rfd):
-                          os.close(rfd)
+                        # update state to substrate
+                        self._filemap.close()
+                        # close the read file descriptors
+                        for rfd in self._rfds.values():
+                          with Pfx("os.close(rfd:%d)", rfd):
+                            os.close(rfd)
 
   @typechecked
   def new_datafile(self) -> DataFileState:
