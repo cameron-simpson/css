@@ -580,14 +580,6 @@ class BlockRecord(BinarySingleValue):
     block_bs = b''.join(flatten_transcription(transcription))
     return BSData(block_bs).transcribe()
 
-@lru_cache(maxsize=1024 * 1024, typed=True)
-def get_HashCodeBlock(hashcode):
-  ''' Caching constructor for HashCodeBlocks of known code.
-  '''
-  if hashcode is None:
-    raise ValueError("invalid hashcode, may not be None")
-  return HashCodeBlock(hashcode=hashcode)
-
 class HashCodeBlock(_Block):
   ''' A Block reference based on a Store hashcode.
   '''
@@ -773,7 +765,7 @@ def Block(*, hashcode=None, data=None, span=None, added=False):
   if data is None:
     if span is None:
       raise ValueError('data and span may not both be None')
-    B = get_HashCodeBlock(hashcode)
+    B = HashCodeBlock(hashcode=hashcode, span=span)
   else:
     if span is None:
       span = len(data)
@@ -825,7 +817,7 @@ class IndirectBlock(_Block):
         for its direct data and the `span` of bytes
         covers.
     '''
-    return cls(get_HashCodeBlock(hashcode), span=span)
+    return cls(HashCodeBlock(hashcode, span=span))
 
   @classmethod
   def from_subblocks(cls, subblocks, force=False):
