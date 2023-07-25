@@ -621,7 +621,7 @@ class HashCodeBlock(_Block):
               (hashcode, h, data)
           )
     self._data = data
-    self._span = None
+    self._span = span
     _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
 
@@ -698,7 +698,6 @@ class HashCodeBlock(_Block):
             "%s: tried to change .span from %s to %s" %
             (self, self._span, newspan)
         )
-      raise RuntimeError("SECOND UNEXPECTED")
 
   def datafrom(self, start=0, end=None):
     ''' Generator yielding data from `start:end`.
