@@ -844,6 +844,19 @@ class IndirectBlock(_Block):
     superblock = HashCodeBlock(data=superBdata)
     return cls(superblock, span=span)
 
+  @classmethod
+  def from_subblocks_data(cls, subblocks_data, force=False):
+    ''' Constructs an `IndirectBlock` from bytes encoding the
+        blockrefs of the subblocks.
+    '''
+    subblocks = cls.decode_subblocks(subblocks_data)
+    return cls.from_subblocks(subblocks, force=force)
+
+  @classmethod
+  def decode_subblocks(cls, subblocks_data: bytes):
+    ''' Return a tuple of Blocks decoded from the raw indirect block data. '''
+    return tuple(map(lambda BR: BR.block, BlockRecord.scan(subblocks_data)))
+
   @prop
   @locked
   def subblocks(self):
@@ -851,12 +864,7 @@ class IndirectBlock(_Block):
     '''
     blocks = self._subblocks
     if blocks is None:
-      blocks = self._subblocks = tuple(
-          map(
-              lambda BR: BR.block,
-              BlockRecord.scan(self.superblock.bufferfrom())
-          )
-      )
+      blocks = self._subblocks = self.decode_subblocks(self.superblock.data)
     return blocks
 
   def transcribe_inner(self, T, fp):
