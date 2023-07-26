@@ -534,7 +534,7 @@ class DataDirStore(MappingStore):
     return self._datadir.get_index_entry(hashcode)
 
   @contextmanager
-  def modify_index_entry(hashcode):
+  def modify_index_entry(self, hashcode):
     ''' Context manager to obtain and yield the `FileDataIndexEntry` for `hashcode`
         and resave it on return.
 
