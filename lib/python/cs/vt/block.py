@@ -937,6 +937,13 @@ class IndirectBlock(_Block):
               ok = False
     return ok
 
+  @uses_Store
+  def is_complete(self, S: Store):
+    ''' Check that the superblock and all the dependent blocks are
+        complete in the Store.
+    '''
+    return S.is_complete_indirect(self.hashcode)
+
 class RLEBlock(_Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes
       all of a specific value, typically NUL.
