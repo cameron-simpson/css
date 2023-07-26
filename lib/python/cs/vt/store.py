@@ -496,6 +496,7 @@ class DataDirStore(MappingStore):
         rollover=rollover
     )
     super().__init__(name, self._datadir, hashclass=hashclass, **kw)
+    self._modify_index_lock = Lock()
 
   @contextmanager
   def startup_shutdown(self):
@@ -519,6 +520,26 @@ class DataDirStore(MappingStore):
     ''' DataDirStore Archives are associated with the internal DataDir.
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
+
+  def get_index_entry(self, hashcode):
+    ''' Return the index entry for `hashcode`, or `None` if there
+        is no index or the index has no entry for `hashcode`.
+    '''
+    return self._datadir.get_index_entry(hashcode)
+
+  @contextmanager
+  def modify_index_entry(hashcode):
+    ''' Context manager to obtain and yield the `FileDataIndexEntry` for `hashcode`
+        and resave it on return.
+
+        Example:
+
+            with index.modify_entry(hashcode) as entry:
+                entry.flags |= FileDataIndexEntry.INDIRECT_COMPLETE
+    '''
+    with self._modify_index_lock:
+      with self._datadir.modify_index_entry(hashcode) as entry:
+        yield entry
 
 def PlatonicStore(name, topdirpath, *a, meta_store=None, hashclass=None, **kw):
   ''' Factory function for platonic Stores.
