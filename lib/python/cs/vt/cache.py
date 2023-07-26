@@ -92,7 +92,12 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     '''
     with super().startup_shutdown():
       workQ = IterableQueue()
-      worker = bg_thread(self._work, args=(workQ,), name="%s WORKER" % (self,))
+      worker = bg_thread(
+          self._work,
+          args=(workQ,),
+          name="%s WORKER" % (self,),
+          thread_states=(),
+      )
       with stackattrs(self, _workQ=workQ):
         try:
           yield
