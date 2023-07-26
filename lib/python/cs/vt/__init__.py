@@ -607,6 +607,35 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             data = item.data
             dstS.add_bg(data)
 
+
+  def get_index_entry(self, hashcode):
+    ''' Return the index entry for `hashcode`, or `None` if there
+        is no index or the index has no entry for `hashcode`.
+    '''
+    return None
+
+  @contextmanager
+  def modify_index_entry(self, hashcode):
+    ''' Context manager to obtain and yield the index record entry for `hashcode`
+        and resave it on return.
+
+        *Important Note*:
+        on Stores with no persistent index-with-flags
+        this yields `None` for the entry and updates nothing on return;
+        callers must recognise this.
+        This is the behaviour of this default implementation.
+
+        Stores with a persistent index such as `DataDirStore` have
+        functioning versions of this method which yield a non`None`
+        result.
+
+        Example:
+
+            with index.modify_entry(hashcode) as entry:
+                if entry is not None:
+                    entry.flags |= entry.INDIRECT_COMPLETE
+    '''
+    yield None
   @classmethod
   @fmtdoc
   def promote(cls, obj):
