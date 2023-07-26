@@ -549,7 +549,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
             )
             break
           else:
-            data_batch.append(next(dataQ))
+            data_batch.append(data)
         yield data_batch
         data_batch = None
 
