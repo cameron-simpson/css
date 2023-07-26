@@ -498,21 +498,33 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       self._dataQ.put(data)
     return hashcode
 
+  def get_index_entry(self, hashcode):
+    ''' Return the index entry for `hashcode`, or `None` if there
+        is no index or the index has no entry for `hashcode`.
+    '''
+    entry_bs = self.index.get(hashcode)
+    if entry_bs is None:
+      return None
+    entry = FileDataIndexEntry.from_bytes(entry_bs)
+    return entry
+
   @contextmanager
-  def modify_entry(self, hashcode):
+  def modify_index_entry(self, hashcode):
     ''' Context manager to obtain and yield the `FileDataIndexEntry` for `hashcode`
         and resave it on return.
 
         Example:
 
             with index.modify_entry(hashcode) as entry:
-                entry.flags |= FileDataIndexEntry.INDIRECT_COMPLETE
+                entry.flags |= entry.INDIRECT_COMPLETE
     '''
     with self._modify_lock:
       entry_bs = self.index[hashcode]
       entry = FileDataIndexEntry.from_bytes(entry_bs)
       yield entry
-      self.index[hashcode] = bytes(entry)
+      new_entry_bs = bytes(entry)
+      if new_entry_bs != entry_bs:
+        self.index[hashcode] = new_entry_bs
 
   def _process_data_queue(self, dataQ):
     wf = None
