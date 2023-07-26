@@ -99,7 +99,7 @@ def get_test_stores(prefix):
     ):
       for store_type in ALL_STORE_TYPES:
         if store_type.__name__ not in STORECLASS_NAMES:
-          X("SKIP %s:%s", hashclass_name, store_type.__name__)
+          ##X("SKIP %s:%s", hashclass_name, store_type.__name__)
           continue
         if store_type is MappingStore:
           with stackkeys(subtest, storetype=MappingStore):
@@ -139,7 +139,6 @@ def get_test_stores(prefix):
                   hashclass=hashclass
               )
         elif store_type is StreamStore:
-          X("StreamStore...")
           with stackkeys(subtest, storetype=StreamStore):
             for addif in False, True:
               with stackkeys(subtest, addif=addif):
@@ -156,7 +155,6 @@ def get_test_stores(prefix):
                     addif=addif,
                     hashclass=hashclass
                 )
-                X("remote_S = %s", remote_S)
                 S = StreamStore(
                     "S",
                     downstream_rd,
@@ -164,14 +162,9 @@ def get_test_stores(prefix):
                     addif=addif,
                     hashclass=hashclass
                 )
-                X("S = %s", S)
                 with local_store:
                   with remote_S:
-                    X("yield subtest %s, S=%s", subtest, S)
-                    X("YIELD BEFORE TEST *************************")
                     yield subtest, S
-                    X("AFTER YIELD TEST *************************")
-          X("post StreamStore")
         elif store_type is TCPClientStore:
           with stackkeys(subtest, storetype=TCPClientStore):
             for addif in False, True:
