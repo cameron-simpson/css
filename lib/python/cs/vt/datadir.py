@@ -519,12 +519,16 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                 entry.flags |= entry.INDIRECT_COMPLETE
     '''
     with self._modify_lock:
-      entry_bs = self.index[hashcode]
-      entry = FileDataIndexEntry.from_bytes(entry_bs)
-      yield entry
-      new_entry_bs = bytes(entry)
-      if new_entry_bs != entry_bs:
-        self.index[hashcode] = new_entry_bs
+      try:
+        entry_bs = self.index[hashcode]
+      except KeyError:
+        yield None
+      else:
+        entry = FileDataIndexEntry.from_bytes(entry_bs)
+        yield entry
+        new_entry_bs = bytes(entry)
+        if new_entry_bs != entry_bs:
+          self.index[hashcode] = new_entry_bs
 
   def _process_data_queue(self, dataQ):
     wf = None
