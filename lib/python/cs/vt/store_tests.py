@@ -511,6 +511,68 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
           self.assertIn(h, M2)
           KS2.add(h)
 
+  @multitest
+  def test_get_index_entry(self):
+    ''' Test `get_index_entry`
+    '''
+    S = self.S
+    for _ in range(16):
+      data = make_randblock(rand0(8193))
+      h = S.hash(data)
+      self.assertIsNone(S.get_index_entry(h))
+      h2 = S.add(data)
+      self.assertEqual(h, h2)
+      entry = S.get_index_entry(h)
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+      else:
+        self.assertIsNone(entry)
+
+  @multitest
+  def test_is_complete_indirect(self):
+    S = self.S
+    data1 = make_randblock(rand0(8193))
+    data2 = make_randblock(rand0(8193))
+    h1 = S.add(data1)
+    B1 = Block(hashcode=h1, span=len(data1))
+    self.assertEqual(len(B1), len(data1))
+    h2 = S.hash(data2)
+    B2 = Block(hashcode=h2, span=len(data2))
+    self.assertEqual(len(B2), len(data2))
+    IB = IndirectBlock.from_subblocks((B1, B2))
+    self.assertIn(h1, S)
+    with S.modify_index_entry(h1) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertFalse(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+    self.assertNotIn(h2, S)
+    with S.modify_index_entry(h2) as entry:
+      self.assertIsNone(entry)
+    ih = IB.hashcode
+    with S.modify_index_entry(ih) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertFalse(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+    self.assertFalse(S.is_complete_indirect(ih))
+    with S.modify_index_entry(ih) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertFalse(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+    S.add(data2)
+    self.assertTrue(S.is_complete_indirect(ih))
+    with S.modify_index_entry(ih) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertTrue(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+
 def selftest(argv):
   ''' Run the unit tests.
   '''
