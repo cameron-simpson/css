@@ -262,6 +262,7 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
   @contextmanager
   def setupTeardown(self):
     S = self.S
+    self.supports_index_entry = type(self.S) in (DataDirStore,)
     if S is not None:
       with S:
         yield
