@@ -36,12 +36,18 @@ from cs.result import report, bg as bg_result
 from cs.seq import Seq
 from cs.threads import bg as bg_thread, HasThreadState, ThreadState
 
-from . import defaults, Lock, RLock, VT_STORE_ENVVAR, VT_STORE_DEFAULT
-from .datadir import DataDir, RawDataDir, PlatonicDir
-from .hash import (
-    HashCode, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin,
-    MissingHashcodeError
+from . import (
+    Store,
+    Lock,
+    RLock,
+    StoreAsyncBase,
+    StoreSyncBase,
 )
+from .backingfile import BackingFileIndexEntry, BinaryHashCodeIndex, CompressibleBackingFile
+from .cache import FileDataMappingProxy, MemoryCacheMapping
+from .datadir import DataDir, RawDataDir, PlatonicDir
+from .hash import DEFAULT_HASHCLASS
+from .index import choose as choose_indexclass
 
 class StoreError(Exception):
   ''' Raised by Store operation failures.
@@ -807,7 +813,7 @@ class ProgressStore(StoreSyncBase):
     ''' Open the subStore.
     '''
     with self.S:  # open the substore
-      with defaults(S=self):  # but make the default Store be self
+      with self:
         yield
 
   def add(self, data):
