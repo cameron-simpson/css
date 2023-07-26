@@ -852,19 +852,6 @@ class ProgressStore(StoreSyncBase):
     self.progress_get.position += len(data)
     return data
 
-  def get_bg(self, data):
-    ''' Advance the progress_add total, and the position on completion.
-    '''
-    LF = self.S.add_bg(data)
-
-    def notifier(LF):
-      data, exc = LF.join()
-      if exc is None:
-        self.progress_get.position += len(data)
-
-    LF.notify(notifier)
-    return LF
-
   def contains(self, h):
     return self.S.contains(h)
 
