@@ -607,15 +607,15 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             data = item.data
             dstS.add_bg(data)
 
-  def is_complete_indirect(self, h):
-    ''' Check whether `h`, the hashcode of an indirect Block,
+  def is_complete_indirect(self, ih):
+    ''' Check whether `ih`, the hashcode of an indirect Block,
         has its data and all its implied data present in this Store.
     '''
-    entry = self.get_index_entry(h)
+    entry = self.get_index_entry(ih)
     if entry is not None and (entry.flags & entry.INDIRECT_COMPLETE):
       # marked as complete, no need to examine the contents
       return True
-    subblocks_data = self.get(h)
+    subblocks_data = self.get(ih)
     if subblocks_data is None:
       # missing hash, incomplete
       return False
@@ -635,8 +635,8 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         return False
     # ensure the index entry gets marked as complete
     if entry is not None:
-      with self.modify_index_entry(h) as entry:
-        entry.flags |= entry.INDIRECT_COMPLETE
+      with self.modify_index_entry(ih) as entry2:
+        entry2.flags |= entry2.INDIRECT_COMPLETE
     return True
 
   def get_index_entry(self, hashcode):
