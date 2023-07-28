@@ -42,8 +42,10 @@ from collections import namedtuple
 from collections.abc import Mapping
 from contextlib import contextmanager
 import errno
+from functools import partial
 import os
 from os import (
+    pread,
     SEEK_SET,
     SEEK_CUR,
     SEEK_END,
@@ -58,11 +60,13 @@ import sys
 from time import time, sleep
 from types import SimpleNamespace
 from uuid import uuid4
+from zlib import decompress
 
 from icontract import require
 from typeguard import typechecked
 
 from cs.app.flag import DummyFlags, FlaggedMixin
+from cs.binary import BinaryMultiValue, BSUInt
 from cs.buffer import CornuCopyBuffer
 from cs.cache import LRU_Cache
 from cs.context import nullcontext, stackattrs
@@ -379,6 +383,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
 
   @property
   def datapath(self):
+    ''' The pathname of the data subdirectory. '''
     return self.pathto('data')
 
   def datapathto(self, rpath):
@@ -581,7 +586,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
           if wf is None:
             DFstate = self.new_datafile()
             filenum = DFstate.filenum
-            wf = open(DFstate.pathname, 'ab')
+            wf = open(DFstate.pathname, 'ab')  # pylint: disable=consider-using-with
             self._WDFstate = DFstate
           bs, data_offset, data_length, flags = self.data_save_information(
               data
