@@ -59,14 +59,21 @@ STORECLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__STORECLASS_NAMES'
 
 # constrain the tests if not empty, try every permutation if empty
 HASHCLASS_NAMES = tuple(
-    os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split()
+    list(filter(None,
+                os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split(' ,')))
     or sorted(HashCode.by_name.keys())
 )
 INDEXCLASS_NAMES = tuple(
-    os.environ.get(INDEXCLASS_NAMES_ENVVAR, '').split() or get_index_names()
+    list(
+        filter(None,
+               os.environ.get(INDEXCLASS_NAMES_ENVVAR, '').split(' ,'))
+    ) or get_index_names()
 )
 STORECLASS_NAMES = tuple(
-    os.environ.get(STORECLASS_NAMES_ENVVAR, '').split() or (
+    list(
+        filter(None,
+               os.environ.get(STORECLASS_NAMES_ENVVAR, '').split(' ,'))
+    ) or (
         'MappingStore', 'MemoryCacheStore', 'DataDirStore', 'FileCacheStore',
         'StreamStore', 'TCPClientStore', 'UNIXSocketClientStore', 'ProxyStore'
     )
