@@ -7,40 +7,27 @@
 ''' Various Store classes.
 '''
 
-from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
+from os.path import isfile as isfilepath, splitext
 import sys
-from threading import Semaphore, Thread
-from typing import Tuple
 
 from icontract import require
-from typeguard import typechecked
 
-from cs.context import stackattrs
 from cs.deco import fmtdoc
-from cs.excutils import logexc
-from cs.later import Later
-from cs.lex import r
 from cs.logutils import warning, error, info
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
-from cs.py.func import prop
-from cs.queues import Channel, IterableQueue, QueueIterator
-from cs.resources import (
-    MultiOpenMixin, openif, RunStateMixin, RunState, uses_runstate
-)
-from cs.result import report, bg as bg_result
-from cs.seq import Seq
-from cs.threads import bg as bg_thread, HasThreadState, ThreadState
+from cs.queues import Channel, IterableQueue
+from cs.resources import openif
+from cs.result import Result, report
+from cs.threads import bg as bg_thread
 
 from . import (
     Store,
     Lock,
     RLock,
-    StoreAsyncBase,
     StoreSyncBase,
 )
 from .backingfile import BackingFileIndexEntry, BinaryHashCodeIndex, CompressibleBackingFile
