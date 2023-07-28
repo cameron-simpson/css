@@ -247,6 +247,7 @@ def multitest(method):
                                      for k, v in sorted(subtest.items())])):
         with self.subTest(test_store=S, **subtest):
           self.S = S
+          self.supports_index_entry = type(self.S) in (DataDirStore,)
           self.hashclass = subtest['hashclass']
           S.init()
           with S:
