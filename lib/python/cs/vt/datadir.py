@@ -133,12 +133,15 @@ class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
 
       These enable direct access to the raw data component.
 
-      The only defined flag at present is `FLAG_COMPRESSED`,
-      indicating that the raw data should be obtained
-      by uncompressing the chunk using `zlib.uncompress`.
+      The following flags are defined:
+      * `FLAG_COMPRESSED`: the raw data should be obtained
+        by uncompressing the chunk using `zlib.uncompress`.
+      * `INDIRECT_COMPLETE`: the `IndirectBlock` with this hashcode
+        is known to have all its data blocks in the Store
   '''
 
   FLAG_COMPRESSED = 0x01
+  INDIRECT_COMPLETE = 0x02
 
   @property
   def is_compressed(self):
