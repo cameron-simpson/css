@@ -104,6 +104,13 @@ class HasThreadState(ContextManagerMixin):
       the state attribute which allows perclass state attributes,
       and also use with classes which already use `.perthread_state` for
       another purpose.
+
+      *NOTE*: `HasThreadState.Thread` is a _class_ method whose default
+      is to push state for all active `HasThreadState` subclasses.
+      Contrast with `HasThreadState.bg` which is an _instance_method
+      whose default is to push state for just that instance.
+      The top level `cs.threads.bg` function calls `HasThreadState.Thread`
+      to obtain its `Thread`.
   '''
 
   _HasThreadState_lock = Lock()
@@ -221,8 +228,7 @@ class HasThreadState(ContextManagerMixin):
 
   @classmethod
   def Thread(cls, *Thread_a, target, thread_states=None, **Thread_kw):
-    ''' Factory for a `Thread` to push the `.current` state for the
-        currently active classes.
+    ''' Class factory for a `Thread` to push the `.current` state for this class.
 
         The optional parameter `thread_states`
         may be used to pass an explicit mapping of `type`->`instance`
@@ -261,14 +267,13 @@ class HasThreadState(ContextManagerMixin):
 
     return builtin_Thread(*Thread_a, target=target_wrapper, **Thread_kw)
 
-  @classmethod
-  def bg(cls, *Thread_a, target, thread_states=None, **Thread_kw):
-    ''' Get a `Thread` using `cls.Thread` and start it.
+  def bg(self, func, *bg_a, thread_states=None, **bg_kw):
+    ''' Get a `Thread` using `self.Thread` and start it.
         Return the `Thread`.
 
-        Note: the default `thread_states` does a `with current:`
-        for this class' `current` instance (if any) so that the
-        `Thread` holds it open until completed.
+        Note: the default `thread_states` is `{type(self): self}`
+        in order to arranges a `with self:` so that the `Thread`
+        holds it open until completed.
         For some worker threads such as `MultiOpenMixin`s consuming
         a queue of tasks this may be undesirable if the instance
         shutdown phase includes a close-and-drain for the queue -
@@ -276,9 +281,12 @@ class HasThreadState(ContextManagerMixin):
         phase never arrives.
         In this case, pass `thread_states=False` to this call.
     '''
-    T = cls.Thread(*Thread_a, target, thread_states=thread_states, **Thread_kw)
-    T.start()
-    return T
+    cls = type(self)
+    if thread_states is None:
+      thread_states = {cls: self}
+    return bg(
+        func, *bg_a, thread_states=thread_states, thread_class=cls, **bg_kw
+    )
 
 # pylint: disable=too-many-arguments
 def bg(
@@ -287,9 +295,10 @@ def bg(
     name=None,
     no_start=False,
     no_logexc=False,
+    thread_class=None,
     thread_states=None,
     args=None,
-    kwargs=None
+    kwargs=None,
 ):
   ''' Dispatch the callable `func` in its own `Thread`;
       return the `Thread`.
@@ -302,7 +311,8 @@ def bg(
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
-      * `thread_states`: passed to `HasThreadState.Thread`
+      * `thread_class`: the `Thread` factory, default `HasThreadState.Thread`
+      * `thread_states`: passed tothe  `thread_class` factory
       * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
@@ -311,6 +321,8 @@ def bg(
     args = ()
   if kwargs is None:
     kwargs = {}
+  if thread_class is None:
+    thread_class = HasThreadState.Thread
 
   ##thread_prefix = prefix() + ': ' + name
   thread_prefix = name
@@ -319,7 +331,7 @@ def bg(
     with Pfx(thread_prefix):
       return func(*args, **kwargs)
 
-  T = HasThreadState.Thread(
+  T = thread_class(
       name=thread_prefix,
       target=thread_body,
       thread_states=thread_states,
