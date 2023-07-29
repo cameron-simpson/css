@@ -525,13 +525,17 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     ''' Test `get_index_entry`
     '''
     S = self.S
-    for _ in range(16):
+    datas = [make_randblock(rand0(8193)) for _ in range(16)]
+    for data in datas:
       data = make_randblock(rand0(8193))
       h = S.hash(data)
       self.assertIsNone(S.get_index_entry(h))
       h2 = S.add(data)
       self.assertEqual(h, h2)
-      entry = S.get_index_entry(h)
+    sleep(0.5)  # wait for the indexing queue to flush
+    for data in datas:
+      h = S.hash(data)
+      entry = trace(S.get_index_entry)(h)
       if self.supports_index_entry:
         self.assertIsNotNone(entry)
       else:
