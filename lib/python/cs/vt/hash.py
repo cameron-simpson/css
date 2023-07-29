@@ -141,13 +141,13 @@ class HashCode(Transcriber, ABC):
   def bare_etag(self):
     ''' An HTTP ETag string (HTTP/1.1, RFC2616 3.11) without the quote marks.
     '''
-    return ':'.join((self.hashname, hexify(self)))
+    return f'{self.hashname}:{hexify(self)}'
 
   @property
   def etag(self):
     ''' An HTTP ETag string (HTTP/1.1, RFC2616 3.11).
     '''
-    return '"' + self.bare_etag + '"'
+    return f'"{self.base_etag}"'
 
   def __eq__(self, other):
     return self.hashenum == other.hashenum and bytes.__eq__(self, other)

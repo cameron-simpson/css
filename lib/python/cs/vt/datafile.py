@@ -24,7 +24,8 @@ DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 class DataFlag(IntFlag):
   ''' Flag values for DataFile records.
 
-      `COMPRESSED`: the data are compressed using zlib.compress.
+      Defined flags:
+      * `COMPRESSED`: the data are compressed using zlib.compress.
   '''
   COMPRESSED = 0x01
 
