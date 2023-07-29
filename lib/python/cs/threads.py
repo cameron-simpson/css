@@ -190,6 +190,8 @@ class HasThreadState(ContextManagerMixin):
             )
             for htscls in cls._HasThreadState_classes
         }
+      elif cls is HasThreadState:
+        currency = {}
       else:
         currency = {
             cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
