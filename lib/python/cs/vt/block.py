@@ -816,7 +816,7 @@ class IndirectBlock(_Block):
         for its direct data and the `span` of bytes
         covers.
     '''
-    return cls(HashCodeBlock(hashcode, span=span))
+    return cls(HashCodeBlock(hashcode=hashcode, span=span))
 
   @classmethod
   def from_subblocks(cls, subblocks, force=False):
