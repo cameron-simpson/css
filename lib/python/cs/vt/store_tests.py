@@ -26,6 +26,7 @@ from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
 from cs.testutils import SetupTeardownMixin
 
+from .block import Block, IndirectBlock
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashCode, HASHCLASS_BY_NAME
 from .socket import (
@@ -253,8 +254,7 @@ def multitest(method):
           with S:
             method(self)
             S.flush()
-          self.S = None
-      S = None
+          self.assertTrue(S.closed)
 
   return testMethod
 
@@ -270,7 +270,6 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
   @contextmanager
   def setupTeardown(self):
     S = self.S
-    self.supports_index_entry = type(self.S) in (DataDirStore,)
     if S is not None:
       with S:
         yield
