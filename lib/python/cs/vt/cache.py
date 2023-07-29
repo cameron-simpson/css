@@ -96,7 +96,7 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
           self._work,
           args=(workQ,),
           name="%s WORKER" % (self,),
-          thread_states=(),
+          thread_states=False,
       )
       with stackattrs(self, _workQ=workQ):
         try:
