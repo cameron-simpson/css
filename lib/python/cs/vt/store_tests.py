@@ -149,7 +149,7 @@ def get_test_stores(prefix):
         elif store_type is StreamStore:
           with stackkeys(subtest, storetype=StreamStore):
             for addif in False, True:
-              with stackkeys(subtest, addif=addif):
+              with stackkeys(subtest, addif=addif, sync=True):
                 local_store = MappingStore(
                     "MappingStore", {}, hashclass=hashclass
                 )
@@ -168,7 +168,8 @@ def get_test_stores(prefix):
                     downstream_rd,
                     upstream_wr,
                     addif=addif,
-                    hashclass=hashclass
+                    hashclass=hashclass,
+                    sync=subtest['sync'],
                 )
                 with local_store:
                   with remote_S:
