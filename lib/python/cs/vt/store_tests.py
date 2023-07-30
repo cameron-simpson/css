@@ -338,35 +338,38 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     ''' Trivial test adding 2 blocks.
     '''
     M1 = self.S
-    KS1 = set()
+    added_hashes = set()
     # test emptiness
     self.assertLen(M1, 0)
     # add one block
     data = make_randblock(rand0(8193))
     h = M1.add(data)
     self.assertIn(h, M1)
+    self.assertIn(h, M1.keys())
     self.assertEqual(M1[h], data)
-    KS1.add(h)
+    added_hashes.add(h)
     self.assertIn(h, M1)
-    mks = set(M1.keys())
-    self.assertIn(h, mks)
-    mks = set(M1.hashcodes())
-    ##self.assertEqual(set(M1.hashcodes()), KS1)
-    if mks != KS1:
+    M1_keys = set(M1.keys())
+    self.assertIn(h, M1_keys)
+    M1_hashcodes = set(M1.hashcodes())
+    self.assertIn(h, M1_hashcodes)
+    if M1_hashcodes != added_hashes:
       warning(
-          "M1.hashcodes != KS1: M1 missing %r, KS1 missing %r", KS1 - mks,
-          mks - KS1
+          "M1.hashcodes != added_hashes: M1 missing %r, added_hashes missing %r",
+          added_hashes - M1_hashcodes, M1_hashcodes - added_hashes
       )
+      X("M1_hashcodes = %r", sorted(M1_hashcodes))
+      X("added_hashes = %r", sorted(added_hashes))
     # add another block
     data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
-    KS1.add(h2)
+    added_hashes.add(h2)
     mks2 = set(M1.hashcodes())
-    ##self.assertEqual(mks2, KS1)
-    if mks2 != KS1:
+    ##self.assertEqual(mks2, added_hashes)
+    if mks2 != added_hashes:
       warning(
-          "M1.hashcodes != KS1: M1 missing %r, KS1 missing %r", KS1 - mks2,
-          mks2 - KS1
+          "M1.hashcodes != added_hashes: M1 missing %r, added_hashes missing %r",
+          added_hashes - mks2, mks2 - added_hashes
       )
 
   @multitest
