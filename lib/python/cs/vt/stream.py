@@ -35,6 +35,7 @@ from cs.py.func import prop
 from cs.resources import ClosedError
 from cs.result import CancellationError, Result
 from cs.threads import locked
+
 from .archive import BaseArchive, ArchiveEntry
 from .dir import _Dirent
 from .hash import (
@@ -62,7 +63,7 @@ class RqType(IntEnum):
   LENGTH = 9  # () -> remote-store-length
 
 class StreamStore(StoreSyncBase):
-  ''' A Store connected to a remote Store via a `PacketConnection`.
+  ''' A `Store` connected to a remote `Store` via a `PacketConnection`.
       Optionally accept a local store to facilitate bidirectional activities
       or simply to implement the server side.
   '''
@@ -110,6 +111,16 @@ class StreamStore(StoreSyncBase):
           the hashcode immediately
 
         Other keyword arguments are passed to `StoreSyncBase.__init__`.
+
+        Note: because a `sync` mode of `False` (the default) breaks this assertion:
+
+            h = S.add(data)
+            assert h in S
+
+        due to the possibility of the contains test completing
+        before the `data` have been added the `StreamStore.add`
+        method has an additional optional `sync=None` parameter to
+        override the default `sync` mode.
     '''
     if capacity is None:
       capacity = 1024
@@ -322,13 +333,25 @@ class StreamStore(StoreSyncBase):
       warning("unparsed bytes after BSUInt(length): %r", payload[offset:])
     return length
 
-  def add(self, data: bytes):
+  def add(self, data: bytes, *, sync=None):
+    ''' Add `data` to the Store, return its hashcode.
+
+        The optinal `sync` parameter may be used to control whether
+        this add is synchronous (return after the remote Stpleted
+        the ore add) or asynchronous (return as soon as the add
+        requests has been queued for the remote Store).
+        If not specified, use the `sync` mode supplied when the
+        `StreamStore` was initialised.
+    '''
     h = self.hash(data)
     if self.mode_addif:
+      # lower bandwidth, higher latency
       if self.contains(h):
         return h
     rq = AddRequest(data=data, hashenum=self.hashclass.hashenum)
-    if self.mode_sync:
+    if sync is None:
+      sync = self.mode_sync
+    if sync:
       flags, payload = self.do(rq)
       h2, offset = hash_decode(payload)
       if offset != len(payload):
