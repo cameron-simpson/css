@@ -151,6 +151,11 @@ class StreamStore(StoreSyncBase):
     # caching method
     self.get_Archive = lru_cache(maxsize=64)(self.raw_get_Archive)
 
+  def __str__(self):
+    return "%s(addif=%r,sync=%r)" % (
+        self.__class__.__name__, self.mode_addif, self.mode_sync
+    )
+
   def init(self):
     ''' Initialise store prior to any use.
     '''
