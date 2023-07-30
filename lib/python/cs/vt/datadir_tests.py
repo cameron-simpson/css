@@ -4,8 +4,6 @@
 ''' Datadir tests. - Cameron Simpson <cs@cskk.id.au>
 '''
 
-from itertools import product
-import os
 from os.path import abspath
 import random
 import shutil
@@ -13,9 +11,7 @@ import sys
 import tempfile
 import unittest
 
-from cs.deco import decorator
 from cs.logutils import setup_logging
-from cs.pfx import Pfx, XP
 from cs.randutils import randomish_chunks
 from cs.testutils import product_test
 
