@@ -20,13 +20,13 @@ import subprocess
 import sys
 import time
 
-from cs.context import stackattrs
 from cs.deco import decorator
 from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
 from cs.x import X
 
+from . import uses_Store
 from .dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from .fs import FileHandle, FileSystem
 from .store import MissingHashcodeError
@@ -244,11 +244,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
         Parameters:
         * `E`: the root directory reference
         * `S`: backing Store
-        * `archive`: if not None, an Archive or similar, with a
+        * `archive`: if not `None`, an Archive or similar, with a
           .update(Dirent[,when]) method
         * `subpath`: relative path to mount Dir
-        * `readonly`: forbid data modification; if omitted or None,
-          infer from S.readonly
+        * `readonly`: forbid data modification; if omitted or `None`,
+          infer from `S.readonly`
         * `append_only`: forbid truncation or overwrite of file data
         * `show_prev_dirent`: show previous Dir revision as '...'
     '''
