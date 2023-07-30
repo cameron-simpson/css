@@ -79,7 +79,6 @@ STORECLASS_NAMES = tuple(
         'StreamStore', 'TCPClientStore', 'UNIXSocketClientStore', 'ProxyStore'
     )
 )
-X("STORECLASS_NAMES = %r", STORECLASS_NAMES)
 
 all_store_type_names = set(
     store_type.__name__ for store_type in ALL_STORE_TYPES
