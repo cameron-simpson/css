@@ -144,10 +144,10 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
   def keys(self):
     ''' Mapping method for .keys.
     '''
-    seen = set()
-    for h in list(self.cached.keys()):
-      yield h
-      seen.add(h)
+    with self._lock:
+      ks = set(self.cached.keys())
+    yield from ks
+    seen = ks
     saved = self.saved
     with self._lock:
       saved_keys = list(saved.keys())
