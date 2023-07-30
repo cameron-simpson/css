@@ -177,7 +177,7 @@ def get_test_stores(prefix):
         elif store_type is TCPClientStore:
           with stackkeys(subtest, storetype=TCPClientStore):
             for addif in False, True:
-              with stackkeys(subtest, addif=addif):
+              with stackkeys(subtest, addif=addif, sync=True):
                 local_store = MappingStore(
                     "MappingStore", {}, hashclass=hashclass
                 )
@@ -196,7 +196,11 @@ def get_test_stores(prefix):
                   else:
                     break
                 S = TCPClientStore(
-                    None, bind_addr, addif=addif, hashclass=hashclass
+                    None,
+                    bind_addr,
+                    addif=addif,
+                    hashclass=hashclass,
+                    sync=subtest['sync'],
                 )
                 with local_store:
                   with remote_S:
