@@ -394,8 +394,8 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
   def initdir(self):
     ''' Init a directory and its "data" subdirectory.
     '''
-    needdir(self.fspath, log=warning)
-    needdir(self.datapath, log=warning)
+    needdir(self.fspath, log=info)
+    needdir(self.datapath, log=info)
 
   @contextmanager
   @uses_upd
