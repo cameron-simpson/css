@@ -692,7 +692,7 @@ class HashCodeBlock(_Block):
     if self._span is None:
       self._span = newspan
     else:
-      warning("setting .span a second time")
+      ##warning("setting .span a second time")
       if newspan != self._span:
         raise RuntimeError(
             "%s: tried to change .span from %s to %s" %
