@@ -208,7 +208,7 @@ def get_test_stores(prefix):
         elif store_type is UNIXSocketClientStore:
           with stackkeys(subtest, storetype=UNIXSocketClientStore):
             for addif in False, True:
-              with stackkeys(subtest, addif=addif):
+              with stackkeys(subtest, addif=addif, sync=True):
                 local_store = MappingStore(
                     "MappingStore", {}, hashclass=hashclass
                 )
@@ -219,7 +219,11 @@ def get_test_stores(prefix):
                       socket_path, local_store=local_store
                   )
                   S = UNIXSocketClientStore(
-                      None, socket_path, addif=addif, hashclass=hashclass
+                      None,
+                      socket_path,
+                      addif=addif,
+                      sync=subtest['sync'],
+                      hashclass=hashclass,
                   )
                   with local_store:
                     with remote_S:
