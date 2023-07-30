@@ -358,6 +358,8 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
     added_hashes.add(h2)
+    self.assertIn(h2, M1)
+    self.assertIn(h2, M1.keys())
     M1_hashcodes_2 = set(M1.hashcodes())
     self.assertEqual(M1_hashcodes_2, added_hashes)
 
