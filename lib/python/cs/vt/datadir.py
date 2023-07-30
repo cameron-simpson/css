@@ -668,7 +668,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       )
 
   def __len__(self):
-    return len(self.index)
+    return len(self.index) + len(self._dataQ)
 
   @pfx_method
   def hashcodes_from(self, *, start_hashcode=None):
