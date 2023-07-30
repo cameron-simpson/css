@@ -353,24 +353,13 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     self.assertIn(h, M1_keys)
     M1_hashcodes = set(M1.hashcodes())
     self.assertIn(h, M1_hashcodes)
-    if M1_hashcodes != added_hashes:
-      warning(
-          "M1.hashcodes != added_hashes: M1 missing %r, added_hashes missing %r",
-          added_hashes - M1_hashcodes, M1_hashcodes - added_hashes
-      )
-      X("M1_hashcodes = %r", sorted(M1_hashcodes))
-      X("added_hashes = %r", sorted(added_hashes))
+    self.assertEqual(M1_hashcodes, added_hashes)
     # add another block
     data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
     added_hashes.add(h2)
-    mks2 = set(M1.hashcodes())
-    ##self.assertEqual(mks2, added_hashes)
-    if mks2 != added_hashes:
-      warning(
-          "M1.hashcodes != added_hashes: M1 missing %r, added_hashes missing %r",
-          added_hashes - mks2, mks2 - added_hashes
-      )
+    M1_hashcodes_2 = set(M1.hashcodes())
+    self.assertEqual(M1_hashcodes_2, added_hashes)
 
   @multitest
   def testhcu01test_hashcodes_from(self):
