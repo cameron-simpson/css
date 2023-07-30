@@ -91,10 +91,10 @@ class TestDataDir(unittest.TestCase):
 
   def product_teardown(self):
     self.datadir.close()
-    os.system("ls -l -- " + self.datadirpath)
+    ##os.system("ls -l -- " + self.datadirpath)
     if self.do_remove_datadirpath:
       shutil.rmtree(self.datadirpath)
-    os.system("ls -l -- " + self.indexdirpath)
+    ##os.system("ls -l -- " + self.indexdirpath)
     if self.do_remove_indexdirpath:
       shutil.rmtree(self.indexdirpath)
 
@@ -166,7 +166,7 @@ class TestDataDir(unittest.TestCase):
           self.assertEqual(data, odata)
     # explicitly close the DataDir and reopen
     # this is because the test framework normally does the outermost open/close
-    # and therefore the datadir index lock is still sitting aroung
+    # and therefore the datadir index lock is still sitting around
     D.close()
     D = self.datadir = self._open_default_datadir()
     D.open()
