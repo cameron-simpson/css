@@ -125,7 +125,7 @@ def blockify(
 
 @promote
 def block_for(bfr: CornuCopyBuffer, **kw):
-  ''' Return a Block for the contents `bfr`, an iterable of `bytes`like objects
+  ''' Return a top Block for the contents `bfr`, an iterable of `bytes`like objects
       such as a `CornuCopyBuffer`.
 
       Keyword arguments are passed to `blockify`.
