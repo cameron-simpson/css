@@ -299,18 +299,9 @@ class VTCmd(BaseCommand):
                       archives=((S, '*'),),
                   )
                   S.config = options.config
-                if show_progress:
-                  S = ProgressStore(S)
-                  add_bar_cmgr = S.progress_add.bar("ADD")
-                  get_bar_cmgr = S.progress_get.bar("GET")
-                else:
-                  add_bar_cmgr = nullcontext()
-                  get_bar_cmgr = nullcontext()
                 with S:
                   with stackattrs(options, S=S):
-                    with add_bar_cmgr:
-                      with get_bar_cmgr:
-                        yield
+                    yield
                 if cacheS:
                   cacheS.backend = None
       if ifdebug():
