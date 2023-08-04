@@ -941,7 +941,7 @@ class DataDir(FilesDir):
     ''' Scan the specified `filepath` from `offset`, yielding `DataRecord`s.
     '''
     bfr = CornuCopyBuffer.from_filename(filepath, offset=offset)
-    yield from DataRecord.scan_with_offsets(bfr)
+    yield from DataRecord.scan(bfr, with_offsets=True)
 
   @with_upd_proxy
   def _monitor_datafiles(self, *, upd_proxy: UpdProxy):
