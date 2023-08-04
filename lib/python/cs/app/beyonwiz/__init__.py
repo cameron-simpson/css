@@ -176,12 +176,17 @@ class RecordingMetaData(NS):
 def Recording(path):
   ''' Factory function returning a TVWiz or Enigma2 `_Recording` object.
   '''
-  if path.endswith('.tvwiz'):
+  if isdirpath(path) and path.endswith('.tvwiz'):
     from .tvwiz import TVWiz  # pylint: disable=import-outside-toplevel
     return TVWiz(path)
-  if path.endswith('.ts'):
+  if isfilepath(path) and path.endswith('.ts'):
     from .enigma2 import Enigma2  # pylint: disable=import-outside-toplevel
     return Enigma2(path)
+  if not existspath(path):
+    # see if we were given a prefix from command line filename completion
+    if path.endswith('.'):
+      return Recording(path + 'ts')
+    return Recording(path + '.ts')
   raise ValueError("don't know how to open recording %r" % (path,))
 
 class _Recording(ABC, HasFSTagsMixin):
