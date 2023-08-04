@@ -46,10 +46,9 @@ from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
 from . import (
-    common,
-    defaults,
     DISTINFO,
     Store,
+    run_modes,
 )
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
@@ -177,7 +176,9 @@ class VTCmd(BaseCommand):
         default_factory=lambda: os.environ.
         get(VTCmd.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname)
     )
-    show_progress: bool = False
+    show_progress: bool = field(
+        default_factory=lambda: run_modes.show_progress
+    )
 
   def apply_opts(self, opts):
     ''' Apply the command line options mapping `opts` to `options`.
@@ -251,7 +252,7 @@ class VTCmd(BaseCommand):
         with config:
           with stackattrs(common, config=config):
             # redo these because defaults is already initialised
-            with stackattrs(defaults, show_progress=show_progress):
+            with stackattrs(run_modes, show_progress=show_progress):
               if cmd in ("config", "dump", "help", "init", "profile", "scan"):
                 yield
               else:
