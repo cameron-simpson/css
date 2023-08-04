@@ -162,8 +162,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
         backend = sys.stderr
       else:
         backend = open_append(backend_path)
-    self._backend = backend
-    assert self._backend is not None
+    assert backend is not None
     # test isatty and the associated file descriptor
     isatty = backend.isatty()
     if isatty:
@@ -174,19 +173,23 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
         isatty = False
     else:
       backend_fd = None
+    self._backend_isatty = isatty
+    self._backend_fd = backend_fd
     if columns is None:
       columns = 80
-      if backend.isatty():
+      if isatty:
         rc = ttysize(backend)
         if rc.columns is not None:
           columns = rc.columns
     if disabled is None:
-      try:
-        disabled = not backend.isatty()
-      except AttributeError:
-        disabled = True
-    self._backend_isatty = isatty
-    self._backend_fd = backend_fd
+      disabled = not isatty
+    self._disabled = disabled
+    if disabled:
+      self._backend = None
+      self._disabled_backend = backend
+    else:
+      self._backend = backend
+      self._disabled_backend = None
     # prepare the terminfo capability mapping, if any
     self._ti_strs = {}
     if isatty:
@@ -210,8 +213,6 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
             if s is not None:
               s = s.decode('ascii')
             self._ti_strs[ti_name] = s
-    self._disabled = disabled
-    self._disabled_backend = None
     self.columns = columns
     self._cursor_visible = True
     self._current_slot = None
@@ -230,7 +231,10 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     proxy0.index = 0
 
   def __str__(self):
-    backend = self._disabled_backend if self._disabled else self._backend
+    backend = (
+        self._disabled_backend if getattr(self, '_disabled', False) else
+        getattr(self, '_backend', None)
+    )
     return "%s(backend=%s)" % (self.__class__.__name__, backend)
 
   ############################################################
