@@ -185,53 +185,7 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
-_progress = Progress(name="cs.vt.common.progress"),
-_over_progress = OverProgress(name="cs.vt.common.over_progress")
-
-# some shared default state, Thread independent
-common = NS(
-    progress=_progress,
-    over_progress=_over_progress,
-    S=None,
-)
-
-del _progress
-del _over_progress
-
-class _Defaults(ThreadState):
-  ''' Per-thread default context stack.
-
-      A Store's __enter__/__exit__ methods push/pop that store
-      from the `.S` attribute.
-  '''
-
-  # Global stack of fallback Store values.
-  # These are pushed by things like main or the fuse setup
-  # to provide a shared default across Threads.
-  _Ss = []
-
-  def __init__(self):
-    super().__init__()
-    self.progress = common.progress
-    self.fs = None
-    self.show_progress = False
-
-  def __getattr__(self, attr):
-    if attr == 'S':
-      S = common.S
-      if S is None:
-        S = self.config['default']
-      return S
-    raise AttributeError(attr)
-
-  @contextmanager
-  def common_S(self, S):
-    ''' Context manager to push a Store onto `common.S`.
-    '''
-    with stackattrs(common, S=S):
-      yield
-
-NOdefaults = _Defaults()
+run_modes = NS(show_progress=True,)
 
 class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             RunStateMixin, ABC):
