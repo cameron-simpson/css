@@ -19,7 +19,7 @@ import time
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
-__version__ = '20221228-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

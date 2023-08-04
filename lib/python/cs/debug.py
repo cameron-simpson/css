@@ -6,6 +6,18 @@
 
 r'''
 Assorted debugging facilities.
+
+If the environment variable $CS_DEBUG_BUILTINS is set to a comma
+separated list of names then the `builtins` module will be monkey
+patched with those names, enabling trite debug use of those names
+anywhere in the code provided this module has been imported somewhere.
+The allowed names are the following:
+* `X`: `cs.x.X`
+* `pformat`: `pprint.pformat`
+* `pprint`: `pprint.pprint`
+* `r`: `cs.lex.r`
+* `s`: `cs.lex.s`
+* `trace`: `cs.debug.trace` (the `@trace` decorator)
 '''
 
 from __future__ import print_function
@@ -13,7 +25,7 @@ from cmd import Cmd
 import inspect
 import logging
 import os
-from pprint import pformat
+from pprint import pformat, pprint  # pylint: disable=unused-import
 from subprocess import Popen, PIPE
 import sys
 from threading import (
@@ -28,7 +40,7 @@ from types import SimpleNamespace as NS
 
 from cs.deco import decorator
 from cs.fs import shortpath
-from cs.lex import s
+from cs.lex import s, r, is_identifier  # pylint: disable=unused-import
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
@@ -39,7 +51,7 @@ from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.x import X
 
-__version__ = '20230610-post'
+__version__ = '20230613.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -62,6 +74,12 @@ DISTINFO = {
         'cs.x',
     ],
 }
+
+# environment variable specifying names to become built in
+CS_DEBUG_BUILTINS_ENVVAR = 'CS_DEBUG_BUILTINS'
+
+# white list of allowed builtin names
+CS_DEBUG_BUILTINS_NAMES = ('X', 'pformat', 'pprint', 's', 'r', 'trace')
 
 # @DEBUG dispatches a thread to monitor function elapsed time.
 # This is how often it polls for function completion.
@@ -644,3 +662,31 @@ def selftest(module_name, defaultTest=None, argv=None):
   signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
   import unittest
   return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
+
+builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
+if builtin_names_s:
+  try:
+    import builtins  # pylint: disable=unused-import
+  except ImportError:
+    warning(
+        "$%s=%r but connot import builtins for monkey patching",
+        CS_DEBUG_BUILTINS_ENVVAR, builtin_names_s
+    )
+  else:
+    for builtin_name in builtin_names_s.split(','):
+      if not builtin_name:
+        continue
+      if builtin_name not in CS_DEBUG_BUILTINS_NAMES:
+        warning(
+            "$%s: ignoring %r, not in CS_DEBUG_BUILTINS_NAMES:%r",
+            CS_DEBUG_BUILTINS_ENVVAR, builtin_name, CS_DEBUG_BUILTINS_NAMES
+        )
+        continue
+      if not is_identifier(builtin_name):
+        warning(
+            "$%s: ignoring %r, not an identifier", CS_DEBUG_BUILTINS_ENVVAR,
+            builtin_name
+        )
+        continue
+      # pylint: disable=eval-used
+      eval('setattr(builtins,builtin_name,%s)' % (builtin_name,))

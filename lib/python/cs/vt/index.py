@@ -4,7 +4,7 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' An index is a mapping of hashcode => `FileDataIndexEntry`.
+''' An index is a mapping of hashcode_bytes => record_bytes.
     This module supports several backends and a mechanism for choosing one.
 '''
 
@@ -68,48 +68,6 @@ def choose(basepath, preferred_indexclass=None):
       "no supported index classes available: tried %r" % (indexclasses,)
   )
 
-class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
-    'filenum': BSUInt,
-    'data_offset': BSUInt,
-    'data_length': BSUInt,
-    'flags': BSUInt,
-})):
-  ''' An index entry describing a data chunk in a `DataDir`.
-
-      This has the following attributes:
-      * `filenum`: the file number of the file containing the block
-      * `data_offset`: the offset within the file of the data chunk
-      * `data_length`: the length of the chunk
-      * `flags`: information about the chunk
-
-      These enable direct access to the raw data component.
-
-      The only defined flag at present is `FLAG_COMPRESSED`,
-      indicating that the raw data should be obtained
-      by uncompressing the chunk using `zlib.uncompress`.
-  '''
-
-  FLAG_COMPRESSED = 0x01
-
-  @property
-  def is_compressed(self):
-    ''' Whether the chunk data are compressed.
-    '''
-    return self.flags & self.FLAG_COMPRESSED
-
-  def fetch_fd(self, rfd):
-    ''' Fetch the decompressed data from an open binary file.
-    '''
-    bs = pread(rfd, self.data_length, self.data_offset)
-    if len(bs) != self.data_length:
-      raise RuntimeError(
-          "%s.fetch_fd: pread(fd=%s) returned %d bytes, expected %d" %
-          (self, rfd, len(bs), self.data_length)
-      )
-    if self.is_compressed:
-      bs = decompress(bs)
-    return bs
-
 class BinaryIndex(MultiOpenMixin, ABC):
   ''' The base class for indices mapping `bytes`->`bytes`.
   '''
@@ -157,7 +115,7 @@ class BinaryIndex(MultiOpenMixin, ABC):
     return self.keys()
 
   def get(self, key, default=None):
-    ''' Get the `FileDataIndexEntry` for `key`.
+    ''' Get the record bytes for `key`.
         Return `default` for a missing `key` (default `None`).
     '''
     try:
@@ -318,8 +276,8 @@ class LMDBIndex(BinaryIndex):
   def __contains__(self, key):
     return self._get(key) is not None
 
-  def __getitem__(self, key):
-    ''' Get the `FileDataIndexEntry` for `key`.
+  def __getitem__(self, key) -> bytes:
+    ''' Get the record bytes for `key`.
         Raise `KeyError` for a missing key.
     '''
     binary_entry = self._get(key)

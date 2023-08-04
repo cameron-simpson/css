@@ -16,7 +16,7 @@ from cs.resources import MultiOpenMixin
 from cs.result import bg
 from cs.threads import locked, LockableMixin
 
-from . import defaults, RLock
+from . import RLock, Store
 from .block import Block, IndirectBlock, RLEBlock
 from .blockify import top_block_for, blockify
 
@@ -55,6 +55,7 @@ class ROBlockFile(RawIOBase, ReadMixin):
     '''
     return self._offset
 
+  # pylint: disable=arguments-differ
   def datafrom(self, offset):
     ''' Generator yielding natural chunks from the file commencing at offset.
         This supports the ReadMixin.read method.
@@ -65,6 +66,7 @@ class ROBlockFile(RawIOBase, ReadMixin):
       backing_block.get_blockmap()
     return backing_block.datafrom(offset)
 
+# pylint: disable=too-many-instance-attributes
 class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
 
@@ -81,6 +83,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       backing_block = Block(data=b'')
     self.filename = None
     self._syncer = None  # syncing Result, close waits for it
+    self._sync_span = None
     self._backing_block = None
     self._blockmap = None
     self._file = None
@@ -183,7 +186,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       span = None
       with self._lock:
         if f.front_range:
-          span = f.front_range._spans.pop(0)
+          span = f.front_range._spans.pop(0)  # pylint: disable=protected-access
       if span is None:
         break
       start, end = span
@@ -260,6 +263,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     '''
     return self._file.write(data)
 
+  # pylint: disable=arguments-differ
   def datafrom(self, offset):
     ''' Generator yielding natural chunks from the file commencing at offset.
         This supports the ReadMixin.read method.

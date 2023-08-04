@@ -67,7 +67,7 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -93,6 +93,7 @@ DISTINFO = {
         'cs.tagset',
         'cs.timeseries',
         'cs.upd',
+        'matplotlib',
         'python-dateutil',
         'typeguard',
     ],
@@ -1008,15 +1009,16 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             --bare          Strip axes and padding from the plot.
             -e events,...   Display the specified events.
             -f              Force. Overwirte the image path even if it exists.
-            --stacked       Stack graphed values on top of each other.
             -o imagepath    Write the plot to imagepath.
                             If not specified, the image will be written
                             to the standard output in sixel format if
                             it is a terminal, and in PNG format otherwise.
+            --stacked       Stack graphed values on top of each other.
             --show          Open the image path with "open".
             --tz tzspec     Skew the UTC times presented on the graph
                             to emulate the timezone specified by tzspec.
                             The default skew is the system local timezone.
+            -U, --update    Run a "pull" before plotting.
             start-time      An integer number of days before the current time
                             or any datetime specification recognised by
                             dateutil.parser.parse.
@@ -1030,6 +1032,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     '''
     options = self.options
     options.bare = False
+    options.do_update = False
     options.show_image = False
     options.imgpath = None
     options.stacked = False
@@ -1044,6 +1047,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         show='show_image',
         stacked=None,
         tz_=('tz', tzfor),
+        U='do_update',
+        update='do_update',
     )
     tz = options.tz
     if len(argv) == 1 and argv[0] in ('?', 'help'):
@@ -1063,6 +1068,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       stop = time.time()
     if stop < start:
       start, stop = stop, start
+    if options.do_update:
+      if self.cmd_pull([]):
+        warning("pull/update failed, not plotting")
+        return 1
     if len(argv) == 1 and argv[0] in ('?', 'help'):
       self.print_known_datasets()
       return 0
