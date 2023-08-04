@@ -250,7 +250,7 @@ class VTCmd(BaseCommand):
         )
       with stackattrs(options, hashclass=hashclass):
         with config:
-          with stackattrs(common, config=config):
+          with stackattrs(run_modes, config=config):
             # redo these because defaults is already initialised
             with stackattrs(run_modes, show_progress=show_progress):
               if cmd in ("config", "dump", "help", "init", "profile", "scan"):
