@@ -458,7 +458,7 @@ class FileSystem(HasThreadState):
           X("NO INODE IMPORT")
         X("FileSystem mntE:")
       with self.S:
-        with fs:
+        with self:
           dump_Dirent(mntE)
     except Exception as e:
       exception("exception during initial report: %s", e)
@@ -495,8 +495,6 @@ class FileSystem(HasThreadState):
   @logexc
   def _sync(self):
     with Pfx("_sync"):
-      if Store.defaults() is None:
-        raise RuntimeError("RUNTIME: Store.defaults() is None!")
       archive = self.archive
       if not self.readonly and archive is not None:
         with self._lock:
