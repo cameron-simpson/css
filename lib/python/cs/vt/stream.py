@@ -127,6 +127,7 @@ class StreamStore(StoreSyncBase):
     super().__init__('StreamStore:%s' % (name,), capacity=capacity, **kw)
     self._lock = Lock()
     self.mode_addif = addif
+    self._contains_cache = set()
     self.mode_sync = sync
     self._local_store = local_store
     self.exports = exports
@@ -393,6 +394,8 @@ class StreamStore(StoreSyncBase):
   def contains(self, h):
     ''' Dispatch a contains request, return a `Result` for collection.
     '''
+    if h in self._contained_cache:
+      return True
     rq = ContainsRequest(h)
     flags, payload = self.do(rq)
     found = flags & 0x01
@@ -402,6 +405,8 @@ class StreamStore(StoreSyncBase):
       raise StoreError("unexpected flags: 0x%02x" % (flags,))
     if payload:
       raise StoreError("unexpected payload: %r" % (payload,))
+    if found:
+      self._contained_cache.add(h)
     return found
 
   def flush(self):
