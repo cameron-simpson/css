@@ -1008,7 +1008,7 @@ class DataDir(FilesDir):
               scanner = progressbar(
                   scanner,
                   "%s: scan %s" %
-                  (self, relpath(datadirpath, DFstate.filename)),
+                  (self, relpath(DFstate.filename, datadirpath)),
                   position=offset,
                   total=new_size,
                   itemlenfunc=(
