@@ -27,7 +27,7 @@ import shutil
 from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 from stat import S_ISREG
 import sys
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Union
 
 from typeguard import typechecked
 
@@ -159,7 +159,7 @@ class VTCmd(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
-    config_map: Optional[str, Mapping] = None
+    config_map: Optional[Union[str, Mapping]] = None
     store_spec: str = field(
         default_factory=lambda: os.environ.
         get(VTCmd.VT_STORE_ENVVAR, '[default]')
