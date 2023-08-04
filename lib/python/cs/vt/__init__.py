@@ -293,8 +293,9 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         val_s = str(val)
       params.append(attr + '=' + val_s)
     return "%s:%s(%s)" % (
-        self.__class__.__name__, self.hashclass.hashname,
-        ','.join([repr(self.name)] + params)
+        self.__class__.__name__,
+        getattr(getattr(self, 'hashclass', None), 'hashname', "no-hashclass"),
+        ','.join([repr(getattr(self, 'name', 'no-name'))] + params),
     )
 
   __repr__ = __str__
