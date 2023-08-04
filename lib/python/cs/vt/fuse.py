@@ -29,7 +29,7 @@ from cs.x import X
 from . import uses_Store
 from .dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from .fs import FileHandle, FileSystem
-from .store import MissingHashcodeError
+from .hash import MissingHashcodeError
 import llfuse
 
 FuseOSError = llfuse.FUSEError
