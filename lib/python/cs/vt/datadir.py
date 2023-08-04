@@ -90,7 +90,7 @@ from cs.threads import locked, bg as bg_thread, joinif
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
 from cs.upd import with_upd_proxy, UpdProxy, uses_upd
 
-from . import MAX_FILE_SIZE, Lock, RLock, Store
+from . import MAX_FILE_SIZE, Lock, RLock, Store, run_modes
 from .archive import Archive
 from .block import Block
 from .blockify import (
@@ -566,7 +566,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
         data_batch = None
 
     batches = data_batches(dataQ, batch_size)
-    if defaults.show_progress:
+    if run_modes.show_progress:
       batches = progress.iterbar(
           batches,
           itemlenfunc=lambda batch: sum(map(len, batch)),
@@ -1004,7 +1004,7 @@ class DataDir(FilesDir):
             offset = DFstate.scanned_to
             hashclass = self.hashclass
             scanner = DFstate.scanfrom(offset=offset)
-            if defaults.show_progress:
+            if run_modes.show_progress:
               scanner = progressbar(
                   scanner,
                   "%s: scan %s" %
