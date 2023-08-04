@@ -1031,6 +1031,8 @@ class DataDir(FilesDir):
               DFstate.scanned_to = post_offset
               if self.cancelled:
                 break
+            # update the persistent filemap state
+            self._filemap.set_indexed_to(DFstate.filenum, DFstate.scanned_to)
             self.flush()
         self.flush()
       if not self.cancelled:
