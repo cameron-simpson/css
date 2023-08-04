@@ -261,7 +261,9 @@ class VTCmd(BaseCommand):
                   if cmd == "serve":
                     options.store_spec = store_spec
                 try:
-                  S = pfx_call(Store, options.store_spec, options.config)
+                  S = pfx_call(
+                      Store.promote, options.store_spec, options.config
+                  )
                 except (KeyError, ValueError) as e:
                   raise GetoptError(
                       f"unusable Store specification: {e}"
