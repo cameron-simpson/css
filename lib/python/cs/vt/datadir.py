@@ -943,8 +943,7 @@ class DataDir(FilesDir):
     bfr = CornuCopyBuffer.from_filename(filepath, offset=offset)
     yield from DataRecord.scan(bfr, with_offsets=True)
 
-  @with_upd_proxy
-  def _monitor_datafiles(self, *, upd_proxy: UpdProxy):
+  def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
 
         This is what supports shared use of the data area. Other clients
@@ -962,21 +961,19 @@ class DataDir(FilesDir):
         sleep(0.1)
         continue
       # scan for new datafiles
-      with upd_proxy.extend_prefix(" check datafiles"):
-        try:
-          listing = pfx_listdir(datadirpath)
-        except OSError as e:
-          if e.errno == errno.ENOENT:
-            error("listing failed, exiting _monitor_datafiles loop: %s", e)
-            break
-          raise
-        for filename in listing:
-          if (not filename.startswith('.')
-              and filename.endswith(DATAFILE_DOT_EXT)
-              and filename not in filemap):
-            with upd_proxy.extend_prefix(" add " + filename):
-              info("MONITOR: add new filename %r", filename)
-              filemap.add_path(filename)
+      try:
+        listing = pfx_listdir(datadirpath)
+      except OSError as e:
+        if e.errno == errno.ENOENT:
+          error("listing failed, exiting _monitor_datafiles loop: %s", e)
+          break
+        raise
+      for filename in listing:
+        if (not filename.startswith('.')
+            and filename.endswith(DATAFILE_DOT_EXT)
+            and filename not in filemap):
+          info("%s: add new filename %r", filename)
+          filemap.add_path(filename)
       # now scan known datafiles for new data
       for filenum in filemap.filenums():
         if self.cancelled or self.flag_scan_disable:
