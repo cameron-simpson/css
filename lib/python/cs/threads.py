@@ -66,7 +66,7 @@ class ThreadState(thread_local):
   '''
 
   def __init__(self, **kw):
-    ''' Initiale the `ThreadState`, providing the per-Thread initial values.
+    ''' Initiate the `ThreadState`, providing the per-Thread initial values.
     '''
     thread_local.__init__(self)
     for k, v in kw.items():
