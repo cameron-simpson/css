@@ -624,7 +624,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
 
   @classmethod
   @fmtdoc
-  def promote(cls, obj):
+  def promote(cls, obj, config=None):
     ''' Promote `obj` to a `Store` instance.
         Existing instances are returned unchanged.
         A `str` is promoted via `Config.Store_from_spec`
@@ -638,8 +638,9 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     if obj is None:
       obj = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
     if isinstance(obj, str):
-      from .config import Config
-      config = Config.default(factory=True)
+      if config is None:
+        from .config import Config
+        config = Config.default(factory=True)
       return config.Store_from_spec(obj)
     raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))
 
