@@ -129,7 +129,7 @@ class FileHandle:
     # NB: additional S.open/close around self.E.close
     @logexc
     def withR(R):
-      with stackattrs(defaults, S=S):
+      with S:
         self.E.close()
       S.close()
 
@@ -458,7 +458,7 @@ class FileSystem(HasThreadState):
           X("NO INODE IMPORT")
         X("FileSystem mntE:")
       with self.S:
-        with stackattrs(defaults, fs=self):
+        with fs:
           dump_Dirent(mntE)
     except Exception as e:
       exception("exception during initial report: %s", e)
