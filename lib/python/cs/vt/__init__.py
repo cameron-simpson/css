@@ -286,7 +286,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
     params = []
-    for attr, val in sorted(self._str_attrs.items()):
+    for attr, val in sorted(getattr(self, '_str_attrs', {}).items()):
       if isinstance(val, type):
         val_s = '<%s.%s>' % (val.__module__, val.__name__)
       else:
