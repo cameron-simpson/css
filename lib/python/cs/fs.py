@@ -4,7 +4,7 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
-from fnmatch import fnmatch
+from fnmatch import filter as fnfilter
 from functools import partial
 import os
 from os.path import (
@@ -25,7 +25,6 @@ from threading import Lock
 from typing import Optional
 
 from icontract import require
-from typeguard import typechecked
 
 from cs.deco import decorator
 from cs.obj import SingletonMixin
@@ -156,10 +155,7 @@ def rpaths(
 def fnmatchdir(dirpath, fnglob):
   ''' Return a list of the names in `dirpath` matching the glob `fnglob`.
   '''
-  return [
-      filename for filename in pfx_listdir(dirpath)
-      if fnmatch(filename, fnglob)
-  ]
+  return fnfilter(pfx_listdir(dirpath), fnglob)
 
 # pylint: disable=too-few-public-methods
 class HasFSPath:
