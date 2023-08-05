@@ -21,6 +21,7 @@ from cs.ffmpegutils import (
     convert as ffconvert,
 )
 from cs.fileutils import crop_name
+from cs.fs import HasFSPath
 from cs.fstags import HasFSTagsMixin
 from cs.logutils import error
 from cs.mediainfo import EpisodeInfo
@@ -38,6 +39,7 @@ DISTINFO = {
         'cs.ffmpegutils',
         'cs.binary',
         'cs.deco',
+        'cs.fs',
         'cs.fstags',
         'cs.logutils',
         'cs.mediainfo',
@@ -189,13 +191,13 @@ def Recording(path):
     return Recording(path + '.ts')
   raise ValueError("don't know how to open recording %r" % (path,))
 
-class _Recording(ABC, HasFSTagsMixin):
+class _Recording(ABC, HasFSPath, HasFSTagsMixin):
   ''' Base class for video recordings.
   '''
 
-  def __init__(self, path, fstags=None):
+  def __init__(self, fspath, fstags=None):
+    HasFSPath.__init__(self, fspath)
     self._fstags = fstags
-    self.path = path
     self._lock = Lock()
 
   def __getattr__(self, attr):
@@ -279,6 +281,7 @@ class _Recording(ABC, HasFSTagsMixin):
       timespans=(),
       extra_opts=None,
       overwrite=False,
+      srcpath=None,
       use_data=False,
       acodec=None,
       vcodec=None,
@@ -289,16 +292,17 @@ class _Recording(ABC, HasFSTagsMixin):
     if dstfmt is None:
       dstfmt = DEFAULT_MEDIAFILE_FORMAT
     if use_data:
-      srcpath = None
+      assert srcpath is None
       if timespans:
         raise ValueError(
             "%d timespans but do_copyto is true" % (len(timespans,))
         )
     else:
-      srcpath = self.path
       # stop path looking like a URL
       if not os.path.isabs(srcpath):
         srcpath = os.path.join('.', srcpath)
+      if srcpath is None:
+        srcpath = self.fspath
     if dstpath is None:
       dstpath = self.filename(ext=dstfmt)
     elif dstpath.endswith('/'):
@@ -359,7 +363,7 @@ class _Recording(ABC, HasFSTagsMixin):
     if dstfmt is None:
       dstfmt = DEFAULT_MEDIAFILE_FORMAT
     M = self.metadata
-    comment = f'Transcoded from {self.path!r} using ffmpeg.'
+    comment = f'Transcoded from {self.fspath!r} using ffmpeg.'
     recording_dt = M.get('file.datetime')
     if recording_dt:
       comment += f' Recording date {recording_dt.isoformat()}.'
@@ -381,8 +385,10 @@ class _Recording(ABC, HasFSTagsMixin):
     '''
     M = self.metadata
     with Pfx("metadata for dstformat %r", dstfmt):
-      ffmeta_kw = dict(comment=f'Transcoded from {self.path!r} using ffmpeg.')
       for ffmeta, beymeta in FFMPEG_METADATA_MAPPINGS[dstfmt].items():
+      ffmeta_kw = dict(
+          comment=f'Transcoded from {self.fspath!r} using ffmpeg.'
+      )
         with Pfx("%r->%r", beymeta, ffmeta):
           if beymeta is None:
             continue
