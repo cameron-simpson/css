@@ -9,6 +9,7 @@ import datetime
 import os
 import os.path
 import struct
+from cs.fs import HasFSPath, fnmatchdir
 from cs.logutils import warning, error
 from cs.pfx import Pfx, pfx_method
 from cs.threads import locked_property
@@ -120,9 +121,12 @@ class TVWiz(_Recording):
   def __init__(self, wizdir):
     _Recording.__init__(self, wizdir)
     self.srcfmt = 'mpegts'
-    self.dirpath = wizdir
     self.path_title, self.path_datetime = self._parse_path()
-    self.headerpath = os.path.join(self.dirpath, TVHDR)
+
+  @property
+  def headerpath(self):
+    ''' The filesystem path of the header file. '''
+    return self.pathto(TVHDR)
 
   def convert(self, dstpath, extra_opts=None, **kw):
     ''' Wrapper for _Recording.convert which requests audio conversion to AAC.
@@ -138,7 +142,7 @@ class TVWiz(_Recording):
   def _parse_path(self):
     basis, ext = os.path.splitext(self.dirpath)
     if ext != '.tvwiz':
-      warning("does not end with .tvwiz: %r", self.dirpath)
+      warning("does not end with .tvwiz: %r", self.fspath)
     title, daytext, timetext = basis.rsplit('_', 2)
     try:
       timetext, plustext = timetext.rsplit('+', 1)
@@ -238,7 +242,7 @@ class TVWiz(_Recording):
   def trunc_records(self):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
-    with open(os.path.join(self.dirpath, "trunc"), "rb") as tfp:
+    with open(joinpath(self.fspath, "trunc"), "rb") as tfp:
       for trec in self.tvwiz_parse_trunc(tfp):
         yield trec
 
