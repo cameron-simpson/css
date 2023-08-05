@@ -137,7 +137,13 @@ class TVWiz(_Recording):
     ]
     if extra_opts:
       tvwiz_extra_opts.extend(extra_opts)
-    super().convert(dstpath, extra_opts=tvwiz_extra_opts, **kw)
+    with NamedTemporaryFile(prefix=basename(self.fspath) + '--',
+                            suffix='.ts') as T:
+      for bs in self.video_data():
+        T.write(bs)
+      T.flush()
+      trace(super().convert
+            )(dstpath, srcpath=T.name, extra_opts=tvwiz_extra_opts, **kw)
 
   def _parse_path(self):
     basis, ext = os.path.splitext(self.dirpath)
@@ -245,6 +251,20 @@ class TVWiz(_Recording):
     with open(joinpath(self.fspath, "trunc"), "rb") as tfp:
       for trec in self.tvwiz_parse_trunc(tfp):
         yield trec
+
+  def video_filenames(self):
+    ''' The video filenames in lexical order. '''
+    return sorted(self.fnmatch('[0-9][0-9][0-9][0-9]'))
+
+  def video_pathnames(self):
+    ''' The filesystem paths of the video data files in lexical order. '''
+    return [self.pathto(filename) for filename in self.video_filenames()]
+
+  def video_data(self):
+    ''' Generator yielding `bytes` instances from the video files. '''
+    for path in self.video_pathnames():
+      with open(path, 'rb') as vf:
+        yield from datafrom(vf)
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
