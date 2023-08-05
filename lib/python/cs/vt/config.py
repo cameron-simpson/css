@@ -648,6 +648,7 @@ class Config(SingletonMixin, HasThreadState):
       host=None,
       port=None,
       hashclass=None,
+      addif=False,
   ):
     ''' Construct a TCPClientStore from a "tcp" clause.
     '''
@@ -657,7 +658,12 @@ class Config(SingletonMixin, HasThreadState):
       raise ValueError('no "port"')
     if isinstance(port, str):
       port, _ = get_integer(port, 0)
-    return TCPClientStore(store_name, (host, port), hashclass=hashclass)
+    return TCPClientStore(
+        store_name,
+        (host, port),
+        hashclass=hashclass,
+        addif=addif,
+    )
 
   @staticmethod
   def socket_Store(
