@@ -11,6 +11,7 @@ import errno
 from collections import namedtuple
 import datetime
 import os.path
+
 from cs.binary import structtuple
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import warning
@@ -18,6 +19,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.py3 import datetime_fromisoformat
 from cs.tagset import TagSet
 from cs.threads import locked_property
+
 from . import _Recording
 
 # an "access poiint" record from the .ap file
@@ -33,6 +35,30 @@ class Enigma2(_Recording):
   '''
 
   DEFAULT_FILENAME_BASIS = '{meta.title:lc}--{file.channel:lc}--beyonwiz--{file.datetime}--{meta.description:lc}'
+
+  FFMPEG_METADATA_MAPPINGS = {
+
+      # available metadata for MP4 files
+      'mp4': {
+          'album': None,
+          'album_artist': None,
+          'author': None,
+          'comment': None,
+          'composer': None,
+          'copyright': None,
+          'description': None,
+          'episode_id': None,
+          'genre': None,
+          'grouping': None,
+          'lyrics': None,
+          'network': lambda tags: tags.file.channel,
+          'show': lambda tags: tags.meta.title,
+          'synopsis': lambda tags: tags['meta.description'],
+          'title': lambda tags: tags['meta.title'],
+          'track': None,
+          'year': None,
+      }
+  }
 
   def __init__(self, tspath):
     _Recording.__init__(self, tspath)

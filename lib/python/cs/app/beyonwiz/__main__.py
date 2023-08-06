@@ -12,7 +12,7 @@ from pprint import pformat
 import sys
 
 from cs.cmdutils import BaseCommand
-from cs.ffmpegutils import convert as ffconvert, ffprobe
+from cs.ffmpegutils import ffprobe
 from cs.logutils import warning
 from cs.pfx import Pfx
 
@@ -124,6 +124,16 @@ class BWizCmd(BaseCommand):
         ) else 1
     )
 
+  def cmd_ffprobe(self, argv):
+    ''' Run `ffprobe` against a file.
+
+        Usage: {cmd} media-file
+          Probe media-file with "ffprobe" and print the result.
+    '''
+    filename, = argv
+    probed = ffprobe(filename)
+    print(json.dumps(probed, sort_keys=True, indent=2))
+
   def cmd_meta(self, argv):
     ''' Usage: {cmd} recording...
           Report metadata for the supplied recordings.
@@ -136,18 +146,8 @@ class BWizCmd(BaseCommand):
         print(filename)
         print(pformat(R.metadata))
         print(R.DEFAULT_FILENAME_BASIS)
-        print(R.filename(ext=DEFAULT_MEDIAFILE_FORMAT))
+        print("=>", R.filename(ext=DEFAULT_MEDIAFILE_FORMAT))
     return 0
-
-  def cmd_ffprobe(self, argv):
-    ''' Run `ffprobe` against a file.
-
-        Usage: {cmd} media-file
-          Probe media-file with "ffprobe" and print the result.
-    '''
-    filename, = argv
-    probed = ffprobe(filename)
-    print(json.dumps(probed, sort_keys=True, indent=2))
 
   def cmd_scan(self, argv):
     ''' Scan a TVWiz directory.
