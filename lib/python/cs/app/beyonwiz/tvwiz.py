@@ -6,9 +6,6 @@ TVWiz (pre-T3 Beyonwiz devices) specific support.
 
 from collections import namedtuple
 from datetime import datetime
-import fnmatch
-import os
-import os.path
 from os.path import (
     basename,
     join as joinpath,
@@ -22,13 +19,12 @@ from cs.binary import BinaryMultiStruct, BinarySingleStruct
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.fileutils import datafrom
-from cs.fs import HasFSPath, fnmatchdir
 from cs.logutils import warning, error
-from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.pfx import pfx, pfx_call
 from cs.tagset import TagSet
 from cs.threads import locked_property
 
-from . import _Recording, RecordingMetaData
+from . import _Recording
 
 # constants related to headers
 #
@@ -120,7 +116,6 @@ class TVWiz_Header(namedtuple(
 )):
 
   @classmethod
-  @trace
   @promote
   def parse(cls, bfr: CornuCopyBuffer) -> 'TVWiz_Header':
     bs_1024 = bfr.take(1024)
@@ -165,7 +160,6 @@ def bytes0_to_str(bs0, encoding='utf8'):
 def unrle(bfr: CornuCopyBuffer, fmt):
   ''' Decode a TVWiz run length encoded record. UNUSED.
   '''
-  offset0 = bfr.offset
   S = struct.Struct(fmt)
   length_bs = bfr.take(S.size)
   length, = S.unpack(length_bs)
@@ -192,8 +186,7 @@ class TVWiz(_Recording):
           'genre': None,
           'grouping': None,
           'lyrics': None,
-          'network':
-          (lambda tags: (X("tags = %s", tags), tags.service_name)[-1]),
+          'network': lambda tags: tags.service_name,
           'show': lambda tags: tags.series_name,
           'synopsis': lambda tags: tags.description,
           'title': lambda tags: tags.series_name,
