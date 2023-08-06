@@ -11,7 +11,14 @@ from abc import ABC, abstractmethod
 import datetime
 import json
 import os.path
-from os.path import join as joinpath, isdir as isdirpath
+from os.path import (
+    exists as existspath,
+    isabs as isabspath,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+    splitext,
+)
 from threading import Lock
 from types import SimpleNamespace as NS
 
@@ -237,10 +244,10 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     ''' Find an available unused pathname based on `path`.
         Raises ValueError in none is available.
     '''
-    basis, ext = os.path.splitext(path)
+    basis, ext = splitext(path)
     for i in range(max_n):
       path2 = "%s--%d%s" % (basis, i + 1, ext)
-      if not os.path.exists(path2):
+      if not existspath(path2):
         return path2
     raise ValueError(
         "no available --0..--%d variations: %r" % (max_n - 1, path)
@@ -274,23 +281,23 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
             "%d timespans but do_copyto is true" % (len(timespans,))
         )
     else:
-      # stop path looking like a URL
-      if not os.path.isabs(srcpath):
-        srcpath = os.path.join('.', srcpath)
       if srcpath is None:
         srcpath = self.fspath
+      # stop srcpath looking like a URL
+      if not isabspath(srcpath):
+        srcpath = joinpath('.', srcpath)
     if dstpath is None:
       dstpath = self.filename(ext=dstfmt)
     elif dstpath.endswith('/'):
       dstpath += self.filename(ext=dstfmt)
     elif isdirpath(dstpath):
       dstpath = joinpath(dstpath, self.filename(ext=dstfmt))
-    # stop path looking like a URL
-    if not os.path.isabs(dstpath):
-      dstpath = os.path.join('.', dstpath)
+    # stop dstpath looking like a URL
+    if not isabspath(dstpath):
+      dstpath = joinpath('.', dstpath)
     ok = True
     with Pfx(dstpath):
-      if os.path.exists(dstpath):
+      if existspath(dstpath):
         ok = False
         if max_n is not None:
           try:
@@ -303,10 +310,10 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
           error("file exists")
       if not ok:
         return ok
-      if os.path.exists(dstpath):
+      if existspath(dstpath):
         raise ValueError("dstpath exists")
       if dstfmt is None:
-        _, ext = os.path.splitext(dstpath)
+        _, ext = splitext(dstpath)
         if not ext:
           raise ValueError(
               "can't infer output format from dstpath, no extension"

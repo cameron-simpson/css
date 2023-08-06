@@ -8,6 +8,11 @@ from collections import namedtuple
 import datetime
 import os
 import os.path
+from os.path import (
+    basename,
+    join as joinpath,
+    splitext,
+)
 import struct
 from cs.fs import HasFSPath, fnmatchdir
 from cs.logutils import warning, error
@@ -171,8 +176,8 @@ class TVWiz(_Recording):
       trace(super().convert
             )(dstpath, srcpath=T.name, extra_opts=tvwiz_extra_opts, **kw)
 
-  def _parse_path(self):
-    basis, ext = os.path.splitext(self.dirpath)
+  def _parse_path(self) -> Tuple[str, datetime]:
+    basis, ext = splitext(basename(self.fspath))
     if ext != '.tvwiz':
       warning("does not end with .tvwiz: %r", self.fspath)
     title, daytext, timetext = basis.rsplit('_', 2)
