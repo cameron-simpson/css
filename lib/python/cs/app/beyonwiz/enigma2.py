@@ -11,6 +11,7 @@ import errno
 from collections import namedtuple
 import datetime
 import os.path
+
 from cs.binary import structtuple
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import warning
@@ -18,6 +19,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.py3 import datetime_fromisoformat
 from cs.tagset import TagSet
 from cs.threads import locked_property
+
 from . import _Recording
 
 # an "access poiint" record from the .ap file
@@ -49,8 +51,7 @@ class Enigma2(_Recording):
           'genre': None,
           'grouping': None,
           'lyrics': None,
-          'network': lambda tags:
-          (X("tags = %s", tags), tags.file.channel)[-1],
+          'network': lambda tags: tags.file.channel,
           'show': lambda tags: tags.meta.title,
           'synopsis': lambda tags: tags['meta.description'],
           'title': lambda tags: tags['meta.title'],
