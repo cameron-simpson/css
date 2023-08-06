@@ -9,7 +9,7 @@ set -ue
 use_tmux=
 [ -n "${FFMPEG_DOCKER_TMUX:-}" ] && use_tmux=1
 image=linuxserver/ffmpeg
-runopts=--rm
+runopts='--rm --read-only'
 ffopts=
 
 cmd=$0
