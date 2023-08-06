@@ -117,6 +117,32 @@ class TVWizMetaData(RecordingMetaData):
 class TVWiz(_Recording):
   ''' A TVWiz specific _Recording for pre-T3 Beyonwiz devices.
   '''
+  DEFAULT_FILENAME_BASIS = '{series_name:lc}--{service_name:lc}--beyonwiz--{file_dt}--{description:lc}'
+
+  FFMPEG_METADATA_MAPPINGS = {
+
+      # available metadata for MP4 files
+      'mp4': {
+          'album': None,
+          'album_artist': None,
+          'author': None,
+          'comment': None,
+          'composer': None,
+          'copyright': None,
+          'description': lambda tags: tags.description,
+          'episode_id': None,
+          'genre': None,
+          'grouping': None,
+          'lyrics': None,
+          'network':
+          (lambda tags: (X("tags = %s", tags), tags.service_name)[-1]),
+          'show': lambda tags: tags.series_name,
+          'synopsis': lambda tags: tags.description,
+          'title': lambda tags: tags.series_name,
+          'track': None,
+          'year': lambda tags: tags.filename_dt.year,
+      }
+  }
 
   def __init__(self, wizdir):
     _Recording.__init__(self, wizdir)

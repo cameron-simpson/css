@@ -34,6 +34,31 @@ class Enigma2(_Recording):
 
   DEFAULT_FILENAME_BASIS = '{meta.title:lc}--{file.channel:lc}--beyonwiz--{file.datetime}--{meta.description:lc}'
 
+  FFMPEG_METADATA_MAPPINGS = {
+
+      # available metadata for MP4 files
+      'mp4': {
+          'album': None,
+          'album_artist': None,
+          'author': None,
+          'comment': None,
+          'composer': None,
+          'copyright': None,
+          'description': None,
+          'episode_id': None,
+          'genre': None,
+          'grouping': None,
+          'lyrics': None,
+          'network': lambda tags:
+          (X("tags = %s", tags), tags.file.channel)[-1],
+          'show': lambda tags: tags.meta.title,
+          'synopsis': lambda tags: tags['meta.description'],
+          'title': lambda tags: tags['meta.title'],
+          'track': None,
+          'year': None,
+      }
+  }
+
   def __init__(self, tspath):
     _Recording.__init__(self, tspath)
     self.srcfmt = 'mpegts'

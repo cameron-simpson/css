@@ -56,30 +56,6 @@ DISTINFO = {
 
 DEFAULT_MEDIAFILE_FORMAT = 'mp4'
 
-FFMPEG_METADATA_MAPPINGS = {
-
-    # available metadata for MP4 files
-    'mp4': {
-        'album': None,
-        'album_artist': None,
-        'author': None,
-        'comment': None,
-        'composer': None,
-        'copyright': None,
-        'description': None,
-        'episode_id': None,
-        'genre': None,
-        'grouping': None,
-        'lyrics': None,
-        'network': lambda M: M['file.channel'],
-        'show': lambda M: M['meta.title'],
-        'synopsis': lambda M: M['meta.description'],
-        'title': lambda M: M['meta.title'],
-        'track': None,
-        'year': None,
-    }
-}
-
 # UNUSED
 def trailing_nul(bs):
   ''' Strip trailing `NUL`s
