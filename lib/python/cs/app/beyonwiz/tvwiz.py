@@ -5,7 +5,8 @@ TVWiz (pre-T3 Beyonwiz devices) specific support.
 '''
 
 from collections import namedtuple
-import datetime
+from datetime import datetime
+import fnmatch
 import os
 import os.path
 from os.path import (
@@ -14,10 +15,19 @@ from os.path import (
     splitext,
 )
 import struct
+from tempfile import NamedTemporaryFile
+from typing import Tuple
+
+from cs.binary import BinaryMultiStruct, BinarySingleStruct
+from cs.buffer import CornuCopyBuffer
+from cs.deco import promote
+from cs.fileutils import datafrom
 from cs.fs import HasFSPath, fnmatchdir
 from cs.logutils import warning, error
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.tagset import TagSet
 from cs.threads import locked_property
+
 from . import _Recording, RecordingMetaData
 
 # constants related to headers
@@ -51,27 +61,97 @@ HEADER_DATA_OFF = HDR_MAIN_OFF
 HEADER_DATA_SZ = HDR_EXTINFO_OFF + HDR_EXTINFO_SZ
 
 # TVWizFileHeader: 5 unsigned shorts, then 4 bytes: lock, mediaType, inRec, unused
-TVWizFileHeader = struct.Struct('<HHHHHBBBB')
-# TOffset: unsigned long long lastOff, then 8640 unsigned long long fileOff
+#
+# from wizhdrs.h above:
+#
+# struct TVWizFileHeader { /* Offest 0 */
+#     ushort      hidden[5];
+#     uchar       lock;
+#     uchar       mediaType;
+#     uchar       inRec;
+#     uchar       unused;
+# };
+#
+TVWizFileHeader = BinaryMultiStruct(
+    'TVWizFileHeader',
+    '<5HBBBB',
+    'hidden1 hidden2 hidden3 hidden4 hidden5 lock media_type in_rec unused',
+)
+
+# TOffset: unsigned long long last_offset, then 8640 unsigned long long fileOff
 # TVWizTSPoint, offset 1024:
-#    svcName    eg TV channel name
-#    evtName    eg program title
-#    mjd        Modified Julian Date
-#                 http://tycho.usno.navy.mil/mjd.html
+#    service_name       eg TV channel name
+#    event_name         eg program title
+#    mod_julian_date    Modified Julian Date
+#                       http://tycho.usno.navy.mil/mod_julian_date.html
 #    pad
 #    start
-#    last       play time = last*10 + sec
+#    last               play time = last*10 + sec
 #    sec
-#    lastOff
-# followed by 8640 fileOff
-TVWizTSPoint = struct.Struct('<256s256sHHLHHQ')
+#    last_offset
+#    followed by 8640 fileOff
+class TVWizTSPoint(BinaryMultiStruct(
+    'TVWizTSPoint',
+    '<256s256sHHLHHQ',
+    'service_name_bs0 event_name_bs0 mod_julian_date pad start last sec last_offset',
+)):
+
+  @property
+  def event_name(self):
+    return bytes0_to_str(self.event_name_bs0)
+
+  @property
+  def service_name(self):
+    return bytes0_to_str(self.service_name_bs0)
+
+  @property
+  def start_unixtime(self):
+    return (self.mod_julian_date - 40587) * DAY + self.start
+
+TVWizFileOffset = BinarySingleStruct(
+    'TVWizFileOffset', '<Q', field_name='offset'
+)
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 
-TVWiz_Header = namedtuple(
+class TVWiz_Header(namedtuple(
     'TVWiz_Header',
-    'lock mediaType inRec svcName evtName episode synopsis mjd start playtime lastOff'
-)
+    'file_header event_header file_offsets episode synopsis',
+)):
+
+  @classmethod
+  @trace
+  @promote
+  def parse(cls, bfr: CornuCopyBuffer) -> 'TVWiz_Header':
+    bs_1024 = bfr.take(1024)
+    fhdr = TVWizFileHeader.parse(bs_1024)
+    evhdr = TVWizTSPoint.parse(bfr)
+    file_offsets = [TVWizFileOffset.parse(bfr).value for _ in range(8640)]
+
+    assert HDR_EPISODE_OFF > bfr.offset
+    bfr.skipto(HDR_EPISODE_OFF)
+    epi_bs = unrle(bfr, '<B').rstrip(b'\xff')
+    episode = epi_bs.decode('utf8', errors='replace')
+
+    assert HDR_EXTINFO_OFF > bfr.offset
+    bfr.skipto(HDR_EXTINFO_OFF)
+    syn_bs = unrle(bfr, '<H').rstrip(b'\xff')
+    synopsis = syn_bs.decode('utf8', errors='replace')
+
+    # sometimes the description seems to be in the episode
+    # sometimes not
+    if not synopsis:
+      synopsis = episode
+      if len(episode.split()) > 10:
+        episode = ''
+
+    return cls(
+        file_header=fhdr,
+        event_header=evhdr,
+        file_offsets=file_offsets,
+        episode=episode,
+        synopsis=synopsis,
+    )
 
 def bytes0_to_str(bs0, encoding='utf8'):
   ''' Decode a NUL terminated chunk of bytes into a string.
@@ -79,45 +159,18 @@ def bytes0_to_str(bs0, encoding='utf8'):
   nulpos = bs0.find(0)
   if nulpos >= 0:
     bs0 = bs0[:nulpos]
-  s = bs0.decode(encoding)
-  return s
+  s0 = bs0.decode(encoding)
+  return s0
 
-def unrle(data, fmt, offset=0):
+def unrle(bfr: CornuCopyBuffer, fmt):
   ''' Decode a TVWiz run length encoded record. UNUSED.
   '''
-  offset0 = offset
+  offset0 = bfr.offset
   S = struct.Struct(fmt)
-  offset2 = offset + S.size
-  length, = S.unpack(data[offset:offset2])
-  offset = offset2
-  offset2 += length
-  subdata = data[offset:offset2]
-  if length != len(subdata):
-    warning(
-        "unrle(%r...): rle=%d but len(subdata)=%d", data[offset0:offset0 + 16],
-        length, len(subdata)
-    )
-  offset += len(subdata)
-  return subdata, offset
-
-class TVWizMetaData(RecordingMetaData):
-  ''' Metadata for pre-T3 Beyonwiz devices.
-  '''
-
-  @pfx_method
-  def __init__(self, raw):
-    RecordingMetaData.__init__(self, raw)
-    self.series_name = raw['evtName']
-    self.description = raw['synopsis']
-    self.start_unixtime = (raw['mjd'] - 40587) * DAY + raw['start']
-    channel = raw['svcName']
-    if channel:
-      self.source_name = channel
-    episode = raw['episode']
-    try:
-      self.episodeinfo.episode = int(episode)
-    except ValueError:
-      self.episodeinfo.episode_title = episode
+  length_bs = bfr.take(S.size)
+  length, = S.unpack(length_bs)
+  data = bfr.take(length)
+  return data
 
 class TVWiz(_Recording):
   ''' A TVWiz specific _Recording for pre-T3 Beyonwiz devices.
@@ -173,8 +226,9 @@ class TVWiz(_Recording):
       for bs in self.video_data():
         T.write(bs)
       T.flush()
-      trace(super().convert
-            )(dstpath, srcpath=T.name, extra_opts=tvwiz_extra_opts, **kw)
+      return super().convert(
+          dstpath, srcpath=T.name, extra_opts=tvwiz_extra_opts, **kw
+      )
 
   def _parse_path(self) -> Tuple[str, datetime]:
     basis, ext = splitext(basename(self.fspath))
@@ -189,73 +243,24 @@ class TVWiz(_Recording):
       warning("discarding %r from timetext", "+" + plustext)
     title = title.replace('_ ', ': ').replace('_s ', "'s ")
     to_parse = daytext + timetext
-    dt = datetime.datetime.strptime(to_parse, '%b.%d.%Y%H.%M')
+    dt = pfx_call(datetime.strptime, to_parse, '%b.%d.%Y%H.%M')
     return title, dt
 
-  @staticmethod
-  def parse_header_data(data, offset=0):
-    ''' Decode the data chunk from a TV or radio header chunk.
-    '''
-    h1, h2, h3, h4, h5, \
-    lock, mediaType, inRec, _ \
-        = TVWizFileHeader.unpack(data[offset:offset+TVWizFileHeader.size])
-    # skip ahead to TSPoint information
-    offset += 1024
-    svcName, evtName, \
-    mjd, _, start, last, sec, lastOff \
-        = TVWizTSPoint.unpack(data[offset:offset+TVWizTSPoint.size])
-    svcName = bytes0_to_str(svcName)
-    evtName = bytes0_to_str(evtName)
-    # advance to file offsets
-    offset += TVWizTSPoint.size
-    fileOffs = []
-    for i in range(0, 8640):
-      fileOff, = struct.unpack('<Q', data[offset:offset + 8])
-      fileOffs.append(fileOff)
-      offset += 8
-    epi_b, offset = unrle(
-        data[HDR_EPISODE_OFF:HDR_EPISODE_OFF + HDR_EPISODE_SZ], '<B'
-    )
-    epi_b = epi_b.rstrip(b'\xff')
-    syn_b, offset = unrle(
-        data[HDR_EXTINFO_OFF:HDR_EXTINFO_OFF + HDR_EXTINFO_SZ], '<H'
-    )
-    syn_b = syn_b.rstrip(b'\xff')
-    episode = epi_b.decode('utf8', errors='replace')
-    synopsis = syn_b.decode('utf8', errors='replace')
-    return TVWiz_Header(
-        lock=lock,
-        mediaType=mediaType,
-        inRec=inRec,
-        svcName=svcName,
-        evtName=evtName,
-        episode=episode,
-        synopsis=synopsis,
-        mjd=mjd,
-        start=start,
-        playtime=last * 10 + sec,
-        lastOff=lastOff
-    )
-
-  def read_header(self):
-    ''' Read and decode the header data.
-    '''
-    with open(self.headerpath, "rb") as hfp:
-      data = hfp.read()
-    return self.parse_header_data(data)
-
   @locked_property
-  def metadata(self):
+  def metadata(self) -> TagSet:
     ''' The decoded metadata.
     '''
-    hdrs = self.read_header()
+    tvhdr = TVWiz_Header.parse(self.headerpath)
+    file_title, file_dt = self._parse_path()
     tags = TagSet(
-        series_name=hdrs.evtName,
-        description=hdrs.synopsis,
-        start_unixtime=(raw['mjd'] - 40587) * DAY + raw['start'],
-        course_name=hdrs.svcName,
+        file_title=file_title,
+        file_dt=file_dt,
+        series_name=tvhdr.event_header.event_name,
+        description=tvhdr.synopsis,
+        start_unixtime=tvhdr.event_header.start_unixtime,
+        service_name=tvhdr.event_header.service_name,
     )
-    episode = hdrs.episode
+    episode = tvhdr.episode
     try:
       episode_num = int(episode)
     except ValueError:
