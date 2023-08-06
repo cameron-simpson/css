@@ -302,30 +302,31 @@ class TVWiz(_Recording):
       with open(path, 'rb') as vf:
         yield from datafrom(vf)
 
+  @pfx
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
     '''
-    with Pfx("data(%s)", self.dirpath):
-      fp = None
-      lastFileNum = None
-      for rec in self.trunc_records():
-        wizOffset, fileNum, flags, offset, size = rec
-        if lastFileNum is None or lastFileNum != fileNum:
-          if lastFileNum is not None:
-            fp.close()
-          fp = open(os.path.join(self.dirpath, "%04d" % (fileNum,)), "rb")
-          filePos = 0
-          lastFileNum = fileNum
-        if filePos != offset:
-          fp.seek(offset)
-        while size > 0:
-          rsize = min(size, 8192)
-          buf = fp.read(rsize)
-          assert len(buf) <= rsize
-          if not buf:
-            error("%s: unexpected EOF", fp)
-            break
-          yield buf
-          size -= len(buf)
-      if lastFileNum is not None:
-        fp.close()
+    # TODO: yield from a buffer, cropped?
+    vf = None
+    lastFileNum = None
+    for rec in self.trunc_records():
+      wizOffset, fileNum, flags, offset, size = rec
+      if lastFileNum is None or lastFileNum != fileNum:
+        if lastFileNum is not None:
+          vf.close()
+        vf = open(self.pathto("%04d" % (fileNum,)), "rb")
+        filePos = 0
+        lastFileNum = fileNum
+      if filePos != offset:
+        vf.seek(offset)
+      while size > 0:
+        rsize = min(size, 8192)
+        buf = vf.read(rsize)
+        assert len(buf) <= rsize
+        if not buf:
+          error("%s: unexpected EOF", vf)
+          break
+        yield buf
+        size -= len(buf)
+    if lastFileNum is not None:
+      vf.close()
