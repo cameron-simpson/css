@@ -209,7 +209,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
       ext = '.' + ext
     md = self.metadata
     full_filename = md.format_as(format).replace('\r', '_').replace('\n', '_')
-    return crop_name(full_filename + ext, ext=ext)
+    return crop_name(full_filename + ext, ext=ext, name_max=191)
 
   @abstractmethod
   def data(self):
