@@ -8,7 +8,7 @@ structures and to access Beyonwiz devices via the net.
 '''
 
 from abc import ABC, abstractmethod
-import datetime
+from datetime import datetime
 import json
 from os.path import (
     exists as existspath,
@@ -87,7 +87,7 @@ def jsonable(value):
     return {field: jsonable(subvalue) for field, subvalue in value.items()}
   if isinstance(value, (set, tuple, list)):
     return [jsonable(subvalue) for subvalue in value]
-  if isinstance(value, datetime.datetime):
+  if isinstance(value, datetime):
     return value.isoformat(' ')
   try:
     d = value._asdict()
@@ -104,7 +104,7 @@ class MetaJSONEncoder(json.JSONEncoder):
   def default(self, o):
     if isinstance(o, set):
       return sorted(o)
-    if isinstance(o, datetime.datetime):
+    if isinstance(o, datetime):
       return o.isoformat(' ')
     return json.JSONEncoder.default(self, o)
 
@@ -149,7 +149,7 @@ class RecordingMetaData(NS):
   def start_dt(self):
     ''' Start of recording as a datetime.datetime.
     '''
-    return datetime.datetime.fromtimestamp(self.start_unixtime)
+    return datetime.fromtimestamp(self.start_unixtime)
 
   @property
   def start_dt_iso(self):
@@ -365,7 +365,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     ''' Compute the metadata for the output format
         which may be passed with the input arguments.
     '''
-    M = self.metadata
+    md_tags = self.metadata
     with Pfx("metadata for dstformat %r", dstfmt):
       ffmeta_kw = dict(
           comment=f'Transcoded from {self.fspath!r} using ffmpeg.'
@@ -375,9 +375,18 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
           if beymeta is None:
             continue
           if isinstance(beymeta, str):
-            ffmetavalue = M.get(beymeta, '')
+            # metadata name
+            beymeta = md_tags.get(beymeta, '')
           elif callable(beymeta):
-            ffmetavalue = beymeta(M)
+            # function
+            beymeta = beymeta(md_tags)
+          # compute ffmetavalue
+          if isinstance(beymeta, str):
+            ffmetavalue = beymeta
+          elif isinstance(beymeta, (int, float)):
+            ffmetavalue = str(beymeta)
+          elif isinstance(beymeta, datetime):
+            ffmetavalue = beymeta.isoformat()
           else:
             raise RuntimeError(
                 "unsupported beymeta %s:%r" %
@@ -387,5 +396,5 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
               "ffmetavalue should be a str, got %s:%r" %
               (type(ffmetavalue).__name__, ffmetavalue)
           )
-          ffmeta_kw[ffmeta] = beymeta(M)
+          ffmeta_kw[ffmeta] = ffmetavalue
     return ffmeta_kw
