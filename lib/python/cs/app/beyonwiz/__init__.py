@@ -368,10 +368,10 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     '''
     M = self.metadata
     with Pfx("metadata for dstformat %r", dstfmt):
-      for ffmeta, beymeta in FFMPEG_METADATA_MAPPINGS[dstfmt].items():
       ffmeta_kw = dict(
           comment=f'Transcoded from {self.fspath!r} using ffmpeg.'
       )
+      for ffmeta, beymeta in self.FFMPEG_METADATA_MAPPINGS[dstfmt].items():
         with Pfx("%r->%r", beymeta, ffmeta):
           if beymeta is None:
             continue
