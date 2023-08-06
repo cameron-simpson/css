@@ -43,7 +43,7 @@ cs.excutils pypi.release="20230212.1" ok_revision="2e8aa06ec61e7b92454d70fa9430b
 cs.ffmpegutils
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20230421" ok_revision="62626d992e97416fe7d75cf9f1908f060a800fca" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
-cs.fs ok_revision=d636cb2ccd71e4b8cc237d054859053da6bfcea1 pypi.release="20230401" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
+cs.fs ok_revision=d636cb2ccd71e4b8cc237d054859053da6bfcea1 pypi.release="20230806" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
 cs.fsm ok_revision=ef0fb0ddccdc43e16ca922726cbf2adfb7eebff4 pypi.release="20221118"
 cs.fsrelease
 cs.fstags pypi.release="20230407" ok_revision=bdd5aabd7c2b1cb5ee8ddcac56dd8ab9dbab0456 features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"]}
