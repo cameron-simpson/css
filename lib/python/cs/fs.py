@@ -43,7 +43,6 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'icontract',
-        'typeguard',
     ],
 }
 
