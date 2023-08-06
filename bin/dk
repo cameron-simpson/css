@@ -252,7 +252,6 @@ case "$op" in
       [ $# -gt 0 ] || set -- -f -t --tail=50 "$DK_PRIMARY_SERVICE"
       ;;
   pid)ptn=$( echo "$*" | tr ' ' '|' )
-      set -x
       grep NSpid: /proc/*/status | egrep "$ptn"
       exit $?
       ;;
