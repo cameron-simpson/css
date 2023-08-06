@@ -169,7 +169,7 @@ def unrle(bfr: CornuCopyBuffer, fmt):
 class TVWiz(_Recording):
   ''' A TVWiz specific _Recording for pre-T3 Beyonwiz devices.
   '''
-  DEFAULT_FILENAME_BASIS = '{series_name:lc}--{service_name:lc}--beyonwiz--{file_dt}--{description:lc}'
+  DEFAULT_FILENAME_BASIS = '{series_name:lc}--{file_dt}--{service_name:lc}--beyonwiz--{description:lc}'
 
   FFMPEG_METADATA_MAPPINGS = {
 
