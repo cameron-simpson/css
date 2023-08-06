@@ -129,10 +129,13 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+docker_name=$( echo "ffmpeg $inputbase $$" | tr -s ' .:+' '____' )
+
 uid=$( id -u )
 gid=$( id -g )
 
 set -- docker run $runopts $run_it_opts \
+    --name "$docker_name" \
     --mount "type=bind,readonly,source=$inputmnt,destination=$inputmnt_as" \
     --mount "type=bind,source=$outputmnt,destination=$outputmnt_as" \
     -w "$convdir" \
@@ -144,7 +147,7 @@ set -- docker run $runopts $run_it_opts \
 
 if [ $use_tmux ]
 then
-  session_name=$( echo "FFMPEG $inputbase $outputbase $$" | tr -s ' .:' '___' )
+  session_name=$( echo "FFMPEG_$inputbase $outputbase $$" | tr -s ' .:+' '____' )
   set -- tm -x "$session_name" "$@"
 fi
 
