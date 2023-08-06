@@ -34,7 +34,7 @@ class Enigma2(_Recording):
         https://github.com/oe-alliance/oe-alliance-enigma2/blob/master/doc/FILEFORMAT
   '''
 
-  DEFAULT_FILENAME_BASIS = '{meta.title:lc}--{file.channel:lc}--beyonwiz--{file.datetime}--{meta.description:lc}'
+  DEFAULT_FILENAME_BASIS = '{meta.title:lc}--{file.datetime}--{file.channel:lc}--beyonwiz--{meta.description:lc}'
 
   FFMPEG_METADATA_MAPPINGS = {
 
