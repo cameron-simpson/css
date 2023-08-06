@@ -191,7 +191,7 @@ class TVWiz(_Recording):
           'synopsis': lambda tags: tags.description,
           'title': lambda tags: tags.series_name,
           'track': None,
-          'year': lambda tags: tags.filename_dt.year,
+          'year': lambda tags: tags.file_dt.year,
       }
   }
 
