@@ -10,7 +10,6 @@ structures and to access Beyonwiz devices via the net.
 from abc import ABC, abstractmethod
 import datetime
 import json
-import os.path
 from os.path import (
     exists as existspath,
     isabs as isabspath,
@@ -65,7 +64,7 @@ DEFAULT_MEDIAFILE_FORMAT = 'mp4'
 
 # UNUSED
 def trailing_nul(bs):
-  ''' Strip trailing `NUL`s
+  ''' Strip trailing `NUL`s.
   '''
   bs = bs.rstrip(b'\x00')
   # locate preceeding NUL padded area
