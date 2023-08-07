@@ -633,6 +633,7 @@ class SymlinkDirent(_Dirent):
 
   def __init__(self, name, *, target=None, **kw):
     super().__init__(DirentType.SYMBOLIC, name, **kw)
+    self.block = None
     if target is None:
       if self.meta.pathref is None:
         raise ValueError("missing target")
