@@ -464,8 +464,8 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
 
   @property
   def config(self):
-    ''' The configuration for use with this Store.
-        Falls back to `defaults.config`.
+    ''' The configuration for use with this `Store`.
+        Falls back to `Config.default`.
     '''
     from .config import Config
     return self._config or Config.default(factory=True)
