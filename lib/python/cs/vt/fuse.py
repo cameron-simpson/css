@@ -18,7 +18,9 @@ from os.path import abspath, dirname
 import stat
 import subprocess
 import sys
+from threading import Thread
 import time
+from typing import Optional
 
 from cs.deco import decorator
 from cs.excutils import logexc
@@ -26,10 +28,13 @@ from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
 from cs.x import X
 
-from . import uses_Store
+from typeguard import typechecked
+
+from . import Store, uses_Store
 from .dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from .fs import FileHandle, FileSystem
 from .hash import MissingHashcodeError
+
 import llfuse
 
 FuseOSError = llfuse.FUSEError
@@ -49,18 +54,19 @@ PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 FS_IO_BLOCKSIZE = 4096
 
 @uses_Store
+@typechecked
 def mount(
-    mnt,
-    E,
+    mnt: str,
+    E: Dir,
     *,
-    S,
+    S: Store,
     archive=None,
-    subpath=None,
-    readonly=None,
-    append_only=False,
-    fsname=None
-):
-  ''' Run a FUSE filesystem, return the Thread running the filesystem.
+    subpath: Optional[str] = None,
+    readonly: Optional[bool] = None,
+    append_only: Optional[bool] = False,
+    fsname: Optional[str] = None,
+) -> Thread:
+  ''' Run a FUSE filesystem, return the `Thread` running the filesystem.
 
       Parameters:
       * `mnt`: mount point
