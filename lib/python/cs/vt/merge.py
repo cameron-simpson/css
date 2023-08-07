@@ -15,7 +15,7 @@ from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.upd import Upd, uses_upd
 
-from . import defaults
+from . import run_modes
 from .dir import Dir, FileDirent
 from .paths import DirLike, OSDir
 
@@ -47,7 +47,7 @@ def merge(
   ok = True
   if not target_root.exists():
     target_root.create()
-  if defaults.show_progress:
+  if run_modes.show_progress:
     proxy_cmgr = upd.insert(1)
   else:
     proxy_cmgr = nullcontext()
