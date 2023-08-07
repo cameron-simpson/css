@@ -120,7 +120,7 @@ class FFmpegSource:
   def add_as_input(self, ff):
     ''' Add as an input to `ff`.
         Return `None` if `self.source` is a pathname,
-        otherwise return the file descriptor of the data sourc.
+        otherwise return the file descriptor of the data source.
 
         Note: because we rely on `ff.input('pipe:')` for nonpathnames,
         you can only use a nonpathname `FFmpegSource` for one of the inputs.
