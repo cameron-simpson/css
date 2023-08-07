@@ -395,7 +395,7 @@ class StreamStore(StoreSyncBase):
   def contains(self, h):
     ''' Dispatch a contains request, return a `Result` for collection.
     '''
-    if h in self._contained_cache:
+    if h in self._contains_cache:
       return True
     rq = ContainsRequest(h)
     flags, payload = self.do(rq)
@@ -407,7 +407,7 @@ class StreamStore(StoreSyncBase):
     if payload:
       raise StoreError("unexpected payload: %r" % (payload,))
     if found:
-      self._contained_cache.add(h)
+      self._contains_cache.add(h)
     return found
 
   def flush(self):
