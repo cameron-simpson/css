@@ -500,13 +500,9 @@ class FileSystem(HasThreadState):
         with self._lock:
           E = self.E
           updated = False
-          X("snapshot %r  ...", E)
           E.snapshot()
-          X("snapshot: afterwards E=%r", E)
           fs_inode_dirents = self._inodes.get_fs_inode_dirents()
-          X("_SYNC: FS_INODE_DIRENTS:")
           dump_Dirent(fs_inode_dirents)
-          X("set meta.fs_inode_dirents")
           if fs_inode_dirents.size > 0:
             E.meta['fs_inode_dirents'] = str(fs_inode_dirents)
           else:
