@@ -15,7 +15,7 @@ from functools import lru_cache
 from subprocess import Popen, PIPE
 from threading import Lock
 import time
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from icontract import require
 from typeguard import typechecked
@@ -68,18 +68,19 @@ class StreamStore(StoreSyncBase):
       or simply to implement the server side.
   '''
 
+  @typechecked
   def __init__(
       self,
-      name,
+      name: str,
       recv,
       send,
       *,
-      addif=False,
-      connect=None,
+      addif: bool = False,
+      connect: Optional[Callable] = None,
       local_store=None,
       exports=None,
       capacity=None,
-      sync=False,
+      sync: bool = False,
       **kw
   ):
     ''' Initialise the `StreamStore`.
