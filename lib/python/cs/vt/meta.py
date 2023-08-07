@@ -597,7 +597,6 @@ class Meta(dict, Transcriber):
         use the group permissions.
         Otherwise use the "other" permissions.
     '''
-    X("META.ACCESS...")
     u = self.uid
     if u is None:
       u = default_uid
