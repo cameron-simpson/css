@@ -966,7 +966,7 @@ class Dir(_Dirent, DirLike):
   @locked
   def changed(self, status):
     ''' Mark this dirent as changed or not changed;
-        propagate truth to parent Dir if present.
+        propagate truth to ancestor `Dir`s.
     '''
     if not status:
       raise ValueError("cannot clear .changed")
