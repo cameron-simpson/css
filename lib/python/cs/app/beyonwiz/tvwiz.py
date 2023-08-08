@@ -205,23 +205,18 @@ class TVWiz(_Recording):
     ''' The filesystem path of the header file. '''
     return self.pathto(TVHDR)
 
-  def convert(self, dstpath, extra_opts=None, **kw):
+  def convert(self, dstpath, doit=True, **kw):
     ''' Wrapper for _Recording.convert which requests audio conversion to AAC.
     '''
-    tvwiz_extra_opts = [
-        '-c:a',
-        'aac',  # convert all audio to AAC
-    ]
-    if extra_opts:
-      tvwiz_extra_opts.extend(extra_opts)
     with NamedTemporaryFile(prefix=basename(self.fspath) + '--',
                             suffix='.ts') as T:
       for bs in self.video_data():
         T.write(bs)
+        if not doit:
+          # the first chunk is enough for the ffprobe
+          break
       T.flush()
-      return super().convert(
-          dstpath, srcpath=T.name, extra_opts=tvwiz_extra_opts, **kw
-      )
+      return super().convert(dstpath, srcpath=T.name, doit=doit, **kw)
 
   def _parse_path(self) -> Tuple[str, datetime]:
     basis, ext = splitext(basename(self.fspath))
