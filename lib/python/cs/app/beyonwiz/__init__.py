@@ -106,7 +106,7 @@ class MetaJSONEncoder(json.JSONEncoder):
       return sorted(o)
     if isinstance(o, datetime):
       return o.isoformat(' ')
-    return json.JSONEncoder.default(self, o)
+    return super().default(o)
 
 class RecordingMetaData(NS):
   ''' Base class for recording metadata.
