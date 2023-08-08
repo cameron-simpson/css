@@ -91,17 +91,22 @@ class TVWizTSPoint(BinaryMultiStruct(
     '<256s256sHHLHHQ',
     'service_name_bs0 event_name_bs0 mod_julian_date pad start last sec last_offset',
 )):
+  ''' Core recording information.
+  '''
 
   @property
   def event_name(self):
+    ''' The event name (programme name). '''
     return bytes0_to_str(self.event_name_bs0)
 
   @property
   def service_name(self):
+    ''' The service name (channel/station name). '''
     return bytes0_to_str(self.service_name_bs0)
 
   @property
   def start_unixtime(self):
+    ''' The start time of the recording as a UNIX timestamp. '''
     return (self.mod_julian_date - 40587) * DAY + self.start
 
 TVWizFileOffset = BinarySingleStruct(
@@ -118,6 +123,7 @@ class TVWiz_Header(namedtuple(
   @classmethod
   @promote
   def parse(cls, bfr: CornuCopyBuffer) -> 'TVWiz_Header':
+    ''' Parse a `TVWiz_Header` from `bfr`. '''
     bs_1024 = bfr.take(1024)
     fhdr = TVWizFileHeader.parse(bs_1024)
     evhdr = TVWizTSPoint.parse(bfr)
@@ -224,11 +230,12 @@ class TVWiz(_Recording):
       warning("does not end with .tvwiz: %r", self.fspath)
     title, daytext, timetext = basis.rsplit('_', 2)
     try:
-      timetext, plustext = timetext.rsplit('+', 1)
+      timetext, _ = timetext.rsplit('+', 1)
     except ValueError:
       pass
     else:
-      warning("discarding %r from timetext", "+" + plustext)
+      ##warning("discarding %r from timetext", "+" + plustext)
+      pass
     title = title.replace('_ ', ': ').replace('_s ', "'s ")
     to_parse = daytext + timetext
     dt = pfx_call(datetime.strptime, to_parse, '%b.%d.%Y%H.%M')
