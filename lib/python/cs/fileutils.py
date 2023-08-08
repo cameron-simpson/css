@@ -747,19 +747,19 @@ def crop_name(name, ext=None, name_max=255):
     return name
   return base[:max_base_len] + ext
 
-def max_suffix(dirpath, pfx):
+def max_suffix(dirpath, prefix):
   ''' Compute the highest existing numeric suffix
-      for names starting with the prefix `pfx`.
+      for names starting with `prefix`.
 
       This is generally used as a starting point for picking
       a new numeric suffix.
   '''
-  pfx = ustr(pfx)
+  prefix = ustr(prefix)
   maxn = None
-  pfxlen = len(pfx)
+  pfxlen = len(prefix)
   for e in os.listdir(dirpath):
     e = ustr(e)
-    if len(e) <= pfxlen or not e.startswith(pfx):
+    if len(e) <= pfxlen or not e.startswith(prefix):
       continue
     tail = e[pfxlen:]
     if tail.isdigit():
@@ -1644,6 +1644,7 @@ def atomic_filename(
     dir=None,
     prefix=None,
     suffix=None,
+    rename_func=rename,
     **kw
 ):
   ''' A context manager to create `filename` atomicly on completion.
@@ -1665,6 +1666,10 @@ def atomic_filename(
       * `suffix`: passed to `NamedTemporaryFile`, specifies a suffix
         for the temporary file; the default is the extension obtained
         from `splitext(basename(filename))`
+      * `rename_func`: a callable accepting `(tempname,filename)`
+        used to rename the temporary file to the final name; the
+        default is `os.rename` and this parametr exists to accept
+        something such as `FSTags.move`
       Other keyword arguments are passed to the `NamedTemporaryFile` constructor.
 
       Example:
@@ -1713,7 +1718,7 @@ def atomic_filename(
       except FileNotFoundError:
         atime = mtime
       pfx_call(os.utime, T.name, (atime, mtime))
-    pfx_call(rename, T.name, filename)
+    pfx_call(rename_func, T.name, filename)
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.

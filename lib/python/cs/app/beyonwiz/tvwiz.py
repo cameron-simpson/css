@@ -91,17 +91,22 @@ class TVWizTSPoint(BinaryMultiStruct(
     '<256s256sHHLHHQ',
     'service_name_bs0 event_name_bs0 mod_julian_date pad start last sec last_offset',
 )):
+  ''' Core recording information.
+  '''
 
   @property
   def event_name(self):
+    ''' The event name (programme name). '''
     return bytes0_to_str(self.event_name_bs0)
 
   @property
   def service_name(self):
+    ''' The service name (channel/station name). '''
     return bytes0_to_str(self.service_name_bs0)
 
   @property
   def start_unixtime(self):
+    ''' The start time of the recording as a UNIX timestamp. '''
     return (self.mod_julian_date - 40587) * DAY + self.start
 
 TVWizFileOffset = BinarySingleStruct(
@@ -118,6 +123,7 @@ class TVWiz_Header(namedtuple(
   @classmethod
   @promote
   def parse(cls, bfr: CornuCopyBuffer) -> 'TVWiz_Header':
+    ''' Parse a `TVWiz_Header` from `bfr`. '''
     bs_1024 = bfr.take(1024)
     fhdr = TVWizFileHeader.parse(bs_1024)
     evhdr = TVWizTSPoint.parse(bfr)
@@ -205,23 +211,18 @@ class TVWiz(_Recording):
     ''' The filesystem path of the header file. '''
     return self.pathto(TVHDR)
 
-  def convert(self, dstpath, extra_opts=None, **kw):
+  def convert(self, dstpath, doit=True, **kw):
     ''' Wrapper for _Recording.convert which requests audio conversion to AAC.
     '''
-    tvwiz_extra_opts = [
-        '-c:a',
-        'aac',  # convert all audio to AAC
-    ]
-    if extra_opts:
-      tvwiz_extra_opts.extend(extra_opts)
     with NamedTemporaryFile(prefix=basename(self.fspath) + '--',
                             suffix='.ts') as T:
       for bs in self.video_data():
         T.write(bs)
+        if not doit:
+          # the first chunk is enough for the ffprobe
+          break
       T.flush()
-      return super().convert(
-          dstpath, srcpath=T.name, extra_opts=tvwiz_extra_opts, **kw
-      )
+      return super().convert(dstpath, srcpath=T.name, doit=doit, **kw)
 
   def _parse_path(self) -> Tuple[str, datetime]:
     basis, ext = splitext(basename(self.fspath))
@@ -229,11 +230,12 @@ class TVWiz(_Recording):
       warning("does not end with .tvwiz: %r", self.fspath)
     title, daytext, timetext = basis.rsplit('_', 2)
     try:
-      timetext, plustext = timetext.rsplit('+', 1)
+      timetext, _ = timetext.rsplit('+', 1)
     except ValueError:
       pass
     else:
-      warning("discarding %r from timetext", "+" + plustext)
+      ##warning("discarding %r from timetext", "+" + plustext)
+      pass
     title = title.replace('_ ', ': ').replace('_s ', "'s ")
     to_parse = daytext + timetext
     dt = pfx_call(datetime.strptime, to_parse, '%b.%d.%Y%H.%M')
@@ -302,24 +304,29 @@ class TVWiz(_Recording):
     # TODO: yield from a buffer, cropped?
     vf = None
     lastFileNum = None
-    for rec in self.trunc_records():
-      wizOffset, fileNum, flags, offset, size = rec
-      if lastFileNum is None or lastFileNum != fileNum:
-        if lastFileNum is not None:
-          vf.close()
-        vf = open(self.pathto("%04d" % (fileNum,)), "rb")
-        filePos = 0
-        lastFileNum = fileNum
-      if filePos != offset:
-        vf.seek(offset)
-      while size > 0:
-        rsize = min(size, 8192)
-        buf = vf.read(rsize)
-        assert len(buf) <= rsize
-        if not buf:
-          error("%s: unexpected EOF", vf)
-          break
-        yield buf
-        size -= len(buf)
-    if lastFileNum is not None:
-      vf.close()
+    try:
+      for rec in self.trunc_records():
+        wizOffset, fileNum, flags, offset, size = rec
+        if lastFileNum is None or lastFileNum != fileNum:
+          if lastFileNum is not None:
+            vf.close()
+          vf = open(
+              self.pathto("%04d" % (fileNum,)),
+              "rb",
+          )  # pylint: disable=consider-using-with
+          filePos = 0
+          lastFileNum = fileNum
+        if filePos != offset:
+          vf.seek(offset)
+        while size > 0:
+          rsize = min(size, 8192)
+          buf = vf.read(rsize)
+          assert len(buf) <= rsize
+          if not buf:
+            error("%s: unexpected EOF", vf)
+            break
+          yield buf
+          size -= len(buf)
+    finally:
+      if lastFileNum is not None:
+        vf.close()
