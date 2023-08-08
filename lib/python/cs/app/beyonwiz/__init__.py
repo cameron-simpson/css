@@ -8,9 +8,11 @@ structures and to access Beyonwiz devices via the net.
 '''
 
 from abc import ABC, abstractmethod
+from contextlib import nullcontext
 from datetime import datetime
 import json
 from os.path import (
+    dirname,
     exists as existspath,
     isabs as isabspath,
     isdir as isdirpath,
@@ -26,7 +28,7 @@ from cs.ffmpegutils import (
     MetaData as FFmpegMetaData,
     convert as ffconvert,
 )
-from cs.fileutils import crop_name
+from cs.fileutils import atomic_filename, crop_name
 from cs.fs import HasFSPath
 from cs.fstags import HasFSTagsMixin
 from cs.logutils import error
@@ -297,6 +299,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     ok = True
     with Pfx(dstpath):
       if existspath(dstpath):
+        # locate a nonconflicting output path
         ok = False
         if max_n is not None:
           try:
@@ -326,17 +329,25 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     if not doit:
       print(srcpath)
       print("  =>", dstpath)
-    ffconvert(
-        srcpath,
-        dstpath=dstpath,
-        doit=doit,
-        conversions=None,
-        metadata=self.ffmetadata(dstfmt),
-        timespans=timespans,
-        overwrite=overwrite,
-        acodec=acodec,
-        vcodec=vcodec,
-    )
+    with atomic_filename(
+        dstpath,
+        exists_ok=overwrite,
+        dir=dirname(dstpath),
+        suffix=f'.{dstfmt}',
+        rename_func=fstags.move,
+    ) if doit else nullcontext() as T:
+      ffconvert(
+          srcpath,
+          dstpath=dstpath if T is None else T.name,
+          doit=doit,
+          conversions=None,
+          metadata=self.ffmetadata(dstfmt),
+          timespans=timespans,
+          overwrite=T is not None,
+          acodec=acodec,
+          vcodec=vcodec,
+          extra_opts=extra_opts,
+      )
     return True
 
   def ffmpeg_metadata(self, dstfmt=None):
