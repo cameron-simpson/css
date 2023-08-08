@@ -1644,6 +1644,7 @@ def atomic_filename(
     dir=None,
     prefix=None,
     suffix=None,
+    rename_func=rename,
     **kw
 ):
   ''' A context manager to create `filename` atomicly on completion.
