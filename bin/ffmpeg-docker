@@ -10,7 +10,7 @@ use_tmux=
 [ -n "${FFMPEG_DOCKER_TMUX:-}" ] && use_tmux=1
 image=linuxserver/ffmpeg
 runopts='--rm --read-only'
-ffopts=
+ff_postopts==
 
 cmd=$0
 usage="Usage: $cmd [--tm] [input-opts...] -i inputfile [output-opts...] outputfile
@@ -143,7 +143,8 @@ set -- docker run $runopts $run_it_opts \
     "$image" \
     "$uid:$gid" \
     /usr/local/bin/ffmpeg \
-    "$@"
+    "$@" \
+    $ff_postopts
 
 if [ $use_tmux ]
 then

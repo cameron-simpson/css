@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from contextlib import nullcontext
 from datetime import datetime
 import json
+import os
 from os.path import (
     dirname,
     exists as existspath,
@@ -336,6 +337,8 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
         suffix=f'.{dstfmt}',
         rename_func=fstags.move,
     ) if doit else nullcontext() as T:
+      if doit:
+        os.remove(T.name)
       ffconvert(
           srcpath,
           dstpath=dstpath if T is None else T.name,
@@ -343,7 +346,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
           conversions=None,
           metadata=self.ffmetadata(dstfmt),
           timespans=timespans,
-          overwrite=T is not None,
+          overwrite=False,
           acodec=acodec,
           vcodec=vcodec,
           extra_opts=extra_opts,
