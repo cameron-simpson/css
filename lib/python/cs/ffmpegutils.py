@@ -194,6 +194,7 @@ def convert(
     overwrite=False,
     acodec=None,
     vcodec=None,
+    extra_opts=None,
 ):
   ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
   '''
@@ -249,18 +250,20 @@ def convert(
             timespans
         )
     )
-  extra_opts = {
+  output_opts = {
       'nostdin': None,
       'c:a': acodec or 'copy',
       'c:v': vcodec or 'copy',
   }
   if sys.stdout.isatty():
-    extra_opts.update(stats=None)
+    output_opts.update(stats=None)
+  if extra_opts:
+    output_opts.update(extra_opts)
   ff = ff.output(
       dstpath,
       format=dstfmt,
       metadata=list(map('='.join, ffmeta_kw.items())),
-      **extra_opts,
+      **output_opts,
   )
   if overwrite:
     ff = ff.overwrite_output()
