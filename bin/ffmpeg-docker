@@ -10,7 +10,7 @@ use_tmux=
 [ -n "${FFMPEG_DOCKER_TMUX:-}" ] && use_tmux=1
 image=linuxserver/ffmpeg
 runopts='--rm --read-only'
-ff_postopts==
+ff_postopts=
 
 cmd=$0
 usage="Usage: $cmd [--tm] [input-opts...] -i inputfile [output-opts...] outputfile
