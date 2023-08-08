@@ -747,19 +747,19 @@ def crop_name(name, ext=None, name_max=255):
     return name
   return base[:max_base_len] + ext
 
-def max_suffix(dirpath, pfx):
+def max_suffix(dirpath, prefix):
   ''' Compute the highest existing numeric suffix
-      for names starting with the prefix `pfx`.
+      for names starting with `prefix`.
 
       This is generally used as a starting point for picking
       a new numeric suffix.
   '''
-  pfx = ustr(pfx)
+  prefix = ustr(prefix)
   maxn = None
-  pfxlen = len(pfx)
+  pfxlen = len(prefix)
   for e in os.listdir(dirpath):
     e = ustr(e)
-    if len(e) <= pfxlen or not e.startswith(pfx):
+    if len(e) <= pfxlen or not e.startswith(prefix):
       continue
     tail = e[pfxlen:]
     if tail.isdigit():
