@@ -297,24 +297,29 @@ class TVWiz(_Recording):
     # TODO: yield from a buffer, cropped?
     vf = None
     lastFileNum = None
-    for rec in self.trunc_records():
-      wizOffset, fileNum, flags, offset, size = rec
-      if lastFileNum is None or lastFileNum != fileNum:
-        if lastFileNum is not None:
-          vf.close()
-        vf = open(self.pathto("%04d" % (fileNum,)), "rb")
-        filePos = 0
-        lastFileNum = fileNum
-      if filePos != offset:
-        vf.seek(offset)
-      while size > 0:
-        rsize = min(size, 8192)
-        buf = vf.read(rsize)
-        assert len(buf) <= rsize
-        if not buf:
-          error("%s: unexpected EOF", vf)
-          break
-        yield buf
-        size -= len(buf)
-    if lastFileNum is not None:
-      vf.close()
+    try:
+      for rec in self.trunc_records():
+        wizOffset, fileNum, flags, offset, size = rec
+        if lastFileNum is None or lastFileNum != fileNum:
+          if lastFileNum is not None:
+            vf.close()
+          vf = open(
+              self.pathto("%04d" % (fileNum,)),
+              "rb",
+          )  # pylint: disable=consider-using-with
+          filePos = 0
+          lastFileNum = fileNum
+        if filePos != offset:
+          vf.seek(offset)
+        while size > 0:
+          rsize = min(size, 8192)
+          buf = vf.read(rsize)
+          assert len(buf) <= rsize
+          if not buf:
+            error("%s: unexpected EOF", vf)
+            break
+          yield buf
+          size -= len(buf)
+    finally:
+      if lastFileNum is not None:
+        vf.close()
