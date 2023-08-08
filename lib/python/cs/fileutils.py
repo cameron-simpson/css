@@ -1665,6 +1665,10 @@ def atomic_filename(
       * `suffix`: passed to `NamedTemporaryFile`, specifies a suffix
         for the temporary file; the default is the extension obtained
         from `splitext(basename(filename))`
+      * `rename_func`: a callable accepting `(tempname,filename)`
+        used to rename the temporary file to the final name; the
+        default is `os.rename` and this parametr exists to accept
+        something such as `FSTags.move`
       Other keyword arguments are passed to the `NamedTemporaryFile` constructor.
 
       Example:
@@ -1713,7 +1717,7 @@ def atomic_filename(
       except FileNotFoundError:
         atime = mtime
       pfx_call(os.utime, T.name, (atime, mtime))
-    pfx_call(rename, T.name, filename)
+    pfx_call(rename_func, T.name, filename)
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.
