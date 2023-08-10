@@ -219,9 +219,9 @@ def convert(
   for i, stream in enumerate(probed.streams):
     codec_type = stream.get('codec_type', 'unknown')
     codec_key = stream.get('codec_name', stream.codec_tag)
-    with Pfx("stream[%d]: %s/%s", i, codec_type, codec_key, print=True):
+    with Pfx("stream[%d]: %s/%s", i, codec_type, codec_key):
       if codec_type not in ('audio', 'video'):
-        warning("not audio or video, skipping")
+        ##warning("not audio or video, skipping")
         continue
       try:
         new_codec = conversions[codec_key]
