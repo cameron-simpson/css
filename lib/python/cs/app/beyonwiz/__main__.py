@@ -7,14 +7,20 @@
 from __future__ import print_function
 from getopt import GetoptError
 import json
-import os.path
+import os
+from os.path import (
+    isdir as isdirpath,
+    isfile as isfilepath,
+    islink as islinkpath,
+)
 from pprint import pformat
+import shutil
 import sys
 
 from cs.cmdutils import BaseCommand
 from cs.ffmpegutils import ffprobe
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 
 from . import Recording, DEFAULT_MEDIAFILE_FORMAT
 from .tvwiz import TVWiz
@@ -53,7 +59,7 @@ class BWizCmd(BaseCommand):
   def cmd_convert(self, argv):
     ''' Convert a recording to MP4.
 
-        Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [start..end]... recording [output.mp4]
+        Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [--rm] [start..end]... recording [output.mp4]
           Convert the video content of the named recording to
           the named output file (typically MP4, though the ffmpeg
           output format chosen is based on the extension).
@@ -65,6 +71,7 @@ class BWizCmd(BaseCommand):
     doit = True
     acodec = None
     vcodec = None
+    remove_source = False
     # parse options
     while argv:
       arg0 = argv.pop(0)
@@ -80,6 +87,8 @@ class BWizCmd(BaseCommand):
           acodec = arg0[3:]
         elif arg0.startswith('-v:'):
           acodec = arg0[3:]
+        elif arg0 == '--rm':
+          remove_source = True
         else:
           warning('unexpected option')
           badopts = True
@@ -113,16 +122,27 @@ class BWizCmd(BaseCommand):
     if badopts:
       raise GetoptError("bad invocation")
     R = Recording(srcpath)
-    return (
-        0 if R.convert(
-            dstpath,
-            doit=doit,
-            acodec=acodec,
-            vcodec=vcodec,
-            max_n=TRY_N,
-            timespans=timespans,
-        ) else 1
-    )
+    if not R.convert(
+        dstpath,
+        doit=doit,
+        acodec=acodec,
+        vcodec=vcodec,
+        max_n=TRY_N,
+        timespans=timespans,
+    ):
+      return 1
+    if remove_source:
+      if doit:
+        with Pfx("remove %s", R.fspath):
+          if islinkpath(R.fspath) or isfilepath(R.fspath):
+            pfx_call(os.remove, R.fspath)
+          elif isdirpath(R.fspath):
+            pfx_call(shutil.rmtree, R.fspath)
+          else:
+            warning("cannot remove, not a file or directory")
+            return 1
+      else:
+        print("remove", R.fspath)
 
   def cmd_ffprobe(self, argv):
     ''' Run `ffprobe` against a file.
