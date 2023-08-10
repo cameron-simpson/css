@@ -14,7 +14,7 @@ mobi
 mypy
 musicbrainzngs
 numpy
-objc
+##objc
 pandas
 pillow
 pycodestyle
