@@ -172,8 +172,12 @@ def Recording(path):
   if not existspath(path):
     # see if we were given a prefix from command line filename completion
     if path.endswith('.'):
-      return Recording(path + 'ts')
-    return Recording(path + '.ts')
+      tspath = path + 'ts'
+      if existspath(tspath):
+        return Recording(tspath)
+    else:
+      tspath = path + '.ts'
+      return Recording(tspath)
   raise ValueError("don't know how to open recording %r" % (path,))
 
 class _Recording(ABC, HasFSPath, HasFSTagsMixin):
