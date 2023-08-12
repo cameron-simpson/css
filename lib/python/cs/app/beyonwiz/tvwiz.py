@@ -175,7 +175,7 @@ def unrle(bfr: CornuCopyBuffer, fmt):
 class TVWiz(_Recording):
   ''' A TVWiz specific _Recording for pre-T3 Beyonwiz devices.
   '''
-  DEFAULT_FILENAME_BASIS = '{series_name:lc}--{file_dt:lc}--{service_name:lc}--beyonwiz--{description:lc}'
+  DEFAULT_FILENAME_BASIS = '{meta.event_name:lc}--{file.datetime:lc}--{meta.service_name:lc}--beyonwiz--{meta.synopsis:lc}'
 
   FFMPEG_METADATA_MAPPINGS = {
 
@@ -187,17 +187,17 @@ class TVWiz(_Recording):
           'comment': None,
           'composer': None,
           'copyright': None,
-          'description': lambda tags: tags.description,
+          'description': 'meta.synopsis',
           'episode_id': None,
           'genre': None,
           'grouping': None,
           'lyrics': None,
-          'network': lambda tags: tags.service_name,
-          'show': lambda tags: tags.series_name,
-          'synopsis': lambda tags: tags.description,
-          'title': lambda tags: tags.series_name,
+          'network': 'meta.service_name',
+          'show': 'meta.event_name',
+          'synopsis': 'meta.synopsis',
+          'title': 'meta.event_name',
           'track': None,
-          'year': lambda tags: tags.file_dt.year,
+          'year': lambda tags: tags['file.datetime'].year,
       }
   }
 
@@ -212,7 +212,7 @@ class TVWiz(_Recording):
     return self.pathto(TVHDR)
 
   def convert(self, dstpath, doit=True, **kw):
-    ''' Wrapper for _Recording.convert which requests audio conversion to AAC.
+    ''' Wrapper for `_Recording.convert` which composes the video data subfiles into a single MPEG-2 TS stream.
     '''
     with NamedTemporaryFile(prefix=basename(self.fspath) + '--',
                             suffix='.ts') as T:
@@ -247,14 +247,14 @@ class TVWiz(_Recording):
     '''
     tvhdr = TVWiz_Header.parse(self.headerpath)
     file_title, file_dt = self._parse_path()
-    tags = TagSet(
-        file_title=file_title,
-        file_dt=file_dt,
-        series_name=tvhdr.event_header.event_name,
-        description=tvhdr.synopsis,
-        start_unixtime=tvhdr.event_header.start_unixtime,
-        service_name=tvhdr.event_header.service_name,
-    )
+    tags = TagSet({
+        'file.title': file_title,
+        'file.datetime': file_dt,
+        'meta.event_name': tvhdr.event_header.event_name,
+        'meta.service_name': tvhdr.event_header.service_name,
+        'meta.synopsis': tvhdr.synopsis,
+        'meta.start_unixtime':tvhdr.event_header.start_unixtime,
+        })
     episode = tvhdr.episode
     try:
       episode_num = int(episode)

@@ -46,17 +46,17 @@ class Enigma2(_Recording):
           'comment': None,
           'composer': None,
           'copyright': None,
-          'description': None,
+          'description': 'meta.description',
           'episode_id': None,
           'genre': None,
           'grouping': None,
           'lyrics': None,
-          'network': lambda tags: tags.file.channel,
-          'show': lambda tags: tags.meta.title,
-          'synopsis': lambda tags: tags['meta.description'],
-          'title': lambda tags: tags['meta.title'],
+          'network': 'file.channel',
+          'show': 'meta.title',
+          'synopsis': 'meta.description',
+          'title': 'meta.title',
           'track': None,
-          'year': None,
+          'year': lambda tags: tags['file.datetime'].year,
       }
   }
 
@@ -94,8 +94,11 @@ class Enigma2(_Recording):
     return data
 
   @locked_property
-  def metadata(self):
-    ''' The metadata associated with this recording.
+  def metadata(self) -> TagSet:
+    ''' The metadata associated with this recording as a `TagSet`.
+
+        meta.* comes from `self.read_meta()`.
+        file.* comes from `self.filename_metadata()`.
     '''
     tags = TagSet()
     tags.update(self.read_meta(), prefix='meta')
