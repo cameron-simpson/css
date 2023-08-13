@@ -14,7 +14,6 @@ mobi
 mypy
 musicbrainzngs
 numpy
-##objc
 pandas
 pillow
 pycodestyle
@@ -23,6 +22,7 @@ pycryptodome
 pyflakes
 pyicontract-lint
 pylint
+pyobjc[allbindings]
 pytest
 python-dateutil
 railroad-diagrams
