@@ -234,8 +234,8 @@ case "$op" in
                     incd "$clonedir" pwd >&3
                     ;;
       # current diff
-      diff,git)     git diff ${1+"$@"} ;;
-      diff,hg)      hg diff ${1+"$@"} ;;
+      diff,git)     git ${VCS_GIT_DIFF:-"diff"} ${1+"$@"} ;;
+      diff,hg)      hg ${VCS_HG_DIFF:-"diff"} ${1+"$@"} ;;
       dl,git | download,git)
                     git fetch $git_q --all ${1+"$@"} ;;
       dl,hg | download,hg)
@@ -272,12 +272,22 @@ case "$op" in
       glog,hg)      hg log -G --template "$VCS_FORMAT_GLOG_HG" \
                       ${1+"$@"}
                     ;;
+      in,hg)        hg in ${1+"$@"} ;;
+      in,git)       alt=origin
+                    [ $# = 0 ] || { alt=$1; shift; }
+                    "$0" glog "HEAD..$alt"
+                    ;;
       # report modified files
       modified,git) ( cd "$vcs_top"
                       git status --porcelain | awk '$1 == "M" { print $2 }'
                     )
                     ;;
       modified,hg)  hg status -n -am ${1+"$@"} ;;
+      out,hg)       hg out ${1+"$@"} ;;
+      out,git)      alt=origin
+                    [ $# = 0 ] || { alt=$1; shift; }
+                    "$0" glog "$alt..HEAD"
+                    ;;
       # record partial changes
       record,hg)    hg record ${1+"$@"} ;;
       record,git)   git add -p ${1+"$@"} && git diff --staged \

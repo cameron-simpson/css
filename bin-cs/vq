@@ -1,0 +1,14 @@
+#!/bin/sh
+
+[ $# -gt 0 ] || {
+  echo "$0: missing words" >&2
+  echo "Usage: $0 words..." >&2
+  exit 2
+}
+
+word1=$1; shift
+
+if [ $# = 0 ]
+then  find "$HOME/v/" "$HOME/vv/" -iname "*${word1}*"
+else  find "$HOME/v/" "$HOME/vv/" -iname "*${word1}*" | grepall "$@"
+fi

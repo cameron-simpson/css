@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Store tests.
 #       - Cameron Simpson <cs@cskk.id.au>
@@ -7,6 +7,7 @@
 ''' Tests for Stores.
 '''
 
+from contextlib import contextmanager
 import errno
 from itertools import accumulate
 import os
@@ -17,21 +18,40 @@ import tempfile
 import threading
 from time import sleep
 import unittest
+
 from cs.context import stackkeys
-from cs.debug import thread_dump
+from cs.debug import thread_dump, trace
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
-from . import _TestAdditionsMixin
-from .cache import FileCacheStore, MemoryCacheStore
+from cs.testutils import SetupTeardownMixin
+
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashCode, HASHCLASS_BY_NAME
 from .socket import (
     TCPStoreServer, TCPClientStore, UNIXSocketStoreServer,
     UNIXSocketClientStore
 )
-from .store import MappingStore, DataDirStore, ProxyStore
+from .store import (
+    DataDirStore,
+    FileCacheStore,
+    MappingStore,
+    MemoryCacheStore,
+    ProxyStore,
+)
 from .stream import StreamStore
+from .testsutil import _TestAdditionsMixin
+
+ALL_STORE_TYPES = (
+    MappingStore,
+    MemoryCacheStore,
+    DataDirStore,
+    FileCacheStore,
+    StreamStore,
+    TCPClientStore,
+    UNIXSocketClientStore,
+    ProxyStore,
+)
 
 HASHCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__HASHCLASS_NAMES'
 INDEXCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__INDEXCLASS_NAMES'
@@ -39,28 +59,43 @@ STORECLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__STORECLASS_NAMES'
 
 # constrain the tests if not empty, try every permutation if empty
 HASHCLASS_NAMES = tuple(
-    os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split()
+    list(filter(None,
+                os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split(' ,')))
     or sorted(HashCode.by_name.keys())
 )
 INDEXCLASS_NAMES = tuple(
-    os.environ.get(INDEXCLASS_NAMES_ENVVAR, '').split() or get_index_names()
+    list(
+        filter(None,
+               os.environ.get(INDEXCLASS_NAMES_ENVVAR, '').split(' ,'))
+    ) or get_index_names()
 )
 STORECLASS_NAMES = tuple(
-    os.environ.get(STORECLASS_NAMES_ENVVAR, '').split() or (
+    list(
+        filter(None,
+               os.environ.get(STORECLASS_NAMES_ENVVAR, '').split(' ,'))
+    ) or (
         'MappingStore', 'MemoryCacheStore', 'DataDirStore', 'FileCacheStore',
-        'StreamStore', 'TCPClientStoreUNIXSocketClientStore', 'ProxyStore'
+        'StreamStore', 'TCPClientStore', 'UNIXSocketClientStore', 'ProxyStore'
     )
+)
+X("STORECLASS_NAMES = %r", STORECLASS_NAMES)
+
+all_store_type_names = set(
+    store_type.__name__ for store_type in ALL_STORE_TYPES
+)
+assert all(
+    store_name in all_store_type_names for store_name in STORECLASS_NAMES
+), (
+    "unknown Store types in STORECLASS_NAMES:%r, I know %r" %
+    (STORECLASS_NAMES, sorted(all_store_type_names))
 )
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
-      Yield `(subtest,Store)` tuples.
-
-      `subtest` is a dict containing decriptive fields for `unittest.subtest()`.
-
-      `Store` is an empty Store to test.
+      Yield `(subtest,S)` tuples being:
+      - `subtest`: is a dict containing descriptive fields for `unittest.subtest()`
+      - `S`: an empty `Store` to test
   '''
-  # test all Store types against all the hash classes
   subtest = {}
   for hashclass_name in HASHCLASS_NAMES:
     hashclass = HASHCLASS_BY_NAME[hashclass_name]
@@ -69,118 +104,135 @@ def get_test_stores(prefix):
         hashname=hashclass_name,
         hashclass=hashclass.__name__,
     ):
-      # MappingStore
-      with stackkeys(subtest, storetype=MappingStore):
-        yield subtest, MappingStore(
-            'MappingStore', mapping={}, hashclass=hashclass
-        )
-      # MemoryCacheStore
-      with stackkeys(subtest, storetype=MemoryCacheStore):
-        yield subtest, MemoryCacheStore(
-            'MemoryCacheStore', 1024 * 1024 * 1024, hashclass=hashclass
-        )
-      # DataDirStore
-      with stackkeys(subtest, storetype=DataDirStore):
-        for index_name in INDEXCLASS_NAMES:
-          indexclass = get_index_by_name(index_name)
-          with stackkeys(subtest, indexname=index_name, indexclass=indexclass):
-            for rollover in 200000, :
-              with stackkeys(subtest, rollover=rollover):
-                T = tempfile.TemporaryDirectory(prefix=prefix)
-                with T as tmpdirpath:
-                  yield subtest, DataDirStore(
-                      'DataDirStore',
-                      tmpdirpath,
-                      hashclass=hashclass,
-                      indexclass=indexclass,
-                      rollover=rollover
-                  )
-      # FileCacheStore
-      with stackkeys(subtest, storetype=FileCacheStore):
-        T = tempfile.TemporaryDirectory(prefix=prefix)
-        with T as tmpdirpath:
-          yield subtest, FileCacheStore(
-              'FileCacheStore',
-              MappingStore('MappingStore', {}),
-              tmpdirpath,
-              hashclass=hashclass
-          )
-      # StreamStore
-      with stackkeys(subtest, storetype=StreamStore):
-        for addif in False, True:
-          with stackkeys(subtest, addif=addif):
-            local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
-            upstream_rd, upstream_wr = os.pipe()
-            downstream_rd, downstream_wr = os.pipe()
-            remote_S = StreamStore(
-                "remote_S",
-                upstream_rd,
-                downstream_wr,
-                local_store=local_store,
-                addif=addif,
-                hashclass=hashclass
+      for store_type in ALL_STORE_TYPES:
+        if store_type.__name__ not in STORECLASS_NAMES:
+          ##X("SKIP %s:%s", hashclass_name, store_type.__name__)
+          continue
+        if store_type is MappingStore:
+          with stackkeys(subtest, storetype=MappingStore):
+            yield subtest, MappingStore(
+                'MappingStore', mapping={}, hashclass=hashclass
             )
-            S = StreamStore(
-                "S",
-                downstream_rd,
-                upstream_wr,
-                addif=addif,
-                hashclass=hashclass
+        elif store_type is MemoryCacheStore:
+          with stackkeys(subtest, storetype=MemoryCacheStore):
+            yield subtest, MemoryCacheStore(
+                'MemoryCacheStore', 1024 * 1024 * 1024, hashclass=hashclass
             )
-            with local_store:
-              with remote_S:
-                yield subtest, S
-      # TCPClientStore
-      with stackkeys(subtest, storetype=TCPClientStore):
-        for addif in False, True:
-          with stackkeys(subtest, addif=addif):
-            local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
-            base_port = 9999
-            while True:
-              bind_addr = ('127.0.0.1', base_port)
-              try:
-                remote_S = TCPStoreServer(bind_addr, local_store=local_store)
-              except OSError as e:
-                if e.errno == errno.EADDRINUSE:
-                  base_port += 1
-                else:
-                  raise
-              else:
-                break
-            S = TCPClientStore(
-                None, bind_addr, addif=addif, hashclass=hashclass
-            )
-            with local_store:
-              with remote_S:
-                yield subtest, S
-      # UNIXSocketClientStore
-      with stackkeys(subtest, storetype=UNIXSocketClientStore):
-        for addif in False, True:
-          with stackkeys(subtest, addif=addif):
-            local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
+        elif store_type is DataDirStore:
+          with stackkeys(subtest, storetype=DataDirStore):
+            for index_name in INDEXCLASS_NAMES:
+              indexclass = get_index_by_name(index_name)
+              with stackkeys(subtest, indexname=index_name,
+                             indexclass=indexclass):
+                for rollover in 200000, :
+                  with stackkeys(subtest, rollover=rollover):
+                    T = tempfile.TemporaryDirectory(prefix=prefix)
+                    with T as tmpdirpath:
+                      yield subtest, DataDirStore(
+                          'DataDirStore',
+                          tmpdirpath,
+                          hashclass=hashclass,
+                          indexclass=indexclass,
+                          rollover=rollover
+                      )
+        elif store_type is FileCacheStore:
+          with stackkeys(subtest, storetype=FileCacheStore):
             T = tempfile.TemporaryDirectory(prefix=prefix)
             with T as tmpdirpath:
-              socket_path = joinpath(tmpdirpath, 'sock')
-              remote_S = UNIXSocketStoreServer(
-                  socket_path, local_store=local_store
+              yield subtest, FileCacheStore(
+                  'FileCacheStore',
+                  MappingStore('MappingStore', {}),
+                  tmpdirpath,
+                  hashclass=hashclass
               )
-              S = UNIXSocketClientStore(
-                  None, socket_path, addif=addif, hashclass=hashclass
-              )
-              with local_store:
-                with remote_S:
-                  yield subtest, S
-      # ProxyStore
-      with stackkeys(subtest, storetype=ProxyStore):
-        main1 = MappingStore("main1", {}, hashclass=hashclass)
-        main2 = MappingStore("main2", {}, hashclass=hashclass)
-        save2 = MappingStore("save2", {}, hashclass=hashclass)
-        S = ProxyStore(
-            "ProxyStore", (main1, main2), (main2, save2),
-            hashclass=hashclass,
-            save2=(save2,)
-        )
-        yield subtest, S
+        elif store_type is StreamStore:
+          with stackkeys(subtest, storetype=StreamStore):
+            for addif in False, True:
+              with stackkeys(subtest, addif=addif):
+                local_store = MappingStore(
+                    "MappingStore", {}, hashclass=hashclass
+                )
+                upstream_rd, upstream_wr = os.pipe()
+                downstream_rd, downstream_wr = os.pipe()
+                remote_S = StreamStore(
+                    "remote_S",
+                    upstream_rd,
+                    downstream_wr,
+                    local_store=local_store,
+                    addif=addif,
+                    hashclass=hashclass
+                )
+                S = StreamStore(
+                    "S",
+                    downstream_rd,
+                    upstream_wr,
+                    addif=addif,
+                    hashclass=hashclass
+                )
+                with local_store:
+                  with remote_S:
+                    yield subtest, S
+        elif store_type is TCPClientStore:
+          with stackkeys(subtest, storetype=TCPClientStore):
+            for addif in False, True:
+              with stackkeys(subtest, addif=addif):
+                local_store = MappingStore(
+                    "MappingStore", {}, hashclass=hashclass
+                )
+                base_port = 9999
+                while True:
+                  bind_addr = ('127.0.0.1', base_port)
+                  try:
+                    remote_S = TCPStoreServer(
+                        bind_addr, local_store=local_store
+                    )
+                  except OSError as e:
+                    if e.errno == errno.EADDRINUSE:
+                      base_port += 1
+                    else:
+                      raise
+                  else:
+                    break
+                S = TCPClientStore(
+                    None, bind_addr, addif=addif, hashclass=hashclass
+                )
+                with local_store:
+                  with remote_S:
+                    yield subtest, S
+        elif store_type is UNIXSocketClientStore:
+          with stackkeys(subtest, storetype=UNIXSocketClientStore):
+            for addif in False, True:
+              with stackkeys(subtest, addif=addif):
+                local_store = MappingStore(
+                    "MappingStore", {}, hashclass=hashclass
+                )
+                T = tempfile.TemporaryDirectory(prefix=prefix)
+                with T as tmpdirpath:
+                  socket_path = joinpath(tmpdirpath, 'sock')
+                  remote_S = UNIXSocketStoreServer(
+                      socket_path, local_store=local_store
+                  )
+                  S = UNIXSocketClientStore(
+                      None, socket_path, addif=addif, hashclass=hashclass
+                  )
+                  with local_store:
+                    with remote_S:
+                      yield subtest, S
+        elif store_type is ProxyStore:
+          with stackkeys(subtest, storetype=ProxyStore):
+            main1 = MappingStore("main1", {}, hashclass=hashclass)
+            main2 = MappingStore("main2", {}, hashclass=hashclass)
+            save2 = MappingStore("save2", {}, hashclass=hashclass)
+            S = ProxyStore(
+                "ProxyStore", (main1, main2), (main2, save2),
+                hashclass=hashclass,
+                save2=(save2,)
+            )
+            yield subtest, S
+        else:
+          raise RuntimeError(
+              f'no Stopre subtests for Store type {store_type!r}'
+          )
 
 def multitest(method):
   ''' Decorator to permute a test method for multiple Store types and hash classes.
@@ -195,6 +247,7 @@ def multitest(method):
                                      for k, v in sorted(subtest.items())])):
         with self.subTest(test_store=S, **subtest):
           self.S = S
+          self.supports_index_entry = type(self.S) in (DataDirStore,)
           self.hashclass = subtest['hashclass']
           S.init()
           with S:
@@ -205,7 +258,7 @@ def multitest(method):
 
   return testMethod
 
-class TestStore(unittest.TestCase, _TestAdditionsMixin):
+class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
   ''' Tests for Stores.
   '''
 
@@ -214,12 +267,19 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.S = None
     self.keys1 = None
 
-  def tearDown(self):
-    if self.S is not None:
-      self.S.close()
-    Ts = threading.enumerate()
+  @contextmanager
+  def setupTeardown(self):
+    S = self.S
+    self.supports_index_entry = type(self.S) in (DataDirStore,)
+    if S is not None:
+      with S:
+        yield
+    else:
+      yield
+    Ts = [T for T in threading.enumerate() if not T.daemon]
     if len(Ts) > 1:
-      thread_dump(Ts=Ts, fp=open('/dev/tty', 'w'))
+      with open('/dev/tty', 'w') as tty:
+        thread_dump(Ts=Ts, fp=tty)
 
   @multitest
   def test00empty(self):
@@ -459,6 +519,68 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
           self.assertEqual(h, M1hash)
           self.assertIn(h, M2)
           KS2.add(h)
+
+  @multitest
+  def test_get_index_entry(self):
+    ''' Test `get_index_entry`
+    '''
+    S = self.S
+    for _ in range(16):
+      data = make_randblock(rand0(8193))
+      h = S.hash(data)
+      self.assertIsNone(S.get_index_entry(h))
+      h2 = S.add(data)
+      self.assertEqual(h, h2)
+      entry = S.get_index_entry(h)
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+      else:
+        self.assertIsNone(entry)
+
+  @multitest
+  def test_is_complete_indirect(self):
+    S = self.S
+    data1 = make_randblock(rand0(8193))
+    data2 = make_randblock(rand0(8193))
+    h1 = S.add(data1)
+    B1 = Block(hashcode=h1, span=len(data1))
+    self.assertEqual(len(B1), len(data1))
+    h2 = S.hash(data2)
+    B2 = Block(hashcode=h2, span=len(data2))
+    self.assertEqual(len(B2), len(data2))
+    IB = IndirectBlock.from_subblocks((B1, B2))
+    self.assertIn(h1, S)
+    with S.modify_index_entry(h1) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertFalse(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+    self.assertNotIn(h2, S)
+    with S.modify_index_entry(h2) as entry:
+      self.assertIsNone(entry)
+    ih = IB.hashcode
+    with S.modify_index_entry(ih) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertFalse(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+    self.assertFalse(S.is_complete_indirect(ih))
+    with S.modify_index_entry(ih) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertFalse(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+    S.add(data2)
+    self.assertTrue(S.is_complete_indirect(ih))
+    with S.modify_index_entry(ih) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertTrue(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
 
 def selftest(argv):
   ''' Run the unit tests.

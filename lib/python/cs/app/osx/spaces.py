@@ -11,6 +11,7 @@ from os.path import (
     exists as existspath,
     isdir as isdirpath,
     join as joinpath,
+    realpath,
 )
 from pprint import pprint
 import random
@@ -24,11 +25,17 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.delta import monitor
+from cs.fs import shortpath
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 
 CG = apple.CoreGraphics
 HI = apple.HIServices
+
+def main(argv=None):
+  ''' cs.app.osx.spaces command line mode.
+  '''
+  return SpacesCommand(sys.argv).run()
 
 class Spaces:
   ''' The spaces for a particular display.
@@ -150,9 +157,10 @@ class SpacesCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    options = self.options
-    with stackattrs(options, spaces=Spaces()):
-      yield
+    with super().run_context():
+      options = self.options
+      with stackattrs(options, spaces=Spaces()):
+        yield
 
   def cmd_monitor(self, argv):
     ''' Usage: {cmd}
@@ -268,4 +276,4 @@ class SpacesCommand(BaseCommand):
       print(changes)
 
 if __name__ == '__main__':
-  sys.exit(SpacesCommand(sys.argv).run())
+  sys.exit(main(sys.argv))

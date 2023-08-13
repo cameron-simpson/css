@@ -18,19 +18,20 @@ from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
+from inspect import isclass
 import json
 import re
 from threading import RLock
 from uuid import UUID, uuid4
 
 from cs.deco import strable
-from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase
+from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20220626-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'description':
@@ -1004,6 +1005,8 @@ class AttrableMappingMixin(object):
         `dict` at least seem not to consult that with attribute
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
+    if attr == 'ATTRABLE_MAPPING_DEFAULT':
+      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
     # try self.__dict__ first - this is because it appears that
     # getattr(dict,...) does not consult __dict__
     try:
@@ -1251,6 +1254,14 @@ class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
   '''
 
+def attrable(o):
+  ''' Like `jsonable`, return `o` with `dicts` replaced by `AttrableMapping`s. '''
+  if isinstance(o, dict):
+    o = AttrableMapping({k: attrable(v) for k, v in o.items()})
+  elif isinstance(o, list):
+    o = list(map(attrable, o))
+  return o
+
 class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
   ''' A handy `dict` subtype providing the basis for mapping classes
       indexed by `UUID`s.
@@ -1369,6 +1380,7 @@ class RemappedMappingProxy:
   def key(self, subk):
     ''' Return the external key for `subk`.
     '''
+    X("%s.key(subk=%r)...", self.__class__.__name__, subk)
     try:
       k = self._mapped_subkeys[subk]
     except KeyError:
@@ -1433,15 +1445,18 @@ class PrefixedMappingProxy(RemappedMappingProxy):
   def prefixify_subkey(subk, prefix):
     ''' Return the external (prefixed) key from a subkey `subk`.
     '''
-    assert not subk.startswith(prefix)
+    assert not subk.startswith(prefix), (
+        "subkey %r already starts with the prefix %r" % (subk, prefix)
+    )
     return prefix + subk
 
   @staticmethod
   def unprefixify_key(key, prefix):
     ''' Return the internal subkey (unprefixed) from the external `key`.
     '''
-    assert key.startswith(prefix), \
+    assert key.startswith(prefix), (
         "key:%r does not start with prefix:%r" % (key, prefix)
+    )
     return cutprefix(key, prefix)
 
   # pylint: disable=arguments-differ
@@ -1451,3 +1466,100 @@ class PrefixedMappingProxy(RemappedMappingProxy):
     return super().keys(
         select_key=lambda subkey: subkey.startswith(self.prefix)
     )
+
+class TypedKeyMixin:
+  ''' A mixin to check that the keys of a mapping are of a particular type.
+
+      The triggering use case is the constant UUID vs str(UUID) tension
+      in a lot of database code.
+  '''
+
+  def __init__(self, key_type):
+    if not isclass(key_type):
+      raise TypeError("key_type must be a class, got a %s" % (type(key_type)))
+    self.__key_type = key_type
+
+  def __getitem__(self, key):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self.__key_type, type(key))
+      )
+    return super().__getitem__(key)
+
+  def __setitem__(self, key, value):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self.__key_type, type(key))
+      )
+    return super().__setitem__(key, value)
+
+  def __delitem__(self, key):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self.__key_type, type(key))
+      )
+    return super().__delitem__(key)
+
+  def __contains__(self, key):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self.__key_type, type(key))
+      )
+    return super().__contains__(key)
+
+  def get(self, key, *a):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self.__key_type, type(key))
+      )
+    return super().get(key, *a)
+
+  def setdefault(self, key, *a):
+    if type(key) is not self.__key_type:
+      raise TypeError(
+          "key must be of type %s but was of type %s" %
+          (self.__key_type, type(key))
+      )
+    return super().setdefault(key, *a)
+
+def TypedKeyClass(key_type, superclass, name=None):
+  ''' Factory to create a new mapping class subclassing
+      `(TypedKeyMixin,superclass)` which checks that keys are of type
+      `key_type`.
+  '''
+
+  class TypedKeyMapping(TypedKeyMixin, superclass):
+
+    def __init__(self, *a, **kw):
+      ''' Initialise the `TypedKeyDict`. The first positional parameter
+          is the type for keys.
+      '''
+      TypedKeyMixin.__init__(self, key_type)
+      superclass.__init__(self, *a, **kw)
+      if not all(map(lambda key: type(key) is key_type, self.keys())):
+        raise TypeError("all keys must be of type %s" % (key_type,))
+
+  if name is None:
+    name = f'{key_type.__name__}Typed{superclass.__name__}'
+  TypedKeyMapping.__name__ = name
+  TypedKeyMapping.__doc__ = stripped_dedent(
+      f'''
+      Subclass of `{superclass.__name__}` which ensures that its
+      keys are of type `{key_type.__name__}` using `TypedKeyMixin`.
+      '''
+  )
+  return TypedKeyMapping
+
+StrKeyedDict = TypedKeyClass(str, dict, name='StrKeyedDict')
+UUIDKeyedDict = TypedKeyClass(UUID, dict, name='UUIDKeyedDict')
+StrKeyedDefaultDict = TypedKeyClass(
+    str, defaultdict, name='StrKeyedDefaultDict'
+)
+UUIDKeyedDefaultDict = TypedKeyClass(
+    UUID, defaultdict, name='UUIDKeyedDefaultDict'
+)

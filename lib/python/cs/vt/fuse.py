@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Fuse interface to a Store.
 # Uses llfuse: https://bitbucket.org/nikratio/python-llfuse/
@@ -18,12 +18,15 @@ from os.path import abspath, dirname
 import stat
 import subprocess
 import sys
+import time
+
 from cs.context import stackattrs
+from cs.deco import decorator
 from cs.excutils import logexc
-from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT, LogTime
-from cs.pfx import Pfx, PfxThread, XP
+from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
+from cs.pfx import Pfx, PfxThread
 from cs.x import X
-from . import defaults
+
 from .dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from .fs import FileHandle, FileSystem
 from .store import MissingHashcodeError
@@ -45,11 +48,12 @@ PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 # notional I/O blocksize for stat.st_blksize
 FS_IO_BLOCKSIZE = 4096
 
+@uses_Store
 def mount(
     mnt,
     E,
     *,
-    S=None,
+    S,
     archive=None,
     subpath=None,
     readonly=None,
@@ -61,8 +65,8 @@ def mount(
       Parameters:
       * `mnt`: mount point
       * `E`: Dirent of root Store directory
-      * `S`: optional backing Store, default from defaults.S
-      * `archive`: if not None, an Archive or similar, with a
+      * `S`: backing Store
+      * `archive`: if not `None`, an Archive or similar, with a
         `.update(Dirent[,when])` method
       * `subpath`: relative path from `E` to the directory to attach
         to the mountpoint
@@ -109,75 +113,100 @@ def umount(mnt):
   '''
   return subprocess.call(['umount', mnt])
 
-def handler(method):
+@decorator
+def handler(method, trace=False):
   ''' Decorator for FUSE handlers.
 
       Prefixes exceptions with the method name, associates with the
       Store, prevents anything other than a FuseOSError being raised.
   '''
 
-  def handle(self, *a, **kw):
-    ''' Wrapper for FUSE handler methods.
+  syscall = method.__name__
+
+  def syscall_desc(syscall, a, kw):
+    ''' Return a description if the system call as `syscall(args,kwargs)`
+        suitably formatted for convenience.
     '''
-    syscall = method.__name__
     if syscall == 'write':
       fh, offset, bs = a
-      arg_desc = [
+      desc_v = [
           str(a[0]),
           str(a[1]),
           "%d bytes:%r..." % (len(bs), bytes(bs[:16]))
       ]
     else:
-      arg_desc = [
+      desc_v = [
           (
               ("<%s>" % (type(arg).__name__,))
               if isinstance(arg, llfuse.RequestContext) else repr(arg)
           ) for arg in a
       ]
-    arg_desc.extend(
+    desc_v.extend(
         "%s=%r" % (kw_name, kw_value) for kw_name, kw_value in kw.items()
     )
-    arg_desc = ','.join(arg_desc)
-    with Pfx("%s.%s(%s)", type(self).__name__, syscall, arg_desc):
-      trace = syscall in (
-          ##'getxattr',
-          ##'setxattr',
-          ##'statfs',
-      )
-      if trace:
-        X("CALL %s(%s)", syscall, arg_desc)
-      fs = self._vtfs
-      try:
-        with stackattrs(defaults, fs=fs):
-          with fs.S:
-            with LogTime("SLOW SYSCALL", threshold=5.0):
-              result = method(self, *a, **kw)
-            if trace:
-              if isinstance(result, bytes):
-                X(
-                    "CALL %s result => %d bytes, %r...", syscall, len(result),
-                    result[:16]
-                )
-              else:
-                X("CALL %s result => %s", syscall, result)
-            return result
-      ##except FuseOSError as e:
-      ##  warning("=> FuseOSError %s", e, exc_info=False)
-      ##  raise
-      except OSError as e:
-        ##warning("=> OSError %s => FuseOSError", e, exc_info=False)
-        raise FuseOSError(e.errno) from e
-      except MissingHashcodeError as e:
-        error("raising IOError from missing hashcode: %s", e)
-        raise FuseOSError(errno.EIO) from e
-      except Exception as e:
-        exception("unexpected exception, raising EINVAL %s:%s", type(e), e)
-        raise FuseOSError(errno.EINVAL) from e
-      except BaseException as e:
-        error("UNCAUGHT EXCEPTION: %s", e)
-        raise RuntimeError("UNCAUGHT EXCEPTION") from e
-      except:
-        error("=> EXCEPTION %r", sys.exc_info())
+    desc = ','.join(desc_v)
+    return desc
+
+  def handle(self, *a, **kw):
+    ''' Wrapper for FUSE handler methods.
+    '''
+    sysdesc = None
+    do_trace = (
+        syscall in (
+            ##'getxattr',
+            ##'setxattr',
+            ##'statfs',
+        ) if trace is None else trace
+    )
+    if do_trace:
+      sysdesc = sysdesc or syscall_desc(syscall, a, kw)
+      X("CALL %s", sysdesc)
+    fs = self._vtfs
+    try:
+      with fs:
+        with fs.S:
+          if do_trace:
+            start_time = time.time()
+          result = method(self, *a, **kw)
+          if do_trace:
+            end_time = time.time()
+            if end_time - start_time >= 1.0:
+              sysdesc = sysdesc or syscall_desc(syscall, a, kw)
+              warning(
+                  "more that %fs spent on %s", end_time - start_time, sysdesc
+              )
+          if do_trace:
+            sysdesc = sysdesc or syscall_desc(syscall, a, kw)
+            if isinstance(result, bytes):
+              X(
+                  "CALL %s result => %d bytes, %r...", sysdesc, len(result),
+                  result[:16]
+              )
+            else:
+              X("CALL %s result => %s", sysdesc, result)
+          return result
+    except BaseException:
+      sysdesc = sysdesc or syscall_desc(syscall, a, kw)
+      with Pfx(sysdesc):
+        try:
+          raise
+        ##except FuseOSError as e:
+        ##  warning("=> FuseOSError %s", e, exc_info=False)
+        ##  raise
+        except OSError as e:
+          ##warning("=> OSError %s => FuseOSError", e, exc_info=False)
+          raise FuseOSError(e.errno) from e
+        except MissingHashcodeError as e:
+          error("raising IOError from missing hashcode: %s", e)
+          raise FuseOSError(errno.EIO) from e
+        except Exception as e:
+          exception("unexpected exception, raising EINVAL %s:%s", type(e), e)
+          raise FuseOSError(errno.EINVAL) from e
+        except BaseException as e:
+          error("UNCAUGHT EXCEPTION: %s", e)
+          raise RuntimeError("UNCAUGHT EXCEPTION") from e
+        except:
+          error("=> EXCEPTION %r", sys.exc_info())
 
   return handle
 
@@ -197,11 +226,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
+  @uses_Store
   def __init__(
       self,
       E,
       *,
-      S=None,
+      S,
       archive=None,
       subpath=None,
       options=None,
@@ -213,7 +243,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         Parameters:
         * `E`: the root directory reference
-        * `S`: optional backing Store, default from defaults.S
+        * `S`: backing Store
         * `archive`: if not None, an Archive or similar, with a
           .update(Dirent[,when]) method
         * `subpath`: relative path to mount Dir
@@ -297,11 +327,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
       def mainloop():
         ''' Worker main loop to run the filesystem then tidy up.
         '''
-        with stackattrs(defaults, fs=fs):
+        with fs:
           with S:
-            with defaults.common_S(S):
-              llfuse.main(workers=32)
-              llfuse.close()
+            llfuse.main(workers=32)
+            llfuse.close()
         S.close()
 
       T = PfxThread(target=mainloop)
@@ -787,13 +816,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
           if EA is None:
             if E is not None:
               # yield name, attributes and next offset
-              with stackattrs(defaults, fs=fs):
-                with S:
-                  try:
-                    EA = self._vt_EntryAttributes(E)
-                  except Exception as e:
-                    warning("%r: %s", name, e)
-                    EA = None
+              with S:
+                try:
+                  EA = self._vt_EntryAttributes(E)
+                except Exception as e:
+                  warning("%r: %s", name, e)
+                  EA = None
           if EA is not None:
             yield self._vt_bytes(name), EA, o + 1
           o += 1
@@ -1031,6 +1059,3 @@ class StoreFS_LLFUSE(llfuse.Operations):
     return written
 
 StoreFS = StoreFS_LLFUSE
-
-if __name__ == '__main__':
-  sys.exit(main(sys.argv))

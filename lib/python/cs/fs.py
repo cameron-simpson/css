@@ -4,7 +4,7 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
-from fnmatch import fnmatch
+from fnmatch import filter as fnfilter
 from functools import partial
 import os
 from os.path import (
@@ -12,6 +12,7 @@ from os.path import (
     dirname,
     exists as existspath,
     expanduser,
+    expandvars,
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
@@ -24,29 +25,24 @@ from threading import Lock
 from typing import Optional
 
 from icontract import require
-from typeguard import typechecked
 
 from cs.deco import decorator
-from cs.env import envsub
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
-__version__ = '20220805-post'
+__version__ = '20230806-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.deco',
-        'cs.env',
         'cs.obj',
         'cs.pfx',
         'icontract',
-        'typeguard',
     ],
 }
 
@@ -56,19 +52,24 @@ pfx_makedirs = partial(pfx_call, os.makedirs)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
-def needdir(dirpath, mode=0o777, *, use_makedirs=False):
+def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
   ''' Create the directory `dirpath` if missing.
 
       Parameters:
       * `dirpath`: the required directory path
       * `mode`: the permissions mode, default `0o777`
+      * `log`: log `makedirs` or `mkdir` call
       * `use_makedirs`: optional creation mode, default `False`;
         if true, use `os.makedirs`, otherwise `os.mkdir`
   '''
   if not isdirpath(dirpath):
     if use_makedirs:
+      if log is not None:
+        log("makedirs(%r,0o%3o)", dirpath, mode)
       pfx_makedirs(dirpath, mode)
     else:
+      if log is not None:
+        log("mkdir(%r,0o%3o)", dirpath, mode)
       pfx_mkdir(dirpath, mode)
 
 @decorator
@@ -152,10 +153,7 @@ def rpaths(
 def fnmatchdir(dirpath, fnglob):
   ''' Return a list of the names in `dirpath` matching the glob `fnglob`.
   '''
-  return [
-      filename for filename in pfx_listdir(dirpath)
-      if fnmatch(filename, fnglob)
-  ]
+  return fnfilter(pfx_listdir(dirpath), fnglob)
 
 # pylint: disable=too-few-public-methods
 class HasFSPath:
@@ -165,11 +163,17 @@ class HasFSPath:
   def __init__(self, fspath):
     self.fspath = fspath
 
+  def __str__(self):
+    return f'{self.__class__.__name__}(fspath={self.shortpath})'
+
   @property
   def shortpath(self):
     ''' The short version of `self.fspath`.
     '''
-    return shortpath(self.fspath)
+    try:
+      return shortpath(self.fspath)
+    except AttributeError:
+      return "<no-fspath>"
 
   @require(lambda subpath: not isabspath(subpath))
   def pathto(self, subpath):
@@ -187,7 +191,12 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   '''
 
   @classmethod
-  def _resolve_fspath(cls, fspath, envvar=None, default_attr=None):
+  def _resolve_fspath(
+      cls,
+      fspath: Optional[str],
+      envvar: Optional[str] = None,
+      default_attr=None
+  ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
 
         Parameters:
@@ -257,12 +266,12 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
 
 DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
 
-def shortpath(path, environ=None, prefixes=None):
+def shortpath(path, prefixes=None):
   ''' Return `path` with the first matching leading prefix replaced.
 
       Parameters:
       * `environ`: environment mapping if not os.environ
-      * `prefixes`: iterable of `(prefix,subst)` to consider for replacement;
+      * `prefixes`: optional iterable of `(prefix,subst)` to consider for replacement;
         each `prefix` is subject to environment variable
         substitution before consideration
         The default considers "$HOME/" for replacement by "~/".
@@ -270,12 +279,12 @@ def shortpath(path, environ=None, prefixes=None):
   if prefixes is None:
     prefixes = DEFAULT_SHORTEN_PREFIXES
   for prefix, subst in prefixes:
-    prefix = envsub(prefix, environ)
+    prefix = expandvars(prefix)
     if path.startswith(prefix):
       return subst + path[len(prefix):]
   return path
 
-def longpath(path, environ=None, prefixes=None):
+def longpath(path, prefixes=None):
   ''' Return `path` with prefixes and environment variables substituted.
       The converse of `shortpath()`.
   '''
@@ -285,7 +294,7 @@ def longpath(path, environ=None, prefixes=None):
     if path.startswith(subst):
       path = prefix + path[len(subst):]
       break
-  path = envsub(path, environ)
+  path = expandvars(path)
   return path
 
 def is_clean_subpath(subpath: str):

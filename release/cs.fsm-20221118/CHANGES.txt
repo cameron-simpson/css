@@ -1,0 +1,13 @@
+lib/python/cs/fsm.py: cs.fsm: FSM.__init__: make state optional, default from self.FSM_DEFAULT_STATE - now all args are optional, which helps a Django Model subclassing FSM
+lib/python/cs/fsm.py: cs.fsm: formatting, comment tweak
+lib/python/cs/fsm.py: cs.fsm: better reference to FSM.FSM_ANY_STATE
+lib/python/cs/fsm.py: merge default ==> taskqueue
+lib/python/cs/fsm.py: cs.fsm: FSM.__init__: if the state is None or not supplied, do not set .fsm_state at all; add explaination for this weird design choice
+lib/python/cs/fsm.py: cs.fsm: FSM.__getattr__: only generate event methods for events with public names (no leading underscore)
+lib/python/cs/fsm.py: cs.fsm: FSM: new fsm_event_is_allowed(event) method, useful as a sanity check elsewhere
+lib/python/cs/fsm.py: cs.fsm: FSM: new .fsm_history property, aiding subclassing elsewhere
+lib/python/cs/fsm.py: cs.fsm: undo formatting damage from accidental application of black, the misopinionated formatter
+lib/python/cs/fsm.py: cs.fsm: FSM.__getattr__: refactor to narrow try/except statements, tweak message construction
+lib/python/cs/fsm.py: cs.fsm: FSM: drop dot_node_fillcolor, now provided by DOTNodeMixin.__getattr__, provide dot_node_palette_key using self.fsm_state
+lib/python/cs/fsm.py: cs.fsm: FSM.dot_node_attrs: color from self.dot_node_color
+lib/python/cs/fsm.py: cs.fsm,cs.gvutils: from FSM.dot_node_attrs, add colours to DOTNodeMixin.dot_node_attrs and fix "fontcolor"
