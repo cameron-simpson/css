@@ -303,6 +303,15 @@ class FSM(DOTNodeMixin):
     '''
     return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
 
+  def fsm_as_svg(self, layout=None, **dot_kw):
+    ''' Render the state transition diagram as SVG. '''
+    return gvsvg(self.fsm_dot, layout=layout, **dot_kw)
+
+  @property
+  def fsm_svg(self):
+    ''' The state transition diagram as SVG. '''
+    return self.fsm_as_svg()
+
 if __name__ == '__main__':
   import sys
   from cs.taskqueue import Task
