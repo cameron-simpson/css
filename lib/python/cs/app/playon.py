@@ -252,7 +252,7 @@ class PlayOnCommand(BaseCommand):
           filename = api[dl_id].format_as(filename_format)
           filename = (
               filename.lower().replace(' - ', '--')
-              .replace('_', ':').replace(os.sep, ':') + '.'
+              .replace(' ', '-').replace('_', ':').replace(os.sep, ':') + '.'
           )
           filename = re.sub('---+', '--', filename)
           try:
