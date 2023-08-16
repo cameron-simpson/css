@@ -15,7 +15,7 @@ from threading import Thread
 from typing import Mapping
 from urllib.parse import quote as urlquote
 
-from cs.lex import cutprefix, cutsuffix
+from cs.lex import cutprefix, cutsuffix, r
 
 __version__ = '20221207-post'
 
@@ -272,6 +272,26 @@ class DOTNodeMixin:
     '''
     return self.dot_node_id
 
+  @staticmethod
+  def dot_node_attrs_str(attrs):
+    ''' An attributes mapping transcribed for DOT,
+        ready for insertion between `[]` in a node definition.
+    '''
+    strs = []
+    for attr, value in attrs.items():
+      if isinstance(value, (int, float)):
+          value_s = str(value)
+      elif isinstance(value, str):
+        value_s = quote(value)
+      else:
+        raise TypeError(
+            "attrs[%r]=%s: expected int,float,str"
+            % (attr, r(value))
+        )
+      strs.append(quote(attr) + '=' + value_s)
+    attrs_s = ','.join(strs)
+    return attrs_s
+
   def dot_node(self, label=None, **node_attrs) -> str:
     ''' A DOT syntax node definition for `self`.
     '''
@@ -282,10 +302,7 @@ class DOTNodeMixin:
     attrs.update(node_attrs)
     if not attrs:
       return quote(label)
-    attrs_s = ','.join(
-        f'{quote(attr)}={quote(value)}' for attr, value in attrs.items()
-    )
-    return f'{quote(self.dot_node_id)}[{attrs_s}]'
+    return f'{quote(self.dot_node_id)}[{self.dot_node_attrs_str(attrs)}]'
 
   # pylint: disable=no-self-use
   def dot_node_attrs(self) -> Mapping[str, str]:
