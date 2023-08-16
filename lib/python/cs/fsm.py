@@ -257,8 +257,7 @@ class FSM(DOTNodeMixin):
           cb for cb in self.__callbacks[state] if cb != callback
       ]
 
-  @classmethod
-  def fsm_transitions_as_dot(cls, fsm_transitions, sep='\n', graph_name=None):
+  def fsm_transitions_as_dot(self, fsm_transitions, sep='\n', graph_name=None):
     ''' Compute a DOT syntax graph description from a transitions dictionary.
 
         Parameters:
@@ -267,7 +266,7 @@ class FSM(DOTNodeMixin):
         * `graph_name`: optional name for the graph, default the class name
     '''
     if graph_name is None:
-      graph_name = cls.__name__
+      graph_name = self.__class__.__name__
     dot = [f'digraph {gvq(graph_name)} {{']
     # NB: we _do not_ sort the transition graph because the "dot" programme
     # layout is affected by the order in which the graph is defined.
@@ -276,6 +275,11 @@ class FSM(DOTNodeMixin):
     # describing the transitions in the natural order in which they
     # occur typically produces a nicer graph diagram.
     for src_state, transitions in fsm_transitions.items():
+      if src_state == self.fsm_state:
+        # colour the current state
+        fillcolor = self.DOT_NODE_FILLCOLOR_PALETTE.get(src_state)
+        if fillcolor:
+          dot.append(f'  {gvq(src_state)}[{self.dot_node_attrs_str(fillcolor=fillcolor)}];')
       for event, dst_state in sorted(transitions.items()):
         dot.append(
             f'  {gvq(src_state)}->{gvq(dst_state)}[label={gvq(event)}];'
