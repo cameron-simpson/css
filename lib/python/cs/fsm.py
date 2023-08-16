@@ -25,7 +25,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.gimmicks',
-        'cs.gvutils',
+        'cs.gvutils>=20230816',
         'cs.lex',
         'cs.pfx',
         'typeguard',
