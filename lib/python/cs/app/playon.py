@@ -251,9 +251,10 @@ class PlayOnCommand(BaseCommand):
         with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
-              filename.lower().replace(' - ', '--').replace('----', '--')
-              .replace('_', ':').replace(' ', '-').replace(os.sep, ':') + '.'
+              filename.lower().replace(' - ', '--')
+              .replace('_', ':').replace(os.sep, ':') + '.'
           )
+          filename = re.sub('---+', '--', filename)
           try:
             api.download(dl_id, filename=filename)
           except ValueError as e:
