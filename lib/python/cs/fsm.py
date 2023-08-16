@@ -11,7 +11,7 @@ from typing import Optional, TypeVar
 from typeguard import typechecked
 
 from cs.gimmicks import exception
-from cs.gvutils import gvprint, quote as gvq, DOTNodeMixin
+from cs.gvutils import gvprint, gvsvg, quote as gvq, DOTNodeMixin
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 
