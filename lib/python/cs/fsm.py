@@ -279,7 +279,8 @@ class FSM(DOTNodeMixin):
         # colour the current state
         fillcolor = self.DOT_NODE_FILLCOLOR_PALETTE.get(src_state)
         if fillcolor:
-          dot.append(f'  {gvq(src_state)}[{self.dot_node_attrs_str(fillcolor=fillcolor)}];')
+          attrs_s = self.dot_node_attrs_str(dict(style='filled',fillcolor=fillcolor))
+          dot.append(f'  {gvq(src_state)}[{attrs_s}];')
       for event, dst_state in sorted(transitions.items()):
         dot.append(
             f'  {gvq(src_state)}->{gvq(dst_state)}[label={gvq(event)}];'
