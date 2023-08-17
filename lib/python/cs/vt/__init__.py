@@ -491,8 +491,8 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     self._blockmapdir = dirpath
 
-  @typechecked
   @require(lambda capacity: capacity >= 1)
+  @typechecked
   def pushto(self,
              dstS,
              *,

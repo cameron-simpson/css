@@ -426,13 +426,13 @@ class StreamStore(StoreSyncBase):
     '''
     return missing_hashcodes_by_checksum(self, other, **kw)
 
-  @typechecked
   @require(
       lambda self, start_hashcode: (
           start_hashcode is None or self.hashclass is None or
           isinstance(start_hashcode, self.hashclass)
       )
   )
+  @typechecked
   def hashcodes(
       self,
       start_hashcode=None,
@@ -738,11 +738,11 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
 
   RQTYPE = RqType.HASHCODES
 
-  @typechecked
   @require(lambda hashclass: issubclass(hashclass, HashCode))
   @require(
       lambda after, start_hashcode: not after or start_hashcode is not None
   )
+  @typechecked
   def __init__(
       self,
       *,

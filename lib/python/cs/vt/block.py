@@ -83,8 +83,8 @@ def isBlock(o):
 
 class _Block(Transcriber, ABC):
 
-  @typechecked
   @require(lambda span: span is None or span >= 0)
+  @typechecked
   def __init__(self, block_type, span: Optional[int]):
     self.type = block_type
     self.span = span

@@ -838,9 +838,9 @@ class SqliteFilemap:
       c.close()
 
   @pfx_method
-  @typechecked
   @require(lambda new_path: new_path is not None)
   ##@require(lambda new_path: isfilepath(new_path))
+  @typechecked
   def add_path(self, new_path: str, indexed_to=0) -> DataFileState:
     ''' Insert a new path into the map.
         Return its `DataFileState`.
