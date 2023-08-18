@@ -41,8 +41,10 @@
 from collections import namedtuple
 from collections.abc import Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 import errno
 from functools import partial
+from getopt import GetoptError
 import os
 from os import (
     pread,
@@ -59,6 +61,7 @@ import stat
 import sys
 from time import time, sleep
 from types import SimpleNamespace
+from typing import Optional
 from uuid import uuid4
 from zlib import decompress
 
@@ -69,6 +72,7 @@ from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.binary import BinaryMultiValue, BSUInt
 from cs.buffer import CornuCopyBuffer
 from cs.cache import LRU_Cache
+from cs.cmdutils import BaseCommand
 from cs.context import nullcontext, stackattrs
 from cs.fileutils import (
     DEFAULT_READSIZE,
@@ -78,6 +82,7 @@ from cs.fileutils import (
     shortpath,
 )
 from cs.fs import HasFSPath, needdir
+from cs.lex import s
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -943,6 +948,20 @@ class DataDir(FilesDir):
     bfr = CornuCopyBuffer.from_filename(filepath, offset=offset)
     yield from DataRecord.scan(bfr, with_offsets=True)
 
+  def datafilenames(self):
+    ''' Return a list of the datafile basenames. '''
+    try:
+      listing = pfx_listdir(self.datapath)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        warning("listing failed: %s", e)
+        return []
+      raise
+    return [
+        filename for filename in pfx_listdir(self.datapath) if
+        not filename.startswith('.') and filename.endswith(DATAFILE_DOT_EXT)
+    ]
+
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
 
@@ -961,17 +980,8 @@ class DataDir(FilesDir):
         sleep(0.1)
         continue
       # scan for new datafiles
-      try:
-        listing = pfx_listdir(datadirpath)
-      except OSError as e:
-        if e.errno == errno.ENOENT:
-          error("listing failed, exiting _monitor_datafiles loop: %s", e)
-          break
-        raise
-      for filename in listing:
-        if (not filename.startswith('.')
-            and filename.endswith(DATAFILE_DOT_EXT)
-            and filename not in filemap):
+      for filename in self.datafilenames():
+        if filename not in filemap:
           info("%s: add new filename %r", filename)
           filemap.add_path(filename)
       # now scan known datafiles for new data
@@ -1471,6 +1481,86 @@ class PlatonicDir(FilesDir):
         post_offset = offset + len(data)
         yield offset, data, post_offset
         offset = post_offset
+
+class DataDirCommand(BaseCommand):
+
+  GETOPT_SPEC = 'S:'
+
+  USAGE_FORMAT = '''Usage: {cmd} [-d datadir] subcommand [...]
+  -d datadir    Specify the filesystem path of the DataDir.
+                Default from the default Store, which must be a DataDirStore.
+  '''
+
+  SUBCOMMAND_ARGV_DEFAULT = ['info']
+
+  @dataclass
+  class Options(BaseCommand.Options):
+    ''' Special class for `self.options` with various properties.
+    '''
+    datadirpath: Optional[str] = None
+
+  @contextmanager
+  def run_context(self):
+    options = self.options
+    datadirpath = options.datadirpath
+    if datadirpath is None:
+      from .store import DataDirStore
+      S = pfx_call(Store.promote, options.store_spec, options.config)
+      if not isinstance(S, DataDirStore):
+        raise GetoptError("default Store is not a DataDirStore: %s" % (s(S),))
+      datadir = S._datadir
+      datadirpath = datadir.fspath
+    else:
+      datadir = DataDir(datadirpath)
+    with super().run_context():
+      with stackattrs(
+          options,
+          datadir=datadir,
+          datadirpath=datadirpath,
+      ):
+        yield
+
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Print information about the DataDir.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    datadir = options.datadir
+    verbose = options.verbose
+    print(datadir)
+    print("  hashclass: ", datadir.hashclass.__name__)
+    print("  indexclass:", datadir.indexclass.__name__)
+    if verbose:
+      print("  datafiles:")
+    total_data = 0
+    datafilenames = datadir.datafilenames()
+    for filename in sorted(datafilenames):
+      with Pfx(filename):
+        datapath = datadir.datapathto(filename)
+        S = os.stat(datapath)
+        if verbose:
+          print("   ", filename, transcribe_bytes_geek(S.st_size))
+        total_data += S.st_size
+    if verbose:
+      print("   ", transcribe_bytes_geek(total_data))
+    else:
+      print(
+          "  datafiles:",
+          len(datafilenames),
+          "files, ",
+          transcribe_bytes_geek(total_data),
+          "total bytes",
+      )
+
+  def cmd_init(self, argv):
+    ''' Usage: {cmd}
+          Initialise the DataDir.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    self.options.datadir.initdir()
 
 if __name__ == '__main__':
   from .datadir_tests import selftest
