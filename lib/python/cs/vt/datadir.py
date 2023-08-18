@@ -1488,7 +1488,7 @@ class PlatonicDir(FilesDir):
 
 class DataDirCommand(BaseCommand):
 
-  GETOPT_SPEC = 'S:'
+  GETOPT_SPEC = 'd:'
 
   USAGE_FORMAT = '''Usage: {cmd} [-d datadir] subcommand [...]
   -d datadir    Specify the filesystem path of the DataDir.
@@ -1502,6 +1502,16 @@ class DataDirCommand(BaseCommand):
     ''' Special class for `self.options` with various properties.
     '''
     datadirpath: Optional[str] = None
+    store_spec: Optional[str] = None
+
+  def apply_opt(self, opt, val):
+    ''' Apply the command line option `opt` with value `val`.
+    '''
+    options = self.options
+    if opt == '-d':
+      options.datadirpath = val
+    else:
+      raise GetoptError(f'unhandled option: {opt!r}={val!r}')
 
   @contextmanager
   def run_context(self):
