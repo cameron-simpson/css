@@ -126,6 +126,10 @@ DEFAULT_ROLLOVER = MAX_FILE_SIZE
 # flush the index after this many updates in the index updater worker thread
 INDEX_FLUSH_RATE = 16384
 
+def main(argv=None):
+  ''' DataDir command line mode. '''
+  return DataDirCommand(argv=argv).run()
+
 class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
     'filenum': BSUInt,
     'data_offset': BSUInt,
@@ -1563,5 +1567,4 @@ class DataDirCommand(BaseCommand):
     self.options.datadir.initdir()
 
 if __name__ == '__main__':
-  from .datadir_tests import selftest
-  selftest(sys.argv)
+  sys.exit(main(sys.argv))
