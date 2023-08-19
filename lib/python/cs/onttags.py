@@ -86,7 +86,7 @@ class OntCommand(TagsOntologyCommand):
     for tn in type_names:
       print(tn)
 
-class Ont(TagsOntology, HasFSPath, Promotable):
+class Ont(FSPathBasedSingleton, TagsOntology, Promotable):
   ''' A `TagsOntology` based on a persistent store.
   '''
 
