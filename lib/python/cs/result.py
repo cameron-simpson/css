@@ -280,7 +280,6 @@ class Result(FSM):
       raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
     self.collected = True
     if state == self.CANCELLED:
-      self.collected = True
       raise CancellationError
     return self._exc_info
 
