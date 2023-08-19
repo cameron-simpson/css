@@ -25,8 +25,8 @@ from cs.cmdutils import BaseCommandOptions
 from cs.context import stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
-from cs.fstags import FSTags
 from cs.fs import HasFSPath
+from cs.fstags import FSTags, uses_fstags
 from cs.gui_tk import BaseTkCommand
 from cs.lex import r
 from cs.logutils import warning
@@ -71,15 +71,16 @@ class TaggerCommand(BaseTkCommand):
       raise RuntimeError(f'unhandled option: {opt!r}')
 
   @contextmanager
-  def run_context(self):
+  @uses_fstags
+  def run_context(self, *, fstags: FSTags):
     ''' Set up around commands.
     '''
     with super().run_context():
       options = self.options
-      with FSTags() as fstags:
-        tagger = Tagger('.', fstags=fstags)
+      with fstags:
+        tagger = Tagger(options.fspath)
         with tagger:
-          with stackattrs(options, tagger=tagger, fstags=fstags):
+          with stackattrs(options, tagger=tagger):
             yield
 
   def tagger_for(self, fspath):
@@ -276,13 +277,13 @@ class TaggerCommand(BaseTkCommand):
             repr([shortpath(path) for path in paths])
         )
 
-  def cmd_test(self, argv):
+  @uses_fstags
+  def cmd_test(self, argv, *, fstags: FSTags):
     ''' Usage: {cmd} path
           Run a test against path.
           Current we try out the suggestions.
     '''
     tagger = self.options.tagger
-    fstags = self.options.fstags
     if not argv:
       raise GetoptError("missing path")
     path = argv.pop(0)
