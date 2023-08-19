@@ -30,6 +30,7 @@ from typing import Callable, List, Mapping, Optional
 from typeguard import typechecked
 
 from cs.context import stackattrs
+from cs.deco import Promotable
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -791,17 +792,30 @@ class BaseCommand:
     '''
     return argv
 
-  class _OptSpec(namedtuple('_OptSpec',
-                            'help_text, parse, validate, unvalidated_message')
-                 ):
+  class _OptSpec(
+      namedtuple('_OptSpec',
+                 'help_text, parse, validate, unvalidated_message'),
+      Promotable,
+  ):
     ''' A class to support parsing an option value.
     '''
 
     @classmethod
-    def from_specs(cls, *specs):
+    def promote(cls, spec):
       ''' Construct an `_OptSpec` from a list of positional parameters
           as for `poparg()`.
       '''
+      if isinstance(spec, cls):
+        return spec
+      if isinstance(spec, str):
+        # the help text
+        specs = spec,
+      elif callable(spec):
+        # the factory
+        specs = spec,
+      else:
+        # some iterable
+        specs = spec
       parse = None
       help_text = None
       validate = None
@@ -827,7 +841,8 @@ class BaseCommand:
             "string value" if parse is None else "value for %s" % (parse,)
         )
       if parse is None:
-        parse = str
+        # pass option value through unchanged
+        parse = lambda val: val
       if unvalidated_message is None:
         unvalidated_message = "invalid value"
       return cls(
@@ -923,7 +938,7 @@ class BaseCommand:
             >>> argv  # zz was pushed back
             ['zz']
     '''
-    opt_spec = cls._OptSpec.from_specs(*a)
+    opt_spec = cls._OptSpec.promote(a)
     with Pfx(opt_spec.help_text):
       if not argv:
         raise GetoptError("missing argument")
@@ -1042,7 +1057,7 @@ class BaseCommand:
         if not specs or not isinstance(specs[0], str):
           specs.insert(0, default_help_text)
         if needs_arg:
-          opt_spec = cls._OptSpec.from_specs(*specs)
+          opt_spec = cls._OptSpec.promote(specs)
           opt_spec_map[opt] = opt_spec
         opt_name_map[opt] = opt_name
     opts, post_argv = getopt(argv, shortopts, longopts)
