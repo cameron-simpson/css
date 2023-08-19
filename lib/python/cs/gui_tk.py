@@ -100,9 +100,9 @@ class BaseTkCommand(BaseCommand):
     xit = super().run(**kw)
     if xit is None:
       # the command did GUI setup - run the app now
-      runstate = self.options.runstate()
-      if not runstate.cancelled():
-        with runstate():
+      runstate = self.options.runstate
+      if not runstate.cancelled:
+        with runstate:
           self.options.tk_app.mainloop()
     return xit
 
