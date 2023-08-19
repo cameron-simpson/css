@@ -622,8 +622,8 @@ class ListQueue:
     if self.unrepeated_signature is None:
       return self
 
+    # remove duplicates from the iteration
     def unique_items():
-      # remove duplicates from the iteration
       while True:
         try:
           item = self.get()
