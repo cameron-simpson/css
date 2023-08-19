@@ -322,7 +322,7 @@ class BaseCommandOptions:
   def popopts(self, argv, **opt_specs):
     ''' Convenience method to appply `BaseCommand.popopts` to the options.
     '''
-    return BaseCommand.popopts(argv, self, **opt_specs)
+    BaseCommand.popopts(argv, self, **opt_specs)
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
