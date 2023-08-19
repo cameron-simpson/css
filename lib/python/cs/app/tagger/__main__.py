@@ -90,9 +90,9 @@ class TaggerCommand(BaseTkCommand):
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_autofile(self, argv):
-    ''' Usage: {cmd} [-dnrx] pathnames...
-          Link pathnames to destinations based on their tags.
-          -d    Treat directory pathnames like files - file the
+    ''' Usage: {cmd} [-dnrx] paths...
+          Link paths to destinations based on their tags.
+          -d    Treat directory paths like files - file the
                 directory, not its contents.
                 (TODO: we file by linking - this needs a rename.)
           -n    No link (default). Just print filing actions.
@@ -124,7 +124,7 @@ class TaggerCommand(BaseTkCommand):
         else:
           raise RuntimeError("unimplemented option")
     if not argv:
-      raise GetoptError("missing pathnames")
+      raise GetoptError("missing paths")
     q = ListQueue(argv, unique=True)
     for path in q:
       with Pfx(path):
@@ -134,12 +134,15 @@ class TaggerCommand(BaseTkCommand):
         if isdirpath(path) and not direct:
           if recurse:
             # queue the directory entries
-            for entry in sorted(os.scandir(path), key=lambda entry: entry.name,
-                                reverse=True):
+            for entry in sorted(
+                os.scandir(path),
+                key=lambda entry: entry.name,
+                reverse=True,
+            ):
               if entry.name.startswith('.'):
                 continue
-              if entry.is_dir(follow_symlinks=False
-                              ) or entry.is_file(follow_symlinks=False):
+              if (entry.is_dir(follow_symlinks=False)
+                  or entry.is_file(follow_symlinks=False)):
                 q.prepend((joinpath(path, entry.name),))
           else:
             warning("recursion disabled, skipping")
@@ -170,12 +173,13 @@ class TaggerCommand(BaseTkCommand):
     if not argv:
       raise GetoptError("missing paths")
     for path in argv:
-      print(path)
-      tagger = self.tagger_for(dirname(path))
-      print("  tagger =", tagger)
-      print(" ", repr(tagger.conf))
-      for tag in tagger.infer_tags(path, mode=infer_mode):
-        print(" ", tag)
+      with Pfx(path):
+        print(path)
+        tagger = self.tagger_for(dirname(path))
+        print("  tagger =", tagger)
+        print(" ", repr(tagger.conf))
+        for tag in tagger.infer_tags(path, mode=infer_mode):
+          print(" ", tag)
     return 0
 
   def cmd_conf(self, argv):
@@ -221,11 +225,11 @@ class TaggerCommand(BaseTkCommand):
     return 0
 
   def cmd_gui(self, argv):
-    ''' Usage: {cmd} pathnames...
-          Run a GUI to tag pathnames.
+    ''' Usage: {cmd} paths...
+          Run a GUI to tag paths.
     '''
     if not argv:
-      raise GetoptError("missing pathnames")
+      raise GetoptError("missing paths")
     from .gui_tk import main as gui_main  # pylint: disable=import-outside-toplevel
     return gui_main([self.cmd, *argv])
 
@@ -246,11 +250,11 @@ class TaggerCommand(BaseTkCommand):
         print(" ", r(type_value), tagger.ont[ontkey])
 
   def cmd_suggest(self, argv):
-    ''' Usage: {cmd} pathnames...
-          Suggest tags for each pathname.
+    ''' Usage: {cmd} paths...
+          Suggest tags for each path.
     '''
     if not argv:
-      raise GetoptError("missing pathnames")
+      raise GetoptError("missing paths")
     tagger = self.options.tagger
     for path in argv:
       print()
