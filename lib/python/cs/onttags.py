@@ -16,7 +16,7 @@ from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.deco import fmtdoc, Promotable
-from cs.fs import HasFSPath
+from cs.fs import FSPathBasedSingleton
 from cs.fstags import TagFile
 from cs.lex import cutsuffix, r
 from cs.logutils import warning
