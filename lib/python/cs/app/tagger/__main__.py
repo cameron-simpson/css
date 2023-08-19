@@ -5,6 +5,7 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
+from dataclasses import dataclass
 from getopt import GetoptError, getopt
 import json
 import os
@@ -20,10 +21,12 @@ from os.path import (
 from pprint import pprint
 import sys
 
+from cs.cmdutils import BaseCommandOptions
 from cs.context import stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
+from cs.fs import HasFSPath
 from cs.gui_tk import BaseTkCommand
 from cs.lex import r
 from cs.logutils import warning
@@ -46,6 +49,26 @@ class TaggerCommand(BaseTkCommand):
   '''
 
   DEFAULT_WIDGET_CLASS = TaggerWidget
+  GETOPT_SPEC = 'd:nqv'
+
+  @dataclass
+  class TaggerOptions(BaseCommandOptions, HasFSPath):
+    fspath: str = '.'
+
+  # pylint: disable=no-self-use
+  @trace
+  def apply_opt(self, opt, val):
+    options = self.options
+    if opt == '-d':
+      options.fspath = val
+    elif opt == '-n':
+      options.dry_run = True
+    elif opt == '-q':
+      options.quiet = True
+    elif opt == '-v':
+      options.verbose = True
+    else:
+      raise RuntimeError(f'unhandled option: {opt!r}')
 
   @contextmanager
   def run_context(self):
