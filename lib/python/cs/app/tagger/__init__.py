@@ -25,7 +25,7 @@ from typing import List, Optional
 
 from cs.deco import cachedmethod, default_params, fmtdoc, promote
 from cs.fs import FSPathBasedSingleton, shortpath
-from cs.fstags import FSTags
+from cs.fstags import FSTags, uses_FSTags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
 from cs.onttags import Ont, ONTTAGS_PATH_DEFAULT, ONTTAGS_PATH_ENVVAR
@@ -84,21 +84,16 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
   perthread_state = ThreadState(current=None)
 
   @promote
-  def __init__(self, fspath: str, fstags=None, ont: Optional[Ont] = None):
+  def __init__(self, fspath: str, ont: Optional[Ont] = None):
     ''' Initialise the `Tagger`.
 
         Parameters:
-        * `fstags`: optional `FSTags` instance;
-          an instance will be created if not supplied
         * `ont`: optional `cs.onttags.Ont`;
           an instance will be created if not supplied
     '''
     if hasattr(self, 'fspath'):
       return
-    if fstags is None:
-      fstags = FSTags()
     super().__init__(fspath)
-    self.fstags = fstags
     self.ont = ont
     self._file_by_mappings = {}
     # mapping of (dirpath,tag_name)=>tag_value=>set(subdirpaths)
@@ -113,13 +108,14 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     ''' Factory to return a `Tagger` for a directory
         using the same `FSTags` and ontology as `self`.
     '''
-    return type(self)(dirpath, fstags=self.fstags, ont=self.ont)
+    return type(self)(dirpath, ont=self.ont)
 
   @property
-  def tagged(self):
+  @uses_FSTags
+  def tagged(self, fstags: FSTags):
     ''' The `TaggedPath` associated with this directory.
     '''
-    return self.fstags[self.fspath]
+    return fstags[self.fspath]
 
   @property
   @cachedmethod
@@ -144,7 +140,8 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     return self.conf_all.get('autoname', [])
 
   @pfx
-  def autoname(self, srcpath):
+  @uses_FSTags
+  def autoname(self, srcpath, fstags: FSTags):
     ''' Generate a filename computed from `srcpath`.
 
         The format strings used to generate the pathname
@@ -160,7 +157,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       # the tags to use in the format string are the inherited Tags of
       # dstdirpath overlaid by the inherited Tags of srcpath
       fmttags = self.tagged.merged_tags()
-      fmttags.update(self.fstags[srcpath].merged_tags())
+      fmttags.update(fstags[srcpath].merged_tags())
       for fmt in formats:
         with Pfx(repr(fmt)):
           try:
@@ -181,13 +178,16 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     return list(self.ont.type_values(tag_name))
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+  @uses_FSTags
   @fmtdoc
   def file_by_tags(
       self,
       origpath: str,
+      *,
       prune_inherited=False,
       no_link=False,
       do_remove=False,
+      fstags: FSTags,
   ):
     ''' Examine a file's tags.
         Where those tags imply a location, link the file to that location.
@@ -223,12 +223,11 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     seen = set()
     for srcpath in unrepeated(q, signature=realpath, seen=seen):
       with Pfx(shortpath(srcpath)):
-        tagged = self.fstags[srcpath]
+        tagged = fstags[srcpath]
         tagger = self.tagger_for(dirname(srcpath))
         # infer tags before filing
         tagger.infer_tags(tagged.fspath, mode='infill')
         tags = tagged.merged_tags()
-        fstags = tagger.fstags
         conf = tagger.conf
         # examine the file_by mapping for entries which match tags on origpath
         refile_to_dirs = set()
@@ -323,8 +322,9 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
 
   @locked
   @pfx
+  @uses_FSTags
   @fmtdoc
-  def per_tag_auto_file_map(self, tag_names):
+  def per_tag_auto_file_map(self, tag_names, *, fstags: FSTags):
     ''' Walk the file tree at `self.fspath`
         looking for directories whose direct tags contain tags
         whose name is in `tag_names`.
@@ -341,7 +341,6 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
         We also skip subdirectories tagged with `{TAGGER_TAG_PREFIX_DEFAULT}.skip`.
     '''
     fspath = self.fspath
-    fstags = self.fstags
     tagged = fstags[fspath]
     all_tag_names = set(tag_names)
     assert all(isinstance(tag_name, str) for tag_name in all_tag_names)
@@ -434,8 +433,9 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
 
   @locked
   @pfx
+  @uses_FSTags
   @fmtdoc
-  def file_by_mapping(self, srcdirpath):
+  def file_by_mapping(self, srcdirpath, *, fstags: FSTags):
     ''' Examine the `{TAGGER_TAG_PREFIX_DEFAULT}.file_by` tag for `srcdirpath`.
         Return a mapping of specific tag values to filing locations
         derived via `per_tag_auto_file_map`.
@@ -461,7 +461,6 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     '''
     assert not srcdirpath.startswith('~')
     assert '~' not in srcdirpath
-    fstags = self.fstags
     tagged = fstags[srcdirpath]
     key = tagged.fspath
     try:
@@ -494,12 +493,13 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       self._file_by_mappings[key] = mapping
     return mapping
 
-  def suggested_tags(self, path):
+  @uses_FSTags
+  def suggested_tags(self, path, *, fstags: FSTags):
     ''' Return a mapping of `tag_name=>set(tag_values)`
         representing suggested tags
         obtained from the autofiling configurations.
     '''
-    tagged = self.fstags[path]
+    tagged = fstags[path]
     srcdirpath = dirname(tagged.fspath)
     suggestions = defaultdict(set)
     for bare_tag, _ in self.file_by_mapping(srcdirpath).items():
@@ -535,8 +535,9 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     return rule
 
   @pfx
+  @uses_FSTags
   @fmtdoc
-  def infer_tags(self, path, mode='infer'):
+  def infer_tags(self, path, *, mode='infer', fstags: FSTags):
     ''' Compare the `{TAGGER_TAG_PREFIX_DEFAULT}.filename_inference` rules to `path`,
         producing a mapping of prefix=>[Tag] for each rule which infers tags.
         Return the mapping.
@@ -545,7 +546,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
         also apply all the inferred tags to `path`
         with each `Tag` *name*=*value* applied as *prefix*.*name*=*value*.
     '''
-    tagged = self.fstags[path]
+    tagged = fstags[path]
     srcpath = tagged.fspath
     srcbase = basename(srcpath)
     inferred_tags = TagSet()
