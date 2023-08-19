@@ -25,7 +25,7 @@ from typing import List, Optional
 
 from cs.deco import cachedmethod, default_params, fmtdoc, promote
 from cs.fs import FSPathBasedSingleton, shortpath
-from cs.fstags import FSTags, uses_FSTags
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
 from cs.onttags import Ont, ONTTAGS_PATH_DEFAULT, ONTTAGS_PATH_ENVVAR
@@ -111,7 +111,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     return type(self)(dirpath, ont=self.ont)
 
   @property
-  @uses_FSTags
+  @uses_fstags
   def tagged(self, fstags: FSTags):
     ''' The `TaggedPath` associated with this directory.
     '''
@@ -140,7 +140,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     return self.conf_all.get('autoname', [])
 
   @pfx
-  @uses_FSTags
+  @uses_fstags
   def autoname(self, srcpath, fstags: FSTags):
     ''' Generate a filename computed from `srcpath`.
 
@@ -178,7 +178,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     return list(self.ont.type_values(tag_name))
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
-  @uses_FSTags
+  @uses_fstags
   @fmtdoc
   def file_by_tags(
       self,
@@ -322,7 +322,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
 
   @locked
   @pfx
-  @uses_FSTags
+  @uses_fstags
   @fmtdoc
   def per_tag_auto_file_map(self, tag_names, *, fstags: FSTags):
     ''' Walk the file tree at `self.fspath`
@@ -433,7 +433,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
 
   @locked
   @pfx
-  @uses_FSTags
+  @uses_fstags
   @fmtdoc
   def file_by_mapping(self, srcdirpath, *, fstags: FSTags):
     ''' Examine the `{TAGGER_TAG_PREFIX_DEFAULT}.file_by` tag for `srcdirpath`.
@@ -493,7 +493,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       self._file_by_mappings[key] = mapping
     return mapping
 
-  @uses_FSTags
+  @uses_fstags
   def suggested_tags(self, path, *, fstags: FSTags):
     ''' Return a mapping of `tag_name=>set(tag_values)`
         representing suggested tags
@@ -535,7 +535,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     return rule
 
   @pfx
-  @uses_FSTags
+  @uses_fstags
   @fmtdoc
   def infer_tags(self, path, *, mode='infer', fstags: FSTags):
     ''' Compare the `{TAGGER_TAG_PREFIX_DEFAULT}.filename_inference` rules to `path`,
