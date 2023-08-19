@@ -607,6 +607,67 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             data = item.data
             dstS.add_bg(data)
 
+  def is_complete_indirect(self, ih):
+    ''' Check whether `ih`, the hashcode of an indirect Block,
+        has its data and all its implied data present in this Store.
+    '''
+    entry = self.get_index_entry(ih)
+    if entry is not None and (entry.flags & entry.INDIRECT_COMPLETE):
+      # marked as complete, no need to examine the contents
+      return True
+    subblocks_data = self.get(ih)
+    if subblocks_data is None:
+      # missing hash, incomplete
+      return False
+    from .block import IndirectBlock
+    IB = IndirectBlock.from_subblocks_data(subblocks_data)
+    for subblock in IB.subblocks:
+      h = subblock.hashcode
+      if h not in self:
+        # missing hash, incomplete
+        return False
+      if not subblock.indirect:
+        # direct block, is complete
+        continue
+      # TODO how/when to set the flag in the index?
+      if not self.is_complete_indirect(h):
+        # subblock incomplete
+        return False
+    # ensure the index entry gets marked as complete
+    if entry is not None:
+      with self.modify_index_entry(ih) as entry2:
+        entry2.flags |= entry2.INDIRECT_COMPLETE
+    return True
+
+  def get_index_entry(self, hashcode):
+    ''' Return the index entry for `hashcode`, or `None` if there
+        is no index or the index has no entry for `hashcode`.
+    '''
+    return None
+
+  @contextmanager
+  def modify_index_entry(self, hashcode):
+    ''' Context manager to obtain and yield the index record entry for `hashcode`
+        and resave it on return.
+
+        *Important Note*:
+        on Stores with no persistent index-with-flags
+        this yields `None` for the entry and updates nothing on return;
+        callers must recognise this.
+        This is the behaviour of this default implementation.
+
+        Stores with a persistent index such as `DataDirStore` have
+        functioning versions of this method which yield a non`None`
+        result.
+
+        Example:
+
+            with index.modify_entry(hashcode) as entry:
+                if entry is not None:
+                    entry.flags |= entry.INDIRECT_COMPLETE
+    '''
+    yield None
+
   @classmethod
   @fmtdoc
   def promote(cls, obj):

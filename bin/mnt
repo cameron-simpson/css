@@ -153,7 +153,7 @@ do_mount(){
     case "$type" in
       ssh | sshfs )
         set -- \
-          set-x sshfs -f -o reconnect -o ssh_command='datethen 2 set-x ssh' \
+          set-x sshfs -f -o reconnect -o ssh_command='datethen set-x ssh' \
             -- "$host:$path/" "$mount_point"
         [ $use_tmux ] && set -- tm use-session -d "MNT_${host}_${pathbase}" "$@"
         set -- $trace "$@"

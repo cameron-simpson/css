@@ -19,11 +19,11 @@ from cs.pfx import Pfx, XP
 from cs.randutils import randomish_chunks
 from cs.testutils import product_test
 
-from .datadir import DataDir, RawDataDir
+from .datadir import DataDir, RawDataDir, FileDataIndexEntry
 from .hash import HASHCLASS_BY_NAME
 from .index import (
-    FileDataIndexEntry, class_names as indexclass_names, class_by_name as
-    indexclass_by_name
+    class_names as indexclass_names,
+    class_by_name as indexclass_by_name,
 )
 
 MAX_BLOCK_SIZE = 16383
