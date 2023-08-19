@@ -101,8 +101,8 @@ class TaggerCommand(BaseTkCommand):
           raise RuntimeError("unimplemented option")
     if not argv:
       raise GetoptError("missing pathnames")
-    q = ListQueue(argv)
-    for path in unrepeated(q):
+    q = ListQueue(argv, unique=True)
+    for path in q:
       with Pfx(path):
         if not existspath(path):
           warning("no such path, skipping")
