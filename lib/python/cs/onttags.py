@@ -52,7 +52,7 @@ class OntCommand(TagsOntologyCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'type'
 
   @dataclass
-  class Options(OntCommand.Options):
+  class Options(TagsOntologyCommand.Options):
     ont_path: str = field(
         default_factory=lambda: os.environ.get(ONTTAGS_PATH_ENVVAR)
     )
