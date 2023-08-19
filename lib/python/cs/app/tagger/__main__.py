@@ -68,7 +68,7 @@ class TaggerCommand(BaseTkCommand):
   def cmd_autofile(self, argv):
     ''' Usage: {cmd} [-dnrx] pathnames...
           Link pathnames to destinations based on their tags.
-          -d    Treat directory pathnames like file - file the
+          -d    Treat directory pathnames like files - file the
                 directory, not its contents.
                 (TODO: we file by linking - this needs a rename.)
           -n    No link (default). Just print filing actions.
@@ -76,6 +76,8 @@ class TaggerCommand(BaseTkCommand):
           -x    Remove the source file if linked successfully. Implies -y.
           -y    Link files to destinations.
     '''
+    options = self.options
+    tagger = options.tagger
     direct = False
     recurse = False
     no_link = True
@@ -118,7 +120,7 @@ class TaggerCommand(BaseTkCommand):
           else:
             warning("recursion disabled, skipping")
         else:
-          linked_to = self.options.tagger.file_by_tags(
+          linked_to = tagger.file_by_tags(
               path, no_link=no_link, do_remove=do_remove
           )
           for linkpath in linked_to:
