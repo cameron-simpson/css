@@ -268,14 +268,14 @@ class _Widget(ABC):
         v = getattr(self, attr)
         if v is not None:
           kw.setdefault(K.lower(), v)
-    X("CALLER = %s", caller())
-    X("type(self)=%r", type(self))
-    X("type(parent)=%s", type(parent))
-    X("parent=%s", r(parent))
-    X(
-        "%s: _Widget.__init__: super().__init__(parent=%s,*a=%r,**kw=%r)...",
-        type(self), r(parent), a, kw
-    )
+    ##X("CALLER = %s", caller())
+    ##X("type(self)=%r", type(self))
+    ##X("type(parent)=%s", type(parent))
+    ##X("parent=%s", r(parent))
+    ##X(
+    ##    "%s: _Widget.__init__: super().__init__(parent=%s,*a=%r,**kw=%r)...",
+    ##    type(self), r(parent), a, kw
+    ##)
     super().__init__(parent, *a, **kw)
     if fixed_size is None:
       fixed_size = (None, None)
