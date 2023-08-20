@@ -21,7 +21,7 @@ from os.path import (
 from pprint import pprint
 import sys
 
-from cs.cmdutils import BaseCommandOptions
+from cs.cmdutils import BaseCommand, BaseCommandOptions
 from cs.context import stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
@@ -44,7 +44,7 @@ def main(argv=None):
   '''
   return TaggerCommand(argv).run()
 
-class TaggerCommand(BaseTkCommand):
+class TaggerCommand(BaseCommand):
   ''' Tagger command line implementation.
   '''
 
