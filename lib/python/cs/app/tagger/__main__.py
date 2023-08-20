@@ -52,7 +52,7 @@ class TaggerCommand(BaseCommand):
   GETOPT_SPEC = 'd:nqv'
 
   @dataclass
-  class TaggerOptions(BaseCommandOptions, HasFSPath):
+  class Options(BaseCommandOptions, HasFSPath):
     fspath: str = '.'
 
   # pylint: disable=no-self-use
@@ -184,11 +184,11 @@ class TaggerCommand(BaseCommand):
 
   def cmd_conf(self, argv):
     ''' Usage: {cmd} [dirpath]
-          Edit the tagger.file_by mapping for the current directory.
-          -d dirpath    Edit the mapping for a different directory.
+          Edit the tagger.file_by mapping for the default directory.
+          dirpath    Edit the mapping for a different directory.
     '''
     options = self.options
-    dirpath = '.'
+    dirpath = options.fspath
     if argv:
       dirpath = argv.pop(0)
     if argv:
