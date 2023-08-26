@@ -771,7 +771,7 @@ class KindleCommand(BaseCommand):
               quiet=quiet,
               verbose=verbose,
           )
-        except ValueError as e:
+        except (dedrm.DeDRMError, ValueError) as e:
           warning("export failed: %s", e)
           xit = 1
     if runstate.cancelled:
