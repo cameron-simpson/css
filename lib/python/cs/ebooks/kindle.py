@@ -71,39 +71,35 @@ KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
     'Application Support/Kindle/My Kindle Content'
 )
 
-def kindle_content_path_default():
-  ''' Return the default content path for the Kindle application.
-      Currently only knows about Darwin (MacOS).
-  '''
-  if sys.platform == 'darwin':
-    return expanduser(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH)
-  raise RuntimeError(
-      "I do not know the default Kindle content path on platform %r" %
-      (sys.platform,)
-  )
+# The default location of the Kindle content.
+# On MacOS ("darwin") this is KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH.
+# Otherwise use the made up path ~/media/kindle/My Kindle Content,
+# which is where I'm putting my personal Kindle stuff.
+KINDLE_CONTENT_DEFAULT_PATH = {
+    'darwin': KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH,
+}.get(sys.platform, '~/media/kindle/My Kindle Content')
 
+@fmtdoc
 def kindle_content_path():
-  ''' Return the default Kindle content path or `None`.
-      Currently only supports Darwin (MacOS).
+  ''' Return the default Kindle content path.
+      On MacOS this will look up
+      `{KINDLE_APP_OSX_DEFAULTS_DOMAIN}[{KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING}]`
+      if present.
+      Otherwise it returns `KINDLE_CONTENT_DEFAULT_PATH`
+      (`{KINDLE_CONTENT_DEFAULT_PATH!r}`).
   '''
   if sys.platform == 'darwin':
+    # use the app settings if provided
     defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
     path = defaults.get(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING)
-    if path is None:
-      path = kindle_content_path_default()
-    return path
-  raise RuntimeError(
-      "cannot look up Kindle content path on platform %r" % (sys.platform,)
-  )
+    if path is not None:
+      return path
+  return expanduser(KINDLE_CONTENT_DEFAULT_PATH)
 
 @fmtdoc
 def default_kindle_library():
-  ''' Return the default kindle library content path
-        from ${KINDLE_LIBRARY_ENVVAR}.
-        On Darwin, fall back to the Kindle app setting from the
-        defaults domain {KINDLE_APP_OSX_DEFAULTS_DOMAIN!r}
-        setting {KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING!r}.
-        Returns `None` if no default can be found.
+  ''' Return the default kindle library content path from `${KINDLE_LIBRARY_ENVVAR}`
+      otherwise fall back to `kindle_content_path()`.
     '''
   path = os.environ.get(KINDLE_LIBRARY_ENVVAR, None)
   if path is not None:
@@ -732,9 +728,15 @@ class KindleCommand(BaseCommand):
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     if content_path == 'DEFAULT':
-      content_path = kindle_content_path_default()
-    defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
-    defaults[KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING] = content_path
+      content_path = kindle_content_path()
+    if sys.platform == 'darwin':
+      defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
+      defaults[KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING] = content_path
+    else:
+      error(
+          f'cannot set Kindle default content path on sys.platform=={sys.platform!r}'
+      )
+      return 1
     return 0
 
   def cmd_dbshell(self, argv):
