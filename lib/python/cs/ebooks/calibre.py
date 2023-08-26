@@ -550,8 +550,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       return False
     return True
 
-  @typechecked
   @require(lambda dbid: dbid > 0)
+  @typechecked
   def book_by_dbid(self, dbid: int, *, db_book=None):
     ''' Return a cached `CalibreBook` for `dbid`.
     '''
