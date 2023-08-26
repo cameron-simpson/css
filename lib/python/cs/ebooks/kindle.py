@@ -275,15 +275,20 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
             * `verbose`: default `False`, print all actions or nonactions
         '''
         azwpath = self.extpath('azw')
-        if not isfilepath(azwpath):
-          raise ValueError("no AZW file: %r" % (azwpath,))
+        kcrpath = self.extpath('kcr')
+        if isfilepath(azwpath):
+          bookpath = azwpath
+        elif isfilepath(kcrpath):
+          bookpath = kcrpath
+        else:
+          raise ValueError("no AZW or KCR file: %r, %r" % (azwpath, kcrpath))
         added = False
         cbooks = list(calibre.by_asin(self.asin))
         if not cbooks:
           # new book
           # pylint: disable=expression-not-assigned
-          quiet or print("new book <=", shortpath(azwpath))
-          dbid = calibre.add(azwpath, dedrm=dedrm, doit=doit, quiet=quiet)
+          quiet or print("new book <=", shortpath(bookpath))
+          dbid = calibre.add(bookpath, dedrm=dedrm, doit=doit, quiet=quiet)
           if dbid is None:
             added = not doit
             cbook = None
@@ -301,18 +306,26 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
             )
           with Pfx(cbook):
             # look for exact content match
-            for fmtk in 'AZW3', 'AZW', 'MOBI':
+            for fmtk in 'AZW3', 'AZW', 'KCR', 'MOBI':
               fmtpath = cbook.formatpath(fmtk)
-              if fmtpath and filecmp.cmp(fmtpath, azwpath):
-                # pylint: disable=expression-not-assigned
-                verbose and print(
-                    cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
-                )
-                return cbook, False
-            # remaining logic is in CalibreBook.pull_format
-            cbook.pull_format(
-                azwpath, doit=doit, force=force, quiet=quiet, verbose=verbose
-            )
+              extpath = self.extpath(fmtk.lower())
+              if not existspath(extpath):
+                continue
+              if fmtpath and existspath(fmtpath):
+                if filecmp.cmp(fmtpath, azwpath):
+                  # pylint: disable=expression-not-assigned
+                  verbose and print(
+                      cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
+                  )
+                  return cbook, False
+              # remaining logic is in CalibreBook.pull_format
+              cbook.pull_format(
+                  extpath,
+                  doit=doit,
+                  force=force,
+                  quiet=quiet,
+                  verbose=verbose
+              )
         return cbook, added
 
     self.KindleBook = KindleBook
