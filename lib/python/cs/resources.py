@@ -12,7 +12,7 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock, current_thread, main_thread
 import time
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple, Union
 
 from typeguard import typechecked
 
@@ -237,7 +237,7 @@ class MultiOpenMixin(ContextManagerMixin):
     try:
       yield
     finally:
-      self.close(caller_frame=caller())
+      self.close()  ##caller_frame=caller())
 
   @contextmanager
   def startup_shutdown(self):
@@ -795,7 +795,7 @@ class RunStateMixin(object):
   '''
 
   @typechecked
-  def __init__(self, runstate: RunState):
+  def __init__(self, runstate: Optional[Union[RunState, str]]):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
         Parameters:
@@ -803,7 +803,9 @@ class RunStateMixin(object):
           If a `str`, a new `RunState` with that name is allocated.
           If omitted, the default `RunState` is used.
     '''
-    if isinstance(runstate, str):
+    if runstate is None:
+      runstate = RunState(runstate)
+    elif isinstance(runstate, str):
       runstate = RunState(runstate)
     self.runstate = runstate
 
