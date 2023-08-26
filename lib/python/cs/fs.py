@@ -116,8 +116,7 @@ def atomic_directory(infill_func, make_placeholder=False):
       if remove_placeholder and isdirpath(dirpath):
         pfx_rmdir(dirpath)
       raise
-    else:
-      return result
+    return result
 
   return atomic_directory_wrapper
 
