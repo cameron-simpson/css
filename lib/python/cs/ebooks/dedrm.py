@@ -206,6 +206,9 @@ class DeDRMWrapper(Promotable):
         raise ValueError("no \"standalone\" subdirectory")
       self.dedrm_package_path = dedrm_package_path
       dedrm_DeDRM = self.import_name(self.DEDRM_PACKAGE_NAME, 'DeDRM')
+      dedrm_DeDRMError = self.import_name(
+          self.DEDRM_PACKAGE_NAME, 'DeDRMError'
+      )
 
       class CSEBookDeDRM(DeDRMOverride, dedrm_DeDRM):
         ''' Our wrapper for the DeDRM/noDRM `DeDRM` class
@@ -214,6 +217,7 @@ class DeDRMWrapper(Promotable):
         alfdir = dedrm_package_path
 
       self.dedrm = CSEBookDeDRM()
+      self.DeDRMError = dedrm_DeDRMError
     with self.dedrm_imports():
       kindlekey = self.import_name('kindlekey')
       # monkey patch the kindlekey.kindlekeys function
