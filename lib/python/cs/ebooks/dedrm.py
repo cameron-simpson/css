@@ -540,8 +540,8 @@ def getLibCrypto():
 
       def set_decrypt_key(self, userkey, iv):
         self._blocksize = len(userkey)
-        if (self._blocksize != 16) and (self._blocksize !=
-                                        24) and (self._blocksize != 32):
+        if (self._blocksize != 16) and (self._blocksize
+                                        != 24) and (self._blocksize != 32):
           raise DrmException(u"AES improper key used")
           return
         keyctx = self._keyctx = AES_KEY()
