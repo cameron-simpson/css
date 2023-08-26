@@ -17,6 +17,7 @@ import json
 import os
 from os.path import (
     basename,
+    dirname,
     isdir as isdirpath,
     join as joinpath,
     normpath,
@@ -341,20 +342,28 @@ class DeDRMWrapper(Promotable):
         return M
       return pfx_call(getattr, M, name)
 
-  def remove(self, srcpath, dstpath, exists_ok=False):
+  @pfx_method
+  def remove(self, srcpath, dstpath, *, booktype=None, exists_ok=False):
     ''' Remove the DRM from `srcpath`, writing the resulting file to `dstpath`.
 
         Parameters:
         * `exists_ok`: if true then `dstpath` may already exist; default `False`
     '''
+    if booktype is None:
+      # infer book type from file extension
+      booktype = splitext(basename(srcpath))[1][1:].lower()
+      if booktype is '':
+        # Kobo kepub
+        if basename(dirname(srcpath)).lower() == 'kepub':
+          booktype = 'kepub'
+      if not booktype:
+        raise ValueType("cannot infer book type")
     with atomic_filename(dstpath, exists_ok=exists_ok) as T:
       dedrm = self.dedrm
       # monkey patch temporary_file method to return tmpfilename
       with stackattrs(dedrm, temporary_file=lambda ext: T):
         with self.dedrm_imports():
           dedrm.starttime = time.time()
-          # infer book type from file extension
-          booktype = splitext(basename(srcpath))[1][1:].lower()
           if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3', 'azw4',
                           'tpz', 'kfx-zip']:
             # Kindle/Mobipocket
@@ -370,7 +379,7 @@ class DeDRMWrapper(Promotable):
             decrypted_ebook = dedrm.ePubDecrypt(srcpath)
           else:
             raise ValueError(
-                "cannot decrypt %r, unhandle book type %r" %
+                "cannot decrypt %r, unhandled book type %r" %
                 (srcpath, booktype)
             )
           assert decrypted_ebook == T.name
