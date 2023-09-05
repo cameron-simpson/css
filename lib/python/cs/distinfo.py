@@ -1323,12 +1323,12 @@ class Module:
     pyproject = {
         "project": projspec,
         "build-system": {
+            "build-backend": "setuptools.build_meta",
             "requires": [
                 "setuptools >= 61.2",
                 'trove-classifiers',
                 "wheel",
             ],
-            "build-backend": "setuptools.build_meta",
         }
     }
     docs = self.compute_doc()

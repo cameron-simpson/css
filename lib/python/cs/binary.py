@@ -814,7 +814,8 @@ def BinaryMultiStruct(
       '''
 
       @classmethod
-      def parse(cls, bfr):
+      @promote
+      def parse(cls, bfr:CornuCopyBuffer):
         ''' Parse from `bfr` via `struct.unpack`.
         '''
         bs = bfr.take(struct.size)

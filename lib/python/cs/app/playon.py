@@ -45,7 +45,7 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20230705-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -64,7 +64,6 @@ DISTINFO = {
         'cs.context',
         'cs.deco',
         'cs.fileutils>=atomic_filename',
-        'cs.fstags',
         'cs.lex',
         'cs.logutils',
         'cs.pfx>=pfx_call',
@@ -76,6 +75,7 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'icontract',
         'requests',
         'typeguard',
     ],
@@ -86,7 +86,7 @@ DBURL_DEFAULT = '~/var/playon.sqlite'
 
 FILENAME_FORMAT_ENVVAR = 'PLAYON_FILENAME_FORMAT'
 DEFAULT_FILENAME_FORMAT = (
-    '{series_prefix}{playon.Name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
+    '{series_prefix}{series_episode_name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
 # download parallelism
@@ -251,9 +251,10 @@ class PlayOnCommand(BaseCommand):
         with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
-              filename.lower().replace(' - ', '--').replace('_', ':')
-              .replace(' ', '-').replace(os.sep, ':') + '.'
+              filename.lower().replace(' - ', '--')
+              .replace(' ', '-').replace('_', ':').replace(os.sep, ':') + '.'
           )
+          filename = re.sub('---+', '--', filename)
           try:
             api.download(dl_id, filename=filename)
           except ValueError as e:
@@ -554,6 +555,28 @@ class Recording(SQLTagSet):
     if not parts:
       return ''
     return sep.join(parts) + sep
+
+  @format_attribute
+  def series_episode_name(self):
+    name = self.playon.Name
+    name = name.strip()
+    if self.playon.Season is not None:
+      spfx, n, offset = get_prefix_n(name, 's', n=self.playon.Season)
+      if spfx is not None:
+        assert name.startswith(f's{self.playon.Season:02d}')
+        name = name[offset:]
+    if self.playon.Episode is not None:
+      epfx, n, offset = get_prefix_n(name, 'e', n=self.playon.Episode)
+      if epfx is not None:
+        assert name.startswith(f'e{self.playon.Episode:02d}')
+        name = name[offset:]
+      name = name.lstrip()
+      epfx, n, offset = get_prefix_n(
+          name.lower(), 'episode ', n=self.playon.Episode
+      )
+      if epfx is not None:
+        name = name[offset:]
+    return name.strip()
 
   @format_attribute
   def is_available(self):
@@ -951,7 +974,6 @@ class PlayOnAPI(HTTPServiceAPI):
                     else:
                       entry[e_field] = value2
           te = self.sqltags[f'{type}.{entry_id}']
-          te = self.feature(entry_id)
           te.update(entry, prefix='playon')
           te.update(dict(last_updated=now))
           tes.add(te)
