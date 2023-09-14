@@ -1,0 +1,1 @@
+FSM.fsm_transitions_as_dot: now an instance method so that we can colour the current state.

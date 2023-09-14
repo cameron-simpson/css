@@ -11,11 +11,11 @@ from typing import Optional, TypeVar
 from typeguard import typechecked
 
 from cs.gimmicks import exception
-from cs.gvutils import gvprint, quote as gvq, DOTNodeMixin
+from cs.gvutils import gvprint, gvsvg, quote as gvq, DOTNodeMixin
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 
-__version__ = '20221118-post'
+__version__ = '20230816.3-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -25,7 +25,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.gimmicks',
-        'cs.gvutils',
+        'cs.gvutils>=20230816',
         'cs.lex',
         'cs.pfx',
         'typeguard',
@@ -257,8 +257,7 @@ class FSM(DOTNodeMixin):
           cb for cb in self.__callbacks[state] if cb != callback
       ]
 
-  @classmethod
-  def fsm_transitions_as_dot(cls, fsm_transitions, sep='\n', graph_name=None):
+  def fsm_transitions_as_dot(self, fsm_transitions, sep='\n', graph_name=None):
     ''' Compute a DOT syntax graph description from a transitions dictionary.
 
         Parameters:
@@ -267,7 +266,7 @@ class FSM(DOTNodeMixin):
         * `graph_name`: optional name for the graph, default the class name
     '''
     if graph_name is None:
-      graph_name = cls.__name__
+      graph_name = self.__class__.__name__
     dot = [f'digraph {gvq(graph_name)} {{']
     # NB: we _do not_ sort the transition graph because the "dot" programme
     # layout is affected by the order in which the graph is defined.
@@ -276,6 +275,12 @@ class FSM(DOTNodeMixin):
     # describing the transitions in the natural order in which they
     # occur typically produces a nicer graph diagram.
     for src_state, transitions in fsm_transitions.items():
+      if src_state == self.fsm_state:
+        # colour the current state
+        fillcolor = self.DOT_NODE_FILLCOLOR_PALETTE.get(src_state)
+        if fillcolor:
+          attrs_s = self.dot_node_attrs_str(dict(style='filled',fillcolor=fillcolor))
+          dot.append(f'  {gvq(src_state)}[{attrs_s}];')
       for event, dst_state in sorted(transitions.items()):
         dot.append(
             f'  {gvq(src_state)}->{gvq(dst_state)}[label={gvq(event)}];'
@@ -302,6 +307,15 @@ class FSM(DOTNodeMixin):
         This is a wrapper for `cs.gvutils.gvprint`.
     '''
     return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
+
+  def fsm_as_svg(self, layout=None, **dot_kw):
+    ''' Render the state transition diagram as SVG. '''
+    return gvsvg(self.fsm_dot, layout=layout, **dot_kw)
+
+  @property
+  def fsm_svg(self):
+    ''' The state transition diagram as SVG. '''
+    return self.fsm_as_svg()
 
 if __name__ == '__main__':
   import sys

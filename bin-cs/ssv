@@ -50,6 +50,6 @@ exec mpv \
   "--screenshot-directory=$sssubdir" \
   "--screenshot-format=png" \
   "--screenshot-template=%F--%P" \
-  "--screenshot-sw=yes" \
+  "--screenshot-sw=no" \
   "--msg-level=all=warn" \
   "$vfpath"
