@@ -139,7 +139,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-docker_name=$( echo "ffmpeg $inputbase $$" | tr -s ' .:+' '____' )
+docker_name=$( echo "ffmpeg $inputbase $$" | tr -s "' .:+" "_____" )
 
 uid=$( id -u )
 gid=$( id -g )
