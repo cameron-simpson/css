@@ -13,6 +13,8 @@ from typing import Any, Callable
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
+from cs.logutils import setup_logging, warning
+from cs.pfx import Pfx
 from cs.lex import r
 
 from cs.debug import trace
@@ -345,47 +347,57 @@ def tokenise(buf: CornuCopyBuffer):
   old_in_dict_key = []
   previous_object = None
   while True:
-    for reaction in tokenisers:
-      token = reaction.match(buf, previous_object=previous_object)
-      if token is not None:
-        break
-    else:
-      if buf.at_eof():
-        return
-      # nothing matched - yield the starting byte
-      token = buf.take(1)
-      raise RuntimeError
-
-    if isinstance(token, ArrayOpen):
-      old_in_obj.append(in_obj)
-      in_obj = ArrayObject()
-      previous_object = None
-      continue
-    if isinstance(token, DictOpen):
-      old_in_obj.append(in_obj)
-      old_in_dict_key.append(in_dict_key)
-      in_obj = DictObject()
-      in_dict_key = None
-      previous_object = None
-      continue
-    if isinstance(token, ArrayClose):
-      # replace token with the array
-      assert isinstance(in_obj, ArrayObject
-                        ), ("in_obj should be ArrayObject but is %r" % in_obj)
-      token = in_obj
-      in_obj = old_in_obj.pop()
-      previous_object = None
-    elif isinstance(token, DictClose):
-      # replace token with the dictionary
-      assert isinstance(in_obj, DictObject)
-      assert in_dict_key is None, (
-          "token=%r: in_dict_key should be None, but is %r, on_obj = %r" %
-          (token, in_dict_key, in_obj)
-      )
-      token = in_obj
-      in_obj = old_in_obj.pop()
-      in_dict_key = old_in_dict_key.pop()
-
+    with Pfx("tokenise(%s)", buf):
+      for reaction in tokenisers:
+        token = reaction.match(buf, previous_object=previous_object)
+        if token is not None:
+          break
+      else:
+        if buf.at_eof():
+          # end parse loop
+          break
+        # nothing matched - yield the starting byte
+        warning(
+            "tokenise: no match at offset %d:%r..., taking the first byte",
+            buf.offset,
+            buf.peek(8, short_ok=True),
+        )
+        token = buf.take(1)
+      if isinstance(token, ArrayOpen):
+        old_in_obj.append(in_obj)
+        in_obj = ArrayObject()
+        previous_object = None
+        continue
+      if isinstance(token, DictOpen):
+        old_in_obj.append(in_obj)
+        old_in_dict_key.append(in_dict_key)
+        in_obj = DictObject()
+        in_dict_key = None
+        previous_object = None
+        continue
+      if isinstance(token, ArrayClose):
+        # replace token with the array
+        if isinstance(in_obj, ArrayObject):
+          token = in_obj
+          in_obj = old_in_obj.pop()
+          previous_object = None
+        else:
+          warning("unexpected %r, in_obj is %r", token, in_obj)
+      elif isinstance(token, DictClose):
+        # replace token with the dictionary
+        if isinstance(in_obj, DictObject):
+          if in_dict_key is not None:
+            warning(
+                "%r: trailing key %r, associating with null", token,
+                in_dict_key
+            )
+            in_obj[in_dict_key] = Keyword(b'null')
+            in_dict_key = None
+          token = in_obj
+          in_obj = old_in_obj.pop()
+          in_dict_key = old_in_dict_key.pop()
+        else:
+          warning("unexpected %r, in_obj is %r", token, in_obj)
     if in_obj is None:
       yield token
     else:
@@ -403,12 +415,16 @@ def tokenise(buf: CornuCopyBuffer):
             in_dict_key = None
         else:
           raise RuntimeError(
-              f'expected in_obj to be ArrayObject or DictObject but is {r(in_obj)}'
+              f'unhandled in_obj:{in_obj!r}, expected ArrayObject or DictObject'
           )
-
     if not isinstance(token, (Comment, WhiteSpace)):
       previous_object = token
-  assert in_obj is None
+  while in_obj is not None:
+    warning("tokenise(%s): unclosed %r at EOF", buf, in_obj)
+    try:
+      in_obj = old_in_obj.pop()
+    except IndexError:
+      break
 
 def decode_pdf_hex(bs: bytes):
   ''' Decode a PDF hex string body.
@@ -478,6 +494,7 @@ def decode_pdf_simple_string(bs: bytes):
   return b''.join(mbs)
 
 if __name__ == '__main__':
+  setup_logging()
   buf = CornuCopyBuffer.from_fd(0)
   offset = buf.offset
   for token in tokenise(buf):
