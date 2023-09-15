@@ -172,34 +172,56 @@ class StreamReaction(Reaction):
     assert isinstance(endtoken, EndStream)
     return Stream(previous_object, payload)
 
-class ArrayOpen(bytes):
+class _Token(bytes):
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{bytes(self)!r}'
+
+class ArrayOpen(_Token):
   ''' A `bytes` instance representing a PDF array open.
   '''
 
-class ArrayClose(bytes):
+class ArrayClose(_Token):
   ''' A `bytes` instance representing a PDF array close.
   '''
 
-class Comment(bytes):
+class Comment(_Token):
   ''' A `bytes` instance representing a PDF comment.
   '''
 
-class DictOpen(bytes):
+class DictOpen(_Token):
   ''' A `bytes` instance representing a PDF dictionary open.
   '''
 
-class DictClose(bytes):
+class DictClose(_Token):
   ''' A `bytes` instance representing a PDF dictionary close.
   '''
 
-class DictObject:
-  ''' A PDF dictionary.
+class EndStream(_Token):
+  ''' A `bytes` instance representing a PDF endstream.
   '''
 
-  kv: dict
+class HexString(_Token):
+  ''' A `bytes` instance representing a PDF hex string.
+  '''
 
-  def __getitem__(self, key):
-    return self.kv[key]
+  def __bytes__(self):
+    return b'<' + binascii.hexlify(self) + b'>'
+
+class Keyword(_Token):
+  ''' A `bytes` instance representing a PDF keyword.
+  '''
+
+class Name(_Token):
+  ''' A `bytes` instance representing a PDF name.
+  '''
+
+  def __bytes__(self):
+    return br'/' + self
+
+class ArrayObject(list):
+  ''' A PDF array.
+  '''
 
   def __bytes__(self):
     return b''.join(
