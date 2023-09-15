@@ -223,12 +223,9 @@ class ArrayObject(list):
 
   def __bytes__(self):
     return b''.join(
-        b'<<\r\n',
-        *chain(
-            (b'  ', bytes(k), b'\rn\    ', bytes(v), b'\r\n')
-            for k, v in sorted(self.kv.items())
-        ),
-        b'>>',
+        b'[ ',
+        *map(bytes, self),
+        b' ]',
     )
 
 class DictObject(dict):
@@ -237,9 +234,12 @@ class DictObject(dict):
 
   def __bytes__(self):
     return b''.join(
-        b'[ ',
-        *map(bytes, self),
-        b' ]',
+        b'<<\r\n',
+        *chain(
+            (b'  ', bytes(k), b'\rn\    ', bytes(v), b'\r\n')
+            for k, v in sorted(self.items())
+        ),
+        b'>>',
     )
 
 @dataclass
