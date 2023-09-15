@@ -113,7 +113,7 @@ class Reaction:
         distinguishable by their leadin patterns.
     '''
     # probe for the leading regexp
-    m = self.re_leadin.match(buf.peek(self.min_len))
+    m = self.re_leadin.match(buf.peek(self.min_len, short_ok=True))
     if m is None:
       # no leadin, do no further matching
       return None
@@ -155,7 +155,7 @@ class StreamReaction(Reaction):
 
   def match(self, buf: CornuCopyBuffer, previous_object=None):
     # probe for the leading regexp
-    m = self.re_leadin.match(buf.peek(self.min_len))
+    m = self.re_leadin.match(buf.peek(self.min_len, short_ok=True))
     if m is None:
       # no leadin, do no further matching
       return None
