@@ -128,7 +128,6 @@ class Reaction:
       tokenise = self.tokenise
     while True:
       buflen = len(buf)
-      ##X("  try %s with len(buf)=%d %r...", R, len(buf), buf.peek(8))
       m = R.match(buf.peek(buflen))
       if m is not None:
         # a match, which might be incomplete (eg an int)
@@ -136,7 +135,6 @@ class Reaction:
           # must be complete because the match did not consume the buffer
           buf.take(m.end())
           return tokenise(m)
-      ##X("  extend(%d)", self.buf_inc)
       buf.extend(self.buf_inc, short_ok=True)
       if buflen == len(buf):
         # EOF, no more data to match
