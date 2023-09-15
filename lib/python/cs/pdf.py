@@ -233,23 +233,16 @@ class ArrayObject(list):
         b'>>',
     )
 
-class HexString(bytes):
-  ''' A `bytes` instance representing a PDF hex string.
+class DictObject(dict):
+  ''' A PDF dictionary.
   '''
 
   def __bytes__(self):
-    return b'<' + binascii.hexlify(self) + b'>'
-
-class Keyword(bytes):
-  ''' A `bytes` instance representing a PDF keyword.
-  '''
-
-class Name(bytes):
-  ''' A `bytes` instance representing a PDF name.
-  '''
-
-  def __bytes__(self):
-    return br'/' + self
+    return b''.join(
+        b'[ ',
+        *map(bytes, self),
+        b' ]',
+    )
 
 @dataclass
 class Stream:
