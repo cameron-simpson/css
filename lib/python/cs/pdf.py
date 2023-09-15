@@ -39,7 +39,7 @@ FLOAT_re_bs = br'[-+]?(\.\d+|\d+\.\d*)'
 FLOAT_LEADIN_re_bs = br'[-+.\d]'
 INT_re_bs = br'[-+]?\d+(?!\.)'
 INT_LEADIN_re_bs = br'[-+\d]'
-# I have not yet found a formall definition of a keyword :-(
+# I have not yet found a formal definition of a keyword :-(
 KEYWORD_re_bs = br'[a-zA-Z][_\w]*'
 KEYWORD_LEADIN_re_bs = br'[a-zA-Z]'
 NAME_HASHHEX_re_bs = br'#[0-9a-fA-F][0-9a-fA-F]'
@@ -491,7 +491,7 @@ def decode_pdf_simple_string(bs: bytes):
       mbs = m.group()
     bss.append(mbs)
     assert offset > offset0
-  return b''.join(mbs)
+  return b''.join(bss)
 
 if __name__ == '__main__':
   setup_logging()
