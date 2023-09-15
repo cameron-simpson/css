@@ -339,20 +339,76 @@ tokenisers = [
 def tokenise(buf: CornuCopyBuffer):
   ''' Scan `buf` and yield tokens, which may be `bytes` or some higher level construct.
   '''
+  in_obj = None
+  old_in_obj = []
+  in_dict_key = None
+  old_in_dict_key = []
+  previous_object = None
   while True:
-    previous_object = None
     for reaction in tokenisers:
       token = reaction.match(buf, previous_object=previous_object)
       if token is not None:
-        if not isinstance(token, (Comment, WhiteSpace)):
-          previous_object = token
-        yield token
         break
     else:
+      if buf.at_eof():
+        return
       # nothing matched - yield the starting byte
-      X("tokenise: no match at offset %d:%r...", buf.offset, buf.peek(8))
-      yield buf.take(1)
-      break
+      token = buf.take(1)
+      raise RuntimeError
+
+    if isinstance(token, ArrayOpen):
+      old_in_obj.append(in_obj)
+      in_obj = ArrayObject()
+      previous_object = None
+      continue
+    if isinstance(token, DictOpen):
+      old_in_obj.append(in_obj)
+      old_in_dict_key.append(in_dict_key)
+      in_obj = DictObject()
+      in_dict_key = None
+      previous_object = None
+      continue
+    if isinstance(token, ArrayClose):
+      # replace token with the array
+      assert isinstance(in_obj, ArrayObject
+                        ), ("in_obj should be ArrayObject but is %r" % in_obj)
+      token = in_obj
+      in_obj = old_in_obj.pop()
+      previous_object = None
+    elif isinstance(token, DictClose):
+      # replace token with the dictionary
+      assert isinstance(in_obj, DictObject)
+      assert in_dict_key is None, (
+          "token=%r: in_dict_key should be None, but is %r, on_obj = %r" %
+          (token, in_dict_key, in_obj)
+      )
+      token = in_obj
+      in_obj = old_in_obj.pop()
+      in_dict_key = old_in_dict_key.pop()
+
+    if in_obj is None:
+      yield token
+    else:
+      if not isinstance(token, (Comment, WhiteSpace)):
+        # another object - stash it
+        if isinstance(in_obj, ArrayObject):
+          in_obj.append(token)
+        elif isinstance(in_obj, DictObject):
+          if in_dict_key is None:
+            # key
+            in_dict_key = token
+          else:
+            # value - store key and value
+            in_obj[in_dict_key] = token
+            in_dict_key = None
+        else:
+          raise RuntimeError(
+              f'expected in_obj to be ArrayObject or DictObject but is {r(in_obj)}'
+          )
+
+    if not isinstance(token, (Comment, WhiteSpace)):
+      previous_object = token
+  assert in_obj is None
 
 def decode_pdf_hex(bs: bytes):
   ''' Decode a PDF hex string body.
