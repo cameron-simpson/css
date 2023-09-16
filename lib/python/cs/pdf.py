@@ -10,11 +10,12 @@ import binascii
 from dataclasses import dataclass
 import re
 from typing import Any, Callable
+import zlib
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.logutils import setup_logging, warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.lex import r
 
 from cs.debug import trace
@@ -322,6 +323,29 @@ class Stream:
   context_dict: DictObject
   payload: bytes
 
+  _decoded_payload: bytes = None
+
+  @property
+  def decoded_payload(self):
+    bs = self._decoded_payload
+    if bs is None:
+      filters = self.context_dict.get(b'Filter')
+      if filters is None:
+        filters = []
+      elif isinstance(filters, bytes):
+        filters = [filters]
+      else:
+        assert isinstance(filters, list)
+      bs = self.payload
+      for filt in filters:
+        if filt == b'FlateDecode':
+          bs = pfx_call(flatedecode, bs)
+        else:
+          warning("stop at unimplemented filter %r", filt)
+          break
+      self._decoded_payload = bs
+    return bs
+
   def __bytes__(self):
     return (
         bytes(self.context_dict) + b'\r\nstream\r\n' + self.payload +
@@ -600,6 +624,9 @@ def decode_pdf_simple_string(bs: bytes):
     bss.append(mbs)
     assert offset > offset0
   return b''.join(bss)
+
+def flatedecode(bs):
+  return zlib.decompress(bs)
 
 if __name__ == '__main__':
   setup_logging()
