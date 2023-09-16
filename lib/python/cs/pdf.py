@@ -43,7 +43,7 @@ INT_LEADIN_re_bs = br'[-+\d]'
 KEYWORD_re_bs = br'[a-zA-Z][_\w]*'
 KEYWORD_LEADIN_re_bs = br'[a-zA-Z]'
 NAME_HASHHEX_re_bs = br'#[0-9a-fA-F][0-9a-fA-F]'
-NAME_NONHASH_re_bs = br'[^/\[\]<>#\x00\x09\x0a\x0c\x0d\x20]'
+NAME_NONHASH_re_bs = br'[^/\[\]<>\(#\x00\x09\x0a\x0c\x0d\x20]'
 NAME_re_bs = b''.join(
     (
         br'/(',
