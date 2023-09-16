@@ -233,16 +233,22 @@ def convert(
           if acodec is None:
             acodec = new_codec
           elif acodec != new_codec:
-            warning("already converting %s/%s to %r instead of default %r",codec_type,codec_key,acodec,new_codec)
+            warning(
+                "already converting %s/%s to %r instead of default %r",
+                codec_type, codec_key, acodec, new_codec
+            )
         elif codec_type == 'video':
           if vcodec is None:
             vcodec = new_codec
           else:
-            warning("already converting %s/%s to %r instead of default %r",codec_type,codec_key,acodec,new_codec)
+            warning(
+                "already converting %s/%s to %r instead of default %r",
+                codec_type, codec_key, acodec, new_codec
+            )
         else:
           warning(
               "no option to convert streams of type %s/%s, ignoring new_codec=%r",
-              codec_type, codec_key,new_codec
+              codec_type, codec_key, new_codec
           )
   ffmeta_kw = dict(probed.format.get('tags', {}))
   ffmeta_kw.update(metadata)
