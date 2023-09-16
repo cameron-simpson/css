@@ -60,10 +60,22 @@ COMMENT_re_bs = br'%[^\r\n]*' + EOL_re_bs
 COMMENT_LEADIN_re_bs = br'%'
 HEXSTRING_re_bs = br'<[0-9a-zA-F]+>'
 HEXSTRING_LEADIN_re_bs = br'<'
-STRING_NONSLOSH_re_bs = br'[^\\\()\r\n]'
-# STRING slosh escape
-STRING_SLOSHED_re_bs = br'\\([nrtbf()\\]|[0-7]{3})'
-SIMPLE_STRING_re_bs = b''.join(
+# string bytes not needing escapes
+STRING_NONSLOSH_re_bs = br'[^\\\(\)\r\n]'
+# STRING slosh escapes
+STRING_SLOSHED_re_bs = b''.join(
+    (
+        br'\\',
+        br'(',
+        br'[nrtbf()\\]',  # \t et al
+        br'|',
+        br'[0-7]{3}',  # \ooo
+        br'|',
+        EOL_re_bs,  # line extension
+        br')',
+    )
+)
+STRING_OPEN_re_bs = b''.join(
     (
         br'\(',
         br'(',
@@ -71,11 +83,11 @@ SIMPLE_STRING_re_bs = b''.join(
         br'|',
         STRING_SLOSHED_re_bs,
         br')*',
-        br'\)',
     )
 )
-SIMPLE_STRING_LEADIN_re_bs = br'\('
-## streams
+STRING_OPEN_LEADIN_re_bs = br'\('
+STRING_CLOSE_re_bs = br'\)'
+STRING_CLOSE_LEADIN_re_bs = br'\)'
 STREAM_LEADIN_re_bs = br'stream\r?\n'
 
 @dataclass
@@ -224,6 +236,45 @@ class Name(_Token):
   def __bytes__(self):
     return br'/' + self
 
+class String(_Token):
+  ''' A `bytes` instance representing a PDF string.
+  '''
+
+  STRING_NONSLOSH_bre = re.compile(STRING_NONSLOSH_re_bs + b'+')
+
+  # mapping of byte values to slosh escapes
+  SLOSH_MAP = {
+      ord('\\'): b'\\\\',
+      ord('\n'): br'\n',
+      ord('\r'): br'\r',
+      ord('\t'): br'\t',
+      ord('('): br'\(',
+      ord(')'): br'\)',
+  }
+
+  def sloshed(self):
+    ''' Return the string in sloshed form with no nested parentheses.
+    '''
+    bss = []
+    offset = 0
+    while offset < len(self):
+      m = STRING_NONSLOSH_bre.match(self, offset)
+      if m:
+        bss.append(m.group())
+        offset = m.end()
+      else:
+        b = self[offset]
+        try:
+          bs = self.SLOSH_MAP[b]
+        except KeyError:
+          bs = ("\\03o" % b).encode('ascii')
+        bss.append(bs)
+        offset += 1
+    return b''.join(bss)
+
+  def __bytes__(self):
+    return br'(' + self.sloshed() + br')'
+
 class ArrayObject(list):
   ''' A PDF array.
   '''
@@ -263,9 +314,35 @@ class Stream:
         b'\r\nendstream\r\n'
     )
 
+class StringOpen(_Token):
+  ''' The opening section of a PDF string.
+  '''
+
+class StringClose(_Token):
+  ''' The closing parenthesis section of a PDF string.
+  '''
+
+class StringParts(list):
+  ''' The `bytes` components of a PDF string.
+  '''
+
+  def __bytes__(self):
+    return b''.join(map(decode_pdf_simple_string, self))
+
 class WhiteSpace(bytes):
   ''' A `bytes` instance representing PDF whitespace.
   '''
+
+StringOpen_reaction = Reaction(
+    re.compile(STRING_OPEN_re_bs),
+    re.compile(STRING_OPEN_LEADIN_re_bs),
+    lambda m: StringOpen(m.group()),
+)
+StringClose_reaction = Reaction(
+    re.compile(STRING_CLOSE_re_bs),
+    re.compile(STRING_CLOSE_LEADIN_re_bs),
+    lambda m: StringClose(m.group()),
+)
 
 # regular expressions for tokens in recognition order
 # for example the FLOAT_re must preceed the INT_re
@@ -335,11 +412,8 @@ tokenisers = [
         re.compile(HEXSTRING_LEADIN_re_bs),
         lambda m: HexString(decode_pdf_hex(m.group(0)[1:-1])),
     ),
-    Reaction(
-        re.compile(SIMPLE_STRING_re_bs),
-        re.compile(SIMPLE_STRING_LEADIN_re_bs),
-        lambda m: decode_pdf_simple_string(m.group(1)),
-    ),
+    StringOpen_reaction,
+    StringClose_reaction,
 ]
 
 @promote
@@ -353,7 +427,8 @@ def tokenise(buf: CornuCopyBuffer):
   previous_object = None
   while True:
     with Pfx("tokenise(%s)", buf):
-      for reaction in tokenisers:
+      for reaction in ((StringOpen_reaction, StringClose_reaction)
+                       if isinstance(in_obj, StringParts) else tokenisers):
         token = reaction.match(buf, previous_object=previous_object)
         if token is not None:
           break
@@ -380,6 +455,10 @@ def tokenise(buf: CornuCopyBuffer):
         in_dict_key = None
         previous_object = None
         continue
+      if isinstance(token, StringOpen):
+        old_in_obj.append(in_obj)
+        in_obj = StringParts([token[1:]])
+        continue
       if isinstance(token, ArrayClose):
         # replace token with the array
         if isinstance(in_obj, ArrayObject):
@@ -401,6 +480,12 @@ def tokenise(buf: CornuCopyBuffer):
           token = in_obj
           in_obj = old_in_obj.pop()
           in_dict_key = old_in_dict_key.pop()
+        else:
+          warning("unexpected %r, in_obj is %r", token, in_obj)
+      elif isinstance(token, StringClose):
+        if isinstance(in_obj, StringParts):
+          token = String(bytes(in_obj))
+          in_obj = old_in_obj.pop()
         else:
           warning("unexpected %r, in_obj is %r", token, in_obj)
     if in_obj is None:
@@ -473,23 +558,26 @@ def decode_pdf_simple_string(bs: bytes):
       offset = m.end()
       mbs = m.group()
       assert mbs.startswith(b'\\')
-      if mbs == b'\\n':
+      if mbs == br'\n':
         mbs = b'\n'
-      elif mbs == b'\\r':
+      elif mbs == br'\r':
         mbs = b'\r'
-      elif mbs == b'\\t':
+      elif mbs == br'\t':
         mbs = b'\t'
-      elif mbs == b'\\b':
+      elif mbs == br'\b':
         mbs = b'\b'
-      elif mbs == b'\\f':
+      elif mbs == br'\f':
         mbs = b'\f'
-      elif mbs == b'\\(':
+      elif mbs == br'\(':
         mbs = b'('
-      elif mbs == b'\\)':
+      elif mbs == br'\)':
         mbs = b')'
       elif mbs == b'\\\\':
         mbs = b'\\'
+      elif mbs in (b'\\\r', b'\\\r\n', b'\\\n'):
+        mbs = b''
       else:
+        # \ooo
         mbs = bytes((int(mbs[1:], 8),))
     else:
       m = STRING_NONSLOSH_bre.match(bs, offset)
