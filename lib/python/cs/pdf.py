@@ -212,6 +212,11 @@ class Keyword(_Token):
   ''' A `bytes` instance representing a PDF keyword.
   '''
 
+def isnull(token):
+  ''' Test whether `token` is the `null` keyword.
+  '''
+  return isinstance(token, Keyword) and token == b'null'
+
 class Name(_Token):
   ''' A `bytes` instance representing a PDF name.
   '''
@@ -388,10 +393,10 @@ def tokenise(buf: CornuCopyBuffer):
         if isinstance(in_obj, DictObject):
           if in_dict_key is not None:
             warning(
-                "%r: trailing key %r, associating with null", token,
-                in_dict_key
+                "%r: trailing key %r, discarded",
+                token,
+                in_dict_key,
             )
-            in_obj[in_dict_key] = Keyword(b'null')
             in_dict_key = None
           token = in_obj
           in_obj = old_in_obj.pop()
@@ -410,8 +415,9 @@ def tokenise(buf: CornuCopyBuffer):
             # key
             in_dict_key = token
           else:
-            # value - store key and value
-            in_obj[in_dict_key] = token
+            # value - store key and value, except for null which must be discarded
+            if not isnull(token):
+              in_obj[in_dict_key] = token
             in_dict_key = None
         else:
           raise RuntimeError(
