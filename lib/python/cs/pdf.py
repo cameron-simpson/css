@@ -185,6 +185,10 @@ class StreamReaction(Reaction):
     return Stream(previous_object, payload)
 
 class _Token(bytes):
+  ''' Base class for PDF tokens, a subtype of `bytes`.
+      Where relevant the `bytes` value is the raw value
+      and `bytes(token)` returns a transcription suitable for use in a PDF.
+  '''
 
   def __repr__(self):
     return f'{self.__class__.__name__}:{bytes(self)!r}'
@@ -218,6 +222,8 @@ class HexString(_Token):
   '''
 
   def __bytes__(self):
+    ''' Return a PDF transcription of the string.
+    '''
     return b'<' + binascii.hexlify(self) + b'>'
 
 class Keyword(_Token):
@@ -234,10 +240,16 @@ class Name(_Token):
   '''
 
   def __bytes__(self):
+    ''' Return a PDF transcription of the string.
+    '''
     return br'/' + self
 
 class String(_Token):
   ''' A `bytes` instance representing a PDF string.
+
+      The `String`'s value is the decoded bytes.
+      Note that `bytes(string)` is a transcription of the `String`
+      for use in a PDF.
   '''
 
   STRING_NONSLOSH_bre = re.compile(STRING_NONSLOSH_re_bs + b'+')
@@ -273,6 +285,8 @@ class String(_Token):
     return b''.join(bss)
 
   def __bytes__(self):
+    ''' Return a PDF transcription of the string.
+    '''
     return br'(' + self.sloshed() + br')'
 
 class ArrayObject(list):
