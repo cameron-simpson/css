@@ -329,6 +329,7 @@ class Stream:
   payload: bytes
 
   _decoded_payload: bytes = None
+  _image: Image = None
 
   @property
   def filters(self) -> List[bytes]:
@@ -359,6 +360,33 @@ class Stream:
           break
       self._decoded_payload = bs
     return bs
+
+  @property
+  def image(self):
+    im = self._image
+    if im is None:
+      decoded_bs = self.decoded_payload
+      print(".image: context_dict:")
+      pprint(self.context_dict)
+      decode_params = self.context_dict.get(b'DecodeParms', {})
+      color_transform = decode_params.get(b'ColorTransform', 0)
+      color_space = self.context_dict[b'ColorSpace']
+      bits_per_component = decode_params.get(b'BitsPerComponent')
+      if not bits_per_component:
+        bits_per_component = {b'DeviceRGB': 8, b'DeviceGray': 8}[color_space]
+      colors = decode_params.get(b'Colors')
+      if not colors:
+        colors = {b'DeviceRGB': 3, b'DeviceGray': 1}[color_space]
+      mode_index = (color_space, bits_per_component, colors, color_transform)
+      width = self.context_dict[b'Width']
+      height = self.context_dict[b'Height']
+      PIL_mode = {
+          (b'DeviceGray', 1, 1, 0): 'L',
+          (b'DeviceRGB', 8, 3, 0): 'RGB',
+      }[mode_index]
+      im = Image.frombytes(PIL_mode, (width, height), decoded_bs)
+      self._image = im
+    return im
 
   def __bytes__(self):
     return (
