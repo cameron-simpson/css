@@ -9,7 +9,7 @@
 import binascii
 from dataclasses import dataclass
 import re
-from typing import Any, Callable
+from typing import Any, Callable, List
 import zlib
 
 from cs.buffer import CornuCopyBuffer
@@ -324,6 +324,19 @@ class Stream:
   payload: bytes
 
   _decoded_payload: bytes = None
+
+  @property
+  def filters(self) -> List[bytes]:
+    ''' The filters as a list of `bytes` instances.
+    '''
+    filters = self.context_dict.get(b'Filter')
+    if filters is None:
+      filters = []
+    elif isinstance(filters, bytes):
+      filters = [filters]
+    else:
+      assert isinstance(filters, list)
+    return filters
 
   @property
   def decoded_payload(self):
