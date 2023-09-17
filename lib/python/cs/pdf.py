@@ -8,16 +8,19 @@
 
 import binascii
 from dataclasses import dataclass
+from getopt import GetoptError
 from io import BytesIO
 from itertools import chain
 from pprint import pprint
 import re
+import sys
 from typing import Any, Callable, List
 import zlib
 
 from PIL import Image
 
 from cs.buffer import CornuCopyBuffer
+from cs.cmdutils import BaseCommand
 from cs.deco import promote
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx, pfx_call
@@ -25,6 +28,37 @@ from cs.lex import r
 
 from cs.debug import trace
 from cs.x import X
+
+def main(argv=None):
+  return PDFCommand(argv).run()
+
+class PDFCommand(BaseCommand):
+
+  def cmd_scan(self, argv):
+    ''' Usage: {cmd} < PDF-data
+          Scan the PDF-data on standard input and report.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    buf = CornuCopyBuffer.from_fd(0)
+    offset = buf.offset
+    for token in tokenise(buf):
+      if isinstance(token, Comment):
+        print('=>', offset, r(token))
+      elif isinstance(token, Stream):
+        print('stream', len(token.payload))
+        pprint(token.context_dict)
+        decoded_bs = token.decoded_payload
+        print('  =>', len(decoded_bs), 'bytes decoded')
+        subtype = token.context_dict.get(b'Subtype')
+        print("  subtype", subtype)
+        if (subtype == b'Image' and token.filters
+            and token.filters[-1] == b'DCTDecode'):
+          im = token.image
+          im.show()
+          exit(1)
+      offset = buf.offset
+      ##break
 
 # Binary regexps for PDF tokens.
 # These consist of a pair:
@@ -687,10 +721,4 @@ def flatedecode(bs):
   return zlib.decompress(bs)
 
 if __name__ == '__main__':
-  setup_logging()
-  buf = CornuCopyBuffer.from_fd(0)
-  offset = buf.offset
-  for token in tokenise(buf):
-    print('=>', offset, r(token))
-    offset = buf.offset
-    ##break
+  sys.exit(main(sys.argv))
