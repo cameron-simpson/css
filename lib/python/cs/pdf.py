@@ -8,9 +8,14 @@
 
 import binascii
 from dataclasses import dataclass
+from io import BytesIO
+from itertools import chain
+from pprint import pprint
 import re
 from typing import Any, Callable, List
 import zlib
+
+from PIL import Image
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
@@ -342,16 +347,12 @@ class Stream:
   def decoded_payload(self):
     bs = self._decoded_payload
     if bs is None:
-      filters = self.context_dict.get(b'Filter')
-      if filters is None:
-        filters = []
-      elif isinstance(filters, bytes):
-        filters = [filters]
-      else:
-        assert isinstance(filters, list)
+      filters = self.filters
       bs = self.payload
       for filt in filters:
-        if filt == b'FlateDecode':
+        if filt == b'DCTDecode':
+          bs, im = pfx_call(dctdecode_im, bs)
+        elif filt == b'FlateDecode':
           bs = pfx_call(flatedecode, bs)
         else:
           warning("stop at unimplemented filter %r", filt)
@@ -638,7 +639,23 @@ def decode_pdf_simple_string(bs: bytes):
     assert offset > offset0
   return b''.join(bss)
 
+def dctdecode_im(bs):
+  ''' Decode `bs` using the `DCTDecode` filter.
+      Returns the decoded `bytes` and a PIL `Image`.
+  '''
+  im = Image.open(BytesIO(bs), formats=('JPEG',))
+  return bytes(chain(*im.getdata())), im
+
+def dctdecode(bs):
+  ''' Decode `bs` using the `DCTDecode` filter.
+      Returns the decoded `bytes`.
+  '''
+  decoded_bs, im = dctdecode_im(bs)
+  return decoded_bs
+
 def flatedecode(bs):
+  ''' Decode `bs` using the `FlateDecode` filter.
+  '''
   return zlib.decompress(bs)
 
 if __name__ == '__main__':
