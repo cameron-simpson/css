@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from getopt import GetoptError
 from io import BytesIO
 from itertools import chain
+from math import floor
 from pprint import pprint
 import re
 import sys
@@ -446,17 +447,98 @@ class Stream:
       bits_per_component = decode_params.get(b'BitsPerComponent')
       if not bits_per_component:
         bits_per_component = {b'DeviceRGB': 8, b'DeviceGray': 8}[color_space]
-      colors = decode_params.get(b'Colors')
-      if not colors:
-        colors = {b'DeviceRGB': 3, b'DeviceGray': 1}[color_space]
-      mode_index = (color_space, bits_per_component, colors, color_transform)
+      ncolors = decode_params.get(b'Colors')
+      if not ncolors:
+        ncolors = {b'DeviceRGB': 3, b'DeviceGray': 1}[color_space]
+      predictor = decode_params.get(b'Predictor', 0)
+      mode_index = (color_space, bits_per_component, ncolors, color_transform)
       width = self.context_dict[b'Width']
       height = self.context_dict[b'Height']
       PIL_mode = {
           (b'DeviceGray', 1, 1, 0): 'L',
+          (b'DeviceGray', 8, 1, 0): 'L',
           (b'DeviceRGB', 8, 3, 0): 'RGB',
       }[mode_index]
-      im = Image.frombytes(PIL_mode, (width, height), decoded_bs)
+      if predictor == 0:
+        image_data = decoded_bs
+      elif predictor >= 10:
+        # split data into tagged rows
+        mv = memoryview(decoded_bs)
+        tags = []
+        rows = []
+        row_length = 1 + width * ncolors
+        # dummy preceeding row filled with zeroes
+        prev_row = bytes(width * ncolors)
+        prev_offset = -row_length
+        for row_index, offset in enumerate(range(
+            0,
+            height * row_length,
+            row_length,
+        )):
+          prev_offset = offset
+          tag = decoded_bs[offset]
+          tags.append(tag)
+          row_data = mv[offset + 1:offset + row_length]
+          # TODO: unpredict....
+          # recon methods from tag values
+          # detailed here:
+          # https://www.w3.org/TR/png/#9Filters
+          if tag == 0:
+            # None: Recon(x) = Filt(x)
+            # store row unchanged
+            pass
+          else:
+            # we will be modifying these data in place, so make a read/write copy
+            row_data = bytearray(row_data)
+            row_data0 = row_data
+            if tag == 1:
+              # Sub: Recon(x) = Filt(x) + Recon(a)
+              recon_a = 0
+              for i, b in enumerate(row_data):
+                row_data[i] = (b + recon_a) % 256
+                recon_a = b
+            elif tag == 2:
+              # Up: Recon(x) = Filt(x) + Recon(b)
+              for i, b in enumerate(row_data):
+                recon_b = prev_row[i]
+                row_data[i] = (b + recon_b) % 256
+            elif tag == 3:
+              # Average: Recon(x) = Filt(x) + floor((Recon(a) + Recon(b)) / 2)
+              for i, b in enumerate(row_data):
+                recon_a = 0 if i < ncolors else row_data[i - ncolors]
+                recon_b = prev_row[i]
+                row_data[i] = (b + floor((recon_a + recon_b) / 2)) % 256
+            elif tag == 4:
+              # Paeth: Recon(x) = Filt(x) + PaethPredictor(Recon(a), Recon(b), Recon(c))
+              for i, b in enumerate(row_data):
+                recon_a = 0 if i < ncolors else row_data[i - ncolors]
+                recon_b = prev_row[i]
+                recon_c = 0 if i < ncolors else prev_row[i - ncolors]
+                # Paeth predictor
+                p = recon_a + recon_b - recon_c
+                pa = abs(p - recon_a)
+                pb = abs(p - recon_b)
+                pc = abs(p - recon_c)
+                if pa <= pb and pa <= pc:
+                  Pr = recon_a
+                elif pb <= pc:
+                  Pr = recon_b
+                else:
+                  Pr = recon_c
+                row_data[i] = (b + Pr) % 256
+            else:
+              warning(
+                  "row %d: unsupported tag value %d, row unchanged",
+                  row_index,
+                  tag,
+              )
+          rows.append(row_data)
+          prev_row = row_data
+        image_data = b''.join(rows)
+      else:
+        warning("unhandled DecodeParms[Predictor] value %r", predictor)
+        image_data = decoded_bs
+      im = Image.frombytes(PIL_mode, (width, height), image_data)
       self._image = im
     return im
 
