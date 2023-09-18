@@ -423,9 +423,12 @@ class Stream:
     if bs is None:
       filters = self.filters
       bs = self.payload
-      for filt in filters:
+      for i, filt in enumerate(filters, 1):
         if filt == b'DCTDecode':
           bs, im = pfx_call(dctdecode_im, bs)
+          if i == len(filters):
+            # also stash as the cached Image
+            self._image = im
         elif filt == b'FlateDecode':
           bs = pfx_call(flatedecode, bs)
         else:
