@@ -451,9 +451,9 @@ class Stream:
       if not ncolors:
         ncolors = {b'DeviceRGB': 3, b'DeviceGray': 1}[color_space]
       predictor = decode_params.get(b'Predictor', 0)
-      mode_index = (color_space, bits_per_component, ncolors, color_transform)
       width = self.context_dict[b'Width']
       height = self.context_dict[b'Height']
+      mode_index = (color_space, bits_per_component, ncolors, color_transform)
       PIL_mode = {
           (b'DeviceGray', 1, 1, 0): 'L',
           (b'DeviceGray', 8, 1, 0): 'L',
