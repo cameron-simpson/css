@@ -29,10 +29,48 @@ from cs.lex import r
 from cs.debug import trace
 from cs.x import X
 
+DEFAULT_IMAGE_FILENAME_FORMAT = '{n:03d}.png'
+
 def main(argv=None):
   return PDFCommand(argv).run()
 
 class PDFCommand(BaseCommand):
+  ''' Command line tool for doing things with PDF files.
+  '''
+
+  def cmd_extract_images(self, argv):
+    ''' Usage: {cmd} [-o image-filename-format] < PDF-data
+          Extract image objects from the PDF-data on standard input.
+          -f fmt
+            Image format. Default inferred from the image filename.
+          -o image-filename-format
+            Format string used to make image filenames.
+    '''
+    opts = self.popopts(
+        argv, f_=('format', str), o_=('image_filename_format', str)
+    )
+    image_filename_format = opts.pop(
+        'image_filename_format', DEFAULT_IMAGE_FILENAME_FORMAT
+    )
+    image_format = opts.pop(
+        'format',
+        splitext(image_filename_format)[1][1:].upper() and None
+    )
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    buf = CornuCopyBuffer.from_fd(0)
+    offset = buf.offset
+    image_n = 0
+    for token in tokenise(buf):
+      if isinstance(token, Stream):
+        subtype = token.context_dict.get(b'Subtype')
+        if subtype == b'Image':
+          im = token.image
+          image_n += 1
+          imagepath = image_filename_format.format(n=image_n)
+          _, pathext = splitext(imagepath)
+          with pfx_call(open, imagepath, 'xb') as imf:
+            pfx_call(im.save, imf, format=image_format)
 
   def cmd_scan(self, argv):
     ''' Usage: {cmd} < PDF-data
