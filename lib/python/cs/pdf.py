@@ -464,6 +464,12 @@ class Stream:
   _decoded_payload: bytes = None
   _image: Image = None
 
+  def __bytes__(self):
+    return (
+        bytes(self.context_dict) + b'\r\nstream\r\n' + self.payload +
+        b'\r\nendstream\r\n'
+    )
+
   @property
   def filters(self) -> List[bytes]:
     ''' The filters as a list of `bytes` instances.
