@@ -403,6 +403,16 @@ class DictObject(dict):
         b'>>',
     )
 
+class IntObject(int):
+
+  def __bytes__(self):
+    return str(self).encode('ascii')
+
+class FloatObject(float):
+
+  def __bytes__(self):
+    return ("%f" % sef).encode('ascii')
+
 @dataclass
 class Stream:
   ''' A PDF Stream.
@@ -645,13 +655,13 @@ tokenisers = [
     Reaction(
         re.compile(INT_re_bs),
         re.compile(INT_LEADIN_re_bs),
-        lambda m: int(m.group()),
+        lambda m: IntObject(m.group()),
         1,
     ),
     Reaction(
         re.compile(FLOAT_re_bs),
         re.compile(FLOAT_LEADIN_re_bs),
-        lambda m: float(m.group()),
+        lambda m: FloatObject(m.group()),
         3,
     ),
     Reaction(
