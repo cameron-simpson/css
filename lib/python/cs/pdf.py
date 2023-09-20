@@ -562,10 +562,9 @@ class Stream:
             row_data0 = row_data
             if tag == 1:
               # Sub: Recon(x) = Filt(x) + Recon(a)
-              recon_a = 0
               for i, b in enumerate(row_data):
+                recon_a = 0 if i < ncolors else row_data[i - ncolors]
                 row_data[i] = (b + recon_a) % 256
-                recon_a = b
             elif tag == 2:
               # Up: Recon(x) = Filt(x) + Recon(b)
               for i, b in enumerate(row_data):
