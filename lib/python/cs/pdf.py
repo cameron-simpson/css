@@ -414,6 +414,46 @@ class FloatObject(float):
     return ("%f" % sef).encode('ascii')
 
 @dataclass
+class IndirectObject:
+  ''' An indirect object.
+  '''
+
+  number: int
+  generation: int
+  value: Any
+
+  def __bytes__(self):
+    return b' '.join(
+        str(self.number).encode('ascii'),
+        str(self.generation).encode('ascii'),
+        b'obj',
+        bytes(self.value),
+        b'endobj',
+    )
+
+@dataclass
+class ObjectRef:
+  ''' A reference to an `IndirectObject`.
+  '''
+
+  number: int
+  generation: int
+
+  def __bytes__(self):
+    return b' '.join(
+        str(self.number).encode('ascii'),
+        str(self.generation).encode('ascii'),
+        b'R',
+    )
+
+  def deref(self, objmap):
+    ''' Dereference though the mapping `objmap`
+        of `(number,generation)->IndirectObject`.
+        Returns `None` if there is no entry in `objmap`.
+    '''
+    return objmap.get((self.number, self.generation))
+
+@dataclass
 class Stream:
   ''' A PDF Stream.
   '''
