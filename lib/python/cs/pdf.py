@@ -74,30 +74,40 @@ class PDFCommand(BaseCommand):
             pfx_call(im.save, imf, format=image_format)
 
   def cmd_scan(self, argv):
-    ''' Usage: {cmd} < PDF-data
+    ''' Usage: {cmd} pdf-files...
           Scan the PDF-data on standard input and report.
     '''
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    buf = CornuCopyBuffer.from_fd(0)
-    offset = buf.offset
-    for token in tokenise(buf):
-      if isinstance(token, Comment):
-        print('=>', offset, r(token))
-      elif isinstance(token, Stream):
-        print('stream', len(token.payload))
-        pprint(token.context_dict)
-        decoded_bs = token.decoded_payload
-        print('  =>', len(decoded_bs), 'bytes decoded')
-        subtype = token.context_dict.get(b'Subtype')
-        print("  subtype", subtype)
-        if (subtype == b'Image' and token.filters
-            and token.filters[-1] == b'DCTDecode'):
-          im = token.image
-          im.show()
-          exit(1)
-      offset = buf.offset
-      ##break
+    if not argv:
+      raise GetoptError('missing pdf-files')
+    runstate = self.options.runstate
+    for pdf_filename in argv:
+      with pfx_open(pdf_filename, 'rb') as pdff:
+        buf = CornuCopyBuffer.promote(pdff)
+        offset = buf.offset
+        for token in tokenise(buf):
+          if runstate.cancelled:
+            return 1
+          if isinstance(token, Comment):
+            print('=>', offset, r(token))
+          elif isinstance(token, Stream):
+            ##print('stream', len(token.payload))
+            ##pprint(token.context_dict)
+            decoded_bs = token.decoded_payload
+            ##print('  =>', len(decoded_bs), 'bytes decoded')
+            subtype = token.context_dict.get(b'Subtype')
+            ##print("  subtype", subtype)
+            if (subtype == b'Image' and (1 or token.filters)
+                and (1 or token.filters[-1] == b'DCTDecode')
+                and (1 or b'SMask' not in token.context_dict)):
+              print("Image:")
+              pprint(token.context_dict)
+              im = token.image
+              ##im.show()
+              ##exit(1)
+            else:
+              print("skip stream subtype", repr(subtype))
+              pprint(token.context_dict)
+          offset = buf.offset
 
 # Binary regexps for PDF tokens.
 # These consist of a pair:
