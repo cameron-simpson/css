@@ -719,18 +719,15 @@ tokenisers = [
 
 @promote
 def tokenise(buf: CornuCopyBuffer):
-  ''' Scan `buf` and yield tokens, which may be `bytes` or some higher level construct.
+  ''' Scan `buf` and yield tokens.
   '''
-  in_obj = None
-  old_in_obj = []
-  in_dict_key = None
-  old_in_dict_key = []
-  previous_object = None
+  in_str = None
+  in_str_stack = []
   while True:
     with Pfx("tokenise(%s)", buf):
       for reaction in ((StringOpen_reaction, StringClose_reaction)
-                       if isinstance(in_obj, StringParts) else tokenisers):
-        token = reaction.match(buf, previous_object=previous_object)
+                       if isinstance(in_str, StringParts) else tokenisers):
+        token = reaction.match(buf)
         if token is not None:
           break
       else:
@@ -744,17 +741,25 @@ def tokenise(buf: CornuCopyBuffer):
             buf.peek(8, short_ok=True),
         )
         token = buf.take(1)
-      if isinstance(token, ArrayOpen):
-        old_in_obj.append(in_obj)
-        in_obj = ArrayObject()
-        previous_object = None
+        break  ## debug
+      if isinstance(token, StringOpen):
+        in_str_stack.append(in_str)
+        in_str = StringParts([token[1:]])
         continue
-      if isinstance(token, DictOpen):
-        old_in_obj.append(in_obj)
-        old_in_dict_key.append(in_dict_key)
-        in_obj = DictObject()
-        in_dict_key = None
-        previous_object = None
+      if isinstance(token, StringClose):
+        if isinstance(in_str, StringParts):
+          token = String(bytes(in_str))
+          in_str = in_str_stack.pop()
+        else:
+          warning("unexpected %r, in_str is %r", token, in_str)
+      if in_str is None:
+        yield token
+  while in_str is not None:
+    warning("tokenise(%s): unclosed %s at EOF", buf, r(in_str))
+    try:
+      in_str = in_str_stack.pop()
+    except IndexError:
+      break
         continue
       if isinstance(token, StringOpen):
         old_in_obj.append(in_obj)
