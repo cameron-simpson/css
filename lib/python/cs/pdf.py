@@ -81,14 +81,14 @@ class PDFCommand(BaseCommand):
       raise GetoptError('missing pdf-files')
     runstate = self.options.runstate
     for pdf_filename in argv:
-      with pfx_open(pdf_filename, 'rb') as pdff:
-        buf = CornuCopyBuffer.promote(pdff)
-        offset = buf.offset
-        for token in tokenise(buf):
+      with Pfx(argv):
+        with open(pdf_filename, 'rb') as pdff:
+          pdf = PDFDocument.parse(buf=pdff)
+        for token in pdf.tokens:
           if runstate.cancelled:
             return 1
           if isinstance(token, Comment):
-            print('=>', offset, r(token))
+            print('=>', r(token))
           elif isinstance(token, Stream):
             ##print('stream', len(token.payload))
             ##pprint(token.context_dict)
@@ -107,7 +107,6 @@ class PDFCommand(BaseCommand):
             else:
               print("skip stream subtype", repr(subtype))
               pprint(token.context_dict)
-          offset = buf.offset
 
 # Binary regexps for PDF tokens.
 # These consist of a pair:
