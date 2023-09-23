@@ -109,7 +109,7 @@ class PDFCommand(BaseCommand):
               pprint(token.context_dict)
 
 # Binary regexps for PDF tokens.
-# These consist of a pair:
+# Most of these consist of a pair:
 # a regexp FOO_re_bs to match the entire token
 # and a regexp FOO_LEADIN_re_bs to match the required starting bytes.
 EOL_re_bs = br'(\r?\n|\r(?!\n))'
@@ -176,7 +176,6 @@ STRING_OPEN_re_bs = b''.join(
 STRING_OPEN_LEADIN_re_bs = br'\('
 STRING_CLOSE_re_bs = br'\)'
 STRING_CLOSE_LEADIN_re_bs = br'\)'
-STREAM_LEADIN_re_bs = br'stream\r?\n'
 
 @dataclass
 class Reaction:
@@ -196,7 +195,7 @@ class Reaction:
   min_len: int = 1
   buf_inc: int = 16
 
-  def match(self, buf: CornuCopyBuffer, previous_object=None):
+  def match(self, buf: CornuCopyBuffer):
     ''' Match a token at the start of `buf`.
         Return the result of `self.tokenise(m)`
         where `m` is the `re.Match` object.
@@ -246,31 +245,6 @@ class Reaction:
           return tokenise(m)
         # no match possible
         return None
-
-@dataclass
-class StreamReaction(Reaction):
-
-  # the end of stream marker
-  ENDSTREAM_bre = re.compile(EOL_re_bs + br'endstream(?:\W)')
-
-  def match(self, buf: CornuCopyBuffer, previous_object=None):
-    # probe for the leading regexp
-    m = self.re_leadin.match(buf.peek(self.min_len, short_ok=True))
-    if m is None:
-      # no leadin, do no further matching
-      return None
-    # advance past the EOL
-    buf.skip(m.end())
-    assert isinstance(previous_object, DictObject)
-    length = previous_object[b'Length']
-    assert isinstance(length, int)
-    assert length >= 0
-    payload = buf.take(length)
-    endtoken = self.match_re(
-        buf, self.ENDSTREAM_bre, tokenise=lambda m: EndStream(m.group(1))
-    )
-    assert isinstance(endtoken, EndStream)
-    return Stream(previous_object, payload)
 
 class _Token(bytes):
   ''' Base class for PDF tokens, a subtype of `bytes`.
