@@ -7,23 +7,26 @@
 '''
 
 import binascii
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import partial
 from getopt import GetoptError
 from io import BytesIO
 from itertools import chain
 from math import floor
+from os.path import splitext
 from pprint import pprint
 import re
 import sys
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Mapping, Tuple
 import zlib
 
 from PIL import Image
 
+from cs.binary import AbstractBinary
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.deco import promote
-from cs.logutils import setup_logging, warning
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.lex import r
 
@@ -332,7 +335,7 @@ class String(_Token):
     bss = []
     offset = 0
     while offset < len(self):
-      m = STRING_NONSLOSH_bre.match(self, offset)
+      m = self.STRING_NONSLOSH_bre.match(self, offset)
       if m:
         bss.append(m.group())
         offset = m.end()
@@ -370,7 +373,7 @@ class DictObject(dict):
     return b''.join(
         b'<<\r\n',
         *chain(
-            (b'  ', bytes(k), b'\rn\    ', bytes(v), b'\r\n')
+            (b'  ', bytes(k), b'\r\n    ', bytes(v), b'\r\n')
             for k, v in sorted(self.items())
         ),
         b'>>',
@@ -384,7 +387,7 @@ class IntObject(int):
 class FloatObject(float):
 
   def __bytes__(self):
-    return ("%f" % sef).encode('ascii')
+    return ("%f" % self).encode('ascii')
 
 @dataclass
 class IndirectObject:
