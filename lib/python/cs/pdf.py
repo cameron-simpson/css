@@ -760,68 +760,139 @@ def tokenise(buf: CornuCopyBuffer):
       in_str = in_str_stack.pop()
     except IndexError:
       break
+
+@dataclass
+class PDFDocument(AbstractBinary):
+  ''' A PDF document.
+  '''
+
+  objmap: Mapping[Tuple[int, int], 'Object'] = field(default_factory=dict)
+  tokens: List = field(default_factory=list)
+  values: List = field(default_factory=list)
+
+  @classmethod
+  @promote
+  def parse(cls, buf: CornuCopyBuffer):
+    ''' Scan `buf`, return a `PDFDocument`.
+    '''
+    objmap = {}
+    tokens = []
+    values = []
+    values_stack = []
+    in_obj = None
+    in_obj_stack = []
+    tokens_it = tokenise(buf)
+    for token in tokens_it:
+      tokens.append(token)
+      if not isinstance(token, (
+          Comment,
+          WhiteSpace,
+          ArrayOpen,
+          ArrayClose,
+          DictOpen,
+          DictClose,
+      )):
+        values.append(token)
+      # number generation "obj" value "endobj"
+      if isinstance(token, Keyword) and token == b'endobj':
+        # define an indirect object
+        number, generation, obj, objvalue, endobj = values[-5:]
+        assert isinstance(obj, Keyword) and obj == b'obj'
+        assert isinstance(number, int) and number > 0
+        assert isinstance(generation, int) and generation >= 0
+        assert isinstance(endobj, Keyword) and endobj == b'endobj'
+        objkey = number, generation
+        assert objkey not in objmap, "repeated obj definition %d %d" % (
+            number, generation
+        )
+        objmap[objkey] = iobj = IndirectObject(
+            number=number, generation=generation, value=objvalue
+        )
+        # replace the last 5 values with the indirect object
+        values[-5:] = [iobj]
         continue
-      if isinstance(token, StringOpen):
-        old_in_obj.append(in_obj)
-        in_obj = StringParts([token[1:]])
+      # number generation "R"
+      if isinstance(token, Keyword) and token == b'R':
+        # an object reference
+        number, generation, R = values[-3:]
+        assert isinstance(number, int) and number > 0
+        assert isinstance(generation, int) and generation >= 0
+        assert isinstance(R, Keyword) and R == b'R'
+        objref = ObjectRef(number, generation)
+        # replace the last 3 values
+        values[-3:] = [objref]
+        generation = tokens.pop()
+        continue
+      if isinstance(token, ArrayOpen):
+        in_obj_stack.append(in_obj)
+        in_obj = ArrayObject()
+        values_stack.append(values)
+        values = []
         continue
       if isinstance(token, ArrayClose):
-        # replace token with the array
-        if isinstance(in_obj, ArrayObject):
-          token = in_obj
-          in_obj = old_in_obj.pop()
-          previous_object = None
-        else:
-          warning("unexpected %r, in_obj is %r", token, in_obj)
-      elif isinstance(token, DictClose):
-        # replace token with the dictionary
-        if isinstance(in_obj, DictObject):
-          if in_dict_key is not None:
-            warning(
-                "%r: trailing key %r, discarded",
-                token,
-                in_dict_key,
-            )
-            in_dict_key = None
-          token = in_obj
-          in_obj = old_in_obj.pop()
-          in_dict_key = old_in_dict_key.pop()
-        else:
-          warning("unexpected %r, in_obj is %r", token, in_obj)
-      elif isinstance(token, StringClose):
-        if isinstance(in_obj, StringParts):
-          token = String(bytes(in_obj))
-          in_obj = old_in_obj.pop()
-        else:
-          warning("unexpected %r, in_obj is %r", token, in_obj)
-    if in_obj is None:
-      yield token
-    else:
-      if not isinstance(token, (Comment, WhiteSpace)):
-        # another object - stash it
-        if isinstance(in_obj, ArrayObject):
-          in_obj.append(token)
-        elif isinstance(in_obj, DictObject):
-          if in_dict_key is None:
-            # key
-            in_dict_key = token
+        if not isinstance(in_obj, ArrayObject):
+          warning("ignoring unexpected %r, in_obj is %r", token, in_obj)
+          continue
+        in_obj.extend(values)
+        values = values_stack.pop()
+        values.append(in_obj)
+        in_obj = in_obj_stack.pop()
+        continue
+      if isinstance(token, DictOpen):
+        in_obj_stack.append(in_obj)
+        in_obj = DictObject()
+        values_stack.append(values)
+        values = []
+        continue
+      if isinstance(token, DictClose):
+        if not isinstance(in_obj, DictObject):
+          warning("ignoring unexpected %r, in_obj is %r", token, in_obj)
+          continue
+        for i in range(0, len(values), 2):
+          k = values[i]
+          v = values[i + 1]
+          if not isnull(v):
+            in_obj[k] = v
+        values = values_stack.pop()
+        values.append(in_obj)
+        in_obj = in_obj_stack.pop()
+        continue
+      if isinstance(token, Keyword) and token == b'stream':
+        with Pfx("stream"):
+          # consume the required EOL
+          eol_bs = buf.peek(2)
+          if eol_bs == b'\r\n':
+            buf.take(2)
+          elif eol_bs.startswith(b'\n'):
+            buf.take(1)
           else:
-            # value - store key and value, except for null which must be discarded
-            if not isnull(token):
-              in_obj[in_dict_key] = token
-            in_dict_key = None
-        else:
-          raise RuntimeError(
-              f'unhandled in_obj:{in_obj!r}, expected ArrayObject or DictObject'
-          )
-    if not isinstance(token, (Comment, WhiteSpace)):
-      previous_object = token
-  while in_obj is not None:
-    warning("tokenise(%s): unclosed %r at EOF", buf, in_obj)
-    try:
-      in_obj = old_in_obj.pop()
-    except IndexError:
-      break
+            warning("missing EOL after stream")
+          context_dict, stream = values[-2:]
+          assert isinstance(context_dict, DictObject)
+          length = context_dict[b'Length']
+          assert isinstance(length, int)
+          assert length >= 0
+          payload = buf.take(length)
+          newline_bs = buf.peek(2, short_ok=True)
+          if newline_bs == b'\r\n':
+            buf.take(2)
+          elif newline_bs.startswith(b'\n'):
+            buf.take(1)
+          else:
+            warning("expected EOL after payload")
+          endstream = next(tokens_it)
+          assert isinstance(endstream, Keyword) and endstream == b'endstream'
+          assert tokens[-1] is token
+          stream = Stream(context_dict, payload)
+          tokens[-2:] = [stream]
+          values[-2:] = [stream]
+          continue
+    return cls(tokens=tokens, objmap=objmap, values=values)
+
+  def transcribe(self):
+    ''' Yield `bytes` instances transcribing the PDF document.
+    '''
+    yield from iter(self.tokens)
 
 def decode_pdf_hex(bs: bytes):
   ''' Decode a PDF hex string body.
