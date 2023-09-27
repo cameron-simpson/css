@@ -1,3 +1,4 @@
+ffmpeg-docker: support "ffmpeg-docker --version"
 ListQueue should have builtin unrepeated support
 Result with placholder return until some async operation completes it? thinking Tagger rule inference
 cs.py.stack function to return the caller's current method name and class
