@@ -215,7 +215,9 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     if not ext.startswith('.'):
       ext = '.' + ext
     md = self.metadata
-    full_filename = md.format_as(format).replace('\r', '_').replace('\n', '_')
+    full_filename = md.format_as(format).replace('_', '-').replace(
+        '\r', '_'
+    ).replace('\n', '_')
     return crop_name(full_filename + ext, ext=ext, name_max=191)
 
   @abstractmethod
