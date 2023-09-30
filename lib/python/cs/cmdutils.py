@@ -539,7 +539,7 @@ class BaseCommand:
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
-    options = self.options = self.Options()
+    options = self.options = self.Options(cmd=self.cmd)
     options.runstate_signals = self.DEFAULT_SIGNALS
     # override the default options
     for option, value in kw_options.items():
