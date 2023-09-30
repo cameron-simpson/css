@@ -174,6 +174,7 @@ class FFmpegSource:
 # A mapping of ffmpeg codec_name values to default converted names.
 # If there's no entry here, use copy mode.
 DEFAULT_CONVERSIONS = {
+    'aac_latm': 'aac',
     'mp2': 'aac',
     'mpeg2video': 'h264',
 }
