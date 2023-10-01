@@ -76,6 +76,7 @@ cd "$rd"
     ln -s -- "$img" .
     first=
   done
+  [ -t 1 ] && ls "$rd/"
   [ $first ] && { echo "$cmd: nothing found" >&2; exit 1; }
   $trace spaces wp "$spaces" "$rd"
 }
