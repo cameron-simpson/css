@@ -593,6 +593,13 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
       s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras
   )
 
+def is_uc_identifier(s, offset=0, **kw):
+  ''' Test if the string `s` is an uppercase identifier
+      from position `offset` (default `0`) onward.
+  '''
+  s2, offset2 = get_uc_identifier(s, offset=offset, **kw)
+  return s2 and offset2 == len(s)
+
 # pylint: disable=redefined-outer-name
 def get_dotted_identifier(s, offset=0, **kw):
   ''' Scan the string `s` for a dotted identifier (by default an
