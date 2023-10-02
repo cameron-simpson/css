@@ -53,16 +53,18 @@ accesses the flag named "PORTFWD_DISABLE".
 from __future__ import print_function
 from collections import defaultdict
 from collections.abc import MutableMapping
-from contextlib import contextmanager
 import errno
 from getopt import GetoptError
 import os
 import os.path
 import sys
-from threading import Thread
+from threading import Thread, RLock
 from time import sleep
+
 from cs.env import FLAGDIR
-from cs.lex import get_uc_identifier
+from cs.fs import HasFSPath, needdir
+from cs.gimmicks import info
+from cs.lex import is_uc_identifier
 from cs.pfx import Pfx
 
 __version__ = '20201228-post'
@@ -74,7 +76,13 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.env', 'cs.lex', 'cs.pfx'],
+    'install_requires': [
+        'cs.env',
+        'cs.fs',
+        'cs.gimmicks',
+        'cs.lex',
+        'cs.pfx',
+    ],
     'entry_points': {
         'console_scripts': ['flagset = cs.app.flag:main_flagset'],
     },
@@ -255,7 +263,7 @@ class FlaggedMixin(object):
         with changes propagated to `.flags`.
   '''
 
-  def __init__(self, flags=None, debug=None, prefix=None):
+  def __init__(self, flags=None, prefix=None):
     ''' Initialise the mixin.
 
         Parameters:
@@ -267,10 +275,7 @@ class FlaggedMixin(object):
           or is empty if there is no `.name`
     '''
     if flags is None:
-      flags = Flags(debug=debug)
-    else:
-      if debug is not None:
-        flags.debug = debug
+      flags = Flags()
     self.flags = flags
     self.flags_prefix = prefix
 
@@ -318,11 +323,11 @@ class FlaggedMixin(object):
 DummyFlags = lambda: defaultdict(lambda: False)
 
 # pylint: disable=too-many-ancestors
-class Flags(MutableMapping, FlaggedMixin):
+class Flags(MutableMapping, HasFSPath, FlaggedMixin):
   ''' A mapping which directly inspects the flags directory.
   '''
 
-  def __init__(self, flagdir=None, environ=None, lock=None, debug=None):
+  def __init__(self, flagdir=None, environ=None, print_changes=None):
     ''' Initialise the `Flags` instance.
 
         Parameters:
@@ -330,78 +335,47 @@ class Flags(MutableMapping, FlaggedMixin):
           if omitted use the value from `cs.env.FLAGDIR(environ)`
         * `environ`: the environment mapping to use,
           default `os.environ`
-        * `lock`: a `Lock`like mutex to control multithreaded access;
-          if omitted no locking is down
         * `debug`: debug mode, default `False`
     '''
-    MutableMapping.__init__(self)
-
-    @contextmanager
-    def mutex():
-      ''' Mutex context manager.
-      '''
-      if lock:
-        lock.acquire()
-      try:
-        yield
-      finally:
-        if lock:
-          lock.release()
-
-    self._mutex = mutex
-    if debug is None:
-      debug = False
-    self.debug = debug
-    FlaggedMixin.__init__(self, flags=self)
     if flagdir is None:
       flagdir = FLAGDIR(environ=environ)
-    self.dirpath = flagdir
+    HasFSPath.__init__(self, flagdir)
+    MutableMapping.__init__(self)
+    self._lock = RLock()
+    FlaggedMixin.__init__(self, flags=self)
+    self.fspath = flagdir
     self._old_flags = {}
 
   def __repr__(self):
-    return "%s(dir=%r)" % (self.__class__.__name__, self.dirpath)
+    return "%s(dir=%r)" % (self.__class__.__name__, self.fspath)
 
   def init(self):
     ''' Ensure the flag directory exists.
     '''
-    if not os.path.isdir(self.dirpath):
-      with Pfx("makedirs(%r)", self.dirpath):
-        os.makedirs(self.dirpath)
+    needdir(self.fspath)
 
   def _flagpath(self, k):
     ''' Compute the pathname of the flag backing file.
         Raise `KeyError` on an invalid flag names.
     '''
-    if not k:
-      raise KeyError(k)
-    name, offset = get_uc_identifier(k)
-    if offset != len(k):
-      raise KeyError(k)
-    return os.path.join(self.dirpath, name)
+    if not k or not is_uc_identifier(k):
+      raise ValueError("not an uppercase name: %r" % (k,))
+    return self.pathto(k)
+
+  @property
+  def flagnames(self):
+    ''' Return a list of the existing flag names based on the names in the directory. '''
+    return [name for name in self.listdir() if is_uc_identifier(name)]
 
   def __iter__(self):
     ''' Iterator returning the flag names in the directory.
     '''
-    try:
-      with self._mutex():
-        listing = list(os.listdir(self.dirpath))
-    except OSError as e:
-      if e.errno == errno.ENOENT:
-        return
-      raise
-    for k in listing:
-      if k:
-        name, offset = get_uc_identifier(k)
-        if offset == len(k):
-          yield name
+    return iter(self.flagnames)
 
   def __len__(self):
     ''' Return the number of flag files.
     '''
-    n = 0
-    for _ in self:
-      n += 1
-    return n
+    return len(self.flagnames)
 
   def __getitem__(self, k):
     ''' Return the truthiness of this flag.
@@ -427,17 +401,17 @@ class Flags(MutableMapping, FlaggedMixin):
     '''
     if truthy(value):
       value = True
-      with self._mutex():
+      with self._lock:
         if not self[k]:
           flagpath = self._flagpath(k)
-          with open(flagpath, 'w') as fp:
-            fp.write("1\n")
+          with open(flagpath, 'wb') as fp:
+            fp.write(b"1\n")
     else:
       value = False
-      with self._mutex():
+      with self._lock:
         if self[k]:
           flagpath = self._flagpath(k)
-          with open(flagpath, 'w') as fp:
+          with open(flagpath, 'wb') as fp:
             pass
     self._track(k, value)
 
@@ -445,12 +419,12 @@ class Flags(MutableMapping, FlaggedMixin):
     self[k] = False
 
   def _track(self, k, value):
-    with self._mutex():
+    with self._lock:
       old_value = self._old_flags.get(k, False)
       if value != old_value:
         self._old_flags[k] = value
-    if value != old_value and self.debug:
-      print("%s -> %d" % (k, (1 if value else 0)), file=sys.stderr)
+    if value != old_value:
+      info("%s -> %d", k, (1 if value else 0))
 
   def update_prefix(self, prefix, updates, omitted_value=False):
     ''' Update all flag values commencing with `prefix`,
