@@ -327,7 +327,7 @@ class Flags(MutableMapping, HasFSPath, FlaggedMixin):
   ''' A mapping which directly inspects the flags directory.
   '''
 
-  def __init__(self, flagdir=None, environ=None, print_changes=None):
+  def __init__(self, flagdir=None, environ=None):
     ''' Initialise the `Flags` instance.
 
         Parameters:
@@ -335,16 +335,15 @@ class Flags(MutableMapping, HasFSPath, FlaggedMixin):
           if omitted use the value from `cs.env.FLAGDIR(environ)`
         * `environ`: the environment mapping to use,
           default `os.environ`
-        * `debug`: debug mode, default `False`
     '''
     if flagdir is None:
       flagdir = FLAGDIR(environ=environ)
     HasFSPath.__init__(self, flagdir)
     MutableMapping.__init__(self)
-    self._lock = RLock()
     FlaggedMixin.__init__(self, flags=self)
     self.fspath = flagdir
     self._old_flags = {}
+    self._lock = RLock()
 
   def __repr__(self):
     return "%s(dir=%r)" % (self.__class__.__name__, self.fspath)
