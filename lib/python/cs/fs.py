@@ -186,6 +186,10 @@ class HasFSPath:
     '''
     return fnmatchdir(self.fspath, fnglob)
 
+  def listdir(self):
+    ''' Return `os.listdir(self.fspath)`. '''
+    return os.listdir(self.fspath)
+
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
   '''
