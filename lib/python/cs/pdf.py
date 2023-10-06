@@ -418,6 +418,7 @@ class ObjectRef:
   ''' A reference to an `IndirectObject`.
   '''
 
+  objmap: Mapping[Tuple[int, int], IndirectObject]
   number: int
   generation: int
 
@@ -764,7 +765,7 @@ class PDFDocument(AbstractBinary):
   def parse(cls, buf: CornuCopyBuffer):
     ''' Scan `buf`, return a `PDFDocument`.
     '''
-    objmap = {}
+    objmap: Mapping[Tuple[int, int], IndirectObject] = {}
     tokens = []
     values = []
     values_stack = []
@@ -807,7 +808,7 @@ class PDFDocument(AbstractBinary):
         assert isinstance(number, int) and number > 0
         assert isinstance(generation, int) and generation >= 0
         assert isinstance(R, Keyword) and R == b'R'
-        objref = ObjectRef(number, generation)
+        objref = ObjectRef(objmap, number, generation)
         # replace the last 3 values
         values[-3:] = [objref]
         generation = tokens.pop()
