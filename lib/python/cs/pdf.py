@@ -258,6 +258,12 @@ class _Token(bytes):
   def __repr__(self):
     return f'{self.__class__.__name__}:{bytes(self)!r}'
 
+  @property
+  def value(self):
+    ''' The value of this object, by default `self`.
+    '''
+    return self
+
 class ArrayOpen(_Token):
   ''' A `bytes` instance representing a PDF array open.
   '''
@@ -422,12 +428,12 @@ class ObjectRef:
         b'R',
     )
 
-  def deref(self, objmap):
-    ''' Dereference though the mapping `objmap`
-        of `(number,generation)->IndirectObject`.
-        Returns `None` if there is no entry in `objmap`.
-    '''
-    return objmap.get((self.number, self.generation))
+  @property
+  def value(self):
+    iobj = self.objmap.get((self.number, self.generation))
+    if iobj is None:
+      return None
+    return iobj.value
 
 @dataclass
 class Stream:
@@ -478,6 +484,12 @@ class Stream:
           break
       self._decoded_payload = bs
     return bs
+
+  @property
+  def value(self):
+    ''' The value of a stream is the decoded payload.
+    '''
+    return self.decoded_payload
 
   @property
   def image(self):
