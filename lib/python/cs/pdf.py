@@ -422,6 +422,9 @@ class ObjectRef:
   number: int
   generation: int
 
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{self.number},{self.generation}'
+
   def __bytes__(self):
     return b' '.join(
         str(self.number).encode('ascii'),
@@ -446,6 +449,9 @@ class Stream:
 
   _decoded_payload: bytes = None
   _image: Image = None
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}:encoded_length={len(self.payload)}'
 
   def __bytes__(self):
     return (
