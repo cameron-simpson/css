@@ -1,0 +1,120 @@
+#!/bin/sh
+#
+# Remux a media file using ffmpeg, write the remuxed filename to standard output.
+# I use this to repair what I believe are mangled media indices
+# produced by another transcoder.
+# - Cameron Simpson <cs@cskk.id.au> 16jul2023
+#
+
+set -ue
+
+exec 3>&1 1>&2
+
+cmd=$0
+usage="Usage: $cmd [--replace] input [output [ffmpeg-options...]]
+  Write the output filename to standard output."
+
+badopts=
+
+do_replace=
+ffmpeg_exe=${FFMPEG_EXE:-ffmpeg}
+
+[ $# -gt 0 ] && [ "x$1" = 'x--replace' ] && { do_replace=1; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing input" >&2
+  badopts=1
+else
+  input=$1; shift
+  if [ ! -s "$input" ]
+  then
+    echo "$cmd: input $input: not a regular file" >&2
+    badopts=1
+  else
+    case "$input" in
+      */*)  inputdir=$( dirname "$input" )/
+            inputbase=$( basename "$input" )
+            ;;
+      *)    inputdir=
+            inputbase=$input
+            ;;
+    esac
+    # compute default $outputbase
+    ts=$( date '+%Y%m%d-%H%M%S' )
+    case "$inputbase" in
+      *.*)  inputext=$( expr "x$inputbase" : 'x.*\(\..*\)' )
+            inputpfx=$( expr "x$inputbase" : 'x\(.*\)\..*' )
+            outputbase=$inputpfx--remuxed-$ts$inputext
+            ;;
+      *)    outputbase=$inputbase--remuxed-$ts
+            ;;
+    esac
+    if [ $# = 0 ]
+    then
+      outputdir=$inputdir
+    else
+      case "$1" in
+        -?*)  echo "$cmd: missing output before ffmpeg-options" >&2
+              badopts=1
+              ;;
+        */)   outputdir=$1 ;;
+        *)    if [ -d "$1" ]
+              then
+                outputdir=$1/
+              else
+                case "$1" in
+                  */*)  outputdir=$( dirname "$1" )/
+                        outputbase=$( basename "$1" )
+                        ;;
+                  *)    outputdir=
+                        outputbase=$1
+                        ;;
+                esac
+              fi
+              ;;
+      esac
+      [ $badopts ] || shift
+    fi
+    output=$outputdir$outputbase
+    [ $badopts ] || [ ! -e "$output" ] || {
+      echo "$cmd: output $output: already exists" >&2
+      badopts=1
+    }
+  fi
+fi
+
+ffprobe_output=$( ffprobe "$input" 2>&1 ) || {
+  echo "$cmd: ffprobe $input: failure" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -- -c copy ${1+"$@"}
+skip_streams=$(
+  printf '%s\n' "$ffprobe_output" \
+  | sed -n 's/^[^#]*#\([0-9][0-9]*:[0-9][0-9]*\).*Subtitle: eia_608 .*/\1/p'
+)
+for stream in $skip_streams
+do
+  echo "$cmd: omitting stream $stream, unhandled" >&2
+  set -- -map "-$stream" "$@"
+done
+set -- -map 0 "$@"
+
+set -x
+"$ffmpeg_exe" -i "$input" "$@" "$output" || exit $?
+fstags cptags "$input" "$output" || :
+exec >&3 3>&-
+
+if [ $do_replace ]
+then
+  if mv "$input" "$input--SAFE-$$"
+  then
+    mv "$output" "$input"
+    rm "$input--SAFE-$$"
+  fi
+else
+  printf '%s\n' "$output"
+fi

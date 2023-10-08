@@ -4,7 +4,7 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
-from fnmatch import fnmatch
+from fnmatch import filter as fnfilter
 from functools import partial
 import os
 from os.path import (
@@ -25,19 +25,17 @@ from threading import Lock
 from typing import Optional
 
 from icontract import require
-from typeguard import typechecked
 
 from cs.deco import decorator
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
-__version__ = '20230401-post'
+__version__ = '20230806-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -45,7 +43,6 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'icontract',
-        'typeguard',
     ],
 }
 
@@ -156,10 +153,7 @@ def rpaths(
 def fnmatchdir(dirpath, fnglob):
   ''' Return a list of the names in `dirpath` matching the glob `fnglob`.
   '''
-  return [
-      filename for filename in pfx_listdir(dirpath)
-      if fnmatch(filename, fnglob)
-  ]
+  return fnfilter(pfx_listdir(dirpath), fnglob)
 
 # pylint: disable=too-few-public-methods
 class HasFSPath:
@@ -191,6 +185,10 @@ class HasFSPath:
     ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
     '''
     return fnmatchdir(self.fspath, fnglob)
+
+  def listdir(self):
+    ''' Return `os.listdir(self.fspath)`. '''
+    return os.listdir(self.fspath)
 
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.

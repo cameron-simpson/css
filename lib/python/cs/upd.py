@@ -1130,20 +1130,21 @@ class UpdProxy(object):
     upd = self.upd
     if upd is None:
       return
+    index = self.index
+    if index is None:
+      return
     update_period = self.update_period
     if update_period:
       now = time.time()
       if (self.last_update is not None
           and now - self.last_update < update_period):
         return
+    txt = upd.normalise(self._prefix + self._text + self._suffix)
     with upd._lock:  # pylint: disable=protected-access
-      index = self.index
-      if index is not None:
-        txt = upd.normalise(self._prefix + self._text + self._suffix)
-        overflow = len(txt) - upd.columns + 1
-        if overflow > 0:
-          txt = '<' + txt[overflow + 1:]
-        self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+      overflow = len(txt) - upd.columns + 1
+      if overflow > 0:
+        txt = '<' + txt[overflow + 1:]
+      self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
     if update_period:
       self.last_update = now
 

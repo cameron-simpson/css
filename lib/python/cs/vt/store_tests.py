@@ -7,6 +7,7 @@
 ''' Tests for Stores.
 '''
 
+from contextlib import contextmanager
 import errno
 from itertools import accumulate
 import os
@@ -23,6 +24,7 @@ from cs.debug import thread_dump, trace
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
+from cs.testutils import SetupTeardownMixin
 
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashCode, HASHCLASS_BY_NAME
@@ -57,14 +59,21 @@ STORECLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__STORECLASS_NAMES'
 
 # constrain the tests if not empty, try every permutation if empty
 HASHCLASS_NAMES = tuple(
-    os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split()
+    list(filter(None,
+                os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split(' ,')))
     or sorted(HashCode.by_name.keys())
 )
 INDEXCLASS_NAMES = tuple(
-    os.environ.get(INDEXCLASS_NAMES_ENVVAR, '').split() or get_index_names()
+    list(
+        filter(None,
+               os.environ.get(INDEXCLASS_NAMES_ENVVAR, '').split(' ,'))
+    ) or get_index_names()
 )
 STORECLASS_NAMES = tuple(
-    os.environ.get(STORECLASS_NAMES_ENVVAR, '').split() or (
+    list(
+        filter(None,
+               os.environ.get(STORECLASS_NAMES_ENVVAR, '').split(' ,'))
+    ) or (
         'MappingStore', 'MemoryCacheStore', 'DataDirStore', 'FileCacheStore',
         'StreamStore', 'TCPClientStore', 'UNIXSocketClientStore', 'ProxyStore'
     )
@@ -97,7 +106,7 @@ def get_test_stores(prefix):
     ):
       for store_type in ALL_STORE_TYPES:
         if store_type.__name__ not in STORECLASS_NAMES:
-          X("SKIP %s:%s", hashclass_name, store_type.__name__)
+          ##X("SKIP %s:%s", hashclass_name, store_type.__name__)
           continue
         if store_type is MappingStore:
           with stackkeys(subtest, storetype=MappingStore):
@@ -137,7 +146,6 @@ def get_test_stores(prefix):
                   hashclass=hashclass
               )
         elif store_type is StreamStore:
-          X("StreamStore...")
           with stackkeys(subtest, storetype=StreamStore):
             for addif in False, True:
               with stackkeys(subtest, addif=addif):
@@ -154,7 +162,6 @@ def get_test_stores(prefix):
                     addif=addif,
                     hashclass=hashclass
                 )
-                X("remote_S = %s", remote_S)
                 S = StreamStore(
                     "S",
                     downstream_rd,
@@ -162,14 +169,9 @@ def get_test_stores(prefix):
                     addif=addif,
                     hashclass=hashclass
                 )
-                X("S = %s", S)
                 with local_store:
                   with remote_S:
-                    X("yield subtest %s, S=%s", subtest, S)
-                    X("YIELD BEFORE TEST *************************")
                     yield subtest, S
-                    X("AFTER YIELD TEST *************************")
-          X("post StreamStore")
         elif store_type is TCPClientStore:
           with stackkeys(subtest, storetype=TCPClientStore):
             for addif in False, True:
@@ -245,6 +247,7 @@ def multitest(method):
                                      for k, v in sorted(subtest.items())])):
         with self.subTest(test_store=S, **subtest):
           self.S = S
+          self.supports_index_entry = type(self.S) in (DataDirStore,)
           self.hashclass = subtest['hashclass']
           S.init()
           with S:
@@ -255,7 +258,7 @@ def multitest(method):
 
   return testMethod
 
-class TestStore(unittest.TestCase, _TestAdditionsMixin):
+class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
   ''' Tests for Stores.
   '''
 
@@ -264,14 +267,15 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.S = None
     self.keys1 = None
 
-  def setUp(self):
+  @contextmanager
+  def setupTeardown(self):
     S = self.S
+    self.supports_index_entry = type(self.S) in (DataDirStore,)
     if S is not None:
-      S.open()
-
-  def tearDown(self):
-    if self.S is not None:
-      self.S.close()
+      with S:
+        yield
+    else:
+      yield
     Ts = [T for T in threading.enumerate() if not T.daemon]
     if len(Ts) > 1:
       with open('/dev/tty', 'w') as tty:
@@ -515,6 +519,68 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
           self.assertEqual(h, M1hash)
           self.assertIn(h, M2)
           KS2.add(h)
+
+  @multitest
+  def test_get_index_entry(self):
+    ''' Test `get_index_entry`
+    '''
+    S = self.S
+    for _ in range(16):
+      data = make_randblock(rand0(8193))
+      h = S.hash(data)
+      self.assertIsNone(S.get_index_entry(h))
+      h2 = S.add(data)
+      self.assertEqual(h, h2)
+      entry = S.get_index_entry(h)
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+      else:
+        self.assertIsNone(entry)
+
+  @multitest
+  def test_is_complete_indirect(self):
+    S = self.S
+    data1 = make_randblock(rand0(8193))
+    data2 = make_randblock(rand0(8193))
+    h1 = S.add(data1)
+    B1 = Block(hashcode=h1, span=len(data1))
+    self.assertEqual(len(B1), len(data1))
+    h2 = S.hash(data2)
+    B2 = Block(hashcode=h2, span=len(data2))
+    self.assertEqual(len(B2), len(data2))
+    IB = IndirectBlock.from_subblocks((B1, B2))
+    self.assertIn(h1, S)
+    with S.modify_index_entry(h1) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertFalse(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+    self.assertNotIn(h2, S)
+    with S.modify_index_entry(h2) as entry:
+      self.assertIsNone(entry)
+    ih = IB.hashcode
+    with S.modify_index_entry(ih) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertFalse(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+    self.assertFalse(S.is_complete_indirect(ih))
+    with S.modify_index_entry(ih) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertFalse(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
+    S.add(data2)
+    self.assertTrue(S.is_complete_indirect(ih))
+    with S.modify_index_entry(ih) as entry:
+      if self.supports_index_entry:
+        self.assertIsNotNone(entry)
+        self.assertTrue(entry.flags & entry.INDIRECT_COMPLETE)
+      else:
+        self.assertIsNone(entry)
 
 def selftest(argv):
   ''' Run the unit tests.

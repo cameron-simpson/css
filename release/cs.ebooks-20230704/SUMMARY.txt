@@ -1,0 +1,4 @@
+CalibreCommand.cmd_linkto: link series members to a subdirectory unless a specific link_format is supplied.
+CalibreTree: do not make a db session for startup_shutdown, instead offer a separate db_session context manager because we need the db released to run any Calibre executable.
+CalibreCommand.cmd_ls: hold a db session during the listing.
+Assorted internal changes.

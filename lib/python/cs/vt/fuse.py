@@ -27,7 +27,6 @@ from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
 from cs.x import X
 
-from . import defaults
 from .dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from .fs import FileHandle, FileSystem
 from .store import MissingHashcodeError
@@ -164,7 +163,7 @@ def handler(method, trace=False):
       X("CALL %s", sysdesc)
     fs = self._vtfs
     try:
-      with defaults(fs=fs):
+      with fs:
         with fs.S:
           if do_trace:
             start_time = time.time()
@@ -328,11 +327,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
       def mainloop():
         ''' Worker main loop to run the filesystem then tidy up.
         '''
-        with stackattrs(defaults, fs=fs):
+        with fs:
           with S:
-            with defaults.common_S(S):
-              llfuse.main(workers=32)
-              llfuse.close()
+            llfuse.main(workers=32)
+            llfuse.close()
         S.close()
 
       T = PfxThread(target=mainloop)
@@ -818,13 +816,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
           if EA is None:
             if E is not None:
               # yield name, attributes and next offset
-              with stackattrs(defaults, fs=fs):
-                with S:
-                  try:
-                    EA = self._vt_EntryAttributes(E)
-                  except Exception as e:
-                    warning("%r: %s", name, e)
-                    EA = None
+              with S:
+                try:
+                  EA = self._vt_EntryAttributes(E)
+                except Exception as e:
+                  warning("%r: %s", name, e)
+                  EA = None
           if EA is not None:
             yield self._vt_bytes(name), EA, o + 1
           o += 1

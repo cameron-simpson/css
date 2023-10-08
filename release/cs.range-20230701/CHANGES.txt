@@ -1,0 +1,3 @@
+lib/python/cs/range.py: cs.range: spans(): fix call to item.spans()
+lib/python/cs/range.py: cs.range: fix a bunch of misguided Span unpackings, tweak Range.spans
+lib/python/cs/range.py: cs.range: Range.spans: return a copy of self._spans, not an iterator
