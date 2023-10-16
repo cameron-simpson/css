@@ -594,7 +594,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
   @typechecked
   def by_kobo_volumeid(self, uuid: Union[str, UUID]):
-    ''' Return an iterable of `CalibreBook`s with the supplied ASIN.
+    ''' Return an iterable of `CalibreBook`s with the supplied Kobo volumeid.
     '''
     if isinstance(uuid, str):
       uuid = UUID(uuid)
