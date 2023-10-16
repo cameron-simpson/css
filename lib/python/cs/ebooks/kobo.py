@@ -103,7 +103,7 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
     return self.books[book_uuid]
 
 @dataclass
-class KoboBook:
+class KoboBook(HasFSPath):
   uuid: UUID
   kobo_tree: KoboTree
   kobo_book: obok.KoboBook
@@ -118,6 +118,12 @@ class KoboBook:
   def fspath(self):
     return self.filename
 
+
+  @property
+  def tags(self):
+    ''' The `FSTags` for this book file.
+        '''
+    return self.kobo_tree.fstags[self.fspath]
   @pfx
   def decrypt(self, dstpath, exists_ok=False):
     ''' Decrypt the encrypted kepub file of `book` and save the
