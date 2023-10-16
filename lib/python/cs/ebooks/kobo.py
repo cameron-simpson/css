@@ -118,6 +118,10 @@ class KoboBook(HasFSPath):
   def fspath(self):
     return self.filename
 
+  @property
+  def volumeid(self):
+    ''' The Kobo volumeid, the book `UUID` as a `str`. '''
+    return str(self.uuid)
 
   @property
   def tags(self):
