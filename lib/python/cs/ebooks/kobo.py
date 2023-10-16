@@ -266,3 +266,48 @@ class KoboCommand(BaseCommand):
     print("kobo", kobo)
     for bookpath in kobo.bookpaths():
       print(" ", shortpath(bookpath))
+
+  def cmd_export(self, argv):
+    options = self.options
+    calibre = options.calibre
+    kobo = options.kobo
+    runstate = options.runstate
+    self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
+    doit = options.doit
+    force = options.force
+    quiet = options.quiet
+    verbose = options.verbose
+    volumeids = argv or sorted(str(vid) for vid in kobo.volumeids)
+    xit = 0
+    quiet or print("export", kobo.shortpath, "=>", calibre.shortpath)
+    for vid in progressbar(volumeids, f"export to {calibre}"):
+      with Pfx(vid):
+        book = kobo[vid]
+        if runstate.cancelled:
+          xit = 1
+          break
+        try:
+          cbook, added = book.export_to_calibre(
+              calibre,
+              doit=doit,
+              force=force,
+              replace_format=force,
+              quiet=quiet,
+              verbose=verbose,
+          )
+        except ValueError as e:
+          warning("export failed: %s", e)
+          xit = 1
+        except Exception as e:
+          warning("kobo book.export_to_calibre: e=%s", s(e))
+          raise
+    return xit
+
+  def cmd_ls(self, argv):
+    kobo = self.options.kobo
+    volumeids = argv or sorted(str(vid) for vid in kobo.volumeids)
+    for vid in volumeids:
+      book = kobo[vid]
+      print(book.uuid, book)
+      print(" ", book.author, book.title)
+      print(" ", book.filename)
