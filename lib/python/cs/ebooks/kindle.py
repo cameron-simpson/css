@@ -789,6 +789,9 @@ class KindleCommand(BaseCommand):
         except (dedrm.DeDRMError, ValueError) as e:
           warning("export failed: %s", e)
           xit = 1
+        except Exception as e:
+          warning("kbook.export_to_calibre: e=%s", s(e))
+          raise
     if runstate.cancelled:
       xit = 1
     return xit
