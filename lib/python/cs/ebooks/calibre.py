@@ -31,7 +31,8 @@ import shlex
 from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Optional, Union
+from uuid import UUID
 
 from icontract import require
 from sqlalchemy import (
@@ -590,6 +591,16 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Return an iterable of `CalibreBook`s with the supplied ASIN.
     '''
     return self.by_identifier('mobi-asin', asin.upper())
+
+  @typechecked
+  def by_kobo_volumeid(self, uuid: Union[str, UUID]):
+    ''' Return an iterable of `CalibreBook`s with the supplied ASIN.
+    '''
+    if isinstance(uuid, str):
+      uuid = UUID(uuid)
+    else:
+      assert isinstance(uuid, UUID)
+    return self.by_identifier('kobo-volumeid', str(uuid).lower())
 
   def _run(self, calcmd, *calargv, doit=True, quiet=False, **subp_options):
     ''' Run a Calibre utility command.
