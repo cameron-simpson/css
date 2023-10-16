@@ -357,7 +357,7 @@ class DeDRMWrapper(Promotable):
     if booktype is None:
       # infer book type from file extension
       booktype = splitext(basename(srcpath))[1][1:].lower()
-      if booktype is '':
+      if booktype == '':
         # Kobo kepub
         if basename(dirname(srcpath)).lower() == 'kepub':
           booktype = 'kepub'
@@ -619,7 +619,7 @@ def import_obok(obok_package_path=None):
 
 @pfx
 def decrypt_obok(obok_lib, obok_book, dstpath: str, exists_ok=False):
-  ''' Decrypt the encrypted kepub file of `book` and save the
+  ''' Decrypt the encrypted kepub file of `obok_book` and save the
       decrypted form at `dstpath`.
 
       This is closely based on the `decrypt_book()` function from
