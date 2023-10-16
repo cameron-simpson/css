@@ -1,24 +1,32 @@
 #!/usr/bin/env python3
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import filecmp
 from functools import cached_property, partial
 from getopt import GetoptError
 import os
-from os.path import expanduser
+from os.path import (
+    exists as existspath,
+    expanduser,
+)
 import sys
 from tempfile import NamedTemporaryFile
 from threading import RLock
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
-from cs.fs import FSPathBasedSingleton, shortpath
+from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
+from cs.lex import s
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
+from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 
+from .calibre import CalibreTree
 from .dedrm import import_obok, decrypt_obok
 
 obok = import_obok()
