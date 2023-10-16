@@ -255,7 +255,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       ):
         ''' Export this Kindle book to a Calibre instance,
             return `(cbook,added)`
-            being the `CalibreBook` and whether the Kinble book was added
+            being the `CalibreBook` and whether the Kindle book was added
             (books are not added if the format is already present).
 
             Parameters:
