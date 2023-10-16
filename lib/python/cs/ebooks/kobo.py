@@ -276,6 +276,17 @@ class KoboCommand(BaseCommand):
       print(" ", shortpath(bookpath))
 
   def cmd_export(self, argv):
+    ''' Usage: {cmd} [-fnqv] [volumeids...]
+          Export Kobo books to Calibre library.
+          -f    Force: replace the EPUB format if already present.
+          -n    No action, recite planned actions.
+          -q    Quiet: report only warnings.
+          -v    Verbose: report more information about actions and inaction.
+          volumeids
+                Optional Kobo volumeid identifiers to export.
+                The default is to export all books.
+                (TODO: just those with no "calibre.dbid" fstag.)
+    '''
     options = self.options
     calibre = options.calibre
     kobo = options.kobo
@@ -312,6 +323,12 @@ class KoboCommand(BaseCommand):
     return xit
 
   def cmd_ls(self, argv):
+    ''' Usage: {cmd} [volumeids...]
+          List the contents of the library.
+          (TODO: -l  Long mode.)
+          volumeids
+                Optional Kobo volumeid identifiers to list.
+    '''
     kobo = self.options.kobo
     volumeids = argv or sorted(str(vid) for vid in kobo.volumeids)
     for vid in volumeids:
