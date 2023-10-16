@@ -671,6 +671,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       dedrm=None,
       doit=True,
       quiet=False,
+      add_args=(),
       **subp_options,
   ):
     ''' Add a book file via the `calibredb add` command.
@@ -679,6 +680,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         Parameters:
         * `bookpath`: the filesystem path to the book
         * `dedrm`: optional `DeDRMWrapper` instance
+        * `add_args`: optional iterable of additional `calibredb`
+          command line arguments
     '''
     if dedrm is not None:
       # try to remove DRM from the book file
@@ -689,6 +692,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     cp = self.calibredb(
         'add',
         '--duplicates',
+        *add_args,
         bookpath,
         doit=doit,
         quiet=quiet,
