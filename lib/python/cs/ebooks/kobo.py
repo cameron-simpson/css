@@ -232,6 +232,16 @@ class KoboCommand(BaseCommand):
   class Options(BaseCommand.Options):
     ''' Set up the default values in `options`.
     '''
+
+    def _calibre_path():
+      try:
+        # pylint: disable=protected-access
+        calibre_path = CalibreTree._resolve_fspath(None)
+      except ValueError:
+        calibre_path = None
+      return calibre_path
+
+    calibre_path: Optional[str] = field(default_factory=_calibre_path)
     kobo_path: Optional[str] = None
 
   @contextmanager
@@ -241,9 +251,10 @@ class KoboCommand(BaseCommand):
       kobo_path = options.kobo_path
       if kobo_path is None:
         kobo_path = default_kobo_library()
-      with KoboTree(kobo_path) as kt:
-        with stackattrs(options, kobo=kt):
-          yield
+      with KoboTree(kobo_path) as kobo:
+        with CalibreTree(options.calibre_path) as cal:
+          with stackattrs(options, kobo=kobo, calibre=cal):
+            yield
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
