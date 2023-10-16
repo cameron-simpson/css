@@ -140,6 +140,17 @@ class KoboBook(HasFSPath):
         self.kobo_tree.lib, self.kobo_book, dstpath, exists_ok=exists_ok
     )
 
+  @contextmanager
+  def decrypted(self):
+    ''' Context manager which decrypts a Kobo book
+        and yields the filesystem path of the decrypted copy,
+        valid for the duration of the context.
+    '''
+    with NamedTemporaryFile(prefix=f'kobo--{self.uuid}--',
+                            suffix='.epub') as f:
+      self.decrypt(f.name, exists_ok=True)
+      yield f.name
+
 class KoboCommand(BaseCommand):
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
