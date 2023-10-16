@@ -39,9 +39,9 @@ from cs.context import stackattrs
 from cs.deco import cachedmethod, fmtdoc
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton, HasFSPath
-from cs.fstags import FSTags
-from cs.lex import cutsuffix
-from cs.logutils import warning
+from cs.fstags import FSTags, uses_fstags
+from cs.lex import cutsuffix, s
+from cs.logutils import warning, error
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
@@ -208,10 +208,11 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
         return self.pathto(self.subdir_name + '.' + ext)
 
       @property
-      def tags(self):
+      @uses_fstags
+      def tags(self, fstags: FSTags):
         ''' The `FSTags` for this book subdirectory.
         '''
-        return self.tree.fstags[self.fspath]
+        return fstags[self.fspath]
 
       def asset_names(self):
         ''' Return the names of files within the subdirectory
@@ -333,12 +334,12 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     return "%s(%r)" % (type(self).__name__, self.fspath)
 
   @contextmanager
-  def startup_shutdown(self):
+  @uses_fstags
+  def startup_shutdown(self, fstags: FSTags):
     ''' Context manager to obtain and release resources.
     '''
-    with FSTags() as fstags:
-      with stackattrs(self, fstags=fstags):
-        yield
+    with fstags:
+      yield
 
   @property
   @cachedmethod
@@ -396,7 +397,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     return self.book_subdir_names()
 
   def __getitem__(self, subdir_name):
-    ''' Return the `cs.fstags.TaggedPath` for the ebook subdirectory named `subdir_name`.
+    ''' Return the `KindleBook` for the ebook subdirectory named `subdir_name`.
     '''
     if not self.is_book_subdir(subdir_name):
       raise ValueError(
@@ -510,7 +511,7 @@ class KindleBookAssetDB(ORM):
           String,
           nullable=False,
           comment=
-          'Book sample state, often blank, "Sample" for a sample download'
+          'Book sample state, often blank, "Sample" for a sample download',
       )
 
     # pylint: disable=missing-class-docstring
@@ -695,7 +696,8 @@ class KindleCommand(BaseCommand):
       super().apply_opt(opt, val)
 
   @contextmanager
-  def run_context(self):
+  @uses_fstags
+  def run_context(self, fstags: FSTags):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
@@ -709,7 +711,8 @@ class KindleCommand(BaseCommand):
       with KindleTree(options.kindle_path) as kt:
         with CalibreTree(options.calibre_path) as cal:
           with stackattrs(options, kindle=kt, calibre=cal, dedrm=dedrm):
-            yield
+            with fstags:
+              yield
 
   def cmd_app_path(self, argv):
     ''' Usage: {cmd} [content-path]
@@ -827,7 +830,8 @@ class KindleCommand(BaseCommand):
         if len(cbooks) > 1:
           # pylint: disable=expression-not-assigned
           quiet or print(
-              f"asin {asin}: multiple Calibre books, dbids {[cb.dbid for cb in cbooks]!r}; choosing {cbook}"
+              f'asin {asin}: multiple Calibre books,',
+              f'dbids {[cb.dbid for cb in cbooks]!r}; choosing {cbook}'
           )
         ktags = kbook.tags
         ctags = ktags.subtags('calibre')
