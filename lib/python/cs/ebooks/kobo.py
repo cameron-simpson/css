@@ -128,6 +128,7 @@ class KoboBook(HasFSPath):
     ''' The `FSTags` for this book file.
         '''
     return self.kobo_tree.fstags[self.fspath]
+
   @pfx
   def decrypt(self, dstpath, exists_ok=False):
     ''' Decrypt the encrypted kepub file of `book` and save the
@@ -150,6 +151,78 @@ class KoboBook(HasFSPath):
                             suffix='.epub') as f:
       self.decrypt(f.name, exists_ok=True)
       yield f.name
+
+  # pylint: disable=too-many-branches
+  def export_to_calibre(
+      self,
+      calibre,
+      *,
+      doit=True,
+      replace_format=False,
+      force=False,
+      quiet=False,
+      verbose=False,
+  ):
+    ''' Export this Kobo book to a Calibre instance,
+        return `(cbook,added)`
+        being the `CalibreBook` and whether the Kobo book was added
+        (books are not added if the format is already present).
+
+        Parameters:
+        * `calibre`: the `CalibreTree`
+        * `doit`: optional flag, default `True`;
+          if false just recite planned actions
+        * `force`: optional flag, default `False`;
+          if true pull the AZW file even if an AZW format already exists
+        * `replace_format`: if true, export even if the `AZW3`
+          format is already present
+        * `quiet`: default `False`, do not print nonwarnings
+        * `verbose`: default `False`, print all actions or nonactions
+    '''
+    with self.decrypted() as bookpath:
+      added = False
+      cbooks = list(calibre.by_kobo_volumeid(self.volumeid))
+      if not cbooks:
+        # new book
+        # pylint: disable=expression-not-assigned
+        quiet or print("new book <=", self.shortpath)
+        dbid = calibre.add(
+            bookpath,
+            doit=doit,
+            quiet=quiet,
+            add_args=['-I', f'kobo-volumeid:{self.volumeid}'],
+        )
+        if dbid is None:
+          added = not doit
+          cbook = None
+        else:
+          added = True
+          cbook = calibre[dbid]
+          quiet or print(" ", cbook)
+      else:
+        # book already present in calibre
+        cbook = cbooks[0]
+        if len(cbooks) > 1:
+          warning(
+              "multiple calibre books, dbids %r: choosing %s",
+              [cb.dbid for cb in cbooks], cbook
+          )
+        with Pfx(cbook):
+          # look for exact content match
+          for fmtk in 'EPUB', :
+            fmtpath = cbook.formatpath(fmtk)
+            if fmtpath and existspath(fmtpath):
+              if filecmp.cmp(fmtpath, bookpath):
+                # pylint: disable=expression-not-assigned
+                verbose and print(
+                    cbook, fmtk, shortpath(fmtpath), '=', shortpath(bookpath)
+                )
+                return cbook, False
+            # remaining logic is in CalibreBook.pull_format
+            cbook.pull_format(
+                bookpath, doit=doit, force=force, quiet=quiet, verbose=verbose
+            )
+    return cbook, added
 
 class KoboCommand(BaseCommand):
 
