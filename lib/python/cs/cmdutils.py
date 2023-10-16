@@ -280,6 +280,7 @@ class BaseCommandOptions:
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
+  runstate: Optional[RunState] = None
   verbose: bool = False
 
   def copy(self, **updates):
@@ -289,9 +290,11 @@ class BaseCommandOptions:
         Any keyword arguments are applied as attribute updates to the copy.
     '''
     copied = type(self)(
-        **{k: v
-           for k, v in self.__dict__.items()
-           if not k.startswith('_')}
+        **{
+            k: v
+            for k, v in self.__dict__.items()
+            if not k.startswith('_')
+        }
     )
     for k, v in updates.items():
       setattr(copied, k, v)
