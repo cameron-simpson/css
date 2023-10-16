@@ -95,7 +95,7 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
     ]
 
   def __iter__(self):
-    return iter(self.books.values())
+    return iter(sorted(self.books.values(), key=lambda book: book.uuid))
 
   def __getitem__(self, book_uuid: UUID):
     return self.books[book_uuid]
