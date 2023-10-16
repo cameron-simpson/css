@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+''' Support for Kobo Desktop libraries.
+'''
+
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 import filecmp
@@ -20,6 +23,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import s
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
@@ -124,6 +128,7 @@ class KoboBook(HasFSPath):
 
   @property
   def fspath(self):
+    ''' The filesystem path of the KEPub file. '''
     return self.filename
 
   @property
@@ -132,10 +137,11 @@ class KoboBook(HasFSPath):
     return str(self.uuid)
 
   @property
-  def tags(self):
+  @uses_fstags
+  def tags(self, fstags: FSTags):
     ''' The `FSTags` for this book file.
-        '''
-    return self.kobo_tree.fstags[self.fspath]
+    '''
+    return fstags[self.fspath]
 
   @pfx
   def decrypt(self, dstpath, exists_ok=False):
@@ -233,6 +239,8 @@ class KoboBook(HasFSPath):
     return cbook, added
 
 class KoboCommand(BaseCommand):
+  ''' Command line for interacting with a Kobo Desktop filesystem tree.
+  '''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
@@ -250,10 +258,13 @@ class KoboCommand(BaseCommand):
       return calibre_path
 
     calibre_path: Optional[str] = field(default_factory=_calibre_path)
+    calibre: Optional[CalibreTree] = None
     kobo_path: Optional[str] = None
+    kobo: Optional[KoboTree] = None
 
   @contextmanager
-  def run_context(self):
+  @uses_fstags
+  def run_context(self, fstags: FSTags):
     with super().run_context():
       options = self.options
       kobo_path = options.kobo_path
@@ -262,7 +273,8 @@ class KoboCommand(BaseCommand):
       with KoboTree(kobo_path) as kobo:
         with CalibreTree(options.calibre_path) as cal:
           with stackattrs(options, kobo=kobo, calibre=cal):
-            yield
+            with fstags:
+              yield
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
@@ -275,6 +287,7 @@ class KoboCommand(BaseCommand):
     for bookpath in kobo.bookpaths():
       print(" ", shortpath(bookpath))
 
+  # pylint: disable=too-many-locals
   def cmd_export(self, argv):
     ''' Usage: {cmd} [-fnqv] [volumeids...]
           Export Kobo books to Calibre library.
@@ -306,7 +319,7 @@ class KoboCommand(BaseCommand):
           xit = 1
           break
         try:
-          cbook, added = book.export_to_calibre(
+          book.export_to_calibre(
               calibre,
               doit=doit,
               force=force,
