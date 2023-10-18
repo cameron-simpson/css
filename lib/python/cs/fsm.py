@@ -257,16 +257,38 @@ class FSM(DOTNodeMixin):
           cb for cb in self.__callbacks[state] if cb != callback
       ]
 
-  def fsm_transitions_as_dot(self, fsm_transitions, sep='\n', graph_name=None):
+  def fsm_transitions_as_dot(
+      self,
+      fsm_transitions=None,
+      *,
+      sep='\n',
+      graph_name=None,
+      history_style=None
+  ):
     ''' Compute a DOT syntax graph description from a transitions dictionary.
 
         Parameters:
-        * `fsm_transitions`: a mapping of *state*->*event*->*state*
+        * `fsm_transitions`: optional mapping of *state*->*event*->*state*,
+          default `self.FSM_TRANSITIONS`
         * `sep`: optional separator between "lines", default `'\n'`
         * `graph_name`: optional name for the graph, default the class name
+        * `history_style`: optional style mapping for event transition history,
+          used to style edges which have been traversed
     '''
+    if fsm_transitions is None:
+      fsm_transitions = self.FSM_TRANSITIONS
     if graph_name is None:
       graph_name = self.__class__.__name__
+    traversed_edges = defaultdict(list)
+    if history_style:
+      # fill in the mapping of (old,event,new) -> count
+      for transition in self.fsm_history:
+        # particular types of transitions
+        traversed_edges[transition.old_state, transition.event,
+                        transition.new_state].append(transition)
+        # any type of transition
+        traversed_edges[transition.old_state,
+                        transition.new_state].append(transition)
     dot = [f'digraph {gvq(graph_name)} {{']
     # NB: we _do not_ sort the transition graph because the "dot" programme
     # layout is affected by the order in which the graph is defined.
@@ -279,12 +301,18 @@ class FSM(DOTNodeMixin):
         # colour the current state
         fillcolor = self.DOT_NODE_FILLCOLOR_PALETTE.get(src_state)
         if fillcolor:
-          attrs_s = self.dot_node_attrs_str(dict(style='filled',fillcolor=fillcolor))
+          attrs_s = self.dot_node_attrs_str(
+              dict(style='filled', fillcolor=fillcolor)
+          )
           dot.append(f'  {gvq(src_state)}[{attrs_s}];')
       for event, dst_state in sorted(transitions.items()):
-        dot.append(
-            f'  {gvq(src_state)}->{gvq(dst_state)}[label={gvq(event)}];'
+        edge_style = dict(label=event)
+        if history_style and (src_state, dst_state) in traversed_edges:
+          edge_style.update(history_style)
+        edge_style_dot = ",".join(
+            f'{gvq(k)}={gvq(str(v))}' for k, v in edge_style.items()
         )
+        dot.append(f'  {gvq(src_state)}->{gvq(dst_state)}[{edge_style_dot}];')
     dot.append('}')
     return sep.join(dot)
 
@@ -308,9 +336,13 @@ class FSM(DOTNodeMixin):
     '''
     return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
 
-  def fsm_as_svg(self, layout=None, **dot_kw):
+  def fsm_as_svg(self, layout=None, history_style=None, **dot_kw):
     ''' Render the state transition diagram as SVG. '''
-    return gvsvg(self.fsm_dot, layout=layout, **dot_kw)
+    return gvsvg(
+        self.fsm_transitions_as_dot(history_style=history_style),
+        layout=layout,
+        **dot_kw,
+    )
 
   @property
   def fsm_svg(self):
