@@ -115,8 +115,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CONTENT_DIRNAME = 'My Kindle Content'
 
-  FSPATH_DEFAULT = default_kindle_library()
-
+  FSPATH_FACTORY = default_kindle_library
   FSPATH_ENVVAR = KINDLE_LIBRARY_ENVVAR
 
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
