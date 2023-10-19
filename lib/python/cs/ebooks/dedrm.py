@@ -49,6 +49,8 @@ def main(argv=None):
   return DeDRMCommand(argv).run()
 
 class DeDRMCommand(BaseCommand):
+  ''' cs.dedrm command line implementation.
+  '''
 
   GETOPT_SPEC = 'D:'
   USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
@@ -61,6 +63,9 @@ class DeDRMCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
+    ''' Command line option state.
+    '''
+
     dedrm_package_path: Optional[str] = field(
         default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
     )
@@ -226,6 +231,7 @@ class DeDRMWrapper(Promotable):
       self.DeDRMError = dedrm_DeDRMError
     with self.dedrm_imports():
       kindlekey = self.import_name('kindlekey')
+      ##kindlekey = self.import_name('kindlekey', package=__package__)
       # monkey patch the kindlekey.kindlekeys function
       self.base_kindlekeys = kindlekey.kindlekeys
       kindlekey.kindlekeys = self.cached_kindlekeys
@@ -323,9 +329,11 @@ class DeDRMWrapper(Promotable):
           sys,
           path=[tmpdirpath, joinpath(tmpdirpath, self.DEDRM_PACKAGE_NAME)] +
           sys.path):
+        # pylint: disable=import-outside-toplevel
         import builtins
         with stackattrs(builtins, print=print):
           with redirect_stdout(sys.stderr):
+            # pylint: disable=import-outside-toplevel
             import prefs  # imported for its side effect
             yield
 
@@ -375,11 +383,12 @@ class DeDRMWrapper(Promotable):
       if booktype == 'kepub':
         obok = import_obok()
         if obok_lib is None:
-          from .kobo import default_kobo_library, decrypt_obok
+          from .kobo import default_kobo_library  # pylint: disable=import-outside-toplevel
           obok_lib = obok.KoboLibrary(desktopkobodir=default_kobo_library())
           need_close_lib = True
         else:
           need_close_lib = False
+        # pylint: disable=protected-access
         obok_book = obok.KoboBook(
             basename(srcpath), srcpath, srcpath, 'kepub', obok_lib.__cursor
         )
