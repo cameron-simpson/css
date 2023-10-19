@@ -82,7 +82,19 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
       return
     super().__init__(fspath=fspath)
     self._lock = RLock()
+    self.lib = None
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/closethe obok library. '''
+    assert self.lib is None
     self.lib = obok.KoboLibrary(desktopkobodir=self.fspath)
+    try:
+      yield
+    finally:
+      self.lib.close()
+      self.lib = None
+      # TODO: flush the .books cache
 
   @cached_property
   def books(self):
