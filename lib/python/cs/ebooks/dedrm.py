@@ -348,7 +348,15 @@ class DeDRMWrapper(Promotable):
       return pfx_call(getattr, M, name)
 
   @pfx_method
-  def remove(self, srcpath, dstpath, *, booktype=None, exists_ok=False):
+  def remove(
+      self,
+      srcpath,
+      dstpath,
+      *,
+      booktype=None,
+      exists_ok=False,
+      obok_lib=None
+  ):
     ''' Remove the DRM from `srcpath`, writing the resulting file to `dstpath`.
 
         Parameters:
@@ -358,36 +366,51 @@ class DeDRMWrapper(Promotable):
       # infer book type from file extension
       booktype = splitext(basename(srcpath))[1][1:].lower()
       if booktype == '':
-        # Kobo kepub
+        # Kobo kepub files inside the "kepub" directory
         if basename(dirname(srcpath)).lower() == 'kepub':
           booktype = 'kepub'
       if not booktype:
-        raise ValueType("cannot infer book type")
+        raise ValueError("cannot infer book type")
     with atomic_filename(dstpath, exists_ok=exists_ok) as T:
-      dedrm = self.dedrm
-      # monkey patch temporary_file method to return tmpfilename
-      with stackattrs(dedrm, temporary_file=lambda ext: T):
-        with self.dedrm_imports():
-          dedrm.starttime = time.time()
-          if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3', 'azw4',
-                          'tpz', 'kfx-zip']:
-            # Kindle/Mobipocket
-            decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
-          elif booktype == 'pdb':
-            # eReader
-            decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
-          elif booktype == 'pdf':
-            # Adobe PDF (hopefully) or LCP PDF
-            decrypted_ebook = dedrm.PDFDecrypt(srcpath)
-          elif booktype == 'epub':
-            # Adobe Adept, PassHash (B&N) or LCP ePub
-            decrypted_ebook = dedrm.ePubDecrypt(srcpath)
-          else:
-            raise ValueError(
-                "cannot decrypt %r, unhandled book type %r" %
-                (srcpath, booktype)
-            )
-          assert decrypted_ebook == T.name
+      if booktype == 'kepub':
+        obok = import_obok()
+        if obok_lib is None:
+          from .kobo import default_kobo_library, decrypt_obok
+          obok_lib = obok.KoboLibrary(desktopkobodir=default_kobo_library())
+          need_close_lib = True
+        else:
+          need_close_lib = False
+        obok_book = obok.KoboBook(
+            basename(srcpath), srcpath, srcpath, 'kepub', obok_lib.__cursor
+        )
+        decrypt_obok(obok_lib, obok_book, T.name, exists_ok=True)
+        if need_close_lib:
+          obok_lib.close()
+      else:
+        dedrm = self.dedrm
+        # monkey patch temporary_file method to return tmpfilename
+        with stackattrs(dedrm, temporary_file=lambda ext: T):
+          with self.dedrm_imports():
+            dedrm.starttime = time.time()
+            if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3',
+                            'azw4', 'tpz', 'kfx-zip']:
+              # Kindle/Mobipocket
+              decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
+            elif booktype == 'pdb':
+              # eReader
+              decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
+            elif booktype == 'pdf':
+              # Adobe PDF (hopefully) or LCP PDF
+              decrypted_ebook = dedrm.PDFDecrypt(srcpath)
+            elif booktype == 'epub':
+              # Adobe Adept, PassHash (B&N) or LCP ePub
+              decrypted_ebook = dedrm.ePubDecrypt(srcpath)
+            else:
+              raise ValueError(
+                  "cannot decrypt %r, unhandled book type %r" %
+                  (srcpath, booktype)
+              )
+            assert decrypted_ebook == T.name
 
   @contextmanager
   def removed(self, srcpath):
