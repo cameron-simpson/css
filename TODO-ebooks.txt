@@ -1,3 +1,4 @@
+kobo: do not require dedrm and the associated envvar, only need decrypt if there are encrypted zip members
 export_to_calibre: try to decrypt azw files
 kindle export: recite src and dst libs
 calibre lint command
