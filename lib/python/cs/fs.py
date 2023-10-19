@@ -198,7 +198,8 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
       cls,
       fspath: Optional[str],
       envvar: Optional[str] = None,
-      default_attr=None
+      default_attr=None,
+      default_factory=None,
   ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
 
@@ -209,6 +210,8 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
           the default for this comes from `cls.FSPATH_ENVVAR` if defined
         * `default_attr`: the class attribute containing the default `fspath`
           if defined and there is no environment variable for `envvar`
+        * `default_factory`: an optional factory function to return the default `fspath`;
+          default from `cls.DEFAULT_FACTORY` if defined
 
         The common mode is where each instance might have an arbitrary path,
         such as a `TagFile`.
@@ -224,13 +227,30 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         fspath = os.environ.get(envvar)
         if fspath is not None:
           return realpath(fspath)
-      if default_attr is None:
-        default_attr = 'FSPATH_DEFAULT'
-      defaultpath = getattr(cls, default_attr, None)
+      if default_factory is None:
+        default_factory = getattr(cls, 'FSPATH_FACTORY', None)
+      if default_factory is None:
+        if default_attr is None:
+          default_attr = 'FSPATH_DEFAULT'
+      if default_factory is not None:
+        # use the factory
+        if default_attr is not None:
+          raise ValueError(
+              "default_attr:%r and default_factory:%r may not both be specified"
+              % (
+                  default_attr,
+                  default_factory,
+              )
+          )
+        else:
+          defaultpath = default_factory()
+      else:
+        # use the attribute
+        defaultpath = getattr(cls, default_attr, None)
       if defaultpath is not None:
         return realpath(expanduser(defaultpath))
       raise ValueError(
-          "_resolve_fspath: fspath=None and no %s no %s.%s" % (
+          "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
               (
                   cls.__name__ + '.FSPATH_ENVVAR' if envvar is None else '$' +
                   envvar
