@@ -1106,9 +1106,11 @@ class FSTags(MultiOpenMixin):
   def startup_shutdown(self):
     ''' Sync tag files and db mapping on final close.
     '''
-    yield
-    # save any modified tag files on shutdown.
-    self.sync()
+    try:
+      yield
+    finally:
+      # save any modified tag files on shutdown.
+      self.sync()
 
   @locked
   @pfx_method

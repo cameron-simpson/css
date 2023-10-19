@@ -31,7 +31,8 @@ import shlex
 from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Optional, Union
+from uuid import UUID
 
 from icontract import require
 from sqlalchemy import (
@@ -550,8 +551,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       return False
     return True
 
-  @typechecked
   @require(lambda dbid: dbid > 0)
+  @typechecked
   def book_by_dbid(self, dbid: int, *, db_book=None):
     ''' Return a cached `CalibreBook` for `dbid`.
     '''
@@ -590,6 +591,16 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Return an iterable of `CalibreBook`s with the supplied ASIN.
     '''
     return self.by_identifier('mobi-asin', asin.upper())
+
+  @typechecked
+  def by_kobo_volumeid(self, uuid: Union[str, UUID]):
+    ''' Return an iterable of `CalibreBook`s with the supplied Kobo volumeid.
+    '''
+    if isinstance(uuid, str):
+      uuid = UUID(uuid)
+    else:
+      assert isinstance(uuid, UUID)
+    return self.by_identifier('kobo-volumeid', str(uuid).lower())
 
   def _run(self, calcmd, *calargv, doit=True, quiet=False, **subp_options):
     ''' Run a Calibre utility command.
@@ -660,6 +671,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       dedrm=None,
       doit=True,
       quiet=False,
+      add_args=(),
       **subp_options,
   ):
     ''' Add a book file via the `calibredb add` command.
@@ -668,6 +680,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         Parameters:
         * `bookpath`: the filesystem path to the book
         * `dedrm`: optional `DeDRMWrapper` instance
+        * `add_args`: optional iterable of additional `calibredb`
+          command line arguments
     '''
     if dedrm is not None:
       # try to remove DRM from the book file
@@ -678,6 +692,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     cp = self.calibredb(
         'add',
         '--duplicates',
+        *add_args,
         bookpath,
         doit=doit,
         quiet=quiet,

@@ -5,7 +5,6 @@
 
     This is an experimental module aimed at making the DeDRM/noDRM
     packages run outside Calibre's plugin environment.
-    It does not yet work.
 '''
 
 from contextlib import contextmanager, redirect_stdout
@@ -17,7 +16,9 @@ import json
 import os
 from os.path import (
     basename,
+    dirname,
     isdir as isdirpath,
+    isfile as isfilepath,
     join as joinpath,
     normpath,
     realpath,
@@ -27,6 +28,7 @@ import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 import time
 from typing import Iterable, List, Optional
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -34,11 +36,12 @@ from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import pfx, Pfx, pfx_call, pfx_method
 from cs.sqltags import SQLTags
 from cs.upd import print  # pylint: disable=redefined-builtin
 
 DEDRM_PACKAGE_PATH_ENVVAR = 'DEDRM_PACKAGE_PATH'
+OBOK_PACKAGE_PATH_ENVVAR = 'OBOK_PACKAGE_PATH'
 
 def main(argv=None):
   ''' DeDRM command line mode.
@@ -46,6 +49,8 @@ def main(argv=None):
   return DeDRMCommand(argv).run()
 
 class DeDRMCommand(BaseCommand):
+  ''' cs.dedrm command line implementation.
+  '''
 
   GETOPT_SPEC = 'D:'
   USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
@@ -58,8 +63,14 @@ class DeDRMCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
+    ''' Command line option state.
+    '''
+
     dedrm_package_path: Optional[str] = field(
         default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+    )
+    obok_package_path: Optional[str] = field(
+        default_factory=lambda: os.environ.get(OBOK_PACKAGE_PATH_ENVVAR)
     )
 
   def apply_opt(self, opt, val):
@@ -206,6 +217,9 @@ class DeDRMWrapper(Promotable):
         raise ValueError("no \"standalone\" subdirectory")
       self.dedrm_package_path = dedrm_package_path
       dedrm_DeDRM = self.import_name(self.DEDRM_PACKAGE_NAME, 'DeDRM')
+      dedrm_DeDRMError = self.import_name(
+          self.DEDRM_PACKAGE_NAME, 'DeDRMError'
+      )
 
       class CSEBookDeDRM(DeDRMOverride, dedrm_DeDRM):
         ''' Our wrapper for the DeDRM/noDRM `DeDRM` class
@@ -214,8 +228,10 @@ class DeDRMWrapper(Promotable):
         alfdir = dedrm_package_path
 
       self.dedrm = CSEBookDeDRM()
+      self.DeDRMError = dedrm_DeDRMError
     with self.dedrm_imports():
       kindlekey = self.import_name('kindlekey')
+      ##kindlekey = self.import_name('kindlekey', package=__package__)
       # monkey patch the kindlekey.kindlekeys function
       self.base_kindlekeys = kindlekey.kindlekeys
       kindlekey.kindlekeys = self.cached_kindlekeys
@@ -313,9 +329,11 @@ class DeDRMWrapper(Promotable):
           sys,
           path=[tmpdirpath, joinpath(tmpdirpath, self.DEDRM_PACKAGE_NAME)] +
           sys.path):
+        # pylint: disable=import-outside-toplevel
         import builtins
         with stackattrs(builtins, print=print):
           with redirect_stdout(sys.stderr):
+            # pylint: disable=import-outside-toplevel
             import prefs  # imported for its side effect
             yield
 
@@ -337,39 +355,71 @@ class DeDRMWrapper(Promotable):
         return M
       return pfx_call(getattr, M, name)
 
-  def remove(self, srcpath, dstpath, exists_ok=False):
+  @pfx_method
+  def remove(
+      self,
+      srcpath,
+      dstpath,
+      *,
+      booktype=None,
+      exists_ok=False,
+      obok_lib=None
+  ):
     ''' Remove the DRM from `srcpath`, writing the resulting file to `dstpath`.
 
         Parameters:
         * `exists_ok`: if true then `dstpath` may already exist; default `False`
     '''
+    if booktype is None:
+      # infer book type from file extension
+      booktype = splitext(basename(srcpath))[1][1:].lower()
+      if booktype == '':
+        # Kobo kepub files inside the "kepub" directory
+        if basename(dirname(srcpath)).lower() == 'kepub':
+          booktype = 'kepub'
+      if not booktype:
+        raise ValueError("cannot infer book type")
     with atomic_filename(dstpath, exists_ok=exists_ok) as T:
-      dedrm = self.dedrm
-      # monkey patch temporary_file method to return tmpfilename
-      with stackattrs(dedrm, temporary_file=lambda ext: T):
-        with self.dedrm_imports():
-          dedrm.starttime = time.time()
-          # infer book type from file extension
-          booktype = splitext(basename(srcpath))[1][1:].lower()
-          if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3', 'azw4',
-                          'tpz', 'kfx-zip']:
-            # Kindle/Mobipocket
-            decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
-          elif booktype == 'pdb':
-            # eReader
-            decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
-          elif booktype == 'pdf':
-            # Adobe PDF (hopefully) or LCP PDF
-            decrypted_ebook = dedrm.PDFDecrypt(srcpath)
-          elif booktype == 'epub':
-            # Adobe Adept, PassHash (B&N) or LCP ePub
-            decrypted_ebook = dedrm.ePubDecrypt(srcpath)
-          else:
-            raise ValueError(
-                "cannot decrypt %r, unhandle book type %r" %
-                (srcpath, booktype)
-            )
-          assert decrypted_ebook == T.name
+      if booktype == 'kepub':
+        obok = import_obok()
+        if obok_lib is None:
+          from .kobo import default_kobo_library  # pylint: disable=import-outside-toplevel
+          obok_lib = obok.KoboLibrary(desktopkobodir=default_kobo_library())
+          need_close_lib = True
+        else:
+          need_close_lib = False
+        # pylint: disable=protected-access
+        obok_book = obok.KoboBook(
+            basename(srcpath), srcpath, srcpath, 'kepub', obok_lib.__cursor
+        )
+        decrypt_obok(obok_lib, obok_book, T.name, exists_ok=True)
+        if need_close_lib:
+          obok_lib.close()
+      else:
+        dedrm = self.dedrm
+        # monkey patch temporary_file method to return tmpfilename
+        with stackattrs(dedrm, temporary_file=lambda ext: T):
+          with self.dedrm_imports():
+            dedrm.starttime = time.time()
+            if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3',
+                            'azw4', 'tpz', 'kfx-zip']:
+              # Kindle/Mobipocket
+              decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
+            elif booktype == 'pdb':
+              # eReader
+              decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
+            elif booktype == 'pdf':
+              # Adobe PDF (hopefully) or LCP PDF
+              decrypted_ebook = dedrm.PDFDecrypt(srcpath)
+            elif booktype == 'epub':
+              # Adobe Adept, PassHash (B&N) or LCP ePub
+              decrypted_ebook = dedrm.ePubDecrypt(srcpath)
+            else:
+              raise ValueError(
+                  "cannot decrypt %r, unhandled book type %r" %
+                  (srcpath, booktype)
+              )
+            assert decrypted_ebook == T.name
 
   @contextmanager
   def removed(self, srcpath):
@@ -536,8 +586,8 @@ def getLibCrypto():
 
       def set_decrypt_key(self, userkey, iv):
         self._blocksize = len(userkey)
-        if (self._blocksize != 16) and (self._blocksize !=
-                                        24) and (self._blocksize != 32):
+        if (self._blocksize != 16) and (self._blocksize
+                                        != 24) and (self._blocksize != 32):
           raise DrmException(u"AES improper key used")
           return
         keyctx = self._keyctx = AES_KEY()
@@ -578,6 +628,72 @@ def getLibCrypto():
   LibCrypto = _load_crypto()
 
   return LibCrypto
+
+@pfx
+def import_obok(obok_package_path=None):
+  ''' Import the `obok.py` module.
+  '''
+  if obok_package_path is None:
+    obok_package_path = pfx_call(os.environ.get, OBOK_PACKAGE_PATH_ENVVAR)
+    if obok_package_path is None:
+      raise ValueError(
+          f'no obok_package_path and no ${OBOK_PACKAGE_PATH_ENVVAR} environment variable'
+      )
+  if not isdirpath(obok_package_path):
+    raise ValueError("not a directory: %r", obok_package_path)
+  if not isfilepath(joinpath(obok_package_path, 'obok.py')):
+    raise ValueError("missing obok.py: %r", obok_package_path)
+  with TemporaryDirectory() as tmpdirpath:
+    pfx_call(os.symlink, obok_package_path, joinpath(tmpdirpath, 'obok'))
+    with stackattrs(sys, path=[tmpdirpath] + sys.path):
+      obok = pfx_call(importlib.import_module, '.obok', package='obok')
+  return obok
+
+@pfx
+def decrypt_obok(obok_lib, obok_book, dstpath: str, exists_ok=False):
+  ''' Decrypt the encrypted kepub file of `obok_book` and save the
+      decrypted form at `dstpath`.
+
+      This is closely based on the `decrypt_book()` function from
+      `obok.obok` in the DeDRM Obok_plugin.
+  '''
+  userkeys = obok_lib.userkeys
+  with pfx_call(ZipFile, obok_book.filename, "r") as zin:
+    with open(os.devnull, 'w') as devnull:
+      with stackattrs(sys, stdout=devnull):
+        with atomic_filename(
+            dstpath,
+            exists_ok=exists_ok,
+            suffix=f'--{basename(obok_book.filename)}.zip',
+        ) as f:
+          with ZipFile(f.name, 'w', ZIP_DEFLATED) as zout:
+            for filename in zin.namelist():
+              with Pfx(filename):
+                contents = zin.read(filename)
+                try:
+                  file = obok_book.encryptedfiles[filename]
+                except KeyError:
+                  plain_contents = contents
+                else:
+                  for userkey in userkeys:
+                    with Pfx("userkey %s", userkey):
+                      try:
+                        plain_contents = file.decrypt(userkey, contents)
+                      except ValueError as e:
+                        warning("%s", e)
+                        continue
+                      try:
+                        file.check(plain_contents)
+                      except (IndexError, ValueError) as e:
+                        # Parse failures mean the key is probably wrong.
+                        ##warning("file.check fails: %s", e)
+                        continue
+                      break
+                  else:
+                    raise ValueError(
+                        f'could not decrypt using any keys from userkeys:{userkeys!r}'
+                    )
+                zout.writestr(filename, plain_contents)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
