@@ -92,9 +92,10 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
     try:
       yield
     finally:
+      # close the library
+      del self.books
       self.lib.close()
       self.lib = None
-      # TODO: flush the .books cache
 
   @cached_property
   def books(self):
