@@ -74,7 +74,7 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CONTENT_DIRNAME = 'kepub'
 
-  FSPATH_FACTORY = default_kobo_library
+  FSPATH_DEFAULT = default_kobo_library
   FSPATH_ENVVAR = KOBO_LIBRARY_ENVVAR
 
   def __init__(self, fspath=None):
