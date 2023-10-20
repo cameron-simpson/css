@@ -178,7 +178,10 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
       yield
     finally:
       # close the library
-      del self.books
+      try:
+        del self.books
+      except AttributeError:
+        pass
       self.lib.close()
       self.lib = None
 
