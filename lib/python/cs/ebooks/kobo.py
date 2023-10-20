@@ -361,3 +361,6 @@ class KoboCommand(BaseCommand):
       print(book.uuid, book)
       print(" ", book.author, book.title)
       print(" ", book.filename)
+
+if __name__ == '__main__':
+  sys.exit(KoboCommand(sys.argv).run())
