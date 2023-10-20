@@ -153,11 +153,13 @@ class FSM(DOTNodeMixin):
         else:
           if attr in statedef:
             return lambda **kw: self.fsm_event(attr, **kw)
+    sup = super()
     try:
-      sga = super().__getattr__
+      sga = sup.__getattr__
     except AttributeError as e:
       raise AttributeError(
-          "no %s.%s attribute" % (self.__class__.__name__, attr)
+          "no %s.%s attribute (no %s.__getattr__: %s)" %
+          (self.__class__.__name__, attr, sup, e)
       ) from e
     return sga(attr)
 
