@@ -4,6 +4,7 @@
 '''
 
 from collections import defaultdict, namedtuple
+from itertools import chain
 from threading import Lock
 import time
 from typing import Optional, TypeVar
@@ -146,13 +147,27 @@ class FSM(DOTNodeMixin):
           # relies on upper case state names
           return state == in_state.upper()
         FSM_TRANSITIONS = self.FSM_TRANSITIONS
-        try:
-          statedef = FSM_TRANSITIONS[state]
-        except KeyError:
-          pass
-        else:
+        all_transitions = set(
+            chain(
+                *(
+                    per_state_transition.keys()
+                    for per_state_transition in FSM_TRANSITIONS.values()
+                )
+            )
+        )
+        if attr in all_transitions:
+          # only look up known transitions
+          try:
+            statedef = FSM_TRANSITIONS[state]
+          except KeyError as ke:
+            raise AttributeError(
+                f'FSM.{attr}: no FSM_TRANSITIONS for state {state!r}'
+            ) from ke
           if attr in statedef:
             return lambda **kw: self.fsm_event(attr, **kw)
+          raise AttributeError(
+              f'FSM.{attr}: no such transition for state {state!r}: {statedef!r}'
+          )
     sup = super()
     try:
       sga = sup.__getattr__
