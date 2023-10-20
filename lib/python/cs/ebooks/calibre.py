@@ -119,7 +119,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     if not isdirpath(self.fspath):
       raise valueError(f'no directory at {self.fspath!r}')
     self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
-    self.prefs_dirpath = prefs_dirpath or expanduser(CALIBRE_PREFSDIR_DEFAULT)
+    self.prefs_dirpath = (
+        prefs_dirpath or os.environ.get('CALIBRE_CONFIG_DIRECTORY')
+        or expanduser(CALIBRE_PREFSDIR_DEFAULT)
+    )
 
     # define the proxy classes
     class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
@@ -765,11 +768,26 @@ class CalibreMetadataDB(ORM):
 
   DB_FILENAME = 'metadata.db'
 
-  def __init__(self, tree):
+  def __init__(self, tree, db_url=None):
     if isinstance(tree, str):
       tree = CalibreTree(tree)
     self.tree = tree
-    self.db_url = 'sqlite:///' + self.db_path
+    if db_url is None:
+      db_path = (
+          os.environ.get('CALIBRE_OVERRIDE_DATABASE_PATH')
+          or tree.pathto(self.DB_FILENAME)
+      )
+      db_url = 'sqlite:///' + db_path
+    elif db_url.startswith('/'):
+      db_path = db_url
+      db_url = 'sqlite:///' + db_path
+    elif db_url.startswith('~'):
+      db_path = expanduser(db_url)
+      db_url = 'sqlite:///' + db_path
+    else:
+      db_path = None
+    self.db_path = db_path
+    self.db_url = db_url
     super().__init__(self.db_url)
 
   @property
@@ -777,12 +795,6 @@ class CalibreMetadataDB(ORM):
     ''' No distinct ORM class for `CalibreMetadataDB`.
     '''
     return self
-
-  @property
-  def db_path(self):
-    ''' The filesystem path to the database.
-    '''
-    return self.tree.pathto(self.DB_FILENAME)
 
   def shell(self):
     ''' Interactive db shell.
