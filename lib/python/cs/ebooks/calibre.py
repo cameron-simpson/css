@@ -1112,7 +1112,7 @@ class CalibreCommand(BaseCommand):
         get(CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR),
     )
     dedrm_package_path: Optional[str] = field(
-        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR),
     )
 
     def _default_kindle_path():
