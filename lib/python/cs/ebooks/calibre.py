@@ -50,7 +50,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import contextif
-from cs.deco import cachedmethod
+from cs.deco import cachedmethod, fmtdoc
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
@@ -76,20 +76,50 @@ from cs.upd import UpdProxy, uses_upd, print  # pylint: disable=redefined-builti
 
 from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 
+CALIBRE_FSPATH = '~/Calibre Library'
+CALIBRE_FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
+CALIBRE_BINDIR_DEFAULT = '/usr/bin'
+CALIBRE_PREFSDIR_DEFAULT = expanduser('~/.config/calibre')
+if sys.platform == 'darwin':
+  ## macos default? ## CALIBRE_FSPATH = '~/Calibre Library'
+  CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
+  CALIBRE_PREFSDIR_DEFAULT = expanduser('~/Library/Preferences/calibre')
+
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
 
   # used by FSPathBasedSingleton for the default library path
-  FSPATH_DEFAULT = '~/CALIBRE'
-  FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
+  FSPATH_ENVVAR = CALIBRE_FSPATH_ENVVAR
 
-  CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
+  @classmethod
+  @fmtdoc
+  def FSPATH_DEFAULT(cls):
+    ''' Called for the default `CalibreTree` filesystem path
+        if unspecified and no `${CALIBRE_FSPATH_ENVVAR}` environment
+        variable.
+    '''
+    return expanduser(CALIBRE_FSPATH)
 
   # pylint: disable=too-many-statements
   @typechecked
-  def __init__(self, calibrepath: Optional[str]):
+  def __init__(
+      self,
+      calibrepath: Optional[str] = None,
+      bin_dirpath: Optional[str] = None,
+      prefs_dirpath: Optional[str] = None,
+  ):
+    ''' Initialise the `CalibreTree`.
+
+        Parameters:
+        * `calibrepath`: optional filesystem path of the Calibre library,
+          default from 
+    '''
     super().__init__(calibrepath)
+    if not isdirpath(self.fspath):
+      raise valueError(f'no directory at {self.fspath!r}')
+    self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
+    self.prefs_dirpath = prefs_dirpath or expanduser(CALIBRE_PREFSDIR_DEFAULT)
 
     # define the proxy classes
     class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
@@ -505,6 +535,11 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     yield
 
   @property
+  def plugins_dirpath(self):
+    ''' Where the installed plugins live. '''
+    return joinpath(self.prefs_dirpath, 'plugins')
+
+  @property
   @locked
   @cachedmethod
   def db(self):
@@ -609,7 +644,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         Parameters:
         * `calcmd`: the Calibre command to invoke;
           if the command name is not an absolute path
-          it is expected to come from `self.CALIBRE_BINDIR_DEFAULT`
+          it is expected to come from `self.bin_dirpath`
         * `calargv`: the arguments for the command
         * `doit`: default `True`; do not run the command of false
         * `quiet`: default `False`; if true, do not print the command or its output
@@ -620,7 +655,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     subp_options.setdefault('check', False)
     subp_options.setdefault('text', True)
     if not isabspath(calcmd):
-      calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
+      calcmd = joinpath(self.bin_dirpath, calcmd)
     calargv = [calcmd, *calargv]
     cp = run(calargv, doit=doit, quiet=quiet, **subp_options)
     if cp is not None and cp.stdout and not quiet:
@@ -1070,15 +1105,11 @@ class CalibreCommand(BaseCommand):
     '''
 
     calibre_path: str = field(
-        default_factory=lambda: CalibreTree.
-        _resolve_fspath(None, CalibreTree.FSPATH_ENVVAR)
+        default_factory=lambda: os.environ.get(CalibreTree.FSPATH_ENVVAR)
     )
     calibre_path_other: Optional[str] = field(
-        default_factory=lambda: (
-            CalibreTree.
-            _resolve_fspath(None, CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR)
-            if CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR in os.environ else None
-        )
+        default_factory=lambda: os.environ.
+        get(CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR),
     )
     dedrm_package_path: Optional[str] = field(
         default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
