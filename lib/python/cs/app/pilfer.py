@@ -6,6 +6,7 @@
 
 from collections import namedtuple
 from configparser import ConfigParser
+from contextlib import contextmanager
 import os
 import os.path
 import errno
@@ -31,6 +32,7 @@ from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
 from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
 from cs.deco import promote
 from cs.debug import ifdebug
 from cs.env import envsub
@@ -51,7 +53,7 @@ from cs.pipeline import pipeline, StageType
 from cs.py.func import funcname
 from cs.py.modules import import_module_name
 from cs.queues import NullQueue
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunStateMixin, uses_runstate
 from cs.seq import seq
 from cs.threads import locked
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
@@ -130,6 +132,16 @@ class PilferCommand(BaseCommand):
     if dflt_rc:
       with Pfx("$PILFERRC: %s", dflt_rc):
         P.rcs.extend(load_pilferrcs(dflt_rc))
+
+  @contextmanager
+  @uses_runstate
+  def run_context(self, *, runstate):
+    ''' Apply the `options.runstate` to the main `Pilfer`.
+    '''
+    with super().run_context():
+      options = self.options
+      with stackattrs(options.pilfer, runstate=options.runstate):
+        yield
 
   @staticmethod
   def hack_postopts_argv(argv, options):
