@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Resourcing related classes and functions.
 # - Cameron Simpson <cs@cskk.id.au> 11sep2014
@@ -686,6 +686,23 @@ class RunState(HasThreadState):
     ''' Set the .cancelled attribute.
     '''
     self._cancelled = cancel_status
+
+  def raiseif(self, msg=None, *a):
+    ''' Raise `CancellationError` is cancelled.
+
+        Example:
+
+            for item in items:
+                runstate.raiseif()
+                ... process item ...
+    '''
+    if self.cancelled:
+      if msg is None:
+        msg = "%s.cancelled" % (self,)
+      else:
+        if a:
+          msg = msg % a
+      raise CancellationError(msg)
 
   @property
   def running(self):
