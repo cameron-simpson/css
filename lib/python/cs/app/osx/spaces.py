@@ -32,6 +32,11 @@ from cs.pfx import Pfx, pfx_call
 CG = apple.CoreGraphics
 HI = apple.HIServices
 
+def main(argv=None):
+  ''' cs.app.osx.spaces command line mode.
+  '''
+  return SpacesCommand(sys.argv).run()
+
 class Spaces:
   ''' The spaces for a particular display.
   '''
@@ -152,9 +157,10 @@ class SpacesCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    options = self.options
-    with stackattrs(options, spaces=Spaces()):
-      yield
+    with super().run_context():
+      options = self.options
+      with stackattrs(options, spaces=Spaces()):
+        yield
 
   def cmd_monitor(self, argv):
     ''' Usage: {cmd}
@@ -172,19 +178,23 @@ class SpacesCommand(BaseCommand):
       print(old['index'] + 1, '->', new['index'] + 1)
 
   def cmd_wp(self, argv):
-    ''' Usage: {cmd} [{{.|space#}} [wp-path]]
+    ''' Usage: {cmd} [{{.|space#|*}} [wp-path]]
           Set or query the wallpaper for a space.
+          The optional space number may be "." to indicate the
+          current space or "*" to indicate all spaces.
     '''
     options = self.options
     spaces = options.spaces
-    space_num = None
+    space_indices = None
     wp_path = None
     if argv:
       with Pfx("space# %r:", argv[0]):
         if argv[0] == '.':
           argv.pop(0)
-          space_num = spaces.current_index + 1
-          assert 1 <= space_num <= len(spaces)
+          space_indices = (spaces.current_index,)
+        elif argv[0] == '*':
+          argv.pop(0)
+          space_indices = list(range(len(spaces)))
         else:
           try:
             space_num = int(argv[0])
@@ -196,6 +206,7 @@ class SpacesCommand(BaseCommand):
               raise GetoptError("space# counts from 1")
             if space_num > len(spaces):
               raise GetoptError("only %d spaces" % (len(spaces),))
+            space_indices = (space_num - 1,)
       if argv:
         with Pfx("wp-path %r", argv[0]):
           wp_path = argv.pop(0)
@@ -203,43 +214,45 @@ class SpacesCommand(BaseCommand):
             raise GetoptError("not a file")
     if argv:
       raise GetoptError("extra aguments: %r" % (argv,))
-    space_indices = range(len(spaces)
-                          ) if space_num is None else (space_num - 1,)
     if wp_path is None:
+      if space_indices is None:
+        space_indices = list(range(len(spaces)))
       for space_index in space_indices:
         space_num = space_index + 1
         print("Space", space_num)
         for k, v in sorted(spaces.get_wp_config(space_index).items()):
           print(" ", k, "=", str(v).replace("\n", ""))
+    elif space_indices is None:
+      raise GetoptError("setting a wallpaper requires a space specification")
     else:
-      space_index = space_num - 1
-      if isdirpath(wp_path):
-        wp_path = realpath(wp_path)
-        images = [
-            filename for filename in os.listdir(wp_path)
-            if not filename.startswith('.') and '.' in filename
-        ]
-        if not images:
-          warning("no *.* files in %r", wp_path)
-          return 1
-        lastname = random.choice(images)
-        imagepath = joinpath(wp_path, lastname)
-        wp_config = dict(
-            BackgroundColor=(0, 0, 0),
-            Change='TimeInterval',
-            ChangePath=shortpath(wp_path),
-            NewChangePath=shortpath(wp_path),
-            ChangeTime=5,
-            DynamicStyle=0,
-            ImageFilePath=shortpath(imagepath),
-            NewImageFilePath=shortpath(imagepath),
-            LastName=lastname,
-            Placement='SizeToFit',
-            Random=True,
-        )
-      else:
-        wp_config = dict(ImageFilePath=abspath(wp_path),)
-      spaces.set_wp_config(space_index, wp_config)
+      for space_index in space_indices:
+        with Pfx("%d <- %r", space_index + 1, wp_path):
+          if isdirpath(wp_path):
+            images = [
+                filename for filename in os.listdir(wp_path)
+                if not filename.startswith('.') and '.' in filename
+            ]
+            if not images:
+              warning("no *.* files in %r", wp_path)
+              return 1
+            lastname = random.choice(images)
+            imagepath = abspath(joinpath(wp_path, lastname))
+            wp_config = dict(
+                BackgroundColor=(0, 0, 0),
+                Change='TimeInterval',
+                ChangePath=abspath(wp_path),
+                NewChangePath=abspath(wp_path),
+                ChangeTime=5,
+                DynamicStyle=0,
+                ImageFilePath=imagepath,
+                NewImageFilePath=imagepath,
+                LastName=lastname,
+                Placement='SizeToFit',
+                Random=True,
+            )
+          else:
+            wp_config = dict(ImageFilePath=abspath(wp_path),)
+          spaces.set_wp_config(space_index, wp_config)
 
   def cmd_wpm(self, argv):
     ''' Usage: {cmd} [{{.|space#}}]
@@ -263,4 +276,4 @@ class SpacesCommand(BaseCommand):
       print(changes)
 
 if __name__ == '__main__':
-  sys.exit(SpacesCommand(sys.argv).run())
+  sys.exit(main(sys.argv))

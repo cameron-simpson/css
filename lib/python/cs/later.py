@@ -30,18 +30,20 @@ so to collect the result you just call the `LateFunction`.
 '''
 
 from __future__ import print_function
+
 from contextlib import contextmanager
 from functools import partial
 from heapq import heappush, heappop
+from itertools import zip_longest
 import logging
 import sys
-from threading import Lock, Thread, Event
+from threading import Lock, Event
 import time
 from typing import Callable, Iterable, Optional
 
 from typeguard import typechecked
 
-from cs.deco import OBSOLETE, decorator
+from cs.deco import OBSOLETE, decorator, default_params
 from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import error, warning, info, debug, ifdebug, exception, D
@@ -51,9 +53,9 @@ from cs.queues import IterableQueue, TimerQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, report, after
 from cs.seq import seq
-from cs.threads import State as ThreadState
+from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20220918-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -78,13 +80,16 @@ DISTINFO = {
 
 DEFAULT_RETRY_DELAY = 0.1
 
-default = ThreadState(current=None)
+# decorator to provide the `later` parameter
+# lambda because of the forward reference to Later
+# pylint: disable=unnecessary-lambda
+uses_later = default_params(later=lambda: Later.default())
 
 def defer(func, *a, **kw):
   ''' Queue a function using the current default Later.
       Return the `LateFunction`.
   '''
-  return default.current.defer(func, *a, **kw)  # pylint: disable=no-member
+  return Later.default().defer(func, *a, **kw)  # pylint: disable=no-member
 
 class RetryError(Exception):
   ''' Exception raised by functions which should be resubmitted to the queue.
@@ -116,16 +121,18 @@ class _Late_context_manager(object):
   '''
 
   # pylint: disable=too-many-arguments
+  @uses_later
   def __init__(
       self,
-      L,
+      *,
+      later,
       priority=None,
       delay=None,
       when=None,
       name=None,
       pfx=None,  # pylint: disable=redefined-outer-name
   ):
-    self.later = L
+    self.later = later
     self.parameters = {
         'priority': priority,
         'delay': delay,
@@ -212,7 +219,7 @@ class LateFunction(Result):
       TODO: .cancel(), timeout for wait().
   '''
 
-  def __init__(self, func, name=None, retry_delay=None):
+  def __init__(self, func, name=None, retry_delay=None, thread_states=None):
     ''' Initialise a `LateFunction`.
 
         Parameters:
@@ -220,6 +227,7 @@ class LateFunction(Result):
         * `name`, if supplied, specifies an identifying name for the `LateFunction`.
         * `retry_local`: time delay before retry of this function on RetryError.
           Default from `later.retry_delay`.
+        * `thread_states`: optional thread states passed to `HasThreadState.Thread`
     '''
     Result.__init__(self)
     self.func = func
@@ -229,6 +237,12 @@ class LateFunction(Result):
       retry_delay = DEFAULT_RETRY_DELAY
     self.name = name
     self.retry_delay = retry_delay
+    # we prepare the Thread now in order to honour the perThread states
+    self.thread = HasThreadState.Thread(
+        name=name,
+        target=partial(self.run_func, func),
+        thread_states=thread_states,
+    )
 
   def __str__(self):
     return "%s[%s]" % (type(self).__name__, self.name)
@@ -245,7 +259,9 @@ class LateFunction(Result):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    return self.bg(self.func)
+    T = self.thread
+    T.start()
+    return T
 
   @OBSOLETE
   def wait(self):
@@ -275,7 +291,7 @@ class LateFunction(Result):
     Result._complete(self, result, exc_info)
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
-class Later(MultiOpenMixin):
+class Later(MultiOpenMixin, HasThreadState):
   ''' A management class to queue function calls for later execution.
 
       Methods are provided for submitting functions to run ASAP or
@@ -292,6 +308,10 @@ class Later(MultiOpenMixin):
 
       TODO: drop global default Later.
   '''
+
+  THREAD_STATE_ATTR = 'later_perthread_state'
+
+  later_perthread_state = ThreadState()
 
   def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
     ''' Initialise the Later instance.
@@ -338,26 +358,38 @@ class Later(MultiOpenMixin):
     # inbound requests queue
     self.finished_event = None
 
+  def __enter_exit__(self):
+    ''' Run both the inherited context managers.
+    '''
+    for _ in zip_longest(
+        MultiOpenMixin.__enter_exit__(self),
+        HasThreadState.__enter_exit__(self),
+    ):
+      yield
+
   @contextmanager
   def startup_shutdown(self):
     with super().startup_shutdown():
       self.finished_event = Event()
-      with default(current=self):
-        try:
-          yield
-        finally:
-          # Shut down the Later instance:
-          # - queue the final job to set the finished_event Event
-          # - close the request queue
-          # - close the TimerQueue if any
-          # - close the worker thread pool
-          # - dispatch a Thread to wait for completion and fire the
-          #   finished_event Event
-          # queue final action to mark activity completion
-          self.defer(self.finished_event.set, force=True)
-          if self._timerQ:
-            self._timerQ.close()
-            self._timerQ.join()
+      try:
+        yield
+      finally:
+        # Shut down the Later instance:
+        # - queue the final job to set the finished_event Event
+        # - close the request queue
+        # - close the TimerQueue if any
+        # - close the worker thread pool
+        # - dispatch a Thread to wait for completion and fire the
+        #   finished_event Event
+        # queue final action to mark activity completion
+        self.defer(
+            dict(thread_states=False),
+            self.finished_event.set,
+            _force_submit=True,
+        )
+        if self._timerQ:
+          self._timerQ.close()
+          self._timerQ.join()
 
   def _try_dispatch(self):
     ''' Try to dispatch the next `LateFunction`.
@@ -426,9 +458,9 @@ class Later(MultiOpenMixin):
 
   def __str__(self):
     return (
-        "<%s[%s] pending=%d running=%d delayed=%d>" % (
-            self.name, self.capacity, len(self.pending), len(self.running),
-            len(self.delayed)
+        "<%s:%s[%s] pending=%d running=%d delayed=%d>" % (
+            self.__class__.__name__, self.name, self.capacity,
+            len(self.pending), len(self.running), len(self.delayed)
         )
     )
 
@@ -518,8 +550,8 @@ class Later(MultiOpenMixin):
     '''
     citation = funccite(method)
 
-    def submittable_method(self, *a, force=False, **kw):
-      if not force and not self.is_submittable():
+    def submittable_method(self, *a, _force_submit=False, **kw):
+      if not _force_submit and not self.is_submittable():
         raise RuntimeError("%s: %s: not submittable" % (self, citation))
       return method(self, *a, **kw)
 
@@ -579,7 +611,8 @@ class Later(MultiOpenMixin):
       name=None,
       pfx=None,  # pylint: disable=redefined-outer-name
       LF=None,
-      retry_delay=None
+      retry_delay=None,
+      thread_states=None,
   ):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding `LateFunction` for result collection.
@@ -613,7 +646,12 @@ class Later(MultiOpenMixin):
     if pfx is not None:
       func = pfx.partial(func)
     if LF is None:
-      LF = LateFunction(func, name=name, retry_delay=retry_delay)
+      LF = LateFunction(
+          func,
+          name=name,
+          retry_delay=retry_delay,
+          thread_states=thread_states
+      )
     pri_entry = list(priority)
     pri_entry.append(seq())  # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
@@ -710,7 +748,7 @@ class Later(MultiOpenMixin):
       func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = self.submit(func, force=True, **params)  # pylint: disable=unexpected-keyword-arg
+    LF = self.submit(func, _force_submit=True, **params)  # pylint: disable=unexpected-keyword-arg
     return LF
 
   def with_result_of(self, callable1, func, *a, **kw):
@@ -886,7 +924,7 @@ class Later(MultiOpenMixin):
   def pool(self, *a, **kw):
     ''' Return a `LatePool` to manage some tasks run with this `Later`.
     '''
-    return LatePool(L=self, *a, **kw)
+    return LatePool(*a, later=self, **kw)
 
   # forget the @submittable decorator
   del submittable
@@ -895,13 +933,14 @@ class SubLater(object):
   ''' A class for managing a group of deferred tasks using an existing `Later`.
   '''
 
-  def __init__(self, L):
+  @uses_later
+  def __init__(self, *, later: Later):
     ''' Initialise the `SubLater` with its parent `Later`.
 
         TODO: accept `discard=False` param to suppress the queue and
         associated checks.
     '''
-    self._later = L
+    self._later = later
     self._later.open()
     self._lock = Lock()
     self._deferred = 0
@@ -975,7 +1014,9 @@ class SubLater(object):
           except Exception as e:  # pylint: disable=broad-except
             exception("%s: reap %s: %s", self, LF, e)
 
-    T = Thread(name="reaper(%s)" % (self,), target=reap, args=(self._queue,))
+    T = HasThreadState.Thread(
+        name="reaper(%s)" % (self,), target=reap, args=(self._queue,)
+    )
     T.start()
     return T
 
@@ -999,9 +1040,11 @@ class LatePool(object):
   '''
 
   # pylint: disable=too-many-arguments
+  @uses_later
   def __init__(
       self,
-      L=None,
+      *,
+      later,
       priority=None,
       delay=None,
       when=None,
@@ -1011,15 +1054,13 @@ class LatePool(object):
     ''' Initialise the `LatePool`.
 
         Parameters:
-        * `L`: `Later` instance, default from default.current.
+        * `later`: optional `Later` instance, default from `Later.default()`
         * `priority`, `delay`, `when`, `name`, `pfx`:
           default values passed to Later.submit.
         * `block`: if true, wait for `LateFunction` completion
           before leaving __exit__.
     '''
-    if L is None:
-      L = default.current  # pylint: disable=no-member
-    self.later = L
+    self.later = later
     self.parameters = {
         'priority': priority,
         'delay': delay,

@@ -1,0 +1,1 @@
+Get warning etc from cs.gimmicks, breaks circular import with cs.logutils.

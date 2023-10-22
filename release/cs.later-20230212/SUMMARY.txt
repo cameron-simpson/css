@@ -1,0 +1,2 @@
+SubLater.reaper: use HasThreadState.Thread to prepare the reap Thread.
+Some finalisation fixes etc.

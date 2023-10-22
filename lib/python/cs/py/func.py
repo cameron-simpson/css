@@ -13,11 +13,10 @@ from pprint import pformat
 
 from cs.deco import decorator
 from cs.py.stack import caller
-from cs.py3 import unicode, raise_from
-
+from cs.py3 import raise_from
 from cs.x import X
 
-__version__ = '20221118-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -56,11 +55,13 @@ def funccite(func):
   except AttributeError:
     return "%s[no.__code__]" % (repr(func),)
   try:
-    from cs.fs import shortpath
+    from cs.fs import shortpath  # pylint: disable=import-outside-toplevel
   except ImportError:
-    shortpath = lambda p: p
+    shortpath = lambda p: p  # pylint: disable=unnecessary-lambda-assignment
   return "%s[%s:%d]" % (
-      funcname(func), shortpath(code.co_filename), code.co_firstlineno
+      funcname(func),
+      shortpath(code.co_filename),
+      code.co_firstlineno,
   )
 
 def func_a_kw_fmt(func, *a, **kw):
@@ -69,7 +70,10 @@ def func_a_kw_fmt(func, *a, **kw):
       Return `format,args`.
 
       The `func` argument can also be a string,
-      presumably a prepared description of `func` such as `funccite(func)`.
+      typically a prepared description of `func` such as `funccite(func)`.
+
+      *Note*: the returned `args` is a `list` for easy incorporation
+      into further arguments.  The `%` operator requires a `tuple`.
   '''
   av = [
       func if isinstance(func, str) else getattr(func, '__name__', str(func))
@@ -80,6 +84,12 @@ def func_a_kw_fmt(func, *a, **kw):
   for kv in kw.items():
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
+
+def func_a_kw(func, *a, **kw):
+  ''' Return a string representing a call to `func(*a,**kw)`.
+  '''
+  fmt, args = func_a_kw_fmt(func, *a, **kw)
+  return fmt % tuple(args)
 
 def callif(doit, func, *a, **kw):
   ''' Call `func(*a,**kw)` if `doit` is true
@@ -101,65 +111,6 @@ def callif(doit, func, *a, **kw):
   fmt, av = func_a_kw_fmt(func, *a, **kw)
   modes['print'](fmt % tuple(av))
   return None
-
-_trace_indent = ""
-
-@decorator
-# pylint: disable=too-many-arguments
-def trace(
-    func,
-    call=True,
-    retval=False,
-    exception=True,
-    use_pformat=False,
-    with_caller=False,
-    with_pfx=False,
-):
-  ''' Decorator to report the call and return of a function.
-  '''
-
-  citation = funccite(func)
-
-  def traced_function_wrapper(*a, **kw):
-    ''' Wrapper for `func` to trace call and return.
-    '''
-    global _trace_indent
-    if with_pfx:
-      # late import so that we can use this in modules we import
-      # pylint: disable=import-outside-toplevel
-      try:
-        from cs.pfx import XP as xlog
-      except ImportError:
-        xlog = X
-    else:
-      xlog = X
-    log_cite = citation
-    if with_caller:
-      log_cite = log_cite + "from[%s]" % (caller(),)
-    if call:
-      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("%sCALL " + fmt, _trace_indent, *av)
-    old_indent = _trace_indent
-    _trace_indent += '  '
-    try:
-      result = func(*a, **kw)
-    except Exception as e:
-      if exception:
-        xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
-      _trace_indent = old_indent
-      raise
-    else:
-      if retval:
-        xlog(
-            "%sCALL %s RETURN %s", _trace_indent, log_cite,
-            (pformat if use_pformat else repr)(result)
-        )
-      _trace_indent = old_indent
-      return result
-
-  traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
-  traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
-  return traced_function_wrapper
 
 def callmethod_if(o, method, default=None, a=None, kw=None):
   ''' Call the named `method` on the object `o` if it exists.
@@ -204,7 +155,7 @@ def derived_property(
     original_revision_name='_revision',
     lock_name='_lock',
     property_name=None,
-    unset_object=None
+    unset_object=None,
 ):
   ''' A property which must be recomputed
       if the reference revision (attached to self)
@@ -248,56 +199,3 @@ def derived_from(property_name):
       derived_property,
       original_revision_name='_' + property_name + '__revision'
   )
-
-def yields_type(func, basetype):
-  ''' Decorator which checks that a generator yields values of type `basetype`.
-  '''
-  citation = funccite(func)
-
-  def check_yields_type(*a, **kw):
-    for item in func(*a, **kw):
-      if not isinstance(item, basetype):
-        raise TypeError(
-            "wrong type yielded from func %s: expected subclass of %s, got %s: %r"
-            % (citation, basetype, type(item), item)
-        )
-      yield item
-
-  check_yields_type.__name__ = (
-      'check_yields_type[%s,basetype=%s]' % (citation, basetype)
-  )
-  return check_yields_type
-
-def returns_type(func, basetype):
-  ''' Decrator which checks that a function returns values of type `basetype`.
-  '''
-  citation = funccite(func)
-
-  def check_returns_type(*a, **kw):
-    retval = func(*a, **kw)
-    if not isinstance(retval, basetype):
-      raise TypeError(
-          "wrong type returned from func %s: expected subclass of %s, got %s: %r"
-          % (citation, basetype, type(retval), retval)
-      )
-    return retval
-
-  check_returns_type.__name__ = (
-      'check_returns_type[%s,basetype=%s]' % (citation, basetype)
-  )
-  return check_returns_type
-
-def yields_str(func):
-  ''' Decorator for generators which should yield strings.
-  '''
-  return yields_type(func, (str, unicode))
-
-def returns_bool(func):
-  ''' Decorator for functions which should return Booleans.
-  '''
-  return returns_type(func, bool)
-
-def returns_str(func):
-  ''' Decorator for functions which should return strings.
-  '''
-  return returns_type(func, (str, unicode))

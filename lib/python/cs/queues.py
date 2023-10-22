@@ -22,7 +22,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20220918-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'description':
@@ -60,9 +60,10 @@ class QueueIterator(MultiOpenMixin):
     )
     # count of non-sentinel items
     self._item_count = 0
+    self._lock = Lock()
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.name)
+    return "%s(%r:q=%s)" % (type(self).__name__, self.name, self.q)
 
   @not_closed
   def put(self, item, *args, **kw):
@@ -76,7 +77,8 @@ class QueueIterator(MultiOpenMixin):
       raise ClosedError("QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
-    self._item_count += 1
+    with self._lock:
+      self._item_count += 1
     return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
@@ -89,8 +91,10 @@ class QueueIterator(MultiOpenMixin):
     ''' `MultiOpenMixin` support; puts the sentinel onto the underlying queue
         on the final close.
     '''
-    yield
-    self._put(self.sentinel)
+    try:
+      yield
+    finally:
+      self._put(self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
@@ -105,12 +109,8 @@ class QueueIterator(MultiOpenMixin):
     try:
       item = q.get()
     except Queue_Empty as e:
-      warning(
-          "%s: Queue_Empty: %s, (SHOULD THIS HAPPEN?) calling finalise...",
-          self, e
-      )
+      warning("%s: Queue_Empty: %s", self, e)
       self._put(self.sentinel)
-      self.finalise()
       # pylint: disable=raise-missing-from
       raise StopIteration("Queue_Empty: %s" % (e,))
     if item is self.sentinel:
@@ -119,7 +119,8 @@ class QueueIterator(MultiOpenMixin):
       # put the sentinel back for other iterators
       self._put(self.sentinel)
       raise StopIteration("SENTINEL")
-    self._item_count -= 1
+    with self._lock:
+      self._item_count -= 1
     return item
 
   next = __next__
@@ -136,6 +137,7 @@ class QueueIterator(MultiOpenMixin):
   def empty(self):
     ''' Test if the queue is empty.
     '''
+    # testing the count because the "close" sentinel makes the underlying queue not empty
     return self._item_count == 0
 
   def task_done(self):
@@ -149,7 +151,9 @@ class QueueIterator(MultiOpenMixin):
     self.q.join()
 
 def IterableQueue(capacity=0, name=None):
-  ''' Factory to create an iterable `Queue`.
+  ''' Factory to create an iterable queue.
+      Note that the returned queue is already open
+      and needs a close.
   '''
   return QueueIterator(Queue(capacity), name=name).open()
 
@@ -517,6 +521,12 @@ class ListQueue:
       self.queued.extend(queued)
     self._lock = Lock()
 
+  def __str__(self):
+    return "%s:%d[]" % (self.__class__.__name__, len(self))
+
+  def __repr__(self):
+    return "%s(%r)" % (self.__class__.__name__, self.queued)
+
   def get(self):
     ''' Get pops from the start of the list.
     '''
@@ -573,6 +583,9 @@ class ListQueue:
     '''
     with self._lock:
       return bool(self.queued)
+
+  def __len__(self):
+    return len(self.queued)
 
   def __iter__(self):
     ''' A `ListQueue` is iterable.

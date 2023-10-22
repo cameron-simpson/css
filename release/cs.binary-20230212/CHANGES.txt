@@ -1,0 +1,3 @@
+lib/python/cs/binary.py: cs.binary: BinaryMixin: new load(file) and save(file) methods
+lib/python/cs/binary.py: merge vt => media
+lib/python/cs/binary.py: cs.binary: BinaryMixin.scan: promote the bfr argument, modernise BinaryMixin.save, clean lint

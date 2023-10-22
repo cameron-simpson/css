@@ -1,0 +1,4 @@
+Epoch.promote: do not special case None, let Optional[Epoch] type annoations handle that.
+Mark PlotSeries.promote as incomplete (raises RuntimeError).
+TimespanPolicy.promote: use cls.from_name() instead of TimespanPolicy.from_name().
+Assorted other small updates.

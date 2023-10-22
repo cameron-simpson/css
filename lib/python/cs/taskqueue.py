@@ -8,7 +8,7 @@ from itertools import chain
 import sys
 from threading import RLock
 import time
-from typing import Callable, TypeVar, Union
+from typing import Callable, Union
 
 from icontract import require
 from typeguard import typechecked
@@ -20,12 +20,13 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import funcname
 from cs.queues import ListQueue
-from cs.resources import RunState, RunStateMixin
+from cs.resources import RunState, RunStateMixin, uses_runstate
 from cs.result import Result, CancellationError
 from cs.seq import Seq, unrepeated
-from cs.threads import bg as bg_thread, locked, State as ThreadState
+from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
+from cs.typingutils import subtype
 
-__version__ = '20220805-post'
+__version__ = '20230401-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -45,6 +46,7 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
+        'cs.typingutils',
         'icontract',
         'typeguard',
     ],
@@ -108,6 +110,7 @@ class BaseTask(FSM, RunStateMixin):
       definition to provide this default in the usual way.
   '''
 
+  @uses_runstate
   def __init__(self, *, state=None, runstate=None):
     FSM.__init__(self, state)
     RunStateMixin.__init__(self, runstate)
@@ -173,10 +176,10 @@ class BaseTask(FSM, RunStateMixin):
     '''
     return f'{self.name}\n{self.fsm_state}'
 
-BaseTaskSubType = TypeVar('BaseTaskSubType', bound=BaseTask)
+BaseTaskSubType = subtype(BaseTask)
 
 # pylint: disable=too-many-instance-attributes
-class Task(FSM, RunStateMixin):
+class Task(BaseTask, HasThreadState):
   ''' A task which may require the completion of other tasks.
 
       The model here may not be quite as expected; it is aimed at
@@ -275,7 +278,7 @@ class Task(FSM, RunStateMixin):
 
   _seq = Seq()
 
-  _state = ThreadState(current_task=None, initial_state=FSM_DEFAULT_STATE)
+  perthread_state = ThreadState(initial_state=FSM_DEFAULT_STATE)
 
   def __init__(
       self,
@@ -300,7 +303,7 @@ class Task(FSM, RunStateMixin):
           "unexpected positional parameters after func:%r: %r" % (func, a)
       )
     if state is None:
-      state = type(self)._state.initial_state
+      state = type(self).perthread_state.initial_state
     if func_kwargs is None:
       func_kwargs = {}
     self._lock = RLock()
@@ -337,15 +340,6 @@ class Task(FSM, RunStateMixin):
         by calling `self.result()`.
     '''
     return self.result()
-
-  @classmethod
-  def current_task(cls):
-    ''' The current `Task`, valid while the task is running.
-        This allows the function called by the `Task` to access the
-        task, typically to poll its `.runstate` attribute.
-        This is a `Thread` local value.
-    '''
-    return cls._state.current_task  # pylint: disable=no-member
 
   @typechecked
   def then(
@@ -490,7 +484,7 @@ class Task(FSM, RunStateMixin):
         *WARNING*: this _ignores_ the current state and any blocking `Task`s.
         You should usually use `dispatch` or `make`.
 
-        During the run the thread local `self.state.current_task`
+        During the run the thread local `Task.default()`
         will be `self` and the `self.runstate` will be running.
 
         Otherwise run `func_result=self.func(*self.func_args,**self.func_kwargs)`
@@ -508,9 +502,8 @@ class Task(FSM, RunStateMixin):
     '''
     if not self.is_running:
       warning(f'.run() when state is not {self.RUNNING!r}')
-    state = type(self)._state
     R = self.result
-    with state(current_task=self):
+    with self:
       try:
         with self.runstate:
           func_result = self.func(*self.func_args, **self.func_kwargs)
@@ -565,7 +558,7 @@ class Task(FSM, RunStateMixin):
     '''
     self.result.join()
 
-TaskSubType = TypeVar('TaskSubType', bound=Task)
+TaskSubType = subtype(Task)
 
 # pylint: disable=too-many-branches
 def make(*tasks, fail_fast=False, queue=None):

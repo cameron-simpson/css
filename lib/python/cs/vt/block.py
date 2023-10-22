@@ -1,6 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # pylint: disable=too-many-lines
+#
 
 ''' Functions and classes relating to Blocks, which are data chunk references.
 
@@ -35,22 +36,27 @@
     this is the sum of the .span values of their subblocks.
 '''
 
-from __future__ import print_function
 from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
 import sys
+from typing import Optional
+
 from icontract import require
+from typeguard import typechecked
+
 from cs.binary import (
     BinarySingleValue, BSUInt, BSData, flatten as flatten_transcription
 )
 from cs.buffer import CornuCopyBuffer
-from cs.lex import untexthexify, get_decimal_value
+from cs.lex import untexthexify, get_decimal_value, r
 from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
+from cs.resources import uses_runstate
 from cs.threads import locked
-from . import defaults, RLock
+
+from . import RLock, Store, uses_Store
 from .hash import HashCode, io_fail
 from .transcribe import (
     Transcriber, register as register_transcriber, hexify, parse
@@ -77,18 +83,17 @@ def isBlock(o):
 
 class _Block(Transcriber, ABC):
 
-  def __init__(self, block_type, span):
+  @typechecked
+  @require(lambda span: span is None or span >= 0)
+  def __init__(self, block_type, span: Optional[int]):
     self.type = block_type
-    if span is not None:
-      if not isinstance(span, int) or span < 0:
-        raise ValueError("invalid span: %r" % (span,))
-      self.span = span
+    self.span = span
     self.indirect = False
     self.blockmap = None
     self._lock = RLock()
 
   def __bytes__(self):
-    ''' `bytes(_Block)` returns allo the data together as a single `bytes` instance.
+    ''' `bytes(_Block)` returns all the data concatenated as a single `bytes` instance.
 
         Try not to do this for indirect blocks, it gets expensive.
     '''
@@ -255,7 +260,8 @@ class _Block(Transcriber, ABC):
       yield self
 
   @locked
-  def get_blockmap(self, force=False, blockmapdir=None):
+  @uses_Store
+  def get_blockmap(self, *, force=False, blockmapdir=None, S):
     ''' Get the blockmap for this block, creating it if necessary.
 
         Parameters:
@@ -270,7 +276,7 @@ class _Block(Transcriber, ABC):
       warning("making blockmap for %s", self)
       from .blockmap import BlockMap  # pylint: disable=import-outside-toplevel
       if blockmapdir is None:
-        blockmapdir = defaults.S.blockmapdir
+        blockmapdir = S.blockmapdir
       self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
@@ -397,7 +403,9 @@ class _Block(Transcriber, ABC):
         "unsupported open mode, expected 'rb' or 'w+b', got: %r" % (mode,)
     )
 
-  def pushto_queue(self, Q, runstate=None, progress=None):
+  @uses_Store
+  @uses_runstate
+  def pushto_queue(self, Q, *, S, runstate, progress=None):
     ''' Push this Block and any implied subblocks to a queue.
 
         Parameters:
@@ -414,17 +422,18 @@ class _Block(Transcriber, ABC):
     '''
     if progress is not None and progress.total is None:
       progress.total = 0
-    with defaults.S:
+    with S:
       if progress is not None:
         progress.total += len(self)
       Q.put(self)
       if self.indirect:
         # recurse, reusing the Queue
-        for subB in self.subblocks:
-          if runstate and runstate.cancelled:
-            warning("%s: push cancelled", self)
-            break
-          subB.pushto_queue(Q, runstate=runstate, progress=progress)
+        with runstate:
+          for subB in self.subblocks:
+            if runstate.cancelled:
+              warning("%s: push cancelled", self)
+              break
+            subB.pushto_queue(Q, progress=progress)
 
 class BlockRecord(BinarySingleValue):
   ''' Support for binary parsing and transcription of blockrefs.
@@ -534,7 +543,7 @@ class BlockRecord(BinarySingleValue):
     return B
 
   @staticmethod
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,arguments-renamed
   def transcribe_value(B):
     ''' Transcribe this `Block`, the inverse of parse_value.
     '''
@@ -571,24 +580,18 @@ class BlockRecord(BinarySingleValue):
     block_bs = b''.join(flatten_transcription(transcription))
     return BSData(block_bs).transcribe()
 
-@lru_cache(maxsize=1024 * 1024, typed=True)
-def get_HashCodeBlock(hashcode):
-  ''' Caching constructor for HashCodeBlocks of known code.
-  '''
-  if hashcode is None:
-    raise ValueError("invalid hashcode, may not be None")
-  return HashCodeBlock(hashcode=hashcode)
-
 class HashCodeBlock(_Block):
   ''' A Block reference based on a Store hashcode.
   '''
 
   transcribe_prefix = 'B'
 
-  def __init__(self, hashcode=None, data=None, added=False, span=None, **kw):
+  def __init__(
+      self, *, hashcode=None, data=None, added=False, span=None, **kw
+  ):
     ''' Initialise a `BT_HASHCODE` Block.
 
-        A HashCodeBlock always stores its hashcode directly.
+        A `HashCodeBlock` always stores its hashcode directly.
         If `data` is supplied, store it and compute or check the hashcode.
         If `span` is not `None`, store it. Otherwise compute it on
           demand from the data, fetching that if necessary.
@@ -608,7 +611,8 @@ class HashCodeBlock(_Block):
         if hashcode is None:
           raise ValueError("added=%s but no hashcode supplied" % (added,))
       else:
-        h = defaults.S.add(data)
+        S = Store.default()
+        h = S.add(data)
         if hashcode is None:
           hashcode = h
         elif h != hashcode:
@@ -617,9 +621,16 @@ class HashCodeBlock(_Block):
               (hashcode, h, data)
           )
     self._data = data
-    self._span = None
+    self._span = span
     _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
+
+  @property
+  def uri(self):
+    ''' The block reference as a `VTURI`.
+    '''
+    from .uri import VTURI  # pylint: disable=import-outside-toplevel
+    return VTURI(indirect=self.indirect, hashcode=self.hashcode)
 
   @property
   def data(self):
@@ -633,14 +644,15 @@ class HashCodeBlock(_Block):
     with self._lock:
       data = self._data
       if data is None:
-        data = self._data = defaults.S[self.hashcode]
+        S = Store.default()
+        data = self._data = S[self.hashcode]
     return data
 
   @classmethod
-  def need_direct_data(cls, blocks):
+  @uses_Store
+  def need_direct_data(cls, blocks, *, S):
     ''' Bulk request the direct data for `blocks`.
     '''
-    S = defaults.S
     Rs = []
     for B in blocks:
       try:
@@ -675,7 +687,7 @@ class HashCodeBlock(_Block):
   def span(self, newspan):
     ''' Set the span of the data encompassed by this HashCodeBlock.
     '''
-    if newspan < 0:
+    if newspan is not None and newspan < 0:
       raise ValueError("%s: set .span: invalid newspan=%s" % (self, newspan))
     if self._span is None:
       self._span = newspan
@@ -686,7 +698,6 @@ class HashCodeBlock(_Block):
             "%s: tried to change .span from %s to %s" %
             (self, self._span, newspan)
         )
-      raise RuntimeError("SECOND UNEXPECTED")
 
   def datafrom(self, start=0, end=None):
     ''' Generator yielding data from `start:end`.
@@ -722,13 +733,14 @@ class HashCodeBlock(_Block):
     return B, offset
 
   @io_fail
-  def fsck(self, recurse=False):  # pylint: disable=unused-argument
+  @uses_Store
+  def fsck(self, *, recurse=False, S):  # pylint: disable=unused-argument
     ''' Check this HashCodeBlock.
     '''
     ok = True
     hashcode = self.hashcode
     with Pfx(hashcode):
-      with defaults.S as S:
+      with S:
         try:
           data = S[hashcode]
         except KeyError:
@@ -752,7 +764,7 @@ def Block(*, hashcode=None, data=None, span=None, added=False):
   if data is None:
     if span is None:
       raise ValueError('data and span may not both be None')
-    B = get_HashCodeBlock(hashcode)
+    B = HashCodeBlock(hashcode=hashcode, span=span)
   else:
     if span is None:
       span = len(data)
@@ -776,7 +788,7 @@ class IndirectBlock(_Block):
   def __init__(self, superblock, span=None):
     if superblock.indirect:
       raise ValueError(
-          "superblock may not be indirect: superblock=%s" % (superblock,)
+          "superblock may not be indirect: superblock=%s" % (r(superblock),)
       )
     super().__init__(BlockType.BT_INDIRECT, 0)
     self.indirect = True
@@ -804,7 +816,7 @@ class IndirectBlock(_Block):
         for its direct data and the `span` of bytes
         covers.
     '''
-    return cls(get_HashCodeBlock(hashcode), span=span)
+    return cls(HashCodeBlock(hashcode, span=span))
 
   @classmethod
   def from_subblocks(cls, subblocks, force=False):
@@ -831,6 +843,19 @@ class IndirectBlock(_Block):
     superblock = HashCodeBlock(data=superBdata)
     return cls(superblock, span=span)
 
+  @classmethod
+  def from_subblocks_data(cls, subblocks_data, force=False):
+    ''' Constructs an `IndirectBlock` from bytes encoding the
+        blockrefs of the subblocks.
+    '''
+    subblocks = cls.decode_subblocks(subblocks_data)
+    return cls.from_subblocks(subblocks, force=force)
+
+  @classmethod
+  def decode_subblocks(cls, subblocks_data: bytes):
+    ''' Return a tuple of Blocks decoded from the raw indirect block data. '''
+    return tuple(map(lambda BR: BR.block, BlockRecord.scan(subblocks_data)))
+
   @prop
   @locked
   def subblocks(self):
@@ -838,12 +863,7 @@ class IndirectBlock(_Block):
     '''
     blocks = self._subblocks
     if blocks is None:
-      blocks = self._subblocks = tuple(
-          map(
-              lambda BR: BR.block,
-              BlockRecord.scan(self.superblock.bufferfrom())
-          )
-      )
+      blocks = self._subblocks = self.decode_subblocks(self.superblock.data)
     return blocks
 
   def transcribe_inner(self, T, fp):
@@ -856,7 +876,7 @@ class IndirectBlock(_Block):
   @classmethod
   # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
-    ''' Parse "span:Block"
+    ''' Parse "span:Block".
     '''
     span, offset2 = get_decimal_value(s, offset)
     if s[offset2] != ':':
@@ -867,14 +887,15 @@ class IndirectBlock(_Block):
     superB, offset = parse(s, offset, T)
     return cls(superB, span), offset
 
-  def datafrom(self, start=0, end=None):
+  @uses_Store
+  def datafrom(self, start=0, end=None, *, S):
     ''' Yield data from a point in the Block.
     '''
     if end is None:
       end = self.span
     if start >= end:
       return
-    block_cache = defaults.S.block_cache
+    block_cache = S.block_cache
     if block_cache:
       try:
         bm = block_cache[self.hashcode]
@@ -894,7 +915,8 @@ class IndirectBlock(_Block):
         yield B.get_direct_data()[Bstart:Bend]
 
   @io_fail
-  def fsck(self, recurse=False):
+  @uses_runstate
+  def fsck(self, *, recurse=False, runstate):
     ''' Check this IndirectBlock.
     '''
     ok = True
@@ -904,16 +926,23 @@ class IndirectBlock(_Block):
       error("span:%d != sum(subblocks.span):%d", span, subspan)
       ok = False
     if recurse:
-      runstate = defaults.runstate
-      for subB in self.subblocks:
-        if runstate.cancelled:
-          error("cancelled")
-          ok = False
-          break
-        with Pfx(str(subB)):
-          if not subB.fsck(recurse=True):
+      with runstate:
+        for subB in self.subblocks:
+          if runstate.cancelled:
+            error("cancelled")
             ok = False
+            break
+          with Pfx(str(subB)):
+            if not subB.fsck(recurse=True):
+              ok = False
     return ok
+
+  @uses_Store
+  def is_complete(self, S: Store):
+    ''' Check that the superblock and all the dependent blocks are
+        complete in the Store.
+    '''
+    return S.is_complete_indirect(self.hashcode)
 
 class RLEBlock(_Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes

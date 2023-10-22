@@ -1,0 +1,9 @@
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.sql_parameters: fix general tag name
+lib/python/cs/sqltags.py: cs.threads: State renamed to ThreadState, update importing modules
+lib/python/cs/sqltags.py: cs.*: drop BaseCommand.apply_defaults in favour of the Options dataclass
+lib/python/cs/sqltags.py: merge vt ==> solar: assorted updates from the vt branch, mostly the cs.cmdutils ones
+lib/python/cs/sqltags.py: cs.sqltags:
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.startup_shutdown: update docstring
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: new jsonable class method to produce a JSON serialisable object - converts sets and Sequences to flat lists, etc
+lib/python/cs/sqltags.py: cs.fstags,tagset,sqltags: put @typechecked after @require
+lib/python/cs/sqltags.py: cs.sqltags: fix context message

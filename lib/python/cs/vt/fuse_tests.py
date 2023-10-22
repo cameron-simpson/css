@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # FUSE tests.
 # - Cameron Simpson <cs@cskk.id.au> 10jul2014

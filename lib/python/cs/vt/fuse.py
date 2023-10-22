@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Fuse interface to a Store.
 # Uses llfuse: https://bitbucket.org/nikratio/python-llfuse/
@@ -27,7 +27,6 @@ from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
 from cs.x import X
 
-from . import defaults
 from .dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from .fs import FileHandle, FileSystem
 from .store import MissingHashcodeError
@@ -49,11 +48,12 @@ PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 # notional I/O blocksize for stat.st_blksize
 FS_IO_BLOCKSIZE = 4096
 
+@uses_Store
 def mount(
     mnt,
     E,
     *,
-    S=None,
+    S,
     archive=None,
     subpath=None,
     readonly=None,
@@ -65,7 +65,7 @@ def mount(
       Parameters:
       * `mnt`: mount point
       * `E`: Dirent of root Store directory
-      * `S`: optional backing Store, default from defaults.S
+      * `S`: backing Store
       * `archive`: if not `None`, an Archive or similar, with a
         `.update(Dirent[,when])` method
       * `subpath`: relative path from `E` to the directory to attach
@@ -163,7 +163,7 @@ def handler(method, trace=False):
       X("CALL %s", sysdesc)
     fs = self._vtfs
     try:
-      with defaults(fs=fs):
+      with fs:
         with fs.S:
           if do_trace:
             start_time = time.time()
@@ -226,11 +226,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
+  @uses_Store
   def __init__(
       self,
       E,
       *,
-      S=None,
+      S,
       archive=None,
       subpath=None,
       options=None,
@@ -242,7 +243,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         Parameters:
         * `E`: the root directory reference
-        * `S`: optional backing Store, default from defaults.S
+        * `S`: backing Store
         * `archive`: if not None, an Archive or similar, with a
           .update(Dirent[,when]) method
         * `subpath`: relative path to mount Dir
@@ -326,11 +327,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
       def mainloop():
         ''' Worker main loop to run the filesystem then tidy up.
         '''
-        with stackattrs(defaults, fs=fs):
+        with fs:
           with S:
-            with defaults.common_S(S):
-              llfuse.main(workers=32)
-              llfuse.close()
+            llfuse.main(workers=32)
+            llfuse.close()
         S.close()
 
       T = PfxThread(target=mainloop)
@@ -816,13 +816,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
           if EA is None:
             if E is not None:
               # yield name, attributes and next offset
-              with stackattrs(defaults, fs=fs):
-                with S:
-                  try:
-                    EA = self._vt_EntryAttributes(E)
-                  except Exception as e:
-                    warning("%r: %s", name, e)
-                    EA = None
+              with S:
+                try:
+                  EA = self._vt_EntryAttributes(E)
+                except Exception as e:
+                  warning("%r: %s", name, e)
+                  EA = None
           if EA is not None:
             yield self._vt_bytes(name), EA, o + 1
           o += 1

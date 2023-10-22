@@ -1,3 +1,16 @@
+run-unbound: update config check incantation
+cs.app.ydl: adopt the name format in use by cs.app.playon
+ffmpeg-docker: support "ffmpeg-docker --version"
+ListQueue should have builtin unrepeated support
+Result with placholder return until some async operation completes it? thinking Tagger rule inference
+cs.py.stack function to return the caller's current method name and class
+method for MultiOpenMixin to capture common open-in-caller-close-in-child idiom?
+cs.distinfo: cs-release seems to ignore SIGINT at least during a "rel"
+cs.debug: Lock and RLock to be the same class with a different underlying lock class
+default_params: supply modified sugnature for wrapper function indicating the param is optional
+Pfx: reimplement as a linked list, use HasThreadState
+CornuCopyBuffer: improve docstring - replace references to .buf etc
+cs.cmdutils:BaseCommand - help should include the top level usage as well, currently omitted
 frename needs to be a mode of fstags to move the tags
 "Because" class containing a bool and an explaintion, start using in the SvcD test function and elsewhere
 @promote: make @strable wrap this, using params=[0],promote[0]=open

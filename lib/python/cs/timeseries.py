@@ -36,6 +36,7 @@ from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta, tzinfo
 from fnmatch import fnmatch
 from functools import partial
@@ -88,10 +89,10 @@ from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
 from cs.context import stackattrs
 from cs.csvutils import csv_import
-from cs.deco import cachedmethod, decorator, promote
+from cs.deco import cachedmethod, decorator, promote, Promotable
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
-from cs.fstags import FSTags
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import is_identifier, s, r
 from cs.logutils import warning
 from cs.mappings import column_name_to_identifier
@@ -99,11 +100,11 @@ from cs.mplutils import axes, remove_decorations, print_figure, save_figure
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.modules import import_extra
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220918-post'
+__version__ = '20230612-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -133,7 +134,7 @@ DISTINFO = {
         'cs.resources',
         'cs.result',
         'cs.upd',
-        'dateutil',
+        'python-dateutil',
         'icontract',
         'matplotlib',
         'numpy',
@@ -161,7 +162,7 @@ pfx_listdir = partial(pfx_call, os.listdir)
 pfx_mkdir = partial(pfx_call, os.mkdir)
 pfx_open = partial(pfx_call, open)
 
-class TypeCode(str):
+class TypeCode(str, Promotable):
   ''' A valid `array` typecode with convenience methods.
   '''
 
@@ -203,14 +204,14 @@ class TypeCode(str):
         * `int`: `array` type code `q` (signed 64 bit)
         * `float`: `array` type code `d` (double float)
     '''
-    if not isinstance(t, cls):
-      if isinstance(t, (str, type)):
-        t = cls(t)
-      else:
-        raise TypeError(
-            "cannot promote %s to %s, expect str or type" % (r(t), cls)
-        )
-    return t
+    if isinstance(t, cls):
+      return t
+    if isinstance(t, (str, type)):
+      return cls(t)
+    raise TypeError(
+        "%s.promote: cannot promote %s, expect str or type" %
+        (cls.__name__, r(t))
+    )
 
   @property
   def type(self):
@@ -440,13 +441,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
             "fields:%r should not be suppplied for a %s" % (argv, s(ts))
         )
       ax = ts.plot(
-          start,
-          stop,
-          ax=ax,
-          runstate=runstate,
-          tz=tz,
-          figsize=(plot_dx, plot_dy),
-          **plot_kw
+          start, stop, ax=ax, tz=tz, figsize=(plot_dx, plot_dy), **plot_kw
       )  # pylint: disable=missing-kwoa
     elif isinstance(ts, TimeSeriesMapping):
       # multiple timeseries each with their own key
@@ -469,7 +464,6 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
           start,
           stop,
           keys,
-          runstate=runstate,
           tz=tz,
           ax=ax,
           **plot_kw,
@@ -512,9 +506,10 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       'iso8601': lambda d: pfx_call(arrow.get, d, tzinfo='local').timestamp(),
   }
 
-  def apply_defaults(self):
-    self.options.ts_step = None  # the time series step
-    self.options.ts = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    ts_step: Optional[float] = None  # the time series step
+    ts: Optional["TimeSeries"] = None
 
   def apply_opt(self, opt, val):
     if opt == '-s':
@@ -1006,13 +1001,14 @@ def plot_events(
   ax.scatter(xaxis, yaxis, **scatter_kw)
   return ax
 
-class PlotSeries(namedtuple('PlotSeries', 'label series extra')):
+class PlotSeries(namedtuple('PlotSeries', 'label series extra'), Promotable):
   ''' Information about a series to be plotted:
       - `label`: the label for this series
-      - `series`: an series
+      - `series`: a `Series`
       - `extra`: a `dict` of extra information such as plot styling
   '''
 
+  @classmethod
   @timerange
   def promote(cls, data, tsmap=None, extra=None):
     ''' Promote `data` to a `PlotSeries`.
@@ -1020,13 +1016,16 @@ class PlotSeries(namedtuple('PlotSeries', 'label series extra')):
     if isinstance(data, str):
       # label from tsmap
       if tsmap is None:
-        raise ValueError("cannot promote str to %s without a tsmap" % (cls,))
+        raise TypeError(
+            "%s.promote: cannot promote str without a tsmap" % (cls.__name__,)
+        )
       label = data
       series = self[label].as_pd_series
       series = tsmap.as_pd_series(start, stop, utcoffset=utcoffset)
       extra = {}
     else:
       label, series = data
+    raise NotImplementedError
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
@@ -1177,7 +1176,7 @@ class TimeStepsMixin:
         for offset_step in self.offset_range(start, stop)
     )
 
-class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
+class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin, Promotable):
   ''' The basis of time references with a starting UNIX time `start`
       and a `step` defining the width of a time slot.
   '''
@@ -1215,9 +1214,7 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
 
   @classmethod
   def promote(cls, epochy):
-    ''' Promote `epochy` to an `Epoch` (except for `None`).
-
-        `None` remains `None`.
+    ''' Promote `epochy` to an `Epoch`.
 
         An `Epoch` remains unchanged.
 
@@ -1226,43 +1223,42 @@ class Epoch(namedtuple('Epoch', 'start step'), TimeStepsMixin):
 
         A 2-tuple of `(start,step)` will be used to construct a new `Epoch` directly.
     '''
-    if epochy is not None and not isinstance(epochy, Epoch):
-      if isinstance(epochy, (int, float)):
-        # just the step value, start the epoch at 0
-        epochy = 0, epochy
-      if isinstance(epochy, tuple):
-        start, step = epochy
-        if isinstance(start, float) and isinstance(step, int):
-          step0 = step
-          step = float(step)
-          if step != step0:
+    if epochy is None or isinstance(epochy, cls):
+      return epochy
+    if isinstance(epochy, (int, float)):
+      # just the step value, start the epoch at 0
+      epochy = 0, epochy
+    if isinstance(epochy, tuple):
+      start, step = epochy
+      if isinstance(start, float) and isinstance(step, int):
+        step0 = step
+        step = float(step)
+        if step != step0:
+          raise ValueError(
+              "promoted step:%r to float to match start, but new value %r is not equal"
+              % (step0, step)
+          )
+      elif isinstance(start, int) and isinstance(step, float):
+        # ints have unbound precision in Python and 63 bits in storage
+        # so if we can work in ints, use ints
+        step_i = int(step)
+        if step_i == step:
+          # demote step to an int to match start
+          step = step_i
+        else:
+          # promote start to float to match step
+          start0 = start
+          start = float(start)
+          if start != start0:
             raise ValueError(
-                "promoted step:%r to float to match start, but new value %r is not equal"
-                % (step0, step)
+                "promoted start:%r to float to match start, but new value %r is not equal"
+                % (start0, start)
             )
-        elif isinstance(start, int) and isinstance(step, float):
-          # ints have unbound precision in Python and 63 bits in storage
-          # so if we can work in ints, use ints
-          step_i = int(step)
-          if step_i == step:
-            # demote step to an int to match start
-            step = step_i
-          else:
-            # promote start to float to match step
-            start0 = start
-            start = float(start)
-            if start != start0:
-              raise ValueError(
-                  "promoted start:%r to float to match start, but new value %r is not equal"
-                  % (start0, start)
-              )
-        epochy = cls(start, step)
-      else:
-        raise TypeError(
-            "%s.promote: do not know how to promote %s" %
-            (cls.__name__, r(epochy))
-        )
-    return epochy
+      return cls(start, step)
+    raise TypeError(
+        "%s.promote: do not know how to promote %s" %
+        (cls.__name__, r(epochy))
+    )
 
 class HasEpochMixin(TimeStepsMixin):
   ''' A `TimeStepsMixin` with `.start` and `.step` derived from `self.epoch`.
@@ -1456,7 +1452,6 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
       figure=None,
       ax=None,
       label=None,
-      runstate=None,  # pylint: disable=unused-argument
       utcoffset,
       **plot_kw,
   ) -> Axes:
@@ -1466,7 +1461,6 @@ class TimeSeries(MultiOpenMixin, HasEpochMixin, ABC):
         Parameters:
         * `start`,`stop`: the time range
         * `label`: optional label for the graph
-        * `runstate`: optional `RunState`, ignored in this implementation
         * `utcoffset`: optional timestamp skew from UTC in seconds
         * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
@@ -1513,8 +1507,8 @@ class TimeSeriesFileHeader(SimpleBinary, HasEpochMixin):
   # step time
   HEADER_LENGTH = 24
 
-  @typechecked
   @require(lambda typecode: typecode in 'dq')
+  @typechecked
   def __init__(
       self,
       *,
@@ -1651,6 +1645,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -1660,7 +1655,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       *,
       epoch: Optional[Epoch] = None,
       fill=None,
-      fstags=None,
+      fstags: FSTags,
   ):
     ''' Prepare a new time series stored in the file at `fspath`
         containing machine native data for the time series values.
@@ -1681,11 +1676,9 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
           and `float('nan')` for `'d'`
     '''
     HasFSPath.__init__(self, fspath)
-    if fstags is None:
-      fstags = FSTags()
     self.fstags = fstags
     try:
-      header, = TimeSeriesFileHeader.scan_fspath(self.fspath, max_count=1)
+      header, = TimeSeriesFileHeader.scan(self.fspath, max_count=1)
     except FileNotFoundError:
       # a missing file is ok, other exceptions are not
       ok = True
@@ -2217,7 +2210,7 @@ class TimePartition(namedtuple('TimePartition',
     '''
     return range(self.start_offset, self.end_offset)
 
-class TimespanPolicy(DBC, HasEpochMixin):
+class TimespanPolicy(DBC, HasEpochMixin, Promotable):
   ''' A class implementing a policy allocating times to named time spans.
 
       The `TimeSeriesPartitioned` uses these policies
@@ -2254,9 +2247,8 @@ class TimespanPolicy(DBC, HasEpochMixin):
   def from_name(
       cls, policy_name: str, epoch: Optional[Epoch] = None, **policy_kw
   ):
-    ''' Factory method to return a new `TimespanPolicy` instance
-        from the policy name,
-        which indexes `TimespanPolicy.FACTORIES`.
+    ''' Factory method to return a new `cls` instance from the policy name,
+        which indexes `cls.FACTORIES`.
     '''
     if cls is not TimespanPolicy:
       raise TypeError(
@@ -2288,13 +2280,13 @@ class TimespanPolicy(DBC, HasEpochMixin):
       if epoch is None:
         raise ValueError("epoch may not be None if promotion is required")
       if isinstance(policy, str):
-        policy = TimespanPolicy.from_name(policy, epoch=epoch, **policy_kw)
+        policy = cls.from_name(policy, epoch=epoch, **policy_kw)
       elif isinstance(policy, type) and issubclass(policy, TimespanPolicy):
         policy = policy(epoch=epoch, **policy_kw)
       else:
         raise TypeError(
             "%s.promote: do not know how to promote %s" %
-            (cls.__name__, policy)
+            (cls.__name__, r(policy))
         )
     assert epoch is None or policy.epoch == epoch
     return policy
@@ -2312,8 +2304,8 @@ class TimespanPolicy(DBC, HasEpochMixin):
     factory.name = name
 
   @abstractmethod
-  @typechecked
   @ensure(lambda when, result: result[0] <= when < result[1])
+  @typechecked
   def raw_edges(self, when: Numeric):
     ''' Return the _raw_ start and end UNIX times
         (inclusive and exclusive respectively)
@@ -2480,8 +2472,8 @@ class ArrowBasedTimespanPolicy(TimespanPolicy):
     a = arrow.get(span_name, self.PARTITION_FORMAT, tzinfo=self.tz)
     return self.span_for_time(a.timestamp())
 
-  @typechecked
   @ensure(lambda when, result: result[0] <= when < result[1])
+  @typechecked
   def raw_edges(self, when: Numeric):
     ''' Return the _raw_ start and end UNIX times
         (inclusive and exclusive respectively)
@@ -2688,6 +2680,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     return 'd'
 
   @pfx
+  @uses_runstate
   @typechecked
   def as_pd_dataframe(
       self,
@@ -2696,7 +2689,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       df_data: Optional[Iterable[Union[str, Tuple[str, Any]]]] = None,
       *,
       key_map=None,
-      runstate=None,
+      runstate: RunState,
       utcoffset=None,
   ):
     ''' Return a `numpy.DataFrame` containing the specified data.
@@ -2733,7 +2726,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     data_dict = {}
     with UpdProxy(prefix="gather fields: ") as proxy:
       for data in progressbar(df_data, "gather fields"):
-        if runstate and runstate.cancelled:
+        if runstate.cancelled:
           raise CancellationError
         pfx_context = (
             data
@@ -2750,7 +2743,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
             key, series = data
           data_key = key_map.get(key, key)
           data_dict[data_key] = series
-    if runstate and runstate.cancelled:
+    if runstate.cancelled:
       raise CancellationError
     return pfx_call(
         pd.DataFrame,
@@ -2790,6 +2783,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     df.to_csv(f, **to_csv_kw)
 
   @timerange
+  @uses_runstate
   @typechecked
   def plot(
       self,
@@ -2800,7 +2794,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
       figure=None,
       ax=None,
       label=None,
-      runstate=None,
+      runstate: RunState,
       utcoffset,
       stacked=False,
       kind=None,
@@ -2816,7 +2810,6 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         * `plot_data`: optional iterable of plot data,
           default `sorted(self.keys())`
         * `label`: optional label for the graph
-        * `runstate`: optional `RunState` to allow interruption
         * `figure`,`ax`: optional arguments as for `cs.mplutils.axes`
         Other keyword parameters are passed to `DataFrame.plot`.
 
@@ -2837,7 +2830,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         runstate=runstate,
         utcoffset=utcoffset,
     )
-    if runstate and runstate.cancelled:
+    if runstate.cancelled:
       raise CancellationError
     return df.plot(ax=ax, kind=kind, stacked=stacked, **plot_kw)
 
@@ -2926,6 +2919,7 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
 
   # pylint: disable=too-many-branches,too-many-statements
   @pfx_method
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -2935,12 +2929,10 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       epoch: Optional[Epoch] = None,
       policy=None,  # :TimespanPolicy
       tz: Optional[str] = None,
-      fstags: Optional[FSTags] = None,
+      fstags: FSTags,
   ):
     HasConfigIni.__init__(self, self.CONFIG_SECTION_NAME)
     HasFSPath.__init__(self, fspath)
-    if fstags is None:
-      fstags = FSTags()
     self.fstags = fstags
     config = self.config
     if not isdirpath(fspath):
@@ -3110,6 +3102,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       which dictates which partition holds the datum for a UNIX time.
   '''
 
+  @uses_fstags
   @promote
   @typechecked
   def __init__(
@@ -3119,7 +3112,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       *,
       epoch: Optional[Epoch] = None,
       policy,  # :TimespanPolicy,
-      fstags: Optional[FSTags] = None,
+      fstags: FSTags,
   ):
     ''' Initialise the `TimeSeriesPartitioned` instance.
 
@@ -3151,8 +3144,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     policy = TimespanPolicy.promote(policy, epoch)
     HasFSPath.__init__(self, dirpath)
-    if fstags is None:
-      fstags = FSTags()
     if typecode is None:
       typecode = TypeCode(self.tags.typecode)
     policy = TimespanPolicy.promote(policy, epoch=epoch)
@@ -3165,7 +3156,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def __str__(self):
     return "%s(%s,%r,%s,%s)" % (
         type(self).__name__,
-        shortpath(self.fspath),
+        getattr(self, 'shortpath', 'NO_FSPATH'),
         getattr(self, 'typecode', 'NO_TYPECODE_YET'),
         getattr(self, 'epoch', 'NO_EPOCH_YET'),
         getattr(self, 'policy', 'NO_POLICY_YET'),
@@ -3197,12 +3188,12 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def startup_shutdown(self):
     ''' Close the subsidiary `TimeSeries` instances.
     '''
-    try:
-      with self.fstags:
+    with self.fstags:
+      try:
         yield
-    finally:
-      for ts in self._ts_by_partition.values():
-        ts.close()
+      finally:
+        for ts in self._ts_by_partition.values():
+          ts.close()
 
   @property
   @cachedmethod
@@ -3412,7 +3403,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       figure=None,
       ax=None,
       label=None,
-      runstate=None,
       **plot_kw,
   ) -> Axes:
     ''' Convenience shim for `DataFrame.plot` to plot data from
@@ -3429,13 +3419,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     if label is None:
       label = self.tags.get('csv.header')
     return super().plot(
-        start,
-        stop,
-        figure=figure,
-        ax=ax,
-        label=label,
-        runstate=runstate,
-        **plot_kw
+        start, stop, figure=figure, ax=ax, label=label, **plot_kw
     )
 
 @promote

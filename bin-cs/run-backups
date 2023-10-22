@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 # Run my backups from the current machine to other places.
 # Consults ~/rc-local/run-backups files as follows:
@@ -11,9 +11,10 @@
 
 set -ue
 
-quiet=
+quiet=1
 rsvopts=
 trace=
+targets=
 doit=1
 dont=
 isatty=
@@ -26,8 +27,11 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd [-n] [srcs...]
   -n    No action. Passed -n to rsync for the rsync backups,
         and suppresses the histbackup runs.
-  -q    Quiet.
+  -q    Quiet (default).
+  -v    Verbose (not quiet, also passed to rsync).
   -x    Trace execution.
+  @target,...
+        Optional comma separated list of target hosts to constrain backup targets.
   srcs...
         Backup source paths; if specified, only these paths will be backed up.
 
@@ -57,6 +61,7 @@ do
         ;;
     -n) doit= dont=echo ;;
     -q) quiet=1 rsvopts= trace= ;;
+    -v) quiet= rsvopts="$rsvopts -v" ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -66,6 +71,16 @@ do
   esac
   shift
 done
+
+# optional @target,...
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    @*) targets=$( expr "$1" : '^@\(.*\)' | tr , ' ' )
+        shift
+        ;;
+  esac
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -111,6 +126,15 @@ do
       *)      dst=$( basename "$src" )
               ;;
     esac
+    if [ -n "$targets" ]
+    then
+      case " $targets " in
+        *" $dsthost "*) ;;
+        *)    [ $quiet ] || echo "$0: $backups:$lineno: skip dsthost=$dsthost, not in targets $targets" >&2
+              continue
+              ;;
+      esac
+    fi
     case "$dst" in
       /*)     ;;
       *)      case "$mode" in

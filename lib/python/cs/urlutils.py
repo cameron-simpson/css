@@ -50,7 +50,7 @@ import lxml
 import requests
 from typeguard import typechecked
 
-from cs.deco import cachedmethod, promote
+from cs.deco import cachedmethod, promote, Promotable
 from cs.excutils import logexc, safe_property
 from cs.lex import parseUC_sAttr
 from cs.logutils import debug, error, warning, exception
@@ -69,8 +69,8 @@ from cs.threads import locked_property, State as ThreadState
 ##  return putheader0(self, header, *values)
 ##HTTPConnection.putheader = my_putheader
 
-class URL(SingletonMixin):
-  ''' Utility class to do simple stuff to URLs.
+class URL(SingletonMixin, HasThreadState, Promotable):
+  ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
   # Thread local stackable class state
@@ -88,16 +88,16 @@ class URL(SingletonMixin):
   @promote
   @typechecked
   def __init__(self, url_s: str):
-    ''' Initialise the `URL` from the URL string `url_s`..
+    ''' Initialise the `URL` from the URL string `url_s`.
     '''
     if hasattr(self, 'url_s'):
       assert url_s == self.url_s
-    else:
-      self.url_s = url_s
-      self._lock = trace_func(RLock)()
-      self._parts = None
-      self._info = None
-      self.flush()
+      return
+    self.url_s = url_s
+    self._lock = trace_func(RLock)()
+    self._parts = None
+    self._info = None
+    self.flush()
 
   def __str__(self):
     return f'{self.__class__.__name__}({self.url_s})'
@@ -115,11 +115,23 @@ class URL(SingletonMixin):
   def promote(cls, obj):
     ''' Promote `obj` to an instance of `cls`.
         Instances of `cls` are passed through unchanged.
-        `str` if promoted to `cls(obj)`.
+        `str` is promoted directly to `cls(obj)`.
         `(url,referer)` is promoted to `cls(url,referer=referer)`.
     '''
-    if not isinstance(obj, URL):
-      obj = cls(obj)
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, str):
+      return cls(obj)
+    try:
+      url, referer = obj
+    except (ValueError, TypeError):
+      raise TypeError(
+          "%s.promote: cannot convert to URL: %s" % (cls.__name__, r(obj))
+      )
+    if isinstance(url, cls):
+      obj = url if referer is None else cls(url, referer=referer)
+    else:
+      obj = cls.promote(url) if referer is None else cls(url, referer=referer)
     return obj
 
   def __getattr__(self, attr):

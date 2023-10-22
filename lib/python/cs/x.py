@@ -39,13 +39,17 @@ which often divert `sys.stderr`.
 '''
 
 from __future__ import print_function
+
 from io import UnsupportedOperation
 import os
 import os.path
+import stat
 import sys
-from cs.ansi_colour import colourise
 
-__version__ = '20221118-post'
+from cs.ansi_colour import colourise
+from cs.gimmicks import open_append
+
+__version__ = '20230331-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -54,7 +58,10 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.ansi_colour'],
+    'install_requires': [
+        'cs.ansi_colour',
+        'cs.gimmicks',
+    ],
 }
 
 # discard output? the default if sys.stderr is not a tty
@@ -69,6 +76,7 @@ X_logger = None
 # colouring
 X_default_colour = os.environ.get('CS_X_COLOUR')
 
+# pylint: disable=too-many-branches
 def X(msg, *args, **kw):
   ''' Unconditionally write the message `msg`.
 
@@ -101,6 +109,7 @@ def X(msg, *args, **kw):
     msg = msg % args
   if colour:
     msg = colourise(msg, colour=colour)
+  close_fp = None
   if fp is None:
     if X_logger:
       # NB: ignores any kwargs
@@ -109,20 +118,7 @@ def X(msg, *args, **kw):
     if X_via_tty:
       # NB: ignores any kwargs
       try:
-        try:
-          f = open(X_via_tty, 'a')
-        except (OSError, UnsupportedOperation) as e:
-          # sometimes you cannot append to a tty (Linux?)
-          # so open for readwrite and seek to the end
-          # (may also fail on a tty, so ignore the seek error)
-          f = open(X_via_tty, 'r+')
-          try:
-            f.seek(0, os.SEEK_END)
-          except (OSError, UnsupportedOperation):
-            pass
-        with f:
-          f.write(msg)
-          f.write('\n')
+        f = open_append(X_via_tty)
       except (IOError, OSError) as e:
         X(
             "X: cannot append to %r: %s:%s",
@@ -132,11 +128,14 @@ def X(msg, *args, **kw):
             file=sys.stderr
         )
         X(msg, file=sys.stderr)
-      return
+        return
+      close_fp = f
     if X_discard:
       return
     fp = sys.stderr
   print(msg, file=fp)
+  if close_fp is not None:
+    close_fp.close()
 
 # init X_via_tty (after X() because we use X() for messaging)
 env_via_tty = os.environ.get('CS_X_VIA_TTY', '')

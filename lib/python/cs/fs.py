@@ -4,7 +4,7 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
-from fnmatch import fnmatch
+from fnmatch import filter as fnfilter
 from functools import partial
 import os
 from os.path import (
@@ -25,19 +25,17 @@ from threading import Lock
 from typing import Optional
 
 from icontract import require
-from typeguard import typechecked
 
 from cs.deco import decorator
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
-__version__ = '20220918-post'
+__version__ = '20230806-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -45,7 +43,6 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'icontract',
-        'typeguard',
     ],
 }
 
@@ -119,8 +116,7 @@ def atomic_directory(infill_func, make_placeholder=False):
       if remove_placeholder and isdirpath(dirpath):
         pfx_rmdir(dirpath)
       raise
-    else:
-      return result
+    return result
 
   return atomic_directory_wrapper
 
@@ -156,10 +152,7 @@ def rpaths(
 def fnmatchdir(dirpath, fnglob):
   ''' Return a list of the names in `dirpath` matching the glob `fnglob`.
   '''
-  return [
-      filename for filename in pfx_listdir(dirpath)
-      if fnmatch(filename, fnglob)
-  ]
+  return fnfilter(pfx_listdir(dirpath), fnglob)
 
 # pylint: disable=too-few-public-methods
 class HasFSPath:
@@ -176,25 +169,42 @@ class HasFSPath:
   def shortpath(self):
     ''' The short version of `self.fspath`.
     '''
-    return shortpath(self.fspath)
+    try:
+      return shortpath(self.fspath)
+    except AttributeError:
+      return "<no-fspath>"
 
-  @require(lambda subpath: not isabspath(subpath))
-  def pathto(self, subpath):
-    ''' The full path to `subpath`, a relative path below `self.fspath`.
+  @require(lambda subpaths: len(subpaths) > 0)
+  @require(lambda subpaths: not any(map(isabspath, subpaths)))
+  def pathto(self, *subpaths):
+    ''' The full path to `subpaths`, comprising a relative path
+        below `self.fspath`.
+        This is a shim for `os.path.join` which requires that all
+        the `subpaths` be relative paths.
     '''
-    return joinpath(self.fspath, subpath)
+    return joinpath(self.fspath, *subpaths)
 
   def fnmatch(self, fnglob):
     ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
     '''
     return fnmatchdir(self.fspath, fnglob)
 
+  def listdir(self):
+    ''' Return `os.listdir(self.fspath)`. '''
+    return os.listdir(self.fspath)
+
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
   '''
 
   @classmethod
-  def _resolve_fspath(cls, fspath, envvar=None, default_attr=None):
+  def _resolve_fspath(
+      cls,
+      fspath: Optional[str],
+      envvar: Optional[str] = None,
+      default_attr=None,
+      default_factory=None,
+  ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
 
         Parameters:
@@ -204,6 +214,8 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
           the default for this comes from `cls.FSPATH_ENVVAR` if defined
         * `default_attr`: the class attribute containing the default `fspath`
           if defined and there is no environment variable for `envvar`
+        * `default_factory`: an optional factory function to return the default `fspath`;
+          default from `cls.DEFAULT_FACTORY` if defined
 
         The common mode is where each instance might have an arbitrary path,
         such as a `TagFile`.
@@ -219,13 +231,30 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         fspath = os.environ.get(envvar)
         if fspath is not None:
           return realpath(fspath)
-      if default_attr is None:
-        default_attr = 'FSPATH_DEFAULT'
-      defaultpath = getattr(cls, default_attr, None)
+      if default_factory is None:
+        default_factory = getattr(cls, 'FSPATH_FACTORY', None)
+      if default_factory is None:
+        if default_attr is None:
+          default_attr = 'FSPATH_DEFAULT'
+      if default_factory is not None:
+        # use the factory
+        if default_attr is not None:
+          raise ValueError(
+              "default_attr:%r and default_factory:%r may not both be specified"
+              % (
+                  default_attr,
+                  default_factory,
+              )
+          )
+        else:
+          defaultpath = default_factory()
+      else:
+        # use the attribute
+        defaultpath = getattr(cls, default_attr, None)
       if defaultpath is not None:
         return realpath(expanduser(defaultpath))
       raise ValueError(
-          "_resolve_fspath: fspath=None and no %s no %s.%s" % (
+          "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
               (
                   cls.__name__ + '.FSPATH_ENVVAR' if envvar is None else '$' +
                   envvar

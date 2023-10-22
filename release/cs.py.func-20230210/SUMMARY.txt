@@ -1,0 +1,1 @@
+Drop the returns_* and yields_* decorators, these days type annotations and @typechecked are the go.

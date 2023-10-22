@@ -4,17 +4,37 @@
 '''
 
 import hashlib
+import mmap
+import os
 
 from cs.buffer import CornuCopyBuffer
-from cs.lex import hexify
 
-class _HashCode(bytes):
+class BaseHashCode(bytes):
+  ''' Base class for hashcodes, subclassed by `SHA1`, `SHA256` et al.
+  '''
 
   __slots__ = ()
-  hashfunc = None
+
+  def __init_subclass__(cls, *, hashfunc, hashname=None, **kw):
+    super().__init_subclass__(**kw)
+    if hashname is None:
+      hashname = cls.__name__.lower()
+    cls.hashname = hashname
+    cls.hashfunc = hashfunc
+    cls.hashlen = len(hashfunc(b'').digest())
+    if not cls.__doc__:
+      cls.__doc__ = f'{hashfunc.__name__} hashcode class, subclass of `bytes`.'
+
+  hashfunc = lambda bs=None: None  # pylint: disable=unnecessary-lambda-assignment
 
   def __str__(self):
-    return f'{type(self).__name__.lower()}:{hexify(self)}'
+    return f'{self.hashname}:{self.hex()}'
+
+  @property
+  def hashname(self):
+    ''' The hash code type name, derived from the class name.
+    '''
+    return self.__class__.__name__.lower()
 
   @classmethod
   def from_data(cls, bs):
@@ -32,14 +52,32 @@ class _HashCode(bytes):
     return cls(h.digest())
 
   @classmethod
-  def from_pathname(cls, pathname, **kw):
-    ''' Compute hashcode from the contents of the file `pathname`.
+  def from_fspath(cls, fspath, **kw):
+    ''' Compute hashcode from the contents of the file `fspath`.
     '''
-    return cls.from_buffer(CornuCopyBuffer.from_filename(pathname, **kw))
+    # try to mmap the file and hash the whole thing in one go
+    fd = None
+    try:
+      fd = os.open(fspath, os.O_RDONLY)
+    except OSError:
+      pass
+    else:
+      try:
+        with mmap.mmap(fd, 0, flags=mmap.MAP_PRIVATE,
+                       prot=mmap.PROT_READ) as mmapped:
+          return cls.from_data(mmapped)
+      except OSError:
+        pass
+    finally:
+      if fd is not None:
+        os.close(fd)
+    # mmap fails, try plain open of file
+    return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
 
-class SHA256(_HashCode):
-  ''' SHA256 hashcode class, subclass of `bytes`.
-  '''
-
+# pylint: disable=missing-class-docstring
+class SHA1(BaseHashCode, hashfunc=hashlib.sha1):
   __slots__ = ()
-  hashfunc = hashlib.sha256
+
+# pylint: disable=missing-class-docstring
+class SHA256(BaseHashCode, hashfunc=hashlib.sha256):
+  __slots__ = ()

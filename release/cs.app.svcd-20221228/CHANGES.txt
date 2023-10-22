@@ -1,0 +1,11 @@
+lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: __str__,__repr__: make robust against use before __init__ has completed
+lib/python/cs/app/svcd.py: cs.app.svcd: docstring and warning text updates
+lib/python/cs/app/svcd.py: cs.resources: update DISTINFO
+lib/python/cs/app/svcd.py: cs.app.svcd: undo some accidentally commited debug
+lib/python/cs/app/svcd.py: cs.app.svcd: SvcD.__init__: argv now all the positional arguments
+lib/python/cs/app/svcd.py: cs.app.svcd: globals TEST_RATE, KILL_TIME, RESTART_DELAY now class attributes of SvcD
+lib/python/cs/app/svcd.py: cs.app.svcd: LockedPopen: lint
+lib/python/cs/app/svcd.py: cs.app.svcd: modernise main() as SvcDCommand(BaseCommand)
+lib/python/cs/app/svcd.py: cs.app.svcd: clean some lint, update imports
+lib/python/cs/app/svcd.py: cs.app.svcd: SvcDCommand: new "ls" subcommand
+lib/python/cs/app/svcd.py: cs.app.svcd: update DISTINFO, clean some lint

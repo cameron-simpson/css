@@ -68,7 +68,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20221118-post'
+__version__ = '20230331-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -95,13 +95,21 @@ class CancellationError(Exception):
   ''' Raised when accessing `result` or `exc_info` after cancellation.
   '''
 
-  def __init__(self, message=None):
+  def __init__(self, message=None, **kw):
+    ''' Initialise the `CancellationError`.
+
+        The optional `message` parameter (default `"cancelled"`)
+        is set as the `message` attribute.
+        Other keyword parameters set their matching attributes.
+    '''
     if message is None:
       message = "cancelled"
     elif not isinstance(message, StringTypes):
       message = "cancelled: %s" % (message,)
     Exception.__init__(self, message)
     self.message = message
+    for k, v in kw.items():
+      setattr(self, k, v)
 
 @decorator
 def not_cancelled(method):
@@ -191,7 +199,7 @@ class Result(FSM):
       if self.is_done:
         exc_info = self.exc_info
         if exc_info:
-          raise RuntimeError("UNREPORTED EXCEPTION: %r" % (exc_info,))
+          warning("UNREPORTED EXCEPTION at __del__: %r", exc_info)
 
   def __hash__(self):
     return id(self)
@@ -209,7 +217,7 @@ class Result(FSM):
 
   @property
   def ready(self):
-    ''' True if `Result` state is `DONE` or `CANCLLED`..
+    ''' True if the `Result` state is `DONE` or `CANCELLED`..
     '''
     return self.fsm_state in (self.DONE, self.CANCELLED)
 
@@ -361,6 +369,7 @@ class Result(FSM):
       if state in (self.PENDING, self.RUNNING, self.CANCELLED):
         self._result = result  # pylint: disable=attribute-defined-outside-init
         self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+        self._get_lock.release()
         if state != self.CANCELLED:
           self.fsm_event('complete')
       elif state == self.DONE:
@@ -376,7 +385,6 @@ class Result(FSM):
             "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE)"
             % (self, self.fsm_state)
         )
-      self._get_lock.release()
 
   @pfx_method
   def join(self):
@@ -392,7 +400,7 @@ class Result(FSM):
     '''
     self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._get_lock.release()
-    return self.result, self.exc_info
+    return self._result, self._exc_info
 
   def get(self, default=None):
     ''' Wait for readiness; return the result if `self.exc_info` is `None`,
@@ -420,10 +428,10 @@ class Result(FSM):
     return result
 
   def notify(self, notifier):
-    ''' After the function completes, call `notifier(self)`.
+    ''' After the `Result` completes, call `notifier(self)`.
 
-        If the function has already completed this will happen immediately.
-        example: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
+        If the `Result` has already completed this will happen immediately.
+        If you'd rather `self` got put on some queue `Q`, supply `Q.put`.
     '''
 
     # TODO: adjust all users of .notify() to use fsm_callback and
@@ -438,8 +446,38 @@ class Result(FSM):
     with self._lock:
       self.fsm_callback('CANCELLED', callback)
       self.fsm_callback('DONE', callback)
-      if self.fsm_state in (self.CANCELLED, self.DONE):
-        notifier(self)
+      state = self.fsm_state
+    # already cancelled or done? call the notifier immediately
+    if state in (self.CANCELLED, self.DONE):
+      self.collected = True
+      notifier(self)
+
+  def post_notify(self, post_func) -> "Result":
+    ''' Return a secondary `Result` which processes the result of `self`.
+
+        After the `self` completes, call `post_func(retval)` where
+        `retval` is the result of `self`, and use that to complete
+        the secondary `Result`.
+
+        Example:
+
+            # submit packet to data stream
+            R = submit_packet()
+            # arrange that when the response is received, decode the response
+            R2 = R.post_notify(lambda response: decode(response))
+            # collect decoded response
+            decoded = R2()
+
+        If the `Result` has already completed this will happen immediately.
+    '''
+    post_R = Result(f'POST_RESULT[{self.name}]')
+
+    def notifier(preR):
+      retval = preR()
+      post_R.run_func(post_func, retval)
+
+    self.notify(notifier)
+    return post_R
 
 def in_thread(func):
   ''' Decorator to evaluate `func` in a separate `Thread`.
