@@ -142,10 +142,9 @@ class DockerUtilCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing image")
     DR.image = argv.pop(0)
-    DR.argv = argv
     with TemporaryDirectory(dir='.') as T:
       with stackattrs(DR, outputpath=T):
-        DR.run(exe=options.docker_command)
+        trace(DR.run)(*argv, exe=options.docker_command)
 
 def docker(
     *dk_argv,
@@ -187,7 +186,8 @@ class DockerRun:
   input_map: dict = field(default_factory=dict)
   output_root: str = OUTPUTDIR_DEFAULT
   outputpath: str = None
-  output_root: str = '/output'
+  as_root: bool = False
+  pull_mode: str = 'missing'
 
   @typechecked
   def popopts(self, argv: List[str]) -> None:
@@ -272,17 +272,21 @@ class DockerRun:
         raise ValueError('may not contain multiple components')
       if inputmount in self.input_map:
         raise ValueError(f'already present in input_map:{self.input_map!r}')
-    self.input_map[inputmount] = inputpath
+    self.input_map[inputmount] = abspath(inputpath)
 
-  def run(self, *, exe=None):
-    ''' Run the docker command.
+  def run(self, *argv, doit=None, quiet=None, docker_exe=None):
+    ''' Run a command via `docker run`.
+        Return the `CompletedProcess` result or `None` if `doit` is false.
     '''
-    if exe is None:
-      exe = default_docker_command()
+    if doit is None:
+      doit = True
+    if quiet is None:
+      quiet = True
+    argv = list(argv)  # work with a mutable copy
+    if docker_exe is None:
+      docker_exe = default_docker_command()
     if self.image is None:
       raise ValueError("self.image is still None")
-    if not self.argv:
-      raise ValueError("no argv")
     with Pfx("input_root:%r", self.input_root):
       if not isabspath(self.input_root):
         raise ValueError('not an absolute path')
@@ -305,8 +309,8 @@ class DockerRun:
         raise ValueError('contains a comma, "docker run --mount" hates it')
       if not isdirpath(self.outputpath):
         raise ValueError('not a directory')
-    argv = [
-        exe,
+    docker_argv = [
+        docker_exe,
         'run',
         '--rm',
         '-w',
@@ -317,16 +321,30 @@ class DockerRun:
     for inputmount, inputpath in self.input_map.items():
       mnt = joinpath(self.input_root, inputmount)
       with Pfx("%r->%r", mnt, inputpath):
-        argv.append('--mount')
-        argv.append(f'type=bind,readonly,source={inputpath},destination={mnt}')
-    argv.append('--mount')
-    argv.append(
-        f'type=bind,source={self.outputpath},destination={self.output_root}'
+        docker_argv.extend(
+            [
+                '--mount',
+                f'type=bind,readonly,source={inputpath},destination={mnt}'
+            ]
+        )
+    docker_argv.extend(
+        [
+            '--mount',
+            f'type=bind,source={self.outputpath},destination={self.output_root}'
+        ]
     )
-    argv.append('--')
-    argv.append(self.image)
-    argv.extend(self.argv)
-    print_argv(*argv, fold=True)
+    if self.as_root:
+      entrypoint = argv.pop(0)
+    else:
+      entrypoint = '/usr/bin/s6-setuidgid'
+      uid = os.geteuid()
+      gid = os.getegid()
+      argv.insert(0, f'{uid}:{gid}')
+    docker_argv.extend(['--entrypoint', entrypoint])
+    docker_argv.append('--')
+    docker_argv.append(self.image)
+    docker_argv.extend(argv)
+    return run(docker_argv, doit=doit, quiet=quiet)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
