@@ -13,19 +13,25 @@ from collections import namedtuple
 from dataclasses import dataclass
 import json
 from os.path import (
+    basename,
+    isdir as isdirpath,
     isfile as isfilepath,
+    join as joinpath,
+    splitext,
 )
 import shlex
+from subprocess import CompletedProcess
 import sys
-from typing import Any, List, Optional, Tuple
+from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union
 
 import ffmpeg
 from typeguard import typechecked
 
+from cs.dockerutils import DockerRun
 from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.mappings import attrable
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, print_argv
 from cs.tagset import TagSet
 
@@ -44,6 +50,9 @@ DISTINFO = {
 }
 
 FFMPEG_EXE_DEFAULT = 'ffmpeg'
+
+FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
+FFMPEG_DOCKER_IMAGE_DEFAULT = 'linuxserver/ffmpeg'
 
 class MetaData(TagSet):
   ''' Object containing fields which may be supplied to ffmpeg's -metadata option.
@@ -307,3 +316,116 @@ def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
   P = pipefrom(argv, quiet=quiet, text=True)
   probed = pfx_call(json.loads, pfx_call(P.stdout.read))
   return attrable(probed)
+
+@pfx
+@typechecked
+def ffmpeg_docker(
+    *ffmpeg_args: Iterable[str],
+    docker_run_opts: Optional[Union[List[str], Mapping]] = None,
+    doit: bool = None,
+    quiet: bool = None,
+    ffmpeg_exe: Optional[str] = None,
+    docker_exe: Optional[str] = None,
+    image: Optional[str] = None,
+    outputpath: Optional[str] = '.',
+) -> Optional[CompletedProcess]:
+  ffmpeg_args: List[str] = list(ffmpeg_args)
+  if docker_run_opts is None:
+    docker_run_opts = []
+  if ffmpeg_exe is None:
+    ffmpeg_exe = FFMPEG_DOCKER_EXE_DEFAULT
+  if image is None:
+    image = FFMPEG_DOCKER_IMAGE_DEFAULT
+  if not isdirpath(outputpath):
+    raise ValueError(f'outputpath:{outputpath!r}: not a directory')
+  DR = DockerRun(image=image, outputpath=outputpath)
+  DR.popopts(docker_run_opts)
+  if docker_run_opts:
+    raise ValueError(f'unparsed docker_run args: {docker_run_opts!r}')
+  # parse ffmpeg options in order to extract the input and output files
+  ffmpeg_argv = [ffmpeg_exe]
+  output_map = {}
+  while ffmpeg_args:
+    arg = ffmpeg_args.pop(0)
+    with Pfx(arg):
+      if arg == '':
+        raise ValueError("invalid empty outfile")
+      if arg == '-':
+        # output to stdout
+        ffmpeg_argv.append(arg)
+      elif not arg.startswith('-'):
+        # output filename
+        # TODO: URLs?
+        outbase = basename(arg)
+        if outbase in output_map:
+          base_prefix, base_ext = splitext(outbase)
+          for n in range(2, 128):
+            outbase = f'{base_prefix}-{n}{base_ext}'
+            if outbase not in output_map:
+              break
+          else:
+            raise ValueError('output basename and variants already allocated')
+        assert outbase not in output_map
+        output_map[outbase] = arg
+        ffmpeg_argv.append(outbase)
+      elif arg == '-i':
+        # input filename
+        # TODO: URLs?
+        inputpath = ffmpeg_args.pop(0)
+        if inputpath == '-':
+          # input from stdin
+          ffmpeg_argv.extend([arg, inputpath])
+        else:
+          inbase = basename(inputpath)
+          if inbase in DR.input_map:
+            base_prefix, base_ext = splitext(inbase)
+            for n in range(2, 128):
+              inbase = f'{base_prefix}-{n}{base_ext}'
+              if inbase not in DR.input_map:
+                break
+            else:
+              raise ValueError('input basename and variants already allocated')
+          assert inbase not in DR.input_map
+          DR.add_input(inbase, inputpath)
+          ffmpeg_argv.extend([arg, joinpath(DR.input_root, inbase)])
+      else:
+        arg_ = arg[1:]
+        # check for singular options
+        if arg_ in (
+            # information options
+            'version',
+            'buildconf',
+            'formats',
+            'muxers',
+            'demuxers',
+            'devices',
+            'codecs',
+            'decoders',
+            'encoders',
+            'bsfs',
+            'protocols',
+            'filters',
+            'pix_fmts',
+            'layouts',
+            'sample_fmts',
+            'dispositions',
+            'colors',
+            'hwaccels',  # global options
+            'report',
+            'y',
+            'n',
+            'ignore_unknown',
+            'stats',  # Per-file main options
+            'apad',
+            'reinit_filter',
+            'discard',
+            'disposition',  # Video options
+            'vn',
+            'dn',  # Audio options
+            'an',  # Subtitle options
+            'sn',
+        ):
+          ffmpeg_argv.append(arg)
+        else:
+          ffmpeg_argv.extend([arg, ffmpeg_args.pop(0)])
+  return DR.run(*ffmpeg_argv, docker_exe=docker_exe, doit=doit, quiet=quiet)
