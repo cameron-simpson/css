@@ -135,53 +135,7 @@ class DockerUtilCommand(BaseCommand):
     '''
     options = self.options
     DR = DockerRun()
-    pull_mode = 'always'
-    while argv:
-      arg0 = argv.pop(0)
-      if arg0 == '--':
-        break
-      if not arg0.startswith('-'):
-        argv.insert(0, arg0)
-        break
-      with Pfx(arg0):
-        assert arg0.startswith('-')
-        arg0_ = arg0[1:]
-        if arg0 == '-i':
-          inputpath = argv.pop(0)
-          inputmount = basename(inputpath)
-          DR.add_input(inputmount, inputpath)
-        elif arg0 == '-I':
-          inputpath = argv.pop(0)
-          inputmount = argv.pop(0)
-          DR.add_input(inputmount, inputpath)
-        elif arg0 == '-U':
-          DR.options.append('--pull-mode')
-          DR.options.append('always')
-        elif arg0_ in (
-            'd',
-            'detach',
-            'help',
-            'init',
-            'i',
-            'interactive',
-            'no-healthcheck',
-            'oom-kill-disable',
-            'privileged',
-            'P',
-            'publish-all',
-            'q',
-            'quiet',
-            'read-only',
-            'rm',
-            'sig-proxy',
-            't',
-            'tty',
-        ):
-          DR.options.append(arg0)
-        else:
-          arg1 = argv.pop(0)
-          DR.options.append(arg0)
-          DR.options.append(arg1)
+    DR.popopts(argv)
     if not argv:
       raise GetoptError("missing image")
     DR.image = argv.pop(0)
@@ -231,6 +185,70 @@ class DockerRun:
   output_root: str = OUTPUTDIR_DEFAULT
   outputpath: str = None
   output_root: str = '/output'
+
+  @typechecked
+  def popopts(self, argv: List[str]) -> None:
+    ''' Pop options from the list `argv`.
+
+        The command's working directory will be /output.
+        -i inputpath
+            Mount inputpath as /input/basename(inputpath)
+        -I inputpath dockerpath
+            Mount inputpath as /input/dockerpath
+        --root
+            Do not switch to the current effective uid:gid inside
+            the container.
+        -U  Update the local copy of image before running.
+        Other options are passed to "docker run".
+    '''
+    while argv:
+      arg0 = argv.pop(0)
+      if arg0 == '--':
+        break
+      if not arg0.startswith('-'):
+        argv.insert(0, arg0)
+        break
+      with Pfx(arg0):
+        assert arg0.startswith('-')
+        arg0_ = arg0[1:]
+        if arg0 == '-i':
+          inputpath = argv.pop(0)
+          inputmount = basename(inputpath)
+          self.add_input(inputmount, inputpath)
+        elif arg0 == '-I':
+          inputpath = argv.pop(0)
+          inputmount = argv.pop(0)
+          self.add_input(inputmount, inputpath)
+        elif arg0 == '--root':
+          self.as_root = True
+        elif arg0 == '-U':
+          self.options.append('--pull-mode')
+          self.options.append('always')
+        elif arg0_ in (
+            'd',
+            'detach',
+            'help',
+            'init',
+            'i',
+            'interactive',
+            'no-healthcheck',
+            'oom-kill-disable',
+            'privileged',
+            'P',
+            'publish-all',
+            'q',
+            'quiet',
+            'read-only',
+            'rm',
+            'sig-proxy',
+            't',
+            'tty',
+        ):
+          self.options.append(arg0)
+        else:
+          arg1 = argv.pop(0)
+          self.options.append(arg0)
+          self.options.append(arg1)
 
   def add_input(self, inputmount: str, inputpath: str):
     ''' Add an input mount mapping. '''
