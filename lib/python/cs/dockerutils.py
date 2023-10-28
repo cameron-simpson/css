@@ -130,8 +130,11 @@ class DockerUtilCommand(BaseCommand):
               Mount inputpath as /input/basename(inputpath)
           -I inputpath dockerpath
               Mount inputpath as /input/dockerpath
-          -U  Update the local copy of image before runnings.
-          Other options passed to "docker run".
+          --root
+              Do not switch to the current effective uid:gid inside
+              the container.
+          -U  Update the local copy of image before running.
+          Other options are passed to "docker run".
     '''
     options = self.options
     DR = DockerRun()
