@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from getopt import GetoptError
 import os
 from os.path import (
+    abspath,
     basename,
     isabs as isabspath,
     isdir as isdirpath,
@@ -17,6 +18,8 @@ from subprocess import CompletedProcess
 import sys
 from tempfile import TemporaryDirectory
 from typing import List, Optional
+
+from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, BaseCommandOptions
 from cs.context import stackattrs
@@ -144,7 +147,7 @@ class DockerUtilCommand(BaseCommand):
     DR.image = argv.pop(0)
     with TemporaryDirectory(dir='.') as T:
       with stackattrs(DR, outputpath=T):
-        trace(DR.run)(*argv, exe=options.docker_command)
+        DR.run(*argv, exe=options.docker_command)
 
 def docker(
     *dk_argv,
