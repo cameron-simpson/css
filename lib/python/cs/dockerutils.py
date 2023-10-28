@@ -222,11 +222,13 @@ def docker_compose(
 
 @dataclass
 class DockerRun:
+  INPUTDIR_DEFAULT = '/input'
+  OUTPUTDIR_DEFAULT = '/output'
   image: str = None
   options: List[str] = field(default_factory=list)
-  argv: List[str] = None
+  input_root: str = INPUTDIR_DEFAULT
   input_map: dict = field(default_factory=dict)
-  input_root: str = '/input'
+  output_root: str = OUTPUTDIR_DEFAULT
   outputpath: str = None
   output_root: str = '/output'
 
