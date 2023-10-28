@@ -43,6 +43,8 @@ DISTINFO = {
     ],
 }
 
+FFMPEG_EXE_DEFAULT = 'ffmpeg'
+
 class MetaData(TagSet):
   ''' Object containing fields which may be supplied to ffmpeg's -metadata option.
   '''
@@ -281,13 +283,14 @@ def convert(
   if overwrite:
     ff = ff.overwrite_output()
   ff_args = ff.get_args()
+  ff_argv = [FFMPEG_EXE_DEFAULT, *ff_args]
   if doit:
-    print_argv('ffmpeg', *ff_args)
-    fstags[dstpath]['ffmpeg.argv'] = ['ffmpeg', *ff_args]
+    print_argv(*ff_argv)
+    fstags[dstpath]['ffmpeg.argv'] = ff_argv
     fstags.sync()
     ff.run()
   else:
-    print_argv('ffmpeg', *ff_args, fold=True)
+    print_argv(*ff_argv, fold=True)
 
 def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
   ''' Run `ffprobe -print_format json` on `input_file`,
