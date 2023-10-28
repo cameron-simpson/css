@@ -322,12 +322,12 @@ def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
 def ffmpeg_docker(
     *ffmpeg_args: Iterable[str],
     docker_run_opts: Optional[Union[List[str], Mapping]] = None,
-    doit: bool = None,
-    quiet: bool = None,
+    doit: Optional[bool] = None,
+    quiet: Optional[bool] = None,
     ffmpeg_exe: Optional[str] = None,
     docker_exe: Optional[str] = None,
     image: Optional[str] = None,
-    outputpath: Optional[str] = '.',
+    outputpath: str = '.',
 ) -> Optional[CompletedProcess]:
   ffmpeg_args: List[str] = list(ffmpeg_args)
   if docker_run_opts is None:
