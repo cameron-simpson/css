@@ -155,10 +155,16 @@ do_mount(){
     set -ue
     case "$type" in
       ssh | sshfs )
+        set -x
         set -- \
-          set-x sshfs -f -o reconnect -o ssh_command='datethen set-x ssh' \
-            $sshfs_opts \
-            -- "$host:$path/" "$mount_point"
+          set-x sshfs -f \
+            -o reconnect \
+            -o ssh_command='datethen set-x ssh'
+        for idfile in gidfile uidfile
+        do  idfilepath=$HOME/rc/sshfs/$host-$idfile
+            [ -f "$idfilepath" ] && set -- "$@" -o "$idfile=$HOME/rc/sshfs/$host-$idfile"
+        done
+        set -- "$@" $sshfs_opts -- "$host:$path/" "$mount_point"
         [ $use_tmux ] && set -- tm use-session -d "MNT_${host}_${pathbase}" "$@"
         set -- $trace "$@"
         ;;
