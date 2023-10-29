@@ -370,10 +370,10 @@ class BaseCommand:
       Modules which implement a command line mode generally look like this:
 
           ... imports etc ...
-          def main(argv=None):
+          def main(argv=None, **run_kw):
               """ The command line mode.
               """
-              return MyCommand(argv).run()
+              return MyCommand(argv).run(**run_kw)
           ... other code ...
           class MyCommand(BaseCommand):
           ... other code ...
