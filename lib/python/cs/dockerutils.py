@@ -333,7 +333,7 @@ class DockerRun:
     docker_argv.extend(
         [
             '--mount',
-            f'type=bind,source={self.outputpath},destination={abspath(self.output_root)}'
+            f'type=bind,source={abspath(self.outputpath)},destination={self.output_root}'
         ]
     )
     if self.as_root:
