@@ -367,7 +367,7 @@ def ffmpeg_docker(
             raise ValueError('output basename and variants already allocated')
         assert outbase not in output_map
         output_map[outbase] = arg
-        ffmpeg_argv.append(outbase)
+        ffmpeg_argv.append('./' + outbase)
       elif arg == '-i':
         # input filename
         # TODO: URLs?
