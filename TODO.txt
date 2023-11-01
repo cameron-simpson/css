@@ -1,3 +1,4 @@
+rel needs to check packages against the list from the DE guys
 run-unbound: update config check incantation
 cs.app.ydl: adopt the name format in use by cs.app.playon
 ffmpeg-docker: support "ffmpeg-docker --version"
