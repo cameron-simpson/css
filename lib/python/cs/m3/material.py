@@ -337,7 +337,7 @@ class Material:
       data[f'v{label}'] += f / inertia * dt
 
   @typechecked
-  def Surface(
+  def as_Surface(
       self,
       slice_dim: int,
       slice_index: int,
@@ -435,6 +435,6 @@ class Material:
         for c in 0, shape[skip_dim] - 1:
           if runstate and runstate.cancelled:
             return None
-          surface = self.Surface(skip_dim, c, texture=texture)
+          surface = self.as_Surface(skip_dim, c, texture=texture)
           model.append(surface)
     return model
