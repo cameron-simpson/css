@@ -1013,6 +1013,7 @@ class PlotSeries(namedtuple('PlotSeries', 'label series extra')):
       - `extra`: a `dict` of extra information such as plot styling
   '''
 
+  # TODO: PlotSeries.promote() is nonsense at present
   @timerange
   def promote(cls, data, tsmap=None, extra=None):
     ''' Promote `data` to a `PlotSeries`.
