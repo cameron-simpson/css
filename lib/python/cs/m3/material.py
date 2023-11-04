@@ -185,7 +185,7 @@ class Material:
 
         The grid defines 2 things:
         the topological relationship of the particles,
-        used when computing forces between "adjecaent" particles
+        used when computing forces between "adjacent" particles
         or when deriving "surfaces",
         and the _initial_ spacial locations of the particles.
         The topological relation presists under deformation.
