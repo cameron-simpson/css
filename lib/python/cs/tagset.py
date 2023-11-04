@@ -1002,7 +1002,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return name, tags
 
   @classmethod
-  @pfx_method
   def edit_tagsets(cls, tes, editor=None, verbose=True):
     ''' Edit a collection of `TagSet`s.
         Return a list of `(old_name,new_name,TagSet)` for those which were modified.
@@ -1996,8 +1995,8 @@ class TagSetPrefixView(FormatableMixin):
           TagSet:{'a': 1, 'b': 2, 'sub.x': 3, 'sub.y': 4, 'sub.z': 5}
   '''
 
-  @typechecked
   @require(lambda prefix: len(prefix) > 0)
+  @typechecked
   def __init__(self, tags, prefix: str):
     self.__dict__.update(_tags=tags, _prefix=prefix, _prefix_=prefix + '.')
 
