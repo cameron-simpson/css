@@ -82,7 +82,7 @@ import numpy as np
 from numpy import datetime64, timedelta64
 from typeguard import typechecked
 
-from cs.binary import BinarySingleStruct, SimpleBinary
+from cs.binary import BinarySingleStruct, BinaryMultiStruct, SimpleBinary
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
@@ -2166,6 +2166,209 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
       ary.extend(fill for _ in range(ary_index - len(ary) + 1))
       self.modified = True
       assert len(ary) == ary_index + 1
+
+class TimeEventsFileHeader(SimpleBinary, HasEpochMixin):
+  ''' The binary data structure of the `TimeEventsFile` file header.
+
+      This is 8 bytes long and consists of:
+      * the 4 byte magic number, `b'csts'`
+      * the file bigendian marker, a `struct` byte order indicator
+        with a value of `b'>'` for big endian data
+        or `b'<'` for little endian data
+      * the datum typecode, `b'd'` for double float
+        or `b'q'` for signed 64 bit integer
+      * the time typecode, `b'd'` for double float
+        or `b'q'` for signed 64 bit integer
+      * a pad byte, value `b'_'`
+
+      In addition to the header values and methods this also presents:
+      * `datum_type`: a `BinarySingleStruct` for the binary form of a data value
+      * `time_type`:  a `BinarySingleStruct` for the binary form of a time value
+  '''
+
+  MAGIC = b'cste'
+  # MAGIC + endian + data type + time type + pad ('_')
+  # start time
+  # step time
+  HEADER_LENGTH = 8
+
+  @require(lambda typecode: typecode in 'dq')
+  @typechecked
+  def __init__(
+      self,
+      *,
+      bigendian: bool,
+      typecode: TypeCodeish,
+      time_typecode: TypeCodeish,
+  ):
+    typecode = TypeCode.promote(typecode)
+    time_typecode = TypeCode.promote(time_typecode)
+    super().__init__(
+        bigendian=bigendian,
+        typecode=typecode,
+        time_typecode=time_typecode,
+    )
+    self.timeddatum_type = BinaryMultiStruct(
+        'TimedDatum',
+        self.struct_endian_marker + self.time_typecode + self.typecode,
+        'when value',
+    )
+
+  @property
+  def struct_endian_marker(self):
+    ''' The endianness indicatoe for a `struct` format string.
+    '''
+    return '>' if self.bigendian else '<'
+
+  @classmethod
+  def parse(cls, bfr):
+    ''' Parse the header record, return a `TimeSeriesFileHeader`.
+    '''
+    offset0 = bfr.offset
+    magic = bfr.take(4)
+    if magic != cls.MAGIC:
+      raise ValueError(
+          "invalid magic number, expected %r, got %r" % (cls.MAGIC, magic)
+      )
+    struct_endian_b, typecode_b, time_typecode_b, pad = bfr.take(4)
+    struct_endian_marker = chr(struct_endian_b)
+    if struct_endian_marker == '>':
+      bigendian = True
+    elif struct_endian_marker == '<':
+      bigendian = False
+    else:
+      raise ValueError(
+          "invalid endian marker, expected '>' or '<', got %r" %
+          (struct_endian_marker,)
+      )
+    typecode = TypeCode(chr(typecode_b))
+    time_typecode = TypeCode(chr(time_typecode_b))
+    if pad != ord('_'):
+      warning(
+          "ignoring unexpected header pad, expected %r, got %r" % (b'_', pad)
+      )
+    assert bfr.offset - offset0 == cls.HEADER_LENGTH
+    return cls(
+        bigendian=bigendian,
+        typecode=typecode,
+        time_typecode=time_typecode,
+    )
+
+  def transcribe(self):
+    ''' Transcribe the header record.
+    '''
+    yield self.MAGIC
+    yield b'>' if self.bigendian else b'<'
+    yield self.typecode
+    yield self.time_typecode
+    yield b'_'
+
+class TimeEventsFile(dict, HasFSPath, MultiOpenMixin):
+
+  def __init__(self, fspath, typecode: TypeCodeish):
+    HasFSPath().__init__(fspath)
+    self.modified = False
+    self._load()
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' `MultiOpenMixin` hook to save the file if we modified the data.
+    '''
+    try:
+      yield
+    finally:
+      if self.modified:
+        self._save()
+
+  @require(lambda self: not self.modified)
+  def _load(self):
+    ''' Load the existing file contents.
+    '''
+    self.clear()
+    try:
+      fd = pfx_call(os.open, self.fspath, os.O_RDONLY)
+    except FileNotFoundError:
+      header = TimeEventsFileHeader(
+          bigendian=NATIVE_BIGENDIANNESS[self.typecode],
+          typecode=self.typecode,
+          time_typecode=self.time_typecode,
+      )
+    else:
+      try:
+        bfr = CornuCopyBuffer.from_mmap(fd)
+        header, = TimeEventsFileHeader.scan(bfr, max_count=1)
+        timeddatum_type = header.timeddatum_type
+        while True:
+          try:
+            when, value = timeddatum_type.parse(bfr)
+          except EOFError:
+            break
+          self[when] = value
+      finally:
+        os.close(fd)
+    self.header = header
+    self.modified = False
+
+  def _save(self):
+    ''' Write the data back into the file.
+
+        Note:
+        this uses `atomic_filename` to create a new temporary file
+        which is then renamed onto the original.
+    '''
+    if not self.modified:
+      return
+    saved = self.save_to(self.fspath)
+    self.modified = False
+    return saved
+
+  def save_to(self, fspath):
+    ''' Write the data back into the file.
+
+        Note:
+        this uses `atomic_filename` to create a new temporary file
+        which is then renamed onto the original.
+    '''
+    timeddatum_type = self.header.timeddatum_type
+    items = sorted(self.__data.items())
+    with atomic_filename(fspath, exists_ok=True,
+                         prefix='.tmp-{basename(fspath)}') as T:
+      with pfx_open(T.name, 'wb') as f:
+        f.write(bytes(self.header))
+        for when, value in items:
+          f.write(timeddatum_type(when, value).transcribe())
+
+  def __delitem__(self, when):
+    super().__delitem__(when)
+    self.modified = True
+
+  def __setitem__(self, when, value):
+    super().__setitem__(when, value)
+    self.modified = True
+
+  def clear(self):
+    if len(self) > 0:
+      super().clear()
+      self.modified = True
+
+  def pop(self, k):
+    retval = super().pop(k)
+    self.modified = True
+    return retval
+
+  def popitem(self):
+    kv = super().popitem()
+    self.modified = True
+    return kv
+
+  def setdefault(self, k, default=None):
+    try:
+      v = self[k]
+    except KeyError:
+      self[k] = default
+      v = default
+      self.modified = True
+    return v
 
 class TimePartition(namedtuple('TimePartition',
                                'epoch name start_offset end_offset'),
