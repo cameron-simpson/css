@@ -16,7 +16,7 @@
     * `dump`,`dumps`,dumpz`: after the style of `json.dump`, functions
       to dump objects in Egg syntax
     * `Eggable`: a mixin to support objects which can be transcribed in Egg syntax
-    * `DCEggable`: an `Eggable` based on a dataclass
+    * `EggableDataClass`: an `Eggable` based on a dataclass
     * `Eggable.as_str(obj)`: a class method to transcribe an object in Egg syntax,
       accepting `Eggable`s, `str`s and numeric values
     * various factories and classes for Egg nodes: `Texture`,
@@ -194,7 +194,7 @@ class Eggable(metaclass=EggMetaClass):
       * `egg_contents`: return an iterable of items contained by this Egg node
 
       A common implementation for Egg nodes is based on a data class,
-      see the `DCEggable` subclass which is oriented to this.
+      see the `EggableDataClass` subclass which is oriented to this.
 
       This base implementation provides the following implementations:
       * `egg_name`: returns `self.name` or `None` if that is missing
@@ -385,7 +385,7 @@ class EggableList(list, Eggable):
   def egg_contents(self):
     return iter(self)
 
-class DCEggable(Eggable):
+class EggableDataClass(Eggable):
   ''' `Eggable` subclass for dataclasses.
 
        This provides an `egg_contents` method which enumerates the
@@ -449,8 +449,8 @@ class DCEggable(Eggable):
     ''' Promote `obj` to `cls`. Return the promoted object.
 
         Promotions:
-        * `list` or `tuple` to `DCEggable(*obj)`
-        * `dict` to `DCEggable(**obj)`
+        * `list` or `tuple` to `EggableDataClass(*obj)`
+        * `dict` to `EggableDataClass(**obj)`
         Other types are promoted via `Eggable.promote`.
     '''
     if not isinstance(obj, cls):
@@ -526,28 +526,28 @@ class EggNode(Eggable):
     return self.contents
 
 @dataclass
-class Normal(DCEggable):
+class Normal(EggableDataClass):
   POSITIONAL = True
   x: float
   y: float
   z: float
 
 @dataclass
-class BiNormal(DCEggable):
+class BiNormal(EggableDataClass):
   POSITIONAL = True
   x: float
   y: float
   z: float
 
 @dataclass
-class Tangent(DCEggable):
+class Tangent(EggableDataClass):
   POSITIONAL = True
   x: float
   y: float
   z: float
 
 @dataclass
-class UV(DCEggable):
+class UV(EggableDataClass):
   POSITIONAL = True
   u: float
   v: float
@@ -555,7 +555,7 @@ class UV(DCEggable):
   BiNormal: Optional[BiNormal] = None
 
 @dataclass
-class RGBA(DCEggable):
+class RGBA(EggableDataClass):
   POSITIONAL = True
   r: float
   g: float
@@ -575,29 +575,29 @@ class RGBA(DCEggable):
     return cls(r, g, b, a)
 
 @dataclass
-class Translate(DCEggable):
+class Translate(EggableDataClass):
   POSITIONAL = True
   x: float
   y: float
   z: float
 
 @dataclass
-class RotX(DCEggable):
+class RotX(EggableDataClass):
   POSITIONAL = True
   degrees: float
 
 @dataclass
-class RotY(DCEggable):
+class RotY(EggableDataClass):
   POSITIONAL = True
   degrees: float
 
 @dataclass
-class RotZ(DCEggable):
+class RotZ(EggableDataClass):
   POSITIONAL = True
   degrees: float
 
 @dataclass
-class Rotate(DCEggable):
+class Rotate(EggableDataClass):
   POSITIONAL = True
   degrees: float
   x: Optional[float] = None
@@ -615,13 +615,13 @@ class Rotate(DCEggable):
     return rotate
 
 @dataclass
-class Scale1(DCEggable):
+class Scale1(EggableDataClass):
   POSITIONAL = True
   egg_name = lambda _: 'Scale'
   s: float
 
 @dataclass
-class Scale3(DCEggable):
+class Scale3(EggableDataClass):
   POSITIONAL = True
   egg_name = lambda _: 'Scale'
   x: float
@@ -629,7 +629,7 @@ class Scale3(DCEggable):
   z: float
 
 @dataclass
-class Matrix4(DCEggable):
+class Matrix4(EggableDataClass):
   POSITIONAL = True
   aa: float
   ab: float
@@ -652,7 +652,7 @@ class Transform(EggableList):
   pass
 
 @dataclass
-class Vertex(DCEggable):
+class Vertex(EggableDataClass):
   POSITIONAL = 'x', 'y', 'z', 'w'
   x: float
   y: float
@@ -818,7 +818,7 @@ class Texture(Eggable):
 REFTYPES.add(RefTypeSpec(type=Texture, refname='TRef'))
 
 @dataclass
-class Material(DCEggable):
+class Material(EggableDataClass):
   name: str
   diffr: Optional[float] = None
   diffg: Optional[float] = None
