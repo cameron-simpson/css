@@ -251,8 +251,8 @@ class PlayOnCommand(BaseCommand):
         with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
-              filename.lower().replace(' - ', '--')
-              .replace(' ', '-').replace('_', ':').replace(os.sep, ':') + '.'
+              filename.lower().replace(' - ', '--').replace(' ', '-')
+              .replace('_', ':').replace(os.sep, ':') + '.'
           )
           filename = re.sub('---+', '--', filename)
           try:
@@ -359,7 +359,7 @@ class PlayOnCommand(BaseCommand):
           warning("no recording ids")
           xit = 1
           continue
-        for dl_id in recording_ids:
+        for dl_id in sorted(recording_ids):
           recording = sqltags[dl_id]
           with Pfx(recording.name):
             recording.ls(ls_format=listing_format, long_mode=long_mode)
