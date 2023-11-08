@@ -111,14 +111,18 @@ do
   shift
 done
 
-[ -s "$DK_COMPOSE_YML" ] || \
-  if yml=$( findup "$DK_COMPOSE_YML" )
-  then
-    DK_COMPOSE_YML=$yml
-  else
-    echo "$cmd: cannot find \$DK_COMPOSE_YML=$DK_COMPOSE_YML" >&2
-    badopts=1
-  fi
+case "$DK_COMPOSE_YML" in
+  '') if yml=$( findup "$DK_COMPOSE_YML" )
+      then
+        DK_COMPOSE_YML=$yml
+      else
+        DK_COMPOSE_YML=$PWD/docker-compose.yml
+      fi
+      ;;
+  /*) ;;
+  *)  DK_COMPOSE_YML=$PWD/$DK_COMPOSE_YML
+      ;;
+esac
 
 if [ $# = 0 ]
 then
@@ -178,7 +182,7 @@ resolve_container_path(){
   )
 }
 
-DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
+[ -e "$DK_COMPOSE_YML" ] && DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
 : ${DK_BASE_PREFIX:=${COMPOSE_PROJECT_NAME:-$( basename "$ymlbasedir" )}}
 base=$DK_BASE_PREFIX
