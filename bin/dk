@@ -251,6 +251,71 @@ case "$op" in
             psql -e -U $DK_PSQL_SETUP_USERNAME $DK_PSQL_DBNAME
            "
       ;;
+  login)
+      # DK_LOGIN_USERNAME DK_LOGIN_HOST
+      ##set -x
+      if [ $# = 0 ]
+      then opt1=--show
+      else opt1=$1; shift
+      fi
+      case "$opt1" in
+        --show)
+          [ $# = 0 ] || { echo "$cmd $op $opt1: extra arguments: $*" >&2; exit 2; }
+          set -u
+          echo "$DK_LOGGEDIN_HOST"
+          echo "$DK_LOGGEDIN_USERNAME"
+          exit 0
+          ;;
+        --update)
+          case "$#" in
+            0)  new_host=$DK_LOGIN_HOST
+                new_username=$DK_LOGIN_USERNAME
+                ;;
+            2)  new_host=$1
+                new_username=$2
+                ;;
+            *)  echo "$cmd $op $opt1: expected host and username but \$#=$#: $*" >&2
+                exit 2
+                ;;
+          esac
+          old_host=${DK_LOGGEDIN_HOST:-''}
+          old_username=${DK_LOGGEDIN_USERNAME:-''}
+          [ "x$old_host" = "x$new_host" -a "x$old_username" = "x$new_username" ] \
+          || {
+               set -uex
+               docker logout
+               docker login --username "$new_username" "$new_host" >&2
+          }
+          exit $?
+          ;;
+        --update-sh)
+          case "$#" in
+            0)  new_host=$DK_LOGIN_HOST
+                new_username=$DK_LOGIN_USERNAME
+                ;;
+            2)  new_host=$1
+                new_username=$2
+                ;;
+            *)  echo "$cmd $op $opt1: expected host and username but \$#=$#: $*" >&2
+                exit 2
+                ;;
+          esac
+          if "$0" login --update "$new_host" "$new_username"
+          then
+            set -ue
+            new_host_qs=$( shqstr "$new_host" )
+            new_username_qs=$( shqstr "$new_username" )
+            echo "export DK_LOGGEDIN_HOST=$new_host_qs"
+            echo "export DK_LOGGEDIN_USERNAME=$new_username_qs"
+          fi
+          exit $?
+          ;;
+        *)set -x
+          exec docker login "$opt1" ${1+"$@"}
+          ;;
+      esac
+      exit 1
+      ;;
   logs)
       set -x
       [ $# -gt 0 ] || set -- -f -t --tail=50 "$DK_PRIMARY_SERVICE"
