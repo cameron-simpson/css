@@ -760,13 +760,14 @@ uses_vpool = default_params(vpool=lambda: VertexPool.default())
 
 class PointLight(Eggable):
 
+  @uses_vpool
   @promote
   @typechecked
   def __init__(
       self,
       name: str,
-      vpool: VertexPool,
       *vertices,
+      vpool: VertexPool,
       **attrs,
   ):
     self.name = name
