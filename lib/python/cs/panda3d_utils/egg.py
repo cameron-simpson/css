@@ -696,9 +696,11 @@ class Vertex(EggableDataClass):
         x=self.x, y=self.y, z=self.z, w=self.w, attrs=dict(self.attrs)
     )
 
-class VertexPool(Eggable):
+class VertexPool(Eggable, HasThreadState):
   ''' A subclass of `list` containing vertices.
   '''
+
+  perthread_state = ThreadState()
 
   @typechecked
   def __init__(self, name: str, *vertices, keyfn=None):
