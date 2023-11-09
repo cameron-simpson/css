@@ -44,13 +44,15 @@ class Surface:
 
   def add_polygon(self, *vertices, **polygon_attrs):
     ''' Create and add a new `Polygon` to the `Surface`.
+
+        The `vertices` may be `Vertex` instances or vertex indices.
     '''
     if len(vertices) < 3:
       raise ValueError(
           "need at least 3 vertices, but only received %d" % (len(vertices),)
       )
     vifn = self.vpool.vertex_index
-    vindices = [vifn(v) for v in vertices]
+    vindices = [(v if isinstance(v, int) else vifn(v)) for v in vertices]
     self.polygons.append(Polygon(None, self.vpool, *vindices, **polygon_attrs))
 
   @promote
