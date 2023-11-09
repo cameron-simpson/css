@@ -162,7 +162,9 @@ class EggRegistry(defaultdict, HasThreadState):
 # a stackable state
 _registry0 = EggRegistry(__file__)
 
-uses_registry = default_params(registry=lambda: EggRegistry.default())
+uses_registry = default_params(
+    registry=lambda: EggRegistry.default() or _registry0
+)
 
 class EggMetaClass(type):
 
