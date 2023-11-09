@@ -174,7 +174,10 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
   o_s = repr(o) if use_repr else str(o)
   if max_length is not None:
     o_s = cropped(o_s, max_length)
-  s = "%s:%s" % (type(o) if use_cls else type(o).__name__, o_s)
+  cls = type(o)
+  s = "%s:%s" % (
+      (cls if use_cls else cls.__module__ + '.' + cls.__name__), o_s
+  )
   return s
 
 # convenience alias
