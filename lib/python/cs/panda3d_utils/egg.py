@@ -714,12 +714,12 @@ class VertexPool(Eggable, HasThreadState):
       self.vertex_index(v)
 
   def __len__(self):
-    return len(self.vertices)
+    return len(self._by_vkey)
 
   def __iter__(self):
     ''' Iteration yields the `vertices`.
     '''
-    return iter(self.vertices)
+    return iter(self._by_vkey.values())
 
   def egg_contents(self):
     ''' The Egg contents are synthetic `vertex` nodes numbered by their position.
