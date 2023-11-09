@@ -370,12 +370,17 @@ class Eggable(metaclass=EggMetaClass):
         Promotions:
         * `str` to the `Eggable` registered with that name
     '''
-    if not isinstance(obj, cls):
-      if isinstance(obj, str):
-        obj = cls.instance(obj, registry=registry)
-      else:
-        raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
-    return obj
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, str):
+      return cls.instance(obj, registry=registry)
+    try:
+      from .blender import as_Eggable
+    except ImportError:
+      pass
+    else:
+      return as_Eggable(obj)
+    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
 
 class EggableList(list, Eggable):
   ''' An `Eggable` which is just a list of items, such as `<Transform>`.
