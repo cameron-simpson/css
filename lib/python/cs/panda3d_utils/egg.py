@@ -944,6 +944,7 @@ class Model(ContextManagerMixin):
     with self._registry:
       yield self
 
+  @promote
   @typechecked
   def append(self, item: Eggable):
     ''' Append `item` to the model.
