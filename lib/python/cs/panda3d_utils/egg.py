@@ -755,6 +755,9 @@ class VertexPool(Eggable, HasThreadState):
   def vertex_by_index(self, index: int) -> Vertex:
     return self.vertex_map[index]
 
+# use the prevailing VertexPool
+uses_vpool = default_params(vpool=lambda: VertexPool.default())
+
 class PointLight(Eggable):
 
   @promote
