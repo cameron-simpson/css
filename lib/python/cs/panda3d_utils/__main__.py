@@ -83,15 +83,15 @@ class P3DCommand(BaseCommand):
             ##texture=texture,
         )
         model.append(surface)
-        model.append(
-            PointLight(
-                "light0",
-                surface.vpool,
-                (100, 100, 100),
-                thick=10,
-                RGBA=RGBA(300, 0, 0),
-            )
-        )
+        with surface.vpool:
+          model.append(
+              PointLight(
+                  "light0",
+                  (100, 100, 100),
+                  thick=10,
+                  RGBA=RGBA(300, 0, 0),
+              )
+          )
       scene = model
     else:
       scene = model_spec
