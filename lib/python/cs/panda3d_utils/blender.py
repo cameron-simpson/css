@@ -69,9 +69,13 @@ class BlenderObjectProxy(Eggable):
       )
 
   def egg_name(self):
+    ''' The default Egg name comes from `self.name`.
+    '''
     return self.name
 
   def egg_type(self):
+    ''' The default Egg type comes from the class name of `self.egg_cls`.
+    '''
     return self.egg_cls.__name__
 
 class LightProxy(BlenderObjectProxy):
@@ -95,6 +99,8 @@ class LightProxy(BlenderObjectProxy):
   @uses_vpool
   @typechecked
   def egg_contents(self, *, vpool: VertexPool):
+    ''' Return the Egg contents by constructing a suitable light object.
+    '''
     light = self.egg_cls(self.name, vpool=vpool)
     return light.egg_contents()
 
@@ -141,6 +147,6 @@ if __name__ == '__main__':
         try:
           eggable = as_Eggable(blobj)
         except TypeError as e:
-          warning("cannot represent in Egg syntax: %s", e)
+          warning("SKIP, cannot represent in Egg syntax: %s", e)
         else:
           print(as_Eggable(blobj))
