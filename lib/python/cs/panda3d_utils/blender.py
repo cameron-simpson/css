@@ -110,10 +110,16 @@ class MeshProxy(BlenderObjectProxy):
 
   @typechecked
   def egg_contents(self):
-    return self.as_Surface().egg_contents()
+    ''' Return the Egg contents by constructing a `cs.panda3d_utils.geom.Surface`.
+    '''
+    surface = self.as_Surface()
+    return surface.as_Eggable().egg_contents()
 
   @uses_vpool
+  @typechecked
   def as_Surface(self, *, vpool: VertexPool) -> Surface:
+    ''' Return a `cs.panda3d_utils.geom.Surface` representing the mesh.
+    '''
     mesh = self.blender_object.data
     surface = Surface(self.name, vpool=vpool)
     # store all the vertices
@@ -123,7 +129,7 @@ class MeshProxy(BlenderObjectProxy):
     # store the polygons
     for p in mesh.polygons:
       surface.add_polygon(*[sindex_by_vindex[vindex] for vindex in p.vertices])
-    return surface.as_Eggable()
+    return surface
 
 if __name__ == '__main__':
   setup_logging()
