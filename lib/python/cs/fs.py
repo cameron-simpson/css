@@ -28,7 +28,7 @@ from icontract import require
 
 from cs.deco import decorator
 from cs.obj import SingletonMixin
-from cs.pfx import pfx_call
+from cs.pfx import pfx, pfx_call
 
 __version__ = '20230806-post'
 
@@ -324,8 +324,12 @@ def longpath(path, prefixes=None):
   path = expandvars(path)
   return path
 
-def is_clean_subpath(subpath: str):
-  ''' Test that `subpath` is clean:
+@pfx
+def validate_rpath(rpath: str):
+  ''' Test that `rpath` is a clean relative path with no funny business;
+      raise `ValueError` if the test fails.
+
+      Tests:
       - not empty or '.' or '..'
       - not an absolute path
       - normalised
@@ -333,13 +337,30 @@ def is_clean_subpath(subpath: str):
 
       Examples:
 
-          >>> is_clean_subpath('')
+          >>> validate_rpath('')
           False
-          >>> is_clean_subpath('.')
+          >>> validate_rpath('.')
   '''
-  if subpath in ('', '.', '..'):
+  if not rpath:
+    raise ValueError('empty path')
+  if rpath in ('.', '..'):
+    raise ValueError('may not be . or ..')
+  if isabspath(rpath):
+    raise ValueError('absolute path')
+  if rpath != normpath(rpath):
+    raise ValueError('!= normpath(rpath)')
+  if rpath.startswith('../'):
+    raise ValueError('goes up')
+
+def is_valid_rpath(rpath, log=None) -> bool:
+  ''' Test that `rpath` is a clean relative path with no funny business.
+
+      This is a Boolean wrapper for `validate_rpath()`.
+  '''
+  try:
+    validate_rpath(rpath)
+  except ValueError as e:
+    if log is not None:
+      log("invalid: %s", e)
     return False
-  if isabspath(subpath):
-    return False
-  normalised = normpath(subpath)
-  return subpath == normalised and not normalised.startswith('../')
+  return True

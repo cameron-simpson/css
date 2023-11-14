@@ -1,3 +1,5 @@
+dk login update: silence on no change, same for update-sh
+rel needs to check packages against the list from the DE guys
 run-unbound: update config check incantation
 cs.app.ydl: adopt the name format in use by cs.app.playon
 ffmpeg-docker: support "ffmpeg-docker --version"

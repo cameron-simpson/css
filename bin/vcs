@@ -97,14 +97,14 @@ cd "$wd"
     hg)   if [ -d .hg ]
           then  vcs_top=$wd
           elif [ -d ../.hg ]
-          then  vcs_top=$( dirname "$wd" )
+          then  vcs_top=$( dirname "$(pwd)" )
           else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.hg" ]' )
           fi
           ;;
     git)  if [ -d .git ]
           then  vcs_top=$wd
           elif [ -d ../.git ]
-          then  vcs_top=$( dirname "$wd" )
+          then  vcs_top=$( dirname "$(pwd)" )
           else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.git" ]' )
           fi
           ;;
@@ -112,7 +112,7 @@ cd "$wd"
     '')   if [ -d .hg -o -d .git ]
           then  vcs_top=$wd
           elif [ -d ../.hg -o -d ../.git ]
-          then  vcs_top=$( dirname "$wd" )
+          then  vcs_top=$( dirname "$(pwd)" )
           else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' )
           fi
           ;;

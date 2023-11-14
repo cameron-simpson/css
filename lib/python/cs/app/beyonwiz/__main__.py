@@ -86,7 +86,7 @@ class BWizCmd(BaseCommand):
         elif arg0.startswith('-a:'):
           acodec = arg0[3:]
         elif arg0.startswith('-v:'):
-          acodec = arg0[3:]
+          vcodec = arg0[3:]
         elif arg0 == '--rm':
           remove_source = True
         else:
