@@ -93,7 +93,6 @@ class PilferCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
-    pilfer: "Pilfer" = field(default_factory=lambda: Pilfer)
     quiet: bool = False
     jobs: int = DEFAULT_JOBS
     flagnames: str = DEFAULT_FLAGS_CONJUNCTION
@@ -140,9 +139,16 @@ class PilferCommand(BaseCommand):
     ''' Apply the `options.runstate` to the main `Pilfer`.
     '''
     with super().run_context():
-      options = self.options
-      with stackattrs(options.pilfer, runstate=options.runstate):
-        yield
+      later = Later(options.jobs)
+      with later:
+        pilfer = Pilfer(later=later)
+        with stackattrs(
+            options,
+            later=later,
+            pilfer=pilfer,
+            runstate=options.runstate,
+        ):
+          yield
 
   @staticmethod
   def hack_postopts_argv(argv, options):
@@ -194,7 +200,6 @@ class PilferCommand(BaseCommand):
         error(err)
       raise GetoptError("invalid main pipeline")
 
-    LTR = Later(options.jobs)
     P.flagnames = options.flagnames.split()
     if cs.logutils.D_mode or ifdebug():
       # poll the status of the Later regularly
