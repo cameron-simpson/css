@@ -421,7 +421,7 @@ def url_xml_find(U: URL, match):
   for found in url_io(U.xml_find_all, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
-class Pilfer:
+class Pilfer(MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
 
       Notable attributes include:
@@ -430,7 +430,8 @@ class Pilfer:
       * `user_vars`: mapping of user variables for arbitrary use.
   '''
 
-  def __init__(self, item=None):
+  @uses_later
+  def __init__(self, item=None, later: Later):
     self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
     self.user_vars = {'_': item, 'save_dir': '.'}
@@ -447,11 +448,17 @@ class Pilfer:
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     self.opener.add_handler(HTTPCookieProcessor())
+    self.later = later
 
   def __str__(self):
     return "%s[%s]" % (self._name, self._)
 
   __repr__ = __str__
+
+  @contextmanager
+  def startup_shutdown(self):
+    with self.later:
+      yield
 
   def copy(self, *a, **kw):
     ''' Convenience function to shallow copy this `Pilfer` with modifications.
