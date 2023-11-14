@@ -111,29 +111,6 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       except AttributeError:
         pass
 
-  @classmethod
-  def promote(cls, obj):
-    ''' Promote `obj` to an instance of `cls`.
-        Instances of `cls` are passed through unchanged.
-        `str` is promoted directly to `cls(obj)`.
-        `(url,referer)` is promoted to `cls(url,referer=referer)`.
-    '''
-    if isinstance(obj, cls):
-      return obj
-    if isinstance(obj, str):
-      return cls(obj)
-    try:
-      url, referer = obj
-    except (ValueError, TypeError):
-      raise TypeError(
-          "%s.promote: cannot convert to URL: %s" % (cls.__name__, r(obj))
-      )
-    if isinstance(url, cls):
-      obj = url if referer is None else cls(url, referer=referer)
-    else:
-      obj = cls.promote(url) if referer is None else cls(url, referer=referer)
-    return obj
-
   def __getattr__(self, attr):
     ''' Ad hoc attributes.
         Upper case attributes named "FOO" parse the text and find
@@ -600,6 +577,29 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     ''' Default URLLimit for this URL: same host:port, any subpath.
     '''
     return URLLimit(self.scheme, self.hostname, self.port, '/')
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to an instance of `cls`.
+        Instances of `cls` are passed through unchanged.
+        `str` is promoted directly to `cls(obj)`.
+        `(url,referer)` is promoted to `cls(url,referer=referer)`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, str):
+      return cls(obj)
+    try:
+      url, referer = obj
+    except (ValueError, TypeError):
+      raise TypeError(
+          "%s.promote: cannot convert to URL: %s" % (cls.__name__, r(obj))
+      )
+    if isinstance(url, cls):
+      obj = url if referer is None else cls(url, referer=referer)
+    else:
+      obj = cls.promote(url) if referer is None else cls(url, referer=referer)
+    return obj
 
 class URLLimit(namedtuple('URLLimit', 'scheme hostname port subpath')):
 
