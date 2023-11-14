@@ -211,42 +211,56 @@ class PilferCommand(BaseCommand):
       ping = Thread(target=pinger, args=(LTR,))
       ping.daemon = True
       ping.start()
-
-    with LTR as L:
-      P.later = L
-      # construct the pipeline
-      pipe = pipeline(
-          L,
-          pipe_funcs,
-          name="MAIN",
-          outQ=NullQueue(name="MAIN_PIPELINE_END_NQ", blocking=True).open(),
-      )
-      X("MAIN: RUN PIPELINE...")
-      with pipe:
-        for U in urls(url, stdin=sys.stdin, cmd=self.cmd):
-          X("MAIN: PUT %r", U)
-          pipe.put(P.copy_with_vars(_=U))
-      X("MAIN: RUN PIPELINE: ALL ITEMS .put")
-      # wait for main pipeline to drain
-      LTR.state("drain main pipeline")
-      for item in pipe.outQ:
-        warning("main pipeline output: escaped: %r", item)
-      # At this point everything has been dispatched from the input queue
-      # and the only remaining activity is in actions in the diversions.
-      # As long as there are such actions, the Later will be busy.
-      # In fact, even after the Later first quiesces there may
-      # be stalled diversions waiting for EOF in order to process
-      # their "func_final" actions. Releasing these may pass
-      # tasks to other diversions.
-      # Therefore we iterate:
-      #  - wait for the Later to quiesce
-      #  - TODO: topologically sort the diversions
-      #  - pick the [most-ancestor-like] diversion that is busy
-      #    or exit loop if they are all idle
-      #  - close the div
-      #  - wait for that div to drain
-      #  - repeat
-      # drain all the diversions, choosing the busy ones first
+    P.later = L
+    # construct the pipeline
+    pipe = pipeline(
+        pipe_funcs,
+        name="MAIN",
+        outQ=NullQueue(name="MAIN_PIPELINE_END_NQ", blocking=True).open(),
+    )
+    with pipe:
+      for U in urls(url, stdin=sys.stdin, cmd=self.cmd):
+        pipe.put(P.copy_with_vars(_=U))
+    # wait for main pipeline to drain
+    later.state("drain main pipeline")
+    for item in pipe.outQ:
+      warning("main pipeline output: escaped: %r", item)
+    # At this point everything has been dispatched from the input queue
+    # and the only remaining activity is in actions in the diversions.
+    # As long as there are such actions, the Later will be busy.
+    # In fact, even after the Later first quiesces there may
+    # be stalled diversions waiting for EOF in order to process
+    # their "func_final" actions. Releasing these may pass
+    # tasks to other diversions.
+    # Therefore we iterate:
+    #  - wait for the Later to quiesce
+    #  - TODO: topologically sort the diversions
+    #  - pick the [most-ancestor-like] diversion that is busy
+    #    or exit loop if they are all idle
+    #  - close the div
+    #  - wait for that div to drain
+    #  - repeat
+    # drain all the diversions, choosing the busy ones first
+    divnames = P.open_diversion_names
+    while divnames:
+      busy_name = None
+      for divname in divnames:
+        div = P.diversion(divname)
+        if div._busy:
+          busy_name = divname
+          break
+      # nothing busy? pick the first one arbitrarily
+      if not busy_name:
+        busy_name = divnames[0]
+      busy_div = P.diversion(busy_name)
+      later.state("CLOSE DIV %s", busy_div)
+      busy_div.close(enforce_final_close=True)
+      outQ = busy_div.outQ
+      later.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)
+      for item in outQ:
+        # diversions are supposed to discard their outputs
+        error("%s: RECEIVED %r", busy_div, item)
+      later.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
       divnames = P.open_diversion_names
       while divnames:
         busy_name = None
