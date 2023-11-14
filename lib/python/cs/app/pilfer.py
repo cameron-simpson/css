@@ -932,15 +932,17 @@ def url_io(func, onerror, *a, **kw):
     warning("%s", e)
     return onerror
 
-def url_io_iter(I):
-  ''' Generator that calls `I.next()` until StopIteration, yielding
+@uses_runstate
+def url_io_iter(it, *, runstate):
+  ''' Generator that calls `it.next()` until `StopIteration`, yielding
       its values.
       If the call raises URLError or HTTPError, report the error
       instead of aborting.
   '''
   while True:
+    runstate.raiseif("url_io_iter(it=%s): cancelled", it)
     try:
-      item = next(I)
+      item = next(it)
     except StopIteration:
       break
     except (URLError, HTTPError) as e:
