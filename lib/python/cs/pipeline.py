@@ -133,10 +133,11 @@ class _PipelineStage(PushQueue):
     '''
     return self.pipeline.later.defer(functor, *a, **kw)
 
-  def defer_iterable(self, I, outQ):
-    ''' Submit an iterable `I` for processing to `outQ`.
+  @not_cancelled
+  def defer_iterable(self, it: Iterable, outQ):
+    ''' Submit an iterable `it` for processing to `outQ`.
     '''
-    return self.pipeline.later.defer_iterable(I, outQ)
+    return self.pipeline.later.defer_iterable(it, outQ)
 
 class _PipelineStageOneToOne(_PipelineStage):
 
@@ -165,13 +166,13 @@ class _PipelineStageOneToMany(_PipelineStage):
     LF = self.defer(self.functor, item)
 
     def notify(LF):
-      I, exc_info = LF.join()
+      it, exc_info = LF.join()
       if exc_info:
         # report exception
         error("%s.put(%r): %r", self.name, item, exc_info, stack_info=True)
         self.outQ.close()
       else:
-        self.defer_iterable(I, self.outQ)
+        self.defer_iterable(it, self.outQ)
 
     LF.notify(notify)
 
@@ -192,13 +193,13 @@ class _PipelineStageManyToMany(_PipelineStage):
     LF = self.defer(self.functor, gathered)
 
     def notify(LF):
-      I, exc_info = LF.join()
+      it, exc_info = LF.join()
       if exc_info:
         # report exception
-        error("%s.put(%r): %r", self.name, I, exc_info, stack_info=True)
+        error("%s.put(%r): %r", self.name, it, exc_info, stack_info=True)
         self.outQ.close()
       else:
-        self.defer_iterable(I, self.outQ)
+        self.defer_iterable(it, self.outQ)
       _PipelineStage.shutdown(self)
 
     LF.notify(notify)
