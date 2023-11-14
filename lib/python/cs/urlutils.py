@@ -172,7 +172,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   def content(self):
     ''' The URL content as a string.
     '''
-    return self.GET().context
+    return self.GET().content
 
   @safe_property
   def text(self):
