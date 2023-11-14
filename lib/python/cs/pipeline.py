@@ -235,8 +235,10 @@ class Pipeline(MultiOpenMixin):
       a call to `Later.pipeline`.
   '''
 
-  def __init__(self, name, L, actions, outQ):
-    ''' Initialise the Pipeline from `name`, Later instance `L`,
+  @uses_later
+  @typechecked
+  def __init__(self, name: str, *, later: Later, actions: Iterable, outQ):
+    ''' Initialise the Pipeline from `name`, Later instance `later`,
         list of filter functions `actions` and output queue `outQ`.
 
         Each action is either a 2-tuple of `(sig,functor)` or an
@@ -244,7 +246,7 @@ class Pipeline(MultiOpenMixin):
         a callable.
     '''
     self.name = name
-    self.later = L
+    self.later = later
     self.queues = [outQ]
     # counter tracking items in play
     self._busy = TrackingCounter(name="Pipeline<%s>._items" % (name,))
