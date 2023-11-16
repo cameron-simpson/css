@@ -14,7 +14,7 @@ mobi
 mypy
 musicbrainzngs
 numpy
-objc
+pyobjc[allbindings]
 pandas
 pillow
 pycodestyle
