@@ -340,6 +340,57 @@ class CDRipCommand(BaseCommand):
         )
     return 0
 
+def probe_disc(device, mbdb, disc_id=None):
+  ''' Probe MusicBrainz about the disc in `device`.
+  '''
+  print("probe_disc: device", device, "mbdb", mbdb)
+  if disc_id is None:
+    dev_info = discid.read(device=device)
+    disc_id = dev_info.id
+  print("probe_disc: disc_id", disc_id)
+  if disc_id in mbdb.discs:
+    disc = mbdb.discs[disc_id]
+    print("  already present:", disc)
+    print(type(disc))
+    mbdb.stale(disc)
+    mbdb.refresh(
+        disc,
+        recurse=True,
+    )
+    return
+  print("  missing disc_id", disc_id)
+  includes = ['artist-credits']
+  get_type = 'releases'
+  id_name = 'discid'
+  record_key = 'disc'
+  with stackattrs(mbdb, dev_info=dev_info):
+    query_time = time.time()
+    A = mbdb.query(
+        get_type,
+        disc_id,
+        includes,
+        id_name,
+        record_key,
+        toc=dev_info.toc_string,
+    )
+  releases = A['release-list']
+  for release in releases:
+    print(
+        release['id'], release['title'], "by", release['artist-credit-phrase']
+    )
+    print(" ", release['release-event-list'])
+    for medium in release['medium-list']:
+      print("  medium")
+      for track in medium['track-list']:
+        print("    track", track['number'], track['recording']['title'])
+  release = pick(
+      releases,
+      as_str=(
+          lambda rel:
+          f"{rel['id']} {rel['title']} by {rel['artist-credit-phrase']}"
+      )
+  )
+
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def rip(
     device,
