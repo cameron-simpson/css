@@ -794,6 +794,16 @@ class MBSQLTags(SQLTags):
       'recording': MBRecording,
   }
 
+  def default_factory(
+      self,
+      name: Optional[str] = None,
+      skip_refresh=None,
+      **kw,
+  ):
+    if skip_refresh is None:
+      skip_refresh = '.' not in name
+    return super().default_factory(name, skip_refresh=skip_refresh, **kw)
+
   @fmtdoc
   def __init__(self, mbdb_path=None):
     ''' Initialise the `MBSQLTags` instance,
@@ -811,12 +821,6 @@ class MBSQLTags(SQLTags):
     super().__init__(db_url=mbdb_path)
     self.mbdb_path = mbdb_path
 
-  def default_factory(self, index):
-    ''' The default factory runs the `SQLTags` default factory and then does an MB refresh.
-    '''
-    te = super().default_factory(index)
-    te.refresh()
-    return te
 
   def get(self, key, default=None):
     ''' Run the default `.get()` and the do an MB refresh.
