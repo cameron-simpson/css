@@ -14,34 +14,45 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from getopt import GetoptError
+from getopt import getopt, GetoptError
 import os
 from os.path import (
+    dirname,
     exists as existspath,
     expanduser,
     isdir as isdirpath,
     join as joinpath,
 )
-from pprint import pformat
-import subprocess
+from pprint import pformat, pprint
+from signal import SIGINT, SIGTERM
 import sys
-from tempfile import NamedTemporaryFile
 import time
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
 
 import discid
+from discid.disc import DiscError
+from icontract import require
 import musicbrainzngs
+from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
-from cs.deco import fmtdoc
+from cs.context import stackattrs, stack_signals
+from cs.deco import cachedmethod, fmtdoc
+from cs.fileutils import atomic_filename
+from cs.fs import needdir
 from cs.fstags import FSTags
-from cs.logutils import error, warning, info
-from cs.pfx import Pfx
-from cs.resources import MultiOpenMixin
+from cs.lex import cutsuffix, is_identifier, r
+from cs.logutils import error, warning, info, debug
+from cs.mappings import AttrableMapping
+from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.psutils import run
+from cs.queues import ListQueue
+from cs.resources import MultiOpenMixin, RunStateMixin
+from cs.seq import unrepeated
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
+from cs.upd import run_task, print
 
 __version__ = '20201004-dev'
 
