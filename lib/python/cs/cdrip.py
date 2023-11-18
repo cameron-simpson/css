@@ -300,7 +300,7 @@ class CDRipCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     try:
       rip(
-          options.device,
+          self.device_id,
           options.mbdb,
           output_dirpath=dirpath,
           disc_id=disc_id,
@@ -325,7 +325,7 @@ class CDRipCommand(BaseCommand):
     MB = options.mbdb
     if disc_id is None:
       try:
-        dev_info = discid.read(device=options.device)
+        dev_info = discid.read(device=self.device_id)
       except discid.disc.DiscError as e:
         error("disc error: %s", e)
         return 1
