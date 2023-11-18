@@ -701,6 +701,17 @@ class MBDisc(_MBTagSet):
             else:
               yield release
 
+  @property
+  def release(self):
+    ''' The first release of this disc found in the releases from Musicbrainz, or `None`.
+    '''
+    return list(self.releases())[-1]
+    try:
+      rel = next(self.releases())
+    except StopIteration:
+      return None
+    return rel
+
 class MBRecording(_MBTagSet):
   ''' A Musicbrainz recording entry.
   '''
