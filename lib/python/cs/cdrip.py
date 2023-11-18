@@ -143,13 +143,30 @@ class CDRipCommand(BaseCommand):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     with super().run_context():
+      options = self.options
       fstags = FSTags()
-      mbdb = MBDB(mbdb_path=self.options.mbdb_path)
+      mbdb = MBDB(mbdb_path=options.mbdb_path, runstate=options.runstate)
       with fstags:
         with mbdb:
-          with stackattrs(self.options, fstags=fstags, mbdb=mbdb,
-                          verbose=True):
-            yield
+          mbdb_attrs = {}
+          try:
+            dev_info = pfx_call(discid.read, device=self.device_id)
+          except discid.disc.DiscError as e:
+            warning("no disc information: %s", e)
+          else:
+            mbdb_attrs.update(dev_info=dev_info)
+          with stackattrs(mbdb, **mbdb_attrs):
+            with stackattrs(options, fstags=fstags, mbdb=mbdb,
+                            sqltags=mbdb.sqltags, verbose=True):
+
+              def on_signal(sig, frame):
+                ''' Note signal and cancel the `RunState`.
+                '''
+                warning("signal %s at %s, cancelling runstate", sig, frame)
+                options.runstate.cancel()
+
+              with stack_signals([SIGINT, SIGTERM], on_signal):
+                yield
 
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
