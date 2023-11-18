@@ -181,6 +181,8 @@ class CDRipCommand(BaseCommand):
         if self.options.device == CDRIP_DEV_DEFAULT else self.options.device
     )
 
+  cmd_dbshell = SQLTagsCommand.cmd_dbshell
+
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
           Edit the entities specified by criteria.
