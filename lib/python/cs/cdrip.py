@@ -835,6 +835,31 @@ class MBDB(MultiOpenMixin):
   '''
 
   def __init__(self, mbdb_path=None):
+  # Mapping of Tag names whose type is not themselves.
+  # TODO: get this from the ontology type?
+  TYPE_NAME_REMAP = {
+      'artist-credit': 'artist',
+      'begin-area': 'area',
+      'end-area': 'area',
+      'label-info': 'label',
+      'medium': 'disc',
+      'release-event': 'event',
+      'release-group': 'release',
+      'track': 'recording',
+  }
+
+  # Mapping of query type names to default includes,
+  # overrides the fallback to musicbrainzngs.VALID_INCLUDES.
+  QUERY_TYPENAME_INCLUDES = {
+      ##'area': ['annotation', 'aliases'],
+      ##'artist': ['annotation', 'aliases'],
+      'releases': ['artists', 'recordings'],
+      ##'releases': [],
+  }
+  # List of includes only available if logged in.
+  # We drop these if we're not logged in.
+  QUERY_INCLUDES_NEED_LOGIN = ['user-tags', 'user-ratings']
+
     sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
     sqltags.mbdb = self
     with sqltags:
