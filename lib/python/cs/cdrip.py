@@ -637,9 +637,23 @@ class _MBTagSet(SQLTagSet):
     '''
     return self.mbdb.ontology
 
-  # pylint: disable=too-many-branches,too-many-statements
-  def refresh(self, force=False):
-    ''' Query MusicBrainz, fill in tags.
+  @require(lambda type_name: is_identifier(type_name))
+  @typechecked
+  def by_typed_id(self, type_name: str, id: str, no_check_uuid=False):
+    ''' Fetch the object `{type_name}.{id}` and refresh it.
+    '''
+    if not no_check_uuid:
+      UUID(id)
+    if type_name == 'disc':
+      try:
+        UUID(id)
+      except ValueError:
+        pass
+      else:
+        raise RuntimeError("type_name=%r, id=%r is UUID" % (type_name, id))
+    te_name = f"{type_name}.{id}"
+    te = self.sqltags[te_name]
+    return te
 
         This method has a fair bit of entity type specific knowledge.
     '''
