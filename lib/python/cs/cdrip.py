@@ -520,7 +520,8 @@ class _MBTagSet(SQLTagSet):
   ''' An `SQLTagSet` subclass for MB entities.
   '''
 
-  MB_QUERY_PREFIX = 'musicbrainzng.api.query.'
+  MB_QUERY_PREFIX = 'musicbrainzngs.api.query.'
+  MB_QUERY_RESULT_TAG_NAME = MB_QUERY_PREFIX + 'result'
   MB_QUERY_TIME_TAG_NAME = MB_QUERY_PREFIX + 'time'
 
   def __repr__(self):
