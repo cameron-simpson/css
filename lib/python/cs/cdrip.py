@@ -261,6 +261,25 @@ class CDRipCommand(BaseCommand):
         metadata = mbdb.ontology[metaname]
         print(' ', metaname, metadata)
 
+  def cmd_probe(self, argv):
+    ''' Usage: {cmd} [disc_id]
+          Probe Musicbrainz about the current disc.
+          disc_id   Optional disc id to query instead of obtaining
+                    one from the current inserted disc.
+    '''
+    disc_id = None
+    if argv:
+      disc_id = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after disc_id: %r" % (argv,))
+    options = self.options
+    try:
+      probe_disc(self.device_id, options.mbdb, disc_id=disc_id)
+    except DiscError as e:
+      error("%s", e)
+      return 1
+    return 0
+
   # pylint: disable=too-many-locals
   def cmd_rip(self, argv):
     ''' Usage: {cmd} [-n] [disc_id]
