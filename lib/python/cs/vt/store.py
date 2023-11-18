@@ -7,41 +7,34 @@
 ''' Various Store classes.
 '''
 
-from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
+from os.path import isfile as isfilepath, splitext
 import sys
-from threading import Semaphore, Thread
-from typing import Tuple
 
 from icontract import require
-from typeguard import typechecked
 
-from cs.context import stackattrs
 from cs.deco import fmtdoc
-from cs.excutils import logexc
-from cs.later import Later
-from cs.lex import r
 from cs.logutils import warning, error, info
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
-from cs.py.func import prop
-from cs.queues import Channel, IterableQueue, QueueIterator
-from cs.resources import (
-    MultiOpenMixin, openif, RunStateMixin, RunState, uses_runstate
-)
-from cs.result import report, bg as bg_result
-from cs.seq import Seq
-from cs.threads import bg as bg_thread, HasThreadState, ThreadState
+from cs.queues import Channel, IterableQueue
+from cs.resources import openif
+from cs.result import Result, report
+from cs.threads import bg as bg_thread
 
-from . import defaults, Lock, RLock, VT_STORE_ENVVAR, VT_STORE_DEFAULT
-from .datadir import DataDir, RawDataDir, PlatonicDir
-from .hash import (
-    HashCode, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin,
-    MissingHashcodeError
+from . import (
+    Store,
+    Lock,
+    RLock,
+    StoreSyncBase,
 )
+from .backingfile import BackingFileIndexEntry, BinaryHashCodeIndex, CompressibleBackingFile
+from .cache import FileDataMappingProxy, MemoryCacheMapping
+from .datadir import DataDir, RawDataDir, PlatonicDir
+from .hash import DEFAULT_HASHCLASS
+from .index import choose as choose_indexclass
 
 class StoreError(Exception):
   ''' Raised by Store operation failures.
@@ -496,6 +489,7 @@ class DataDirStore(MappingStore):
         rollover=rollover
     )
     super().__init__(name, self._datadir, hashclass=hashclass, **kw)
+    self._modify_index_lock = Lock()
 
   @contextmanager
   def startup_shutdown(self):
@@ -519,6 +513,26 @@ class DataDirStore(MappingStore):
     ''' DataDirStore Archives are associated with the internal DataDir.
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
+
+  def get_index_entry(self, hashcode):
+    ''' Return the index entry for `hashcode`, or `None` if there
+        is no index or the index has no entry for `hashcode`.
+    '''
+    return self._datadir.get_index_entry(hashcode)
+
+  @contextmanager
+  def modify_index_entry(self, hashcode):
+    ''' Context manager to obtain and yield the `FileDataIndexEntry` for `hashcode`
+        and resave it on return.
+
+        Example:
+
+            with index.modify_entry(hashcode) as entry:
+                entry.flags |= FileDataIndexEntry.INDIRECT_COMPLETE
+    '''
+    with self._modify_index_lock:
+      with self._datadir.modify_index_entry(hashcode) as entry:
+        yield entry
 
 def PlatonicStore(name, topdirpath, *a, meta_store=None, hashclass=None, **kw):
   ''' Factory function for platonic Stores.
@@ -786,7 +800,7 @@ class ProgressStore(StoreSyncBase):
     ''' Open the subStore.
     '''
     with self.S:  # open the substore
-      with defaults(S=self):  # but make the default Store be self
+      with self:
         yield
 
   def add(self, data):
@@ -824,19 +838,6 @@ class ProgressStore(StoreSyncBase):
     data = self.S.get(h)
     self.progress_get.position += len(data)
     return data
-
-  def get_bg(self, data):
-    ''' Advance the progress_add total, and the position on completion.
-    '''
-    LF = self.S.add_bg(data)
-
-    def notifier(LF):
-      data, exc = LF.join()
-      if exc is None:
-        self.progress_get.position += len(data)
-
-    LF.notify(notifier)
-    return LF
 
   def contains(self, h):
     return self.S.contains(h)

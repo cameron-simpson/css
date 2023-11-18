@@ -1,0 +1,2 @@
+Span: sanity check .start and .end.
+Range.issubset: efficient comparison with another Range, also .issuperset.

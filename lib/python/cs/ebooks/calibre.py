@@ -31,7 +31,8 @@ import shlex
 from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Optional, Union
+from uuid import UUID
 
 from icontract import require
 from sqlalchemy import (
@@ -550,8 +551,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       return False
     return True
 
-  @typechecked
   @require(lambda dbid: dbid > 0)
+  @typechecked
   def book_by_dbid(self, dbid: int, *, db_book=None):
     ''' Return a cached `CalibreBook` for `dbid`.
     '''
@@ -590,6 +591,16 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Return an iterable of `CalibreBook`s with the supplied ASIN.
     '''
     return self.by_identifier('mobi-asin', asin.upper())
+
+  @typechecked
+  def by_kobo_volumeid(self, uuid: Union[str, UUID]):
+    ''' Return an iterable of `CalibreBook`s with the supplied Kobo volumeid.
+    '''
+    if isinstance(uuid, str):
+      uuid = UUID(uuid)
+    else:
+      assert isinstance(uuid, UUID)
+    return self.by_identifier('kobo-volumeid', str(uuid).lower())
 
   def _run(self, calcmd, *calargv, doit=True, quiet=False, **subp_options):
     ''' Run a Calibre utility command.
@@ -660,6 +671,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       dedrm=None,
       doit=True,
       quiet=False,
+      add_args=(),
       **subp_options,
   ):
     ''' Add a book file via the `calibredb add` command.
@@ -668,6 +680,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         Parameters:
         * `bookpath`: the filesystem path to the book
         * `dedrm`: optional `DeDRMWrapper` instance
+        * `add_args`: optional iterable of additional `calibredb`
+          command line arguments
     '''
     if dedrm is not None:
       # try to remove DRM from the book file
@@ -678,6 +692,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     cp = self.calibredb(
         'add',
         '--duplicates',
+        *add_args,
         bookpath,
         doit=doit,
         quiet=quiet,
@@ -1124,8 +1139,10 @@ class CalibreCommand(BaseCommand):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     with super().run_context():
-      with self.options.calibre:
-        yield
+      calibre = self.options.calibre
+      with calibre:
+        with calibre.db_session():
+          yield
 
   @staticmethod
   def books_from_spec(calibre, book_spec):
@@ -1447,70 +1464,69 @@ class CalibreCommand(BaseCommand):
     verbose = options.verbose
     upd = options.upd
     xit = 0
-    with calibre.db_session():
-      cbooks = []
-      if argv:
-        try:
-          cbooks = self.popbooks(
-              argv, sortkey=cbook_sort_key, reverse=options.sort_reverse
-          )
-        except ValueError as e:
-          raise GetoptError("invalid book specifiers: %s") from e
-      else:
-        with contextif(verbose, upd.run_task, "sort calibre contents"):
-          calibre.preload()
-          cbooks = sorted(
-              calibre, key=cbook_sort_key, reverse=options.sort_reverse
-          )
-      runstate = options.runstate
-      for cbook in cbooks:
-        if runstate.cancelled:
-          break
-        with Pfx(cbook):
-          if ls_format is None:
-            top_row = []
-            series_name = cbook.series_name
-            if series_name:
-              top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
-            top_row.append(cbook.title)
-            author_names = cbook.author_names
-            if author_names:
-              top_row.extend(
-                  ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
-              )
-            top_row.append(f"({cbook.dbid})")
-            if not longmode:
-              top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
-              top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
-            print(*top_row)
-          else:
-            try:
-              output = cbook.format_as(ls_format, error_sep='\n  ')
-            except FormatAsError as e:
-              error(str(e))
-              xit = 1
-              continue
-            print(output)
-          if longmode:
-            print(" ", cbook.path)
-            tags = cbook.tags
-            if tags:
-              print("   ", ", ".join(sorted(tags)))
-            identifiers = cbook.identifiers
-            if identifiers:
-              print("   ", TagSet(identifiers))
-            for fmt, subpath in cbook.formats.items():
-              with Pfx(fmt):
-                fspath = cbook.pathto(subpath)
-                try:
-                  size = pfx_call(os.stat, fspath).st_size
-                except OSError as e:
-                  warning("cannot stat: %s", e)
-                else:
-                  print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
+    cbooks = []
+    if argv:
+      try:
+        cbooks = self.popbooks(
+            argv, sortkey=cbook_sort_key, reverse=options.sort_reverse
+        )
+      except ValueError as e:
+        raise GetoptError("invalid book specifiers: %s") from e
+    else:
+      with contextif(verbose, upd.run_task, "sort calibre contents"):
+        calibre.preload()
+        cbooks = sorted(
+            calibre, key=cbook_sort_key, reverse=options.sort_reverse
+        )
+    runstate = options.runstate
+    for cbook in cbooks:
       if runstate.cancelled:
-        xit = 1
-      return xit
+        break
+      with Pfx(cbook):
+        if ls_format is None:
+          top_row = []
+          series_name = cbook.series_name
+          if series_name:
+            top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
+          top_row.append(cbook.title)
+          author_names = cbook.author_names
+          if author_names:
+            top_row.extend(
+                ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
+            )
+          top_row.append(f"({cbook.dbid})")
+          if not longmode:
+            top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
+            top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
+          print(*top_row)
+        else:
+          try:
+            output = cbook.format_as(ls_format, error_sep='\n  ')
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          print(output)
+        if longmode:
+          print(" ", cbook.path)
+          tags = cbook.tags
+          if tags:
+            print("   ", ", ".join(sorted(tags)))
+          identifiers = cbook.identifiers
+          if identifiers:
+            print("   ", TagSet(identifiers))
+          for fmt, subpath in cbook.formats.items():
+            with Pfx(fmt):
+              fspath = cbook.pathto(subpath)
+              try:
+                size = pfx_call(os.stat, fspath).st_size
+              except OSError as e:
+                warning("cannot stat: %s", e)
+              else:
+                print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
+    if runstate.cancelled:
+      xit = 1
+    return xit
 
   def cmd_make_cbz(self, argv):
     ''' Usage: {cmd} book_specs...

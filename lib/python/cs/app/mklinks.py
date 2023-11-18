@@ -166,15 +166,18 @@ class FileInfo(object):
         with open(path, 'rb') as fp:
           length = os.fstat(fp.fileno()).st_size
           read_len = 0
-          for data in progressbar(
-              read_from(fp, rsize=1024 * 1024),
-              label=label,
-              total=length,
-              units_scale=BINARY_BYTES_SCALE,
-              itemlenfunc=len,
-              update_frequency=128,
-              upd=U,
-          ):
+          data_src = read_from(fp, rsize=1024 * 1024)
+          if length > 128 * 1024 * 1024:
+            data_src = progressbar(
+                read_from(fp, rsize=1024 * 1024),
+                label=label,
+                total=length,
+                units_scale=BINARY_BYTES_SCALE,
+                itemlenfunc=len,
+                update_frequency=128,
+                upd=U,
+            )
+          for data in data_src:
             csum.update(data)
             read_len += len(data)
           assert read_len == self.size

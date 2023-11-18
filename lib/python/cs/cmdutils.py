@@ -9,7 +9,7 @@
     and other command line related stuff.
 '''
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from cmd import Cmd
 from code import interact
 from collections import namedtuple
@@ -45,7 +45,7 @@ from cs.resources import RunState, uses_runstate
 from cs.typingutils import subtype
 from cs.upd import Upd
 
-__version__ = '20230407-post'
+__version__ = '20230703-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -125,6 +125,19 @@ class _BaseSubCommand(ABC):
     return "%s(cmd=%r,method=%s,..)" % (
         type(self).__name__, self.cmd, self.method
     )
+
+  @abstractmethod
+  def __call__(
+      self, subcmd: str, base_command: "BaseCommandSubType", argv: List[str]
+  ):
+    ''' Run the subcommand.
+
+        Parameters:
+        * `subcmd`: the subcommand name
+        * `base_command`: the instance of `BaseCommand`
+        * `argv`: the command line arguments after the subcommand name
+    '''
+    raise NotImplementedError
 
   @staticmethod
   def from_class(command_cls: "BaseCommandSubType") -> Mapping[str, Callable]:
@@ -220,11 +233,14 @@ class _ClassSubCommand(_BaseSubCommand):
   ''' A class to represent a subcommand implemented with a `BaseCommand` subclass.
   '''
 
-  def __call__(self, cmd, command, argv):
-    mkw = dict(command.options.__dict__)
-    if cmd is not None:
-      mkw.update(cmd=cmd)
-    return self.method(argv, **mkw).run()
+  def __call__(
+      self, subcmd: str, command: "BaseCommandSubType", argv: List[str]
+  ):
+    subcmd_class = self.method
+    updates = dict(command.options.__dict__)
+    updates.update(cmd=subcmd)
+    command = subcmd_class(argv, **updates)
+    return command.run()
 
   def usage_format(self) -> str:
     ''' Return the usage format string from the class.
@@ -264,6 +280,7 @@ class BaseCommandOptions:
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
+  runstate: Optional[RunState] = None
   verbose: bool = False
 
   def copy(self, **updates):
@@ -273,9 +290,11 @@ class BaseCommandOptions:
         Any keyword arguments are applied as attribute updates to the copy.
     '''
     copied = type(self)(
-        **{k: v
-           for k, v in self.__dict__.items()
-           if not k.startswith('_')}
+        **{
+            k: v
+            for k, v in self.__dict__.items()
+            if not k.startswith('_')
+        }
     )
     for k, v in updates.items():
       setattr(copied, k, v)
@@ -351,10 +370,10 @@ class BaseCommand:
       Modules which implement a command line mode generally look like this:
 
           ... imports etc ...
-          def main(argv=None):
+          def main(argv=None, **run_kw):
               """ The command line mode.
               """
-              return MyCommand(argv).run()
+              return MyCommand(argv).run(**run_kw)
           ... other code ...
           class MyCommand(BaseCommand):
           ... other code ...
@@ -1160,7 +1179,7 @@ class BaseCommand:
     # redundant try/finally to remind subclassers of correct structure
     try:
       options = self.options
-      assert not hasattr(options, 'runstate')
+      ##assert not hasattr(options, 'runstate')
       handle_signal = getattr(
           self, 'handle_signal', lambda *_: runstate.cancel()
       )
