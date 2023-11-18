@@ -688,6 +688,19 @@ class MBDisc(_MBTagSet):
   ''' A Musicbrainz disc entry.
   '''
 
+  def releases(self):
+    ''' Generator yielding entries from `release_list` matching the `disc_id`. '''
+    discid = self.mbkey
+    for release_entry in self.release_list:
+      for medium in release_entry['medium-list']:
+        for disc_entry in medium['disc-list']:
+          if disc_entry['id'] == discid:
+            release = self.resolve_id('release', release_entry['id'])
+            if release is None:
+              warning("no release found for id %r", release)
+            else:
+              yield release
+
 class MBRecording(_MBTagSet):
   ''' A Musicbrainz recording entry.
   '''
