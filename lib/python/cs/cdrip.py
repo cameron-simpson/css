@@ -749,6 +749,38 @@ class MBRecording(_MBTagSet):
   ''' A Musicbrainz recording entry.
   '''
 
+  @property
+  def artist_names(self):
+    ''' A list of the artist names. '''
+    arts = []
+    for art in self['artist']:
+      if isinstance(art, str):
+        arts.append(art)
+      elif isinstance(art, dict):
+        artist = self.by_typed_id('artist', art['artist'])
+        assert isinstance(artist, MBArtist)
+        arts.append(artist.name_)
+    return arts
+
+  @property
+  @cachedmethod
+  def artist_credit(self):
+    ''' A phrase to credit the artist(s) in this recording.
+    '''
+    credit = (self.get('artist_credit_phrase') or ' '.join(self.artist_names))
+    return credit
+
+  @property
+  def title(self):
+    try:
+      title = self['title']
+    except KeyError:
+      try:
+        title = self.query_result['title']
+      except KeyError as e:
+        raise AttributeError("no .title: {e}") from e
+    return title
+
 class MBSQLTags(SQLTags):
   ''' Musicbrainz `SQLTags` with special `TagSetClass`.
   '''
