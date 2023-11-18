@@ -836,11 +836,10 @@ class MBSQLTags(SQLTags):
         )
     return super().__getitem__(index)
 
-class MBDB(MultiOpenMixin):
+class MBDB(MultiOpenMixin, RunStateMixin):
   ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
   '''
 
-  def __init__(self, mbdb_path=None):
   # Mapping of Tag names whose type is not themselves.
   # TODO: get this from the ontology type?
   TYPE_NAME_REMAP = {
@@ -866,6 +865,10 @@ class MBDB(MultiOpenMixin):
   # We drop these if we're not logged in.
   QUERY_INCLUDES_NEED_LOGIN = ['user-tags', 'user-ratings']
 
+  def __init__(self, mbdb_path=None, runstate=None):
+    RunStateMixin.__init__(self, runstate=runstate)
+    # can be overlaid with discid.read of the current CDROM
+    self.dev_info = None
     sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
     sqltags.mbdb = self
     with sqltags:
