@@ -168,6 +168,19 @@ class CDRipCommand(BaseCommand):
               with stack_signals([SIGINT, SIGTERM], on_signal):
                 yield
 
+  @property
+  @fmtdoc
+  def device_id(self):
+    '''
+    The CD device id to use.
+    This is `self.options.device` unless that is `CDRIP_DEV_DEFAULT` ({CDRIP_DEV_DEFAULT!r})
+    in which case the value from `discid.get_default_device()` is used.
+    '''
+    return (
+        discid.get_default_device()
+        if self.options.device == CDRIP_DEV_DEFAULT else self.options.device
+    )
+
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
           Edit the entities specified by criteria.
