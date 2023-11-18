@@ -183,6 +183,48 @@ class CDRipCommand(BaseCommand):
 
   cmd_dbshell = SQLTagsCommand.cmd_dbshell
 
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd} [-a] [-R] [entity...]
+          Dump each entity.
+          -a    Dump all tags. By default the Musicbrainz API fields
+                and *_relation fields are suppressed.
+          -R    Explicitly refresh the entity before dumping it.
+          If no entities are supplied, dump the entity for the disc in the CD drive.
+    '''
+    options = self.options
+    mbdb = options.mbdb
+    sqltags = mbdb.sqltags
+    all_fields = False
+    do_refresh = False
+    force_refresh = False
+    opts, argv = getopt(argv, 'aR')
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-a':
+          all_fields = True
+        elif opt == '-R':
+          do_refresh = True
+        else:
+          raise RuntimeError("unimplemented option")
+    if not argv:
+      if mbdb.dev_info:
+        argv = ['disc.' + mbdb.dev_info.id]
+      else:
+        raise GetoptError("missing entities and no CD in the drive")
+    q = ListQueue(argv)
+    for name in q:
+      with Pfx(name):
+        if name.endswith('.') and is_identifier(name[:-1]):
+          q.prepend(sqltags.keys(prefix=name[:-1]))
+          continue
+        if name not in sqltags:
+          warning("unknown")
+          continue
+        te = sqltags[name]
+        if do_refresh:
+          mbdb.refresh(te, refetch=options.force, recurse=True)
+        te.dump(compact=True, keys=sorted(te.keys()) if all_fields else None)
+
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
           Edit the entities specified by criteria.
