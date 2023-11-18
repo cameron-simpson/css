@@ -895,8 +895,6 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     '''
     return self.sqltags.find(criteria)
 
-  @staticmethod
-  def query(typename, db_id, includes=None, id_name='id', record_key=None):
   def __getitem__(self, index):
     ''' Fetching via the MBDB triggers a refresh.
     '''
@@ -905,37 +903,115 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       te.refresh()
     return te
 
+  # pylint: disable=too-many-arguments
+  @pfx_method
+  def query(
+      self,
+      typename,
+      db_id,
+      id_name='id',
+      *,
+      includes=None,
+      record_key=None,
+      no_apply=False,
+      **getter_kw
+  ):
     ''' Fetch data from the Musicbrainz API.
     '''
+    logged_in = False
     getter_name = f'get_{typename}_by_{id_name}'
     if record_key is None:
       record_key = typename
     try:
       getter = getattr(musicbrainzngs, getter_name)
     except AttributeError:
-      warning(
-          "no musicbrainzngs.%s: %s", getter_name,
-          pformat(dir(musicbrainzngs))
+      error(
+          "no musicbrainzngs.%s: %r", getter_name,
+          sorted(
+              gname for gname in dir(musicbrainzngs)
+              if gname.startswith('get_')
+          )
       )
-      raise
+      return {}
+      ##raise
     if includes is None:
-      includes = ['tags']
-      warning(
-          "query(%r,..): no includes specified, using %r", typename, includes
-      )
-      help(getter)
-    with Pfx("%s(%r,includes=%r)", getter_name, db_id, includes, print=True):
       try:
-        mb_info = getter(db_id, includes=includes)
-      except musicbrainzngs.InvalidIncludeError as e:
-        warning("BAD INCLUDES: %s", e)
-        warning("help(%s):\n%s", getter_name, getter.__doc__)
-        raise
-      except musicbrainzngs.ResponseError as e:
-        warning("RESPONSE ERROR: %s", e)
-        warning("help(%s):\n%s", getter_name, getter.__doc__)
-        raise
+        includes = self.QUERY_TYPENAME_INCLUDES[typename]
+      except KeyError:
+        includes_map = (
+            musicbrainzngs.VALID_INCLUDES
+            if logged_in else musicbrainzngs.VALID_BROWSE_INCLUDES
+        )
+        include_map_key = 'release' if typename == 'releases' else typename
+        includes = list(includes_map.get(include_map_key, ()))
+    if not logged_in:
+      if typename.startswith('collection'):
+        warning("typename=%r: need to be logged in for collections", typename)
+        return {}
+      if any(map(lambda inc: inc in self.QUERY_INCLUDES_NEED_LOGIN, includes)):
+        warning(
+            "includes contains some of %r, dropping because not logged in",
+            self.QUERY_INCLUDES_NEED_LOGIN
+        )
+        includes = [
+            inc for inc in includes
+            if inc not in self.QUERY_INCLUDES_NEED_LOGIN
+        ]
+    if (typename == 'releases' and 'toc' not in getter_kw
+        and self.dev_info is not None and self.dev_info.id == db_id):
+      getter_kw.update(toc=self.dev_info.toc_string)
+    assert ' ' not in db_id
+    warning(
+        "QUERY typename=%r db_id=%r includes=%r ...", typename, db_id, includes
+    )
+    1 or X(
+        "QUERY: %s(%s,includes=%r,**getter_kw=%r) ...",
+        getter_name,
+        r(db_id),
+        includes,
+        getter_kw,
+    )
+    ##X("TYPENAME = %r, id_name = %r", typename, id_name)
+    if typename == 'releases':
+      try:
+        UUID(db_id)
+      except ValueError as e:
+        ##X("GETTING DISC %r - not a UUID (%s), using unchanged", db_id, e)
+        pass
+      else:
+        raise RuntimeError(
+            "query(%r,%r,...): using a UUID" % (typename, db_id)
+        )
+    try:
+      mb_info = pfx_call(getter, db_id, includes=includes, **getter_kw)
+    except musicbrainzngs.musicbrainz.MusicBrainzError as e:
+      if e.cause.code == 404:
+        warning("not found: %s(%s): %s", getter_name, r(db_id), e)
+        if typename == 'recording':
+          raise
+        return {}
+      warning("help(%s):\n%s", getter_name, getter.__doc__)
+      help(getter)
+      raise
+      return {}
+    if record_key in mb_info:
+      other_keys = sorted(k for k in mb_info.keys() if k != record_key)
+      if other_keys:
+        warning(
+            "mb_info contains %r, discarding other keys: %r",
+            record_key,
+            other_keys,
+        )
       mb_info = mb_info[record_key]
+    else:
+      warning(
+          "no entry named %r, returning entire mb_info, keys=%r", record_key,
+          sorted(mb_info.keys())
+      )
+    X("QUERY RETURNS: %s", pformat(mb_info))
+    if not no_apply:
+      X("QUERY: APPLYING TO MBDB...")
+      self.apply_dict(typename, db_id, mb_info, seen=set())
     return mb_info
 
   def _tagif(self, tags, name, value):
