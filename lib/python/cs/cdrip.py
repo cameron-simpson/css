@@ -573,6 +573,20 @@ class _MBTagSet(SQLTagSet):
         raise AttributeError("%s: no .%s attribute" % (self.name, attr))
 
   @property
+  def query_result(self):
+    ''' The Musicbrainz query result, fetching it if necessary. '''
+    mb_result = self.get(self.MB_QUERY_RESULT_TAG_NAME)
+    if not mb_result:
+      self.refresh(refetch=True)
+      try:
+        mb_result = self[self.MB_QUERY_RESULT_TAG_NAME]
+      except KeyError as e:
+        raise RuntimeError(f'no {self.MB_QUERY_RESULT_TAG_NAME}: {e}') from e
+    typename, db_id = self.name.split('.', 1)
+    self.sqltags.mbdb.apply_dict(typename, db_id, mb_result, seen=set())
+    return mb_result
+
+  @property
   def mbdb(self):
     ''' The associated `MBDB`.
     '''
