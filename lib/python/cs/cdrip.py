@@ -712,6 +712,39 @@ class MBDisc(_MBTagSet):
       return None
     return rel
 
+  @property
+  @pfx_method
+  def artist_names(self):
+    names=[]
+    for artist_ref in self.release.artist:
+      with Pfx("artist_ref %s",r(artist_ref)):
+        artist=self.resolve_id('artist',artist_ref)
+        try:
+          name=artist['artist_name']
+        except KeyError:
+          warning("no ['name']")
+        else:
+          names.append(name)
+    return names
+
+  @property
+  def discid(self):
+    return self.query_result['id']
+
+  @property
+  def title(self):
+    return self.release.title
+
+  @property
+  def recordings(self):
+    ''' Return an iterable of `MBRecording` instances.
+    '''
+    discid = self.mbkey
+    release = self.release_list[0]
+    for track_rec in self.release_list[0]['medium-list'][0]['track-list']:
+      recording=self.resolve_id('recording',track_rec['recording']['id'])
+      yield recording
+
 class MBRecording(_MBTagSet):
   ''' A Musicbrainz recording entry.
   '''
