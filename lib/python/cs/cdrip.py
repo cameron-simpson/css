@@ -836,14 +836,6 @@ class MBSQLTags(SQLTags):
         )
     return super().__getitem__(index)
 
-  def get(self, key, default=None):
-    ''' Run the default `.get()` and the do an MB refresh.
-    '''
-    te = super().get(key, default=default)
-    if te is not default:
-      te.refresh()
-    return te
-
 class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
   '''
