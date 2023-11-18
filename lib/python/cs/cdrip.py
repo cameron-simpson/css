@@ -655,118 +655,30 @@ class _MBTagSet(SQLTagSet):
     te = self.sqltags[te_name]
     return te
 
-        This method has a fair bit of entity type specific knowledge.
+  @typechecked
+  def resolve_ids(self, type_name, ids: list, no_check_uuid=False):
+    ''' Resolve ids against a type.
     '''
-    onttype = self.mbtype
-    if onttype is None:
-      ##warning("%s: no MBTYPE, not refreshing", self)
-      return
-    if not force and self.MB_QUERY_TIME_TAG_NAME in self:
-      return
-    mbkey = self.mbkey
-    get_type = onttype
-    id_name = 'id'
-    record_key = None
-    includes = None
-    if onttype == 'artist':
-      includes = ['annotation']
-    elif onttype == 'disc':
-      includes = ['artists', 'recordings']
-      get_type = 'releases'
-      id_name = 'discid'
-      record_key = 'disc'
-    elif onttype == 'recording':
-      includes = ['artists', 'tags']
-    A = self.mbdb.query(get_type, mbkey, includes, id_name, record_key)
-    self[self.MB_QUERY_TIME_TAG_NAME] = time.time()
-    # record the full response data for forensics
-    self[self.MB_QUERY_PREFIX + 'get_type'] = get_type
-    self[self.MB_QUERY_PREFIX + 'includes'] = includes
-    self[self.MB_QUERY_PREFIX + 'result'] = A
-    # modify A for discs
-    if onttype == 'disc':
-      # drill down to the release and medium containing the disc id
-      # replace A with a dict with selected values
-      found_medium = None
-      found_release = None
-      for release in A['release-list']:
-        if found_medium:
-          break
-        for medium in release['medium-list']:
-          if found_medium:
-            break
-          for disc in medium['disc-list']:
-            if found_medium:
-              break
-            if disc['id'] == mbkey:
-              # matched disc
-              found_medium = medium
-              found_release = release
-      assert found_medium
-      A = {
-          'title':
-          found_release.get('title'),
-          'medium-count':
-          found_release['medium-count'],
-          'medium-position':
-          found_medium['position'],
-          'artist-credit':
-          found_release['artist-credit'],
-          'recordings': [
-              track['recording']['id']
-              for track in found_medium.get('track-list')
-          ],
-      }
-
-    # store salient fields
-    k_tag_map = {
-        'name': onttype + '_name',
-        'artist-credit': 'artists',
-    }
-    k_tag_map_reverse = {v: k for k, v in k_tag_map.items()}
-    for k, v in A.items():
-      with Pfx("%s=%r", k, v):
-        if k == 'id':
-          assert v == mbkey, "A[%r]=%r != mbkey %r" % (k, v, mbkey)
-          continue
-        if k in ('begin-area', 'life-span', 'release-count'):
-          continue
-        if k in k_tag_map_reverse:
-          warning(
-              "SKIP %r=%r, would be overridden by k_tag_map_reverse[%r]=%r", k,
-              v, k, k_tag_map_reverse[k]
-          )
-          continue
-        tag_name = k_tag_map.get(k, k.replace('-', '_'))
-        if k in ('artist-credit-phrase', 'disambiguation', 'offset-list',
-                 'medium-count', 'medium-position', 'name', 'sort-name',
-                 'recordings', 'title', 'type'):
-          tag_value = v
-        elif k in ('length', 'sectors'):
-          tag_value = int(v)
-        elif k == 'artist-credit':
-          # list of artist ids
-          tag_name = 'artists'
-          artist_uuids = []
-          for credit in v:
-            if isinstance(credit, str):
-              try:
-                uu = UUID(credit)
-              except ValueError as e:
-                warning("discarding credit %r, not a UUID: %s", credit, e)
-              else:
-                artist_uuids.append(str(uu))
-            else:
-              artist_uuids.append(credit['artist']['id'])
-          tag_value = artist_uuids
-        elif k == 'tag-list':
-          # list of unique tag strings
-          tag_value = list(set(map(lambda tag_dict: tag_dict['name'], v)))
+    resolved = []
+    for item in ids:
+      with Pfx("resolve_ids(%r,...): %s", type_name, r(item)):
+        if isinstance(item, dict):
+          item_id = item[type_name]
         else:
-          ##warning("SKIP unhandled A record %r", k)
-          ##print(pformat(v))
-          continue
-        self[tag_name] = tag_value
+          item_id = item
+        resolved.append(
+            self.by_typed_id(type_name, item_id, no_check_uuid=no_check_uuid)
+        )
+    return resolved
+
+  def resolve_id(self, type_name, objid, no_check_uuid=False):
+    ''' Resolve `objid` against a type, return the object or `None`.
+    '''
+    resolved = self.resolve_ids(
+        type_name, [objid], no_check_uuid=no_check_uuid
+    )
+    obj, = resolved
+    return obj
 
 class MBArtist(_MBTagSet):
   ''' A Musicbrainz artist entry.
