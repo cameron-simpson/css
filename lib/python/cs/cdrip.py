@@ -586,6 +586,16 @@ class _MBTagSet(SQLTagSet):
     self.sqltags.mbdb.apply_dict(typename, db_id, mb_result, seen=set())
     return mb_result
 
+  def dump(self, keys=None, **kw):
+    if keys is None:
+      keys = sorted(
+          k for k in self.keys() if (
+              not k.startswith(self.MB_QUERY_PREFIX)
+              and not k.endswith('_relation')
+          )
+      )
+    return super().dump(keys=keys, **kw)
+
   @property
   def mbdb(self):
     ''' The associated `MBDB`.
