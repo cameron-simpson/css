@@ -897,6 +897,14 @@ class MBDB(MultiOpenMixin, RunStateMixin):
 
   @staticmethod
   def query(typename, db_id, includes=None, id_name='id', record_key=None):
+  def __getitem__(self, index):
+    ''' Fetching via the MBDB triggers a refresh.
+    '''
+    te = self.sqltags[index]
+    if '.' in te.name:
+      te.refresh()
+    return te
+
     ''' Fetch data from the Musicbrainz API.
     '''
     getter_name = f'get_{typename}_by_{id_name}'
