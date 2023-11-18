@@ -821,6 +821,20 @@ class MBSQLTags(SQLTags):
     super().__init__(db_url=mbdb_path)
     self.mbdb_path = mbdb_path
 
+  @pfx_method
+  def __getitem__(self, index):
+    if isinstance(index, str) and index.startswith('disc.'):
+      discid = index[5:]
+      try:
+        UUID(discid)
+      except ValueError:
+        pass
+      else:
+        raise RuntimeError(
+            "%s.__getitem__(%r): discid is a UUID, should not be!" %
+            (type(self).__name__, index)
+        )
+    return super().__getitem__(index)
 
   def get(self, key, default=None):
     ''' Run the default `.get()` and the do an MB refresh.
