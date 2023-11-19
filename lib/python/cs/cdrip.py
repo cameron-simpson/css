@@ -355,8 +355,6 @@ def probe_disc(device, mbdb, disc_id=None):
   print("probe_disc: disc_id", disc_id)
   if disc_id in mbdb.discs:
     disc = mbdb.discs[disc_id]
-    print("  already present:", disc)
-    print(type(disc))
     mbdb.stale(disc)
     mbdb.refresh(
         disc,
@@ -448,9 +446,7 @@ def rip(
     fstags = FSTags()
   with stackattrs(mbdb, dev_info=dev_info):
     with Pfx("MB: discid %s", disc_id, print=True):
-      X("mbdb.discs = %s", mbdb.discs)
       disc = mbdb.discs[disc_id]
-    X("disc = %r", disc)
     release = disc.release
     title = disc.title or "UNTITLED"
     artist_credit = ", ".join(disc.artist_names or "NO_ARTISTS")
