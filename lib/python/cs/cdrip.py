@@ -518,11 +518,17 @@ def rip(
             if existspath(aac_filename):
               warning("AAC file already exists, skipping track")
             else:
-              mp3_dirpath = dirname(mp3_filename)
-              no_action or needdir(mp3_dirpath, use_makedirs=True)
-              fstags[mp3_dirpath].update(**discdir_tags)
+              aac_dirpath = dirname(aac_filename)
+              no_action or needdir(aac_dirpath, use_makedirs=True)
+              fstags[aac_dirpath].update(disc_fstags)
               argv = wav_to_aac(
-                  wav_filename, aac_filename, no_action=no_action
+                  wav_filename,
+                  aac_filename,
+                  no_action=no_action,
+                  disc_title=level2,
+                  tracknum=tracknum,
+                  track_title=recording.title,
+                  track_artists=artist_credit,
               )
             if no_action:
               print("fstags[%r].update(%s)" % (aac_filename, track_fstags))
@@ -535,32 +541,40 @@ def rip(
           else:
             mp3_dirpath = dirname(mp3_filename)
             no_action or needdir(mp3_dirpath, use_makedirs=True)
-            fstags[mp3_dirpath].update(**discdir_tags)
-            argv = wav_to_mp3(wav_filename, mp3_filename, no_action=no_action)
+            fstags[mp3_dirpath].update(disc_fstags)
+            argv = wav_to_mp3(
+                wav_filename,
+                mp3_filename,
+                no_action=no_action,
+                disc_title=level2,
+                tracknum=tracknum,
+                track_title=recording.title,
+                track_artists=artist_credit,
+            )
             if no_action:
               print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
             else:
               fstags[mp3_filename].conversion_command = argv
               fstags[mp3_filename].update(track_fstags)
-  if not no_action:
-    run(['ls', '-la', dirname(mp3_filename)])  # pylint: disable=subprocess-run-check
-    os.system("eject")
 
 def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   ''' Rip a track from the CDROM device to a WAV file.
   '''
-  no_action or needdir(dirname(wav_filename), use_makedirs=True)
-  fstags[dirname(wav_filename)].update(
-      discid=disc.id,
-      title=disc.title,
-      artists=disc.artist_names,
-  )
   with atomic_filename(wav_filename) as T:
     argv = ['cdparanoia', '-d', device, '-w', str(tracknum), T.name]
     run(argv, doit=not no_action, quiet=False, check=True)
   return argv
 
-def wav_to_acc(wav_filename, aac_filename, no_action=False):
+def wav_to_aac(
+    wav_filename,
+    aac_filename,
+    *,
+    no_action=False,
+    disc_title,
+    tracknum,
+    track_title,
+    track_artists,
+):
   ''' Produce an AAC file from a WAV file.
   '''
   with atomic_filename(aac_filename, placeholder=True) as T:
@@ -575,7 +589,16 @@ def wav_to_acc(wav_filename, aac_filename, no_action=False):
     run(argv, doit=not no_action, quiet=False, check=True)
   return argv
 
-def wav_to_mp3(wav_filename, mp3_filename, no_action=False):
+def wav_to_mp3(
+    wav_filename,
+    mp3_filename,
+    *,
+    no_action=False,
+    disc_title,
+    tracknum,
+    track_title,
+    track_artists,
+):
   ''' Produce an MP3 file from a WAV file.
   '''
   with atomic_filename(mp3_filename) as T:
@@ -586,11 +609,11 @@ def wav_to_mp3(wav_filename, mp3_filename, no_action=False):
         '-V',
         '0',
         '--tt',
-        recording.title or "UNTITLED",
+        track_title or "UNTITLED",
         '--ta',
         track_artists or "NO ARTISTS",
         '--tl',
-        level2,
+        disc_title,
         ## '--ty',recording year
         '--tn',
         str(tracknum),
