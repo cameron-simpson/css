@@ -1014,6 +1014,12 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       self.apply_dict(typename, db_id, mb_info, seen=set())
     return mb_info
 
+  def stale(self, te):
+    ''' Make this entry stale by scrubbing the query time attribute.
+    '''
+    if te.MB_QUERY_TIME_TAG_NAME in te:
+      del te[te.MB_QUERY_TIME_TAG_NAME]
+
   def _tagif(self, tags, name, value):
     ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
     '''
