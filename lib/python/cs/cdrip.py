@@ -643,12 +643,17 @@ class _MBTagSet(SQLTagSet):
       return super().__getattr__(attr)
     except AttributeError:
       # no direct tag or other attribute, look in the MB query result
-      mb_result = self.query_result
-      try:
-        value = mb_result[attr.replace('_', '-')]
-        return value
-      except KeyError as e:
-        raise AttributeError("%s: no .%s attribute" % (self.name, attr))
+      if not attr.startswith('_'):
+        mb_result = self.query_result
+        try:
+          value = mb_result[attr.replace('_', '-')]
+          return value
+        except KeyError as e:
+          warning(
+              "%r.__getattr__(%r): no %r[%r]: %s", self.name, attr,
+              self.MB_QUERY_RESULT_TAG_NAME, attr.replace('_', '-'), e
+          )
+    raise AttributeError("%s: no .%s attribute" % (self.name, attr))
 
   @property
   def query_result(self):
