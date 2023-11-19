@@ -364,6 +364,7 @@ def probe_disc(device, mbdb, disc_id=None):
     )
     return
   print("  missing disc_id", disc_id)
+  ##includes = ['artists', 'recordings']
   includes = ['artist-credits']
   get_type = 'releases'
   id_name = 'discid'
@@ -715,12 +716,12 @@ class MBDisc(_MBTagSet):
   @property
   @pfx_method
   def artist_names(self):
-    names=[]
+    names = []
     for artist_ref in self.release.artist:
-      with Pfx("artist_ref %s",r(artist_ref)):
-        artist=self.resolve_id('artist',artist_ref)
+      with Pfx("artist_ref %s", r(artist_ref)):
+        artist = self.resolve_id('artist', artist_ref)
         try:
-          name=artist['artist_name']
+          name = artist['artist_name']
         except KeyError:
           warning("no ['name']")
         else:
@@ -742,7 +743,7 @@ class MBDisc(_MBTagSet):
     discid = self.mbkey
     release = self.release_list[0]
     for track_rec in self.release_list[0]['medium-list'][0]['track-list']:
-      recording=self.resolve_id('recording',track_rec['recording']['id'])
+      recording = self.resolve_id('recording', track_rec['recording']['id'])
       yield recording
 
 class MBRecording(_MBTagSet):
@@ -1008,9 +1009,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
           "no entry named %r, returning entire mb_info, keys=%r", record_key,
           sorted(mb_info.keys())
       )
-    X("QUERY RETURNS: %s", pformat(mb_info))
     if not no_apply:
-      X("QUERY: APPLYING TO MBDB...")
       self.apply_dict(typename, db_id, mb_info, seen=set())
     return mb_info
 
@@ -1167,14 +1166,16 @@ class MBDB(MultiOpenMixin, RunStateMixin):
           # apply members
           assert isinstance(v, list)
           for i, list_entry in enumerate(v):
-            if not isinstance(list_entry,dict):
+            if not isinstance(list_entry, dict):
               continue
             try:
               entry_id = list_entry['id']
             except KeyError:
               for le_key, le_value in list_entry.items():
-                if isinstance(le_value,dict) and 'id' in le_value:
-                  self.apply_dict(le_key,le_value['id'],le_value,q=q,seen=seen)
+                if isinstance(le_value, dict) and 'id' in le_value:
+                  self.apply_dict(
+                      le_key, le_value['id'], le_value, q=q, seen=seen
+                  )
               continue
             self.apply_dict(k_type_name, entry_id, list_entry, q=q, seen=seen)
           continue
