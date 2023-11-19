@@ -311,6 +311,7 @@ class CDRipCommand(BaseCommand):
     except discid.disc.DiscError as e:
       error("disc error: %s", e)
       return 1
+    os.system("eject")
     return 0
 
   def cmd_toc(self, argv):
