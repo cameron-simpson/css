@@ -431,6 +431,7 @@ def rip(
     *,
     output_dirpath,
     disc_id=None,
+    audio_outputs=('wav', 'aac', 'mp3'),
     fstags=None,
     no_action=False,
     split_by_format=False,
@@ -459,6 +460,11 @@ def rip(
         level1.replace(os.sep, ':'),
         level2.replace(os.sep, ':'),
     )
+    disc_fstags = TagSet(
+        discid=disc.id,
+        title=disc.title,
+        artists=disc.artist_names,
+    )
     for tracknum, recording in enumerate(recordings, 1):
       with Pfx("track %d", tracknum):
         recording_md = disc.ontology.metadata('recording', recording.id)
@@ -478,72 +484,123 @@ def rip(
             disc_subpath,
             track_base + '.wav',
         )
+        aac_filename = joinpath(
+            output_dirpath,
+            'aac' if split_by_format else '',
+            disc_subpath,
+            track_base + '.aac',
+        )
         mp3_filename = joinpath(
             output_dirpath,
             'mp3' if split_by_format else '',
             disc_subpath,
             track_base + '.mp3',
         )
-        if existspath(mp3_filename):
-          warning("MP3 file already exists, skipping track: %r", mp3_filename)
-          continue
-        if existspath(wav_filename):
-          info("using existing WAV file: %r", wav_filename)
-        else:
-          no_action or needdir(dirname(wav_filename), use_makedirs=True)
-          fstags[dirname(wav_filename)].update(
-              discid=disc.id,
-              title=disc.title,
-              artists=disc.artist_names,
-          )
-          with atomic_filename(wav_filename) as T:
-            argv = ['cdparanoia', '-d', device, '-w', str(tracknum), T.name]
-            run(argv, doit=not no_action, quiet=False, check=True)
+        with Pfx(wav_filename):
+          if existspath(wav_filename):
+            info("using existing WAV file: %r", wav_filename)
+            argv = None
+          else:
+            wav_dirpath = dirname(mp3_filename)
+            no_action or needdir(wav_dirpath, use_makedirs=True)
+            fstags[wav_dirpath].update(disc_fstags)
+            argv = rip_to_wav(
+                device, tracknum, wav_filename, no_action=no_action
+            )
           if no_action:
-            os.unlink(wav_filename)
-        if no_action:
-          print("fstags[%r].update(%s)" % (wav_filename, track_fstags))
-        else:
-          fstags[wav_filename].update(track_fstags)
-          fstags[wav_filename].rip_command = argv
-        no_action or needdir(dirname(mp3_filename), use_makedirs=True)
-        fstags[dirname(mp3_filename)].update(
-            discid=disc.id,
-            title=disc.title,
-            artists=disc.artist_names,
-        )
-        with atomic_filename(mp3_filename) as T:
-          argv = [
-              'lame',
-              '-q',
-              '7',
-              '-V',
-              '0',
-              '--tt',
-              recording.title or "UNTITLED",
-              '--ta',
-              track_artists or "NO ARTISTS",
-              '--tl',
-              level2,
-              ## '--ty',recording year
-              '--tn',
-              str(tracknum),
-              ## '--tg', recording genre
-              ## '--ti', album cover filename
-              wav_filename,
-              T.name,
-          ]
-          run(argv, doit=not no_action, quiet=False, check=True)
-        if no_action:
-          os.unlink(mp3_filename)
-        if no_action:
-          print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
-        else:
-          fstags[mp3_filename].conversion_command = argv
-          fstags[mp3_filename].update(track_fstags)
+            print("fstags[%r].update(%s)" % (wav_filename, track_fstags))
+          else:
+            fstags[wav_filename].update(track_fstags)
+            if argv is not None:
+              fstags[wav_filename].rip_command = argv
+        if 'aac' in audio_outputs:
+          with Pfx(shortpath(aac_filename)):
+            if existspath(aac_filename):
+              warning("AAC file already exists, skipping track")
+            else:
+              mp3_dirpath = dirname(mp3_filename)
+              no_action or needdir(mp3_dirpath, use_makedirs=True)
+              fstags[mp3_dirpath].update(**discdir_tags)
+              argv = wav_to_aac(
+                  wav_filename, aac_filename, no_action=no_action
+              )
+            if no_action:
+              print("fstags[%r].update(%s)" % (aac_filename, track_fstags))
+            else:
+              fstags[aac_filename].conversion_command = argv
+              fstags[aac_filename].update(track_fstags)
+        if 'mp3' in audio_outputs:
+          if existspath(mp3_filename):
+            warning("MP3 file already exists, skipping track")
+          else:
+            mp3_dirpath = dirname(mp3_filename)
+            no_action or needdir(mp3_dirpath, use_makedirs=True)
+            fstags[mp3_dirpath].update(**discdir_tags)
+            argv = wav_to_mp3(wav_filename, mp3_filename, no_action=no_action)
+            if no_action:
+              print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
+            else:
+              fstags[mp3_filename].conversion_command = argv
+              fstags[mp3_filename].update(track_fstags)
   if not no_action:
     run(['ls', '-la', dirname(mp3_filename)])  # pylint: disable=subprocess-run-check
     os.system("eject")
+
+def rip_to_wav(device, tracknum, wav_filename, no_action=False):
+  ''' Rip a track from the CDROM device to a WAV file.
+  '''
+  no_action or needdir(dirname(wav_filename), use_makedirs=True)
+  fstags[dirname(wav_filename)].update(
+      discid=disc.id,
+      title=disc.title,
+      artists=disc.artist_names,
+  )
+  with atomic_filename(wav_filename) as T:
+    argv = ['cdparanoia', '-d', device, '-w', str(tracknum), T.name]
+    run(argv, doit=not no_action, quiet=False, check=True)
+  return argv
+
+def wav_to_acc(wav_filename, aac_filename, no_action=False):
+  ''' Produce an AAC file from a WAV file.
+  '''
+  with atomic_filename(aac_filename, placeholder=True) as T:
+    argv = [
+        './bin/ffmpeg-docker',
+        '-y',
+        '-i',
+        wav_filename,
+        # TODO: metadata options here
+        T.name,
+    ]
+    run(argv, doit=not no_action, quiet=False, check=True)
+  return argv
+
+def wav_to_mp3(wav_filename, mp3_filename, no_action=False):
+  ''' Produce an MP3 file from a WAV file.
+  '''
+  with atomic_filename(mp3_filename) as T:
+    argv = [
+        'lame',
+        '-q',
+        '7',
+        '-V',
+        '0',
+        '--tt',
+        recording.title or "UNTITLED",
+        '--ta',
+        track_artists or "NO ARTISTS",
+        '--tl',
+        level2,
+        ## '--ty',recording year
+        '--tn',
+        str(tracknum),
+        ## '--tg', recording genre
+        ## '--ti', album cover filename
+        wav_filename,
+        T.name,
+    ]
+    run(argv, doit=not no_action, quiet=False, check=True)
+  return argv
 
 # pylint: disable=too-many-ancestors
 class _MBTagSet(SQLTagSet):
