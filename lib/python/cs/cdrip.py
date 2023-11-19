@@ -1115,6 +1115,89 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     type_name = cls.TYPE_NAME_REMAP.get(type_name, type_name)
     return type_name, suffix
 
+  @typechecked
+  def apply_dict(
+      self,
+      type_name: str,
+      id: str,
+      d: dict,
+      *,
+      get_te=None,
+      q: Optional[ListQueue] = None,
+      seen: set,
+  ):
+    ''' Apply an `'id'`-ed dict from MusicbrainzNG query result `d`
+        associated with its `type_name` and `id` value
+        to the corresponding entity obtained by `get_te(type_name,id)`.
+
+        Parameters:
+        * `type_name`: the entity type, eg `'disc'`
+        * `id`: the entity identifying value, typically a discid or a UUID
+        * `d`: the `dict` to apply to the entity
+        * `get_te`: optional entity fetch function;
+          the default calls `self.sqltags[f"{type_name}.{id}"]`
+        * `q`: optional queue onto which to put related entities
+    '''
+    sig = type_name, id
+    if sig in seen:
+      return
+    seen.add(sig)
+    if get_te is None:
+      get_te = lambda type_name, id: self.sqltags[f"{type_name}.{id}"]
+    if 'id' in d:
+      assert d['id'] == id, "id=%s but d['id']=%s" % (r(id), r(d['id']))
+    te = get_te(type_name, id)
+    counts = {}  # sanity check of foo-count against foo-list
+    # scan the mapping, recognise contents
+    for k, v in d.items():
+      with Pfx("%s=%s", k, r(v, 20)):
+        # skip the id field, already checked
+        if k == 'id':
+          continue
+        # derive tag_name and field role (None, count, list)
+        k_type_name, suffix = self.key_type_name(k)
+        # note expected counts
+        if suffix == 'count':
+          assert isinstance(v, int)
+          counts[k_type_name] = v
+          continue
+        if suffix == 'list':
+          if k_type_name in ('offset',):
+            continue
+          # apply members
+          assert isinstance(v, list)
+          for i, list_entry in enumerate(v):
+            if not isinstance(list_entry,dict):
+              continue
+            try:
+              entry_id = list_entry['id']
+            except KeyError:
+              for le_key, le_value in list_entry.items():
+                if isinstance(le_value,dict) and 'id' in le_value:
+                  self.apply_dict(le_key,le_value['id'],le_value,q=q,seen=seen)
+              continue
+            self.apply_dict(k_type_name, entry_id, list_entry, q=q, seen=seen)
+          continue
+        if suffix in ('relation', 'relation-list'):
+          continue
+        tag_name = k_type_name.replace('-', '_')
+        if tag_name == 'name':
+          tag_name = 'name_'
+        tag_value = te.get(tag_name, '')
+        if not tag_value:
+          v = self._fold_value(k_type_name, v, get_te=get_te, q=q, seen=seen)
+          # apply the folded value
+          te.set(tag_name, v)
+        elif tag_value == v:
+          pass
+    ##X("check counts: %r",counts)
+    for k, c in counts.items():
+      with Pfx("counts[%r]=%d", k, c):
+        if k in te:
+          assert len(te[k]) == c
+        ##else:
+        ##  X("  no te[%r], not checking count %r",k,c)
+
   def _tagif(self, tags, name, value):
     ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
     '''
