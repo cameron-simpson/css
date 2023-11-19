@@ -1661,7 +1661,8 @@ class SQLTags(BaseTagSets, Promotable):
 
   @typechecked
   def default_factory(
-      self, name: Optional[str] = None, *, unixtime=None, tags=None
+      self, name: Optional[str] = None, *, unixtime=None, tags=None,
+      skip_refresh=False,
   ):
     ''' Fetch or create an `SQLTagSet` for `name`.
         Return the `SQLTagSet`.
@@ -1681,11 +1682,13 @@ class SQLTags(BaseTagSets, Promotable):
         session.flush()
         te = self.get(entity.id)
         assert te is not None
-        entity.add_new_tags(tags, session=session)
+        if tags:
+          entity.add_new_tags(tags, session=session)
       # refresh entry from some source if there is a .refresh() method
-      refresh = getattr(type(te), 'refresh', None)
-      if refresh is not None and callable(refresh):
-        refresh(te)
+      if not skip_refresh:
+        refresh = getattr(type(te), 'refresh', None)
+        if refresh is not None and callable(refresh):
+          refresh(te)
     else:
       # update the existing SQLTagSet
       if unixtime is not None:
