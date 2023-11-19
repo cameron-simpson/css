@@ -1095,6 +1095,26 @@ class MBDB(MultiOpenMixin, RunStateMixin):
                 raise TypeError("wrong type for recurse %s", r(recurse))
         return te0[te0.MB_QUERY_RESULT_TAG_NAME]
 
+  @classmethod
+  def key_type_name(cls, k):
+    ''' Derive a type name from a MusicBrainzng key name.
+        Return `(type_name,suffix)`.
+
+        A key such as `'disc-list'` will return `('disc','list')`.
+        A key such as `'recording'` will return `('recording',None)`.
+    '''
+    # NB: ordering matters
+    for suffix in 'relation-list', 'count', 'list', 'relation':
+      _suffix = '-' + suffix
+      type_name = cutsuffix(k, _suffix)
+      if type_name is not k:
+        break
+    else:
+      type_name = k
+      suffix = None
+    type_name = cls.TYPE_NAME_REMAP.get(type_name, type_name)
+    return type_name, suffix
+
   def _tagif(self, tags, name, value):
     ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
     '''
