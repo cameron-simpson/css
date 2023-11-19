@@ -1198,6 +1198,84 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         ##else:
         ##  X("  no te[%r], not checking count %r",k,c)
 
+  @typechecked
+  def _fold_value(
+      self,
+      type_name: str,
+      v,
+      *,
+      get_te=None,
+      q=None,
+      seen: set,
+  ):
+    ''' Fold `v` recursively,
+        replacing `'id'`-ed `dict`s with their identifier
+        and applying their values to the corresponding entity.
+    '''
+    if isinstance(v, dict):
+      if 'id' in v:
+        # {'id':.., ...}
+        v = self._fold_id_dict(type_name, v, get_te=get_te, q=q, seen=seen)
+      else:
+        v = dict(v)
+        for k, subv in list(v.items()):
+          type_name, suffix = self.key_type_name(k)
+          v[k] = self._fold_value(
+              ##type_name, subv, get_te=get_te, q=q, seen=seen
+              type_name,
+              subv,
+              get_te=get_te,
+              q=q,
+              seen=seen
+          )
+    elif isinstance(v, list):
+      v = list(v)
+      for i, subv in enumerate(v):
+        with Pfx("[%d]=%s", i, r(subv, 20)):
+          v[i] = self._fold_value(
+              type_name, subv, get_te=get_te, q=q, seen=seen
+          )
+    elif isinstance(v, str):
+      if type_name not in ('name', 'title'):
+        # folder integer strings to integers
+        try:
+          i = int(v)
+        except ValueError:
+          pass
+        else:
+          if str(i) == v:
+            v = i
+    # TODO: date => date? etc?
+    else:
+      assert isinstance(v, (int, float))
+    return v
+
+  @typechecked
+  def _fold_id_dict(
+      self,
+      type_name: str,
+      d: dict,
+      *,
+      get_te=None,
+      q=None,
+      seen: set,
+  ):
+    ''' Apply `d` (a `dict`) to the entity identified by `(type_name,d['id'])`,
+        return `d['id']`.
+
+        This is used to replace identified records in a MusicbrainzNG query result
+        with their identifier.
+
+        If `q` is not `None`, queue `get_te(type_name, id)` for processing
+        by the enclosing `refresh()`.
+    '''
+    id = d['id']
+    assert isinstance(id, str) and id, (
+        "expected d['id'] to be a nonempty string, got: %s" % (r(id),)
+    )
+    self.apply_dict(type_name, id, d, get_te=get_te, q=q, seen=seen)
+    return id
+
   def _tagif(self, tags, name, value):
     ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
     '''
