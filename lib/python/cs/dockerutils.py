@@ -207,7 +207,7 @@ class DockerRun:
   input_root: str = INPUTDIR_DEFAULT
   input_map: dict = field(default_factory=dict)
   output_root: str = OUTPUTDIR_DEFAULT
-  outputpath: str = None
+  outputpath: str = '.'
   as_root: bool = False
   pull_mode: str = 'missing'
 
@@ -314,7 +314,7 @@ class DockerRun:
     with Pfx("outputpath:%r", self.outputpath):
       # output mount point
       if not self.outputpath:
-        raise ValueError("no outputpath")
+        self.outputpath = '.'
       if not isdirpath(self.outputpath):
         raise ValueError('not a directory')
     docker_argv = [
