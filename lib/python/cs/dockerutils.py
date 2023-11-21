@@ -280,16 +280,8 @@ class DockerRun:
     with Pfx("inputpath:%r", inputpath):
       if not inputpath:
         raise ValueError('may not be empty')
-      if ',' in inputpath:
-        raise ValueError(
-            'inputfile path contains a comma, "docker run --mount" hates it'
-        )
     with Pfx("inputmount:%r", inputmount):
       validate_rpath(inputmount)
-      if ',' in inputmount:
-        raise ValueError(
-            'inputfile mount subpath contains a comma, "docker run --mount" hates it'
-        )
       if '/' in inputmount:
         raise ValueError('may not contain multiple components')
       if inputmount in self.input_map:
@@ -314,21 +306,15 @@ class DockerRun:
         raise ValueError('not an absolute path')
       if self.input_root != normpath(self.input_root):
         raise ValueError('not normalised')
-      if ',' in self.input_root:
-        raise ValueError('contains a comma, "docker run --mount" hates it')
     with Pfx("output_root:%r", self.output_root):
       if not isabspath(self.output_root):
         raise ValueError('not an absolute path')
       if self.output_root != normpath(self.output_root):
         raise ValueError('not normalised')
-      if ',' in self.output_root:
-        raise ValueError('contains a comma, "docker run --mount" hates it')
     with Pfx("outputpath:%r", self.outputpath):
       # output mount point
       if not self.outputpath:
         raise ValueError("no outputpath")
-      if ',' in self.outputpath:
-        raise ValueError('contains a comma, "docker run --mount" hates it')
       if not isdirpath(self.outputpath):
         raise ValueError('not a directory')
     docker_argv = [
