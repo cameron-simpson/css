@@ -180,7 +180,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
 # convenience alias
 s = typed_str
 
-def typed_repr(o, use_cls=False, max_length=None):
+def typed_repr(o, max_length=None, *, use_cls=False):
   ''' Like `typed_str` but using `repr` instead of `str`.
       This is available as both `typed_repr` and `r`.
   '''

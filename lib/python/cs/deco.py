@@ -488,7 +488,7 @@ def cachedmethod(
         except TypeError:
           changed = True
       if changed:
-        setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
+        setattr(self, rev_attr, (getattr(self, rev_attr, 0) or 0) + 1)
       return value
 
   ##  Doesn't work, has no access to self. :-(

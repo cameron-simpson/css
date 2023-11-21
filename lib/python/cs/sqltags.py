@@ -710,31 +710,8 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
 SQTCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
-class PolyValue(namedtuple('PolyValue',
-                           'float_value string_value structured_value')):
-  ''' A `namedtuple` for the polyvalues used in an `SQLTagsORM`.
-
-      We express various types in SQL as one of 3 columns:
-      * `float_value`: for `float`s and `int`s which round trip with `float`
-      * `string_value`: for `str`
-      * `structured_value`: a JSON transcription of any other type
-
-      This allows SQL indexing of basic types.
-
-      Note that because `str` gets stored in `string_value`
-      this leaves us free to use "bare string" JSON to serialise
-      various nonJSONable types.
-
-      The `SQLTagSets` class has a `to_polyvalue` factory
-      which produces a `PolyValue` suitable for the SQL rows.
-      NonJSONable types such as `datetime`
-      are converted to a `str` but stored in the `structured_value` column.
-      This should be overridden by subclasses as necessary.
-
-      On retrieval from the database
-      the tag rows are converted to Python values
-      by the `SQLTagSets.from_polyvalue` method,
-      reversing the process above.
+class PolyValued:
+  ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
   '''
 
   def is_valid(self):
@@ -749,29 +726,6 @@ class PolyValue(namedtuple('PolyValue',
     )
     return True
 
-class PolyValueColumnMixin:
-  ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
-      This is used by the `Tags` and `TagMultiValues` relations inside `SQLTagsORM`.
-  '''
-
-  float_value = Column(
-      Float,
-      nullable=True,
-      default=None,
-      index=True,
-      comment='tag value in numeric form'
-  )
-  string_value = Column(
-      String,
-      nullable=True,
-      default=None,
-      index=True,
-      comment='tag value in string form'
-  )
-  structured_value = Column(
-      JSON, nullable=True, default=None, comment='tag value in JSON form'
-  )
-
   def as_polyvalue(self):
     ''' Return this row's value as a `PolyValue`.
     '''
@@ -783,7 +737,7 @@ class PolyValueColumnMixin:
 
   @require(lambda pv: pv.is_valid())
   @typechecked
-  def set_polyvalue(self, pv: PolyValue):
+  def set_polyvalue(self, pv: "PolyValued"):
     ''' Set all the value fields.
     '''
     self.float_value = pv.float_value
@@ -815,6 +769,57 @@ class PolyValueColumnMixin:
     if isinstance(other_value, str):
       return cls.string_value, other_value
     return cls.structured_value, other_value
+
+class PolyValue(namedtuple('PolyValue',
+                           'float_value string_value structured_value'),
+                PolyValued):
+  ''' A `namedtuple` for the polyvalues used in an `SQLTagsORM`.
+
+      We express various types in SQL as one of 3 columns:
+      * `float_value`: for `float`s and `int`s which round trip with `float`
+      * `string_value`: for `str`
+      * `structured_value`: a JSON transcription of any other type
+
+      This allows SQL indexing of basic types.
+
+      Note that because `str` gets stored in `string_value`
+      this leaves us free to use "bare string" JSON to serialise
+      various nonJSONable types.
+
+      The `SQLTagSets` class has a `to_polyvalue` factory
+      which produces a `PolyValue` suitable for the SQL rows.
+      NonJSONable types such as `datetime`
+      are converted to a `str` but stored in the `structured_value` column.
+      This should be overridden by subclasses as necessary.
+
+      On retrieval from the database
+      the tag rows are converted to Python values
+      by the `SQLTagSets.from_polyvalue` method,
+      reversing the process above.
+  '''
+
+class PolyValueColumnMixin(PolyValued):
+  ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
+      This is used by the `Tags` and `TagMultiValues` relations inside `SQLTagsORM`.
+  '''
+
+  float_value = Column(
+      Float,
+      nullable=True,
+      default=None,
+      index=True,
+      comment='tag value in numeric form'
+  )
+  string_value = Column(
+      String,
+      nullable=True,
+      default=None,
+      index=True,
+      comment='tag value in string form'
+  )
+  structured_value = Column(
+      JSON, nullable=True, default=None, comment='tag value in JSON form'
+  )
 
 # pylint: disable=too-many-instance-attributes
 class SQLTagsORM(ORM, UNIXTimeMixin):
@@ -1007,17 +1012,17 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               )
           )
 
-      def discard_tag(self, name, value=None, *, session):
+      @typechecked
+      def discard_tag(self, name, pv: Optional[PolyValue] = None, *, session):
         ''' Discard the tag matching `(name,value)`.
             Return the tag row discarded or `None` if no match.
         '''
-        tag = Tag(name, value)
         tags_table = orm.tags
         etag = tags_table.lookup1(
             session=session, entity_id=self.id, name=name
         )
         if etag is not None:
-          if tag.value is None or tag.value == etag.value:
+          if pv.value_test(None) or pv == etag.as_polyvalue():
             session.delete(etag)
         self._update_multivalues(name, (), session=session)
         return etag
@@ -1640,17 +1645,24 @@ class SQLTags(BaseTagSets, Promotable):
     '''
     session = self.orm.sqla_state.session
     if session is None:
-      raise RuntimeError("no default db session")
+      raise AttributeError("no default db session")
     return session
 
+  @pfx_method
   def flush(self):
     ''' Flush the current session state to the database.
     '''
-    self.default_db_session.flush()
+    try:
+      sess = self.default_db_session
+    except AttributeError as e:
+      ifverbose("no session: %s", e)
+    else:
+      sess.flush()
 
   @typechecked
   def default_factory(
-      self, name: Optional[str] = None, *, unixtime=None, tags=None
+      self, name: Optional[str] = None, *, unixtime=None, tags=None,
+      skip_refresh=False,
   ):
     ''' Fetch or create an `SQLTagSet` for `name`.
         Return the `SQLTagSet`.
@@ -1670,11 +1682,13 @@ class SQLTags(BaseTagSets, Promotable):
         session.flush()
         te = self.get(entity.id)
         assert te is not None
-        entity.add_new_tags(tags, session=session)
+        if tags:
+          entity.add_new_tags(tags, session=session)
       # refresh entry from some source if there is a .refresh() method
-      refresh = getattr(type(te), 'refresh', None)
-      if refresh is not None and callable(refresh):
-        refresh(te)
+      if not skip_refresh:
+        refresh = getattr(type(te), 'refresh', None)
+        if refresh is not None and callable(refresh):
+          refresh(te)
     else:
       # update the existing SQLTagSet
       if unixtime is not None:

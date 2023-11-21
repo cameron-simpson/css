@@ -202,7 +202,10 @@ import os
 from os.path import (
     dirname, isdir as isdirpath, isfile as isfilepath, join as joinpath
 )
+from pprint import pformat
 import re
+import sys
+from threading import Lock
 import time
 from typing import Mapping, Optional, Union
 from uuid import UUID, uuid4
@@ -422,21 +425,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       you can also access tag values as attributes
       *provided* that they do not conflict with instance attributes
       or class methods or properties.
-      The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
-      as `None` which causes attribute access to return `None`
-      for missing tag names.
-      This supports code like:
-
-          if tags.title:
-              # use the title in something
-          else:
-              # handle a missing title tag
   '''
-
-  # Arrange to return None for missing mapping attributes
-  # supporting tags.foo being None if there is no 'foo' tag.
-  # Note: sometimes this has confusing effects.
-  ATTRABLE_MAPPING_DEFAULT = None
 
   @pfx_method
   @require(
@@ -473,6 +462,47 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
+
+  def dump(self, keys=None, *, preindent=None, file=None, **pf_kwargs):
+    ''' Dump a `TagSet` in multiline format.
+
+        Parameters:
+        * `keys`: optional iterable of `Tag` names to print
+        * `file`: optional keyword parameter specifying the output filelike 
+          object; the default is `sys.stdout`.
+        * `preindent`: optional leading indentation for the entire dump,
+          either a `str` or an `int` indicating a number of spaces
+        Other keyword arguments are passed to `pprint.pformat`.
+    '''
+    if keys is None:
+      keys = sorted(self.keys())
+    else:
+      keys = list(keys)
+    if preindent is None:
+      preindent = ''
+    elif isinstance(preindent, int):
+      preindent = ' ' * preindent
+    else:
+      assert isinstance(
+          preindent, str
+      ), ("preindent: expected int or str, got: %s" % (r(preindent),))
+    if file is None:
+      file = sys.stdout
+    print(preindent, self.name, file=file, sep='')
+    if keys:
+      kwidth = max(map(len, keys)) + 1
+      kindent = '  '
+      ksubindent = kindent + ' ' * kwidth
+      pf_nl_replacement = '\n' + preindent + ksubindent
+      for k in keys:
+        print(
+            preindent,
+            kindent,
+            f"{k:{kwidth}}",
+            pformat(self[k], **pf_kwargs).replace('\n', '\n' + ksubindent),
+            file=file,
+            sep=''
+        )
 
   @classmethod
   def from_tags(cls, tags, _id=None, _ontology=None):
@@ -593,6 +623,21 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     try:
       return self[attr]
     except KeyError:
+
+      sup = super()
+
+      def supergetattr(attr):
+        ''' Function to fetch via the superclass.
+        '''
+        try:
+          sgattr = sup.__getattr__
+        except AttributeError:
+          raise AttributeError(type(self).__name__ + '.' + attr)  # pylint: disable=raise-missing-from
+        return sgattr(attr)
+
+      if not attr.startswith('_'):
+        return supergetattr(attr)
+      # no magic for names commencing with an underscore
       try:
         return self.auto_infer(attr)
       except ValueError:  # as e:
@@ -641,11 +686,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         attr_ = attr + '.'
         if any(map(lambda k: k.startswith(attr_) and k > attr_, self.keys())):
           return self.subtags(attr)
-      try:
-        super_getattr = super().__getattr__
-      except AttributeError:
-        raise AttributeError(type(self).__name__ + '.' + attr)  # pylint: disable=raise-missing-from
-      return super_getattr(attr)
+      return supergetattr(attr)
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
@@ -779,7 +820,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     return self.set(tag_name, value, **kw)
 
-  def __delitem__(self, tag_name):
+  @typechecked
+  def __delitem__(self, tag_name: str):
     if tag_name not in self:
       raise KeyError(tag_name)
     self.discard(tag_name)

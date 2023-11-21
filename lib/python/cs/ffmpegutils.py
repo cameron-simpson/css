@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import json
 from os.path import (
     basename,
+    dirname,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -356,6 +357,7 @@ def ffmpeg_docker(
       elif not arg.startswith('-'):
         # output filename
         # TODO: URLs?
+        DR.outputpath = dirname(arg)
         outbase = basename(arg)
         if outbase in output_map:
           base_prefix, base_ext = splitext(outbase)
