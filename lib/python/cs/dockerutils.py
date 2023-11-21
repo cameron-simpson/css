@@ -346,13 +346,22 @@ class DockerRun:
         docker_argv.extend(
             [
                 '--mount',
-                f'type=bind,readonly,source={inputpath},destination={mnt}'
+                mount_escape(
+                    'type=bind',
+                    'readonly',
+                    f'source={inputpath}',
+                    f'destination={mnt}',
+                ),
             ]
         )
     docker_argv.extend(
         [
             '--mount',
-            f'type=bind,source={abspath(self.outputpath)},destination={self.output_root}'
+            mount_escape(
+                'type=bind',
+                f'source={abspath(self.outputpath)}',
+                f'destination={self.output_root}',
+            ),
         ]
     )
     if self.as_root:
