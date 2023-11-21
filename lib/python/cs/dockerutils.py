@@ -3,8 +3,10 @@
 ''' Docker related utilities.
 '''
 
+import csv
 from dataclasses import dataclass, field
 from getopt import GetoptError
+from io import StringIO
 import os
 from os.path import (
     abspath,
@@ -178,6 +180,23 @@ def docker_compose(
   if config is None:
     config = default_docker_compose_config()
   return run([*exe, '-f', config, *dc_argv], doit=doit, quiet=quiet)
+
+def mount_escape(*args) -> str:
+  ''' Escape the strings in `args` for us in the `docker run --mount` option.
+
+      Apparently the arguments to `docker run --mount` are in fact
+      a CSV data line.
+      (Of course you need to find this allusion in the bug tracker,
+      heaven forfend that the docs actually detail this kind of
+      thing.)
+
+      Rather that try to enumerate what needs escaping, here we use
+      the `csv` module to escape using the default "excel" dialect.
+  '''
+  buf = StringIO()
+  csvw = csv.writer(buf)
+  csvw.writerow(args)
+  return buf.getvalue().rstrip('\n')
 
 @dataclass
 class DockerRun:
