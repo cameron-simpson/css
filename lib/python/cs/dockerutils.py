@@ -19,7 +19,7 @@ from os.path import (
 from subprocess import CompletedProcess
 import sys
 from tempfile import TemporaryDirectory
-from typing import List, Optional
+from typing import List
 
 from typeguard import typechecked
 
@@ -27,7 +27,7 @@ from cs.cmdutils import BaseCommand, BaseCommandOptions
 from cs.context import stackattrs
 from cs.fs import validate_rpath
 from cs.pfx import Pfx
-from cs.psutils import print_argv, run
+from cs.psutils import run
 
 def main(argv=None, **run_kw):
   ''' Invoke the `DockerUtilCommand` with `argv`.
@@ -200,6 +200,29 @@ def mount_escape(*args) -> str:
 
 @dataclass
 class DockerRun:
+  ''' A `DockerRun` specifies how to prepare docker to execute a command.
+
+      This is a generic wrapper for invoking a docker image and
+      internal executable to process data from the host system,
+      essentially a flexible and cleaned up version of the wrappers
+      used to invoke things like the `linuxserver:*` utility docker
+      images.
+
+      Input paths for the executable will be presented in a read
+      only directory, by default `/input' inside the container.
+
+      An output directory (default '.', the current durectory) will
+      be mounted read/write inside the container, by default `/output`
+      inside the container.
+
+      _Unlike_ a lot of docker setups, the default mode runs as the
+      invoking user's UID/GID inside the container and expects the
+      `s6-setuidgid` utility to be present in the image.
+
+      See the `ffmpeg_docker` function from `cs.ffmpegutils` for
+      an example invocation of this class.
+  '''
+
   INPUTDIR_DEFAULT = '/input'
   OUTPUTDIR_DEFAULT = '/output'
   image: str = None
