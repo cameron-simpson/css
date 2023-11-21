@@ -30,6 +30,7 @@ from typeguard import typechecked
 
 from cs.dockerutils import DockerRun
 from cs.fstags import FSTags, uses_fstags
+from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.mappings import attrable
 from cs.pfx import Pfx, pfx, pfx_call
@@ -357,8 +358,10 @@ def ffmpeg_docker(
       elif not arg.startswith('-'):
         # output filename
         # TODO: URLs?
-        DR.outputpath = dirname(arg)
-        outbase = basename(arg)
+        outputpath = arg
+        outputpath = cutprefix(outputpath, 'file:')
+        DR.outputpath = dirname(outputpath) or '.'
+        outbase = basename(outputpath)
         if outbase in output_map:
           base_prefix, base_ext = splitext(outbase)
           for n in range(2, 128):
@@ -368,12 +371,13 @@ def ffmpeg_docker(
           else:
             raise ValueError('output basename and variants already allocated')
         assert outbase not in output_map
-        output_map[outbase] = arg
+        output_map[outbase] = outputpath
         ffmpeg_argv.append('./' + outbase)
       elif arg == '-i':
-        # input filename
+        # an input filename
         # TODO: URLs?
         inputpath = ffmpeg_args.pop(0)
+        inputpath = cutprefix(inputpath, 'file:')
         if inputpath == '-':
           # input from stdin
           ffmpeg_argv.extend([arg, inputpath])
