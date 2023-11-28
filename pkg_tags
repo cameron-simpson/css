@@ -82,5 +82,5 @@ cs.threads ok_revision=d6f3c6ce6435e32e92ccb7ae279840c8d5166142 pypi.release="20
 cs.timeseries ok_revision=be91f275446d9e371d09d41aff9a6ff09308973a pypi.release="20230612"
 cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
 cs.upd ok_revision=edc37e57ebd22f74d6be33c00f3ca03b7a27f90a pypi.release="20230401" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"]}
-cs.x ok_revision="184cfd43b98cddd126b9f36e7fac658bd4d55e2b" pypi.release="20230331"
+cs.x ok_revision="184cfd43b98cddd126b9f36e7fac658bd4d55e2b" pypi.release="20230331" features={"20231129":["via_logger"]}
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
