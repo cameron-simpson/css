@@ -956,11 +956,16 @@ class Module:
     '''
     return self.vcs.pkg_tagsets[self.name]
 
+  def feature_map(self):
+    ''' Return a `dict` mapping package names to features.
+    '''
+    return dict(self.pkg_tags.get('features', {}))
+
   @pfx_method
   def named_features(self):
     ''' Return a set containing all the feature names in use by this `Module`.
     '''
-    feature_map = self.pkg_tags.features or {}
+    feature_map = self.feature_map()
     all_feature_names = set()
     for feature_names in feature_map.values():
       for feature_name in feature_names:
@@ -974,7 +979,7 @@ class Module:
   def set_feature(self, feature_name: str, release_version: str):
     ''' Include `feature_name` in the features for release `release_version`.
     '''
-    feature_map = self.pkg_tags.features or {}
+    feature_map = self.feature_map()
     release_features = set(feature_map.get(release_version, []))
     release_features.add(feature_name)
     feature_map[release_version] = sorted(release_features)
@@ -989,7 +994,7 @@ class Module:
     ''' Yield `(release_version,feature_names)`
         for all releases mentioned in the `features` tag.
     '''
-    feature_map = self.pkg_tags.get('features', {})
+    feature_map = self.feature_map()
     yield from feature_map.items()
 
   @pfx_method(use_str=True)
@@ -1642,7 +1647,7 @@ class Module:
                   continue
                 if self.name == line:
                   problems.append(
-                      f'name conflicts with {third_party_listpath}s:{lineno}: {line!r}'
+                      f'name conflicts with {third_party_listpath}:{lineno}: {line!r}'
                   )
     # see if this package has been marked "ok" as of a particular revision
     latest_ok_rev = self.pkg_tags.get('ok_revision')
