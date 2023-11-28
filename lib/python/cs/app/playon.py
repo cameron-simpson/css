@@ -596,7 +596,8 @@ class Recording(SQLTagSet):
         based on the presence of a `download_path` `Tag`
         or a true `downloaded` `Tag`.
     '''
-    return self.download_path is not None or 'downloaded' in self
+    dlpath = getattr(self, 'download_path', None)
+    return dlpath is not None or 'downloaded' in self
 
   @format_attribute
   def is_pending(self):
