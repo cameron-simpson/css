@@ -51,7 +51,10 @@ except ImportError:
 
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 try:
-  import lxml
+  try:
+    from lxml import etree
+  except ImportError:
+    import xml.etree.ElementTree as etree
 except ImportError:
   try:
     if sys.stderr.isatty():
@@ -68,7 +71,6 @@ from cs.logutils import debug, error, warning, exception
 from cs.pfx import Pfx, pfx_iter
 from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked
-from cs.xml import etree  # ElementTree
 
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader

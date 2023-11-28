@@ -16,7 +16,11 @@ import tempfile
 from cs.logutils import warning
 from cs.pfx import Pfx
 import cs.sh
-from cs.xml import etree
+
+try:
+  from lxml import etree
+except ImportError:
+  import xml.etree.ElementTree as etree
 
 __version__ = '20221228-post'
 
@@ -31,7 +35,6 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.sh',
-        'cs.xml',
     ],
 }
 
