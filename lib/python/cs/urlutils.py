@@ -14,14 +14,10 @@ DISTINFO = {
     ],
     'install_requires': [
         'beautifulsoup4',
-        'cs.excutils',
         'cs.lex',
         'cs.logutils',
         'cs.rfc2616',
         'cs.threads',
-        'cs.py3',
-        'cs.obj',
-        'cs.xml',
     ],
 }
 
