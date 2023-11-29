@@ -545,13 +545,13 @@ class Recording(SQLTagSet):
     parts = []
     if self.playon.Series:
       parts.append(self.playon.Series)
-    se_parts = []
-    if self.playon.Season:
-      se_parts.append(f's{self.playon.Season:02d}')
-    if self.playon.Episode:
-      se_parts.append(f'e{self.playon.Episode:02d}')
-    if se_parts:
-      parts.append(''.join(se_parts))
+      se_parts = []
+      if self.playon.get('Season'):
+        se_parts.append(f's{self.playon.Season:02d}')
+      if self.playon.get('Episode'):
+        se_parts.append(f'e{self.playon.Episode:02d}')
+      if se_parts:
+        parts.append(''.join(se_parts))
     if not parts:
       return ''
     return sep.join(parts) + sep
@@ -560,12 +560,12 @@ class Recording(SQLTagSet):
   def series_episode_name(self):
     name = self.playon.Name
     name = name.strip()
-    if self.playon.Season:
+    if self.playon.get('Season'):
       spfx, n, offset = get_prefix_n(name, 's', n=self.playon.Season)
       if spfx is not None:
         assert name.startswith(f's{self.playon.Season:02d}')
         name = name[offset:]
-    if self.playon.Episode:
+    if self.playon.get('Episode'):
       epfx, n, offset = get_prefix_n(name, 'e', n=self.playon.Episode)
       if epfx is not None:
         assert name.startswith(f'e{self.playon.Episode:02d}')
