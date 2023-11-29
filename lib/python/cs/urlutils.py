@@ -4,6 +4,8 @@
 # - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
 
+__version__ = '20231129'
+
 DISTINFO = {
     'description':
     "convenience functions for working with URLs",
