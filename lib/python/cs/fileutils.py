@@ -72,6 +72,7 @@ DISTINFO = {
         'cs.progress',
         'cs.py3',
         'cs.range',
+        'cs.resources',
         'cs.result',
         'cs.threads',
         'cs.units',
