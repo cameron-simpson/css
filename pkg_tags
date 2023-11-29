@@ -7,7 +7,7 @@ cs.app.mailfiler pypi.release="20200719"
 cs.app.megacli pypi.release="20211031" ok_revision="03033cc34d810f17745cceee447af3df5566ae33"
 cs.app.mklinks pypi.release="20221228" ok_revision="25db918d3d95925205dd361638d2ddb9f279f52c"
 cs.app.myke ok_revision="2d63b52a3bd5c244e3d73b0ea1548655a154cfa0" pypi.release="20220805"
-cs.app.osx.plist ok_revision="0113b8892ffcd70e3896af568ff8005f433dd81e" pypi.release="20221228"
+cs.app.osx.plist ok_revision="599e3e37c0af4e7ba92c2134c0a90d17effcfc39" pypi.release="20221228"
 cs.app.playon ok_revision=c7399d77d116b05c74f8077c40dfe45f807aecbc pypi.release="20230705" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
 cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
 cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9082bc3"
@@ -25,10 +25,12 @@ cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657eca
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20230613.1" ok_revision="927d70161547e2044cba9503c87faa734a244bd6" features={"20230613":["patch_builtins"]}
 cs.deco pypi.release="20231129" ok_revision="2a32e28e9037f546ac7dd7ebdd4aca2d2e074f07" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"]}
+cs.dockerutils
 cs.ebooks ok_revision="2d9c2023e736dab60a6b1524380f4ab52d390dd8" pypi.release="20230704" features={"20230110":["dedrm"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
 cs.env pypi.release="20230407" ok_revision=bd184cdf4bd71eaa2bb8f98b30a735ec582d9abc
 cs.excutils pypi.release="20230212.1" ok_revision="2e8aa06ec61e7b92454d70fa9430bda88a351076"
+cs.ffmpegutils
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20231129" ok_revision=d75cf8d669dbe86500f48ae0b8bd67c63b9580aa features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
 cs.fs ok_revision="685afaef985cbdded670ed494d393653bd145e9e" pypi.release="20231129" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
@@ -45,6 +47,7 @@ cs.lex pypi.release="20231018" ok_revision="9ede9dadafd020c977da540e17d6adfaf55d
 cs.logutils pypi.release="20230212" ok_revision="770c9ea67c7a53169da1cda49bbe94eb83530f5d" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
 cs.mappings pypi.release="20231129" ok_revision="4a18c12b4d506c8532e5b60a97ca49dcdd7c5596" features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"]}
+cs.mediainfo
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.mplutils ok_revision="24a1ebf5b45d44a734462ba8fd3120331bce0173" pypi.release="20230407" features={"20220918":["FigureSize"]}
 cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783" pypi.release="20211208"
@@ -81,6 +84,7 @@ cs.taskqueue ok_revision="5b2c7311b70519bea966bedf91008c797770c819" features={"2
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
 cs.threads ok_revision="1159b96965d7bb681da56ac0420645ec653ba476" pypi.release="20231129" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"]}
 cs.timeseries ok_revision=be91f275446d9e371d09d41aff9a6ff09308973a pypi.release="20230612"
+cs.tty
 cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
 cs.units
 cs.upd ok_revision=edc37e57ebd22f74d6be33c00f3ca03b7a27f90a pypi.release="20230401" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"]}
