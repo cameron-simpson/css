@@ -55,6 +55,9 @@ DISTINFO = {
     'install_requires': [
         'cs.binary',
         'cs.buffer',
+        'cs.deco',
+        'cs.progress',
+        'cs.units',
         'cs.excutils',
         'cs.later',
         'cs.logutils',
@@ -65,6 +68,7 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
+        'icontract',
     ]
 }
 
