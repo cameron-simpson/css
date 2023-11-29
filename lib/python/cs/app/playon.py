@@ -1065,8 +1065,7 @@ class PlayOnAPI(HTTPServiceAPI):
           dl_url, auth=RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with pfx_call(atomic_filename, filename, mode='wb',
-                    placeholder=True) as f:
+      with pfx_call(atomic_filename, filename, mode='wb') as f:
         for chunk in progressbar(
             dl_rsp.iter_content(chunk_size=131072),
             label=filename,
