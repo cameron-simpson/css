@@ -2171,7 +2171,7 @@ class TagSetPrefixView(FormatableMixin):
       try:
         return self[attr]
       except (KeyError, TypeError):
-        return getattr(self.__proxied, attr)
+        return getattr(self.__proxied, self._prefix_ + attr)
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
