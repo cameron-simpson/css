@@ -178,9 +178,8 @@ class PacketConnection(object):
 
         Parameters:
         * `recv`: inbound binary stream.
-          If this is an `int` it is taken to be an OS file descriptor,
-          otherwise it should be a `cs.buffer.CornuCopyBuffer`
-          or a file like object with a `read1` or `read` method.
+          This value is automatically promoted to a `cs.buffer.CornuCopyBuffer`
+          by the `CornuCopyBuffer.promote` method.
         * `recv_len_func`: optional function to compute the data
           length of a received packet; the default watches the offset
           on the receive stream
@@ -525,7 +524,7 @@ class PacketConnection(object):
   def _receive_loop(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
-    XX = self.tick
+    ##XX = self.tick
     for packet in progressbar(
         Packet.scan(self._recv),
         label=f'<= {self.name}',
@@ -620,7 +619,6 @@ class PacketConnection(object):
         Flush whenever the queue is empty.
     '''
     ##XX = self.tick
-    ##with Pfx("%s._send", self):
     with PrePfx("_SEND [%s]", self):
       with post_condition(("_send is None", lambda: self._send is None)):
         fp = self._send
