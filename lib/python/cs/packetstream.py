@@ -226,16 +226,16 @@ class PacketConnection(object):
     if packet_grace is None:
       packet_grace = DEFAULT_PACKET_GRACE
     if tick is None:
-      tick = lambda bs: None
+      tick = lambda bs: None  # pylint: disable=unnecessary-lambda-assignment
     elif isinstance(tick, bool):
       if tick:
         tick = tick_fd_2
       else:
-        tick = lambda bs: None
+        tick = lambda bs: None  # pylint: disable=unnecessary-lambda-assignment
     self._recv_last_offset = 0
     if recv_len_func is None:
 
-      def recv_len_func(pk):
+      def recv_len_func(_):
         ''' The default length of a packet is the length of the _recv.offset change.
         '''
         new_offset = self._recv.offset
@@ -247,7 +247,7 @@ class PacketConnection(object):
     self._send_last_offset = 0
     if send_len_func is None:
 
-      def send_len_func(pk):
+      def send_len_func(_):
         ''' The default length of a packet is the length of the _send.offset change.
         '''
         new_offset = self._send.offset
@@ -365,8 +365,8 @@ class PacketConnection(object):
     channel_info = pending[channel]
     if tag not in channel_info:
       raise ValueError("tag %d unknown in channel %d" % (tag, channel))
-    if False and tag == 15:
-      raise RuntimeError("BANG")
+    ##if False and tag == 15:
+    ##  raise RuntimeError("BANG")
     return channel_info.pop(tag)
 
   def _pending_cancel(self):
