@@ -22,14 +22,14 @@ The following globals further tune its behaviour,
 absent the `file=` parameter:
 * `X_default_colour`: if set, messages will be ANSI coloured using
   `cs.ansi_colour.colourise`
-* `X_discard`: if true then discard the message
+* `X_discard`: if true then discard the message.
   Otherwise write the message to `sys.stderr`.
   `X_discard`'s default value is `not sys.stderr.isatty()`.
-* `X_logger`: if not `None` then log a warning to that logger
-* `X_via_tty`: if true then a pathname to which to append messages
+* `X_logger`: if not `None` then log a warning to that logger.
+* `X_via_tty`: if true then a pathname to which to append messages.
 
 The following environment variables affect the initial values of the globals:
-* `$CS_X_COLOUR`: this sets `X_default_colour`
+* `$CS_X_COLOUR`: this sets `X_default_colour`.
 * `$CS_X_LOGGER`:
   if present, an empty value sets `X_logger` to the root logger
   and a nonempty value names a logger.
