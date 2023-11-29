@@ -78,7 +78,7 @@ cs.sqltags ok_revision="5d67d1ec1f26e3f5248d4b66304b00f2997004dd" pypi.release="
 cs.tagset ok_revision="102befb0ea23b8adefd77cfafdec48969f276b14" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20230612"
 cs.taskqueue ok_revision="5b2c7311b70519bea966bedf91008c797770c819" features={"20221207":["BaseTask"]} pypi.release="20230401"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
-cs.threads ok_revision=d6f3c6ce6435e32e92ccb7ae279840c8d5166142 pypi.release="20230331" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"]}
+cs.threads ok_revision="1159b96965d7bb681da56ac0420645ec653ba476" pypi.release="20230331" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"]}
 cs.timeseries ok_revision=be91f275446d9e371d09d41aff9a6ff09308973a pypi.release="20230612"
 cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
 cs.upd ok_revision=edc37e57ebd22f74d6be33c00f3ca03b7a27f90a pypi.release="20230401" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"]}
