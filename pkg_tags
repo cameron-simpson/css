@@ -1,3 +1,4 @@
+beautifulsoup4
 cs.ansi_colour pypi.release="20220227" ok_revision="6790b9b6946cc7d66b03cfec771154d463f2cc18" features={"20220227":["COLOUR_CODES","TerminalColors","colour_escape"]}
 cs.app.beyonwiz pypi.release=20160828
 cs.app.flag pypi.release="20201228" ok_revision="8d880199ddcb60a456ee67bc162cb453ce85f491"
@@ -82,6 +83,6 @@ cs.threads ok_revision="1159b96965d7bb681da56ac0420645ec653ba476" pypi.release="
 cs.timeseries ok_revision=be91f275446d9e371d09d41aff9a6ff09308973a pypi.release="20230612"
 cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
 cs.upd ok_revision=edc37e57ebd22f74d6be33c00f3ca03b7a27f90a pypi.release="20230401" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"]}
-cs.urlutils ok_revision="7eeaa1d7ef5d4e82b88e9d614e8646d80a5344e7"
+cs.urlutils ok_revision="7eeaa1d7ef5d4e82b88e9d614e8646d80a5344e7" pypi.release="20231129"
 cs.x ok_revision="184cfd43b98cddd126b9f36e7fac658bd4d55e2b" pypi.release="20231129" features={"20231129":["via_logger"]}
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
