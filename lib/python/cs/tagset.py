@@ -2167,11 +2167,10 @@ class TagSetPrefixView(FormatableMixin):
   def __getattr__(self, attr):
     ''' Proxy other attributes through to the `TagSet`.
     '''
-    with Pfx("%s.__getattr__(%r)", type(self).__name__, attr):
-      try:
-        return self[attr]
-      except (KeyError, TypeError):
-        return getattr(self.__proxied, self._prefix_ + attr)
+    try:
+      return self[attr]
+    except (KeyError, TypeError):
+      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
