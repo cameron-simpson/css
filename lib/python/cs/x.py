@@ -35,7 +35,6 @@ The following environment variables affect the initial values of the globals:
   and a nonempty value names a logger.
 * `$CS_X_VIA_TTY`: if missing or empty, `X_via_tty` will be false.
   Otherwise,
-  Otherwise,
   if `$CS_X_VIA_TTY` has a nonempty value which is a full path
   to an existing filesystem object (typically a tty)
   then is will be used for `X_via_tty`,
