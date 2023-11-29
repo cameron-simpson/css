@@ -66,7 +66,7 @@ cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76d
 cs.queues pypi.release="20230331" ok_revision="21372ad95a48270f7efb228877f3bda3111f40fd" features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"],"20220918":["QueueIterator"]}
 cs.range pypi.release="20230701" ok_revision="3c29485aa454ffe595bf84c67c48aaef19abfe30" features={"20230518":["as_list"]}
 cs.resources pypi.release="20230503" ok_revision="0ee133a6fdae6a024fe4e29b6aa467c11c7f2d5f" features={"20220429":["catch_signal"],"20220918":["openif"],"20230503":["RunState_poll_cancel"]}
-cs.result pypi.release="20230331" ok_revision=cbe8b33c19196929af7d229a5209e95e4174c3cb features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"]}
+cs.result pypi.release="20230331" ok_revision="5563fea1a1d5c10ed028761ea0327596c3137f02" features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"]}
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.seq pypi.release="20221118" ok_revision=aaa9c0da103b2c9038b8148b2a21e395e75882d2 featu
