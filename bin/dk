@@ -432,7 +432,7 @@ case "$op" in
       "$0" pull
       "$0" down
       docker volume rm "${base}_var" || :
-      "$0" build
+      $DK_COMPOSE_CMD $docker_compose_opts -f "$DK_COMPOSE_YML" build
       "$0" up setup
       exit $?
       ;;
