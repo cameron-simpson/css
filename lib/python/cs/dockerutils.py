@@ -29,6 +29,23 @@ from cs.fs import validate_rpath
 from cs.pfx import Pfx
 from cs.psutils import run
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.cmdutils',
+        'cs.context',
+        'cs.fs',
+        'cs.pfx',
+        'cs.psutils',
+        'ffmpeg-python',
+        ##'git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python',
+    ],
+}
+
 def main(argv=None, **run_kw):
   ''' Invoke the `DockerUtilCommand` with `argv`.
   '''
