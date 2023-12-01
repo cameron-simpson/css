@@ -53,24 +53,30 @@ def main(argv=None, **run_kw):
 
 DOCKER_COMMAND_ENVVAR = 'DK_COMMAND'
 DOCKER_COMMAND_DEFAULT = 'docker'
+# pylint: disable=unnecessary-lambda-assignment
 default_docker_command = lambda: os.environ.get(
     DOCKER_COMMAND_ENVVAR, DOCKER_COMMAND_DEFAULT
 )
 
 DOCKER_COMPOSE_COMMAND_ENVVAR = 'DK_COMPOSE_COMMAND'
 DOCKER_COMPOSE_COMMAND_DEFAULT = [default_docker_command(), 'compose']
+# pylint: disable=unnecessary-lambda-assignment
 default_docker_compose_command = lambda: os.environ.get(
     DOCKER_COMPOSE_COMMAND_ENVVAR, DOCKER_COMPOSE_COMMAND_DEFAULT
 )
 
 DOCKER_COMPOSE_CONFIG_ENVVAR = 'DK_COMPOSE_YML'
 DOCKER_COMPOSE_CONFIG_DEFAULT = 'docker-compose.yml'
+# pylint: disable=unnecessary-lambda-assignment
 default_docker_compose_config = lambda: os.environ.get(
     DOCKER_COMPOSE_CONFIG_ENVVAR, DOCKER_COMPOSE_CONFIG_DEFAULT
 )
 
 @dataclass
 class DockerUtilCommandOptions(BaseCommandOptions):
+  ''' Command line options for `DockerUtilCommand`.
+  '''
+
   # the default container for "docker exec"
   docker_command: str = field(default_factory=default_docker_command)
   docker_compose_command: str = field(
@@ -94,6 +100,7 @@ class DockerUtilCommand(BaseCommand):
     @container  Specify a target container.
   '''
 
+  # pylint: disable=use-dict-literal
   USAGE_KEYWORDS = dict(
       DOCKER_COMPOSE_COMMAND_DEFAULT=DOCKER_COMPOSE_COMMAND_DEFAULT,
       DOCKER_COMPOSE_CONFIG_DEFAULT=DOCKER_COMPOSE_CONFIG_DEFAULT,
@@ -137,7 +144,6 @@ class DockerUtilCommand(BaseCommand):
     ''' Usage: {cmd}
           Show the running docker containers.
     '''
-    options = self.options
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
     return self.docker_compose('ps').returncode
@@ -168,13 +174,7 @@ class DockerUtilCommand(BaseCommand):
       with stackattrs(DR, outputpath=T):
         DR.run(*argv, exe=options.docker_command)
 
-def docker(
-    *dk_argv,
-    exe=None,
-    config=None,
-    doit=True,
-    quiet=True
-) -> CompletedProcess:
+def docker(*dk_argv, exe=None, doit=True, quiet=True) -> CompletedProcess:
   ''' Invoke `docker` with `dk_argv`.
   '''
   if exe is None:
@@ -193,7 +193,7 @@ def docker_compose(
   if exe is None:
     exe = default_docker_compose_command()
   if isinstance(exe, str):
-    exe = exe,
+    exe = (exe,)
   if config is None:
     config = default_docker_compose_config()
   return run([*exe, '-f', config, *dc_argv], doit=doit, quiet=quiet)
@@ -215,6 +215,7 @@ def mount_escape(*args) -> str:
   csvw.writerow(args)
   return buf.getvalue().rstrip('\n')
 
+# pylint: disable=too-many-instance-attributes
 @dataclass
 class DockerRun:
   ''' A `DockerRun` specifies how to prepare docker to execute a command.
@@ -328,6 +329,7 @@ class DockerRun:
         raise ValueError(f'already present in input_map:{self.input_map!r}')
     self.input_map[inputmount] = abspath(inputpath)
 
+  # pylint: disable=too-many-branches
   def run(self, *argv, doit=None, quiet=None, docker_exe=None):
     ''' Run a command via `docker run`.
         Return the `CompletedProcess` result or `None` if `doit` is false.
