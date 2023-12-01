@@ -44,7 +44,13 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.dockerutils',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.mappings',
         'cs.pfx',
+        'cs.psutils',
         'cs.tagset',
         'ffmpeg-python',
         ##'git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python',
@@ -331,6 +337,8 @@ def ffmpeg_docker(
     image: Optional[str] = None,
     outputpath: str = '.',
 ) -> Optional[CompletedProcess]:
+  ''' Invoke `ffmpeg` using docker.
+  '''
   ffmpeg_args: List[str] = list(ffmpeg_args)
   if docker_run_opts is None:
     docker_run_opts = []
