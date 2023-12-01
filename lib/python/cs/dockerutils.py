@@ -29,7 +29,7 @@ from cs.fs import validate_rpath
 from cs.pfx import Pfx
 from cs.psutils import run
 
-__version__ = '20231202'
+__version__ = '20231202-post'
 
 DISTINFO = {
     'keywords': ["python3"],
