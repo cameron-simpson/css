@@ -25,7 +25,7 @@ cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657eca
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20230613.1" ok_revision="927d70161547e2044cba9503c87faa734a244bd6" features={"20230613":["patch_builtins"]}
 cs.deco pypi.release="20231129" ok_revision="2a32e28e9037f546ac7dd7ebdd4aca2d2e074f07" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"]}
-cs.dockerutils ok_revision="0a4e42415d7b3f1ad8ea4aece73d3c29e56af11e"
+cs.dockerutils ok_revision="0a4e42415d7b3f1ad8ea4aece73d3c29e56af11e" pypi.release="20231202"
 cs.ebooks ok_revision="2d9c2023e736dab60a6b1524380f4ab52d390dd8" pypi.release="20230704" features={"20230110":["dedrm"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
 cs.env pypi.release="20230407" ok_revision=bd184cdf4bd71eaa2bb8f98b30a735ec582d9abc
@@ -91,5 +91,6 @@ cs.upd ok_revision="8165686d54c80b9ad3da20f5ce5834164867c401" pypi.release="2023
 cs.urlutils ok_revision="7eeaa1d7ef5d4e82b88e9d614e8646d80a5344e7" pypi.release="20231129"
 cs.x ok_revision="184cfd43b98cddd126b9f36e7fac658bd4d55e2b" pypi.release="20231129" features={"20231129":["via_logger"]}
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
+"ffmpeg-python"
 icontract
 typeguard
