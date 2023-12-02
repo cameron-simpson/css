@@ -26,9 +26,10 @@ from cs.binary import AbstractBinary
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.deco import promote
+from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
-from cs.lex import r
+from cs.resources import RunState, uses_runstate
 
 from pprint import pformat
 from cs.debug import trace
@@ -521,7 +522,8 @@ class Stream:
     return self.context_dict.get(b'Subtype') == b'Image'
 
   @cached_property
-  def image(self):
+  @uses_runstate
+  def image(self, *, runstate: RunState):
     ''' A cache property holding a `PIL.Image` decoded from the `Stream`.
     '''
     decoded_bs = self.decoded_payload
@@ -577,6 +579,7 @@ class Stream:
           height * row_length,
           row_length,
       )):
+        runstate.raiseif()
         ##print("prev_offset =", prev_offset, "offset =", offset)
         prev_offset = offset
         tag = decoded_bs[offset]
