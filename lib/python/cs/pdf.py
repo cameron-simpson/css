@@ -84,9 +84,23 @@ class PDFCommand(BaseCommand):
       raise GetoptError('missing pdf-files')
     runstate = self.options.runstate
     for pdf_filename in argv:
+      runstate.raiseif()
       with Pfx(argv):
         with open(pdf_filename, 'rb') as pdff:
           pdf = PDFDocument.parse(buf=pdff)
+        for (objnum, objgen), iobj in sorted(pdf.objmap.items()):
+          runstate.raiseif()
+          print(
+              ' ', (
+                  f'objmap[{objnum}]'
+                  if objgen == 0 else f'objmap[num:{objnum},gen:{objgen}]'
+              ), iobj
+          )
+          assert isinstance(iobj, IndirectObject)
+          obj = iobj.object
+          if isinstance(obj, Stream) and obj.is_image():
+            print("   ", obj.image)
+        break
         for token in pdf.tokens:
           if runstate.cancelled:
             return 1
