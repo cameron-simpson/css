@@ -8,7 +8,7 @@
 
 import binascii
 from dataclasses import dataclass, field
-from functools import partial
+from functools import cached_property, partial
 from getopt import GetoptError
 from io import BytesIO
 from itertools import chain
@@ -30,8 +30,11 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.lex import r
 
+from pprint import pformat
 from cs.debug import trace
 from cs.x import X
+
+pfx_open = partial(pfx_call, open)
 
 DEFAULT_IMAGE_FILENAME_FORMAT = '{n:03d}.png'
 
