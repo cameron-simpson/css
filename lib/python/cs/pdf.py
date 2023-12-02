@@ -464,8 +464,8 @@ class Stream:
   context_dict: DictObject
   payload: bytes
 
-  _decoded_payload: bytes = None
-  _image: Image = None
+  def __str__(self):
+    return f'{self.__class__.__name__}:encoded_length={len(self.payload)}'
 
   def __repr__(self):
     return f'{self.__class__.__name__}:encoded_length={len(self.payload)}'
@@ -489,24 +489,21 @@ class Stream:
       assert isinstance(filters, list)
     return filters
 
-  @property
+  @cached_property
   def decoded_payload(self):
-    bs = self._decoded_payload
-    if bs is None:
-      filters = self.filters
-      bs = self.payload
-      for i, filt in enumerate(filters, 1):
-        if filt == b'DCTDecode':
-          bs, im = pfx_call(dctdecode_im, bs)
-          if i == len(filters):
-            # also stash as the cached Image
-            self._image = im
-        elif filt == b'FlateDecode':
-          bs = pfx_call(flatedecode, bs)
-        else:
-          warning("stop at unimplemented filter %r", filt)
-          break
-      self._decoded_payload = bs
+    filters = self.filters
+    bs = self.payload
+    for i, filt in enumerate(filters, 1):
+      if filt == b'DCTDecode':
+        bs, im = pfx_call(dctdecode_im, bs)
+        if i == len(filters):
+          # also stash as the cached Image
+          self._image = im
+      elif filt == b'FlateDecode':
+        bs = pfx_call(flatedecode, bs)
+      else:
+        warning("stop at unimplemented filter %r", filt)
+        break
     return bs
 
   @property
@@ -515,118 +512,159 @@ class Stream:
     '''
     return self.decoded_payload
 
-  @property
-  def image(self):
-    im = self._image
-    if im is None:
-      decoded_bs = self.decoded_payload
-      print(".image: context_dict:")
-      pprint(self.context_dict)
-      decode_params = self.context_dict.get(b'DecodeParms', {})
-      color_transform = decode_params.get(b'ColorTransform', 0)
-      color_space = self.context_dict[b'ColorSpace']
-      bits_per_component = decode_params.get(b'BitsPerComponent')
-      if not bits_per_component:
-        bits_per_component = {b'DeviceRGB': 8, b'DeviceGray': 8}[color_space]
-      ncolors = decode_params.get(b'Colors')
-      if not ncolors:
-        ncolors = {b'DeviceRGB': 3, b'DeviceGray': 1}[color_space]
-      predictor = decode_params.get(b'Predictor', 0)
-      width = self.context_dict[b'Width']
-      height = self.context_dict[b'Height']
-      mode_index = (color_space, bits_per_component, ncolors, color_transform)
-      PIL_mode = {
-          (b'DeviceGray', 1, 1, 0): 'L',
-          (b'DeviceGray', 8, 1, 0): 'L',
-          (b'DeviceRGB', 8, 3, 0): 'RGB',
-      }[mode_index]
-      if predictor == 0:
-        image_data = decoded_bs
-      elif predictor >= 10:
-        # split data into tagged rows
-        mv = memoryview(decoded_bs)
-        tags = []
-        rows = []
-        row_length = 1 + width * ncolors
-        # dummy preceeding row filled with zeroes
-        prev_row = bytes(width * ncolors)
-        prev_offset = -row_length
-        for row_index, offset in enumerate(range(
-            0,
-            height * row_length,
-            row_length,
-        )):
-          prev_offset = offset
-          tag = decoded_bs[offset]
-          tags.append(tag)
-          row_data = mv[offset + 1:offset + row_length]
-          # TODO: unpredict....
-          # recon methods from tag values
-          # detailed here:
-          # https://www.w3.org/TR/png/#9Filters
-          if tag == 0:
-            # None: Recon(x) = Filt(x)
-            # store row unchanged
-            pass
-          else:
-            # we will be modifying these data in place, so make a read/write copy
-            row_data = bytearray(row_data)
-            row_data0 = row_data
-            if tag == 1:
-              # Sub: Recon(x) = Filt(x) + Recon(a)
-              for i, b in enumerate(row_data):
-                recon_a = 0 if i < ncolors else row_data[i - ncolors]
-                row_data[i] = (b + recon_a) % 256
-            elif tag == 2:
-              # Up: Recon(x) = Filt(x) + Recon(b)
-              for i, b in enumerate(row_data):
-                recon_b = prev_row[i]
-                row_data[i] = (b + recon_b) % 256
-            elif tag == 3:
-              # Average: Recon(x) = Filt(x) + floor((Recon(a) + Recon(b)) / 2)
-              for i, b in enumerate(row_data):
-                recon_a = 0 if i < ncolors else row_data[i - ncolors]
-                recon_b = prev_row[i]
-                row_data[i] = (b + floor((recon_a + recon_b) / 2)) % 256
-            elif tag == 4:
-              # Paeth: Recon(x) = Filt(x) + PaethPredictor(Recon(a), Recon(b), Recon(c))
-              for i, b in enumerate(row_data):
-                recon_a = 0 if i < ncolors else row_data[i - ncolors]
-                recon_b = prev_row[i]
-                recon_c = 0 if i < ncolors else prev_row[i - ncolors]
-                # Paeth predictor
-                p = recon_a + recon_b - recon_c
-                pa = abs(p - recon_a)
-                pb = abs(p - recon_b)
-                pc = abs(p - recon_c)
-                if pa <= pb and pa <= pc:
-                  Pr = recon_a
-                elif pb <= pc:
-                  Pr = recon_b
-                else:
-                  Pr = recon_c
-                row_data[i] = (b + Pr) % 256
-            else:
-              warning(
-                  "row %d: unsupported tag value %d, row unchanged",
-                  row_index,
-                  tag,
-              )
-          rows.append(row_data)
-          prev_row = row_data
-        image_data = b''.join(rows)
-      else:
-        warning("unhandled DecodeParms[Predictor] value %r", predictor)
-        image_data = decoded_bs
-      im = Image.frombytes(PIL_mode, (width, height), image_data)
-      self._image = im
-    return im
+  def is_image(self):
+    ''' Does this `Stream` encode an image?
+    '''
+    return self.context_dict.get(b'Subtype') == b'Image'
 
-  def __bytes__(self):
-    return (
-        bytes(self.context_dict) + b'\r\nstream\r\n' + self.payload +
-        b'\r\nendstream\r\n'
+  @cached_property
+  def image(self):
+    ''' A cache property holding a `PIL.Image` decoded from the `Stream`.
+    '''
+    decoded_bs = self.decoded_payload
+    ##print(".image: context_dict:")
+    ##print(len(decoded_bs), 'decoded bytes:', decoded_bs[:10])
+    ##pprint(self.context_dict)
+    decode_params = self.context_dict.get(b'DecodeParms', {})
+    color_transform = decode_params.get(b'ColorTransform', 0)
+    color_space = self.context_dict[b'ColorSpace']
+    bits_per_component = decode_params.get(b'BitsPerComponent')
+    if not bits_per_component:
+      bits_per_component = {b'DeviceRGB': 8, b'DeviceGray': 8}[color_space]
+    ncolors = decode_params.get(b'Colors')
+    if not ncolors:
+      ncolors = {b'DeviceRGB': 3, b'DeviceGray': 1}[color_space]
+    predictor = decode_params.get(b'Predictor', 0)
+    width = self.context_dict[b'Width']
+    height = self.context_dict[b'Height']
+    print("width", width, "height", height)
+    mode_index = (color_space, bits_per_component, ncolors, color_transform)
+    print("mode_index =", mode_index)
+    PIL_mode = {
+        (b'DeviceGray', 1, 1, 0): 'L',
+        (b'DeviceGray', 8, 1, 0): 'L',
+        (b'DeviceRGB', 8, 3, 0): 'RGB',
+    }[mode_index]
+    print(
+        "Image.frombytes(%r,(%d,%d),%r)..." % (
+            PIL_mode,
+            width,
+            height,
+            decoded_bs[:32],
+        )
     )
+    if predictor == 0:
+      image_data = decoded_bs
+    elif predictor >= 10:
+      # split data into tagged rows
+      mv = memoryview(decoded_bs)
+      tags = []
+      rows = []
+      row_length = 1 + width * ncolors
+      print("tagged row length = 1 + width * ncolors:", row_length)
+      print(
+          "height", height, "* row_length", row_length, "=",
+          height * row_length
+      )
+      # dummy preceeding row filled with zeroes
+      prev_row = bytes(width * ncolors)
+      prev_offset = -row_length
+      for row_index, offset in enumerate(range(
+          0,
+          height * row_length,
+          row_length,
+      )):
+        ##print("prev_offset =", prev_offset, "offset =", offset)
+        prev_offset = offset
+        tag = decoded_bs[offset]
+        tags.append(tag)
+        ##print(row_index, "tag", tag)
+        row_data = mv[offset + 1:offset + row_length]
+        ##if tag != 4:
+        ##  print("row_index", row_index, "tag", tag)
+        # recon methods from tag values
+        # detailed here:
+        # https://www.w3.org/TR/png/#9Filters
+        if tag == 0:
+          # None: Recon(x) = Filt(x)
+          # store row unchanged
+          pass
+        else:
+          # we will be modifying these data in place, so make a read/write copy
+          row_data = bytearray(row_data)
+          row_data0 = row_data
+          if tag == 1:
+            # Sub: Recon(x) = Filt(x) + Recon(a)
+            for i, b in enumerate(row_data):
+              recon_a = 0 if i < ncolors else row_data[i - ncolors]
+              row_data[i] = (b + recon_a) % 256
+          elif tag == 2:
+            # Up: Recon(x) = Filt(x) + Recon(b)
+            for i, b in enumerate(row_data):
+              recon_b = prev_row[i]
+              row_data[i] = (b + recon_b) % 256
+          elif tag == 3:
+            # Average: Recon(x) = Filt(x) + floor((Recon(a) + Recon(b)) / 2)
+            for i, b in enumerate(row_data):
+              recon_a = 0 if i < ncolors else row_data[i - ncolors]
+              recon_b = prev_row[i]
+              row_data[i] = (b + floor((recon_a + recon_b) % 256 / 2)) % 256
+          elif tag == 4:
+            # Paeth: Recon(x) = Filt(x) + PaethPredictor(Recon(a), Recon(b), Recon(c))
+            for i, b in enumerate(row_data):
+              recon_a = 0 if i < ncolors else row_data[i - ncolors]
+              recon_b = prev_row[i]
+              recon_c = 0 if i < ncolors else prev_row[i - ncolors]
+              assert 0 <= recon_a < 256
+              assert 0 <= recon_b < 256
+              assert 0 <= recon_c < 256
+              # Paeth predictor
+              p = (recon_a + recon_b - recon_c) % 256
+              assert 0 <= p < 256
+              pa = abs(p - recon_a)
+              assert 0 <= pa < 256
+              pb = abs(p - recon_b)
+              assert 0 <= pb < 256
+              pc = abs(p - recon_c)
+              assert 0 <= pc < 256
+              if pa <= pb and pa <= pc:
+                Pr = recon_a
+              elif pb <= pc:
+                Pr = recon_b
+              else:
+                Pr = recon_c
+              row_data[i] = (b + Pr) % 256
+          else:
+            warning(
+                "row %d: unsupported tag value %d, row unchanged",
+                row_index,
+                tag,
+            )
+        rows.append(row_data)
+        prev_row = row_data
+      # now colour the rows by tag for debugging
+      # 0:black 1:red 2:green 3:blue 4:white
+      tag_bs_map = {
+          0: bytes((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
+          1: bytes((255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0)),
+          2: bytes((0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0)),
+          3: bytes((0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255)),
+          4:
+          bytes((255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255)),
+      }
+      for tag, row_data in zip(tags, rows):
+        tag_bs = tag_bs_map[tag]
+        row_data[:len(tag_bs)] = tag_bs
+      image_data = b''.join(rows)
+    else:
+      warning("unhandled DecodeParms[Predictor] value %r", predictor)
+      image_data = decoded_bs
+    im = Image.frombytes(PIL_mode, (width, height), image_data)
+    print(type(ncolors), ncolors)
+    if False and ncolors == 3:
+      im.show()
+      breakpoint()
+    return im
 
 class StringOpen(_Token):
   ''' The opening section of a PDF string.
