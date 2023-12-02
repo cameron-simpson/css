@@ -2,7 +2,7 @@
 
 ''' Utilities and command line for working with EBooks.
     Basic support for talking to Apple Books, Calibre, Kindle, Mobi.
-    These form the basis of my personal Kindle and Calibre workflow.
+    These form the basis of my personal Kindle/Kobo/Calibre workflow.
 
     The command `python -m cs.ebooks help -l` gives the basic usage information:
 
@@ -144,6 +144,31 @@
                 ls [-l]
                   List the contents of the library.
                   -l  Long mode.
+                shell
+                  Run a command prompt via cmd.Cmd using this command's subcommands.
+          kobo subcommand [...]
+              Subcommands:
+                export [-fnqv] [volumeids...]
+                  Export Kobo books to Calibre library.
+                  -f    Force: replace the EPUB format if already present.
+                  -n    No action, recite planned actions.
+                  -q    Quiet: report only warnings.
+                  -v    Verbose: report more information about actions and inaction.
+                  volumeids
+                        Optional Kobo volumeid identifiers to export.
+                        The default is to export all books.
+                        (TODO: just those with no "calibre.dbid" fstag.)
+                help [-l] [subcommand-names...]
+                  Print the full help for the named subcommands,
+                  or for all subcommands if no names are specified.
+                  -l  Long help even if no subcommand-names provided.
+                info
+                  Report basic information.
+                ls [volumeids...]
+                  List the contents of the library.
+                  (TODO: -l  Long mode.)
+                  volumeids
+                        Optional Kobo volumeid identifiers to list.
                 shell
                   Run a command prompt via cmd.Cmd using this command's subcommands.
           mobi subcommand [...]

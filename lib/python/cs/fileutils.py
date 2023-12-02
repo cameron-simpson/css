@@ -51,7 +51,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20230421-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -72,6 +72,7 @@ DISTINFO = {
         'cs.progress',
         'cs.py3',
         'cs.range',
+        'cs.resources',
         'cs.result',
         'cs.threads',
         'cs.units',
@@ -1712,8 +1713,7 @@ def atomic_filename(
     suffix = fsuffix
   if not exists_ok and existspath(filename):
     raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), filename)
-  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, delete=False,
-                          **kw) as T:
+  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, **kw) as T:
     if placeholder:
       # create a placeholder file
       with open(filename, 'ab' if exists_ok else 'xb'):
@@ -1736,6 +1736,9 @@ def atomic_filename(
         atime = mtime
       pfx_call(os.utime, T.name, (atime, mtime))
     pfx_call(rename_func, T.name, filename)
+    # recreate the temp file so that it can be cleaned up
+    with pfx_call(open, T.name, 'xb'):
+      pass
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.

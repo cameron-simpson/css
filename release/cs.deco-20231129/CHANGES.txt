@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: @cachedmethod: ghastly hack for the revision attribute to accomodate objects which return None for missing attributed (I'm looking at you, TagSet)
+lib/python/cs/deco.py: merge default => cdrip

@@ -45,7 +45,7 @@ from cs.resources import RunState, uses_runstate
 from cs.typingutils import subtype
 from cs.upd import Upd
 
-__version__ = '20230703-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -280,6 +280,7 @@ class BaseCommandOptions:
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
+  runstate: Optional[RunState] = None
   verbose: bool = False
 
   def copy(self, **updates):
@@ -289,9 +290,11 @@ class BaseCommandOptions:
         Any keyword arguments are applied as attribute updates to the copy.
     '''
     copied = type(self)(
-        **{k: v
-           for k, v in self.__dict__.items()
-           if not k.startswith('_')}
+        **{
+            k: v
+            for k, v in self.__dict__.items()
+            if not k.startswith('_')
+        }
     )
     for k, v in updates.items():
       setattr(copied, k, v)
@@ -367,10 +370,10 @@ class BaseCommand:
       Modules which implement a command line mode generally look like this:
 
           ... imports etc ...
-          def main(argv=None):
+          def main(argv=None, **run_kw):
               """ The command line mode.
               """
-              return MyCommand(argv).run()
+              return MyCommand(argv).run(**run_kw)
           ... other code ...
           class MyCommand(BaseCommand):
           ... other code ...
