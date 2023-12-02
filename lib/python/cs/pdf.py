@@ -821,9 +821,18 @@ class PDFDocument(AbstractBinary):
   tokens: List = field(default_factory=list)
   values: List = field(default_factory=list)
 
+  def __str__(self):
+    return (
+        f'{self.__class__.__name__}('
+        f'objects[{len(self.objmap)}],t'
+        f'okens[{len(self.tokens)}],'
+        f'values[{len(self.values)}]'
+        ')'
+    )
+
   @classmethod
   @promote
-  def parse(cls, buf: CornuCopyBuffer):
+  def parse(cls, buf: CornuCopyBuffer) -> 'PDFDocument':
     ''' Scan `buf`, return a `PDFDocument`.
     '''
     objmap: Mapping[Tuple[int, int], IndirectObject] = {}
