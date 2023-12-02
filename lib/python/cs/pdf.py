@@ -819,7 +819,7 @@ class PDFDocument(AbstractBinary):
             number, generation
         )
         objmap[objkey] = iobj = IndirectObject(
-            number=number, generation=generation, value=objvalue
+            number=number, generation=generation, object=objvalue
         )
         # replace the last 5 values with the indirect object
         values[-5:] = [iobj]
