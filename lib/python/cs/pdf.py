@@ -416,14 +416,17 @@ class IndirectObject:
 
   number: int
   generation: int
-  value: Any
+  object: Any
+
+  def __str__(self):
+    return f'{self.__class__.__name__}:{self.generation}:{self.object.__class__.__name__}'
 
   def __bytes__(self):
     return b' '.join(
         str(self.number).encode('ascii'),
         str(self.generation).encode('ascii'),
         b'obj',
-        bytes(self.value),
+        bytes(self.object),
         b'endobj',
     )
 
