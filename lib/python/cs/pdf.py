@@ -742,12 +742,6 @@ tokenisers = [
         re.compile(COMMENT_LEADIN_re_bs),
         lambda m: Comment(m.group(0)),
     ),
-    StreamReaction(
-        None,
-        re.compile(STREAM_LEADIN_re_bs),
-        None,
-        8,
-    ),
     Reaction(
         re.compile(KEYWORD_re_bs),
         re.compile(KEYWORD_LEADIN_re_bs),
