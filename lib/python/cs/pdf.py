@@ -848,6 +848,10 @@ class PDFDocument(AbstractBinary):
   objmap: Mapping[Tuple[int, int], 'Object'] = field(default_factory=dict)
   tokens: List = field(default_factory=list)
   values: List = field(default_factory=list)
+  # mapping of object types to a list of objects
+  by_obj_type: Mapping[bytes, List[Any]] = field(
+      default_factory=lambda: defaultdict(list)
+  )
 
   def __str__(self):
     return (
@@ -866,6 +870,7 @@ class PDFDocument(AbstractBinary):
     objmap: Mapping[Tuple[int, int], IndirectObject] = {}
     tokens = []
     values = []
+    by_obj_type = defaultdict(list)
     values_stack = []
     in_obj = None
     in_obj_stack = []
@@ -898,6 +903,19 @@ class PDFDocument(AbstractBinary):
         )
         # replace the last 5 values with the indirect object
         values[-5:] = [iobj]
+        objtype = None
+        if isinstance(objvalue, DictObject):
+          try:
+            objtype = objvalue.Type
+          except AttributeError:
+            X("no /Type in %r", sorted(objvalue.keys()))
+        elif isinstance(objvalue, Stream):
+          try:
+            objtype = objvalue.context_dict.Type
+          except AttributeError:
+            pass
+        if objtype is not None:
+          by_obj_type[objtype].append(objvalue)
         continue
       # number generation "R"
       if isinstance(token, Keyword) and token == b'R':
