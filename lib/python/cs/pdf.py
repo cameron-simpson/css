@@ -1050,7 +1050,14 @@ class PDFCatalog:
     return getattr(self.object, attr)
 
   def __getitem__(self, index):
-    return self.pages[index]
+    ''' Indexing with an `int` returns the numbered page (starting at `0`).
+        Indexing with a `str` or `Name` returns the named resource.
+    '''
+    if isinstance(index, int):
+      return self.pages[index]
+    resource = Name.promote(index)
+    ref = self.Resources.object.XObject[resource]
+    return ref.object
 
   @cached_property
   @typechecked
@@ -1067,13 +1074,6 @@ class PDFCatalog:
         PDFPage(pdf=self.pdf, catalog=self, number=pagenum, object=kid.object)
         for pagenum, kid in enumerate(kids, 1)
     ]
-
-  @promote
-  def __getitem__(self, resource: Name):
-    ''' Indexing returns the named resource.
-    '''
-    ref = self.Resources.object.XObject[resource]
-    return ref.object
 
 @dataclass
 class PDFPage:
