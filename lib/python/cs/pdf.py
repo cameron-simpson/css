@@ -1104,6 +1104,54 @@ class PDFPage:
       return self.Parent[resource]
     return ref.object
 
+  @pfx_method
+  def render(self):
+    bs = self.Contents.object.decoded_payload
+    buf = CornuCopyBuffer.promote(self.Contents.object.decoded_payload)
+    values_stack = []
+    gs = GraphicsState()
+    gss = [gs]
+    tokens_it = tokenise(buf)
+    for token in tokens_it:
+      with Pfx(s(token)):
+        if isinstance(token, WhiteSpace):
+          continue
+        if isinstance(token, (int, float)):
+          values_stack.append(token)
+        elif isinstance(token, Name):
+          values_stack.append(self[token])
+        elif isinstance(token, Keyword):
+          kw = token.decode('ascii')
+          if kw == 'cm':
+            abcdef = values_stack[-6:]
+            values_stack[-6:] = []
+            gs.ctm = [
+                abcdef[0], abcdef[1], 0, abcdef[2], abcdef[3], 0, abcdef[4],
+                abcdef[5], 1
+            ]
+          elif kw == 'J':
+            line_cap = int(values_stack.pop())
+            if line_cap not in (0, 1):
+              warning("invalid line_cap, should be 0 or 1, got %r", line_cap)
+            gs.line_cap = line_cap
+          elif kw == 'j':
+            line_join = int(values_stack.pop())
+            if line_join not in (0, 1):
+              warning("invalid line_join, should be 0 or 1, got %r", line_join)
+            gs.line_join = line_join
+          elif kw == 'q':
+            gs = GraphicsState(**gs.__dict__)
+            gss.append(gs)
+          elif kw == 'Q':
+            gs = gss.pop()
+          elif kw == 'w':
+            line_width = float(values_stack.pop())
+            gs.line_width = line_width
+          else:
+            warning("unimplemented keyword")
+        else:
+          raise TypeError(f'unsupported token: {s(token)}')
+    assert not values_stack, f'left over content stream values: {values_stack!r}'
 
 @dataclass
 class GraphicsState:
