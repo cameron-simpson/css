@@ -893,7 +893,10 @@ class PDFDocument(AbstractBinary):
     catalog: 'PDFCatalog' = self.catalog
     if catalog is None:
       X("no catalog object, return all Page objects")
-      return self.by_obj_type[Name(b'Page')]
+      return [
+          PDFPage(pdf=self, catalog=None, number=pagenum, object=pageobj) for
+          pagenum, pageobj in enumerate(self.by_obj_type[Name(b'Page')], 1)
+      ]
     return catalog.pages
 
   @classmethod
