@@ -870,6 +870,19 @@ class PDFDocument(AbstractBinary):
         ')'
     )
 
+  @property
+  @pfx_method
+  def catalog(self):
+    ''' The `Catalog` `Dict`.
+    '''
+    catalogs = self.by_obj_type[Name(b'Catalog')]
+    if not catalogs:
+      warning("no catalogs in document")
+      return None
+    if len(catalogs) > 1:
+      warning("%d catalogs in document", len(catalogs))
+    return PDFCatalog(pdf=self, object=catalogs[0])
+
   @classmethod
   @promote
   def parse(cls, buf: CornuCopyBuffer) -> 'PDFDocument':
