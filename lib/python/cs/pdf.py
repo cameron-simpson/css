@@ -494,7 +494,7 @@ class Stream:
     return f'{self.__class__.__name__}:encoded_length={len(self.payload)}'
 
   def __repr__(self):
-    return f'{self.__class__.__name__}:encoded_length={len(self.payload)}'
+    return str(self)
 
   def __bytes__(self):
     return (
