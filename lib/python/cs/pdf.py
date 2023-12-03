@@ -867,10 +867,13 @@ class PDFDocument(AbstractBinary):
   def parse(cls, buf: CornuCopyBuffer) -> 'PDFDocument':
     ''' Scan `buf`, return a `PDFDocument`.
     '''
-    objmap: Mapping[Tuple[int, int], IndirectObject] = {}
     tokens = []
+    objmap: Mapping[Tuple[int, int], IndirectObject] = {}
     values = []
     by_obj_type = defaultdict(list)
+    pdfdoc = cls(
+        tokens=tokens, objmap=objmap, values=values, by_obj_type=by_obj_type
+    )
     values_stack = []
     in_obj = None
     in_obj_stack = []
@@ -993,7 +996,7 @@ class PDFDocument(AbstractBinary):
           tokens[-2:] = [stream]
           values[-2:] = [stream]
           continue
-    return cls(tokens=tokens, objmap=objmap, values=values)
+    return pdfdoc
 
   def transcribe(self):
     ''' Yield `bytes` instances transcribing the PDF document.
