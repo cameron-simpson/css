@@ -883,6 +883,17 @@ class PDFDocument(AbstractBinary):
       warning("%d catalogs in document", len(catalogs))
     return PDFCatalog(pdf=self, object=catalogs[0])
 
+  @property
+  @typechecked
+  def pages(self) -> List['PDFPage']:
+    ''' A list of the `Page` objects.
+    '''
+    catalog: 'PDFCatalog' = self.catalog
+    if catalog is None:
+      X("no catalog object, return all Page objects")
+      return self.by_obj_type[Name(b'Page')]
+    return catalog.pages
+
   @classmethod
   @promote
   def parse(cls, buf: CornuCopyBuffer) -> 'PDFDocument':
