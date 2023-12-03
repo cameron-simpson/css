@@ -7,8 +7,9 @@
 '''
 
 import binascii
+from collections import defaultdict
 from dataclasses import dataclass, field
-from functools import cached_property, partial
+from functools import cache, cached_property, partial
 from getopt import GetoptError
 from io import BytesIO
 from itertools import chain
@@ -21,6 +22,7 @@ from typing import Any, Callable, List, Mapping, Tuple
 import zlib
 
 from PIL import Image
+from typeguard import typechecked
 
 from cs.binary import AbstractBinary
 from cs.buffer import CornuCopyBuffer
@@ -28,11 +30,11 @@ from cs.cmdutils import BaseCommand
 from cs.deco import promote
 from cs.lex import r
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import RunState, uses_runstate
 
 from pprint import pformat
-from cs.debug import trace
+from cs.debug import trace, r, s
 from cs.x import X
 
 pfx_open = partial(pfx_call, open)
