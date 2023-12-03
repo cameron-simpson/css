@@ -1011,6 +1011,58 @@ class PDFDocument(AbstractBinary):
     '''
     yield from iter(self.tokens)
 
+@dataclass
+class PDFCatalog:
+  pdf: PDFDocument
+  object: DictObject
+
+  def __str__(self):
+    return f'{self.__class__.__name__}:{sorted(self.object.keys())}'
+
+  def __repr__(self):
+    return str(self)
+
+  def __getattr__(self, attr):
+    assert attr != 'pages'
+    return getattr(self.object, attr)
+
+  def __getitem__(self, index):
+    return self.pages[index]
+
+  @cached_property
+  @typechecked
+  def pages(self) -> List['PDFPage']:
+    ''' The cached list of `PDFPage`s in this `PDFCatalog`.
+    '''
+    pages_objref = self.Pages
+    X("catalog[/Pages] => %s", s(pages_objref))
+    assert isinstance(pages_objref, ObjectRef)
+    assert isinstance(pages_objref.object, DictObject)
+    kids = pages_objref.object.Kids
+    X("kids = %r", kids)
+    return [
+        PDFPage(pdf=self.pdf, catalog=self, number=pagenum, object=kid.object)
+        for pagenum, kid in enumerate(kids, 1)
+    ]
+
+@dataclass
+class PDFPage:
+  ''' A page of a `PDFDocument`.
+  '''
+  pdf: PDFDocument
+  catalog: PDFCatalog
+  number: int
+  object: DictObject
+
+  def __str__(self):
+    return f'{self.__class__.__name__}#{self.number}'
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}#{self.number}'
+
+  def __getattr__(self, attr):
+    return getattr(self.object, attr)
+
 def decode_pdf_hex(bs: bytes):
   ''' Decode a PDF hex string body.
   '''
