@@ -1071,6 +1071,13 @@ class PDFCatalog:
         for pagenum, kid in enumerate(kids, 1)
     ]
 
+  @promote
+  def __getitem__(self, resource: Name):
+    ''' Indexing returns the named resource.
+    '''
+    ref = self.Resources.object.XObject[resource]
+    return ref.object
+
 @dataclass
 class PDFPage:
   ''' A page of a `PDFDocument`.
@@ -1088,6 +1095,17 @@ class PDFPage:
 
   def __getattr__(self, attr):
     return getattr(self.object, attr)
+
+  @promote
+  def __getitem__(self, resource: Name):
+    ''' Indexing returns the named resources `XObject` entry.
+    '''
+    reses = self.Resources.object.XObject
+    try:
+      ref = self.Resources.object.XObject[resource]
+    except KeyError:
+      return self.Parent[resource]
+    return ref.object
 
 def decode_pdf_hex(bs: bytes):
   ''' Decode a PDF hex string body.
