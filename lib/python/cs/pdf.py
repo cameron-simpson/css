@@ -476,11 +476,19 @@ class ObjectRef:
     )
 
   @property
-  def value(self):
+  def iobj(self):
+    ''' The referenced `IndirectObject`.
+    '''
     iobj = self.objmap.get((self.number, self.generation))
     if iobj is None:
       return None
-    return iobj.value
+    return iobj
+
+  @property
+  def object(self):
+    ''' The `Object` referenced by the `IndirectObject`.
+    '''
+    return self.iobj.object
 
 @dataclass
 class Stream:
