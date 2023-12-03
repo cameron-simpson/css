@@ -1091,7 +1091,7 @@ class PDFPage:
     return f'{self.__class__.__name__}#{self.number}'
 
   def __repr__(self):
-    return f'{self.__class__.__name__}#{self.number}'
+    return str(self)
 
   def __getattr__(self, attr):
     return getattr(self.object, attr)
