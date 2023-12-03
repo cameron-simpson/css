@@ -414,6 +414,17 @@ class DictObject(dict):
         b'>>',
     )
 
+  @typechecked
+  def __getattr__(self, key: str):
+    ''' Provide access to the entries by name.
+    '''
+    try:
+      return self[Name.promote(key)]
+    except KeyError:
+      raise AttributeError(
+          f'{self.__class__.__name__}.{key}: keys={sorted(self.keys())}'
+      )
+
 class IntObject(int):
 
   def __bytes__(self):
