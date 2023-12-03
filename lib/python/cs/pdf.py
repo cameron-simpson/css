@@ -282,6 +282,17 @@ class _Token(bytes):
     '''
     return self
 
+  @classmethod
+  def promote(cls, name):
+    ''' Promote `name` to a `cls`.
+        Accepts `str`, `bytes` or `cls`.
+    '''
+    if isinstance(name, cls):
+      return name
+    if isinstance(name, str):
+      return cls(name.encode('utf-8'))
+    return cls(name)
+
 class ArrayOpen(_Token):
   ''' A `bytes` instance representing a PDF array open.
   '''
