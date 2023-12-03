@@ -1104,6 +1104,40 @@ class PDFPage:
       return self.Parent[resource]
     return ref.object
 
+
+@dataclass
+class GraphicsState:
+  ''' A representation of the graphics state described in section 8.4.
+  '''
+
+  # fields from table 52: Device Independent Graphics State Parameters
+  # current transformation matrix
+  ctm: list = field(default_factory=list)
+  clipping_Path: Any = None
+  color_space: Union[str, list] = "DeviceGray"
+  color: Any = (0, 0, 0)  # black
+  text_state: Any = None
+  line_width: float = 1.0
+  line_cap: int = 0  # square butt caps
+  line_join: int = 0  # mitered joins
+  miter_limit: float = 10.0
+  dash_pattern: Any = None
+  rendering_intent: str = "RelativeColorimetric"
+  stroke_adjustment: bool = False
+  blend_mode: Union[str, list] = "Normal"
+  soft_mask: Optional[Union[str, dict]] = None
+  alpha_constant: float = 1.0
+  alpha_source: bool = False
+
+  # fields from table 53: Device Dependent Graphics State Parameters
+  overprint: bool = False
+  overprint_mode: float = 0.0
+  black_generation: Union[str, Callable] = "???"
+  undercolor_removal: Union[str, Callable] = "???"
+  transfer: Union[str, list, Callable] = "???"
+  halftone: Union[DictObject, Stream, str] = "???"
+  flatness: float = 1.0
+  smoothness: float = 0.0
 def decode_pdf_hex(bs: bytes):
   ''' Decode a PDF hex string body.
   '''
