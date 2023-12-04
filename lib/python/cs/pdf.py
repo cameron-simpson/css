@@ -1200,9 +1200,19 @@ class PDFPage:
       )
 
 @dataclass
+class DashPattern:
+  ''' A dash pattern, section 8.4.3.6.
+  '''
+  array: list
+  phase: int
+
+@dataclass
 class GraphicsState:
   ''' A representation of the graphics state described in section 8.4.
   '''
+
+  # TODO: method to apply a Graphics State Parameter Dictionary
+  # see section 8.4.5 and the "gs" operator in 8.4.4
 
   # fields from table 52: Device Independent Graphics State Parameters
   # current transformation matrix
@@ -1215,7 +1225,7 @@ class GraphicsState:
   line_cap: int = 0  # square butt caps
   line_join: int = 0  # mitered joins
   miter_limit: float = 10.0
-  dash_pattern: Any = None
+  dash_pattern: DashPattern = field(default_factory=lambda: DashPattern([], 0))
   rendering_intent: str = "RelativeColorimetric"
   stroke_adjustment: bool = False
   blend_mode: Union[str, list] = "Normal"
@@ -1232,6 +1242,7 @@ class GraphicsState:
   halftone: Union[DictObject, Stream, str] = "???"
   flatness: float = 1.0
   smoothness: float = 0.0
+
 def decode_pdf_hex(bs: bytes):
   ''' Decode a PDF hex string body.
   '''
