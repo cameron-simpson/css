@@ -18,7 +18,7 @@ from os.path import splitext
 from pprint import pprint
 import re
 import sys
-from typing import Any, Callable, List, Mapping, Tuple
+from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 import zlib
 
 from PIL import Image
@@ -849,7 +849,7 @@ class PDFDocument(AbstractBinary):
   ''' A PDF document.
   '''
 
-  objmap: Mapping[Tuple[int, int], 'Object'] = field(default_factory=dict)
+  objmap: Mapping[Tuple[int, int], Any] = field(default_factory=dict)
   tokens: List = field(default_factory=list)
   values: List = field(default_factory=list)
   # mapping of object types to a list of objects
