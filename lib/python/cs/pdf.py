@@ -1112,6 +1112,13 @@ class PDFPage:
 
   @pfx_method
   def render(self):
+    ''' Render this page.
+
+        At present this just processes the content stream.
+        TODO: apply the rendering to eg a `PIL.Image` or something,
+        but with some sort of modality to support data extraction
+        such as reporting the images and discarding any rendering.
+    '''
     bs = self.Contents.object.decoded_payload
     buf = CornuCopyBuffer.promote(self.Contents.object.decoded_payload)
     values_stack = []
@@ -1122,19 +1129,44 @@ class PDFPage:
       with Pfx(s(token)):
         if isinstance(token, WhiteSpace):
           continue
-        if isinstance(token, (int, float)):
+        if isinstance(token, (int, float, Name)):
           values_stack.append(token)
-        elif isinstance(token, Name):
-          values_stack.append(self[token])
         elif isinstance(token, Keyword):
           kw = token.decode('ascii')
           if kw == 'cm':
+            # modify the CTM
             abcdef = values_stack[-6:]
             values_stack[-6:] = []
             gs.ctm = [
-                abcdef[0], abcdef[1], 0, abcdef[2], abcdef[3], 0, abcdef[4],
-                abcdef[5], 1
+                abcdef[0],
+                abcdef[1],
+                0,
+                abcdef[2],
+                abcdef[3],
+                0,
+                abcdef[4],
+                abcdef[5],
+                1,
             ]
+          elif kw == 'Do':
+            # draw object
+            obj_name: str = values_stack.pop()
+            obj = self[obj_name]
+            if obj.is_image():
+              obj.image.show()
+          elif kw == 'd':
+            # set the line dash pattern
+            dash_array, dash_phase = values_stack[-2:]
+            values_stack[-2:] = []
+            gs.dash_pattern = DashPattern(array=dash_array, phase=dash_phase)
+          elif kw == 'gs':
+            # apply graphics state dictionary
+            # TODO: unimplemented, see table 57
+            extg_name: str = values_stack.pop()
+            warning("TODO: look up graphics state dictionary and apply")
+          elif kw == 'i':
+            # flatness
+            gs.flatness = float(values_stack.pop())
           elif kw == 'J':
             line_cap = int(values_stack.pop())
             if line_cap not in (0, 1):
@@ -1145,11 +1177,15 @@ class PDFPage:
             if line_join not in (0, 1):
               warning("invalid line_join, should be 0 or 1, got %r", line_join)
             gs.line_join = line_join
+          elif kw == 'M':
+            gs.miter_limit = float(values_stack.pop())
           elif kw == 'q':
             gs = GraphicsState(**gs.__dict__)
             gss.append(gs)
           elif kw == 'Q':
             gs = gss.pop()
+          elif kw == 'ri':
+            gs.rendering_intent = values_stack.pop()
           elif kw == 'w':
             line_width = float(values_stack.pop())
             gs.line_width = line_width
@@ -1157,7 +1193,11 @@ class PDFPage:
             warning("unimplemented keyword")
         else:
           raise TypeError(f'unsupported token: {s(token)}')
-    assert not values_stack, f'left over content stream values: {values_stack!r}'
+    if values_stack:
+      warning(
+          "%d left over content stream values: %r", len(values_stack),
+          values_stack
+      )
 
 @dataclass
 class GraphicsState:
