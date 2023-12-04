@@ -1097,12 +1097,18 @@ class PDFPage:
   def __getitem__(self, resource: Name):
     ''' Indexing returns the named resources `XObject` entry.
     '''
-    reses = self.Resources.object.XObject
+    xobjs = self.resources.XObject
     try:
-      ref = self.Resources.object.XObject[resource]
+      ref = xobjs[resource]
     except KeyError:
       return self.Parent[resource]
     return ref.object
+
+  @property
+  def resources(self):
+    ''' The `Resources` dictionary.
+    '''
+    return self.Resources.object
 
   @pfx_method
   def render(self):
