@@ -1231,7 +1231,7 @@ class PDFPage:
     return self.Resources.object
 
   @pfx_method
-  def render(self):
+  def render(self, on_image=lambda im: im.show()):
     ''' Render this page.
 
         At present this just processes the content stream.
@@ -1273,7 +1273,9 @@ class PDFPage:
             obj_name: str = values_stack.pop()
             obj = self[obj_name]
             if obj.is_image():
-              obj.image.show()
+              on_image(obj.image)
+            else:
+              warning("do not know how to draw object: %s", s(obj))
           elif kw == 'd':
             # set the line dash pattern
             dash_array, dash_phase = values_stack[-2:]
