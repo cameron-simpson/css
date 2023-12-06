@@ -493,6 +493,62 @@ class ObjectRef:
     return self.iobj.object
 
 @dataclass
+class ColorSpace:
+
+  # mapping of color space names to classes instances
+  SPACE_BY_NAME = {}
+
+  family_name: str
+  ncolors: int
+  bits_per_component: int
+  PIL_mode: str
+
+  @classmethod
+  @pfx_method
+  def promote(cls, obj):
+    if isinstance(obj, cls):
+      return obj
+    try:
+      name = Name.promote(obj)
+    except TypeError:
+      pass
+    else:
+      return cls.SPACE_BY_NAME[name]
+    if isinstance(obj, ObjectRef):
+      return cls.promote(obj.object)
+    if isinstance(obj, ArrayObject):
+      family_name, spec = obj
+      if isinstance(spec, ObjectRef):
+        spec = spec.object
+      assert isinstance(spec, Stream)
+      cd = spec.context_dict
+      ncolors = cd.N
+      alternate = cd.Alternate
+      length = cd.Length
+      filter = cd.Filter
+      alt_space = ColorSpace.promote(alternate)
+      return ColorSpace(
+          family_name=family_name,
+          ncolors=ncolors,
+          bits_per_component=alt_space.bits_per_component,
+          PIL_mode=alt_space.PIL_mode,
+      )
+    raise TypeError(f'{cls.__name__}.promote(obj={s(obj)}): unsupported type')
+
+ColorSpace.SPACE_BY_NAME[b'DeviceGray'] = ColorSpace(
+    family_name='DeviceGray',
+    ncolors=1,
+    bits_per_component=8,
+    PIL_mode='L',
+)
+ColorSpace.SPACE_BY_NAME[b'DeviceRGB'] = ColorSpace(
+    family_name='DeviceRGB',
+    ncolors=3,
+    bits_per_component=8,
+    PIL_mode='RGB',
+)
+
+@dataclass
 class Stream:
   ''' A PDF Stream.
   '''
