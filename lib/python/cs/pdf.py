@@ -593,6 +593,14 @@ class Stream:
         b'\r\nendstream\r\n'
     )
 
+  def __getattr__(self, attr):
+    ''' Try getting unknown attributes from the context dictionary.
+    '''
+    try:
+      return getattr(self.context_dict, attr)
+    except AttributeError:
+      raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
   @property
   def filters(self) -> List[bytes]:
     ''' The filters as a list of `bytes` instances.
