@@ -14,7 +14,7 @@ from getopt import GetoptError
 from io import BytesIO
 from itertools import chain
 from math import floor
-from os.path import splitext
+from os.path import basename, splitext
 from pprint import pprint
 import re
 import sys
@@ -49,51 +49,68 @@ class PDFCommand(BaseCommand):
   '''
 
   def cmd_extract_images(self, argv):
-    ''' Usage: {cmd} [-o image-filename-format] < PDF-data
-          Extract image objects from the PDF-data on standard input.
-          -f fmt
-            Image format. Default inferred from the image filename.
-          -o image-filename-format
-            Format string used to make image filenames.
-    '''
-    opts = self.popopts(
-        argv, f_=('format', str), o_=('image_filename_format', str)
-    )
-    image_filename_format = opts.pop(
-        'image_filename_format', DEFAULT_IMAGE_FILENAME_FORMAT
-    )
-    image_format = opts.pop(
-        'format',
-        splitext(image_filename_format)[1][1:].upper() and None
-    )
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    buf = CornuCopyBuffer.from_fd(0)
-    offset = buf.offset
-    image_n = 0
-    for token in tokenise(buf):
-      if isinstance(token, Stream):
-        subtype = token.context_dict.get(b'Subtype')
-        if subtype == b'Image':
-          im = token.image
-          image_n += 1
-          imagepath = image_filename_format.format(n=image_n)
-          _, pathext = splitext(imagepath)
-          with pfx_call(open, imagepath, 'xb') as imf:
-            pfx_call(im.save, imf, format=image_format)
-
-  def cmd_scan(self, argv):
     ''' Usage: {cmd} pdf-files...
-          Scan the PDF-data on standard input and report.
+          Extract the images from the named page files.
     '''
     if not argv:
       raise GetoptError('missing pdf-files')
     runstate = self.options.runstate
     for pdf_filename in argv:
       runstate.raiseif()
-      with Pfx(argv):
-        with open(pdf_filename, 'rb') as pdff:
-          pdf = PDFDocument.parse(buf=pdff)
+      with Pfx(pdf_filename):
+        pdf = PDFDocument.from_fspath(pdf_filename)
+        print(' ', pdf.catalog)
+        print(' ', pdf.pages)
+        base, _ = splitext(basename(pdf_filename))
+        for pagenum, page in enumerate(pdf.pages, 1):
+          with Pfx("page %d", pagenum):
+            imgnum = 0
+
+            def on_image(im):
+              nonlocal imgnum
+              imgnum += 1
+              imgpath = f'{base}--{pagenum:02}--{imgnum:02}.png'
+              print(imgpath)
+              pfx_call(im.save, imgpath)
+
+            page.render(on_image=on_image)
+
+  def cmd_scan(self, argv):
+    ''' Usage: {cmd} pdf-files...
+          Scan the PDF-data in pdf-files and report.
+    '''
+    if not argv:
+      raise GetoptError('missing pdf-files')
+    runstate = self.options.runstate
+    for pdf_filename in argv:
+      runstate.raiseif()
+      with Pfx(pdf_filename):
+        pdf = PDFDocument.from_fspath(pdf_filename)
+        print(' ', pdf.catalog)
+        print(' ', pdf.pages)
+        for pagenum, page in enumerate(pdf.pages, 1):
+          print(pagenum, '=============')
+          print(s(page))
+          print(dict(page.object))
+          ##print("I15 =>", page['I15'])
+          ##image_15 = page['I15']
+          ##print(
+          ##    "image 15 is_image", image_15.is_image(), "size",
+          ##    image_15.image.size
+          ##)
+          ##image_15.image.show()
+          content_obj = page.Contents.object
+          print(content_obj)
+          pprint(content_obj.context_dict)
+          page_content_bs = content_obj.decoded_payload
+          print("contents:", page_content_bs)
+          resources = page.Resources
+          print(s(resources))
+          print(s(resources.object))
+          print(dict(resources.object))
+          page.render()
+          break
+        break
         for (objnum, objgen), iobj in sorted(pdf.objmap.items()):
           runstate.raiseif()
           print(
@@ -130,6 +147,7 @@ class PDFCommand(BaseCommand):
             else:
               print("skip stream subtype", repr(subtype))
               pprint(token.context_dict)
+          ##break
 
 # Binary regexps for PDF tokens.
 # Most of these consist of a pair:
