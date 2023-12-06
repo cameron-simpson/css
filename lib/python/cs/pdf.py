@@ -878,7 +878,7 @@ tokenisers = [
 ]
 
 @promote
-def tokenise(buf: CornuCopyBuffer):
+def tokenise(buf: CornuCopyBuffer, debug_matches=False):
   ''' Scan `buf` and yield tokens.
   '''
   in_str = None
@@ -889,10 +889,14 @@ def tokenise(buf: CornuCopyBuffer):
                        if isinstance(in_str, StringParts) else tokenisers):
         token = reaction.match(buf)
         if token is not None:
+          if debug_matches:
+            debug("matched %s", r(token))
           break
       else:
         if buf.at_eof():
           # end parse loop
+          if debug_matches:
+            debug("EOF")
           break
         # nothing matched - yield the starting byte
         warning(
