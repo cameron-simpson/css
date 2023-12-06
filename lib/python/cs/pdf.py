@@ -620,24 +620,20 @@ class Stream:
     ##pprint(self.context_dict)
     decode_params = self.context_dict.get(b'DecodeParms', {})
     color_transform = decode_params.get(b'ColorTransform', 0)
-    color_space = self.context_dict[b'ColorSpace']
+    color_space = ColorSpace.promote(self.context_dict[b'ColorSpace'])
     bits_per_component = decode_params.get(b'BitsPerComponent')
     if not bits_per_component:
-      bits_per_component = {b'DeviceRGB': 8, b'DeviceGray': 8}[color_space]
+      bits_per_component = color_space.bits_per_component
     ncolors = decode_params.get(b'Colors')
     if not ncolors:
-      ncolors = {b'DeviceRGB': 3, b'DeviceGray': 1}[color_space]
+      ncolors = color_space.ncolors
     predictor = decode_params.get(b'Predictor', 0)
-    width = self.context_dict[b'Width']
-    height = self.context_dict[b'Height']
+    width = self.context_dict.Width
+    height = self.context_dict.Height
     print("width", width, "height", height)
     mode_index = (color_space, bits_per_component, ncolors, color_transform)
     print("mode_index =", mode_index)
-    PIL_mode = {
-        (b'DeviceGray', 1, 1, 0): 'L',
-        (b'DeviceGray', 8, 1, 0): 'L',
-        (b'DeviceRGB', 8, 3, 0): 'RGB',
-    }[mode_index]
+    PIL_mode = color_space.PIL_mode
     print(
         "Image.frombytes(%r,(%d,%d),%r)..." % (
             PIL_mode,
