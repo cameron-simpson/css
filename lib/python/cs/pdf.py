@@ -512,7 +512,10 @@ class ObjectRef:
   def object(self):
     ''' The `Object` referenced by the `IndirectObject`.
     '''
-    return self.iobj.object
+    iobj = self.iobj
+    if iobj is None:
+      return None
+    return iobj.object
 
 @dataclass
 class ColorSpace:
