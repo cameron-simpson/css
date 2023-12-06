@@ -947,6 +947,13 @@ class PDFDocument(AbstractBinary):
         ')'
     )
 
+  @classmethod
+  def from_fspath(cls, pdfpath: str):
+    ''' Parse the file at `pdfpath` and return a `PDFDocument`.
+    '''
+    with pfx_call(open, pdfpath, 'rb') as pdff:
+      return cls.parse(buf=pdff)
+
   @property
   @pfx_method
   def catalog(self):
