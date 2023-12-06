@@ -501,6 +501,10 @@ class ObjectRef:
     '''
     iobj = self.objmap.get((self.number, self.generation))
     if iobj is None:
+      warning(
+          "no object named %r: keys=%r", (self.number, self.generation),
+          sorted(self.objmap.keys())
+      )
       return None
     return iobj
 
