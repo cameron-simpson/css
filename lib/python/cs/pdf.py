@@ -66,14 +66,17 @@ class PDFCommand(BaseCommand):
           with Pfx("page %d", pagenum):
             imgnum = 0
 
-            def on_image(im):
+            def on_draw_object(obj):
               nonlocal imgnum
+              if not obj.is_image():
+                return
               imgnum += 1
               imgpath = f'{base}--{pagenum:02}--{imgnum:02}.png'
-              print(imgpath)
+              print(f'{obj.Width}x{obj.Height}', imgpath)
+              im = obj.image
               pfx_call(im.save, imgpath)
 
-            page.render(on_image=on_image)
+            page.render(on_draw_object=on_draw_object)
 
   def cmd_scan(self, argv):
     ''' Usage: {cmd} pdf-files...
@@ -109,6 +112,13 @@ class PDFCommand(BaseCommand):
           print(s(resources.object))
           print(dict(resources.object))
           page.render()
+
+          def on_draw_object(obj):
+            X("page %d: obj %s", pagenum, s(obj))
+            X("  context dict %r", obj.context_dict)
+            if obj.is_image():
+              X("  width %r height %r", obj.Width, obj.Height)
+
           break
         break
         for (objnum, objgen), iobj in sorted(pdf.objmap.items()):
@@ -1239,7 +1249,7 @@ class PDFPage:
     return self.Resources.object
 
   @pfx_method
-  def render(self, on_image=lambda im: im.show()):
+  def render(self, on_draw_object=None):
     ''' Render this page.
 
         At present this just processes the content stream.
@@ -1280,8 +1290,8 @@ class PDFPage:
             # draw object
             obj_name: str = values_stack.pop()
             obj = self[obj_name]
-            if obj.is_image():
-              on_image(obj.image)
+            if on_draw_object:
+              on_draw_object(obj)
             else:
               warning("do not know how to draw object: %s", s(obj))
           elif kw == 'd':
