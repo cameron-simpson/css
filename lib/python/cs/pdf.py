@@ -1097,10 +1097,42 @@ class PDFDocument(AbstractBinary):
             warning("missing EOL after stream")
           context_dict, stream = values[-2:]
           assert isinstance(context_dict, DictObject)
-          length = context_dict[b'Length']
-          assert isinstance(length, int)
-          assert length >= 0
-          payload = buf.take(length)
+          length = context_dict.Length
+          if isinstance(length, ObjectRef):
+            length = length.object
+          if length is not None:
+            # gather up the payload
+            assert isinstance(length,
+                              int), "Length is not an int: %s" % (r(length),)
+            assert length >= 0
+            payload = buf.take(length)
+          else:
+            # weird PDF whose length cannot be resolved
+            warning(
+                "could not resolve stream length, falling back to looking for endstream"
+            )
+            peeklen = 24
+            end_re = re.compile(b'\r?\nendstream[\r\n]')
+            while True:
+              bs = buf.peek(peeklen)
+              m = end_re.search(bs)
+              if m is None:
+                if len(bs) < peeklen:
+                  # EOF, abandon all hope
+                  warning(
+                      "no endstream found, keeping %d bytes as the payload",
+                      len(bs)
+                  )
+                  payload = bs
+                  break
+                peeklen += 1024
+                continue
+              payload = buf.take(m.start())
+              warning(
+                  "found endstream, used %d bytes as the payload",
+                  len(payload)
+              )
+              break
           newline_bs = buf.peek(2, short_ok=True)
           if newline_bs == b'\r\n':
             buf.take(2)
