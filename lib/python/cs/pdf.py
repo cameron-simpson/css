@@ -62,23 +62,49 @@ class PDFCommand(BaseCommand):
         print(' ', pdf.catalog)
         print(' ', pdf.pages)
         base, _ = splitext(basename(pdf_filename))
-        for pagenum, page in enumerate(pdf.pages, 1):
-          with Pfx("page %d", pagenum):
-            imgnum = 0
-
-            def on_draw_object(obj):
-              nonlocal imgnum
-              if not obj.is_image():
-                return
-              imgnum += 1
-              imgpath = f'{base}--{pagenum:02}--{imgnum:02}.png'
-              print(f'{obj.Width}x{obj.Height}', imgpath)
-              im = obj.image
-              pfx_call(im.save, imgpath)
-
-            page.render(on_draw_object=on_draw_object)
+        for pagenum, imgnum, im in pdf.page_images():
+          runstate.raiseif()
+          width, height = im.size
+          with Pfx("page %d, image %d, %dx%d", pagenum, imgnum, width, height):
+            imgpath = f'{base}--{pagenum:02}--{imgnum:02}.png'
+            print("{width}x{height}", imgpath)
+            pfx_call(im.save, imgpath)
 
   cmd_xi = cmd_extract_images
+
+  def cmd_make_cbz(self, argv):
+    ''' Usage: {cmd} pdf-files...
+          Extract the images from the named page files.
+    '''
+    if not argv:
+      raise GetoptError('missing pdf-files')
+    runstate = self.options.runstate
+    for pdf_filename in argv:
+      runstate.raiseif()
+      with Pfx(pdf_filename):
+        pdf = PDFDocument.from_fspath(pdf_filename)
+        print(' ', pdf.catalog)
+        print(' ', pdf.pages)
+        base, _ = splitext(basename(pdf_filename))
+        cbzpath = f'{base}.cbz'
+        try:
+          with pfx_call(ZipFile, cbzpath, 'x', compression=ZIP_STORED) as cbz:
+            for pagenum, imgnum, im in pdf.page_images():
+              runstate.raiseif()
+              width, height = im.size
+              with Pfx("page %d, image %d, %dx%d", pagenum, imgnum, width,
+                       height):
+                imgpath = f'{base}--{pagenum:02}--{imgnum:02}.png'
+                with NamedTemporaryFile(suffix='.png') as T:
+                  pfx_call(im.save, T.name)
+                  pfx_call(cbz.write, T.name, arcname=basename(imgpath))
+        except FileExistsError as e:
+          error("CBZ already eixsts: %r: %s", cbzpath, e)
+          return 1
+        except Exception:
+          if existspath(cbzpath):
+            pfx_call(os.unlink, cbzpath)
+          raise
 
   def cmd_scan(self, argv):
     ''' Usage: {cmd} pdf-files...
