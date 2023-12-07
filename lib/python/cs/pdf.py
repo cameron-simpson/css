@@ -710,11 +710,6 @@ class Stream:
       rows = []
       # a row has a leading tag byte indicating the encoding and then pixels
       row_length = 1 + width * ncolors
-      print("tagged row length = 1 + width * ncolors:", row_length)
-      print(
-          "height", height, "* row_length", row_length, "=",
-          height * row_length
-      )
       # dummy preceeding row filled with zeroes
       prev_row = bytes(width * ncolors)
       prev_offset = -row_length
@@ -734,6 +729,7 @@ class Stream:
         if tag == 0:
           # None: Recon(x) = Filt(x)
           # store row unchanged
+          # debug_tags colour black
           pass
         else:
           # we will be modifying these data in place, so make a read/write copy
