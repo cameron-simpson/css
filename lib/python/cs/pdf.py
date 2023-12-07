@@ -658,9 +658,6 @@ class Stream:
     ''' A cache property holding a `PIL.Image` decoded from the `Stream`.
     '''
     decoded_bs = self.decoded_payload
-    ##print(".image: context_dict:")
-    ##print(len(decoded_bs), 'decoded bytes:', decoded_bs[:10])
-    ##pprint(self.context_dict)
     decode_params = self.context_dict.get(b'DecodeParms', {})
     color_transform = decode_params.get(b'ColorTransform', 0)
     color_space = ColorSpace.promote(self.context_dict[b'ColorSpace'])
@@ -671,11 +668,8 @@ class Stream:
     if not ncolors:
       ncolors = color_space.ncolors
     predictor = decode_params.get(b'Predictor', 0)
-    width = self.context_dict.Width
-    height = self.context_dict.Height
-    print("width", width, "height", height)
-    mode_index = (color_space, bits_per_component, ncolors, color_transform)
-    print("mode_index =", mode_index)
+    width = self.Width
+    height = self.Height
     PIL_mode = color_space.PIL_mode
     print(
         "Image.frombytes(%r,(%d,%d),%r)..." % (
@@ -992,7 +986,6 @@ class PDFDocument(AbstractBinary):
     '''
     catalog: 'PDFCatalog' = self.catalog
     if catalog is None:
-      X("no catalog object, return all Page objects")
       return [
           PDFPage(pdf=self, catalog=None, number=pagenum, object=pageobj) for
           pagenum, pageobj in enumerate(self.by_obj_type[Name(b'Page')], 1)
@@ -1051,7 +1044,7 @@ class PDFDocument(AbstractBinary):
             X("no /Type in %r", sorted(objvalue.keys()))
         elif isinstance(objvalue, Stream):
           try:
-            objtype = objvalue.context_dict.Type
+            objtype = objvalue.Type
           except AttributeError:
             pass
         if objtype is not None:
