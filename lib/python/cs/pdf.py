@@ -78,6 +78,8 @@ class PDFCommand(BaseCommand):
 
             page.render(on_draw_object=on_draw_object)
 
+  cmd_xi = cmd_extract_images
+
   def cmd_scan(self, argv):
     ''' Usage: {cmd} pdf-files...
           Scan the PDF-data in pdf-files and report.
