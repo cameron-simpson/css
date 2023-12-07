@@ -655,14 +655,19 @@ class Stream:
     return self.context_dict.get(b'Subtype') == b'Image'
 
   @cached_property
+  def image(self):
+    ''' A cached property holding a `PIL.Image` decoded from the `Stream`.
+    '''
+    return self.compute_image()
+
   @uses_runstate
-  def image(self, *, runstate: RunState):
-    ''' A cache property holding a `PIL.Image` decoded from the `Stream`.
+  def compute_image(self, *, debug_tags=False, runstate: RunState):
+    ''' Compute a PIL `Image` from the decoded payload.
     '''
     decoded_bs = self.decoded_payload
     decode_params = self.context_dict.get(b'DecodeParms', {})
     color_transform = decode_params.get(b'ColorTransform', 0)
-    color_space = ColorSpace.promote(self.context_dict[b'ColorSpace'])
+    color_space = ColorSpace.promote(self.ColorSpace)
     bits_per_component = decode_params.get(b'BitsPerComponent')
     if not bits_per_component:
       bits_per_component = color_space.bits_per_component
@@ -684,10 +689,26 @@ class Stream:
     if predictor == 0:
       image_data = decoded_bs
     elif predictor >= 10:
-      # split data into tagged rows
+      # Decode the data according to its predictor algorithm.
+      #
+      # I'm indebted to Mark Adler for explaining a lot of this to me here:
+      # https://stackoverflow.com/questions/77120604/decoding-pdf-can-i-use-pil-pillow-to-access-the-png-predictor-algorithm-in-orde
+      #
+      # The algorithms are specified here:
+      # https://www.w3.org/TR/png/#9Filters
+      #
+      # Note that statement "Unsigned arithmetic modulo 256 is used,
+      # so that both the inputs and outputs fit into bytes." actually
+      # applies only to the input and output values themselves. Doing
+      # modulo 256 intermediate values leads to incorrect results.
+      # Therefore it is only when storing the result in the deocded
+      # row data that we apply a `% 256`.
+      #
+      # Split data into tagged rows:
       mv = memoryview(decoded_bs)
       tags = []
       rows = []
+      # a row has a leading tag byte indicating the encoding and then pixels
       row_length = 1 + width * ncolors
       print("tagged row length = 1 + width * ncolors:", row_length)
       print(
@@ -703,14 +724,10 @@ class Stream:
           row_length,
       )):
         runstate.raiseif()
-        ##print("prev_offset =", prev_offset, "offset =", offset)
         prev_offset = offset
         tag = decoded_bs[offset]
         tags.append(tag)
-        ##print(row_index, "tag", tag)
         row_data = mv[offset + 1:offset + row_length]
-        ##if tag != 4:
-        ##  print("row_index", row_index, "tag", tag)
         # recon methods from tag values
         # detailed here:
         # https://www.w3.org/TR/png/#9Filters
@@ -724,38 +741,35 @@ class Stream:
           row_data0 = row_data
           if tag == 1:
             # Sub: Recon(x) = Filt(x) + Recon(a)
+            # debug_tags colour red - looks correct
             for i, b in enumerate(row_data):
               recon_a = 0 if i < ncolors else row_data[i - ncolors]
               row_data[i] = (b + recon_a) % 256
           elif tag == 2:
             # Up: Recon(x) = Filt(x) + Recon(b)
+            # debug_tags colour green
             for i, b in enumerate(row_data):
               recon_b = prev_row[i]
               row_data[i] = (b + recon_b) % 256
           elif tag == 3:
             # Average: Recon(x) = Filt(x) + floor((Recon(a) + Recon(b)) / 2)
+            # debug_tags colour blue
             for i, b in enumerate(row_data):
               recon_a = 0 if i < ncolors else row_data[i - ncolors]
               recon_b = prev_row[i]
-              row_data[i] = (b + floor((recon_a + recon_b) % 256 / 2)) % 256
+              row_data[i] = (b + floor((recon_a + recon_b) / 2)) % 256
           elif tag == 4:
             # Paeth: Recon(x) = Filt(x) + PaethPredictor(Recon(a), Recon(b), Recon(c))
+            # debug_tags colour white
             for i, b in enumerate(row_data):
               recon_a = 0 if i < ncolors else row_data[i - ncolors]
               recon_b = prev_row[i]
               recon_c = 0 if i < ncolors else prev_row[i - ncolors]
-              assert 0 <= recon_a < 256
-              assert 0 <= recon_b < 256
-              assert 0 <= recon_c < 256
               # Paeth predictor
-              p = (recon_a + recon_b - recon_c) % 256
-              assert 0 <= p < 256
+              p = (recon_a + recon_b - recon_c)  ## % 256
               pa = abs(p - recon_a)
-              assert 0 <= pa < 256
               pb = abs(p - recon_b)
-              assert 0 <= pb < 256
               pc = abs(p - recon_c)
-              assert 0 <= pc < 256
               if pa <= pb and pa <= pc:
                 Pr = recon_a
               elif pb <= pc:
@@ -771,19 +785,21 @@ class Stream:
             )
         rows.append(row_data)
         prev_row = row_data
-      # now colour the rows by tag for debugging
-      # 0:black 1:red 2:green 3:blue 4:white
-      tag_bs_map = {
-          0: bytes((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
-          1: bytes((255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0)),
-          2: bytes((0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0)),
-          3: bytes((0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255)),
-          4:
-          bytes((255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255)),
-      }
-      for tag, row_data in zip(tags, rows):
-        tag_bs = tag_bs_map[tag]
-        row_data[:len(tag_bs)] = tag_bs
+      if debug_tags:
+        # colour the rows by tag for debugging
+        # 0:black 1:red 2:green 3:blue 4:white
+        tag_bs_map = {
+            0: bytes((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
+            1: bytes((255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0)),
+            2: bytes((0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0)),
+            3: bytes((0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255)),
+            4: bytes(
+                (255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255)
+            ),
+        }
+        for tag, row_data in zip(tags, rows):
+          tag_bs = tag_bs_map[tag]
+          row_data[:len(tag_bs)] = tag_bs
       image_data = b''.join(rows)
     else:
       warning("unhandled DecodeParms[Predictor] value %r", predictor)
