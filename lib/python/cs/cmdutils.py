@@ -1337,4 +1337,6 @@ class BaseCommandCmd(Cmd):
           return self._doarg(subcmd, arg)
 
         return do_cmdsub
+      if subcmd in ('EOF', 'exit', 'quit'):
+        return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
