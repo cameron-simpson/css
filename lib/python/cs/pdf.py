@@ -1006,6 +1006,37 @@ class PDFDocument(AbstractBinary):
       ]
     return catalog.pages
 
+  def page_images(self):
+    ''' Return an iterable of `(pagenum,imgnum,im)`
+        for each image drawn when rendering the PDF pages.
+    '''
+    Q = IterableQueue(name=str(self) + '.page_images')
+
+    def generate_images():
+      ''' Compute the PDF images and put them onto `Q`.
+      '''
+
+      def on_draw_object(obj):
+        nonlocal imgnum
+        if not obj.is_image():
+          X("draw object nonimage: %s", s(obj))
+          return
+        imgnum += 1
+        im = obj.image
+        Q.put((pagenum, imgnum, im))
+
+      try:
+
+        for pagenum, page in enumerate(self.pages, 1):
+          with Pfx("page %d", pagenum):
+            imgnum = 0
+            page.render(on_draw_object=on_draw_object)
+      finally:
+        Q.close()
+
+    bg(generate_images, daemon=True)
+    return Q
+
   @classmethod
   @promote
   def parse(cls, buf: CornuCopyBuffer) -> 'PDFDocument':
