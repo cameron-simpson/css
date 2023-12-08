@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import filecmp
-from functools import total_ordering
+from functools import cached_property, total_ordering
 from getopt import GetoptError
 from itertools import chain
 import json
@@ -50,7 +50,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import contextif
-from cs.deco import cachedmethod
+from cs.deco import cachedmethod, fmtdoc
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
@@ -78,20 +78,53 @@ from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 from .mobi import Mobi  # pylint: disable=import-outside-toplevel
 from .pdf import PDFDocument
 
+CALIBRE_FSPATH = '~/Calibre Library'
+CALIBRE_FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
+CALIBRE_BINDIR_DEFAULT = '/usr/bin'
+CALIBRE_PREFSDIR_DEFAULT = expanduser('~/.config/calibre')
+if sys.platform == 'darwin':
+  ## macos default? ## CALIBRE_FSPATH = '~/Calibre Library'
+  CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
+  CALIBRE_PREFSDIR_DEFAULT = expanduser('~/Library/Preferences/calibre')
+
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
 
   # used by FSPathBasedSingleton for the default library path
-  FSPATH_DEFAULT = '~/CALIBRE'
-  FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
+  FSPATH_ENVVAR = CALIBRE_FSPATH_ENVVAR
 
-  CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
+  @classmethod
+  @fmtdoc
+  def FSPATH_DEFAULT(cls):
+    ''' Called for the default `CalibreTree` filesystem path
+        if unspecified and no `${CALIBRE_FSPATH_ENVVAR}` environment
+        variable.
+    '''
+    return expanduser(CALIBRE_FSPATH)
 
   # pylint: disable=too-many-statements
   @typechecked
-  def __init__(self, calibrepath: Optional[str]):
+  def __init__(
+      self,
+      calibrepath: Optional[str] = None,
+      bin_dirpath: Optional[str] = None,
+      prefs_dirpath: Optional[str] = None,
+  ):
+    ''' Initialise the `CalibreTree`.
+
+        Parameters:
+        * `calibrepath`: optional filesystem path of the Calibre library,
+          default from 
+    '''
     super().__init__(calibrepath)
+    if not isdirpath(self.fspath):
+      raise ValueError(f'no directory at {self.fspath!r}')
+    self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
+    self.prefs_dirpath = (
+        prefs_dirpath or os.environ.get('CALIBRE_CONFIG_DIRECTORY')
+        or expanduser(CALIBRE_PREFSDIR_DEFAULT)
+    )
 
     # define the proxy classes
     class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
@@ -378,29 +411,30 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         '''
         formats = self.formats
         if 'CBZ' in formats and not replace_format:
-          warning("format CBZ already present, not adding")
+          warning(
+              "format CBZ already present (forats=%r), not adding", formats
+          )
+          return
+        mobipath = self.mobipath
+        pdfpath = self.pdfpath
+        if mobipath:
+          base, _ = splitext(basename(mobipath))
+          MB = Mobi(mobipath)
+          with TemporaryDirectory() as tmpdirpath:
+            cbzpath = joinpath(tmpdirpath, base + '.cbz')
+            pfx_call(MB.make_cbz, cbzpath)
+            self.add_format(cbzpath, force=replace_format)
+        elif pdfpath:
+          base, _ = splitext(basename(pdfpath))
+          pdf = PDFDocument.from_fspath(pdfpath)
+          with TemporaryDirectory() as tmpdirpath:
+            cbzpath = joinpath(tmpdirpath, base + '.cbz')
+            pfx_call(pdf.make_cbz, cbzpath)
+            self.add_format(cbzpath, force=replace_format)
         else:
-          mobipath = self.mobipath
-          if mobipath:
-            base, _ = splitext(basename(mobipath))
-            MB = Mobi(mobipath)
-            with TemporaryDirectory() as tmpdirpath:
-              cbzpath = joinpath(tmpdirpath, base + '.cbz')
-              pfx_call(MB.make_cbz, cbzpath)
-              self.add_format(cbzpath, force=replace_format)
-          else:
-            pdfpath = self.pdfpath
-            if pdfpath:
-              base, _ = splitext(basename(pdfpath))
-              pdf = PDFDocument.from_fspath(pdfpath)
-              with TemporaryDirectory() as tmpdirpath:
-                cbzpath = joinpath(tmpdirpath, base + '.cbz')
-                pfx_call(pdf.make_cbz, cbzpath)
-                self.add_format(cbzpath, force=replace_format)
-            else:
-              raise ValueError(
-                  "no AZW3, AZW or MOBI format from which to construct a CBZ"
-              )
+          raise ValueError(
+              "no AZW3, AZW, MOBI or PDF format from which to construct a CBZ"
+          )
 
       @uses_runstate
       def pull(
@@ -522,8 +556,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     yield
 
   @property
+  def plugins_dirpath(self):
+    ''' Where the installed plugins live. '''
+    return joinpath(self.prefs_dirpath, 'plugins')
+
+  @cached_property
   @locked
-  @cachedmethod
   def db(self):
     ''' The associated `CalibreMetadataDB` ORM,
         instantiated on demand.
@@ -626,7 +664,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         Parameters:
         * `calcmd`: the Calibre command to invoke;
           if the command name is not an absolute path
-          it is expected to come from `self.CALIBRE_BINDIR_DEFAULT`
+          it is expected to come from `self.bin_dirpath`
         * `calargv`: the arguments for the command
         * `doit`: default `True`; do not run the command of false
         * `quiet`: default `False`; if true, do not print the command or its output
@@ -637,7 +675,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     subp_options.setdefault('check', False)
     subp_options.setdefault('text', True)
     if not isabspath(calcmd):
-      calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
+      calcmd = joinpath(self.bin_dirpath, calcmd)
     calargv = [calcmd, *calargv]
     cp = run(calargv, doit=doit, quiet=quiet, **subp_options)
     if cp is not None and cp.stdout and not quiet:
@@ -747,11 +785,28 @@ class CalibreMetadataDB(ORM):
 
   DB_FILENAME = 'metadata.db'
 
-  def __init__(self, tree):
+  def __init__(self, tree, db_url=None, readwrite=False):
     if isinstance(tree, str):
       tree = CalibreTree(tree)
     self.tree = tree
-    self.db_url = 'sqlite:///' + self.db_path
+    if db_url is None:
+      db_path = (
+          os.environ.get('CALIBRE_OVERRIDE_DATABASE_PATH')
+          or tree.pathto(self.DB_FILENAME)
+      )
+      db_url = 'sqlite:///' + db_path
+    elif db_url.startswith('/'):
+      db_path = db_url
+      db_url = 'sqlite:///' + db_path
+    elif db_url.startswith('~'):
+      db_path = expanduser(db_url)
+      db_url = 'sqlite:///' + db_path
+    else:
+      db_path = None
+    self.db_path = db_path
+    self.db_url = db_url
+    if not readwrite:
+      self.db_url += '?immutable=1'
     super().__init__(self.db_url)
 
   @property
@@ -759,12 +814,6 @@ class CalibreMetadataDB(ORM):
     ''' No distinct ORM class for `CalibreMetadataDB`.
     '''
     return self
-
-  @property
-  def db_path(self):
-    ''' The filesystem path to the database.
-    '''
-    return self.tree.pathto(self.DB_FILENAME)
 
   def shell(self):
     ''' Interactive db shell.
@@ -1087,18 +1136,14 @@ class CalibreCommand(BaseCommand):
     '''
 
     calibre_path: str = field(
-        default_factory=lambda: CalibreTree.
-        _resolve_fspath(None, CalibreTree.FSPATH_ENVVAR)
+        default_factory=lambda: os.environ.get(CalibreTree.FSPATH_ENVVAR)
     )
     calibre_path_other: Optional[str] = field(
-        default_factory=lambda: (
-            CalibreTree.
-            _resolve_fspath(None, CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR)
-            if CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR in os.environ else None
-        )
+        default_factory=lambda: os.environ.
+        get(CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR),
     )
     dedrm_package_path: Optional[str] = field(
-        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR),
     )
 
     def _default_kindle_path():
@@ -1158,8 +1203,7 @@ class CalibreCommand(BaseCommand):
     with super().run_context():
       calibre = self.options.calibre
       with calibre:
-        with calibre.db_session():
-          yield
+        yield
 
   @staticmethod
   def books_from_spec(calibre, book_spec):
