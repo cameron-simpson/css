@@ -33,7 +33,6 @@ from cs.binary import AbstractBinary
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.deco import promote
-from cs.ebooks.cbz import make_cbz
 from cs.lex import r
 from cs.logutils import debug, error, warning
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -95,11 +94,7 @@ class PDFCommand(BaseCommand):
         print(' ', pdf.pages)
         base, _ = splitext(basename(pdf_filename))
         cbzpath = f'{base}.cbz'
-        with make_cbz(
-            cbzpath,
-            images=pdf.make_cbz_images(base),
-        ):
-          pass
+        pdf.make_cbz(cbzpath)
 
   def cmd_scan(self, argv):
     ''' Usage: {cmd} pdf-files...
@@ -1057,6 +1052,16 @@ class PDFDocument(AbstractBinary):
 
     bg(generate_images, daemon=True)
     return Q
+
+  def make_cbz(self, cbzpath):
+    ''' Create a CBZ file at `cbzpath` containing the images rendered by the pages.
+    '''
+    from cs.ebooks.cbz import make_cbz
+    with make_cbz(
+        cbzpath,
+        images=self.make_cbz_images(base),
+    ):
+      pass
 
   @pfx_method
   @uses_runstate
