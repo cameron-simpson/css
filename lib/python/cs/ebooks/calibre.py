@@ -75,6 +75,8 @@ from cs.units import transcribe_bytes_geek
 from cs.upd import UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
 from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
+from .mobi import Mobi  # pylint: disable=import-outside-toplevel
+from .pdf import PDFDocument
 
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
@@ -364,10 +366,16 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             return fmtpath
         return None
 
-      def make_cbz(self, replace_format=False):
-        ''' Create a CBZ format from the AZW3 Mobi format.
+      @property
+      def pdfpath(self):
+        ''' The filesystem path of a Mobi format book file, or `None`.
         '''
-        from .mobi import Mobi  # pylint: disable=import-outside-toplevel
+        return self.formatpath('PDF')
+
+      def make_cbz(self, replace_format=False):
+        ''' Create a CBZ format from the AZW3 Mobi format,
+            falling back to PDF if there's one of those.
+        '''
         formats = self.formats
         if 'CBZ' in formats and not replace_format:
           warning("format CBZ already present, not adding")
@@ -381,9 +389,18 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
               pfx_call(MB.make_cbz, cbzpath)
               self.add_format(cbzpath, force=replace_format)
           else:
-            raise ValueError(
-                "no AZW3, AZW or MOBI format from which to construct a CBZ"
-            )
+            pdfpath = self.pdfpath
+            if pdfpath:
+              base, _ = splitext(basename(pdfpath))
+              pdf = PDFDocument.from_fspath(pdfpath)
+              with TemporaryDirectory() as tmpdirpath:
+                cbzpath = joinpath(tmpdirpath, base + '.cbz')
+                pfx_call(pdf.make_cbz, cbzpath)
+                self.add_format(cbzpath, force=replace_format)
+            else:
+              raise ValueError(
+                  "no AZW3, AZW or MOBI format from which to construct a CBZ"
+              )
 
       @uses_runstate
       def pull(

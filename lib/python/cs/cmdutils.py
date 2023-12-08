@@ -38,10 +38,11 @@ from cs.lex import (
     r,
     stripped_dedent,
 )
-from cs.logutils import setup_logging, warning, exception
+from cs.logutils import setup_logging, warning, error, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState, uses_runstate
+from cs.result import CancellationError
 from cs.typingutils import subtype
 from cs.upd import Upd
 
@@ -1099,7 +1100,11 @@ class BaseCommand:
     try:
       with stackattrs(options, **kw_options):
         with self.run_context():
-          return self._run(self._subcmd, self, self._argv)
+          try:
+            return self._run(self._subcmd, self, self._argv)
+          except CancellationError:
+            error("cancelled")
+            return 1
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
@@ -1332,4 +1337,6 @@ class BaseCommandCmd(Cmd):
           return self._doarg(subcmd, arg)
 
         return do_cmdsub
+      if subcmd in ('EOF', 'exit', 'quit'):
+        return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
