@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import filecmp
-from functools import total_ordering
+from functools import cached_property, total_ordering
 from getopt import GetoptError
 from itertools import chain
 import json
@@ -560,9 +560,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Where the installed plugins live. '''
     return joinpath(self.prefs_dirpath, 'plugins')
 
-  @property
+  @cached_property
   @locked
-  @cachedmethod
   def db(self):
     ''' The associated `CalibreMetadataDB` ORM,
         instantiated on demand.
