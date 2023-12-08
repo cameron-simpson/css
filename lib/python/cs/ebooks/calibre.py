@@ -1203,8 +1203,7 @@ class CalibreCommand(BaseCommand):
     with super().run_context():
       calibre = self.options.calibre
       with calibre:
-        with calibre.db_session():
-          yield
+        yield
 
   @staticmethod
   def books_from_spec(calibre, book_spec):
