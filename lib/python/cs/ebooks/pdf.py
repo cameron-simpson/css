@@ -696,14 +696,6 @@ class Stream:
     width = self.Width
     height = self.Height
     PIL_mode = color_space.PIL_mode
-    print(
-        "Image.frombytes(%r,(%d,%d),%r)..." % (
-            PIL_mode,
-            width,
-            height,
-            decoded_bs[:32],
-        )
-    )
     if predictor == 0:
       image_data = decoded_bs
     elif predictor >= 10:
@@ -819,10 +811,6 @@ class Stream:
       warning("unhandled DecodeParms[Predictor] value %r", predictor)
       image_data = decoded_bs
     im = Image.frombytes(PIL_mode, (width, height), image_data)
-    print(type(ncolors), ncolors)
-    if False and ncolors == 3:
-      im.show()
-      breakpoint()
     return im
 
 class StringOpen(_Token):
@@ -1283,11 +1271,9 @@ class PDFCatalog:
     ''' The cached list of `PDFPage`s in this `PDFCatalog`.
     '''
     pages_objref = self.Pages
-    X("catalog[/Pages] => %s", s(pages_objref))
     assert isinstance(pages_objref, ObjectRef)
     assert isinstance(pages_objref.object, DictObject)
     kids = pages_objref.object.Kids
-    X("kids = %r", kids)
     return [
         PDFPage(pdf=self.pdf, catalog=self, number=pagenum, object=kid.object)
         for pagenum, kid in enumerate(kids, 1)
