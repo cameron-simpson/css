@@ -1058,6 +1058,20 @@ class PDFDocument(AbstractBinary):
     bg(generate_images, daemon=True)
     return Q
 
+  @pfx_method
+  @uses_runstate
+  def make_cbz_images(self, base: str, *, runstate: RunState):
+    ''' A generator for the `images` parameter for `cs.ebooks.cbs.make_cbz`.
+    '''
+    for pagenum, imgnum, im in self.page_images():
+      runstate.raiseif()
+      width, height = im.size
+      with Pfx("page %d, image %d, %dx%d", pagenum, imgnum, width, height):
+        imgpath = f'{base}--{pagenum:02}--{imgnum:02}.png'
+        with NamedTemporaryFile(suffix='.png') as T:
+          pfx_call(im.save, T.name)
+          yield T.name, basename(imgpath)
+
   @classmethod
   @promote
   def parse(cls, buf: CornuCopyBuffer) -> 'PDFDocument':
