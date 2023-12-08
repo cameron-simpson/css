@@ -40,6 +40,8 @@ from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
 from cs.threads import bg
 
+from .cbz import make_cbz
+
 from pprint import pformat
 from cs.debug import trace, s
 from cs.x import X
@@ -1056,7 +1058,7 @@ class PDFDocument(AbstractBinary):
   def make_cbz(self, cbzpath):
     ''' Create a CBZ file at `cbzpath` containing the images rendered by the pages.
     '''
-    from cs.ebooks.cbz import make_cbz
+    base, _ = splitext(basename(cbzpath))
     with make_cbz(
         cbzpath,
         images=self.make_cbz_images(base),
