@@ -14,6 +14,8 @@ from typeguard import typechecked
 from cs.fileutils import atomic_filename
 from cs.pfx import Pfx, pfx_call
 
+# TODO: ABCF metadata? https://acbf.fandom.com/wiki/ACBF_Specifications
+
 @contextmanager
 @typechecked
 def make_cbz(
