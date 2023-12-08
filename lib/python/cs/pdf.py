@@ -33,6 +33,7 @@ from cs.binary import AbstractBinary
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.deco import promote
+from cs.ebooks.cbz import make_cbz
 from cs.lex import r
 from cs.logutils import debug, error, warning
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -94,24 +95,11 @@ class PDFCommand(BaseCommand):
         print(' ', pdf.pages)
         base, _ = splitext(basename(pdf_filename))
         cbzpath = f'{base}.cbz'
-        try:
-          with pfx_call(ZipFile, cbzpath, 'x', compression=ZIP_STORED) as cbz:
-            for pagenum, imgnum, im in pdf.page_images():
-              runstate.raiseif()
-              width, height = im.size
-              with Pfx("page %d, image %d, %dx%d", pagenum, imgnum, width,
-                       height):
-                imgpath = f'{base}--{pagenum:02}--{imgnum:02}.png'
-                with NamedTemporaryFile(suffix='.png') as T:
-                  pfx_call(im.save, T.name)
-                  pfx_call(cbz.write, T.name, arcname=basename(imgpath))
-        except FileExistsError as e:
-          error("CBZ already eixsts: %r: %s", cbzpath, e)
-          return 1
-        except Exception:
-          if existspath(cbzpath):
-            pfx_call(os.unlink, cbzpath)
-          raise
+        with make_cbz(
+            cbzpath,
+            images=pdf.make_cbz_images(base),
+        ):
+          pass
 
   def cmd_scan(self, argv):
     ''' Usage: {cmd} pdf-files...
