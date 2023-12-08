@@ -246,7 +246,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
                   cls.__name__ + '.FSPATH_ENVVAR' if envvar is None else '$' +
                   envvar
               ),
-              cls.name,
+              cls.__name__,
               default_attr,
           )
       )
