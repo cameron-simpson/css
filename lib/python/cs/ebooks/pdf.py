@@ -1389,8 +1389,8 @@ class PDFPage:
             gs.flatness = float(values_stack.pop())
           elif kw == 'J':
             line_cap = int(values_stack.pop())
-            if line_cap not in (0, 1):
-              warning("invalid line_cap, should be 0 or 1, got %r", line_cap)
+            if line_cap not in (0, 1, 2):
+              warning("invalid line_cap, should be 0, 1 or 2, got %r", line_cap)
             gs.line_cap = line_cap
           elif kw == 'j':
             line_join = int(values_stack.pop())
