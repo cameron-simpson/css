@@ -366,6 +366,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             return fmtpath
         return None
 
+      @property
+      def pdfpath(self):
+        ''' The filesystem path of a Mobi format book file, or `None`.
+        '''
+        return self.formatpath('PDF')
+
       def make_cbz(self, replace_format=False):
         ''' Create a CBZ format from the AZW3 Mobi format,
             falling back to PDF if there's one of those.
