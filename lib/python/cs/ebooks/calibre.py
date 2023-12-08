@@ -411,29 +411,30 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         '''
         formats = self.formats
         if 'CBZ' in formats and not replace_format:
-          warning("format CBZ already present, not adding")
+          warning(
+              "format CBZ already present (forats=%r), not adding", formats
+          )
+          return
+        mobipath = self.mobipath
+        pdfpath = self.pdfpath
+        if mobipath:
+          base, _ = splitext(basename(mobipath))
+          MB = Mobi(mobipath)
+          with TemporaryDirectory() as tmpdirpath:
+            cbzpath = joinpath(tmpdirpath, base + '.cbz')
+            pfx_call(MB.make_cbz, cbzpath)
+            self.add_format(cbzpath, force=replace_format)
+        elif pdfpath:
+          base, _ = splitext(basename(pdfpath))
+          pdf = PDFDocument.from_fspath(pdfpath)
+          with TemporaryDirectory() as tmpdirpath:
+            cbzpath = joinpath(tmpdirpath, base + '.cbz')
+            pfx_call(pdf.make_cbz, cbzpath)
+            self.add_format(cbzpath, force=replace_format)
         else:
-          mobipath = self.mobipath
-          if mobipath:
-            base, _ = splitext(basename(mobipath))
-            MB = Mobi(mobipath)
-            with TemporaryDirectory() as tmpdirpath:
-              cbzpath = joinpath(tmpdirpath, base + '.cbz')
-              pfx_call(MB.make_cbz, cbzpath)
-              self.add_format(cbzpath, force=replace_format)
-          else:
-            pdfpath = self.pdfpath
-            if pdfpath:
-              base, _ = splitext(basename(pdfpath))
-              pdf = PDFDocument.from_fspath(pdfpath)
-              with TemporaryDirectory() as tmpdirpath:
-                cbzpath = joinpath(tmpdirpath, base + '.cbz')
-                pfx_call(pdf.make_cbz, cbzpath)
-                self.add_format(cbzpath, force=replace_format)
-            else:
-              raise ValueError(
-                  "no AZW3, AZW or MOBI format from which to construct a CBZ"
-              )
+          raise ValueError(
+              "no AZW3, AZW, MOBI or PDF format from which to construct a CBZ"
+          )
 
       @uses_runstate
       def pull(
