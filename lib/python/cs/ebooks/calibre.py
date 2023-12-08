@@ -785,7 +785,7 @@ class CalibreMetadataDB(ORM):
 
   DB_FILENAME = 'metadata.db'
 
-  def __init__(self, tree, db_url=None):
+  def __init__(self, tree, db_url=None, readwrite=False):
     if isinstance(tree, str):
       tree = CalibreTree(tree)
     self.tree = tree
@@ -805,6 +805,8 @@ class CalibreMetadataDB(ORM):
       db_path = None
     self.db_path = db_path
     self.db_url = db_url
+    if not readwrite:
+      self.db_url += '?immutable=1'
     super().__init__(self.db_url)
 
   @property
