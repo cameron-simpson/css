@@ -119,7 +119,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     super().__init__(calibrepath)
     if not isdirpath(self.fspath):
-      raise valueError(f'no directory at {self.fspath!r}')
+      raise ValueError(f'no directory at {self.fspath!r}')
     self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
     self.prefs_dirpath = (
         prefs_dirpath or os.environ.get('CALIBRE_CONFIG_DIRECTORY')
