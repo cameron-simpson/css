@@ -4,6 +4,8 @@
 '''
 
 from contextlib import contextmanager
+import signal
+import threading
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
@@ -434,6 +436,35 @@ def pop_cmgr(o, attr):
   '''
   pop_func = getattr(o, '_push_cmgr__popfunc__' + attr)
   return pop_func()
+
+@contextmanager
+def stack_signals(signums, handler, additional=False):
+  ''' Context manager to apply a handler function to `signums`
+      using `signal.signal`.
+      The old handlers are restored on exit from the context manager.
+
+      If the optional `additional` argument is true,
+      apply a handler which calls both the new handler and the old handler.
+  '''
+  stacked_signals = {}
+  if additional:
+    new_handler = handler
+
+    def handler(sig, frame):
+      old_handler = stacked_signals[sig]
+      new_handler(sig, frame)
+      if old_handler:
+        old_handler(sig, frame)
+
+  if isinstance(signums, int):
+    signums = [signums]
+  try:
+    for signum in signums:
+      stacked_signals[signum] = signal.signal(signum, handler)
+    yield
+  finally:
+    for signum, old_handler in stacked_signals.items():
+      signal.signal(signum, old_handler)
 
 class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods

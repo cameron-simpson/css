@@ -1,0 +1,1 @@
+lib/python/cs/upd.py: cs.upd: UpdProxy._update: also exit early if self.index is None, then narrow the period where we hold the Upd lock

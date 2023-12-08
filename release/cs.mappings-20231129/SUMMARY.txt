@@ -1,0 +1,1 @@
+AttrableMappingMixin: look up ATTRABLE_MAPPING_DEFAULT on the class, not the instance.

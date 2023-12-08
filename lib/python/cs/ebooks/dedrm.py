@@ -24,6 +24,7 @@ from os.path import (
     realpath,
     splitext,
 )
+from shutil import copyfile
 import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 import time
@@ -415,7 +416,8 @@ class DeDRMWrapper(Promotable):
                   "cannot decrypt %r, unhandled book type %r" %
                   (srcpath, booktype)
               )
-            assert decrypted_ebook == T.name
+            if decrypted_ebook == srcpath:
+              pfx_call(copyfile, srcpath, T.name)
 
   @contextmanager
   def removed(self, srcpath):

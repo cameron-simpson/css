@@ -1,0 +1,5 @@
+lib/python/cs/fileutils.py: cs.fileutils: atomic_filename: accept optional rename_func to use instead of os.rename, supports using FSTags.move
+lib/python/cs/fileutils.py: cs.fileutils: add missed parameter from previous commit
+lib/python/cs/fileutils.py: cs.fileutils: rename parameter to placate linter
+lib/python/cs/fileutils.py: cs.fileutils: atomic_filename: clean up the temp file
+lib/python/cs/fileutils.py: cs.fileutils: update DISTINFO

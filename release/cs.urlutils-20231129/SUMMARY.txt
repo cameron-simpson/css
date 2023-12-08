@@ -1,0 +1,4 @@
+Drop Python 2 support.
+No longer use cs.xml, which is going away.
+Make _URL type public as URL with a new promote() method, drop URL factory function, update URL constructors throughout.
+URL.__init__: make parameters keyword only.

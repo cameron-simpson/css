@@ -12,9 +12,11 @@ set -ue
 : "${WPPATH:=$WPDIR:$SSV_DIR}"
 
 nwp=128
+spaces=.
+trace= ## set-x
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd words...
+usage="Usage: $cmd [spaces] words...
     Select up to ${nwp} wallpapers from the directories in \$WPPATH,
     default from \$WPDIR:\$SSV_DIR: $WPPATH
     at random matching the sed-regexps \"words\".
@@ -24,6 +26,27 @@ usage="Usage: $cmd words...
 
 badopts=
 
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -*) echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    . | \* | [1-9] | [1-9][1-9] )
+        spaces=$1
+        shift
+        ;;
+  esac
+fi
+
 if [ $# = 0 ]
 then
   echo "$cmd: missing words" >&2
@@ -32,11 +55,8 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-set -x
-
 rd=$WPLINKDIR/$( echo "$*" | tr ' /' -- )/random
 
-set -x
 [ -d "$rd" ] || set-x mkdir -p "$rd"
 cd "$rd"
 (
@@ -56,6 +76,7 @@ cd "$rd"
     ln -s -- "$img" .
     first=
   done
+  [ -t 1 ] && ls "$rd/"
   [ $first ] && { echo "$cmd: nothing found" >&2; exit 1; }
-  spaces wp . "$rd"
+  $trace spaces wp "$spaces" "$rd"
 }
