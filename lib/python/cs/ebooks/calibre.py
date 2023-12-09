@@ -553,8 +553,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   def startup_shutdown(self):
     ''' Stub startup/shutdown.
     '''
-    with self.db_session():
-      yield
+    yield
 
   @property
   def plugins_dirpath(self):
