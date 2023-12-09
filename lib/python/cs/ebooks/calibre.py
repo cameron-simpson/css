@@ -1159,6 +1159,8 @@ class CalibreCommand(BaseCommand):
             CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR
         ) or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
     )
+    # used by "calibre add [--cbz]"
+    make_cbz: bool = False
 
     @property
     def calibre(self):
@@ -1287,6 +1289,7 @@ class CalibreCommand(BaseCommand):
   def cmd_add(self, argv):
     ''' Usage: {cmd} [-nqv] bookpaths...
           Add the specified ebook bookpaths to the library.
+          --cbz Also make a CBZ.
           -n    No action: recite planned actions.
           -q    Quiet: only emit warnings.
           -v    Verbose: report all actions and decisions.
@@ -1296,18 +1299,23 @@ class CalibreCommand(BaseCommand):
         DeDRMWrapper(options.dedrm_package_path)
         if options.dedrm_package_path else None
     )
-    calibre = options.calibre
-    self.popopts(argv, options, n='doit', q='quiet', v='verbose')
+    self.popopts(
+        argv, options, cbz='make_cbz', n='doit', q='quiet', v='verbose'
+    )
     if not argv:
       raise GetoptError("missing bookpaths")
+    calibre = options.calibre
     for bookpath in argv:
       with Pfx(bookpath):
-        calibre.add(
+        dbid = calibre.add(
             bookpath,
             dedrm=dedrm,
             doit=options.doit,
             quiet=options.quiet,
         )
+        if options.make_cbz and options.doit:
+          cbook = calibre[dbid]
+          pfx_call(cbook.make_cbz)
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_convert(self, argv):
