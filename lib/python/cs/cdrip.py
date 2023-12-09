@@ -432,7 +432,7 @@ def rip(
     *,
     output_dirpath,
     disc_id=None,
-    audio_outputs=('wav', 'aac', 'mp3'),
+    audio_outputs=('wav', 'flac', 'aac', 'mp3'),
     fstags=None,
     no_action=False,
     split_by_format=False,
@@ -491,6 +491,12 @@ def rip(
             disc_subpath,
             track_base + '.aac',
         )
+        flac_filename = joinpath(
+            output_dirpath,
+            'flac' if split_by_format else '',
+            disc_subpath,
+            track_base + '.flac',
+        )
         mp3_filename = joinpath(
             output_dirpath,
             'mp3' if split_by_format else '',
@@ -514,6 +520,28 @@ def rip(
             fstags[wav_filename].update(track_fstags)
             if argv is not None:
               fstags[wav_filename].rip_command = argv
+        if 'flac' in audio_outputs:
+          with Pfx(shortpath(flac_filename)):
+            if existspath(flac_filename):
+              warning("FLAC file already exists, skipping track")
+            else:
+              flac_dirpath = dirname(flac_filename)
+              no_action or needdir(flac_dirpath, use_makedirs=True)
+              fstags[flac_dirpath].update(disc_fstags)
+              argv = wav_to_flac(
+                  wav_filename,
+                  flac_filename,
+                  no_action=no_action,
+                  disc_title=level2,
+                  tracknum=tracknum,
+                  track_title=recording.title,
+                  track_artists=artist_credit,
+              )
+            if no_action:
+              print("fstags[%r].update(%s)" % (flac_filename, track_fstags))
+            else:
+              fstags[flac_filename].conversion_command = argv
+              fstags[flac_filename].update(track_fstags)
         if 'aac' in audio_outputs:
           with Pfx(shortpath(aac_filename)):
             if existspath(aac_filename):
@@ -580,6 +608,36 @@ def wav_to_aac(
   '''
   with atomic_filename(aac_filename, placeholder=True) as T:
     argv = [
+        ##'ffmpeg',
+        ##'/home/cameron/bin-local/ffmpeg',
+        ##'/usr/bin/ffmpeg',
+        './bin/ffmpeg-docker',
+        '-y',
+        '-i',
+        wav_filename,
+        # TODO: metadata options here
+        T.name,
+    ]
+    run(argv, doit=not no_action, quiet=False, check=True)
+  return argv
+
+def wav_to_flac(
+    wav_filename,
+    flac_filename,
+    *,
+    no_action=False,
+    disc_title,
+    tracknum,
+    track_title,
+    track_artists,
+):
+  ''' Produce an FLAC file from a WAV file.
+  '''
+  with atomic_filename(flac_filename, placeholder=True) as T:
+    argv = [
+        ##'ffmpeg',
+        ##'/home/cameron/bin-local/ffmpeg',
+        ##'/usr/bin/ffmpeg',
         './bin/ffmpeg-docker',
         '-y',
         '-i',
