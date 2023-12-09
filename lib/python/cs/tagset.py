@@ -235,7 +235,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20230612-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -564,11 +564,12 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     ''' Support access to dotted name attributes.
 
         The following attribute accesses are supported:
-
-        If `attr` is a key, return `self[attr]`.
-
-        If `self.auto_infer(attr)` does not raise `ValueError`,
-        return that value.
+        - an attrbute from a superclass
+        - a `Tag` whose name is `attr`; return its value
+        - the value of `self.auto_infer(attr)` if that does not raise `ValueError`
+        - if `self.ontology`, try {type}_{field} and {type}_{field}s
+        - otherwise return `self.subtags(attr)` to allow access to dotted tags,
+          provided any existing tags start with "attr."
 
         If this `TagSet` has an ontology
         and `attr looks like *typename*`_`*fieldname*
@@ -596,6 +597,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             >>> tags.a
             1
             >>> tags.c
+            Traceback (most recent call last):
+                ...
+            AttributeError: TagSet.c
             >>> tags['c.z']=9
             >>> tags['c.x']=8
             >>> tags
@@ -620,73 +624,76 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             AttributeError: 'int' object has no attribute 'z'
 
     '''
+    sup = super()
+    try:
+      sgattr = sup.__getattr__
+    except AttributeError:
+      # no superclass __getattr__
+      pass
+    else:
+      try:
+        return sgattr(attr)
+      except AttributeError:
+        # superclass does not resolve attr
+        pass
+    # an exact key match is returned directly
     try:
       return self[attr]
     except KeyError:
-
-      sup = super()
-
-      def supergetattr(attr):
-        ''' Function to fetch via the superclass.
-        '''
-        try:
-          sgattr = sup.__getattr__
-        except AttributeError:
-          raise AttributeError(type(self).__name__ + '.' + attr)  # pylint: disable=raise-missing-from
-        return sgattr(attr)
-
-      if not attr.startswith('_'):
-        return supergetattr(attr)
-      # no magic for names commencing with an underscore
+      pass
+    if attr.startswith('_'):
+      # we do not dereference _*
+      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+    # see if this is known via auto_infer()
+    try:
+      return self.auto_infer(attr)
+    except ValueError:  # as e:
+      # no match
+      ##warning("auto_infer(%r): %s", attr, e)
+      pass
+    # support for {type}_{field} and {type}_{field}s attributes
+    # these dereference through the ontology if there is one
+    ont = self.ontology
+    if ont is not None:
       try:
-        return self.auto_infer(attr)
-      except ValueError:  # as e:
-        # no match
-        ##warning("auto_infer(%r): %s", attr, e)
+        type_name, field_part = attr.split('_', 1)
+      except ValueError:
         pass
-      # support for {type}_{field} and {type}_{field}s attributes
-      # these dereference through the ontology if there is one
-      ont = self.ontology
-      if ont is not None:
-        try:
-          type_name, field_part = attr.split('_', 1)
-        except ValueError:
-          pass
-        else:
-          if type_name in self:
-            value = self[type_name]
-            md = ont.metadata(type_name, value)
-            return md.get(field_part)
-          type_name_s = type_name + 's'
-          if type_name_s in self:
-            # plural field
-            values = self[type_name_s]
-            if isinstance(values, (tuple, list)):
-              # dereference lists and tuples
-              field_name = cutsuffix(field_part, 's')
-              md_field = type_name + '_' + field_name
-              mds = [ont.metadata(type_name, value) for value in values]
-              if field_name is field_part:
-                # singular - take the first element
-                if not mds:
-                  return None
-                md = mds[0]
-                dereffed = md.get(md_field)
-                return dereffed
-              dereffed = [md.get(md_field) for md in mds]
+      else:
+        if type_name in self:
+          value = self[type_name]
+          md = ont.metadata(type_name, value)
+          return md.get(field_part)
+        type_name_s = type_name + 's'
+        if type_name_s in self:
+          # plural field
+          values = self[type_name_s]
+          if isinstance(values, (tuple, list)):
+            # dereference lists and tuples
+            field_name = cutsuffix(field_part, 's')
+            md_field = type_name + '_' + field_name
+            mds = [ont.metadata(type_name, value) for value in values]
+            if field_name is field_part:
+              # singular - take the first element
+              if not mds:
+                return None
+              md = mds[0]
+              dereffed = md.get(md_field)
               return dereffed
-            # misfilled field - seems to be a scalar
-            value = values
-            md = ont.metadata(type_name, value)
-            dereffed = md.get(field_part)
+            dereffed = [md.get(md_field) for md in mds]
             return dereffed
-      # magic dotted name access to attr.bar if there are keys
-      # starting with "attr."
-      if attr and attr[0].isalpha():
-        attr_ = attr + '.'
-        if any(map(lambda k: k.startswith(attr_) and k > attr_, self.keys())):
-          return self.subtags(attr)
-      return supergetattr(attr)
+          # misfilled field - seems to be a scalar
+          value = values
+          md = ont.metadata(type_name, value)
+          dereffed = md.get(field_part)
+          return dereffed
+    # magic dotted name access to attr.bar etc
+    # provided there are any attr.* keys
+    if attr and attr[0].isalpha():
+      attr_ = attr + '.'
+      if any(k.startswith(attr_) for k in self.keys()):
+        return self.subtags(attr)
+    raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
@@ -2160,11 +2167,10 @@ class TagSetPrefixView(FormatableMixin):
   def __getattr__(self, attr):
     ''' Proxy other attributes through to the `TagSet`.
     '''
-    with Pfx("%s.__getattr__(%r)", type(self).__name__, attr):
-      try:
-        return self[attr]
-      except (KeyError, TypeError):
-        return getattr(self.__proxied, attr)
+    try:
+      return self[attr]
+    except (KeyError, TypeError):
+      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.

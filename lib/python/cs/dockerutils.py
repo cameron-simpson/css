@@ -3,8 +3,10 @@
 ''' Docker related utilities.
 '''
 
+import csv
 from dataclasses import dataclass, field
 from getopt import GetoptError
+from io import StringIO
 import os
 from os.path import (
     abspath,
@@ -17,7 +19,7 @@ from os.path import (
 from subprocess import CompletedProcess
 import sys
 from tempfile import TemporaryDirectory
-from typing import List, Optional
+from typing import List
 
 from typeguard import typechecked
 
@@ -25,7 +27,27 @@ from cs.cmdutils import BaseCommand, BaseCommandOptions
 from cs.context import stackattrs
 from cs.fs import validate_rpath
 from cs.pfx import Pfx
-from cs.psutils import print_argv, run
+from cs.psutils import run
+
+__version__ = '20231202-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.cmdutils',
+        'cs.context',
+        'cs.fs',
+        'cs.pfx',
+        'cs.psutils',
+        'ffmpeg-python',
+        ##'git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python',
+        'typeguard',
+    ],
+}
 
 def main(argv=None, **run_kw):
   ''' Invoke the `DockerUtilCommand` with `argv`.
@@ -34,24 +56,30 @@ def main(argv=None, **run_kw):
 
 DOCKER_COMMAND_ENVVAR = 'DK_COMMAND'
 DOCKER_COMMAND_DEFAULT = 'docker'
+# pylint: disable=unnecessary-lambda-assignment
 default_docker_command = lambda: os.environ.get(
     DOCKER_COMMAND_ENVVAR, DOCKER_COMMAND_DEFAULT
 )
 
 DOCKER_COMPOSE_COMMAND_ENVVAR = 'DK_COMPOSE_COMMAND'
 DOCKER_COMPOSE_COMMAND_DEFAULT = [default_docker_command(), 'compose']
+# pylint: disable=unnecessary-lambda-assignment
 default_docker_compose_command = lambda: os.environ.get(
     DOCKER_COMPOSE_COMMAND_ENVVAR, DOCKER_COMPOSE_COMMAND_DEFAULT
 )
 
 DOCKER_COMPOSE_CONFIG_ENVVAR = 'DK_COMPOSE_YML'
 DOCKER_COMPOSE_CONFIG_DEFAULT = 'docker-compose.yml'
+# pylint: disable=unnecessary-lambda-assignment
 default_docker_compose_config = lambda: os.environ.get(
     DOCKER_COMPOSE_CONFIG_ENVVAR, DOCKER_COMPOSE_CONFIG_DEFAULT
 )
 
 @dataclass
 class DockerUtilCommandOptions(BaseCommandOptions):
+  ''' Command line options for `DockerUtilCommand`.
+  '''
+
   # the default container for "docker exec"
   docker_command: str = field(default_factory=default_docker_command)
   docker_compose_command: str = field(
@@ -75,6 +103,7 @@ class DockerUtilCommand(BaseCommand):
     @container  Specify a target container.
   '''
 
+  # pylint: disable=use-dict-literal
   USAGE_KEYWORDS = dict(
       DOCKER_COMPOSE_COMMAND_DEFAULT=DOCKER_COMPOSE_COMMAND_DEFAULT,
       DOCKER_COMPOSE_CONFIG_DEFAULT=DOCKER_COMPOSE_CONFIG_DEFAULT,
@@ -118,7 +147,6 @@ class DockerUtilCommand(BaseCommand):
     ''' Usage: {cmd}
           Show the running docker containers.
     '''
-    options = self.options
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
     return self.docker_compose('ps').returncode
@@ -149,13 +177,7 @@ class DockerUtilCommand(BaseCommand):
       with stackattrs(DR, outputpath=T):
         DR.run(*argv, exe=options.docker_command)
 
-def docker(
-    *dk_argv,
-    exe=None,
-    config=None,
-    doit=True,
-    quiet=True
-) -> CompletedProcess:
+def docker(*dk_argv, exe=None, doit=True, quiet=True) -> CompletedProcess:
   ''' Invoke `docker` with `dk_argv`.
   '''
   if exe is None:
@@ -174,13 +196,54 @@ def docker_compose(
   if exe is None:
     exe = default_docker_compose_command()
   if isinstance(exe, str):
-    exe = exe,
+    exe = (exe,)
   if config is None:
     config = default_docker_compose_config()
   return run([*exe, '-f', config, *dc_argv], doit=doit, quiet=quiet)
 
+def mount_escape(*args) -> str:
+  ''' Escape the strings in `args` for us in the `docker run --mount` option.
+
+      Apparently the arguments to `docker run --mount` are in fact
+      a CSV data line.
+      (Of course you need to find this allusion in the bug tracker,
+      heaven forfend that the docs actually detail this kind of
+      thing.)
+
+      Rather that try to enumerate what needs escaping, here we use
+      the `csv` module to escape using the default "excel" dialect.
+  '''
+  buf = StringIO()
+  csvw = csv.writer(buf)
+  csvw.writerow(args)
+  return buf.getvalue().rstrip('\n')
+
+# pylint: disable=too-many-instance-attributes
 @dataclass
 class DockerRun:
+  ''' A `DockerRun` specifies how to prepare docker to execute a command.
+
+      This is a generic wrapper for invoking a docker image and
+      internal executable to process data from the host system,
+      essentially a flexible and cleaned up version of the wrappers
+      used to invoke things like the `linuxserver:*` utility docker
+      images.
+
+      Input paths for the executable will be presented in a read
+      only directory, by default `/input' inside the container.
+
+      An output directory (default '.', the current durectory) will
+      be mounted read/write inside the container, by default `/output`
+      inside the container.
+
+      _Unlike_ a lot of docker setups, the default mode runs as the
+      invoking user's UID/GID inside the container and expects the
+      `s6-setuidgid` utility to be present in the image.
+
+      See the `ffmpeg_docker` function from `cs.ffmpegutils` for
+      an example invocation of this class.
+  '''
+
   INPUTDIR_DEFAULT = '/input'
   OUTPUTDIR_DEFAULT = '/output'
   image: str = None
@@ -188,7 +251,7 @@ class DockerRun:
   input_root: str = INPUTDIR_DEFAULT
   input_map: dict = field(default_factory=dict)
   output_root: str = OUTPUTDIR_DEFAULT
-  outputpath: str = None
+  outputpath: str = '.'
   as_root: bool = False
   pull_mode: str = 'missing'
 
@@ -261,22 +324,15 @@ class DockerRun:
     with Pfx("inputpath:%r", inputpath):
       if not inputpath:
         raise ValueError('may not be empty')
-      if ',' in inputpath:
-        raise ValueError(
-            'inputfile path contains a comma, "docker run --mount" hates it'
-        )
     with Pfx("inputmount:%r", inputmount):
       validate_rpath(inputmount)
-      if ',' in inputmount:
-        raise ValueError(
-            'inputfile mount subpath contains a comma, "docker run --mount" hates it'
-        )
       if '/' in inputmount:
         raise ValueError('may not contain multiple components')
       if inputmount in self.input_map:
         raise ValueError(f'already present in input_map:{self.input_map!r}')
     self.input_map[inputmount] = abspath(inputpath)
 
+  # pylint: disable=too-many-branches
   def run(self, *argv, doit=None, quiet=None, docker_exe=None):
     ''' Run a command via `docker run`.
         Return the `CompletedProcess` result or `None` if `doit` is false.
@@ -295,21 +351,15 @@ class DockerRun:
         raise ValueError('not an absolute path')
       if self.input_root != normpath(self.input_root):
         raise ValueError('not normalised')
-      if ',' in self.input_root:
-        raise ValueError('contains a comma, "docker run --mount" hates it')
     with Pfx("output_root:%r", self.output_root):
       if not isabspath(self.output_root):
         raise ValueError('not an absolute path')
       if self.output_root != normpath(self.output_root):
         raise ValueError('not normalised')
-      if ',' in self.output_root:
-        raise ValueError('contains a comma, "docker run --mount" hates it')
     with Pfx("outputpath:%r", self.outputpath):
       # output mount point
       if not self.outputpath:
-        raise ValueError("no outputpath")
-      if ',' in self.outputpath:
-        raise ValueError('contains a comma, "docker run --mount" hates it')
+        self.outputpath = '.'
       if not isdirpath(self.outputpath):
         raise ValueError('not a directory')
     docker_argv = [
@@ -327,13 +377,22 @@ class DockerRun:
         docker_argv.extend(
             [
                 '--mount',
-                f'type=bind,readonly,source={inputpath},destination={mnt}'
+                mount_escape(
+                    'type=bind',
+                    'readonly',
+                    f'source={inputpath}',
+                    f'destination={mnt}',
+                ),
             ]
         )
     docker_argv.extend(
         [
             '--mount',
-            f'type=bind,source={abspath(self.outputpath)},destination={self.output_root}'
+            mount_escape(
+                'type=bind',
+                f'source={abspath(self.outputpath)}',
+                f'destination={self.output_root}',
+            ),
         ]
     )
     if self.as_root:

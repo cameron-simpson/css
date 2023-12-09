@@ -203,6 +203,37 @@ case "$op" in
       echo "$usage"
       exit 0
       ;;
+  build)
+      usage="Usage: $cmd $op [-f dockerfile] [--push] [-t tag] [PATH]"
+      path=.
+      dockerfile=Dockerfile
+      tag=
+      do_push=
+      badopts=
+      while [ $# -gt 0 ]
+      do
+        case "$1" in
+          -f)     dockerfile=$2; shift ;;
+          --push) do_push=1 ;;
+          -t)     tag=$2; shift ;;
+          --)     shift; break ;;
+          -?*)    echo "$cmd: $op: unrecognised option: $1" >&2
+                  badopts=1
+                  ;;
+          *)      break ;;
+        esac
+        shift
+      done
+      [ $# = 0 ] || { path=$1; shift; }
+      if [ -n "$tag" ]
+      then set-x docker build -f "$dockerfile" -t "$tag" "$path"
+      else set-x docker build -f "$dockerfile" "$path"
+      fi || exit $?
+      [ -n "$do_push" ] || exit 0
+      set-x docker tag "$tag" "$DK_REPO:$tag" || exit $?
+      set-x docker push "$DK_REPO:$tag"
+      exit $?
+      ;;
   cp) [ $# = 2 ] || {
         echo "$cmd: $op: expected exactly 2 arguments" >&2
         echo "$usage" >&2
@@ -401,7 +432,7 @@ case "$op" in
       "$0" pull
       "$0" down
       docker volume rm "${base}_var" || :
-      "$0" build
+      $DK_COMPOSE_CMD $docker_compose_opts -f "$DK_COMPOSE_YML" build
       "$0" up setup
       exit $?
       ;;

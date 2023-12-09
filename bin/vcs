@@ -328,7 +328,7 @@ case "$op" in
                     ;;
       sibling,git)  clonedir=$1; shift
                     [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
-                    git clone "$vcs_top" "$clonedir"
+                    git clone --reference "$vcs_top" "$vcs_top" "$clonedir"
                     upstream=$( git remote get-url origin )
                     incd "$clonedir" git remote set-url origin "$upstream"
                     ;;

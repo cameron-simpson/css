@@ -13,6 +13,7 @@ from .dedrm import DeDRMCommand
 from .kindle import KindleCommand
 from .kobo import KoboCommand
 from .mobi import MobiCommand
+from .pdf import PDFCommand
 
 class EBooksCommand(BaseCommand):
   ''' Ebooks utility command.
@@ -24,5 +25,6 @@ class EBooksCommand(BaseCommand):
   cmd_kindle = KindleCommand
   cmd_kobo = KoboCommand
   cmd_mobi = MobiCommand
+  cmd_pdf = PDFCommand
 
 sys.exit(EBooksCommand(sys.argv).run())
