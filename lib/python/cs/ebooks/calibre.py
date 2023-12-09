@@ -1159,6 +1159,8 @@ class CalibreCommand(BaseCommand):
             CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR
         ) or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
     )
+    # used by "calibre add [--cbz]"
+    make_cbz: bool = False
 
     @property
     def calibre(self):
@@ -1287,6 +1289,7 @@ class CalibreCommand(BaseCommand):
   def cmd_add(self, argv):
     ''' Usage: {cmd} [-nqv] bookpaths...
           Add the specified ebook bookpaths to the library.
+          --cbz Also make a CBZ.
           -n    No action: recite planned actions.
           -q    Quiet: only emit warnings.
           -v    Verbose: report all actions and decisions.
@@ -1296,18 +1299,23 @@ class CalibreCommand(BaseCommand):
         DeDRMWrapper(options.dedrm_package_path)
         if options.dedrm_package_path else None
     )
-    calibre = options.calibre
-    self.popopts(argv, options, n='doit', q='quiet', v='verbose')
+    self.popopts(
+        argv, options, cbz='make_cbz', n='doit', q='quiet', v='verbose'
+    )
     if not argv:
       raise GetoptError("missing bookpaths")
+    calibre = options.calibre
     for bookpath in argv:
       with Pfx(bookpath):
-        calibre.add(
+        dbid = calibre.add(
             bookpath,
             dedrm=dedrm,
             doit=options.doit,
             quiet=options.quiet,
         )
+        if options.make_cbz and options.doit:
+          cbook = calibre[dbid]
+          pfx_call(cbook.make_cbz)
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_convert(self, argv):
@@ -1526,67 +1534,65 @@ class CalibreCommand(BaseCommand):
     upd = options.upd
     xit = 0
     cbooks = []
-    if argv:
-      try:
-        cbooks = self.popbooks(
-            argv, sortkey=cbook_sort_key, reverse=options.sort_reverse
-        )
-      except ValueError as e:
-        raise GetoptError("invalid book specifiers: %s") from e
-    else:
-      with contextif(verbose, upd.run_task, "sort calibre contents"):
-        calibre.preload()
-        cbooks = sorted(
-            calibre, key=cbook_sort_key, reverse=options.sort_reverse
-        )
-    runstate = options.runstate
-    for cbook in cbooks:
-      if runstate.cancelled:
-        break
-      with Pfx(cbook):
-        if ls_format is None:
-          top_row = []
-          series_name = cbook.series_name
-          if series_name:
-            top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
-          top_row.append(cbook.title)
-          author_names = cbook.author_names
-          if author_names:
-            top_row.extend(
-                ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
-            )
-          top_row.append(f"({cbook.dbid})")
-          if not longmode:
-            top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
-            top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
-          print(*top_row)
-        else:
-          try:
-            output = cbook.format_as(ls_format, error_sep='\n  ')
-          except FormatAsError as e:
-            error(str(e))
-            xit = 1
-            continue
-          print(output)
-        if longmode:
-          print(" ", cbook.path)
-          tags = cbook.tags
-          if tags:
-            print("   ", ", ".join(sorted(tags)))
-          identifiers = cbook.identifiers
-          if identifiers:
-            print("   ", TagSet(identifiers))
-          for fmt, subpath in cbook.formats.items():
-            with Pfx(fmt):
-              fspath = cbook.pathto(subpath)
-              try:
-                size = pfx_call(os.stat, fspath).st_size
-              except OSError as e:
-                warning("cannot stat: %s", e)
-              else:
-                print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
-    if runstate.cancelled:
-      xit = 1
+    with calibre.db_session():
+      calibre.preload()
+      if argv:
+        try:
+          cbooks = self.popbooks(
+              argv, sortkey=cbook_sort_key, reverse=options.sort_reverse
+          )
+        except ValueError as e:
+          raise GetoptError("invalid book specifiers: %s") from e
+      else:
+        with contextif(verbose, upd.run_task, "sort calibre contents"):
+          cbooks = sorted(
+              calibre, key=cbook_sort_key, reverse=options.sort_reverse
+          )
+      runstate = options.runstate
+      for cbook in cbooks:
+        runstate.raiseif()
+        with Pfx(cbook):
+          if ls_format is None:
+            top_row = []
+            series_name = cbook.series_name
+            if series_name:
+              top_row.append(f"{series_name} [{intif(cbook.series_index)}]")
+            top_row.append(cbook.title)
+            author_names = cbook.author_names
+            if author_names:
+              top_row.extend(
+                  ("by", ", ".join(sorted(cbook.author_names, key=str.lower)))
+              )
+            top_row.append(f"({cbook.dbid})")
+            if not longmode:
+              top_row.append(",".join(sorted(map(str.upper, cbook.formats))))
+              top_row.append(",".join(sorted(map(str.lower, cbook.tags))))
+            print(*top_row)
+          else:
+            try:
+              output = cbook.format_as(ls_format, error_sep='\n  ')
+            except FormatAsError as e:
+              error(str(e))
+              xit = 1
+              continue
+            print(output)
+          if longmode:
+            print(" ", cbook.path)
+            tags = cbook.tags
+            if tags:
+              print("   ", ", ".join(sorted(tags)))
+            identifiers = cbook.identifiers
+            if identifiers:
+              print("   ", TagSet(identifiers))
+            for fmt, subpath in cbook.formats.items():
+              with Pfx(fmt):
+                fspath = cbook.pathto(subpath)
+                try:
+                  size = pfx_call(os.stat, fspath).st_size
+                except OSError as e:
+                  warning("cannot stat: %s", e)
+                else:
+                  print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
     return xit
 
   def cmd_make_cbz(self, argv):

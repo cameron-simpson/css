@@ -1,4 +1,3 @@
-calbre add: --cbz option to automake a CBZ from the source file (if not already a CBZ)
 calibre popbooks: error on unknown dbids
 import dedrm and obok plugins from the calibre prefs plugins subdir by default
 command line option to specify kobo library path
