@@ -9,7 +9,7 @@
 # constructing a FreeDB CDDB entry. Used by cdsubmit.
 # Rework of cddiscinfo in Python, since the Perl libraries aren't
 # working any more; update to work on OSX and use MusicBrainz.
-#	- Cameron Simpson <cs@cskk.id.au> 31mar2016
+# - Cameron Simpson <cs@cskk.id.au> 31mar2016
 #
 
 from contextlib import contextmanager
