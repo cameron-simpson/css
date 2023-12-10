@@ -861,6 +861,19 @@ class MBDisc(_MBTagSet):
     return rel
 
   @property
+  def medium_position(self):
+    release_entry = self.release.query_result
+    discid = self.discid
+    for medium in release_entry['medium-list']:
+      for pos, disc_entry in enumerate(medium['disc-list'], 1):
+        if disc_entry['id'] == discid:
+          return pos
+    raise AttributeError(
+        "%s.release_entry: no medium found for discid:%r",
+        self.__class__.__name__, discid
+    )
+
+  @property
   @pfx_method
   def artist_names(self):
     names = []
