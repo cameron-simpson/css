@@ -769,7 +769,8 @@ class _MBTagSet(SQLTagSet):
   def mbkey(self):
     ''' The MusicBrainz key (usually a UUID or discid).
     '''
-    _, mbid = self.name.split('.', 1)
+    with Pfx("%s.mbkey: split(.,1)", self.name):
+      _, mbid = self.name.split('.', 1)
     return mbid
 
   @property
