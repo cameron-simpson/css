@@ -892,11 +892,14 @@ class MBDisc(_MBTagSet):
     names = []
     for artist_ref in self.release.artist:
       with Pfx("artist_ref %s", r(artist_ref)):
-        artist = self.resolve_id('artist', artist_ref)
+        if isinstance(artist_ref, str):
+          continue
+        artist_id = artist_ref['artist']
+        artist = self.resolve_id('artist', artist_id)
         try:
-          name = artist['artist_name']
+          name = artist['name_']
         except KeyError:
-          warning("no ['name']")
+          warning("no ['name']: artist keys = %r", sorted(artist.keys()))
         else:
           names.append(name)
     return names
