@@ -836,6 +836,19 @@ class MBDisc(_MBTagSet):
   ''' A Musicbrainz disc entry.
   '''
 
+  def __getattr__(self, attr):
+    if attr != 'release':
+      release = self.release
+      try:
+        return getattr(release, attr)
+      except AttributeError:
+        pass
+    return super().__getattr__(attr)
+
+  @property
+  def release_list(self):
+    return self.query_result['release-list']
+
   def releases(self):
     ''' Generator yielding entries from `release_list` matching the `disc_id`. '''
     discid = self.mbkey
