@@ -792,8 +792,6 @@ class _MBTagSet(SQLTagSet):
   def by_typed_id(self, type_name: str, id: str, no_check_uuid=False):
     ''' Fetch the object `{type_name}.{id}` and refresh it.
     '''
-    if not no_check_uuid:
-      UUID(id)
     if type_name == 'disc':
       try:
         UUID(id)
