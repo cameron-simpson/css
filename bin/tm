@@ -389,7 +389,7 @@ case "$op" in
     # no tmux? use scr
     have_tmux || exec $trace scr
     do_tmux start-server
-    if [ "x$1" = x-n ]
+    if [ $# -gt 0 ] && [ "x$1" = x-n ]
     then
       shift
       do_tmux list-sessions ${1+"$@"} \
