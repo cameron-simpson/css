@@ -1137,7 +1137,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     if (typename == 'releases' and 'toc' not in getter_kw
         and self.dev_info is not None and self.dev_info.id == db_id):
       getter_kw.update(toc=self.dev_info.toc_string)
-    assert ' ' not in db_id
+    assert ' ' not in db_id, "db_id:%r contains a space" % (db_id,)
     warning(
         "QUERY typename=%r db_id=%r includes=%r ...", typename, db_id, includes
     )
