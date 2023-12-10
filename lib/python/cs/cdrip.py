@@ -503,12 +503,12 @@ def rip(
             disc_subpath,
             track_base + '.mp3',
         )
-        with Pfx(wav_filename):
+        with Pfx(shortpath(wav_filename)):
           if existspath(wav_filename):
             info("using existing WAV file: %r", wav_filename)
             argv = None
           else:
-            wav_dirpath = dirname(mp3_filename)
+            wav_dirpath = dirname(wav_filename)
             no_action or needdir(wav_dirpath, use_makedirs=True)
             fstags[wav_dirpath].update(disc_fstags)
             argv = rip_to_wav(
