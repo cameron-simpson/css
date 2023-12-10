@@ -708,10 +708,18 @@ class _MBTagSet(SQLTagSet):
           return value
         except KeyError as e:
           warning(
-              "%r.__getattr__(%r): no %r[%r]: %s", self.name, attr,
-              self.MB_QUERY_RESULT_TAG_NAME, attr.replace('_', '-'), e
+              "%r.__getattr__(%r): no %r[%r]:keys=%r: %s",
+              self.name,
+              attr,
+              self.MB_QUERY_RESULT_TAG_NAME,
+              attr.replace('_', '-'),
+              sorted(mb_result.keys()),
+              e,
           )
-    raise AttributeError("%s: no .%s attribute" % (self.name, attr))
+          pprint(dict(mb_result))
+    raise AttributeError(
+        "%s:%s: no .%s attribute" % (self.__class__.__name__, self.name, attr)
+    )
 
   @property
   def query_result(self):
