@@ -185,9 +185,8 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
 
   @require(lambda tmux_command: tmux_command and '\n' not in tmux_command)
   def submit(self, tmux_command: str) -> Result:
-    ''' Submit `tmux_command`, return `(cmdnum,R)`
-        being a 2-tuple of the resulting command number
-        and a `Result` for collection of the `TmuxCommandResponse`.
+    ''' Submit `tmux_command`, return a `Result`
+        for collection of the `TmuxCommandResponse`.
     '''
     wf = self.wf
     with self._lock:
@@ -196,7 +195,7 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       wf.write(tmux_command.encode('utf-8'))
       wf.write(b'\n')
       wf.flush()
-    return cmdnum, R
+    return R
 
   # TODO: worker thread to consume the control data and complete Results
 
