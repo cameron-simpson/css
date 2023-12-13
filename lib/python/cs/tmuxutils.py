@@ -183,6 +183,21 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
         # return response to caller
         R.result = rsp
 
+  @require(lambda tmux_command: tmux_command and '\n' not in tmux_command)
+  def submit(self, tmux_command: str) -> Result:
+    ''' Submit `tmux_command`, return `(cmdnum,R)`
+        being a 2-tuple of the resulting command number
+        and a `Result` for collection of the `TmuxCommandResponse`.
+    '''
+    wf = self.wf
+    with self._lock:
+      R = Result(f'{tmux_command}')
+      self.pending.append(R)
+      wf.write(tmux_command.encode('utf-8'))
+      wf.write(b'\n')
+      wf.flush()
+    return cmdnum, R
+
   # TODO: worker thread to consume the control data and complete Results
 
   @pfx_method
