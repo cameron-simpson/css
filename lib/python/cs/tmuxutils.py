@@ -159,6 +159,8 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
     arg0, *args = TmuxCommandResponse.argv(bs)
     if arg0 == 'output':
       return
+    info("%%%s %r", arg0, args)
+
   def _worker(self):
     ''' Worker function to read the initial response
         and then all subsequent responses, using them to complete pending
