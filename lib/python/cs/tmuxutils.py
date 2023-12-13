@@ -158,6 +158,28 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       subdir = f'tmux-{uid}'
     return joinpath(tmpdir, subdir, name)
 
+  def _worker(self):
+    ''' Worker function to read the initial response
+        and then all subsequent responses, using them to complete pending
+        command `Result`s.
+    '''
+    rf = self.rf
+    pending = self.pending
+    notify = self.notify
+    lock = self._lock
+    while True:
+      rsp = TmuxCommandResponse.read_response(rf, notify=notify)
+      if rsp is None:
+        return
+      try:
+        with lock:
+          R = pending.pop(0)
+      except IndexError:
+        warning("discarding unexpected TmuxCommandResponse: %r", rsp)
+      else:
+        # return response to caller
+        R.result = rsp
+
   # TODO: worker thread to consume the control data and complete Results
 
   @pfx_method
