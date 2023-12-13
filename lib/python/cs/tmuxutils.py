@@ -112,10 +112,13 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
 
   TMUX = 'tmux'
 
-  def __init__(self, socketpath=None):
+  def __init__(self, socketpath=None, notify=None):
     if socketpath is None:
       socketpath = self.get_socketpath()
+    if notify is None:
+      notify = self.default_notify
     self.fspath = socketpath
+    self.notify = notify
     self._lock = Lock()
 
   @contextmanager
