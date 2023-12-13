@@ -59,7 +59,7 @@ class TmuxCommandResponse:
     while True:
       bs = rf.readline()
       if not bs:
-        raise EOFError()
+        return None
       if not bs.startswith(b'%'):
         warning("no-%% line: %r", bs)
         continue
