@@ -158,6 +158,11 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       subdir = f'tmux-{uid}'
     return joinpath(tmpdir, subdir, name)
 
+
+  def default_notify(self, bs: bytes):
+    arg0, *args = TmuxCommandResponse.argv(bs)
+    if arg0 == 'output':
+      return
   def _worker(self):
     ''' Worker function to read the initial response
         and then all subsequent responses, using them to complete pending
