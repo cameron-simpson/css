@@ -200,17 +200,11 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
   # TODO: worker thread to consume the control data and complete Results
 
   @pfx_method
-  @require(lambda tmux_command: tmux_command and '\n' not in tmux_command)
   @typechecked
   def __call__(self, tmux_command: str) -> TmuxCommandResponse:
     with self:
-      with self._lock:
-        wf = self.wf
-        X("send %r to wf:%r", tmux_command, wf)
-        wf.write(tmux_command.encode('utf-8'))
-        wf.write(b'\n')
-        wf.flush()
-        return TmuxCommandResponse.read_response(self.rf)
+      R = self.submit(tmux_command)
+      return R()
 
 def tmux(tmux_command, *tmux_args) -> CompletedProcess:
   ''' Execute the tmux(1) command `tmux_command`.
