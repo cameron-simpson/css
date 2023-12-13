@@ -403,6 +403,20 @@ class Result(FSM):
         You can optionally supply a callable and arguments,
         in which case `callable(*args,**kwargs)` will be called
         via `Result.call` and the results applied to this `Result`.
+
+        Basic example:
+
+            R = Result()
+            ... hand R to something which will fulfil it later ...
+            x = R() # wait for fulfilment - value lands in x
+
+        Direct call:
+
+            R = Result()
+            ... pass R to something which wants the result ...
+            # call func(1,2,z=3), save result in R
+            # ready for collection by whatever received R
+            R(func,1,2,z=3)
     '''
     if a:
       self.run_func(*a, **kw)
