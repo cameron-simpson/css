@@ -83,7 +83,7 @@ class TmuxCommandResponse:
       output.append(bs)
     arg, *args = cls.argv(bs)
     ok = arg == 'end'
-    unixtime_s, cmdnum_s, _ = args
+    unixtime_s, _, cmdnum_s = args
     end_unixtime = float(unixtime_s)
     end_cmdnum = int(cmdnum_s)
     assert begin_cmdnum == end_cmdnum
