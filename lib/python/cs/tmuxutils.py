@@ -121,25 +121,6 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
     self.notify = notify
     self._lock = Lock()
 
-  @contextmanager
-  def startup_shutdown(self):
-    ''' Open/close the control socket.
-    '''
-    with Popen([self.TMUX, '-S', self.fspath, '-C'], stdin=PIPE,
-               stdout=PIPE) as P:
-      try:
-        with stackattrs(self, rf=P.stdout, wf=P.stdin):
-          X("read initial response")
-          print(
-              TmuxCommandResponse.read_response(
-                  P.stdout, notify=lambda bs: X("notification %r", bs)
-              )
-          )
-          yield
-      finally:
-        P.stdin.close()
-        P.wait()
-
   @staticmethod
   def get_socketpath(tmpdir=None, subdir=None, name='default'):
     ''' Compute the path to a tmux(1) control socket.
@@ -158,6 +139,21 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       subdir = f'tmux-{uid}'
     return joinpath(tmpdir, subdir, name)
 
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the control socket.
+    '''
+    with Popen([self.TMUX, '-S', self.fspath, '-C'], stdin=PIPE,
+               stdout=PIPE) as P:
+      try:
+        pending = []  # queue of pending Results
+        with stackattrs(self, rf=P.stdout, wf=P.stdin, pending=pending):
+          workerT = bg(self._worker)
+          with stackattrs(self, workerT=workerT):
+            yield
+      finally:
+        P.stdin.close()
+        P.wait()
 
   def default_notify(self, bs: bytes):
     arg0, *args = TmuxCommandResponse.argv(bs)
