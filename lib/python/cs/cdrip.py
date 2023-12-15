@@ -9,7 +9,7 @@
 # constructing a FreeDB CDDB entry. Used by cdsubmit.
 # Rework of cddiscinfo in Python, since the Perl libraries aren't
 # working any more; update to work on OSX and use MusicBrainz.
-#	- Cameron Simpson <cs@cskk.id.au> 31mar2016
+# - Cameron Simpson <cs@cskk.id.au> 31mar2016
 #
 
 from contextlib import contextmanager
@@ -432,7 +432,7 @@ def rip(
     *,
     output_dirpath,
     disc_id=None,
-    audio_outputs=('wav', 'aac', 'mp3'),
+    audio_outputs=('wav', 'flac', 'aac', 'mp3'),
     fstags=None,
     no_action=False,
     split_by_format=False,
@@ -491,18 +491,24 @@ def rip(
             disc_subpath,
             track_base + '.aac',
         )
+        flac_filename = joinpath(
+            output_dirpath,
+            'flac' if split_by_format else '',
+            disc_subpath,
+            track_base + '.flac',
+        )
         mp3_filename = joinpath(
             output_dirpath,
             'mp3' if split_by_format else '',
             disc_subpath,
             track_base + '.mp3',
         )
-        with Pfx(wav_filename):
+        with Pfx(shortpath(wav_filename)):
           if existspath(wav_filename):
             info("using existing WAV file: %r", wav_filename)
             argv = None
           else:
-            wav_dirpath = dirname(mp3_filename)
+            wav_dirpath = dirname(wav_filename)
             no_action or needdir(wav_dirpath, use_makedirs=True)
             fstags[wav_dirpath].update(disc_fstags)
             argv = rip_to_wav(
@@ -514,6 +520,28 @@ def rip(
             fstags[wav_filename].update(track_fstags)
             if argv is not None:
               fstags[wav_filename].rip_command = argv
+        if 'flac' in audio_outputs:
+          with Pfx(shortpath(flac_filename)):
+            if existspath(flac_filename):
+              warning("FLAC file already exists, skipping track")
+            else:
+              flac_dirpath = dirname(flac_filename)
+              no_action or needdir(flac_dirpath, use_makedirs=True)
+              fstags[flac_dirpath].update(disc_fstags)
+              argv = wav_to_flac(
+                  wav_filename,
+                  flac_filename,
+                  no_action=no_action,
+                  disc_title=level2,
+                  tracknum=tracknum,
+                  track_title=recording.title,
+                  track_artists=artist_credit,
+              )
+            if no_action:
+              print("fstags[%r].update(%s)" % (flac_filename, track_fstags))
+            else:
+              fstags[flac_filename].conversion_command = argv
+              fstags[flac_filename].update(track_fstags)
         if 'aac' in audio_outputs:
           with Pfx(shortpath(aac_filename)):
             if existspath(aac_filename):
@@ -580,6 +608,36 @@ def wav_to_aac(
   '''
   with atomic_filename(aac_filename, placeholder=True) as T:
     argv = [
+        ##'ffmpeg',
+        ##'/home/cameron/bin-local/ffmpeg',
+        ##'/usr/bin/ffmpeg',
+        './bin/ffmpeg-docker',
+        '-y',
+        '-i',
+        wav_filename,
+        # TODO: metadata options here
+        T.name,
+    ]
+    run(argv, doit=not no_action, quiet=False, check=True)
+  return argv
+
+def wav_to_flac(
+    wav_filename,
+    flac_filename,
+    *,
+    no_action=False,
+    disc_title,
+    tracknum,
+    track_title,
+    track_artists,
+):
+  ''' Produce an FLAC file from a WAV file.
+  '''
+  with atomic_filename(flac_filename, placeholder=True) as T:
+    argv = [
+        ##'ffmpeg',
+        ##'/home/cameron/bin-local/ffmpeg',
+        ##'/usr/bin/ffmpeg',
         './bin/ffmpeg-docker',
         '-y',
         '-i',
@@ -650,10 +708,18 @@ class _MBTagSet(SQLTagSet):
           return value
         except KeyError as e:
           warning(
-              "%r.__getattr__(%r): no %r[%r]: %s", self.name, attr,
-              self.MB_QUERY_RESULT_TAG_NAME, attr.replace('_', '-'), e
+              "%r.__getattr__(%r): no %r[%r]:keys=%r: %s",
+              self.name,
+              attr,
+              self.MB_QUERY_RESULT_TAG_NAME,
+              attr.replace('_', '-'),
+              sorted(mb_result.keys()),
+              e,
           )
-    raise AttributeError("%s: no .%s attribute" % (self.name, attr))
+          pprint(dict(mb_result))
+    raise AttributeError(
+        "%s:%s: no .%s attribute" % (self.__class__.__name__, self.name, attr)
+    )
 
   @property
   def query_result(self):
@@ -703,7 +769,8 @@ class _MBTagSet(SQLTagSet):
   def mbkey(self):
     ''' The MusicBrainz key (usually a UUID or discid).
     '''
-    _, mbid = self.name.split('.', 1)
+    with Pfx("%s.mbkey: split(.,1)", self.name):
+      _, mbid = self.name.split('.', 1)
     return mbid
 
   @property
@@ -725,8 +792,6 @@ class _MBTagSet(SQLTagSet):
   def by_typed_id(self, type_name: str, id: str, no_check_uuid=False):
     ''' Fetch the object `{type_name}.{id}` and refresh it.
     '''
-    if not no_check_uuid:
-      UUID(id)
     if type_name == 'disc':
       try:
         UUID(id)
@@ -771,6 +836,19 @@ class MBDisc(_MBTagSet):
   ''' A Musicbrainz disc entry.
   '''
 
+  def __getattr__(self, attr):
+    if attr != 'release':
+      release = self.release
+      try:
+        return getattr(release, attr)
+      except AttributeError:
+        pass
+    return super().__getattr__(attr)
+
+  @property
+  def release_list(self):
+    return self.query_result['release-list']
+
   def releases(self):
     ''' Generator yielding entries from `release_list` matching the `disc_id`. '''
     discid = self.mbkey
@@ -796,16 +874,32 @@ class MBDisc(_MBTagSet):
     return rel
 
   @property
+  def medium_position(self):
+    release_entry = self.release.query_result
+    discid = self.discid
+    for medium in release_entry['medium-list']:
+      for pos, disc_entry in enumerate(medium['disc-list'], 1):
+        if disc_entry['id'] == discid:
+          return pos
+    raise AttributeError(
+        "%s.release_entry: no medium found for discid:%r",
+        self.__class__.__name__, discid
+    )
+
+  @property
   @pfx_method
   def artist_names(self):
     names = []
     for artist_ref in self.release.artist:
       with Pfx("artist_ref %s", r(artist_ref)):
-        artist = self.resolve_id('artist', artist_ref)
+        if isinstance(artist_ref, str):
+          continue
+        artist_id = artist_ref['artist']
+        artist = self.resolve_id('artist', artist_id)
         try:
-          name = artist['artist_name']
+          name = artist['name_']
         except KeyError:
-          warning("no ['name']")
+          warning("no ['name']: artist keys = %r", sorted(artist.keys()))
         else:
           names.append(name)
     return names
@@ -1043,7 +1137,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     if (typename == 'releases' and 'toc' not in getter_kw
         and self.dev_info is not None and self.dev_info.id == db_id):
       getter_kw.update(toc=self.dev_info.toc_string)
-    assert ' ' not in db_id
+    assert ' ' not in db_id, "db_id:%r contains a space" % (db_id,)
     warning(
         "QUERY typename=%r db_id=%r includes=%r ...", typename, db_id, includes
     )
