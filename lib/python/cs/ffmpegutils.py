@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Convenience facilities for using FFmpeg (ffmpeg.org).
-#   - Cameron Simpson <cs@cskk.id.au> 30oct2016
+# - Cameron Simpson <cs@cskk.id.au> 30oct2016
 #
 
 '''
@@ -64,6 +64,7 @@ DISTINFO = {
 FFMPEG_EXE_DEFAULT = 'ffmpeg'
 FFMPEG_EXE_ENVVAR = 'FFMPEG_EXE'
 
+# executable and image for use with docker
 FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
 FFMPEG_DOCKER_IMAGE_DEFAULT = 'linuxserver/ffmpeg'
 
