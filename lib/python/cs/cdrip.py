@@ -306,7 +306,7 @@ class CDRipCommand(BaseCommand):
           disc_id=disc_id,
           fstags=fstags,
           no_action=no_action,
-          split_by_format=True,
+          split_by_codec=True,
       )
     except discid.disc.DiscError as e:
       error("disc error: %s", e)
@@ -435,7 +435,7 @@ def rip(
     audio_outputs=('wav', 'flac', 'aac', 'mp3'),
     fstags=None,
     no_action=False,
-    split_by_format=False,
+    split_by_codec=False,
 ):
   ''' Pull audio from `device` and save in `output_dirpath`.
   '''
