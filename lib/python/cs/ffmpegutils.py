@@ -12,6 +12,7 @@ with invocation via `ffmpeg-python`.
 from collections import namedtuple
 from dataclasses import dataclass
 import json
+import os
 from os.path import (
     basename,
     dirname,
@@ -61,6 +62,7 @@ DISTINFO = {
 }
 
 FFMPEG_EXE_DEFAULT = 'ffmpeg'
+FFMPEG_EXE_ENVVAR = 'FFMPEG_EXE'
 
 FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
 FFMPEG_DOCKER_IMAGE_DEFAULT = 'linuxserver/ffmpeg'
@@ -210,6 +212,7 @@ def convert(
     dstpath: str,
     doit=True,
     dstfmt=None,
+    ffmpeg_exe=None,
     fstags: FSTags,
     conversions=None,
     metadata: Optional[dict] = None,
@@ -218,7 +221,7 @@ def convert(
     acodec=None,
     vcodec=None,
     extra_opts=None,
-):
+) -> List[str]:
   ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
   '''
   if conversions is None:
@@ -231,6 +234,8 @@ def convert(
   srcpath = srcs[0].source
   if dstfmt is None:
     dstfmt = DEFAULT_MEDIAFILE_FORMAT
+  if ffmpeg_exe is None:
+    ffmpeg_exe = os.environ.get(FFMPEG_EXE_ENVVAR, FFMPEG_EXE_DEFAULT)
   # set up the initial source path, options and metadata
   ffinopts = {
       'loglevel': 'repeat+error',
@@ -303,7 +308,7 @@ def convert(
   if overwrite:
     ff = ff.overwrite_output()
   ff_args = ff.get_args()
-  ff_argv = [FFMPEG_EXE_DEFAULT, *ff_args]
+  ff_argv = [ffmpeg_exe, *ff_args]
   if doit:
     print_argv(*ff_argv)
     fstags[dstpath]['ffmpeg.argv'] = ff_argv
@@ -311,6 +316,7 @@ def convert(
     ff.run()
   else:
     print_argv(*ff_argv, fold=True)
+  return ff_argv
 
 def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
   ''' Run `ffprobe -print_format json` on `input_file`,
