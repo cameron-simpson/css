@@ -198,9 +198,10 @@ class FFmpegSource:
 # A mapping of ffmpeg codec_name values to default converted names.
 # If there's no entry here, use copy mode.
 DEFAULT_CONVERSIONS = {
-    'aac_latm': 'aac',
-    'mp2': 'aac',
-    'mpeg2video': 'h264',
+    'audio/aac_latm': 'aac',
+    'audio/mp2': 'aac',
+    'audio/pcm_s16le': 'aac',
+    'video/mpeg2video': 'h264',
 }
 DEFAULT_MEDIAFILE_FORMAT = 'mp4'
 
@@ -243,41 +244,34 @@ def convert(
       ##'2': None,
   }
   # choose output formats
-  probed = ffprobe(srcpath)
-  for i, stream in enumerate(probed.streams):
-    codec_type = stream.get('codec_type', 'unknown')
-    codec_key = stream.get('codec_name', stream.codec_tag)
-    with Pfx("stream[%d]: %s/%s", i, codec_type, codec_key):
-      if codec_type not in ('audio', 'video'):
-        ##warning("not audio or video, skipping")
-        continue
-      try:
-        new_codec = conversions[codec_key]
-      except KeyError:
-        warning("no conversion, skipping")
-      else:
-        warning("convert to %r", new_codec)
-        if codec_type == 'audio':
-          if acodec is None:
-            acodec = new_codec
-          elif acodec != new_codec:
-            warning(
-                "already converting %s/%s to %r instead of default %r",
-                codec_type, codec_key, acodec, new_codec
-            )
-        elif codec_type == 'video':
-          if vcodec is None:
-            vcodec = new_codec
+  if acodec is None or vcodec is None:
+    probed = ffprobe(srcpath)
+    for i, stream in enumerate(probed.streams):
+      codec_type = stream.get('codec_type', 'unknown')
+      codec_key = stream.get('codec_name', stream.codec_tag)
+      conv_key = f'{codec_type}/{codec_key}'
+      with Pfx("stream[%d]: %s", i, conv_key):
+        if (codec_type == 'audio' and acodec is None
+            or codec_type == 'video' and vcodec is None):
+          try:
+            new_codec = conversions[conv_key]
+          except KeyError:
+            ##warning("no conversion, skipping")
+            pass
           else:
-            warning(
-                "already converting %s/%s to %r instead of default %r",
-                codec_type, codec_key, acodec, new_codec
-            )
-        else:
-          warning(
-              "no option to convert streams of type %s/%s, ignoring new_codec=%r",
-              codec_type, codec_key, new_codec
-          )
+            warning("convert to %r", new_codec)
+            if codec_type == 'audio':
+              if acodec is None:
+                acodec = new_codec
+            elif codec_type == 'video':
+              if vcodec is None:
+                vcodec = new_codec
+            else:
+              warning(
+                  "no option to convert streams of type %s/%s, ignoring new_codec=%r",
+                  codec_type, codec_key, new_codec
+              )
+
   ffmeta_kw = dict(probed.format.get('tags', {}))
   ffmeta_kw.update(metadata)
   # construct ffmpeg command
