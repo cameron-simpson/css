@@ -479,112 +479,67 @@ def rip(
         track_base = f"{tracknum:02} - {recording.title} -- {track_artists}".replace(
             os.sep, '-'
         )
-        wav_filename = joinpath(
+        fmtpath = lambda acodec, ext: joinpath(
             output_dirpath,
-            'wav' if split_by_format else '',
+            acodec if split_by_codec else '',
             disc_subpath,
-            track_base + '.wav',
+            f'{track_base}.{ext}',
         )
-        aac_filename = joinpath(
-            output_dirpath,
-            'aac' if split_by_format else '',
-            disc_subpath,
-            track_base + '.aac',
-        )
-        flac_filename = joinpath(
-            output_dirpath,
-            'flac' if split_by_format else '',
-            disc_subpath,
-            track_base + '.flac',
-        )
-        mp3_filename = joinpath(
-            output_dirpath,
-            'mp3' if split_by_format else '',
-            disc_subpath,
-            track_base + '.mp3',
-        )
-        with Pfx(shortpath(wav_filename)):
-          if existspath(wav_filename):
-            info("using existing WAV file: %r", wav_filename)
-            argv = None
+        ##wav_filename = fmtpath('wav')
+        ##aac_filename = fmtpath('m4a')
+        ##flac_filename = fmtpath('flac')
+        ##mp3_filename = fmtpath('mp3')
+        for acodec in 'wav', 'flac', 'aac', 'mp3':
+          if acodec != 'wav' and (acodec not in audio_outputs):
+            continue
+          if acodec == 'aac':
+            # to provide metadata we embed AAC audio in an MP4 container
+            # named .m4a to happy iTunes
+            ext = 'm4a'
+            fmt = 'mp4'
           else:
-            wav_dirpath = dirname(wav_filename)
-            no_action or needdir(wav_dirpath, use_makedirs=True)
-            fstags[wav_dirpath].update(disc_fstags)
-            argv = rip_to_wav(
-                device, tracknum, wav_filename, no_action=no_action
-            )
-          if no_action:
-            print("fstags[%r].update(%s)" % (wav_filename, track_fstags))
-          else:
-            fstags[wav_filename].update(track_fstags)
-            if argv is not None:
-              fstags[wav_filename].rip_command = argv
-        if 'flac' in audio_outputs:
-          with Pfx(shortpath(flac_filename)):
-            if existspath(flac_filename):
-              warning("FLAC file already exists, skipping track")
+            fmt = ext = acodec
+          fmt_filename = fmtpath(acodec, ext)
+          ffmetadata = FFMetaData(
+              fmt,
+              album=title,
+              album_artist=artist_credit,
+              track=tracknum,
+              title=recording.title,
+              author=recording.artist_credit,
+          )
+          with Pfx(shortpath(fmt_filename)):
+            if existspath(fmt_filename):
+              info("using existing %s file: %r", fmt.upper(), fmt_filename)
+              argv = None
             else:
-              flac_dirpath = dirname(flac_filename)
-              no_action or needdir(flac_dirpath, use_makedirs=True)
-              fstags[flac_dirpath].update(disc_fstags)
-              argv = wav_to_flac(
-                  wav_filename,
-                  flac_filename,
-                  no_action=no_action,
-                  disc_title=level2,
-                  tracknum=tracknum,
-                  track_title=recording.title,
-                  track_artists=artist_credit,
-              )
+              fmt_dirpath = dirname(fmt_filename)
+              no_action or needdir(fmt_dirpath, use_makedirs=True)
+              fstags[fmt_dirpath].update(disc_fstags)
+              if fmt == 'wav':
+                # rip from CD
+                argv = rip_to_wav(
+                    device, tracknum, fmt_filename, no_action=no_action
+                )
+              else:
+                # use ffmpeg to convert from the WAV file
+                wav_filename = fmtpath('wav', 'wav')
+                with atomic_filename(fmt_filename, placeholder=True) as T:
+                  argv = ffconvert(
+                      wav_filename,
+                      dstpath=T.name,
+                      dstfmt=fmt,
+                      acodec=acodec,
+                      doit=not no_action,
+                      metadata=ffmetadata,
+                      overwrite=True,
+                  )
+                  print("CONVERTED:", *argv)
             if no_action:
-              print("fstags[%r].update(%s)" % (flac_filename, track_fstags))
+              print("fstags[%r].update(%s)" % (fmt_filename, track_fstags))
             else:
-              fstags[flac_filename].conversion_command = argv
-              fstags[flac_filename].update(track_fstags)
-        if 'aac' in audio_outputs:
-          with Pfx(shortpath(aac_filename)):
-            if existspath(aac_filename):
-              warning("AAC file already exists, skipping track")
-            else:
-              aac_dirpath = dirname(aac_filename)
-              no_action or needdir(aac_dirpath, use_makedirs=True)
-              fstags[aac_dirpath].update(disc_fstags)
-              argv = wav_to_aac(
-                  wav_filename,
-                  aac_filename,
-                  no_action=no_action,
-                  disc_title=level2,
-                  tracknum=tracknum,
-                  track_title=recording.title,
-                  track_artists=artist_credit,
-              )
-            if no_action:
-              print("fstags[%r].update(%s)" % (aac_filename, track_fstags))
-            else:
-              fstags[aac_filename].conversion_command = argv
-              fstags[aac_filename].update(track_fstags)
-        if 'mp3' in audio_outputs:
-          if existspath(mp3_filename):
-            warning("MP3 file already exists, skipping track")
-          else:
-            mp3_dirpath = dirname(mp3_filename)
-            no_action or needdir(mp3_dirpath, use_makedirs=True)
-            fstags[mp3_dirpath].update(disc_fstags)
-            argv = wav_to_mp3(
-                wav_filename,
-                mp3_filename,
-                no_action=no_action,
-                disc_title=level2,
-                tracknum=tracknum,
-                track_title=recording.title,
-                track_artists=artist_credit,
-            )
-            if no_action:
-              print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
-            else:
-              fstags[mp3_filename].conversion_command = argv
-              fstags[mp3_filename].update(track_fstags)
+              fstags[fmt_filename].conversion_command = argv
+              fstags[fmt_filename].update(track_fstags)
 
 def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   ''' Rip a track from the CDROM device to a WAV file.
@@ -616,6 +571,12 @@ def wav_to_aac(
         '-i',
         wav_filename,
         # TODO: metadata options here
+        '-metadata',
+        f'title={track_title}',
+        '-metadata',
+        f'author={track_artists}',
+        '-metadata',
+        f'track={tracknum}',
         T.name,
     ]
     run(argv, doit=not no_action, quiet=False, check=True)
