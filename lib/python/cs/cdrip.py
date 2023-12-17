@@ -691,7 +691,7 @@ class _MBTagSet(SQLTagSet):
       try:
         mb_result = self[self.MB_QUERY_RESULT_TAG_NAME]
       except KeyError as e:
-        raise RuntimeError(f'no {self.MB_QUERY_RESULT_TAG_NAME}: {e}') from e
+        raise AttributeError(f'no {self.MB_QUERY_RESULT_TAG_NAME}: {e}') from e
     typename, db_id = self.name.split('.', 1)
     self.sqltags.mbdb.apply_dict(typename, db_id, mb_result, seen=set())
     return mb_result
