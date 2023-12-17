@@ -39,8 +39,9 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs, stack_signals
 from cs.deco import cachedmethod, fmtdoc
+from cs.ffmpegutils import ffmpeg_docker, convert as ffconvert, MetaData as FFMetaData
 from cs.fileutils import atomic_filename
-from cs.fs import needdir
+from cs.fs import needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import cutsuffix, is_identifier, r
 from cs.logutils import error, warning, info, debug
@@ -476,6 +477,7 @@ def rip(
             track=tracknum
         )
         track_artists = recording.artist_credit
+        # filesystem paths
         track_base = f"{tracknum:02} - {recording.title} -- {track_artists}".replace(
             os.sep, '-'
         )
@@ -836,6 +838,7 @@ class MBDisc(_MBTagSet):
 
   @property
   def medium_position(self):
+    '''The position of this recording's medium eg disc 1 of 2.'''
     release_entry = self.release.query_result
     discid = self.discid
     for medium in release_entry['medium-list']:
@@ -850,6 +853,7 @@ class MBDisc(_MBTagSet):
   @property
   @pfx_method
   def artist_names(self):
+    '''A list of the artist names.'''
     names = []
     for artist_ref in self.release.artist:
       with Pfx("artist_ref %s", r(artist_ref)):
@@ -867,17 +871,19 @@ class MBDisc(_MBTagSet):
 
   @property
   def discid(self):
+    '''The disc id.'''
     return self.query_result['id']
 
   @property
   def title(self):
+    '''The release title.'''
     return self.release.title
 
   @property
   def recordings(self):
     ''' Return an iterable of `MBRecording` instances.
     '''
-    discid = self.mbkey
+    discid = self.mbkey  # pylint: disable=redefined-outer-name
     release = self.release_list[0]
     for track_rec in self.release_list[0]['medium-list'][0]['track-list']:
       recording = self.resolve_id('recording', track_rec['recording']['id'])
@@ -1053,7 +1059,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       record_key=None,
       no_apply=False,
       **getter_kw
-  ):
+  ) -> dict:
     ''' Fetch data from the Musicbrainz API.
     '''
     logged_in = False
@@ -1071,7 +1077,6 @@ class MBDB(MultiOpenMixin, RunStateMixin):
           )
       )
       return {}
-      ##raise
     if includes is None:
       try:
         includes = self.QUERY_TYPENAME_INCLUDES[typename]
@@ -1102,19 +1107,10 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     warning(
         "QUERY typename=%r db_id=%r includes=%r ...", typename, db_id, includes
     )
-    1 or X(
-        "QUERY: %s(%s,includes=%r,**getter_kw=%r) ...",
-        getter_name,
-        r(db_id),
-        includes,
-        getter_kw,
-    )
-    ##X("TYPENAME = %r, id_name = %r", typename, id_name)
     if typename == 'releases':
       try:
         UUID(db_id)
       except ValueError as e:
-        ##X("GETTING DISC %r - not a UUID (%s), using unchanged", db_id, e)
         pass
       else:
         raise RuntimeError(
@@ -1131,7 +1127,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       warning("help(%s):\n%s", getter_name, getter.__doc__)
       help(getter)
       raise
-      return {}
+      ##return {}
     if record_key in mb_info:
       other_keys = sorted(k for k in mb_info.keys() if k != record_key)
       if other_keys:
@@ -1228,7 +1224,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
                 if recurse < 1:
                   break
               else:
-                raise TypeError("wrong type for recurse %s", r(recurse))
+                raise TypeError(f'wrong type for recurse {r(recurse)}')
         return te0[te0.MB_QUERY_RESULT_TAG_NAME]
 
   @classmethod
@@ -1279,6 +1275,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       return
     seen.add(sig)
     if get_te is None:
+      # pylint: disable=unnecessary-lambda-assignment
       get_te = lambda type_name, id: self.sqltags[f"{type_name}.{id}"]
     if 'id' in d:
       assert d['id'] == id, "id=%s but d['id']=%s" % (r(id), r(d['id']))
@@ -1326,15 +1323,10 @@ class MBDB(MultiOpenMixin, RunStateMixin):
           v = self._fold_value(k_type_name, v, get_te=get_te, q=q, seen=seen)
           # apply the folded value
           te.set(tag_name, v)
-        elif tag_value == v:
-          pass
-    ##X("check counts: %r",counts)
     for k, c in counts.items():
       with Pfx("counts[%r]=%d", k, c):
         if k in te:
           assert len(te[k]) == c
-        ##else:
-        ##  X("  no te[%r], not checking count %r",k,c)
 
   @typechecked
   def _fold_value(
@@ -1407,7 +1399,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         If `q` is not `None`, queue `get_te(type_name, id)` for processing
         by the enclosing `refresh()`.
     '''
-    id = d['id']
+    id = d['id']  # pylint: disable=redefined-builtin
     assert isinstance(id, str) and id, (
         "expected d['id'] to be a nonempty string, got: %s" % (r(id),)
     )
