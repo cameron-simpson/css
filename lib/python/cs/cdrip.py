@@ -79,6 +79,15 @@ class CDRipCommand(BaseCommand):
 
   GETOPT_SPEC = 'd:D:fM:'
 
+  USAGE_KEYWORDS = {
+      'CDRIP_DEV_ENVVAR': CDRIP_DEV_ENVVAR,
+      'CDRIP_DEV_DEFAULT': CDRIP_DEV_DEFAULT,
+      'CDRIP_DIR_ENVVAR': CDRIP_DIR_ENVVAR,
+      'CDRIP_DIR_DEFAULT': CDRIP_DIR_DEFAULT,
+      'MBDB_PATH_ENVVAR': MBDB_PATH_ENVVAR,
+      'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
+  }
+
   USAGE_FORMAT = r'''Usage: {cmd} [options...] subcommand...
     -d output_dir Specify the output directory path.
     -D device     Device to access. This may be omitted or "default" or
@@ -93,15 +102,6 @@ class CDRipCommand(BaseCommand):
                          default {CDRIP_DIR_DEFAULT}.
     {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
                          default {MBDB_PATH_DEFAULT}.'''
-
-  USAGE_KEYWORDS = {
-      'CDRIP_DEV_ENVVAR': CDRIP_DEV_ENVVAR,
-      'CDRIP_DEV_DEFAULT': CDRIP_DEV_DEFAULT,
-      'CDRIP_DIR_ENVVAR': CDRIP_DIR_ENVVAR,
-      'CDRIP_DIR_DEFAULT': CDRIP_DIR_DEFAULT,
-      'MBDB_PATH_ENVVAR': MBDB_PATH_ENVVAR,
-      'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
-  }
 
   SUBCOMMAND_ARGV_DEFAULT = 'rip'
 
