@@ -962,8 +962,8 @@ class DataDir(FilesDir):
         return []
       raise
     return [
-        filename for filename in pfx_listdir(self.datapath) if
-        not filename.startswith('.') and filename.endswith(DATAFILE_DOT_EXT)
+        filename for filename in listing if
+        (filename.endswith(DATAFILE_DOT_EXT) and not filename.startswith('.'))
     ]
 
   def _monitor_datafiles(self):
