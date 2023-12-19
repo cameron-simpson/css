@@ -38,14 +38,15 @@ from cs.lex import (
     r,
     stripped_dedent,
 )
-from cs.logutils import setup_logging, warning, exception
+from cs.logutils import setup_logging, warning, error, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState, uses_runstate
+from cs.result import CancellationError
 from cs.typingutils import subtype
 from cs.upd import Upd
 
-__version__ = '20230703-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -280,6 +281,7 @@ class BaseCommandOptions:
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
+  runstate: Optional[RunState] = None
   verbose: bool = False
 
   def copy(self, **updates):
@@ -369,10 +371,10 @@ class BaseCommand:
       Modules which implement a command line mode generally look like this:
 
           ... imports etc ...
-          def main(argv=None):
+          def main(argv=None, **run_kw):
               """ The command line mode.
               """
-              return MyCommand(argv).run()
+              return MyCommand(argv).run(**run_kw)
           ... other code ...
           class MyCommand(BaseCommand):
           ... other code ...
@@ -1098,7 +1100,11 @@ class BaseCommand:
     try:
       with stackattrs(options, **kw_options):
         with self.run_context():
-          return self._run(self._subcmd, self, self._argv)
+          try:
+            return self._run(self._subcmd, self, self._argv)
+          except CancellationError:
+            error("cancelled")
+            return 1
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
@@ -1331,4 +1337,6 @@ class BaseCommandCmd(Cmd):
           return self._doarg(subcmd, arg)
 
         return do_cmdsub
+      if subcmd in ('EOF', 'exit', 'quit'):
+        return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))

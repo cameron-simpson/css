@@ -43,7 +43,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20230401-post'
+__version__ = '20231018-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -180,7 +180,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
 # convenience alias
 s = typed_str
 
-def typed_repr(o, use_cls=False, max_length=None):
+def typed_repr(o, max_length=None, *, use_cls=False):
   ''' Like `typed_str` but using `repr` instead of `str`.
       This is available as both `typed_repr` and `r`.
   '''
@@ -592,6 +592,13 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   return get_identifier(
       s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras
   )
+
+def is_uc_identifier(s, offset=0, **kw):
+  ''' Test if the string `s` is an uppercase identifier
+      from position `offset` (default `0`) onward.
+  '''
+  s2, offset2 = get_uc_identifier(s, offset=offset, **kw)
+  return s2 and offset2 == len(s)
 
 # pylint: disable=redefined-outer-name
 def get_dotted_identifier(s, offset=0, **kw):

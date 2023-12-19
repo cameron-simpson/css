@@ -225,6 +225,7 @@ class PlayOnCommand(BaseCommand):
           -n        No download. List the specified recordings.
     '''
     options = self.options
+    runstate = options.runstate
     sqltags = options.sqltags
     dl_jobs = DEFAULT_DL_PARALLELISM
     no_download = False
@@ -251,12 +252,12 @@ class PlayOnCommand(BaseCommand):
         with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
-              filename.lower().replace(' - ', '--')
-              .replace(' ', '-').replace('_', ':').replace(os.sep, ':') + '.'
+              filename.lower().replace(' - ', '--').replace(' ', '-')
+              .replace('_', ':').replace(os.sep, ':') + '.'
           )
           filename = re.sub('---+', '--', filename)
           try:
-            api.download(dl_id, filename=filename)
+            api.download(dl_id, filename=filename, runstate=runstate)
           except ValueError as e:
             warning("download fails: %s", e)
             return None
@@ -359,7 +360,7 @@ class PlayOnCommand(BaseCommand):
           warning("no recording ids")
           xit = 1
           continue
-        for dl_id in recording_ids:
+        for dl_id in sorted(recording_ids):
           recording = sqltags[dl_id]
           with Pfx(recording.name):
             recording.ls(ls_format=listing_format, long_mode=long_mode)
@@ -545,13 +546,13 @@ class Recording(SQLTagSet):
     parts = []
     if self.playon.Series:
       parts.append(self.playon.Series)
-    se_parts = []
-    if self.playon.Season is not None:
-      se_parts.append(f's{self.playon.Season:02d}')
-    if self.playon.Episode:
-      se_parts.append(f'e{self.playon.Episode:02d}')
-    if se_parts:
-      parts.append(''.join(se_parts))
+      se_parts = []
+      if self.playon.get('Season'):
+        se_parts.append(f's{self.playon.Season:02d}')
+      if self.playon.get('Episode'):
+        se_parts.append(f'e{self.playon.Episode:02d}')
+      if se_parts:
+        parts.append(''.join(se_parts))
     if not parts:
       return ''
     return sep.join(parts) + sep
@@ -560,12 +561,12 @@ class Recording(SQLTagSet):
   def series_episode_name(self):
     name = self.playon.Name
     name = name.strip()
-    if self.playon.Season is not None:
+    if self.playon.get('Season'):
       spfx, n, offset = get_prefix_n(name, 's', n=self.playon.Season)
       if spfx is not None:
         assert name.startswith(f's{self.playon.Season:02d}')
         name = name[offset:]
-    if self.playon.Episode is not None:
+    if self.playon.get('Episode'):
       epfx, n, offset = get_prefix_n(name, 'e', n=self.playon.Episode)
       if epfx is not None:
         assert name.startswith(f'e{self.playon.Episode:02d}')
@@ -596,7 +597,7 @@ class Recording(SQLTagSet):
         based on the presence of a `download_path` `Tag`
         or a true `downloaded` `Tag`.
     '''
-    return self.download_path is not None or 'downloaded' in self
+    return self.get('download_path') is not None or 'downloaded' in self
 
   @format_attribute
   def is_pending(self):
@@ -1064,8 +1065,7 @@ class PlayOnAPI(HTTPServiceAPI):
           dl_url, auth=RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with pfx_call(atomic_filename, filename, mode='wb',
-                    placeholder=True) as f:
+      with pfx_call(atomic_filename, filename, mode='wb') as f:
         for chunk in progressbar(
             dl_rsp.iter_content(chunk_size=131072),
             label=filename,

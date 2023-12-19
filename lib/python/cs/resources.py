@@ -24,9 +24,10 @@ from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
+from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20230503-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -686,6 +687,23 @@ class RunState(HasThreadState):
     ''' Set the .cancelled attribute.
     '''
     self._cancelled = cancel_status
+
+  def raiseif(self, msg=None, *a):
+    ''' Raise `CancellationError` is cancelled.
+
+        Example:
+
+            for item in items:
+                runstate.raiseif()
+                ... process item ...
+    '''
+    if self.cancelled:
+      if msg is None:
+        msg = "%s.cancelled" % (self,)
+      else:
+        if a:
+          msg = msg % a
+      raise CancellationError(msg)
 
   @property
   def running(self):

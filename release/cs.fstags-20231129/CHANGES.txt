@@ -1,0 +1,2 @@
+lib/python/cs/fstags.py: cs.fstags,tagset,sqltags: put @typechecked after @require
+lib/python/cs/fstags.py: cs.fstags: FSTags.startup_shutdown: run self.sync() in a finally clause

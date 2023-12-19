@@ -727,6 +727,11 @@ class CornuCopyBuffer(Promotable):
       return taken[0]
     return b''.join(taken)
 
+  def read1(self, size):
+    ''' Shorthand method for `self.read(size,one_fetch=True)`.
+    '''
+    return self.read(size, one_fetch=True)
+
   def byte0(self):
     ''' Consume the leading byte and return it as an `int` (`0`..`255`).
     '''
