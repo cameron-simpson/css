@@ -862,16 +862,22 @@ class VTCmd(BaseCommand):
             raise
         T = None
         try:
-          T = mount(
-              mountpoint,
-              E,
-              S=mount_store,
-              archive=archive,
-              subpath=subpath,
-              readonly=readonly,
-              append_only=append_only,
-              fsname=fsname
-          )
+          # try catching SIGUSR1 to unmount
+          with self.options.runstate.catch_signal(
+              (SIGUSR1,),
+              call_previous=False,
+              handle_signal=lambda *_: runstate.cancel(),
+          ):
+            T = mount(
+                mountpoint,
+                E,
+                S=mount_store,
+                archive=archive,
+                subpath=subpath,
+                readonly=readonly,
+                append_only=append_only,
+                fsname=fsname,
+            )
         except KeyboardInterrupt:
           error("keyboard interrupt, unmounting %r", mountpoint)
           xit = umount(mountpoint)
