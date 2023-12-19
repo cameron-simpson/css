@@ -24,7 +24,7 @@ from os.path import (
     isfile as isfilepath,
 )
 import shutil
-from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
+from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM, SIGUSR1
 from stat import S_ISREG
 import sys
 from typing import Mapping, Optional, Union
@@ -41,9 +41,10 @@ from cs.logutils import (exception, error, warning, track, info, debug, logTo)
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar, Progress
 from cs.py.modules import import_extra
+from cs.resources import RunState, uses_runstate
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import print  # pylint: disable=redefined-builtin
+from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
 from . import (
     DISTINFO,
@@ -730,6 +731,8 @@ class VTCmd(BaseCommand):
           -o options    Mount options: append, readonly.
           -r            Read only, synonym for "-o readonly".
     '''
+    options = self.options
+    runstate = options.runstate
     try:
       from .fuse import mount, umount
     except ImportError as e:
@@ -774,7 +777,7 @@ class VTCmd(BaseCommand):
       with Pfx("special %r", special):
         try:
           fsname, readonly, special_store, specialD, special_basename, archive = \
-              self.options.config.parse_special(special, readonly)
+              options.config.parse_special(special, readonly)
         except ValueError as e:
           error("invalid: %s", e)
           badopts = True
@@ -866,7 +869,7 @@ class VTCmd(BaseCommand):
         T = None
         try:
           # try catching SIGUSR1 to unmount
-          with self.options.runstate.catch_signal(
+          with runstate.catch_signal(
               (SIGUSR1,),
               call_previous=False,
               handle_signal=lambda *_: runstate.cancel(),
