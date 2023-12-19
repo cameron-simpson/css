@@ -95,7 +95,7 @@ from cs.threads import locked, bg as bg_thread, joinif
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
 from cs.upd import with_upd_proxy, UpdProxy, uses_upd
 
-from . import MAX_FILE_SIZE, Lock, RLock, Store, run_modes
+from . import MAX_FILE_SIZE, Lock, RLock, Store, run_modes, uses_Store
 from .archive import Archive
 from .block import Block
 from .blockify import (
@@ -1012,6 +1012,10 @@ class DataDir(FilesDir):
               info("skip nonfile")
               continue
           if new_size > DFstate.scanned_to:
+            warning(
+                "%s: new_size:%d > DFstate.scanned_to:%d", DFstate, new_size,
+                DFstate.scanned_to
+            )
             offset = DFstate.scanned_to
             hashclass = self.hashclass
             scanner = DFstate.scanfrom(offset=offset)
@@ -1575,6 +1579,13 @@ class DataDirCommand(BaseCommand):
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
     self.options.datadir.initdir()
+
+  def cmd_test(self, argv):
+    ''' Usage: {cmd} [selftest-args...]
+          Run the DataDir unit tests.
+    '''
+    from .datadir_tests import selftest
+    selftest([self.options.cmd] + argv)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
