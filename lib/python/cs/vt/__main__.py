@@ -60,6 +60,7 @@ from .blockify import (
 from .compose import get_store_spec
 from .config import Config
 from .convert import expand_path
+from .datadir import DataDirCommand
 from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
 from .dir import Dir, FileDirent
@@ -532,6 +533,8 @@ class VTCmd(BaseCommand):
         else:
           warning("unsupported file type: %r", path)
     return xit
+
+  cmd_datadir = DataDirCommand
 
   def cmd_fsck(self, argv):
     ''' Usage: {cmd} objects...
