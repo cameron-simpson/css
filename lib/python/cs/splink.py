@@ -918,7 +918,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
               dataset = dsinfo.dataset
               with Pfx(rdspath):
                 dstags = fstags[dspath]
-                if not force and dstags.imported:
+                if not force and dstags.get('imported'):
                   ##print('already imported {short_dspath}')
                   continue
                 if dataset in spd.TIMESERIES_DATASETS:
