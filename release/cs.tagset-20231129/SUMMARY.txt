@@ -1,0 +1,3 @@
+TagSet.__getattr__: rework the attribute lookup with greater precision.
+TagSetPrefixView.__getattr__: if the attribute is not there, raise Attribute error, do not try to fall back to something else.
+TagSet: drop ATTRABLE_MAPPING_DEFAULT=None, caused far more confusion that it was worth.

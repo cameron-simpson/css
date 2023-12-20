@@ -55,6 +55,9 @@ DISTINFO = {
     'install_requires': [
         'cs.binary',
         'cs.buffer',
+        'cs.deco',
+        'cs.progress',
+        'cs.units',
         'cs.excutils',
         'cs.later',
         'cs.logutils',
@@ -65,6 +68,7 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
+        'icontract',
     ]
 }
 
@@ -174,9 +178,8 @@ class PacketConnection(object):
 
         Parameters:
         * `recv`: inbound binary stream.
-          If this is an `int` it is taken to be an OS file descriptor,
-          otherwise it should be a `cs.buffer.CornuCopyBuffer`
-          or a file like object with a `read1` or `read` method.
+          This value is automatically promoted to a `cs.buffer.CornuCopyBuffer`
+          by the `CornuCopyBuffer.promote` method.
         * `recv_len_func`: optional function to compute the data
           length of a received packet; the default watches the offset
           on the receive stream
@@ -223,16 +226,16 @@ class PacketConnection(object):
     if packet_grace is None:
       packet_grace = DEFAULT_PACKET_GRACE
     if tick is None:
-      tick = lambda bs: None
+      tick = lambda bs: None  # pylint: disable=unnecessary-lambda-assignment
     elif isinstance(tick, bool):
       if tick:
         tick = tick_fd_2
       else:
-        tick = lambda bs: None
+        tick = lambda bs: None  # pylint: disable=unnecessary-lambda-assignment
     self._recv_last_offset = 0
     if recv_len_func is None:
 
-      def recv_len_func(pk):
+      def recv_len_func(_):
         ''' The default length of a packet is the length of the _recv.offset change.
         '''
         new_offset = self._recv.offset
@@ -244,7 +247,7 @@ class PacketConnection(object):
     self._send_last_offset = 0
     if send_len_func is None:
 
-      def send_len_func(pk):
+      def send_len_func(_):
         ''' The default length of a packet is the length of the _send.offset change.
         '''
         new_offset = self._send.offset
@@ -362,8 +365,8 @@ class PacketConnection(object):
     channel_info = pending[channel]
     if tag not in channel_info:
       raise ValueError("tag %d unknown in channel %d" % (tag, channel))
-    if False and tag == 15:
-      raise RuntimeError("BANG")
+    ##if False and tag == 15:
+    ##  raise RuntimeError("BANG")
     return channel_info.pop(tag)
 
   def _pending_cancel(self):
@@ -521,7 +524,7 @@ class PacketConnection(object):
   def _receive_loop(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
-    XX = self.tick
+    ##XX = self.tick
     for packet in progressbar(
         Packet.scan(self._recv),
         label=f'<= {self.name}',
@@ -616,7 +619,6 @@ class PacketConnection(object):
         Flush whenever the queue is empty.
     '''
     ##XX = self.tick
-    ##with Pfx("%s._send", self):
     with PrePfx("_SEND [%s]", self):
       with post_condition(("_send is None", lambda: self._send is None)):
         fp = self._send

@@ -1,0 +1,1 @@
+BinaryMultiStruct.parse: promote the buffer arguments to a CornuCopyBuffer.

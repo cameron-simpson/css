@@ -31,7 +31,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20230612-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'description':
@@ -1022,8 +1022,9 @@ class AttrableMappingMixin(object):
     try:
       return self[attr]
     except KeyError:
+      cls = type(self)
       try:
-        return self.ATTRABLE_MAPPING_DEFAULT
+        return cls.ATTRABLE_MAPPING_DEFAULT
       except AttributeError:
         names_msgs = []
         ks = list(self.keys())

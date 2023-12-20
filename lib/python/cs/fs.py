@@ -28,9 +28,9 @@ from icontract import require
 
 from cs.deco import decorator
 from cs.obj import SingletonMixin
-from cs.pfx import pfx_call
+from cs.pfx import pfx, pfx_call
 
-__version__ = '20230806-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -116,8 +116,7 @@ def atomic_directory(infill_func, make_placeholder=False):
       if remove_placeholder and isdirpath(dirpath):
         pfx_rmdir(dirpath)
       raise
-    else:
-      return result
+    return result
 
   return atomic_directory_wrapper
 
@@ -175,16 +174,24 @@ class HasFSPath:
     except AttributeError:
       return "<no-fspath>"
 
-  @require(lambda subpath: not isabspath(subpath))
-  def pathto(self, subpath):
-    ''' The full path to `subpath`, a relative path below `self.fspath`.
+  @require(lambda subpaths: len(subpaths) > 0)
+  @require(lambda subpaths: not any(map(isabspath, subpaths)))
+  def pathto(self, *subpaths):
+    ''' The full path to `subpaths`, comprising a relative path
+        below `self.fspath`.
+        This is a shim for `os.path.join` which requires that all
+        the `subpaths` be relative paths.
     '''
-    return joinpath(self.fspath, subpath)
+    return joinpath(self.fspath, *subpaths)
 
   def fnmatch(self, fnglob):
     ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
     '''
     return fnmatchdir(self.fspath, fnglob)
+
+  def listdir(self):
+    ''' Return `os.listdir(self.fspath)`. '''
+    return os.listdir(self.fspath)
 
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
@@ -193,9 +200,9 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   @classmethod
   def _resolve_fspath(
       cls,
-      fspath: Optional[str],
+      fspath: Optional[str] = None,
       envvar: Optional[str] = None,
-      default_attr=None
+      default_attr: str = 'FSPATH_DEFAULT'
   ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
 
@@ -206,6 +213,10 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
           the default for this comes from `cls.FSPATH_ENVVAR` if defined
         * `default_attr`: the class attribute containing the default `fspath`
           if defined and there is no environment variable for `envvar`
+
+        The `default_attr` value may be either a `str`, in which
+        case `os.path.expanduser` is called on it`, or a callable
+        returning a filesystem path.
 
         The common mode is where each instance might have an arbitrary path,
         such as a `TagFile`.
@@ -221,18 +232,21 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         fspath = os.environ.get(envvar)
         if fspath is not None:
           return realpath(fspath)
-      if default_attr is None:
-        default_attr = 'FSPATH_DEFAULT'
-      defaultpath = getattr(cls, default_attr, None)
-      if defaultpath is not None:
-        return realpath(expanduser(defaultpath))
+      default = getattr(cls, default_attr, None)
+      if default is not None:
+        if callable(default):
+          fspath = default()
+        else:
+          fspath = expanduser(default)
+        if fspath is not None:
+          return realpath(fspath)
       raise ValueError(
-          "_resolve_fspath: fspath=None and no %s no %s.%s" % (
+          "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
               (
                   cls.__name__ + '.FSPATH_ENVVAR' if envvar is None else '$' +
                   envvar
               ),
-              cls.name,
+              cls.__name__,
               default_attr,
           )
       )
@@ -297,8 +311,12 @@ def longpath(path, prefixes=None):
   path = expandvars(path)
   return path
 
-def is_clean_subpath(subpath: str):
-  ''' Test that `subpath` is clean:
+@pfx
+def validate_rpath(rpath: str):
+  ''' Test that `rpath` is a clean relative path with no funny business;
+      raise `ValueError` if the test fails.
+
+      Tests:
       - not empty or '.' or '..'
       - not an absolute path
       - normalised
@@ -306,13 +324,30 @@ def is_clean_subpath(subpath: str):
 
       Examples:
 
-          >>> is_clean_subpath('')
+          >>> validate_rpath('')
           False
-          >>> is_clean_subpath('.')
+          >>> validate_rpath('.')
   '''
-  if subpath in ('', '.', '..'):
+  if not rpath:
+    raise ValueError('empty path')
+  if rpath in ('.', '..'):
+    raise ValueError('may not be . or ..')
+  if isabspath(rpath):
+    raise ValueError('absolute path')
+  if rpath != normpath(rpath):
+    raise ValueError('!= normpath(rpath)')
+  if rpath.startswith('../'):
+    raise ValueError('goes up')
+
+def is_valid_rpath(rpath, log=None) -> bool:
+  ''' Test that `rpath` is a clean relative path with no funny business.
+
+      This is a Boolean wrapper for `validate_rpath()`.
+  '''
+  try:
+    validate_rpath(rpath)
+  except ValueError as e:
+    if log is not None:
+      log("invalid: %s", e)
     return False
-  if isabspath(subpath):
-    return False
-  normalised = normpath(subpath)
-  return subpath == normalised and not normalised.startswith('../')
+  return True

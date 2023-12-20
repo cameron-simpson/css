@@ -956,11 +956,16 @@ class Module:
     '''
     return self.vcs.pkg_tagsets[self.name]
 
+  def feature_map(self):
+    ''' Return a `dict` mapping package names to features.
+    '''
+    return dict(self.pkg_tags.get('features', {}))
+
   @pfx_method
   def named_features(self):
     ''' Return a set containing all the feature names in use by this `Module`.
     '''
-    feature_map = self.pkg_tags.features or {}
+    feature_map = self.feature_map()
     all_feature_names = set()
     for feature_names in feature_map.values():
       for feature_name in feature_names:
@@ -974,7 +979,7 @@ class Module:
   def set_feature(self, feature_name: str, release_version: str):
     ''' Include `feature_name` in the features for release `release_version`.
     '''
-    feature_map = self.pkg_tags.features or {}
+    feature_map = self.feature_map()
     release_features = set(feature_map.get(release_version, []))
     release_features.add(feature_name)
     feature_map[release_version] = sorted(release_features)
@@ -989,7 +994,7 @@ class Module:
     ''' Yield `(release_version,feature_names)`
         for all releases mentioned in the `features` tag.
     '''
-    feature_map = self.pkg_tags.features or {}
+    feature_map = self.feature_map()
     yield from feature_map.items()
 
   @pfx_method(use_str=True)
@@ -1625,11 +1630,27 @@ class Module:
         or a mapping of required package name to its problems.
     '''
     problems = self._module_problems
+    # TODO": lru_cache?
     if problems is not None:
       return problems
     problems = self._module_problems = []
-    latest_ok_rev = self.pkg_tags.get('ok_revision')
+    # check for conflicts with third parties
+    allowed_conflicts = ('cs.resources',)
+    if self.name not in allowed_conflicts:
+      for third_party_listpath in glob('3rd-party-conflicts/*'):
+        with Pfx(third_party_listpath):
+          with open(third_party_listpath) as f:
+            for lineno, line in enumerate(f, 1):
+              with Pfx(lineno):
+                line = line.rstrip().replace('-', '_')
+                if not line or line.startswith('#'):
+                  continue
+                if self.name == line:
+                  problems.append(
+                      f'name conflicts with {third_party_listpath}:{lineno}: {line!r}'
+                  )
     # see if this package has been marked "ok" as of a particular revision
+    latest_ok_rev = self.pkg_tags.get('ok_revision')
     unreleased_logs = None
     if latest_ok_rev:
       post_ok_commits = list(self.log_since(vcstag=latest_ok_rev))

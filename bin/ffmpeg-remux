@@ -84,12 +84,12 @@ else
   fi
 fi
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
 ffprobe_output=$( ffprobe "$input" 2>&1 ) || {
   echo "$cmd: ffprobe $input: failure" >&2
   badopts=1
 }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 set -- -c copy ${1+"$@"}
 skip_streams=$(
