@@ -44,7 +44,9 @@ DISTINFO = {
         'cs.psutils',
         'cs.py.func',
         'cs.py.stack',
+        'cs.result',
         'cs.threads',
+        'typeguard',
     ],
 }
 
