@@ -65,6 +65,9 @@ CDRIP_DEV_DEFAULT = 'default'
 CDRIP_DIR_ENVVAR = 'CDRIP_DIR'
 CDRIP_DIR_DEFAULT = '~/var/cdrip'
 
+CDRIP_CODECS_ENVVAR = 'CDRIP_CODECS'
+CDRIP_CODECS_DEFAULT = 'wav,flac,aac,mp3'
+
 MBDB_PATH_ENVVAR = 'MUSICBRAINZ_SQLTAGS'
 MBDB_PATH_DEFAULT = '~/var/cache/mbdb.sqlite'
 
@@ -77,7 +80,7 @@ class CDRipCommand(BaseCommand):
   ''' 'cdrip' command line.
   '''
 
-  GETOPT_SPEC = 'd:D:fM:'
+  GETOPT_SPEC = 'd:D:fF:M:'
 
   USAGE_KEYWORDS = {
       'CDRIP_DEV_ENVVAR': CDRIP_DEV_ENVVAR,
@@ -117,6 +120,15 @@ class CDRipCommand(BaseCommand):
         expanduser(CDRIP_DIR_DEFAULT)
     )
     mbdb_path: Optional[str] = None
+    codecs_spec: str = field(
+        default_factory=lambda: os.environ.
+        get(CDRIP_CODECS_ENVVAR, CDRIP_CODECS_DEFAULT)
+    )
+
+    @property
+    def codecs(self) -> List[str]:
+      '''A list of the codec names to produce.'''
+      return self.codecs_spec.replace(',', ' ').split()
 
   def apply_opts(self, opts):
     ''' Apply the command line options.
@@ -132,6 +144,8 @@ class CDRipCommand(BaseCommand):
           options.force = True
         elif opt == '-M':
           options.mbdb_path = val
+        elif opt == 'F:':
+          options.codecs_spec = val
         else:
           raise GetoptError("unimplemented option")
     if not isdirpath(options.dirpath):
@@ -283,18 +297,17 @@ class CDRipCommand(BaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_rip(self, argv):
-    ''' Usage: {cmd} [-n] [disc_id]
+    ''' Usage: {cmd} [-F codecs] [-n] [disc_id]
           Pull the audio into a subdirectory of the current directory.
-          -n  No action; recite planned actions.
+          -F codecs Specify the formats/codecs to produce.
+          -n        No action; recite planned actions.
     '''
     options = self.options
     fstags = options.fstags
     dirpath = options.dirpath
     no_action = False
     disc_id = None
-    if argv and argv[0] == '-n':
-      no_action = True
-      argv.pop(0)
+    self.popopts(argv, attrfor=options, F_='codecs_spec', n='dry_run')
     if argv:
       disc_id = argv.pop(0)
     if argv:
@@ -304,6 +317,7 @@ class CDRipCommand(BaseCommand):
           self.device_id,
           options.mbdb,
           output_dirpath=dirpath,
+          audio_outputs=options.codecs,
           disc_id=disc_id,
           fstags=fstags,
           no_action=no_action,
