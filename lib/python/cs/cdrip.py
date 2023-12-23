@@ -14,6 +14,7 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import cache, cached_property
 from getopt import getopt, GetoptError
 import os
 from os.path import (
@@ -27,7 +28,7 @@ from pprint import pformat, pprint
 from signal import SIGINT, SIGTERM
 import sys
 import time
-from typing import Optional, Union
+from typing import List, Optional, Union
 from uuid import UUID
 
 import discid
@@ -892,16 +893,6 @@ class MBDisc(_MBTagSet):
         else:
           names.append(name)
     return names
-
-  @property
-  def discid(self):
-    '''The disc id.'''
-    return self.query_result['id']
-
-  @property
-  def title(self):
-    '''The release title.'''
-    return self.release.title
 
   @property
   def recordings(self):
