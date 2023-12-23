@@ -835,8 +835,10 @@ class MBDisc(_MBTagSet):
   def release_list(self):
     return self.query_result['release-list']
 
+  @cached_property
   def releases(self):
-    ''' Generator yielding entries from `release_list` matching the `disc_id`. '''
+    ''' A cached list of entries from `release_list` matching the `disc_id`. '''
+    releases = []
     discid = self.mbkey
     for release_entry in self.release_list:
       for medium in release_entry['medium-list']:
@@ -846,18 +848,17 @@ class MBDisc(_MBTagSet):
             if release is None:
               warning("no release found for id %r", release)
             else:
-              yield release
+              releases.append(release)
+    return releases
 
-  @property
+  @cached_property
   def release(self):
-    ''' The first release of this disc found in the releases from Musicbrainz, or `None`.
+    ''' The first release containing this disc found in the releases from Musicbrainz, or `None`.
     '''
-    return list(self.releases())[-1]
-    try:
-      rel = next(self.releases())
-    except StopIteration:
+    releases = self.releases
+    if not releases:
       return None
-    return rel
+    return releases[0]
 
   @property
   def medium_position(self):
