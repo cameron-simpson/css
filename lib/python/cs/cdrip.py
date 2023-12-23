@@ -823,6 +823,15 @@ class MBDisc(_MBTagSet):
     return super().__getattr__(attr)
 
   @property
+  def discid(self):
+    '''The disc id.'''
+    return self.query_result['id']
+
+  @property
+  def title(self):
+    return self.medium_title or self.release['title']
+
+  @property
   def release_list(self):
     return self.query_result['release-list']
 
