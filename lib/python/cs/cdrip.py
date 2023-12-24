@@ -43,7 +43,7 @@ from cs.deco import cachedmethod, fmtdoc
 from cs.ffmpegutils import ffmpeg_docker, convert as ffconvert, MetaData as FFMetaData
 from cs.fileutils import atomic_filename
 from cs.fs import needdir, shortpath
-from cs.fstags import FSTags
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import cutsuffix, is_identifier, r
 from cs.logutils import error, warning, info, debug
 from cs.mappings import AttrableMapping
@@ -444,6 +444,7 @@ def pick(items, as_str=None):
           return items[i - 1]
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+@uses_fstags
 def rip(
     device,
     mbdb,
@@ -451,7 +452,7 @@ def rip(
     output_dirpath,
     disc_id=None,
     audio_outputs=('wav', 'flac', 'aac', 'mp3'),
-    fstags=None,
+    fstags: FSTags,
     no_action=False,
     split_by_codec=False,
 ):
