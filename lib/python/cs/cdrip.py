@@ -891,7 +891,7 @@ class MBRecording(_MBTagSet):
       if isinstance(art, str):
         arts.append(art)
       elif isinstance(art, dict):
-        artist = self.by_typed_id('artist', art['artist'])
+        artist = self.resolve_id('artist', art['artist'])
         assert isinstance(artist, MBArtist)
         arts.append(artist.name_)
     return arts
