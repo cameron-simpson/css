@@ -348,11 +348,13 @@ class CDRipCommand(BaseCommand):
         error("disc error: %s", e)
         return 1
       disc_id = dev_info.id
+      mb_toc = dev_info.toc_string
     else:
       dev_info = None
     with stackattrs(MB, dev_info=dev_info):
       with Pfx("discid %s", disc_id):
         disc = MB.discs[disc_id]
+        disc.mb_toc = mb_toc
         print(disc.title)
         print(", ".join(disc.artist_names))
         for tracknum, recording in enumerate(disc.recordings, 1):
@@ -460,11 +462,13 @@ def rip(
   if disc_id is None:
     dev_info = discid.read(device=device)
     disc_id = dev_info.id
-  if fstags is None:
-    fstags = FSTags()
+    mb_toc = dev_info.toc_string
+  else:
+    mb_toc = None
   with stackattrs(mbdb, dev_info=dev_info):
-    with Pfx("MB: discid %s", disc_id, print=True):
-      disc = mbdb.discs[disc_id]
+    disc = mbdb.discs[disc_id]
+    if mb_toc is not None:
+      disc.mb_toc = mb_toc
     release = disc.release
     title = disc.title or "UNTITLED"
     artist_credit = ", ".join(disc.artist_names or "NO_ARTISTS")
