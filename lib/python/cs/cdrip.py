@@ -875,7 +875,7 @@ class MBDisc(_MBTagSet):
     '''
     discid = self.mbkey  # pylint: disable=redefined-outer-name
     release = self.release_list[0]
-    for track_rec in self.release_list[0]['medium-list'][0]['track-list']:
+    for track_rec in self.medium['track-list']:
       recording = self.resolve_id('recording', track_rec['recording']['id'])
       yield recording
 
