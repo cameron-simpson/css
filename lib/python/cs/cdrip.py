@@ -679,30 +679,6 @@ class _MBTagSet(SQLTagSet):
   def __repr__(self):
     return "%s:%s:%r" % (type(self).__name__, self.name, self.as_dict())
 
-  def __getattr__(self, attr):
-    try:
-      return super().__getattr__(attr)
-    except AttributeError:
-      # no direct tag or other attribute, look in the MB query result
-      if not attr.startswith('_'):
-        mb_result = self.query_result
-        try:
-          value = mb_result[attr.replace('_', '-')]
-          return value
-        except KeyError as e:
-          warning(
-              "%r.__getattr__(%r): no %r[%r]:keys=%r: %s",
-              self.name,
-              attr,
-              self.MB_QUERY_RESULT_TAG_NAME,
-              attr.replace('_', '-'),
-              sorted(mb_result.keys()),
-              e,
-          )
-          pprint(dict(mb_result))
-    raise AttributeError(
-        "%s:%s: no .%s attribute" % (self.__class__.__name__, self.name, attr)
-    )
 
   @property
   def query_result(self):
