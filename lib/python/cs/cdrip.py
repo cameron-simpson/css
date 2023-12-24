@@ -748,8 +748,10 @@ class _MBTagSet(SQLTagSet):
 
   @require(lambda type_name: is_identifier(type_name))
   @typechecked
-  def by_typed_id(self, type_name: str, id: str, no_check_uuid=False):
-    ''' Fetch the object `{type_name}.{id}` and refresh it.
+  def resolve_id(
+      self, type_name: str, id: str, no_check_uuid=False
+  ) -> '_MBTagSet':
+    ''' Fetch the object `{type_name}.{id}`.
     '''
     if type_name == 'disc':
       try:
@@ -761,31 +763,6 @@ class _MBTagSet(SQLTagSet):
     te_name = f"{type_name}.{id}"
     te = self.sqltags[te_name]
     return te
-
-  @typechecked
-  def resolve_ids(self, type_name, ids: list, no_check_uuid=False):
-    ''' Resolve ids against a type.
-    '''
-    resolved = []
-    for item in ids:
-      with Pfx("resolve_ids(%r,...): %s", type_name, r(item)):
-        if isinstance(item, dict):
-          item_id = item[type_name]
-        else:
-          item_id = item
-        resolved.append(
-            self.by_typed_id(type_name, item_id, no_check_uuid=no_check_uuid)
-        )
-    return resolved
-
-  def resolve_id(self, type_name, objid, no_check_uuid=False):
-    ''' Resolve `objid` against a type, return the object or `None`.
-    '''
-    resolved = self.resolve_ids(
-        type_name, [objid], no_check_uuid=no_check_uuid
-    )
-    obj, = resolved
-    return obj
 
 class MBArtist(_MBTagSet):
   ''' A Musicbrainz artist entry.
