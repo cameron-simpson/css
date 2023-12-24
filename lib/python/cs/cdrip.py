@@ -459,15 +459,15 @@ def rip(
   '''
   if not isdirpath(output_dirpath):
     raise ValueError(f'not a directory: {output_dirpath!r}')
-  if disc_id is None:
-    dev_info = discid.read(device=device)
-    disc_id = dev_info.id
-    mb_toc = dev_info.toc_string
-  else:
-    mb_toc = None
+  dev_info = discid.read(device=device)
+  mb_toc = dev_info.toc_string
   with stackattrs(mbdb, dev_info=dev_info):
+    if disc_id is None:
+      disc_id = dev_info.id
+    elif disc_id != dev_info.id:
+      warning("disc_id:%r != dev_info.id:%r", disc_id, dev_info.id)
     disc = mbdb.discs[disc_id]
-    if mb_toc is not None:
+    if disc_id == dev_info.id:
       disc.mb_toc = mb_toc
     release = disc.release
     title = disc.title or "UNTITLED"
