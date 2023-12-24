@@ -1155,10 +1155,10 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         Return the query result of `te`.
     '''
     with run_task("refresh %s" % te.name) as proxy:
-      with Pfx("refresh(te=%s,...)", te.name):
-        te0 = te
-        q = ListQueue([te])
-        for te in unrepeated(q, signature=lambda te: te.name):
+      te0 = te
+      q = ListQueue([te])
+      for te in unrepeated(q, signature=lambda te: te.name):
+        with Pfx("refresh te=%s", te.name):
           if self.runstate.cancelled:
             break
           with proxy.extend_prefix(": " + te.name):
@@ -1170,41 +1170,43 @@ class MBDB(MultiOpenMixin, RunStateMixin):
               mbkey = te.mbkey
               if mbtype is None:
                 warning("no MBTYPE, not refreshing")
+                continue
+              q_result_tag = te.MB_QUERY_RESULT_TAG_NAME
+              q_time_tag = te.MB_QUERY_TIME_TAG_NAME
+              if (refetch or q_result_tag not in te or q_time_tag not in te
+                  or not te[q_result_tag]):
+                get_type = mbtype
+                id_name = 'id'
+                record_key = None
+                if mbtype == 'disc':
+                  # we use get_releases_by_discid() for discs
+                  get_type = 'releases'
+                  id_name = 'discid'
+                  record_key = 'disc'
+                with stackattrs(
+                    proxy,
+                    text=("query(%r,%r,...)" % (get_type, mbkey)),
+                ):
+                  try:
+                    A = self.query(
+                        get_type, mbkey, id_name, record_key=record_key
+                    )
+                  except (musicbrainzngs.musicbrainz.MusicBrainzError,
+                          musicbrainzngs.musicbrainz.ResponseError) as e:
+                    warning("%s: not refreshed: %s", type(e).__name__, e)
+                    raise
+                    ##A = te.get(te.MB_QUERY_RESULT_TAG_NAME, {})
+                  else:
+                    te[q_time_tag] = time.time()
+                    # record the full response data for forensics
+                    te[te.MB_QUERY_PREFIX + 'get_type'] = get_type
+                    ##te[te.MB_QUERY_PREFIX + 'includes'] = includes
+                    te[te.MB_QUERY_PREFIX + 'result'] = A
+                    self.sqltags.flush()
               else:
-                q_result_tag = te.MB_QUERY_RESULT_TAG_NAME
-                q_time_tag = te.MB_QUERY_TIME_TAG_NAME
-                if (refetch or q_result_tag not in te or q_time_tag not in te
-                    or not te[q_result_tag]):
-                  get_type = mbtype
-                  id_name = 'id'
-                  record_key = None
-                  if mbtype == 'disc':
-                    # we use get_releases_by_discid() for discs
-                    get_type = 'releases'
-                    id_name = 'discid'
-                    record_key = 'disc'
-                  with stackattrs(proxy, text=("query(%r,%r,...)" %
-                                               (get_type, mbkey))):
-                    try:
-                      A = self.query(
-                          get_type, mbkey, id_name, record_key=record_key
-                      )
-                    except (musicbrainzngs.musicbrainz.MusicBrainzError,
-                            musicbrainzngs.musicbrainz.ResponseError) as e:
-                      warning("%s: not refreshed: %s", type(e).__name__, e)
-                      ##raise
-                      A = te.get(te.MB_QUERY_RESULT_TAG_NAME, {})
-                    else:
-                      te[q_time_tag] = time.time()
-                      # record the full response data for forensics
-                      te[te.MB_QUERY_PREFIX + 'get_type'] = get_type
-                      ##te[te.MB_QUERY_PREFIX + 'includes'] = includes
-                      te[te.MB_QUERY_PREFIX + 'result'] = A
-                      self.sqltags.flush()
-                else:
-                  A = te[te.MB_QUERY_PREFIX + 'result']
-                ##self.apply_dict(mbtype, mbkey, A, seen=set())  # q=q
-                self.sqltags.flush()
+                A = te[te.MB_QUERY_PREFIX + 'result']
+              ##self.apply_dict(mbtype, mbkey, A, seen=set())  # q=q
+              self.sqltags.flush()
               # cap recursion
               if isinstance(recurse, bool):
                 if not recurse:
@@ -1215,7 +1217,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
                   break
               else:
                 raise TypeError(f'wrong type for recurse {r(recurse)}')
-        return te0[te0.MB_QUERY_RESULT_TAG_NAME]
+      return te0[te0.MB_QUERY_RESULT_TAG_NAME]
 
   @classmethod
   def key_type_name(cls, k):
