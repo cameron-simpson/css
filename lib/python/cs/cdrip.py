@@ -848,13 +848,15 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
 
   @cached_property
   def recordings(self):
-    ''' Return an iterable of `MBRecording` instances.
+    ''' Return a list of `MBRecording` instances.
     '''
+    recordings = []
     discid = self.mbkey  # pylint: disable=redefined-outer-name
     release = self.release_list[0]
     for track_rec in self.medium['track-list']:
       recording = self.resolve_id('recording', track_rec['recording']['id'])
-      yield recording
+      recordings.append(recording)
+    return recordings
 
   @require(
       lambda self, track_index:
