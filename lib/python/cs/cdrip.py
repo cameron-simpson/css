@@ -794,6 +794,10 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
       return None
     return releases[0]
 
+  @property
+  def release_title(self):
+    return self.release.title
+
   @cached_property
   def mb_info(self):
     ''' Salient data from the MusicbrainzNG API response.
@@ -808,6 +812,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
               disc_entry=disc_entry,
               disc_pos=pos,
               medium=medium,
+              medium_count=medium_count,
           )
     raise AttributeError(f'no medium+disc found for discid:{discid!r}')
 
@@ -817,9 +822,16 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     return self.mb_info.medium
 
   @property
-  def medium_position(self):
+  @typechecked
+  def medium_position(self) -> int:
     '''The position of this recording's medium eg disc 1 of 2.'''
     return int(self.medium['position'])
+
+  @property
+  @typechecked
+  def medium_count(self) -> int:
+    '''The position of this recording's medium eg disc 1 of 2.'''
+    return self.mb_info.medium_count
 
   @property
   def medium_title(self):
