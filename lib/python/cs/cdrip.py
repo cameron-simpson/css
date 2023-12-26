@@ -847,7 +847,34 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
       recording = self.resolve_id('recording', track_rec['recording']['id'])
       yield recording
 
-class MBRecording(_MBTagSet):
+  @require(
+      lambda self, track_index:
+      (track_index >= 0 and track_index < len(self.recordings))
+  )
+  @typechecked
+  def disc_track_tags(self, track_index: int) -> TagSet:
+    ''' Return a `TagSet` for track `tracknum` (counting from 0).
+    '''
+    disc_title = self.release_title
+    if self.medium_count > 1:
+      disc_title += f" ({self.medium_position} of {self.medium_count})"
+    if self.title != self.release_title:
+      disc_title += f' - {self.title}'
+    recording = self.recordings[track_index]
+    tags = TagSet(
+        disc_id=self.mbkey,
+        disc_artist_credit=self.artist_credit,
+        disc_title=disc_title,
+        disc_number=self.medium_position,
+        disc_total=self.medium_count,
+        track_number=track_index + 1,
+        track_total=int(self.medium['track-count']),
+        track_artist_credit=recording.artist_credit,
+        track_title=recording.title,
+    )
+    return tags
+
+class MBRecording(MBHasArtistsMixin, _MBTagSet):
   ''' A Musicbrainz recording entry.
   '''
 
