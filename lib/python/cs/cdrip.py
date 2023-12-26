@@ -656,7 +656,10 @@ class _MBTagSet(SQLTagSet):
   @require(lambda type_name: is_identifier(type_name))
   @typechecked
   def resolve_id(
-      self, type_name: str, id: str, no_check_uuid=False
+      self,
+      type_name: str,
+      id: Union[str, dict],
+      no_check_uuid=False,
   ) -> '_MBTagSet':
     ''' Fetch the object `{type_name}.{id}`.
     '''
