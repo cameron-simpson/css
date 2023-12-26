@@ -306,7 +306,6 @@ class CDRipCommand(BaseCommand):
     options = self.options
     fstags = options.fstags
     dirpath = options.dirpath
-    no_action = False
     disc_id = None
     self.popopts(argv, attrfor=options, F_='codecs_spec', n='dry_run')
     if argv:
@@ -321,7 +320,7 @@ class CDRipCommand(BaseCommand):
           audio_outputs=options.codecs,
           disc_id=disc_id,
           fstags=fstags,
-          no_action=no_action,
+          no_action=options.dry_run,
           split_by_codec=True,
       )
     except discid.disc.DiscError as e:
