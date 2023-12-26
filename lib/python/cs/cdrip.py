@@ -812,7 +812,9 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     mb_info = {}
     release_entry = self.release.query_result
     discid = self.discid
-    for medium in release_entry['medium-list']:
+    media = release_entry['medium-list']
+    medium_count = len(media)
+    for medium in media:
       for pos, disc_entry in enumerate(medium['disc-list'], 1):
         if disc_entry['id'] == discid:
           return AttrableMapping(
