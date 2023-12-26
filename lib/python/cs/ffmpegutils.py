@@ -82,6 +82,7 @@ class MetaData(TagSet):
           'copyright',
           'description',
           'episode_id',
+          'disc',
           'genre',
           'grouping',
           'lyrics',
@@ -97,16 +98,16 @@ class MetaData(TagSet):
   # pylint: disable=redefined-builtin
   def __init__(self, format, **kw):
     super().__init__()
-    try:
-      allowed_fields = MetaData.FIELDNAMES[format]
-    except KeyError:
-      # pylint: disable=raise-missing-from
-      ##raise ValueError("unsupported target format %r" % (format,))
-      allowed_fields = MetaData.FIELDNAMES['mp4']
-    self.__dict__.update(format=format, allow_fields=allowed_fields)
+    ##try:
+    ##  allowed_fields = MetaData.FIELDNAMES[format]
+    ##except KeyError:
+    ##  # pylint: disable=raise-missing-from
+    ##  ##raise ValueError("unsupported target format %r" % (format,))
+    ##  allowed_fields = MetaData.FIELDNAMES['mp4']
+    ##self.__dict__.update(format=format, allowed_fields=allowed_fields)
     for k, v in kw.items():
-      if k not in allowed_fields:
-        raise ValueError("format %r does not support field %r" % (format, k))
+      ##if k not in allowed_fields:
+      ##  raise ValueError("format %r does not support field %r" % (format, k))
       self[k] = v
 
   def options(self):
