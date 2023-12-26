@@ -540,7 +540,7 @@ def rip(
               argv = None
             else:
               fmt_dirpath = dirname(fmt_filename)
-              no_action or needdir(fmt_dirpath, use_makedirs=True)
+              needdir(fmt_dirpath, use_makedirs=True)
               fstags[fmt_dirpath].update(disc_fstags)
               if fmt == 'wav':
                 # rip from CD
