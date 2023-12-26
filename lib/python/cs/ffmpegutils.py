@@ -249,7 +249,7 @@ def convert(
   # choose output formats
   if acodec is None or vcodec is None:
     probed = ffprobe(srcpath)
-    for i, stream in enumerate(probed.streams):
+    for i, stream in enumerate(probed.streams if doit else ()):
       codec_type = stream.get('codec_type', 'unknown')
       codec_key = stream.get('codec_name', stream.codec_tag)
       conv_key = f'{codec_type}/{codec_key}'
@@ -275,7 +275,7 @@ def convert(
                   codec_type, codec_key, new_codec
               )
 
-  ffmeta_kw = dict(probed.format.get('tags', {}))
+  ffmeta_kw = dict(probed.format.get('tags', {}) if doit else {})
   ffmeta_kw.update(metadata)
   # construct ffmpeg command
   ff = ffmpeg.input(srcpath, **ffinopts)
