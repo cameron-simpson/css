@@ -474,9 +474,11 @@ def rip(
     artist_credit = ", ".join(disc.artist_names or "NO_ARTISTS")
     recordings = disc.recordings
     level1 = artist_credit
-    level2 = disc.title or "UNTITLED"
-    if release.medium_count > 1:
+    level2 = disc.release_title
+    if disc.medium_count > 1:
       level2 += f" ({disc.medium_position} of {disc.medium_count})"
+    if disc.title != release.title:
+      level2 += f' - {disc.title}'
     disc_subpath = joinpath(
         level1.replace(os.sep, ':'),
         level2.replace(os.sep, ':'),
@@ -486,31 +488,32 @@ def rip(
         title=disc.title,
         artists=disc.artist_names,
     )
-    for tracknum, recording in enumerate(recordings, 1):
-      with Pfx("track %d", tracknum):
-        recording_md = disc.ontology.metadata('recording', recording.id)
-        track_fstags = TagSet(
-            discid=disc.mbkey,
-            artists=recording.artist_names,
-            title=recording.title,
-            track=tracknum
-        )
-        track_artists = recording.artist_credit
+    for track_index, recording in enumerate(recordings):
+      track_number = track_index + 1
+      with Pfx("track %d", track_number):
+        tags = disc.disc_track_tags(track_index)
+        ##recording_md = disc.ontology.metadata('recording', recording.id)
         # filesystem paths
-        track_base = f"{tracknum:02} - {recording.title} -- {track_artists}".replace(
-            os.sep, '-'
+        artist_part = tags.disc_artist_credit
+        disc_part = tags.disc_title
+        track_part = (
+            f"{tags.track_number:02}"
+            f" - {tags.track_title}"
+            f" -- {tags.track_artist_credit}"
         )
         fmtpath = lambda acodec, ext: joinpath(
             output_dirpath,
             acodec if split_by_codec else '',
-            disc_subpath,
-            f'{track_base}.{ext}',
+            " ".join(artist_part.replace(os.sep, ' - ').split()),
+            " ".join(disc_part.replace(os.sep, ' - ').split()),
+            f'{track_part}.{ext}'.replace(os.sep, '-'),
         )
         ##wav_filename = fmtpath('wav')
         ##aac_filename = fmtpath('m4a')
         ##flac_filename = fmtpath('flac')
         ##mp3_filename = fmtpath('mp3')
         for acodec in 'wav', 'flac', 'aac', 'mp3':
+          # skip unmentioned codec except for "wav"
           if acodec != 'wav' and (acodec not in audio_outputs):
             continue
           if acodec == 'aac':
@@ -523,11 +526,13 @@ def rip(
           fmt_filename = fmtpath(acodec, ext)
           ffmetadata = FFMetaData(
               fmt,
-              album=title,
-              album_artist=artist_credit,
-              track=tracknum,
-              title=recording.title,
-              author=recording.artist_credit,
+              album=tags.disc_title,
+              album_artist=tags.disc_artist_credit,
+              disc=f'{tags.disc_number}/{tags.disc_total}',
+              track=f'{tags.track_number}/{tags.track_total}',
+              title=tags.track_title,
+              artist=tags.track_artist_credit,
+              ##author=tags.track_artist_credit,
           )
           with Pfx(shortpath(fmt_filename)):
             if existspath(fmt_filename):
@@ -540,7 +545,7 @@ def rip(
               if fmt == 'wav':
                 # rip from CD
                 argv = rip_to_wav(
-                    device, tracknum, fmt_filename, no_action=no_action
+                    device, track_number, fmt_filename, no_action=no_action
                 )
               else:
                 # use ffmpeg to convert from the WAV file
@@ -557,10 +562,10 @@ def rip(
                   )
                   print("CONVERTED:", *argv)
             if no_action:
-              print("fstags[%r].update(%s)" % (fmt_filename, track_fstags))
+              print("fstags[%r].update(%s)" % (fmt_filename, tags))
             else:
               fstags[fmt_filename].conversion_command = argv
-              fstags[fmt_filename].update(track_fstags)
+              fstags[fmt_filename].update(tags)
 
 def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   ''' Rip a track from the CDROM device to a WAV file.
@@ -581,7 +586,6 @@ class _MBTagSet(SQLTagSet):
 
   def __repr__(self):
     return "%s:%s:%r" % (type(self).__name__, self.name, self.as_dict())
-
 
   @property
   def query_result(self):
