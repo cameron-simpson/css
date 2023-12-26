@@ -663,6 +663,8 @@ class _MBTagSet(SQLTagSet):
         pass
       else:
         raise RuntimeError("type_name=%r, id=%r is UUID" % (type_name, id))
+    if isinstance(id, dict):
+      id = id["id"]
     te_name = f"{type_name}.{id}"
     te = self.sqltags[te_name]
     return te
