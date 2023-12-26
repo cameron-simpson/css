@@ -671,7 +671,72 @@ class MBArtist(_MBTagSet):
   ''' A Musicbrainz artist entry.
   '''
 
-class MBDisc(_MBTagSet):
+class MBHasArtistsMixin:
+  ''' A mixin for `_MBTagSet`s with artists.
+      This depends on the class specific property `artist_refs`
+      which is a list of Musicbrainzng artist references
+      used to construct artist credits:
+      either a `str` of literal interpolated text
+      or a `dict` with an `"artist"` entry which is an artist id.
+  '''
+
+  @property
+  def artist_refs(self):
+    raise RuntimeError(f'no .artist_refs property on type {type(self)!r}')
+
+  @cached_property
+  @typechecked
+  def artists(self) -> List[Union[MBArtist, str]]:
+    '''A list of `MBArtist`s, possibly interspersed with `str`.'''
+    artists = []
+    for artist_ref in self.artist_refs:
+      with Pfx("artist_ref %s", r(artist_ref)):
+        if isinstance(artist_ref, str):
+          artists.append(artist_ref)
+          continue
+        artist_id = artist_ref['artist']
+        artist = self.resolve_id('artist', artist_id)
+        artists.append(artist)
+    return artists
+
+  @property
+  @trace
+  def artist_credit(self) -> str:
+    '''A credit string computes from `self.artists`.'''
+    strs = []
+    sep = ''
+    for artist in self.artists:
+      if isinstance(artist, str):
+        strs.append(artist)
+        sep = ''
+      else:
+        try:
+          name = artist['name_']
+        except KeyError:
+          warning("no ['name_']: artist keys = %r", sorted(artist.keys()))
+        else:
+          strs.append(sep)
+          strs.append(name)
+          sep = ', '
+    X("artist_credit: strs=%r", strs)
+    return ''.join(strs)
+
+  @property
+  def artist_names(self) -> List[str]:
+    '''A list of the artist names.'''
+    names = []
+    for artist in self.artists:
+      if isinstance(artist, str):
+        continue
+      try:
+        name = artist['name_']
+      except KeyError:
+        warning("no ['name_']: artist keys = %r", sorted(artist.keys()))
+      else:
+        names.append(name)
+    return names
+
+class MBDisc(MBHasArtistsMixin, _MBTagSet):
   ''' A Musicbrainz disc entry.
   '''
 
@@ -692,6 +757,11 @@ class MBDisc(_MBTagSet):
   @property
   def title(self):
     return self.medium_title or self.release['title']
+
+  @property
+  def artist_refs(self):
+    # we get the artist refs from the release
+    return self.release.artist
 
   @property
   def release_list(self):
@@ -753,26 +823,7 @@ class MBDisc(_MBTagSet):
   def medium_title(self):
     return self.medium.get('title')
 
-  @property
-  @pfx_method
-  def artist_names(self):
-    '''A list of the artist names.'''
-    names = []
-    for artist_ref in self.release.artist:
-      with Pfx("artist_ref %s", r(artist_ref)):
-        if isinstance(artist_ref, str):
-          continue
-        artist_id = artist_ref['artist']
-        artist = self.resolve_id('artist', artist_id)
-        try:
-          name = artist['name_']
-        except KeyError:
-          warning("no ['name']: artist keys = %r", sorted(artist.keys()))
-        else:
-          names.append(name)
-    return names
-
-  @property
+  @cached_property
   def recordings(self):
     ''' Return an iterable of `MBRecording` instances.
     '''
@@ -787,25 +838,8 @@ class MBRecording(_MBTagSet):
   '''
 
   @property
-  def artist_names(self):
-    ''' A list of the artist names. '''
-    arts = []
-    for art in self['artist']:
-      if isinstance(art, str):
-        arts.append(art)
-      elif isinstance(art, dict):
-        artist = self.resolve_id('artist', art['artist'])
-        assert isinstance(artist, MBArtist)
-        arts.append(artist.name_)
-    return arts
-
-  @property
-  @cachedmethod
-  def artist_credit(self):
-    ''' A phrase to credit the artist(s) in this recording.
-    '''
-    credit = (self.get('artist_credit_phrase') or ' '.join(self.artist_names))
-    return credit
+  def artist_refs(self):
+    return self.query_result['artist-credit']
 
   @property
   def title(self):
