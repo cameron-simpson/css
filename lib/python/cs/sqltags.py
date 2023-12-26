@@ -1772,7 +1772,7 @@ class SQLTags(BaseTagSets, Promotable):
     entities = self.orm.entities
     entities_table = entities.__table__  # pylint: disable=no-member
     name_column = entities_table.c.name
-    q = select([name_column])
+    q = select(name_column)
     if prefix is None:
       q = q.where(name_column.isnot(None))
     else:
