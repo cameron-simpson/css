@@ -14,7 +14,7 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import cache, cached_property
+from functools import cached_property
 from getopt import getopt, GetoptError
 import os
 from os.path import (
@@ -24,7 +24,6 @@ from os.path import (
     isdir as isdirpath,
     join as joinpath,
 )
-from pprint import pformat, pprint
 from signal import SIGINT, SIGTERM
 import sys
 import time
@@ -39,13 +38,13 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs, stack_signals
-from cs.deco import cachedmethod, fmtdoc
-from cs.ffmpegutils import ffmpeg_docker, convert as ffconvert, MetaData as FFMetaData
+from cs.deco import fmtdoc
+from cs.ffmpegutils import convert as ffconvert, MetaData as FFMetaData
 from cs.fileutils import atomic_filename
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import cutsuffix, is_identifier, r
-from cs.logutils import error, warning, info, debug
+from cs.logutils import error, warning, info
 from cs.mappings import AttrableMapping
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.psutils import run
@@ -111,6 +110,9 @@ class CDRipCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
+    ''' Options for `CDRipCommand`.
+    '''
+
     force: bool = False
     device: str = field(
         default_factory=lambda: os.environ.get(CDRIP_DEV_ENVVAR) or
@@ -386,7 +388,6 @@ def probe_disc(device, mbdb, disc_id=None):
   id_name = 'discid'
   record_key = 'disc'
   with stackattrs(mbdb, dev_info=dev_info):
-    query_time = time.time()
     A = mbdb.query(
         get_type,
         disc_id,
@@ -469,30 +470,28 @@ def rip(
     disc = mbdb.discs[disc_id]
     if disc_id == dev_info.id:
       disc.mb_toc = mb_toc
-    release = disc.release
-    title = disc.title or "UNTITLED"
-    artist_credit = ", ".join(disc.artist_names or "NO_ARTISTS")
     recordings = disc.recordings
-    level1 = artist_credit
-    level2 = disc.release_title
-    if disc.medium_count > 1:
-      level2 += f" ({disc.medium_position} of {disc.medium_count})"
-    if disc.title != release.title:
-      level2 += f' - {disc.title}'
-    disc_subpath = joinpath(
-        level1.replace(os.sep, ':'),
-        level2.replace(os.sep, ':'),
-    )
     disc_fstags = TagSet(
         discid=disc.id,
         title=disc.title,
         artists=disc.artist_names,
     )
-    for track_index, recording in enumerate(recordings):
+
+    def fmtpath(acodec, ext):
+      ''' Compute the output filesystem path.
+      '''
+      return joinpath(
+          output_dirpath,
+          acodec if split_by_codec else '',
+          " ".join(artist_part.replace(os.sep, ' - ').split()),
+          " ".join(disc_part.replace(os.sep, ' - ').split()),
+          f'{track_part}.{ext}'.replace(os.sep, '-'),
+      )
+
+    for track_index in range(len(recordings)):
       track_number = track_index + 1
       with Pfx("track %d", track_number):
         tags = disc.disc_track_tags(track_index)
-        ##recording_md = disc.ontology.metadata('recording', recording.id)
         # filesystem paths
         artist_part = tags.disc_artist_credit
         disc_part = tags.disc_title
@@ -500,13 +499,6 @@ def rip(
             f"{tags.track_number:02}"
             f" - {tags.track_title}"
             f" -- {tags.track_artist_credit}"
-        )
-        fmtpath = lambda acodec, ext: joinpath(
-            output_dirpath,
-            acodec if split_by_codec else '',
-            " ".join(artist_part.replace(os.sep, ' - ').split()),
-            " ".join(disc_part.replace(os.sep, ' - ').split()),
-            f'{track_part}.{ext}'.replace(os.sep, '-'),
         )
         ##wav_filename = fmtpath('wav')
         ##aac_filename = fmtpath('m4a')
@@ -618,6 +610,8 @@ class _MBTagSet(SQLTagSet):
     return self.sqltags.mbdb
 
   def refresh(self, **kw):
+    ''' Refresh the MBDB entry for this `TagSet`.
+    '''
     return self.mbdb.refresh(self, **kw)
 
   @property
@@ -653,13 +647,12 @@ class _MBTagSet(SQLTagSet):
     '''
     return self.mbdb.ontology
 
-  @require(lambda type_name: is_identifier(type_name))
+  @require(lambda type_name: is_identifier(type_name))  # pylint: disable=unnecessary-lambda
   @typechecked
   def resolve_id(
       self,
       type_name: str,
-      id: Union[str, dict],
-      no_check_uuid=False,
+      id: Union[str, dict],  # pylint: disable=redefined-builtin
   ) -> '_MBTagSet':
     ''' Fetch the object `{type_name}.{id}`.
     '''
@@ -691,6 +684,9 @@ class MBHasArtistsMixin:
 
   @property
   def artist_refs(self):
+    ''' Stub method to return a list of artist references.
+        This is overridden by subclasses which use the mixin.
+    '''
     raise RuntimeError(f'no .artist_refs property on type {type(self)!r}')
 
   @cached_property
@@ -709,7 +705,6 @@ class MBHasArtistsMixin:
     return artists
 
   @property
-  @trace
   def artist_credit(self) -> str:
     '''A credit string computes from `self.artists`.'''
     strs = []
@@ -727,7 +722,6 @@ class MBHasArtistsMixin:
           strs.append(sep)
           strs.append(name)
           sep = ', '
-    X("artist_credit: strs=%r", strs)
     return ''.join(strs)
 
   @property
@@ -765,6 +759,8 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
 
   @property
   def title(self):
+    ''' The medium title or failing that the release title.
+    '''
     return self.medium_title or self.release['title']
 
   @property
@@ -774,6 +770,8 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
 
   @property
   def release_list(self):
+    ''' The query result `"release-list"` list.
+    '''
     return self.query_result['release-list']
 
   @cached_property
@@ -803,13 +801,14 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
 
   @property
   def release_title(self):
+    ''' The release title.
+    '''
     return self.release.title
 
   @cached_property
   def mb_info(self):
     ''' Salient data from the MusicbrainzNG API response.
     '''
-    mb_info = {}
     release_entry = self.release.query_result
     discid = self.discid
     media = release_entry['medium-list']
@@ -844,6 +843,8 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
 
   @property
   def medium_title(self):
+    ''' The medium title.
+    '''
     return self.medium.get('title')
 
   @cached_property
@@ -851,8 +852,6 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     ''' Return a list of `MBRecording` instances.
     '''
     recordings = []
-    discid = self.mbkey  # pylint: disable=redefined-outer-name
-    release = self.release_list[0]
     for track_rec in self.medium['track-list']:
       recording = self.resolve_id('recording', track_rec['recording']['id'])
       recordings.append(recording)
@@ -895,6 +894,8 @@ class MBRecording(MBHasArtistsMixin, _MBTagSet):
 
   @property
   def title(self):
+    ''' The recording title.
+    '''
     try:
       title = self['title']
     except KeyError:
@@ -1089,7 +1090,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     if typename == 'releases':
       try:
         UUID(db_id)
-      except ValueError as e:
+      except ValueError:
         pass
       else:
         raise RuntimeError(
@@ -1136,16 +1137,15 @@ class MBDB(MultiOpenMixin, RunStateMixin):
   @typechecked
   def refresh(
       self,
-      te: _MBTagSet,
+      te0: _MBTagSet,
       refetch: bool = True,  ##False,
       recurse: Union[bool, int] = False,
   ) -> dict:
     ''' Query MusicBrainz about the entity `te`, fill recursively.
         Return the query result of `te`.
     '''
-    with run_task("refresh %s" % te.name) as proxy:
-      te0 = te
-      q = ListQueue([te])
+    with run_task("refresh %s" % te0.name) as proxy:
+      q = ListQueue([te0])
       for te in unrepeated(q, signature=lambda te: te.name):
         with Pfx("refresh te=%s", te.name):
           if self.runstate.cancelled:
@@ -1232,7 +1232,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
   def apply_dict(
       self,
       type_name: str,
-      id: str,
+      id: str,  # pylint: disable=redefined-builtin
       d: dict,
       *,
       get_te=None,
@@ -1280,7 +1280,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
             continue
           # apply members
           assert isinstance(v, list)
-          for i, list_entry in enumerate(v):
+          for list_entry in v:
             if not isinstance(list_entry, dict):
               continue
             try:
@@ -1330,7 +1330,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       else:
         v = dict(v)
         for k, subv in list(v.items()):
-          type_name, suffix = self.key_type_name(k)
+          type_name, _ = self.key_type_name(k)
           v[k] = self._fold_value(
               ##type_name, subv, get_te=get_te, q=q, seen=seen
               type_name,
