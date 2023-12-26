@@ -1661,7 +1661,11 @@ class SQLTags(BaseTagSets, Promotable):
 
   @typechecked
   def default_factory(
-      self, name: Optional[str] = None, *, unixtime=None, tags=None,
+      self,
+      name: Optional[str] = None,
+      *,
+      unixtime=None,
+      tags=None,
       skip_refresh=False,
   ):
     ''' Fetch or create an `SQLTagSet` for `name`.
