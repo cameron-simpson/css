@@ -947,6 +947,7 @@ class MBSQLTags(SQLTags):
 
   @pfx_method
   def __getitem__(self, index):
+    assert not index.startswith('releases.')
     if isinstance(index, str) and index.startswith('disc.'):
       discid = index[5:]
       try:
@@ -1044,6 +1045,8 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     '''
     logged_in = False
     getter_name = f'get_{typename}_by_{id_name}'
+    if typename == 'releases':
+      assert getter_name == 'get_releases_by_discid'
     if record_key is None:
       record_key = typename
     try:
