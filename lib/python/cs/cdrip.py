@@ -1038,7 +1038,6 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       *,
       includes=None,
       record_key=None,
-      no_apply=False,
       **getter_kw
   ) -> dict:
     ''' Fetch data from the Musicbrainz API.
@@ -1125,8 +1124,6 @@ class MBDB(MultiOpenMixin, RunStateMixin):
           "no entry named %r, returning entire mb_info, keys=%r", record_key,
           sorted(mb_info.keys())
       )
-    if not no_apply:
-      self.apply_dict(typename, db_id, mb_info, seen=set())
     return mb_info
 
   def stale(self, te):
@@ -1143,6 +1140,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       te0: _MBTagSet,
       refetch: bool = True,  ##False,
       recurse: Union[bool, int] = False,
+      no_apply=None,
   ) -> dict:
     ''' Query MusicBrainz about the entity `te`, fill recursively.
         Return the query result of `te`.
@@ -1175,6 +1173,11 @@ class MBDB(MultiOpenMixin, RunStateMixin):
                   get_type = 'releases'
                   id_name = 'discid'
                   record_key = 'disc'
+                  if no_apply is None:
+                    no_apply = True
+                else:
+                  if no_apply is None:
+                    no_apply = False
                 with stackattrs(
                     proxy,
                     text=("query(%r,%r,...)" % (get_type, mbkey)),
@@ -1194,6 +1197,8 @@ class MBDB(MultiOpenMixin, RunStateMixin):
                     te[te.MB_QUERY_PREFIX + 'get_type'] = get_type
                     ##te[te.MB_QUERY_PREFIX + 'includes'] = includes
                     te[te.MB_QUERY_PREFIX + 'result'] = A
+                    if not no_apply:
+                      self.apply_dict(mbtype, mbkey, A, seen=set())
                     self.sqltags.flush()
               else:
                 A = te[te.MB_QUERY_PREFIX + 'result']
