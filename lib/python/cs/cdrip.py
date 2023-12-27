@@ -356,13 +356,17 @@ class CDRipCommand(BaseCommand):
       with Pfx("discid %s", disc_id):
         disc = MB.discs[disc_id]
         disc.mb_toc = mb_toc
-        print(disc.title)
-        print(", ".join(disc.artist_names))
-        for tracknum, recording in enumerate(disc.recordings, 1):
-          print(
-              tracknum, recording.title, '--',
-              ", ".join(recording.artist_names)
+        tags = disc.disc_track_tags(track_index=None)
+        print(tags.disc_title)
+        print(tags.disc_artist_credit)
+        for track_index, recording in enumerate(disc.recordings):
+          tags = disc.disc_track_tags(track_index)
+          track_title = (
+              f"{tags.track_number:02}"
+              f" - {tags.track_title}"
+              f" -- {tags.track_artist_credit}"
           )
+          print(track_title)
     return 0
 
 def probe_disc(device, mbdb, disc_id=None):
@@ -816,12 +820,15 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     for medium in media:
       for pos, disc_entry in enumerate(medium['disc-list'], 1):
         if disc_entry['id'] == discid:
-          return AttrableMapping(
+          mb_info = AttrableMapping(
               disc_entry=disc_entry,
               disc_pos=pos,
               medium=medium,
               medium_count=medium_count,
           )
+          ##X("MB_INFO: %s", mb_info)
+          ##breakpoint()
+          return mb_info
     raise AttributeError(f'no medium+disc found for discid:{discid!r}')
 
   @property
@@ -858,30 +865,34 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     return recordings
 
   @require(
-      lambda self, track_index:
+      lambda self, track_index: track_index is None or
       (track_index >= 0 and track_index < len(self.recordings))
   )
   @typechecked
-  def disc_track_tags(self, track_index: int) -> TagSet:
+  def disc_track_tags(self, track_index: Optional[int]) -> TagSet:
     ''' Return a `TagSet` for track `tracknum` (counting from 0).
+        Pass `track_index=None` to omit the per-track tags.
     '''
     disc_title = self.release_title
     if self.medium_count > 1:
       disc_title += f" ({self.medium_position} of {self.medium_count})"
     if self.title != self.release_title:
       disc_title += f' - {self.title}'
-    recording = self.recordings[track_index]
     tags = TagSet(
         disc_id=self.mbkey,
         disc_artist_credit=self.artist_credit,
         disc_title=disc_title,
         disc_number=self.medium_position,
         disc_total=self.medium_count,
-        track_number=track_index + 1,
-        track_total=int(self.medium['track-count']),
-        track_artist_credit=recording.artist_credit,
-        track_title=recording.title,
     )
+    if track_index is not None:
+      recording = self.recordings[track_index]
+      tags.update(
+          track_number=track_index + 1,
+          track_total=int(self.medium['track-count']),
+          track_artist_credit=recording.artist_credit,
+          track_title=recording.title,
+      )
     return tags
 
 class MBRecording(MBHasArtistsMixin, _MBTagSet):
