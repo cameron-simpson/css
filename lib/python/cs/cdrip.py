@@ -1133,7 +1133,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       del te[te.MB_QUERY_TIME_TAG_NAME]
 
   # pylint: disable=too-many-branches,too-many-statements
-  @require(lambda te: '.' in te.name)
+  @require(lambda te0: '.' in te0.name)
   @typechecked
   def refresh(
       self,
