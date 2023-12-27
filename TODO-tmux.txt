@@ -1,2 +1,3 @@
+TmuxCOntrol: autostart=False parameter to start a tmux service
 command-in-new-pane function
 TODOs for tmux
