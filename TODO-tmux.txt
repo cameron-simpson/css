@@ -1,0 +1,2 @@
+command-in-new-pane function
+TODOs for tmux
