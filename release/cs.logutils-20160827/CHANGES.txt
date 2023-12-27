@@ -1,0 +1,33 @@
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: prefixify: leave non-str arguments alone, upgrade str to unicode
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: prefixify: only emit debug message when argument is not a string
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: prefixify: recite class name of nonprefixable text
+  lib/python/cs/logutils.py: cs.logutils: infer_logging_level: accept arbitrary strings
+  lib/python/cs/logutils.py: cs.logutils: change signature of infer_logging_level() as it now returns more information; implement support for DEBUG=module.name and DEBUG=module.name.func() values to trace specific modules or functions
+  lib/python/cs/logutils.py: cs.logutils: if main program, test run setup_logging
+  lib/python/cs/logutils.py: cs.logutils: new $DEBUG format: "a.b.c" is a module, "a.b.c:d.e" is callable "d.e" within module "a.b.c"
+  lib/python/cs/logutils.py: cs.logutils: accept non-str as Pfx sole argument
+  lib/python/cs/logutils.py: cs.logutils: expose current Pfx prefix via the prefix() function; add XP() variant on X() which prefixes the message with the current Pfx prefix
+  bin-cs/rig-adzapper bin/xrdb_load lib/python/cs/logutils.py: merge default ==> logutils
+  lib/python/cs/logutils.py: cs.logutils: discard cs.excutils.noexc; catch logging exceptions and report on stderr via XP(), avoiding possible infinite regress
+  lib/python/cs/logutils.py: cs.logutils: X: accept optional file= parameter to override default of sys.stderr
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: minor cleanups
+  lib/python/cs/logutils.py: cs.logutils: X(): python 2 fix for options file= parameter
+  lib/python/cs/logutils.py: cs.logutils: add ._ur_prefix to Pfx._state thread local object for optional leading prefix to Pfx messages
+  lib/python/cs/logutils.py: cs.logutils: new conext manager PrePfx to set the optional leading ._ur_prefix temporarily
+  lib/python/cs/logutils.py: cs.logutils: XP: accept optional file= parameter; new XX to call XP with a leading ._ur_prefix value
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: prefixify: when text is not a string and cannot be prefixed, include sys.exc_info() in the warning message
+  lib/python/cs/logutils.py: cs.logutils: add DP, XP-like parallel for D
+  lib/python/cs/logutils.py: cs.logutils: remove listargs(), long unused
+  lib/python/cs/logutils.py: cs.logutils: cleaner call to new public method Upd.flush
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: stop complaining loudly about exceptions which do not have string arguments; particularly annoying for exceptions which may be caught later anyway
+  lib/python/cs/logutils.py: cs.logutils: add status() function to write string to terminal status line or title bar
+  lib/python/cs/logutils.py: cs.logutils: setup_logging: variable rename for readability
+  lib/python/cs/logutils.py: cs.logutils: setup_logging: return informative object instead of log level; expose Upd object if upd_mode
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: prefixify: leave non-str arguments alone, upgrade str to unicode
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: louder complaint about non-strings, fix typo
+  lib/python/cs/fileutils.py lib/python/cs/logutils.py: Automated merge with file:///Users/cameron/hg/css
+  bin-cs/py2 bin-cs/py3 bin-cs/rig-adzapper bin-cs/rig-tm bin-cs/rig-unbound bin/hg-pull-revs bin/mimeext bin/rst2fh bin/ttysane bin/update bin/xrdb_load lib/python/cs/asynchron.py lib/python/cs/db.py lib/python/cs/fileutils.py lib/python/cs/fileutils_tests.py lib/python/cs/lex.py lib/python/cs/logutils.py lib/python/cs/progress.py lib/python/cs/urlutils.py venti: merge default ==> metaproxy
+  lib/python/cs/fileutils.py lib/python/cs/logutils.py: [metaproxy] merge abandoned branch 13167:60f0fe1f8d96
+  bin-cs/py2 bin-cs/py3 bin-cs/rig-adzapper bin-cs/rig-tm bin-cs/rig-unbound bin/hg-pull-revs bin/mimeext bin/rst2fh bin/ttysane bin/update bin/xrdb_load lib/python/cs/asynchron.py lib/python/cs/db.py lib/python/cs/fileutils.py lib/python/cs/fileutils_tests.py lib/python/cs/lex.py lib/python/cs/logutils.py lib/python/cs/progress.py lib/python/cs/urlutils.py venti: merge default ==> metaproxy
+  lib/python/cs/logutils.py: cs.logutils: backport for older Pythons without importlib (<2.7); if no importlib, warn if module_names or function_names is not empty
+  lib/python/cs/logutils.py: cs.logutils: enhance X() with X_via_tty global flag; if set X opens /dev/tty instead of using sys.stderr - this is because unittest often seems to interfere with stderr somehow

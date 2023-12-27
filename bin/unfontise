@@ -2,7 +2,7 @@
 #
 # Take a fontised string as appears in Subject: lines and attachment descriptions
 # and convert it to raw form. See RFC2047.
-#	- Cameron Simpson <cs@zip.com.au> 01feb2002
+#	- Cameron Simpson <cs@cskk.id.au> 01feb2002
 #
 # -c chregexp - cameron 26jun2002
 # -C - cameron 12jul2002

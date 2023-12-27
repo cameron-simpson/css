@@ -2,7 +2,7 @@
 #
 # Take a mail message on stdin, file it in specific mail folders and
 # note its message-id in a tracking file.
-#	- Cameron Simpson <cs@zip.com.au> 25jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 25jul2004
 #
 
 : ${TMPDIR:=/tmp}

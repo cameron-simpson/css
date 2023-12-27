@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Read a data file produced by vmstat-log and write a CSV file.
-#       - Cameron Simpson <cs@zip.com.au> 21nov2008
+#       - Cameron Simpson <cs@cskk.id.au> 21nov2008
 #
 
 step=

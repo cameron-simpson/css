@@ -1,0 +1,3 @@
+Update for new Upd.without context manager.
+setup_logging: default `upd_mode` to `main_log.isatty()`, was previously False.
+Drop UpdHandler.upd method, shadowed by instance attribute, never used.

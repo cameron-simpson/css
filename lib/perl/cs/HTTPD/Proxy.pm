@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # My proxy server, to share caches.
-#	- Cameron Simpson <cs@zip.com.au> 10sep96
+#	- Cameron Simpson <cs@cskk.id.au> 10sep96
 #
 
 use strict qw(vars);

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Basic routines to supply the META component of a base class.
-#	- Cameron Simpson <cs@zip.com.au> 17may96
+#	- Cameron Simpson <cs@cskk.id.au> 17may96
 #
 
 use strict qw(vars);

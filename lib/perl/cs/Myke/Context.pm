@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Myke::Context: a module for providing context in error reports.
-#	- Cameron Simpson <cs@zip.com.au> 19feb2000
+#	- Cameron Simpson <cs@cskk.id.au> 19feb2000
 #
 
 =head1 NAME
@@ -106,7 +106,7 @@ sub Method1($
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

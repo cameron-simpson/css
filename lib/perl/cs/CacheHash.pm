@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Cache a hash table.
-#	- Cameron Simpson <cs@zip.com.au> 17jun96
+#	- Cameron Simpson <cs@cskk.id.au> 17jun96
 #
 
 use strict qw(vars);

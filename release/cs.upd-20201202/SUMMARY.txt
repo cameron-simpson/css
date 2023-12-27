@@ -1,0 +1,2 @@
+Fix for batch mode - handle failure of curses.setupterm(), throws TypeError.
+Upd.insert: defer check for cuu1 capability until there's at least one line already.

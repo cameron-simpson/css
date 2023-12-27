@@ -1,10 +1,10 @@
 #!/bin/sh
 #
 # Test if a particular file is CVS maintained.
-#	- Cameron Simpson <cs@zip.com.au> 23feb2003
+#	- Cameron Simpson <cs@cskk.id.au> 23feb2003
 #
 # If command supplied, run it with cvsedit (if needed).
-#	- Cameron Simpson <cs@zip.com.au> 27jun2003
+#	- Cameron Simpson <cs@cskk.id.au> 27jun2003
 #
 
 cmd=$0

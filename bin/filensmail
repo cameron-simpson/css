@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Refile any netscape mail folders into my real mail folders.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 nsmail=$HOME/nsmail

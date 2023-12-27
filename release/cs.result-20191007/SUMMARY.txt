@@ -1,0 +1,2 @@
+Simplify ResultState definition.
+Result.bg: use cs.threads.bg to dispatch the Thread.

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.nodedb.csvdb.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import os
@@ -12,7 +12,9 @@ from . import NodeDB
 from .csvdb import Backend_CSVFile
 from .node_tests import TestAll as NodeTestAll
 
-class TestAll(NodeTestAll):
+class CSVDBTestAll(NodeTestAll):
+  ''' Tests for `cs.nodedb.csvdb`.
+  '''
 
   def nodedb(self):
     self.backend = Backend_CSVFile(self.dbpath)

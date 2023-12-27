@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Backup libvirt qemu VM XML and IMG files.
-#       - Cameron Simpson <cs@zip.com.au> 17jun2011
+#       - Cameron Simpson <cs@cskk.id.au> 17jun2011
 #
 
 set -ue

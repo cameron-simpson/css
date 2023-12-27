@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Walk path reporting symlinks.
-#	- Cameron Simpson <cs@zip.com.au> 07may1997
+#	- Cameron Simpson <cs@cskk.id.au> 07may1997
 #
 
 use cs::Pathname;

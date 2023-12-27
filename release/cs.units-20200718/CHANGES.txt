@@ -1,0 +1,5 @@
+lib/python/cs/units.py: Release information for cs.units-20200626.
+lib/python/cs/units.py: cs.units: drop DISTINFO[description] in favour of module docstring; autoformat
+lib/python/cs/units.py: cs.units: tweak docstring
+lib/python/cs/units.py: cs.units: use str.isalpha to recognise "unit" words instead of string.ascii_letters (uses new cs.lex.get_chars "callable gochars" mode)
+lib/python/cs/units.py: merge default ==> pypi

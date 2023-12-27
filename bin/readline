@@ -2,7 +2,7 @@
 #
 # Read a line using the GNU readline stuff, for file completion.
 # Would that there was a way to supply come initial content...:-(
-#	- Cameron Simpson <cs@zip.com.au> 22feb2004
+#	- Cameron Simpson <cs@cskk.id.au> 22feb2004
 #
 
 cddir=

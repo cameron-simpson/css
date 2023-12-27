@@ -3,7 +3,7 @@
 # Forward the input n times to the given addresses.
 # Used to send spam back to the orginator.
 # To be used _only_ when completely sure of the originator's email address.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 : ${TMPDIR:=/tmp}

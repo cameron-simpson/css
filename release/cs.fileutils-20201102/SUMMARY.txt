@@ -1,0 +1,11 @@
+Newline delimited JSON (ndjson) support.
+New UUIDNDJSONMapping implementing a singleton cs.mappings.LoadableMappingMixin of cs.mappings.UUIDedDict subclass instances backed by an NDJSON file.
+New scan_ndjson() function to yield newline delimited JSON records.
+New write_ndjson() function to write newline delimited JSON records.
+New append_ndjson() function to append a single newline delimited JSON record to a file.
+New NamedTemporaryCopy for creating a temporary copy of a file with an optional progress bar.
+rewrite_cmgr: turn into a simple wrapper for rewrite.
+datafrom: make the offset parameter optional, tweak the @strable open function.
+datafrom_fd: support nonseekable file descriptors, document that for these the file position is moved (no pread support).
+New iter_fd and iter_file to return iterators of a file's data by utilising a CornuCopyBuffer.
+New byteses_as_fd to return a readable file descriptor receiving an iterable of bytes via a CornuCopyBuffer.

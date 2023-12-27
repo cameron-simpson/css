@@ -4,7 +4,7 @@
 # Make sure the mountpoints exist for the hosts not us.
 # Make sure symlinks exist for us.
 # Emit fstab lines.
-#	- Cameron Simpson <cs@zip.com.au> 14oct2000
+#	- Cameron Simpson <cs@cskk.id.au> 14oct2000
 #
 
 nfstab=/etc/nfstab

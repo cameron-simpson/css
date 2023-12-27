@@ -1,0 +1,2 @@
+lib/python/cs/x.py: Release information for cs.x-20201102.
+lib/python/cs/x.py: cs.x: new Y() which calls X(...,colour=yellow)

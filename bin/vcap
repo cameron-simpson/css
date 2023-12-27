@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Start VLC with useful settings for taking screenshots.
+# - Cameron Simpson <cs@cskk.id.au> 25feb2019
+#
+
+set -ue
+
+rcfile=$HOME/Library/Preferences/org.videolan.vlc/vlcrc
+dldir=$HOME/dl
+capdirbase=$dldir/v/CAPS
+
+badopts=
+
+cmd=$0
+usage="Usage: $cmd video"
+
+video=$1
+shift
+[ -s "$video" ] || {
+  echo "$cmd: video is not a regular file: $video" >&2
+  badopts=1
+}
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments after video: $*" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+basename=$( basename "$video" )
+base=$( expr "x$basename" : 'x\(.*\)\..*' )
+capdir=$capdirbase/$base
+[ -d "$capdir" ] || ( set -x; mkdir -p "$capdir" )
+
+sedf=
+while read setting value
+do
+  sedf="$sedf
+    s;^#*$setting=.*;$setting=$value;"
+done <<X
+snapshot-path $capdir
+snapshot-prefix $base--
+snapshot-format png
+snapshot-preview 1
+snapshot-sequential 1
+extrashort-jump-size 0
+short-jump-size 1
+medium-jump-size 20
+long-jump-size 60
+X
+
+set -x
+bsed "$sedf" "$rcfile"
+open -a vlc "$video"

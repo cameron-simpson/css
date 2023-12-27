@@ -1,0 +1,41 @@
+  lib/python/cs/urlutils.py: cs.urlutils: do not import urlopen, not used
+  lib/python/cs/urlutils.py: cs.urlutils: handle TimeoutError, reporting elapsed time
+  lib/python/cs/urlutils.py: cs.urlutils: skip_errs: call next(I) instead of I.next()
+  lib/python/cs/urlutils.py: cs.urlutils: do not import StringIO, not used
+  lib/python/cs/urlutils.py: cs.urlutils: handle timeouts on URL fetches with limited number of retries; possibly misguided handling of self._info.get_content_type() raises AttributeError
+  lib/python/cs/urlutils.py: cs.urlutils: new function strip_whitespace for URLs per HTML 4.01 section 1.6 and appendix E; use it for hrefs and srcs
+  lib/python/cs/urlutils.py: cs.urlutils: remove import of HTMLParseError, seems gone in py3.5.1 and not used in my code anyway
+  lib/python/cs/urlutils.py: cs.urlutils: import update for python 3
+  lib/python/cs/urlutils.py: merge default ==> metaproxy
+  lib/python/cs/lex.py lib/python/cs/py/READEME-stack.rst lib/python/cs/urlutils.py: merge default ==> metaproxy
+  bin-cs/py2 bin-cs/py3 bin-cs/rig-adzapper bin-cs/rig-tm bin-cs/rig-unbound bin/hg-pull-revs bin/mimeext bin/rst2fh bin/ttysane bin/update bin/xrdb_load lib/python/cs/asynchron.py lib/python/cs/db.py lib/python/cs/fileutils.py lib/python/cs/fileutils_tests.py lib/python/cs/lex.py lib/python/cs/logutils.py lib/python/cs/progress.py lib/python/cs/urlutils.py venti: merge default ==> metaproxy
+  bin-cs/py2 bin-cs/py3 bin-cs/rig-adzapper bin-cs/rig-tm bin-cs/rig-unbound bin/hg-pull-revs bin/mimeext bin/rst2fh bin/ttysane bin/update bin/xrdb_load lib/python/cs/asynchron.py lib/python/cs/db.py lib/python/cs/fileutils.py lib/python/cs/fileutils_tests.py lib/python/cs/lex.py lib/python/cs/logutils.py lib/python/cs/progress.py lib/python/cs/urlutils.py venti: merge default ==> metaproxy
+  lib/python/cs/urlutils.py: cs.urlutils: _URL.path_elements: note that this property gives a new list every time
+  lib/python/cs/urlutils.py: Automated merge with file:///Users/cameron/hg/css
+  lib/python/cs/urlutils.py: cs.urlutils: URL: present ._fetch as .GET; add .resolve to resolve this URL against a base URL
+  lib/python/cs/urlutils.py: cs.urlutils: URL: add .savepath and .unsavepath methods to generate nonconflicting save pathnames for URLs and the reverse
+  lib/python/cs/urlutils.py: cs.urlutils: URL._response: rename return to opened_url - it is _not_ an HTTPResponse; for _fetch, record the post-redirection URL as final_url
+  lib/python/cs/urlutils.py: cs.urlutils: URL._fetch: record final_url as self or URL(final_url, self) if different
+  lib/python/cs/urlutils.py: cs.urlutils: add URLLimit, class for specifying simple tests for URL acceptance; add URL.walk, method to walk website from starting URL, yielding URLs
+  lib/python/cs/urlutils.py: cs.urlutils: store the URL .info() Message object after HEAD/GET; use it for content_length; do a HEAD instead of a GET in methods needed ._info
+  lib/python/cs/urlutils.py: cs.urlutls: URL.content_length property, returns int or None if header missing
+  lib/python/cs/urlutils.py: cs.urlutils: URL: new .default_limit method returns a URLLimit; use it in URL.walk and fix intialisation
+  lib/python/cs/urlutils.py: cs.urlutils: use @safe_property from cs.excutils to avoid rogue AttributeErrors from breaking properties
+  lib/python/cs/urlutils.py: cs.urlutils: import cs.rfc2616.datetime_from_http_date
+  lib/python/cs/urlutils.py: cs.urlutils: add URL.normalised method to return URL with . and .. processed in the path
+  lib/python/cs/urlutils.py: cs.urlutils: commented out monkey patch to debug request generation
+  lib/python/cs/urlutils.py: cs.urlutils: import heapq operations so that URL.walk can queue URLs in a heap
+  lib/python/cs/urlutils.py: cs.urlutils: _request: quote URL strings for use; feels hackish...
+  lib/python/cs/urlutils.py: cs.urlutils: don't use @cs.excutils.safe_property, use normal @property instead
+  lib/python/cs/urlutils.py: cs.urlutils: URL; redo non-_URL construction
+  lib/python/cs/urlutils.py: cs.urlutils: URL._init: bugfix referer setup
+  lib/python/cs/urlutils.py: cs.urlutils: _URL.__getattr__: return to falling back to str methods in safer way
+  lib/python/cs/urlutils.py: cs.urlutils: pull attribute access out of try/except to narrow its scope
+  lib/python/cs/urlutils.py: cs.urlutils: _URL._fetch: bugfix exception handler
+  lib/python/cs/urlutils.py: cs.urlutils: URL: add .exists test
+  lib/python/cs/urlutils.py: cs.urlutils: remove spurious @logexc decorator
+  lib/python/cs/urlutils.py: cs.urlutils: URL: bugfix .content_legnth property, add .last_modified property
+  lib/python/cs/urlutils.py: cs.urlutils: bs4: use html5lib instead of lxml because of lxml install difficulties
+  lib/python/cs/urlutils.py: cs.urlutils: URL.walk: resolve and normalise subURLs, process URLs in a heap, other improvements
+  lib/python/cs/urlutils.py: cs.urlutils: URLLimit: now tests scheme as well
+  lib/python/cs/urlutils.py: cs.urlutils: find_user_password: fix call to URL factory

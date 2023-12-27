@@ -1,0 +1,31 @@
+lib/python/cs/html.py: cs.html: completely redo as generators, leave previous interfaces as wrappers; rename text2s to quote, like urllib.quote; clean up some PEP8ness; break a few nameslib/python/cs/html.py
+lib/python/cs/html.py: cs.html: do not import StringIO any more
+lib/python/cs/html.py: cs.html: adjust import for python 3
+lib/python/cs/html.py: cs.html: same py 3 import fix
+lib/python/cs/html.py: cs.html: new function page_HTML yields page-of-html wrapped around tokens
+lib/python/cs/html.py: cs.html: left over fix from earlier conversion to generator
+lib/python/cs/html.py: cs.html: docstring for transcribe_string
+lib/python/cs/html.py: cs.html: IMG and HR do not need closing tags
+lib/python/cs/html.py: cs.html: autopep8
+lib/python/cs/html.py: cs.html: A,B,TD,TR: convenience token construction functions
+lib/python/cs/html.py: cs.html: page_HTML: fix .extend invocation
+lib/python/cs/html.py: cs.html: page_HTML: hook for content_type, default to "text/html; charset=UTF-8"
+lib/python/cs/html.py: cs.html: page_HTML: augument with content_type= and head_tokens= parameters
+lib/python/cs/html.py: cs.html: convenience functions for HEAD elements META, LINK and SCRIPT with SRC
+lib/python/cs/html.py: cs.html: adjust LINK and SCRIPT_SRC convenience functions
+lib/python/cs/html.py: cs.html: simple bugfixes
+lib/python/cs/html.py: cs.html: support ["<!--", strings...] for embedding HTML comments
+lib/python/cs/html.py: cs.html: convenience functions comment() and entity()
+lib/python/cs/html.py: cs.html: pad inside of comment with spaces
+lib/python/cs/html.py: cs.html: update "safe" characters in attribute values; add LINK, META and INPUT to singleton tags list
+lib/python/cs/html.py: generate.py: widen "safe characters" for double quoted transcription
+lib/python/cs/html.py: cs.html: transcribe: accept optional body_attrs parameter
+lib/python/cs/html.py: cs.html: basic XHTML support - <foo/>, lowercase tags, xtranscribe function; HTML support now writes lowercase tags also
+lib/python/cs/html.py: cs.html: XHTML: attributes with no value become attribute="attribute"; restore dropped closing tags
+lib/python/cs/html.py: cs.html: add TH() convenienct function
+lib/python/cs/html.py: cs.html: add transcribe_s and xtranscribe_s convenience functions
+lib/python/cs/html.py: cs.html: also allow "{" and "}" in tag attributes
+lib/python/cs/html.py: cs.html: drop spaces from comment transcription
+lib/python/cs/html.py: cs.html: new function attrquote implementing HTML 4.01 section 3.2.2; update _transcribe to use it, drop use of stdlib urlquote
+lib/python/cs/html.py: cs.html: update PyPI DISTINFO, drop debug message
+lib/python/cs/html.py: cs.html: hand redo DISTINFO description update from pypi branch

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Prune all empty directories.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 [ $# = 0 ] && set -- .
 find "$@" -type d -print | sort -r | xxargs set-x rmdir 2>/dev/null

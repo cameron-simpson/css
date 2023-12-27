@@ -1,0 +1,3 @@
+YDL.run: just catch the youtube_dl DownloadError.
+Changes to the default output filename template.
+Other minor internal changes.

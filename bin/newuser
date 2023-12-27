@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Linuxish create a new user and group with specified id.
-#       - Cameron Simpson <cs@zip.com.au> 29oct2006
+#       - Cameron Simpson <cs@cskk.id.au> 29oct2006
 #
 
 cmd=`basename "$0"` || exit 1

@@ -1,0 +1,2 @@
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.takev: bugfix adjustment of buf.offset, was not always done
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.__getitem__: add slice support, note how expensive it is to use

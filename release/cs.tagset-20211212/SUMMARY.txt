@@ -1,0 +1,10 @@
+Tag: new fallback_parse parameter for value parsing, default get_nonwhite.
+Tag: new from_arg factory with fallback_parse grabbing the whole string for command line arguments, thus supporting unquoted strings for ease of use.
+TagSetCriterion: new optional fallback_parse parameter and from_arg method as for the Tag factories.
+Tag.transcribe_value: accept optional json_options to control the JSON encoder, used for human friendly multiline edits in cs.app.tagger.
+Rename edit_many to edit_tagsets for clarity.
+TagsOntology: new type_values method to return values for a type (derived from their metadata entries).
+Tag: new alt_values method returning its TagsOntology.type_values.
+(Internal) New _FormatStringTagProxy which proxies a Tag but uses str(self.__proxied.value) for __str__ to support format strings.
+(Internal) TagSet.get_value: if arg_name matches a Tag, return a _FormatStringTagProxy.
+Tag.__new__: accept (tag_name,value) or (Tag) as initialisation parameters.

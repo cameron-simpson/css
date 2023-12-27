@@ -1,0 +1,9 @@
+  lib/python/cs/app/flag.py: cs.app.flag: report unexpected stat failures to stderr
+  lib/python/cs/app/flag.py: cs.app.flag: improve the module docstring
+  lib/python/cs/app/flag.py: cs.app.flag: add flagset main program, move to truncating false flags instead of removing them
+  lib/python/cs/app/flag.py: cs.*: update @contextmanager formalism to use try/finally for the cleanup phase
+  lib/python/cs/app/flag.py: cs.app.flag: FlaggexMixin: add optional `prefix` parameter to use instead of .name; bugfix a context manager against exceptions; clean some lint
+  lib/python/cs/app/flag.py: cs.app.flag: FlaggedMixin: fix reference to .__flag_prefix
+  lib/python/cs/app/flag.py: cs.app.flag: tweak docstring, strip debugging, add better Flags.__repr__
+  lib/python/cs/app/flag.py: merge venti ==> default: several bugfixes, scan control for PlatonicDirs using flags, start using RunStates to orchestrate shutdown
+  lib/python/cs/app/flag.py: cs.app.flag: clean lint, update docstrings

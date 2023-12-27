@@ -1,0 +1,2 @@
+FSTags.edit_dirpath: new all_names parameter to include dot-names.
+FSTagsCommand.cmd_edit: new -a option to turn on the all_names parameter.

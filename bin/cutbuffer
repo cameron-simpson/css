@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Manipulate CUT_BUFFER0 via xprop(1).
-#	- Cameron Simpson <cs@zip.com.au> 10aug2003
+#	- Cameron Simpson <cs@cskk.id.au> 10aug2003
 #
 
 dfltbuf=0

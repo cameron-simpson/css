@@ -1,0 +1,78 @@
+#!/bin/sh
+#
+# Emit output to re-source the environment files if they've been
+# updated since lastmtime.
+# Have to do them all if any are new because of ordering.
+#	- Cameron Simpson <cs@cskk.id.au> 25dec2004
+#
+
+set -ue
+
+: ${ENVFILES:="/etc/rc.mobile/env.sh $HOME/var/env.sh"}
+
+cmd=$0
+usage="Usage: $cmd lastmtime [command [command-args...]]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing lastmtime" >&2
+  badopts=1
+else
+  lastmtime=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $# -gt 0 ]
+then
+    envstuff=$("$0" "$lastmtime")
+    eval "$envstuff"
+    exec "$@"
+fi
+
+case $(uname -s) in
+  Linux)        mtime(){ stat -c '%Y' -- ${1+"$@"}; } ;;
+  *)            mtime(){ stat -f '%m' -- ${1+"$@"}; } ;;
+esac
+
+# test if a file is newer than $lastmtime
+isnewfile()
+{ [ $# = 1 ] || { echo "$0: Usage: testfile filepath" >&2; exit 2; }
+  _inf_file=$1; shift
+
+  [ -z "$lastmtime" ] \
+  || [ "x$lastmtime" = x- ] \
+  || {
+    [ -f "$_inf_file" ] \
+    && [ -s "$_inf_file" ] \
+    && _inf_mtime=$(mtime "$_inf_file") \
+    && [ "$_inf_mtime" -gt "$lastmtime" ]
+  }
+}
+
+newness=
+envfiles=
+for envpath in $ENVFILES
+do
+  if [ -d "$envpath/." ]
+  then
+    for envfile in "$envpath"/*
+    do
+      [ -f "$envfile" ] || continue
+      envfiles="$envfiles $envfile"
+      isnewfile "$envfile" && newness=1
+    done
+  else
+    [ -f "$envpath" ] || continue
+    envfiles="$envfiles $envpath"
+    isnewfile "$envpath" && newness=1
+  fi
+done
+
+[ $newness ] || exit 0
+
+cat $envfiles
+echo "PATH='$PATH'; export PATH"	# just in case

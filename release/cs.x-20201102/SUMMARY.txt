@@ -1,0 +1,2 @@
+Set X_via_tty if $CS_X_VIA_TTY.
+Put X() into builtins if $CS_X_BUILTIN.

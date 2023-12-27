@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # CSV - comma separated files.
-#	- Cameron Simpson <cs@zip.com.au> 03apr2001
+#	- Cameron Simpson <cs@cskk.id.au> 03apr2001
 #
 
 use strict qw(vars);

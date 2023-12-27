@@ -1,0 +1,10 @@
+  lib/python/cs/deco.py: cs.deco: assorted decorators, starting with @cache
+  lib/python/cs/deco.py: cs.deco: @cached: bugfix sig_func logic nesting; strip out debugging
+  lib/python/cs/deco.py: cs.deco: @decorator: wrapper for decorators to support optional keyword parameters; wrap @cached in it
+  lib/python/cs/deco.py: cs.deco: @cached: track first call, ignore poll_delay
+  lib/python/cs/deco.py: cs.deco: @cached: sanity check for poll_delay
+  lib/python/cs/deco.py: cs.deco: remove debug
+  lib/python/cs/deco.py: cs.deco: @decorator: bugfix arguments case, was dropping the supplied arguments
+  lib/python/cs/deco.py: my email address has changed - update Python code
+  lib/python/cs/deco.py: cs.deco: @cached: if no `sig_func` keep the first computed value forever
+  lib/python/cs/deco.py: cs.deco: prep for PyPI release

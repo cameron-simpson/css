@@ -1,0 +1,1 @@
+Change final .decode to use "replace". Fix a bunch of warning format strings.

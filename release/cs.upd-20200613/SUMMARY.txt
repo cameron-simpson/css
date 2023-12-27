@@ -1,0 +1,10 @@
+New UpdProxy.__call__ which sets the .text property in the manner of logging calls, with (msg,*a).
+New Upd.normalise static method exposing the text normalisation `unctrl(text.rstrip())`.
+New UpdProxy.prefix attribute with a fixed prefix for status updates; `prefix+text` is left cropped for display purposes when updated.
+New UpdProxy.width property computing the space available after the prefix, useful for sizing things like progress bars.
+Make UpdProxy a context manager which self deletes on exit.
+Upd: make default backend=sys.stderr, eases the common case.
+New Upd.above() context manager to support interleaving another stream with the output, as when stdout (for print) is using the same terminal as stderr (for Upd).
+New out() top level function for convenience use with the default Upd().
+New nl() top level function for writing a line to stderr.
+New print() top level function wrapping the builtin print; callers can use "from cs.upd import print" to easily interleave print() with cs.upd use.

@@ -2,7 +2,7 @@
 #
 # Format, mformat, chown etc to make up a FAT filesystem on a Zip disc.
 # Uses the mtools.
-#	- Cameron Simpson <cs@zip.com.au> 22nov96
+#	- Cameron Simpson <cs@cskk.id.au> 22nov96
 #
 
 echo "NOT READY YET" >&2; exit 1

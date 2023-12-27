@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Remove obsolete lock directories for this host.
-#	- Cameron Simpson <cs@zip.com.au> 14jun2002
+#	- Cameron Simpson <cs@cskk.id.au> 14jun2002
 #
 
 cmd=`basename "$0"`

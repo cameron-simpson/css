@@ -1,0 +1,1 @@
+Overdue upgrade of @decorator to support combining the function and decorator args in one call.

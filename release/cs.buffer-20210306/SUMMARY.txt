@@ -1,0 +1,3 @@
+CornuCopyBuffer.from_file: improve the seekability test, handle files with no .tell().
+CornuCopyBuffer.from_bytes: bugfix: set the buffer.offset to the supplied offset.
+CornuCopyBuffer.from_bytes: queue a memoryview of the supplied bytes.

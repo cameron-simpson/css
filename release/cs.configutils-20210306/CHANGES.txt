@@ -1,0 +1,3 @@
+lib/python/cs/configutils_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/configutils_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/configutils.py: cs.app.flag,cs.configutils: fix imports from collections.abc

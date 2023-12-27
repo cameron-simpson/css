@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Use acroread to convert PDF to PostScript (oh for PDF to HTML!).
-#	- Cameron Simpson <cs@zip.com.au> 14may1997
+#	- Cameron Simpson <cs@cskk.id.au> 14may1997
 #
 # No, acroread doesn't parse command line options like most UNIX
 # filters, hence the cat prefix.

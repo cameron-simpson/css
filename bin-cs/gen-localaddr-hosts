@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Generate 127.0.0.n addresses from input lines in /etc/hosts format.
+# - Cameron Simpson <cs@cskk.id.au> 10apr2016
+#
+
+set -ue
+
+n=1
+while read -r name0 names
+do
+  case "$name0" in
+    '' | \#* )  continue ;;
+    PROXY)      namesfx=-proxy ;;
+    *)          namesfx= names="$name0 $names" ;;
+  esac
+  n=$(( n + 1 ))
+  printf "127.0.0.%d" "$n"
+  for name in $names
+  do  printf " $name$namesfx"
+  done
+  echo
+done

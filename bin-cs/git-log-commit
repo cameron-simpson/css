@@ -1,0 +1,21 @@
+#!/bin/sh -ue
+#
+# Record a Git commit.
+# - Cameron Simpson <cs@cskk.id.au> 15feb2020
+#
+
+set -ue
+
+git log -r '@^..@' \
+| \
+{
+  read _commit revision etc
+  unhdr \
+  | {
+    read -r headline
+    wd=$( pwd )
+    wdbase=$( basename "$wd" )
+    dlog log "wd=$wd" vcs.type=git "vcs.revision=$revision" \
+             "$wdbase $headline"
+  }
+}

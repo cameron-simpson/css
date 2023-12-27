@@ -1,0 +1,2 @@
+  lib/python/cs/lex.py: cs.lex,cs.vt.compose: move get_qstr_or_identifier to cs.lex
+  lib/python/cs/lex.py: cs.lex: docstring tweak, tiny lint cleanup

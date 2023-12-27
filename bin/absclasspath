@@ -2,7 +2,7 @@
 #
 # Take the environment $CLASSPATH and resolve into absolute classpath
 # using $CLASSPATHPATH envvar.
-#	- Cameron Simpson <cs@zip.com.au> 14feb2003
+#	- Cameron Simpson <cs@cskk.id.au> 14feb2003
 #
 
 CLASSPATHPATH=${CLASSPATHPATH:-"$HOME/rc/java $JAVA_HOME/jre/lib/ext"}

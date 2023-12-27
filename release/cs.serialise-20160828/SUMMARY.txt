@@ -1,0 +1,6 @@
+Use "install_requires" instead of "requires" in DISTINFO.
+Redo entire API with saner names and regular interface, add unit tests.
+Implement general purpose Packet class.
+Add put_bss, get_bss, read_bss to serialise strings.
+Python 2/3 port fix.
+DOcstring improvements and other internal improvements.

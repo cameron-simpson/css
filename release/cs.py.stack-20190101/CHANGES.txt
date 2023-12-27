@@ -1,0 +1,10 @@
+  lib/python/cs/py/stack.py: cs.*: add empty "install_requires" for completeness
+  lib/python/cs/py/stack.py: merge default ==> beyonwiz
+  lib/python/cs/py/stack.py: cs.py.stack: stack_dump: accept optional `Fs` frames argument
+  lib/python/cs/py/stack.py: my email address has changed - update Python code
+  lib/python/cs/py/stack.py: cs.py.stack: _Frame: rename .functionname to .funcname; caller: turn raw frames into Frames
+  lib/python/cs/py/stack.py: default ==> pilfer
+  lib/python/cs/py/stack.py: merge later ==> pilfer
+  lib/python/cs/py/stack.py: cs.py.stack: caller: accept optional frame_index, default -3
+  lib/python/cs/py/stack.py: cs.py.stack: docstring tweak
+  lib/python/cs/py/stack.py: cs.py.stack: lint and docstrings

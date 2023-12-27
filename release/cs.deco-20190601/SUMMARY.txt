@@ -1,0 +1,2 @@
+Bugfix @decorator to correctly propagate the docstring of the subdecorator.
+Improve other docstrings.

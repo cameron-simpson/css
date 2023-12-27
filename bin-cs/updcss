@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Install and publish css from my development copy.
-#	- Cameron Simpson <cs@zip.com.au> 09apr1997
+#	- Cameron Simpson <cs@cskk.id.au> 09apr1997
 #
 
 : ${TMPDIR:=/tmp}
@@ -9,7 +9,7 @@
 optcss=${OPTCSS:-/opt/css}
 cssweb=$HOME/@/ezos/html/cs/css
 adzapweb=$HOME/@/adzapper.sf/html/scripts
-rev=
+rev=tip
 updateweb=1
 force=
 
@@ -45,14 +45,18 @@ fi
                 badopts=1
               }
 
-if [ -n "$rev" ]
-then
-  cssdatedir=css-$rev
-else
-  rev=`cs-release last`
-  cssdatedir=css-$rev
-  rev=release-$rev
-fi
+case "$rev" in
+  RELEASE)
+    rev=`cs-release last`
+    cssdatedir=css-$rev
+    rev=release-$rev
+    ;;
+  tip)
+    cssdatedir=css-$rev-$(datecode)
+    ;;
+  *)cssdatedir=css-$rev
+    ;;
+esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 

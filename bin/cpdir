@@ -1,39 +1,10 @@
-#!/bin/sh -u
+#!/usr/bin/env python3
 #
-# Copy a directory tree - refuse if target exists as safety measure.
-# Faster, safer, more accurate and more informative than "cp -rp".
-#	- Cameron Simpson <cs@zip.com.au>
+# cpdir - copy a directory using piped tar commands.
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
-cmd=`basename "$0"` || exit 1
-
-bsize=20
-[ $# -gt 0 ] && [ "x$1" = x-b ] && { bsize=$2; shift; shift; }
-
-[ $# = 2 ] || { echo "Usage: $cmd [-b bsize] fromdir todir" >&2
-		exit 2
-	      }
-from=$1
-to=$2
-
-[ -d "$to/."   ] && { echo "$cmd: $to already exists!" >&2; exit 1; }
-[ -d "$from/." ] || { echo "$cmd: $from missing!" >&2; exit 1; }
-
-case $ARCH in
-    *.*.domainos) # preserve ACLs
-	exec /com/cpt "$from" "$to" -pdt -sacl -ld
-	;;
-    *)	( cd "$from/." || exit 1
-          case $ARCH in
-            *.linux)
-              exec tar -c -B -b "$bsize" -f - .
-              ;;
-            *)exec tar cBbf "$bsize" - .
-              ;;
-          esac
-	) \
-	| ( mkdir "$to" && cd "$to" && untar -b "$bsize" )
-	;;
-esac
-
-sync &
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.tarutils import traced_cpdir
+sys.exit(traced_cpdir(*sys.argv[1:]))

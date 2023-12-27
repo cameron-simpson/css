@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Methods for making forms.
-#	- Cameron Simpson <cs@zip.com.au> 07aug1997
+#	- Cameron Simpson <cs@cskk.id.au> 07aug1997
 #
 
 =head1 NAME
@@ -597,7 +597,7 @@ cs::CGI(3),
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

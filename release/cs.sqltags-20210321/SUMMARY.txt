@@ -1,0 +1,1 @@
+Drop logic now merged with cs.sqlalchemy_utils, use the new default session stuff.

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Autofile my news.	- Cameron Simpson <cs@zip.com.au>
+# Autofile my news.	- Cameron Simpson <cs@cskk.id.au>
 #
 
 ($cmd=$0) =~ s:.*/::;

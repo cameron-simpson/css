@@ -2,6 +2,6 @@
 #
 # Strip control characters from input for presentation on screen
 # as harmless text.
-#	- Cameron Simpson <cs@zip.com.au> 02feb2004
+#	- Cameron Simpson <cs@cskk.id.au> 02feb2004
 #
 s/[\000-\010\013-\037]/sprintf("\\o%03o",ord($&))/eg;

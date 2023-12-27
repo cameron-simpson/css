@@ -1,0 +1,1 @@
+New ResultSet(set) class, with context manager and wait methods, and whose __iter__ iterates completed Results.

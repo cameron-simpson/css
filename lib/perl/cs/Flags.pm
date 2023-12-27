@@ -2,7 +2,7 @@
 #
 # A flag class based on a list of strings.
 # Simple but not very efficient in either space or time.
-#	- Cameron Simpson <cs@zip.com.au> 26aug97
+#	- Cameron Simpson <cs@cskk.id.au> 26aug97
 #
 # Reimplement as \0-sep string.	- cameron 30jul98
 #
@@ -174,7 +174,7 @@ and will cause quiet dysfunction.
 
 =head1 AUTHOR
 
-Cameron Simpson <cs@zip.com.au>
+Cameron Simpson <cs@cskk.id.au>
 
 =cut
 

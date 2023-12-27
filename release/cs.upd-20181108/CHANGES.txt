@@ -1,0 +1,9 @@
+  lib/python/cs/README-upd.rst: merge pypi ==> default: linting and releasing, some cs-release improvements, improve @cs.deco.cached
+  lib/python/cs/README-upd.rst: merge default ==> beyonwiz
+  lib/python/cs/README-upd.rst: merge default ==> iphoto
+  lib/python/cs/README-upd.rst: merge default ==> venti
+  lib/python/cs/README-upd.rst: merge default ==> later
+  lib/python/cs/README-upd.rst: merge later ==> pilfer
+  lib/python/cs/upd.py: cs.*: update @contextmanager formalism to use try/finally for the cleanup phase
+  lib/python/cs/README-upd.rst: merge default ==> media
+  lib/python/cs/upd.py: cs.upd: docstring improvements, some linting

@@ -1,0 +1,1 @@
+New ContextManagerMixin mixin class to implement the __enter__/__exit__ methods using a simple generator function named enter_exit.

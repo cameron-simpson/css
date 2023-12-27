@@ -1,0 +1,2 @@
+New class decorator @observable_class.
+Bugfix import of "warning".

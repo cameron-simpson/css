@@ -1,0 +1,1 @@
+caller(): return None if the frame offset is out of range.

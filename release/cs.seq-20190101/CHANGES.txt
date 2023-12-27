@@ -1,0 +1,5 @@
+  lib/python/cs/seq.py: cs.seq: new and UNTESTED class StatefulIterator to associate some externally visible state with an iterator
+  lib/python/cs/seq.py: cs.seq: Seq: accept optional `lock` parameter
+  lib/python/cs/README-seq.rst: merge default ==> media
+  lib/python/cs/seq.py: cs.seq: clean some lint, fix some exception contructions, add some docstrings
+  lib/python/cs/seq.py: cs.seq: docstring updates

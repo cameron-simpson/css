@@ -1,0 +1,8 @@
+lib/python/cs/lex.py: Release information for cs.lex-20200718.
+lib/python/cs/lex.py: cs.lex,cs.hier: move terribly special purpose lastlinelen() from cs.lex to cs.hier and hide it
+lib/python/cs/lex.py: cs.lex: various docstring tweak
+lib/python/cs/lex.py: cs.lex: FormatableMixin: small docstring correction
+lib/python/cs/lex.py: merge fstags ==> sqltags
+lib/python/cs/lex.py: cs.lex: get_dotted_identifier: improve docstring
+lib/python/cs/lex.py: cs.lex: new common_prefix and common_suffix function to compare strings
+lib/python/cs/lex.py: cs.lex: clean lint

@@ -3,10 +3,10 @@
 # rhb - remote histbackup
 #
 # Backup a directory as per histbackup, but to a remote host.
-#	- Cameron Simpson <cs@zip.com.au> 27jun2001
+#	- Cameron Simpson <cs@cskk.id.au> 27jun2001
 #
 # Do it locally, too.
-#	- Cameron Simpson <cs@zip.com.au> 19dec2001
+#	- Cameron Simpson <cs@cskk.id.au> 19dec2001
 #
 
 : ${TMPDIR:=/tmp}

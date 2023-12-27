@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Set the job id of the current desktop.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=$0

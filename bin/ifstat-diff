@@ -3,7 +3,7 @@
 # Run ifstat, run command, run ifstat again and report byte in/out.
 # Handy as a crude measure of the network I/O a command generates on an
 # otherwise fairly idle system.
-#       - Cameron Simpson <cs@zip.com.au> 16apr2011
+#       - Cameron Simpson <cs@cskk.id.au> 16apr2011
 #
 
 set -ue

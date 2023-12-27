@@ -3,7 +3,6 @@
 # Await some condition, then exit.
 #	- Cameron Simpson, 05nov1993
 #
-# Turned into wrapper for forever.
-#
 
-exec forever -E '!' ${1+"$@"}
+loop -E ! ${1+"$@"}
+exit 0

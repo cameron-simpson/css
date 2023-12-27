@@ -1,9 +1,18 @@
 #!/bin/sh -u
+#
+# Grep for a regular expression and highlight the matches if stdout if a tty.
+#   - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
 
 : ${COLOUR_HIGHLIGHT:=cyan}
 
 cmd=$0
-usage="Usage: $cmd [-g grep] [-l] [-v] string [files...]"
+usage="Usage: $cmd [-g grep] [-l] [-v] regexp [files...]
+  -g grep   Specify a grep program.
+  -l        Passed to grep.
+  -v        Passed to grep."
 
 grep=grep
 flags=
@@ -26,15 +35,22 @@ then
     echo "$cmd: missing string" >&2
     badopts=1
 else
-    ptn=$1; shift
+    ptn=$1
+    shift
+fi
+
+# no files? read from stdin: must not be a tty
+if [ $# = 0 -a -t 0 ]
+then
+  echo "$cmd: I expect filenames if stdin is a tty!" >&2
+  badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# no files? read from stdin: must not be a tty
-[ $# = 0 -a -t 0 ] && { echo "$cmd: I expect filenames if stdin is a tty!" >&2
-			exit 2
-		      }
+set -- "$grep" -in $flags "$ptn" ${1+"$@"}
 
-[ -t 1 ] || exec "$grep" -in $flags "$ptn" ${1+"$@"}
-"$grep" -in $flags "$ptn" ${1+"$@"} | colour_highlight "$COLOUR_HIGHLIGHT" "$ptn"
+if [ -t 1 ]
+then "$@" | colour_highlight "$COLOUR_HIGHLIGHT" "$ptn"
+else exec "$@"
+fi

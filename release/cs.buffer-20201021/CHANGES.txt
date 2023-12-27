@@ -1,0 +1,17 @@
+lib/python/cs/buffer.py: Release information for cs.buffer-20200517.
+lib/python/cs/buffer.py: cs.buffer: bump __version__ to 20200517-post to avoid misleading value for future unreleased changes
+lib/python/cs/buffer.py: merge default ==> vt
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.from_file: prettify the seekable test - should this test .seek instead of .tell?
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.from_file: test .seek, not .tell
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.read: call extend with short_ok=True
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.from_fd: record the fd as .fd, lets users os.fstat(bfr.fd)
+lib/python/cs/buffer.py: cs.buffer: new CornuCopyBuffer.as_fd method to return a readable file descriptor fed from the buffer by a Thread, intended for feeding subprocesses
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.from_file: improve the seekable test, rename parameter
+lib/python/cs/buffer.py: cs.buffer: new CornuCopyBuffer.iter(maxlength) to return an iterator of up to maxlength bytes form the buffer
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.subbuffer: make the finishing flush reliable
+lib/python/cs/buffer.py: cs.buffer: docstring tweaks
+lib/python/cs/buffer.py: cs.buffer: FDIterator.__del__ closes the file descriptor
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.__init__: new "close" parameter to release resources; new CornuCopyBuffer.close method to call this; new CornuCopyBuffer.__del__ which calls CornuCopyBuffer.close
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.from_fd: pass in a close parameter to close the iterator (which closes its file descriptor)
+lib/python/cs/buffer.py: cs.buffer: clean lint
+lib/python/cs/buffer.py: cs.buffer: drop commented out line

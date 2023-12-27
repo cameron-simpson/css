@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Palm::App::Address: a module for the Address Palm app
-#	- Cameron Simpson <cs@zip.com.au> 17may2000
+#	- Cameron Simpson <cs@cskk.id.au> 17may2000
 #
 
 =head1 NAME
@@ -108,7 +108,7 @@ cs::Palm(3), cs::Palm::PDB(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

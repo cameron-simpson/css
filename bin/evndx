@@ -2,7 +2,7 @@
 #
 # Peruse a list of date-named files, directories and references and emit an
 # ordered HTML index.
-#	- Cameron Simpson <cs@zip.com.au> 03may96
+#	- Cameron Simpson <cs@cskk.id.au> 03may96
 #
 
 cmd=`basename "$0"`

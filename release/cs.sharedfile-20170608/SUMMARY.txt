@@ -1,0 +1,2 @@
+Facilities for shared files, split out from cs.fileutils.
+SharedAppend* classes. lockfile function.

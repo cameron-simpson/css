@@ -1,0 +1,2 @@
+lib/python/cs/threads.py: cs.threads: drop dependence on cs.obj.O
+lib/python/cs/threads.py: cs.threads: autoformat

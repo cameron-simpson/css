@@ -2,7 +2,7 @@
 #
 # Extract discid and track info from a CD as a preliminary to
 # constructing a FreeDB CDDB entry. Used by cdsubmit.
-#	- Cameron Simpson <cs@zip.com.au> 14mar2001
+#	- Cameron Simpson <cs@cskk.id.au> 14mar2001
 # 
 
 use strict qw(vars);

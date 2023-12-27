@@ -1,0 +1,16 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: new module providing convenience functions for working with external commands
+lib/python/cs/cmdutils.py: cs.cmdutils: add pipeto function
+lib/python/cs/cmdutils.py: cs.cmdutils: workaround for older subprocess where there is no DEVNULL
+lib/python/cs/cmdutils.py: cs.cmdutils: bugfix pipefrom: define devnull when no subprocess.DEVNULL
+lib/python/cs/cmdutils.py: cs.cmdutils: add missing import, fix getattr call
+lib/python/cs/cmdutils.py: cs.cmdutils: pipefrom: add optional `binary` mode
+lib/python/cs/cmdutils.py: cs.cmdutils: pipefrom: new `keep_stdin` mode
+lib/python/cs/cmdutils.py: cs.cmdutils: add @docmd decorator from old cs.venti.vtftp
+lib/python/cs/cmdutils.py: cs.*: adjust imports of cs.pfx.Pfx
+lib/python/cs/cmdutils.py: my email address has changed - update Python code
+lib/python/cs/cmdutils.py: cs.cmdutils: run, pipeto and pipefrom moved to cs.psutils
+lib/python/cs/cmdutils.py: cs.cmdutils: lint
+lib/python/cs/cmdutils.py: cs.cmdutils: module docstring, improve docmd docstring, update imports, autoformat
+lib/python/cs/cmdutils.py: cs.cmdutils: new BaseCommand class to support implementation of commandlines with subcommands
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: wrap the main function in a RunState
+lib/python/cs/cmdutils.py: cs.cmdutils: initial PyPI setup

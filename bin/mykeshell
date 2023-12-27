@@ -2,7 +2,7 @@
 #
 # Shell to run a command from a mykefile.
 # Colourises the output.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=$0

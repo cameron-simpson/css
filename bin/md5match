@@ -8,7 +8,7 @@
 #	size:md5\tfilename\tmd5index\tindex-filename
 # for a match on an md5index file, with "index-filename"
 # being the name from the index.
-#	- Cameron Simpson <cs@zip.com.au> 21jun2000
+#	- Cameron Simpson <cs@cskk.id.au> 21jun2000
 #
 
 : ${TMPDIR:=/tmp}

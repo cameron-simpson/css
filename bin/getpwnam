@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Print a passwd line for the specified user.
-#	- Cameron Simpson <cs@zip.com.au> 03nov2005
+#	- Cameron Simpson <cs@cskk.id.au> 03nov2005
 #
 
 die "Usage: $0 login\n" if @ARGV != 1;

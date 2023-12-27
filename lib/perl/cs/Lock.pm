@@ -3,7 +3,7 @@
 # NFS-safe locks.
 # Adapted from my lock script, which used to use mkdir.
 # Now I use a umask current-umask+write-bits.
-#	- Cameron Simpson <cs@zip.com.au> 26jun1999
+#	- Cameron Simpson <cs@cskk.id.au> 26jun1999
 #
 # Seems not to work on Linux; maybe it tries to be too
 # clever. Back to mkdir().			- cameron 27jun1999
@@ -332,7 +332,7 @@ B<LOCKDIR> - the preferred directory for locks.
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

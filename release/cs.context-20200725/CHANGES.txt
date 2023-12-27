@@ -1,0 +1,2 @@
+lib/python/cs/context.py: cs.context: set __version__ to '20200517-post'
+lib/python/cs/context.py: cs.context: new stackkeys and components pushkeys and popkeys doing "stackattrs for dicts/mappings"

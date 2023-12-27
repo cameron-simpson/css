@@ -7,7 +7,7 @@
 #       constructed directory can be used as an NFS export.
 #       The -s option exists to make soft links if preferred,
 #	or the -c option to make copies instead of links.
-# - Cameron Simpson <cs@zip.com.au> 16jun2003
+# - Cameron Simpson <cs@cskk.id.au> 16jun2003
 #
 
 cmd=`basename "$0"`

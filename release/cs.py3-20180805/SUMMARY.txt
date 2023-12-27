@@ -1,0 +1,1 @@
+Implement pread for systems lacking os.pread.

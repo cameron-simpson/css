@@ -1,0 +1,2 @@
+Default session support, particularly though an ORM's .sqla_state per-Thread state object - this allows removal of a lot of plumbing and @auto_session decoration.
+Support for serialised sessions, for db backend where only one session may be active at a time; this brings easy support for multithreaded SQLite access.

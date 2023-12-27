@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Syntax check a cs::Hier text file.
-#	- Cameron Simpson <cs@zip.com.au> 19may2004
+#	- Cameron Simpson <cs@cskk.id.au> 19may2004
 #
 
 use cs::Misc;

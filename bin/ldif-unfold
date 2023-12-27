@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Unfold leading-space-folded text, such as LDIF.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 ( cat ${1+"$@"}

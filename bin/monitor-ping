@@ -1,0 +1,103 @@
+#!/bin/sh
+#
+# Monitor an IP target using ping.
+# Run commands on "up" and "down"; repeat until successful or state change.
+#       - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+mopts=
+dotrace=
+ping_count=5
+pingopts=
+setflag=
+flagname=
+upcmd=
+downcmd=
+quiet=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-c count] [{-F|-f flagname}] [-q] [-s sleep] [-V rtable] [-x] target up-shcmd down-shcmd
+  -c count  Probe ping count. Default: $ping_count.
+  -F        Set or clear flag PING_{TARGET}.
+  -f flagname Specify flag name explicitly.
+  -q        Quiet.
+  -s sleep  Sleep period between probes.
+  -V rtable Passed to ping.
+  -v        Verbose; passed to monitor(1cs).
+  -x        Trace execution."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -F) setflag=1 ;;
+    -f) setflag=1 flagname=$2; shift ;;
+    -0|-1)
+        mopts="$mopts $1" ;;
+    -s) mopts="$mopts $1 $2"; shift ;;
+    -c) ping_count=$2; shift ;;
+    -q) pingopts="$pingopts $1" mopts="$mopts $1" ;;
+    -V) pingopts="$pingopts $1 $2"; shift ;;
+    -v) mopts="$mopts -v" ;;
+    -x) dotrace=1; mopts="$mopts $1" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing target" >&2
+  badopts=1
+else
+  target=$1
+  shift
+  if [ $# = 0 ]
+  then
+    [ $setflag ] || \
+    { echo "$cmd: missing up-shcmd" >&2
+      echo "$cmd: missing down-shcmd" >&2
+      badopts=1
+    }
+  else
+    upcmd=$1
+    shift
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing down-shcmd" >&2
+      badopts=1
+    else
+      downcmd=$1
+      shift
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: extra arguments after down-shcmd: $*" >&2
+        badopts=1
+      fi
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pingopts="$pingopts -c $ping_count"
+
+if [ $dotrace ]
+then  trace=set-x setx='set -x'
+else  trace= setx=
+fi
+
+if [ $setflag ]
+then
+  : ${flagname:=PING_$( printf '%s\n' "$target" | tr '[.a-z]' '[_A-Z]' )}
+  mopts="$mopts -f $flagname"
+fi
+
+exec $trace monitor $mopts "ping $pingopts $target 2>/dev/null" "$upcmd" "$downcmd"

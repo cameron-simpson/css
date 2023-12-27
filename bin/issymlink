@@ -1,13 +1,13 @@
 #!/usr/bin/ksh
 #
 # Check is something is a symlink.
-#	- Cameron Simpson <cs@zip.com.au> 10nov2000
+#	- Cameron Simpson <cs@cskk.id.au> 10nov2000
 #
 # Switch from playing shell games to using readsymlink.
-#	- Cameron Simpson <cs@zip.com.au> 16oct2001
+#	- Cameron Simpson <cs@cskk.id.au> 16oct2001
 #
 # Switch to using ksh.
-#	- Cameron Simpson <cs@zip.com.au> 13jun2004
+#	- Cameron Simpson <cs@cskk.id.au> 13jun2004
 #
 
 [ $# = 1 ] || { echo "Usage: $0 pathname" >&2; exit 2; }

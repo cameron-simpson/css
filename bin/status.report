@@ -2,7 +2,7 @@
 #
 # Generate a status report of similar form to sysctl output.
 # Very useful for readability/diffing/parsing.
-#       - Cameron Simpson <cs@zip.com.au> 26dec2012
+#       - Cameron Simpson <cs@cskk.id.au> 26dec2012
 #
 
 set -ue

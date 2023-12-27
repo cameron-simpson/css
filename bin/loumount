@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Reverse an lomount. See lomount.
-#	- Cameron Simpson <cs@zip.com.au> 24nov2001
+#	- Cameron Simpson <cs@cskk.id.au> 24nov2001
 #
 
 cmd=$0

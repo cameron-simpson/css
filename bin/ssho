@@ -1,2 +1,0 @@
-#!/bin/sh
-exec sshto StrictHostKeyChecking=no ${1+"$@"}

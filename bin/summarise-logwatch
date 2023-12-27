@@ -2,7 +2,7 @@
 #
 # Process Logwatch reports to strip irrelevant cruft.
 # Used in my display_filter for mutt for these messages.
-#       - Cameron Simpson <cs@zip.com.au> 23apr2011
+#       - Cameron Simpson <cs@cskk.id.au> 23apr2011
 #
 
 s/^  *//
@@ -26,6 +26,7 @@ s/  *$//
   /^--/d
   /^\*\*Unmatched Entries\*\*/d
   /^network unreachable resolving '/d
+  /^host unreachable resolving '/d
   /^connection refused resolving '/d
   /^client .* query .* denied/d
   /^$/d

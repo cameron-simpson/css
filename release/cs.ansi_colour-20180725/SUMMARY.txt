@@ -1,0 +1,1 @@
+rename second colourise function to colourise_patterns, was shadowing things

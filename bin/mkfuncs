@@ -2,7 +2,7 @@
 #
 # C and C++ prototype generator.
 # Believes fairly strongly in my formatting conventions.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 require 'cs/cpp.pl';

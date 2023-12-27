@@ -2,7 +2,7 @@
 #
 # Convert "foo at bar.dom" into "foo@bar.dom".
 # This undoes the obfuscation used in Mailman mail archives.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 $all = 1;

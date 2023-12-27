@@ -1,0 +1,7 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: _state: provide basic session=None attribute, fixes test elsewhere
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: _state: add .orm=None; clean some unused imports, bump DISTINFO.install_requires
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: @orm_auto_session: rename wrapper function for improved debugging
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: rename _state to state, making it public
+lib/python/cs/sqlalchemy_utils.py: cs.context: new twostep() and setup_cmgr() to support separating the set up and tear down phases of an arbitrary context manager
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: fix two typos
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: BasicTableMixin: fix session usage

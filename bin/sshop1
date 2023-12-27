@@ -1,2 +1,0 @@
-#!/bin/sh
-exec ssh -o 'stricthostkeychecking no' -o 'protocol 1' ${1+"$@"}

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parser for RTF.
-#	- Cameron Simpson <cs@zip.com.au> 13jun95
+#	- Cameron Simpson <cs@cskk.id.au> 13jun95
 #
 # newtok(Input[,State]) -> new cs::Tokenise
 # Tok -> new token or undef

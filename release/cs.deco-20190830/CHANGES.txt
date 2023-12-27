@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: @decorator: set the __module__ of the wrapper from the decorated target, aids cs.distinfo

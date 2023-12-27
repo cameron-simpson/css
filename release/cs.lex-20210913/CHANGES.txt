@@ -1,0 +1,16 @@
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.FORMAT_RE_ARG_NAME_s: strings commencing with digits now match \d+(\.\d+)[a-z]+, eg "02d"
+lib/python/cs/lex.py: cs.lex: alias typed_str as s and typed_repr as r
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: avoid unbound recursion: if only 1 format_subspecs use Formatter.format_field directly otherwise cls._format_field1 per subspec
+lib/python/cs/lex.py: cs.lex: FormatableFormatter: format_field1 renamed to _format_field1, might undo this one day
+lib/python/cs/lex.py: cs.lex: docstring updates
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.get_subfield: if the subfiled commences with '.' or '[' assemable as a subexpression otherwise use as a ':' conversion
+lib/python/cs/lex.py: cs.lex: clean some lint, a lot because of the s=typed_str alias
+lib/python/cs/lex.py: merge tagger => default
+lib/python/cs/lex.py: cs.lex: FormatableFormatter: new .format_mode thread local state object initially with strict=False; plumb an optional strict parameter to control whther unknown fields leave a placeholder or raise KeyError
+lib/python/cs/lex.py: cs.lex: remove debug
+lib/python/cs/lex.py: cs.lex: clean lint
+lib/python/cs/lex.py: merge tagger ==> default: Tagger.auto_name: catch FormatAsError to skip tagger.auto_name format strings which cannot be resolved, related tweaks.
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: bugfix single subfield path
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: yet another run at the recursive formatting issue
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: the recursion fix quest continues - fold _format_field1 into format_field, only use convert_via_method_or_attr for things resembling identifiers, etc
+lib/python/cs/lex.py: cs.lex: drop debug import

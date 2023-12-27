@@ -12,7 +12,7 @@
 #     email the first 100 lines to "them".
 #       log-grabber -i 60 foo.log sh -c 'sed 100q | mail -s 100-lines them'
 #
-# - Cameron Simpson <cs@zip.com.au> 22aug2008
+# - Cameron Simpson <cs@cskk.id.au> 22aug2008
 #
 
 interval=60

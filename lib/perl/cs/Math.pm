@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Math stuff.
-#	- Cameron Simpson <cs@zip.com.au> 31jul96
+#	- Cameron Simpson <cs@cskk.id.au> 31jul96
 #
 
 use strict qw(vars);

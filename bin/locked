@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Check if a particular lock is taken.
-#	- Cameron Simpson <cs@zip.com.au> 03may1999
+#	- Cameron Simpson <cs@cskk.id.au> 03may1999
 #
 
 exec lock -q "$@"

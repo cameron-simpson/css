@@ -1,0 +1,5 @@
+lib/python/cs/lex.py: cs.lex: autoformat
+lib/python/cs/lex_tests.py: cs.lex_tests: clean some lint
+lib/python/cs/lex_tests.py: cs.lex_tests: autoformat
+lib/python/cs/lex.py: cs.lex: new cutprefix and cutsuffix functions
+lib/python/cs/lex.py: cs.lex: docstring and message tweaks

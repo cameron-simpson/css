@@ -1,0 +1,6 @@
+  lib/python/cs/binary.py: cs.binary: PacketField: new transcribe_value_flat convenience method to return a flat iterable of bytes-like objects
+  lib/python/cs/binary.py: merge default ==> venti
+  lib/python/cs/binary.py: cs.binary: new PacketField.parse_buffer generator method to parse instances of the PacketField from a buffer until end of input
+  lib/python/cs/binary.py: cs.binary: new PacketField.parse_buffer_values generator method to parse instances of the PacketField from a buffer and yield the `.value` attribute until end of input
+  lib/python/cs/binary.py: cs.binary: clean a little lint
+  lib/python/cs/binary.py: cs.binary: docstring tweaks

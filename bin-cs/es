@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Convenience wrapper for ealsticsearch.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+# default config seems to bind to every local address
+: ${ES_HOST:=127.0.0.1}
+: ${ES_PORT:=9200}
+
+set -x
+exec elasticsearch -E "network.host=$ES_HOST" -E "network.port=$ES_PORT" ${1+"$@"}

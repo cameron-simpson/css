@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.py/stack.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys
@@ -11,6 +11,8 @@ from cs.py.stack import frames, caller
 from cs.logutils import setup_logging
 
 class TestStack(unittest.TestCase):
+  ''' Tests for `cs.py.stack`.
+  '''
 
   def test00stack(self):
     Fs = frames()

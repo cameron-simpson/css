@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Set up user environment to use the CSS tools.
-#	- Cameron Simpson <cs@zip.com.au> 09jun2005
+#	- Cameron Simpson <cs@cskk.id.au> 09jun2005
 #
 
 : ${OPTCSS:=/opt/css}

@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Change the image menu backdrop image for the running FVWM.
-#	- Cameron Simpson <cs@zip.com.au> 18oct2002
+#	- Cameron Simpson <cs@cskk.id.au> 18oct2002
 #
 
 : ${TMPDIR:=/tmp}

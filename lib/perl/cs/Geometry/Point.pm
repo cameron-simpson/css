@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Geometric routines for points.
-#	- Cameron Simpson <cs@zip.com.au> 12feb98
+#	- Cameron Simpson <cs@cskk.id.au> 12feb98
 #
 
 use strict qw(vars);

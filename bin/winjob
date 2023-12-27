@@ -2,7 +2,7 @@
 #
 # Set the job id for the current window.
 # The run command if supplied.
-#	- Cameron Simpson <cs@zip.com.au> 03nov2004
+#	- Cameron Simpson <cs@cskk.id.au> 03nov2004
 #
 
 : ${WINDOWID:=''}

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Manipulate a keyword index of a bunch of text files.
-#	- Cameron Simpson <cs@zip.com.au> 22apr2002
+#	- Cameron Simpson <cs@cskk.id.au> 22apr2002
 #
 
 use strict qw(vars);

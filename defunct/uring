@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Ring my URL bookmarks.
-#	- Cameron Simpson <cs@zip.com.au> 26jun98
+#	- Cameron Simpson <cs@cskk.id.au> 26jun98
 #
 
 exec ring -f "$HOME/private/bookmarks.txt" ${1+"$@"}

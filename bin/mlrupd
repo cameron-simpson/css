@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Update the mailist list DB from an Hier made from Carl's list.
-#	- Cameron Simpson <cs@zip.com.au> 21jul95
+#	- Cameron Simpson <cs@cskk.id.au> 21jul95
 #
 
 ($cmd=$0) =~ s:.*/::;

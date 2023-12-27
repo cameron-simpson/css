@@ -1,0 +1,2 @@
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.at_eof: fast precheck for data in the buffer
+  lib/python/cs/buffer.py: cs.buffer: python 2 tweak to support incidental import by python 2 even if unused

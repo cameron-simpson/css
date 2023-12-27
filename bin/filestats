@@ -3,7 +3,7 @@
 # Read
 #	size	path
 # from stdin, write stats to stdout.
-#	- Cameron Simpson <cs@zip.com.au> 07jun99
+#	- Cameron Simpson <cs@cskk.id.au> 07jun99
 #
 
 use strict qw(vars);

@@ -1,8 +1,8 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Append standard input to a log file.
 # Rotate the file on receiving SIGHUP.
-#       - Cameron Simpson <cs@zip.com.au> 12jun2008
+#       - Cameron Simpson <cs@cskk.id.au> 12jun2008
 #
 
 import sys

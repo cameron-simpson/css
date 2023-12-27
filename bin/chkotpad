@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Check a pad file for matching its name.
-#	- Cameron Simpson <cs@zip.com.au> 24jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 24jul2000
 #
 
 use strict qw(vars);

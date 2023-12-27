@@ -1,0 +1,12 @@
+Packet: now an abstract class, new self_check method initially checking the
+PACKET_FIELDS class attribute against the instance, new methods get_field
+and set_field to fetch or replace existing fields, allow keyword arguments
+to initialise the Packet fields and document the dependency on keyword
+argument ordering.
+PacketField: __len__ computed directory from a transcribe, drop other __len__
+methods.
+EmptyField singleton to use as a placeholder for missing optional fields.
+BytesField: implement value_s and from_buffer.
+multi_struct_field: implement __len__ for generated class.
+flatten: treat memoryviews like bytes.
+Assorted docstrings and fixes.

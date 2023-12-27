@@ -1,0 +1,4 @@
+lib/python/cs/fileutils.py: cs.fileutils: NamedTemporaryCopy: supply a prefix= to NamedTemporaryFile, using "NamedTemporaryCopy" is unspecified - this is to aid forensic identification during debugging
+lib/python/cs/fileutils.py: cs.fileutils: UUIDNDJSONMapping: provide an empty .scan_errors on instantiation, avoids AttributeError if a scan never occurs
+lib/python/cs/fileutils.py: merge default ==> cloud
+lib/python/cs/fileutils.py: cs.fileutils: clean a little lint

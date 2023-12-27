@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::SystemPort: a cs::Port attached to a command
-#	- Cameron Simpson <cs@zip.com.au> 17jan2001
+#	- Cameron Simpson <cs@cskk.id.au> 17jan2001
 #
 
 =head1 NAME
@@ -71,7 +71,7 @@ cs::Port(3), IPC::Open2(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

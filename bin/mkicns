@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+#
+# Construct a .icns file from presupplied icon base files.
+# Recipe from: http://applehelpwriter.com/2012/12/16/make-your-own-icns-icons-for-free/
+# - Cameron Simpson <cs@cskk.id.au> 18may2016
+#
+
+
+from __future__ import print_function
+import sys
+import os
+import os.path
+import subprocess
+from PIL import Image
+##Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+
+USAGE = 'Usage: %s pathname.icns icon-files...'
+
+def main(argv):
+  cmd = argv.pop(0)
+  badopts = False
+  if not argv:
+    error("%s: missing pathname.icns", cmd)
+    badopts = True
+  else:
+    icns_path = argv.pop(0)
+    if not icns_path.endswith('.icns'):
+      error("%s: extension should be .icns: %s", cmd, icns_path)
+      badopts = True
+    if os.path.exists(icns_path):
+      error("%s: already exists: %s", cmd, icns_path)
+      badopts = True
+  if not argv:
+    error("%s: missing icon-files", cmd)
+    badopts = True
+  icon_paths = argv
+  biggest_size = None
+  biggest_icon = None
+  icons_by_size = {}
+  for icon_path in icon_paths:
+    I = Image.open(icon_path)
+    size = I.size
+    icons_by_size[size] = icon_path
+    if size[0] != size[1]:
+      error("%s: %s: icon not square: %s", cmd, icon_path, size)
+      badopts = True
+    if biggest_size is None or size[0] > biggest_size[0]:
+      biggest_icon = icon_path
+      biggest_size = size
+    I.close()
+  if badopts:
+    error(USAGE, cmd)
+    return 2
+  # TODO: use splitext
+  iconset = icns_path[:-5] + '.iconset'
+  os.mkdir(iconset)
+  icons = []
+  for base_size in 16, 32, 128, 256, 512:
+    for scale in 1, 2:
+      icon_size = base_size * scale
+      basename = "icon_%dx%d" % (base_size, base_size)
+      if scale > 1:
+        basename += "@%dx" % (scale,)
+      basename += '.png'
+      icon_out = os.path.join(iconset, basename)
+      size_key = (icon_size, icon_size)
+      try:
+        icon_path = icons_by_size[size_key]
+      except KeyError:
+        print(icon_out, icon_size, '<=', biggest_icon)
+        I = Image.open(biggest_icon)
+        I2 = I.resize(size_key)
+        I2.save(icon_out)
+        I2.close()
+        I.close()
+      else:
+        print(icon_out, icon_size, '<=', icons_by_size[size_key])
+        I = Image.open(icons_by_size[size_key])
+        I.save(icon_out)
+        I.close()
+      icons.append(icon_out)
+  CP = subprocess.run(['iconutil', '-c', 'icns', iconset], stdin=subprocess.DEVNULL)
+  if CP.returncode == 0:
+    for icon in icons:
+      os.remove(icon)
+    os.rmdir(iconset)
+  return CP.returncode
+
+def error(msg, *a):
+  if a:
+    msg = msg % a
+  print(msg, file=sys.stderr)
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

@@ -1,0 +1,3 @@
+Update metadata with "install_requires" instead of "requires".
+Python 2 and 3 portability fixes.
+Assorted minor improvements.

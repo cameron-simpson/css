@@ -3,7 +3,7 @@
 # Simple line update routine; assumes \r and \b
 # do carriage return and non-destructive backspace.
 # Assumes 8 character tabs.
-#	- Cameron Simpson, cs@zip.com.au, DoD#743
+#	- Cameron Simpson, cs@cskk.id.au, DoD#743
 #
 # Added tput code and \r optimisation. - Cameron, 08dec93
 # Made into a module.		       - Cameron, 15may96
@@ -76,7 +76,8 @@ use strict qw(vars);
 
 use cs::Misc;
 
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 
 # hard exported to main
 no warnings 'redefine';
@@ -435,7 +436,7 @@ sub out
 
   if ($cs::Upd::This->{MODE} eq TTY)
   { print $F _diff($cs::Upd::This->{STATE},$_);
-    ::flush($F);
+    $F->flush();
   }
   else
   { ## silent - we only do nl() if going to a log file
@@ -446,11 +447,11 @@ sub out
   $cs::Upd::This->{STATE}=$_;
 }
 
-sub Flush { local($cs::Upd::This)=shift; &flush; }
+sub Flush { shift->flush(); }
 sub flush
 {
   my($F)=$cs::Upd::This->{FILE};
-  ::flush($F);
+  $F->flush();
 }
 
 sub Err	{ local($cs::Upd::This)=shift; &err; }
@@ -467,7 +468,7 @@ sub err	# (@errargs) -> void
     $cs::Upd::This->{ERRSTATE}=$old;
   }
   out('');
-  flush();
+  STDOUT->flush();
   print STDERR $msg;
   out($old);
 }
@@ -491,7 +492,7 @@ sub die { err(@_); }
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

@@ -1,0 +1,3 @@
+  lib/python/cs/py/stack.py: cs.py.stack: add stack_dump()
+  lib/python/cs/py/stack.py: cs.py.stack: correct attribute name
+  lib/python/cs/py/stack.py: cs.py.stack: stack_dump: accept optional `indent` parameter

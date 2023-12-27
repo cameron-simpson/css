@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run a command with $1, $2 etc set up.
-#	- Cameron Simpson <cs@zip.com.au>, 04oct94
+#	- Cameron Simpson <cs@cskk.id.au>, 04oct94
 #
 
 cmd=`basename "$0"`

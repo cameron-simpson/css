@@ -1,7 +1,7 @@
 #!/usr/bin/pythn -tt
 #
 # Knowledge about analog, the web log anaylser.
-#       - Cameron Simpson <cs@zip.com.au> 04jan2009
+#       - Cameron Simpson <cs@cskk.id.au> 04jan2009
 #
 
 from threading import Lock

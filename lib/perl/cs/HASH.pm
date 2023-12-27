@@ -8,7 +8,7 @@
 # It expects the subclass to supply the remaining methods
 # and in particular requires:
 #	KEYS this
-# - Cameron Simpson <cs@zip.com.au> 17may96
+# - Cameron Simpson <cs@cskk.id.au> 17may96
 #
 
 use strict qw(vars);

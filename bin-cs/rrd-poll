@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+
+set -ue
+
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
+
+trace=set-x
+rrdstep=10
+rrdslots=3153600
+create=
+host=${HOST:-`hostname -s`}
+
+cmd=$0
+usage="Usage: $cmd [-c] [-h host] [--] [interfaces...]
+  -c        Create missing RRD tables.
+  -h host   Local hostname. Default: $HOST"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) create=1 ;;
+    -h) host=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$OS" in
+  darwin)   method=netstat bytes_in_col=7 bytes_out_col=10 ;;
+  openbsd)  method=netstat bytes_in_col=5 bytes_out_col=6 ;;
+  linux)    method=proc_net_dev bytes_in_col=2 bytes_out_col=10 ;;
+  *)        echo "$cmd: unsupported OS: $OS" >&2
+            exit 1
+            ;;
+esac
+
+dir=$HOME/var/rrd/$HOST
+
+[ -d "$dir" ] || $trace mkdir "$dir"
+
+case "$method" in
+  netstat)
+    if [ $# = 0 ]
+    then  netstat -n -ib
+    else  for iface
+          do  netstat -n -ib -I "$iface"
+          done
+    fi
+    ;;
+  proc_net_dev)
+    if [ $# = 0 ]
+    then
+      sed '1,2d; s/: / /' /proc/net/dev
+    else
+      for iface
+      do
+        sed -n "1,2d; /^$iface:/s/: / /" /proc/net/dev
+      done
+    fi
+    ;;
+  *)echo "$cmd: unimplemented method: $method" >&2
+    exit 1
+    ;;
+esac \
+| awk -v "bytes_in_col=$bytes_in_col" \
+      -v "bytes_out_col=$bytes_out_col" \
+   'NR > 1 && !seen[$1] && $bytes_in_col > 0 && $bytes_out_col > 0 {
+        print $1, $bytes_in_col, $bytes_out_col
+        seen[$1]=1
+    }' \
+| \
+{
+  xit=0
+  while read iface bytes_in bytes_out
+  do
+    rrdfile=$dir/$iface.rrd
+    [ -s "$rrdfile" ] \
+    || \
+    if [ $create ]
+    then
+      $trace rrdtool create "$rrdfile" --step "$rrdstep" DS:bytes_in:COUNTER:10:0:U DS:bytes_out:COUNTER:10:0:U "RRA:MAX:0.5:1:$rrdslots"
+    else
+      echo "$cmd: $iface: missing RRD file: $rrdfile" >&2
+      xit=1
+      continue
+    fi
+    $trace rrdtool update "$rrdfile" -t bytes_in:bytes_out "N:$bytes_in:$bytes_out"
+  done
+  exit $xit
+}

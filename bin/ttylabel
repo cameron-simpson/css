@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Set terminal's title and icon strings.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
@@ -11,6 +11,7 @@ usage="Usage: $cmd [-n] [--] [label...]"
 
 : ${TTYLABEL:=''}
 : ${TTYLABEL_SUPPRESS:=''}
+: ${TTYLABEL_BADGE:=''}
 
 [ -z "$TTYLABEL_SUPPRESS" ] || exit 0
 
@@ -87,5 +88,7 @@ label=`printf "%s" "$*" | tr -s ' \011\012\015\033' '    \['`
 ttylabel=
 [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
 [ -n "$_start_icon"  ] && ttylabel=$ttylabel$_start_icon$label$_end_icon
+
+iterm setvar terminal_badge "$TTYLABEL_BADGE"
 
 exec necho "$ttylabel"

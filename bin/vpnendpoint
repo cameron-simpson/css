@@ -4,7 +4,7 @@
 # Tails my console file (which is handy for watching the remote host)
 # and copy input to the log (keeps link alive, detects link down).
 # See the portfwd script for use.
-#	- Cameron Simpson <cs@zip.com.au> 07oct1999
+#	- Cameron Simpson <cs@cskk.id.au> 07oct1999
 #
 
 # one day I'll make these tunable

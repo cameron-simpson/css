@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Update a file, edit it, run a commit, commit the file.
-#	- Cameron Simpson <cs@zip.com.au> 05mar1997
+#	- Cameron Simpson <cs@cskk.id.au> 05mar1997
 #
 
 cmd=`basename "$0"`
@@ -116,7 +116,7 @@ editxit=$?
    }
 
 # log the change and diff appropriately
-[ $dolog ] && cvs diff "$file" | grep "$cvsdiffgrep" | execif buglog "cvsedit $base: $msg"
+[ $dolog ] && cvs diff "$file" | grep "$cvsdiffgrep" | execif buglog "$cmd $base: $msg"
 
 ( cd "$dir" || exit 1
   exec cvs commit -m "$msg" "$base"

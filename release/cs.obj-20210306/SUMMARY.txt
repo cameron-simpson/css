@@ -1,0 +1,1 @@
+SingletonMixin: make singleton_also_by() a public method.

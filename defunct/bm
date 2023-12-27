@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Bookmark something.
-#	- Cameron Simpson <cs@zip.com.au> 30sep1997
+#	- Cameron Simpson <cs@cskk.id.au> 30sep1997
 #
 
 use strict qw(vars);

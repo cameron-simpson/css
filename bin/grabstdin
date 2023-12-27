@@ -2,7 +2,7 @@
 #
 # Collect stdin and bg the named command, sending output to the
 # console log, IGNHUPed.
-#	- Cameron Simpson <cs@zip.com.au> 16sep98
+#	- Cameron Simpson <cs@cskk.id.au> 16sep98
 #
 
 : ${TMPDIR:=/tmp}

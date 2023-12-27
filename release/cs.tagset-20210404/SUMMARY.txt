@@ -1,0 +1,1 @@
+Bugfix TagBasedTest.COMPARISON_FUNCS["="]: if cmp_value is None, return true (the tag is present).

@@ -1,0 +1,1 @@
+@locked_property: decorate with @cs.deco.decorator to support keyword arguments.

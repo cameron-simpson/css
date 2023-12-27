@@ -4,7 +4,7 @@
 # Eg:
 #	foodata-generator | catthen lock foo foocmd args...
 # to defer taking the lock until ready with all of foodata.
-#	- Cameron Simpson <cs@zip.com.au> 23jan2004
+#	- Cameron Simpson <cs@cskk.id.au> 23jan2004
 #
 
 : ${TMPDIR:=/tmp}

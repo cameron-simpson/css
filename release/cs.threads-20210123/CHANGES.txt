@@ -1,0 +1,3 @@
+lib/python/cs/threads.py: cs.threads: fix typo in docstring example
+lib/python/cs/threads.py: cs.threads: @locked_property: better name for the wrapper function
+lib/python/cs/threads.py: cs.threads: new @monitor class decorator for simple RLock based reentrance protection

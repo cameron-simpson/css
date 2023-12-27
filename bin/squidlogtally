@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parse squid logs and do cool things, like graph bandwidth etc.
-#	- Cameron Simpson <cs@zip.com.au> 19nov98
+#	- Cameron Simpson <cs@cskk.id.au> 19nov98
 #
 
 use strict qw(vars);

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Edit a GPG encrypted file. Derived from gpgedit.
-#	- Cameron Simpson <cs@zip.com.au> 28oct2003
+#	- Cameron Simpson <cs@cskk.id.au> 28oct2003
 #
 
 set -x

@@ -1,0 +1,6 @@
+  lib/python/cs/deco.py: cs.deco: new decorator @strable for function which may accept a str instead of their primary type
+  lib/python/cs/deco.py: cs.deco: docstring updates
+  lib/python/cs/deco.py: cs.deco: @cached: make the decorator keyword arguments expliciti keyword arguments instead of **dkw
+  lib/python/cs/deco.py: cs.deco: @cached: bugfix previous value check, narrow up the over-Exception try/except to just the signature and core functions
+  lib/python/cs/deco.py: cs.deco: strip back the module docstring as we now include the interior names in the module description
+  lib/python/cs/deco.py: merge default ==> venti

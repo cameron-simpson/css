@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # General index package with various backends.
-#	- Cameron Simpson <cs@zip.com.au> 17may96
+#	- Cameron Simpson <cs@cskk.id.au> 17may96
 #
 
 use strict qw(vars);

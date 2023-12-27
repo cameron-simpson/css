@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -uex
+
+: ${MUTT_AUTO_ALIASES:="$HOME/rc/mutt/aliases-auto"}
+: ${MUTT_AUTO_ALIAS_NAMES:='htmlers polyname info org impersonal'}
+
+( maildb -m "$MAILDB" list-groups -AG $MUTT_AUTO_ALIAS_NAMES
+  ##maildb -m "$MAILDB" list-abbreviations -A $MUTT_AUTO_ALIAS_NAMES
+) | rewriteif -d "$MUTT_AUTO_ALIASES"

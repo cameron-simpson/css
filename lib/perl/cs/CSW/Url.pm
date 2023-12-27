@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Web::CSW::Url: a record associated with a URL
-#	- Cameron Simpson <cs@zip.com.au> 28feb2000
+#	- Cameron Simpson <cs@cskk.id.au> 28feb2000
 #
 
 =head1 NAME
@@ -125,7 +125,7 @@ die "unimplemented";
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.au<gt>
+Cameron Simpson E<lt>cs@cskk.id.au<gt>
 
 =cut
 

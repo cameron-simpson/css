@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Textual representation and parsing of Nodes and attribute values.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from contextlib import closing
@@ -16,7 +16,8 @@ if sys.hexversion < 0x02060000:
 else:
   import json
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, error, info, warning
+from cs.logutils import error, info, warning
+from cs.pfx import Pfx
 import cs.sh
 from .node import Node, nodekey
 from .export import import_csv_wide
@@ -43,11 +44,12 @@ def dumpNodeAttrs(N, ofp):
     assert not plural, "unexpected plural attribute: %s" % (attr,)
     first_value = True
     for value in N[attr]:
-      ofp.write('%-15s %s\n'
-                % ( (attr if first_value else ''),
-                    N.nodedb.totoken(value, node=N, attr=attr)
-                  )
-               )
+      ofp.write(
+          '%-15s %s\n' % (
+              (attr if first_value else ''),
+              N.nodedb.totoken(value, node=N, attr=attr)
+          )
+      )
       first_value = False
 
 def loadNodeAttrs(N, ifp, doCreate=False):
@@ -72,7 +74,9 @@ def loadNodeAttrs(N, ifp, doCreate=False):
       continue
     if ch1.isspace():
       # indented ==> continuation line, get attribute name from previous line
-      assert prev_attr is not None, "%s: unexpected indented line" % (str(ifp),)
+      assert prev_attr is not None, "%s: unexpected indented line" % (
+          str(ifp),
+      )
       attr = prev_attr
       value_text = line.lstrip()
     else:
@@ -80,7 +84,7 @@ def loadNodeAttrs(N, ifp, doCreate=False):
       attr, value_text = line.split(None, 1)
       k, plural = parseUC_sAttr(attr)
       assert k, "%s: invalid attribute name \"%s\"" % (str(ifp), attr)
-      ks = k+'s'
+      ks = k + 's'
       assert not k.endswith('_ID'), \
              "%s: invalid attribute name \"%s\" - FOO_ID forbidden" \
                % (str(ifp), attr)
@@ -132,7 +136,7 @@ def assign(N, assignment, doCreate=False):
       N.set_lcattr(attr, values)
     else:
       k, plural = parse_UC_sAttr(attr)
-      assert k, "invalid attribute name \"%s\"" % (attr, )
+      assert k, "invalid attribute name \"%s\"" % (attr,)
       N[k] = values
 
 def get_commatext(text, pos=0):
@@ -231,7 +235,7 @@ def fromtoken(token, nodedb, doCreate=False):
     warning("can't infer Node from \"%s\", returning string" % (token,))
     return token
 
-  N = nodedb.get( (t, name), doCreate=doCreate )
+  N = nodedb.get((t, name), doCreate=doCreate)
   if N is None:
     raise ValueError("no Node with key (%s, %s)" % (t, name))
 
@@ -248,7 +252,7 @@ def totoken(value):
     m = re_BAREURL.match(value)
     if m is not None and m.end() == len(value):
       return value
-    return '"'+value.replace('"', r'\"')+'"'
+    return '"' + value.replace('"', r'\"') + '"'
 
   if type(value) is int:
     return str(value)

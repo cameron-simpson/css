@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Preprocess POD data to enhance it.
 # So far:
@@ -7,7 +7,7 @@
 #	=modtime
 #	=keywords => discarded
 #
-#	- Cameron Simpson <cs@zip.com.au> 01jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 01jul2003
 #
 
 # unDOSify stuff

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Process MIME Quoted-Printable encoded data.
-#	- Cameron Simpson <cs@zip.com.au> 25jul96
+#	- Cameron Simpson <cs@cskk.id.au> 25jul96
 #
 
 use strict qw(vars);

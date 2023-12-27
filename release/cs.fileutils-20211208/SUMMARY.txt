@@ -1,0 +1,2 @@
+Move NDJSON stuff to separate cs.ndjson module.
+New gzifopen() function to open either a gzipped file or an uncompressed file.

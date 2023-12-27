@@ -1,0 +1,3 @@
+lib/python/cs/app/portfwd.py: cs.app.portfwd: Portfwds: accept any iterable for `target_list`; update docstring and improve message context
+lib/python/cs/app/portfwd.py: cs.app.portfwd: autoformat
+lib/python/cs/app/portfwd.py: cs.app.{portfwd,svcd}: get DEVNULL via cs.py3 instead of directly from subprocess

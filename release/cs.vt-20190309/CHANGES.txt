@@ -1,0 +1,6 @@
+lib/python/cs/vt/__init__.py: cs.vt: remove pre-alpha note from module docstring
+lib/python/cs/vt/__main__.py: cs.vt.__main__: VTCmd.cmd_mount: reliable initialisation of special_basename
+lib/python/cs/vt/__init__.py: cs.vt: former README info folded into package docstring
+lib/python/cs/vt/__main__.py: cs.vt.__main__: VTCmd.main: take a copy of argv to avoid modifying the original
+lib/python/cs/vt/fuse_tests.py: cs.vt.fuse_tests: adjust imports for move back into cs.vt
+lib/python/cs/vt/__init__.py lib/python/cs/vt/block.py lib/python/cs/vt/block_tests.py lib/python/cs/vt/dir.py lib/python/cs/vt/transcribe.py: cs.vt: move last public name from __init__, moving totext over to cs.vt.transcribe.hexify

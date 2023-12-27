@@ -1,24 +1,42 @@
 #!/usr/bin/python
 
 from __future__ import print_function
+from getopt import GetoptError
+import os.path
+import sys
+from cs.logutils import setup_logging, error
+from cs.pfx import Pfx
+from .backend import Backend, Update, ExtendUpdate, ResetUpdate
+from .node import Node, NodeDB, NodeDBFromURL
 
 DISTINFO = {
-    'description': "a simple and versatile collection of nodes with attributes, accessed as direct Python objects and automatically transcribed to assorted backing stores (CSV, SQL, GDBM, etc); the CSV backend can be (loosely) shared between multiple clients",
+    'description':
+    "a simple and versatile collection of nodes with attributes, accessed as direct Python objects and automatically transcribed to assorted backing stores (CSV, SQL, GDBM, etc); the CSV backend can be (loosely) shared between multiple clients",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.csvutils', 'cs.debug', 'cs.excutils', 'cs.fileutils', 'cs.html', 'cs.lex', 'cs.logutils', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.timeutils'],
+    ],
+    'install_requires': [
+        'cs.csvutils',
+        'cs.debug',
+        'cs.excutils',
+        'cs.fileutils',
+        'cs.html',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.py3',
+        'cs.seq',
+        'cs.sh',
+        'cs.sharedfile',
+        'cs.threads',
+        'cs.timeutils',
+        'cs.x',
+    ]
 }
-
-from getopt import GetoptError
-import os.path
-import sys
-from cs.nodedb.backend import Backend
-from cs.nodedb.node import Node, NodeDB, NodeDBFromURL
-from cs.logutils import setup_logging, Pfx, error
 
 def main(argv):
   xit = 0
@@ -41,7 +59,7 @@ def main(argv):
 
     if len(argv) < 1:
       error("missing dburl")
-      badopts=True
+      badopts = True
     else:
       dburl = argv.pop(0)
 
@@ -51,10 +69,11 @@ def main(argv):
     else:
       op = argv.pop(0)
       # special commands that happen before opening the dburl
-      ops = { "create": _create,
-              "dump":   _dump,
-              "load":   _load,
-            }
+      ops = {
+          "create": _create,
+          "dump": _dump,
+          "load": _load,
+      }
       if op in ops:
         with Pfx(op):
           xit = ops[op](dburl, argv)

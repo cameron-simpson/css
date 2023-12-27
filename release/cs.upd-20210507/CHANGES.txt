@@ -1,0 +1,2 @@
+lib/python/cs/upd.py: cs.upd: fix comment typo
+lib/python/cs/upd.py: cs.upd: require cs.context>=stackable_state

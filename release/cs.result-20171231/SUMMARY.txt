@@ -1,0 +1,2 @@
+Bugfix Result.call to catch BaseException instead of Exception.
+New convenience function bg(func) to dispatch `func` in a separate Thread and return a Result to collect its value.

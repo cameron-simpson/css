@@ -9,7 +9,7 @@
 #	-rm	Remove the file.
 #	-x	Print the find command issued.
 #
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 links=+1	# default

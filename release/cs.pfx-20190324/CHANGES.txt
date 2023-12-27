@@ -1,0 +1,1 @@
+lib/python/cs/pfx.py: cs.pfx: Pfx.__exit__: apply the prefix to all the standard attributes where present

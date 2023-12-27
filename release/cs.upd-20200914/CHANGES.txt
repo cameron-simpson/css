@@ -1,0 +1,3 @@
+lib/python/cs/upd.py: Release information for cs.upd-20200716.1.
+lib/python/cs/upd.py: cs.upd: UpdProxy.__enter__: return self
+lib/python/cs/upd.py: cs.upd: clean lint

@@ -1,0 +1,1 @@
+Bugfix @decorator: final plumbing step for decorated decorator.

@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Emit a Nagios report for the status of MySQL replication.
-#       - Cameron Simpson <cs@zip.com.au> 15oct2008
+#       - Cameron Simpson <cs@cskk.id.au> 15oct2008
 #
 
 secret=/root/monitor.secret

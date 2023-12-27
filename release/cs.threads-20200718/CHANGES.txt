@@ -1,0 +1,3 @@
+lib/python/cs/threads.py: Release information for cs.threads-20200521.
+lib/python/cs/threads.py: merge default ==> vt
+lib/python/cs/threads.py: cs.threads: @locked: apply the interior __doc__ to the wrapper

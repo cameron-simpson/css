@@ -3,7 +3,7 @@
 # Reorder the input lines at random.
 # (I really think seq(1) should have a -r to make a random sequence,
 # but apparently not).
-#	- Cameron Simpson <cs@zip.com.au> 14jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 14jul2000
 #
 
 my $max;

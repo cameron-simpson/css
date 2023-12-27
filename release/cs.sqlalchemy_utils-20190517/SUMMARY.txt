@@ -1,0 +1,2 @@
+Make ORM._Session private session factory the public ORM.Session factory for external use.
+with_session: preexisting sessions still trigger a session.begin_nested, removes flush/commit tension elsewhere.

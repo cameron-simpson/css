@@ -4,7 +4,7 @@
 # Supports _only_ sequential reading or skipping.
 # The base method to be overridden by subclasses is Read.
 # The fields TYPE, BUF and POS are used.
-#	- Cameron Simpson <cs@zip.com.au> 15may1996
+#	- Cameron Simpson <cs@cskk.id.au> 15may1996
 #
 # Added Seek() and Seekable().
 # They may need overriding if you implement a seekable subclass.

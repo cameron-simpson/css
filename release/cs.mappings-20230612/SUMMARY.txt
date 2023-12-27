@@ -1,0 +1,2 @@
+AttrableMappingMixin.__getattr__: fast path the check for "ATTRABLE_MAPPING_DEFAULT", fixes unbound recursion.
+New attrable() function returning an object with dicts transmuted to AttrableMapping instances.

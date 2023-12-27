@@ -2,7 +2,7 @@
 #
 # Split up a directory into chunks no larger than a certain size
 # eg to span some CDROMs.
-#	- Cameron Simpson <cs@zip.com.au> 27aug2003
+#	- Cameron Simpson <cs@cskk.id.au> 27aug2003
 #
 
 size=630000000	# 630MB - the size of a standard CDROM is 650MB

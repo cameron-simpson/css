@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Used by histbackup to construct the prototype backup.
-#	- Cameron Simpson <cs@zip.com.au> 03apr2000
+#	- Cameron Simpson <cs@cskk.id.au> 03apr2000
 #
 
 =head1 NAME
@@ -147,6 +147,6 @@ histbackup(1), rab(1), rsync(1)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut

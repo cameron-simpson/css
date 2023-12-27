@@ -1,0 +1,168 @@
+#!/bin/sh
+#
+# Put (fetch-from-remote-end) a local git ref to a remote work directory.
+# Printed the resolved reference to stdout for use.
+#   - Cameron Simpson <cs@cskk.id.au> 14oct2016
+# 
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+
+trace=
+setx=:
+[ -t 2 ] && { trace=set-x; setx='set -x'; }
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-d git-work-dir] [-u] {/path|./path|../path|remote[:path]} [local-ref]
+  -d git-work-dir   Git source working directory (should contain a .git).
+                    Default the git work directory containing the current
+                    directory.
+  -u                Update the destination work directory by also checking out
+                    the revision.
+  -U                Update the destination work directory and
+                    additionally apply the local \"git diff\".
+  local-ref         Changeset reference in the source git working directory.
+                    Default: HEAD"
+
+rev=HEAD
+
+badopts=
+git_work_dir=.
+no_checkout=1
+no_diff=1
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) git_work_dir=$2; shift ;;
+    -u) no_checkout= ;;
+    -U) no_checkout= no_diff= ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing remote" >&2
+  badopts=1
+else
+  remote=$1
+  shift
+  case "$remote" in
+    /* | ./* | ../* )
+            remote_dir=$remote
+            remote=
+            ;;
+    *:*)    remote_dir=$( expr "x$remote" : 'x[^:]*:\(.*\)' )
+            remote=$(     expr "x$remote" : 'x\([^:]*\):.*' )
+            ;;
+    *)      remote_dir=
+            ;;
+  esac
+  case "$remote" in
+    *!*)    ssh=sshto ;;
+    *)      ssh=ssh ;;
+  esac
+fi
+
+if [ $# -gt 0 ]
+then
+  rev=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec 5>&1 1>&2
+
+tmppfx=$TMPDIR/$cmd.$$.
+trap 'rm -f "$tmppfx"*' 0 1 3 15
+
+tmpdiff=${tmppfx}diff
+[ $no_diff ] \
+|| { git diff >"$tmpdiff"; [ -s "$tmpdiff" ] || no_diff=1; }
+
+
+git_top=$( git-top "$git_work_dir" )
+git_top_repo=$git_top/.git
+revhash=$( git "--git-dir=$git_top_repo" rev-parse "$rev" )
+
+# local directory? run git directly
+if [ -z "$remote" ]
+then
+  $trace git -C "$remote_dir" fetch --verbose --progress "$git_top_repo" "$revhash"
+  [ $no_checkout ] || $trace git -C "$remote_dir" checkout -f "$revhash"
+  [ $no_diff ] || git -C "$remote_dir" apply <"$tmpdiff"
+  exit $?
+fi
+
+# otherwise remote: work a lot harder
+git_top_remote=git://127.0.0.1:1234$git_top
+git_tag=$cmd-$revhash-$$
+
+qremote_dir=$( shqstr "$remote_dir" )
+qrevhash=$( shqstr "$revhash" )
+qgit_tag=$( shqstr "$git_tag" )
+qgit_top_remote=$( shqstr "$git_top_remote" )
+
+gitd_out=$TMPDIR/$cmd.gitd-out.$$
+gitd_in=$TMPDIR/$cmd.gitd-in.$$
+
+git "--git-dir=$git_top_repo" tag "$git_tag" "$revhash"
+git "--git-dir=$git_top_repo" init --shared=true
+>>"$git_top_repo/git-daemon-export-ok"
+
+# prepare some pipes to connect local git with ssh to remote
+mkfifo -m 600 "$gitd_in" "$gitd_out"
+exec 3<>"$gitd_in" 4<>"$gitd_out"
+rm -f "$gitd_in" "$gitd_out"
+
+# start local git daemon
+$trace git -C "$git_top" daemon --inetd --verbose --informative-errors "$git_top" <&3 >&4 &
+gitd=$!
+
+# present the git daemon to the remote host
+$ssh "$remote" '
+    set -ue'"
+    remote_dir=${qremote_dir:-.}
+    $setx"'
+    cd "$remote_dir"
+    nc -l 127.0.0.1 1234
+    ' <&4 >&3 &
+ssh_gitd=$!
+
+# detach from pipes
+exec 3<&- 4<&-
+
+sleep 1
+
+xit=0
+
+# go to the remote host and access the local git via the daemon
+{ [ $no_diff ] || cat "$tmpdiff"; } \
+| $ssh "$remote" '
+    set -ue'"
+    no_checkout=$no_checkout
+    no_diff=$no_diff
+    remote_dir=$qremote_dir
+    revhash=$qrevhash
+    git_tag=$qgit_tag
+    git_top_remote=$qgit_top_remote
+    $setx"'
+    cd "$remote_dir"; pwd
+    git fetch --verbose --progress "$git_top_remote" "$git_tag"
+    [ $no_checkout ] || git checkout -f "$revhash"
+    [ $no_diff ] || git apply
+   ' \
+|| xit=1
+
+git "--git-dir=$git_top_repo" tag -d "$git_tag"
+
+exec 1>&5 5>&-
+echo "$revhash"
+
+exit $xit

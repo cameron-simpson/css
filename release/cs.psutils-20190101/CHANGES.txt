@@ -1,0 +1,5 @@
+  lib/python/cs/psutils.py: cs.*: update @contextmanager formalism to use try/finally for the cleanup phase
+  lib/python/cs/psutils.py: cs.psutils: groupargv: raise ValueError if `argv` is empty
+  lib/python/cs/psutils.py: cs.psutils: groupargv hack: halve the default MAX_ARGV because it the real limit seems to be more restrictive
+  lib/python/cs/psutils.py: cs.psutils: update docstrings, clean a little lint
+  lib/python/cs/psutils.py: cs.psutils: tweak docstrings

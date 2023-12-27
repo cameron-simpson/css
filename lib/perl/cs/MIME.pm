@@ -9,7 +9,7 @@
 #  1437	- The Extension of MIME Content-Types to a New Medium
 #  1521	- Media Type Registration Procedure
 #
-#	- Cameron Simpson <cs@zip.com.au> 17may1996
+#	- Cameron Simpson <cs@cskk.id.au> 17may1996
 #
 
 =head1 NAME
@@ -594,7 +594,7 @@ RFCs:
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

@@ -2,7 +2,7 @@
 #
 # Read ssh host keys from stdin and rewrite the named known_host file
 # with the new keys.
-#	- Cameron Simpson <cs@zip.com.au> 25jun2003
+#	- Cameron Simpson <cs@cskk.id.au> 25jun2003
 #
 
 use strict qw(vars);

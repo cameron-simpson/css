@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Strip local versions of $DISPLAY down to :n.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 case $DISPLAY in

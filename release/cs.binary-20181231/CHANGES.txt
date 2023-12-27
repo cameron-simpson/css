@@ -1,0 +1,1 @@
+  lib/python/cs/binary.py: cs.binary: flatten: do not yield zero length bytelike objects, can be misread as EOF on some streams

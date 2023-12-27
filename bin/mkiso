@@ -54,7 +54,7 @@
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson <cs@zip.com.au> 12jul2000
+# Cameron Simpson <cs@cskk.id.au> 12jul2000
 #
 
 cmd=`basename "$0"`

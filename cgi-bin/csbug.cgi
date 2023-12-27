@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Web interface to csbug.
-#	- Cameron Simpson <cs@zip.com.au> 29jul2005
+#	- Cameron Simpson <cs@cskk.id.au> 29jul2005
 #
 
 set -u
@@ -9,7 +9,7 @@ umask 002
 
 : ${TMPDIR:=/tmp}
 : ${PATH_INFO:=''}
-: ${EMAIL:='cs@zip.com.au'}
+: ${EMAIL:='cs@cskk.id.au'}
 : ${HTTP_COOKIE:=''}
 : ${QUERY_STRING:=''}
 : ${CSBUG_ROOT:=$HOME/var/bugs}

@@ -1,12 +1,22 @@
 #!/bin/sh
+#
+# Prepare and dispatch my fvwm event log monitor.
+# - Cameron Simpson <cs@cskk.id.au>
+#
 
-[ $# = 0 ] || { echo "Usage: $0" >&2; exit 2; }
+set -ue
 
-[ -n "$FVWMEVLOG" ] || { echo "$0: no \$FVWMEVLOG envvar" >&2; exit 1; }
-[ -f "$FVWMEVLOG" ] || { echo "$0: no \$FVWMEVLOG log file" >&2; exit 1; }
+cmd=$0
+
+: ${FVWMEVLOG:-''}
+
+[ $# = 0 ] || { echo "Usage: $cmd" >&2; exit 2; }
+
+[ -n "$FVWMEVLOG" ] || { echo "$cmd: no \$FVWMEVLOG envvar" >&2; exit 1; }
+[ -f "$FVWMEVLOG" ] || { echo "$cmd: no \$FVWMEVLOG log file: $FVWMEVLOG" >&2; exit 1; }
 
 fifodir=$FVWM_TMPDIR/fifo-$HOST
-[ -d "$fifodir/." ] || mkdir -p "$fifodir" || exit 1
+needdir "$fifodir"
 fifo=$fifodir/$DISPLAY-`datecode`-$$
 
 FvwmCommand -S "$fifo"

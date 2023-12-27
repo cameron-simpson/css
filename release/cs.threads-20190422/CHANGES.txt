@@ -1,0 +1,3 @@
+lib/python/cs/threads.py: cs.threads: small docstring tweak
+lib/python/cs/threads_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/threads.py: cs.threads: bg: new optional `no_start=False` keyword argument, preventing Thread.start if true

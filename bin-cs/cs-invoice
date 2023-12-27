@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+#
+
+''' Invoice management.
+'''
+
+from cs.x import Y as X
+
+from contextlib import contextmanager
+from datetime import date, datetime, timedelta
+from getopt import GetoptError
+import sys
+from icontract import require
+from typeguard import typechecked
+from cs.context import stackattrs
+from cs.lex import cutprefix
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_method
+from cs.sqltags import SQLTagsCommand, SQLTags, SQLTagSet
+from cs.tagset import TagSet
+
+def main(argv=None):
+  ''' Stub to invoke the command line mode.
+  '''
+  return InvoiceCommand(argv).run()
+
+def parse_ymd(ymd):
+  ''' Parse a YYYY-MM-DD or YYYYMMDD date string,
+      return the matching naive `datetime`.
+  '''
+  with Pfx("parse_ymd(%r)"):
+    try:
+      dt = datetime.strptime(ymd, '%Y-%m-%d')
+    except ValueError:
+      dt = datetime.strptime(ymd, '%Y%m%d')
+    return dt
+
+def parse_ym(yyyymm):
+  ''' Parse a YYYY-MM or YYYYMM date string,
+      return the matching naive `datetime`s
+      for the first day of the corresponding month
+      and the first day of the following month.
+  '''
+  with Pfx("parse_ym(YYYY-DD:%r)"):
+    try:
+      start_dt = datetime.strptime(yyyy_mm, "%Y-%m")
+    except ValueError:
+      start_dt = datetime.strptime(yyyy_mm, "%Y%m")
+    yyyy, mm = start_dt.year, start_dt.month
+    mm += 1
+    if mm > 12:
+      mm -= 12
+      yyyy += 1
+    end_dt = datetime(year=yyyy, month=mm, day=1)
+    return start_dt, end_dt
+
+def next_day(dt):
+  ''' The `datetime` for a day after `dt`.
+  '''
+  return dt + timedelta(days=1)
+
+class PrefixedNameSQLTagSet(SQLTagSet):
+
+  # a prefix ending in a dot, for example "invoice."
+  PREFIX = None
+
+  def __init__(self, *a, **kw):
+    super().__init__(*a, **kw)
+    assert self.name.startswith(self.PREFIX)
+
+  @classmethod
+  def by_name(cls,short_name, sqltags):
+    ''' Return the entity named `self.PREFIX+short_name`
+        or `None` if it does not exist.
+    '''
+    return sqltags.get(cls.PREFIX + short_name)
+
+  @property
+  def short_name(self):
+    ''' The short name, the portion of `self.name`
+        after `self.PREFIX`.
+    '''
+    return cutprefix(self.name, self.PREFIX)
+
+class Invoice(PrefixedNameSQLTagSet):
+  PREFIX = 'invoice.'
+
+  @property
+  def number(self):
+    ''' The invoice number.
+    '''
+    return int(self.short_name)
+
+class Client(PrefixedNameSQLTagSet):
+  PREFIX = 'client.'
+
+class Invoices(SQLTags):
+  ''' Manager for my invoice data.
+  '''
+
+  def TagSetClass(self, *, name, **kw):
+    ''' Factory for `TagSet`s.
+    '''
+    cls = SQLTagSet
+    for match_cls in Invoice, Client:
+      if name is not None and name.startswith(match_cls.PREFIX):
+        cls = match_cls
+        break
+    return cls(name=name, **kw)
+
+  def __iter__(self):
+    ''' Yield the invoice `TagSet`s.
+    '''
+    for invoice in self.values(prefix=Invoice.PREFIX):
+      with Pfx(invoice.name):
+        try:
+          invoice.number
+        except ValueError as e:
+          warning("skip bad invoice number: %s", e)
+          continue
+        yield invoice
+
+  def timespan_criteria(self, dt=None, span=None):
+    ''' Given a start time and a time span,
+        return criteria for searching the database.
+
+        Parameters:
+        * `dt`: (optional) the starting time.
+          If `None`, `datetime.today()`.
+          If a `str`, `parse_yml(dt)`.
+          If a `date`, the corresponding `datetime`.
+          If a `datetime`, used as is.
+        * `span`: (optional) the length of the time span.
+          This is required if `dt` is supplied as a `datetime`;
+          for other `dt` types it defaults to `timedelta(days=1)`.
+          This may be either a `timedelta` or a number of seconds.
+    '''
+    if dt is None:
+      dt = datetime.today()
+      if span is None:
+        span = timedelta(days=1)
+    elif isinstance(dt, str):
+      dt = parse_ymd(dt)
+      if span is None:
+        span = timedelta(days=1)
+    elif isinstance(dt, date):
+      dt = datetime(dt.year, dt.month, dt.day)
+      if span is None:
+        span = timedelta(days=1)
+    elif isinstance(dt, datetime):
+      if span is None:
+        raise ValueError("span=None, must be specified when dt is a datetime")
+    else:
+      raise TypeError("unhandled dt type %s: %r" % (type(dt).__name__, dt))
+    X("dt=%s", dt)
+    start_ts = dt.timestamp()
+    X("start_ts=%s", start_ts)
+    if isinstance(span, (int, float)):
+      end_ts = start_ts + span
+      X("end_ts from span=%s: %s", span, end_ts)
+    elif isinstance(span, timedelta):
+      X("dt + span = %s", dt + span)
+      end_ts = (dt + span).timestamp()
+      X("end_ts from span=%s: %s", span, end_ts)
+    else:
+      raise TypeError(
+          "unhandled span type %s: %r" % (type(span).__name__, span)
+      )
+    end_ts = next_day(dt).timestamp()
+    return [
+        f"unixtime>={start_ts}",
+        f"unixtime<{end_ts}",
+    ]
+
+  def criteria_dayspan(self, dt):
+    ''' Return a list of timespan criteria covering `dt` to `dt+1day`.
+    '''
+    return self.timespan_criteria(dt, timedelta(days=1))
+
+  def criteria_daily_log(self, dt):
+    ''' Return a list of criteria for log entries covering `dt` to `dt+1day`.
+    '''
+    return self.criteria_dayspan(dt) + ['!name', 'headline']
+
+  def daily_log(self, dt):
+    ''' Return a list of log entries covering `dt` to `dt+1day`.
+    '''
+    return list(self.find(self.criteria_daily_log(dt)))
+
+  @typechecked
+  def invoice(self, number: int) -> TagSet:
+    ''' Return the `Invoice` with number `number`, or `None`.
+    '''
+    return Invoice.by_name(str(number), self)
+
+  @pfx_method
+  def new_invoice(self):
+    ''' Create and return a new invoice
+        whose number is the maximum of existing invoices plus 1.
+    '''
+    n = 1
+    for invoice in self:
+      n = max(n, invoice.number + 1)
+    return self[Invoice.PREFIX + str(n)]
+
+class InvoiceCommand(SQLTagsCommand):
+  ''' "cs-invoice" command line implementation.
+  '''
+
+  TAGSETS_CLASS = Invoices
+
+  def cmd_daily(self, argv):
+    ''' Usage: {cmd} [yyyy-mm-dd]
+          Edit the tally for yyyy-mm-dd or today.
+    '''
+    invoices = self.options.sqltags
+    badopts = False
+    if argv:
+      date_arg = argv.pop(0)
+      try:
+        dt = parse_ymd(date_arg)
+      except ValueError as e:
+        warning("bad YYYY-MM-DD argument: %s", e)
+        badopts = True
+    else:
+      dt = datetime.today()
+    if badopts:
+      raise GetoptError("bad invocation")
+    for entry in invoices.daily_log(dt):
+      print(entry.unixtime, entry.headline, entry)
+
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd}
+          List existing invoices.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    invoices = self.options.sqltags
+    for invoice in sorted(iter(invoices), key=lambda inv: inv.number):
+      print(invoice)
+
+  def cmd_new(self, argv):
+    ''' Usage: {cmd} invoice client YYYY-MM
+          Create a new invoice for client for the month YYYY-MM.
+
+        TODO: new invoice client next
+          Create a new invoice picking up from the previous one timewise.
+        TODO: optional span after start date?
+    '''
+    sqltags = self.options.sqltags
+    badopts = False
+    if not argv:
+      warning("missing \"invoice\"")
+      badopts = True
+    else:
+      entry_type = argv.pop(0)
+      with Pfx(entry_type):
+        if entry_type == 'invoice':
+          if not argv:
+            warning("missing client")
+            badopts = True
+          else:
+            short_client = argv.pop(0)
+            with Pfx("client %r", short_client):
+              client = Client.by_name(short_client, sqltags)
+              if client is None:
+                warning("unknown")
+                badopts = True
+          if not argv:
+            warning("missing YYYY-MM")
+            badopts = True
+          else:
+            yyyy_mm = argv.pop(0)
+            with Pfx("YYYY-MM %r", yyyy_mm):
+              try:
+                start_dt = datetime.strptime(yyyy_mm, "%Y-%m")
+              except ValueError:
+                warning("invalid month spec")
+                badopts = True
+              else:
+                yyyy, mm = start_dt.year, start_dt.month
+                mm += 1
+                if mm > 12:
+                  mm -= 12
+                  yyyy += 1
+                end_dt = datetime(year=yyyy, month=mm, day=1)
+        else:
+          warning("unsupported type")
+          badopts = True
+    if argv:
+      warning("extra arguments: %r", argv)
+      badopts = True
+    if badopts:
+      raise GetoptError("bad invocation")
+    with Pfx(entry_type):
+      if entry_type == 'invoice':
+        invoices = self.options.sqltags
+        X("invoices=%s:%s",type(invoices),invoices)
+        entry = invoices.new_invoice()
+        entry.client = client.short_name
+        entry.unixtime_start = start_dt.timestamp()
+        entry.unixtime_end = end_dt.timestamp()
+      else:
+        raise RuntimeError("unimplemented type")
+    print(entry)
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

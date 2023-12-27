@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# Log an interruption and lock my screen.
+#	- Cameron Simpson <cs@cskk.id.au> 28jul2003
+#
+exec xlo interruptions ${1+"$@"}

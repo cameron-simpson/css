@@ -1,0 +1,2 @@
+Use "install_requires" instead of "requires" in DISTINFO.
+Minor tweaks.

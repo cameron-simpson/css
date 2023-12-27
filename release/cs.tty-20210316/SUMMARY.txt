@@ -1,0 +1,2 @@
+ttysize: discard the Popen object earlier.
+ttysize: close Popen.stdout after use. seems to leak.

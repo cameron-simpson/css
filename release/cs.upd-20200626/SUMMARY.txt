@@ -1,0 +1,3 @@
+UpdProxy: call self.delete on __del__.
+If self._backend is None act as if disabled, occurs during shutdown.
+Upd.delete: ignore attempts to delete the last line, also occurs during shutdown.

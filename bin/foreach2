@@ -2,7 +2,7 @@
 #
 # For line of stdin, run the supplied command with the line as argument,
 # in parallel. Serialise output so it doesn't overlap.
-#	- Cameron Simpson <cs@zip.com.au> 28jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 28jul2000
 #
 
 : ${TMPDIR:=/tmp}

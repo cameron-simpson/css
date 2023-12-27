@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::HTTPS: a module for blah.
-#	- Cameron Simpson <cs@zip.com.au> 17jan2001
+#	- Cameron Simpson <cs@cskk.id.au> 17jan2001
 #
 
 =head1 NAME
@@ -68,7 +68,7 @@ s_client(1), openssl(1), cs::HTTP(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

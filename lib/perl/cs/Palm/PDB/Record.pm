@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Palm::PDB::Record: a Palm DataBase Record
-#	- Cameron Simpson <cs@zip.com.au> 19may2000
+#	- Cameron Simpson <cs@cskk.id.au> 19may2000
 #
 
 =head1 NAME
@@ -197,7 +197,7 @@ cs::Palm::PDB(3), cs::Flags(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

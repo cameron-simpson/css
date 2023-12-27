@@ -1,0 +1,7 @@
+  lib/python/cs/env.py: merge default ==> beyonwiz
+  lib/python/cs/env.py: cs.env: new function get_standard_var and new LOGDIR and VARRUN functions expressing norma policy for the cs.* modules
+  lib/python/cs/env.py: cs.env: default policies: pass environ to get_standard_var; add FLAGDIR policy
+  lib/python/cs/env.py: cs.env: get_standard_var: run envsub on the default value; drop obsolete varlog function, superceded by LOGDIR
+  lib/python/cs/env.py: my email address has changed - update Python code
+  lib/python/cs/README-env.rst lib/python/cs/env.py: cs.env: move README into module docstring
+  lib/python/cs/env.py: cs.env: remove unused imports, clean some lint

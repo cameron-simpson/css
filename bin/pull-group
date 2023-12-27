@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Pull named groups and members from remote /etc/groups file.
-#       - Cameron Simpson <cs@zip.com.au> 12may2008
+#       - Cameron Simpson <cs@cskk.id.au> 12may2008
 #
 
 . ${OPTCSS:-/opt/css}/env.sh

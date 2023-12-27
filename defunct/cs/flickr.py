@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # Flickr convenience classes.
-#       - Cameron Simpson <cs@zip.com.au> 18dec2007
+#       - Cameron Simpson <cs@cskk.id.au> 18dec2007
 #
 
 import urllib

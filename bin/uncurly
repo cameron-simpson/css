@@ -2,7 +2,7 @@
 #
 # Replace {foo} with $foo in the specified file, for a specified
 # list of "foo".
-#	- Cameron Simpson <cs@zip.com.au> 27may2001
+#	- Cameron Simpson <cs@cskk.id.au> 27may2001
 #
 # Deduce list by inspecting the input. - cameron 09sep2002
 #

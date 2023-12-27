@@ -1,0 +1,1 @@
+Initial release with @docmd decorator and alpha quality BaseCommand command line assistance class.

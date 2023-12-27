@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Decode Base64 stuff and emit.
-#	- Cameron Simpson <cs@zip.com.au> 21may1998
+#	- Cameron Simpson <cs@cskk.id.au> 21may1998
 #
 
 use cs::MIME::Base64;

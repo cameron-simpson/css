@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::GNUInfo: a module for parsing GNU info files.
-#	- Cameron Simpson <cs@zip.com.au> 22sep2000
+#	- Cameron Simpson <cs@cskk.id.au> 22sep2000
 #
 
 =head1 NAME
@@ -370,7 +370,7 @@ info2pod(1), info2man(1), pod2man(1), perlpod(1)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

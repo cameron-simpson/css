@@ -1,0 +1,2 @@
+@OBSOLETE(obj_as_dict), recommend "as_dict()".
+[BREAKING] change as_dict() to accept a single optional selector instead of various mutually exclusive keywords.

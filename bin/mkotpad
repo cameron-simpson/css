@@ -4,7 +4,7 @@
 # Coded on the basis of David Madore's paper:
 #	http://www.eleves.ens.fr:8080/home/madore/misc/freespeech.html
 # A damn fine idea.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 : ${TMPDIR:=/tmp}

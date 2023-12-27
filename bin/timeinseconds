@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wrapper for time to print the user, system and real times in seconds
-# to stderr (by default).	- Cameron Simpson <cs@zip.com.au> 23apr99
+# to stderr (by default).	- Cameron Simpson <cs@cskk.id.au> 23apr99
 #
 
 : ${TMPDIR:=/tmp}

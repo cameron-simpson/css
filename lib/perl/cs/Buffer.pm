@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # A buffer with logging. Used by Multio et al.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 # new(@extras) -> Buffer
 # Size -> length of buffer

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Read mail addresses, one per line, and record in raw mailrc db.
-#	- Cameron Simpson <cs@zip.com.au> 15jun98
+#	- Cameron Simpson <cs@cskk.id.au> 15jun98
 #
 
 rawdb=$MAILRC.rawdb

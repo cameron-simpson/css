@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Phone database stuff.
-#	- Cameron Simpson <cs@zip.com.au> 10dec97
+#	- Cameron Simpson <cs@cskk.id.au> 10dec97
 #
 
 use strict qw(vars);

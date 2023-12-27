@@ -3,7 +3,7 @@
 # View a URL. Fetch and hand to something other than my web browser.
 # Spurred into implementation by the Liberty Meadows comics strip,
 # which is funny but too small, so XV to the rescue!
-#	- Cameron Simpson <cs@zip.com.au> 12jun2001
+#	- Cameron Simpson <cs@cskk.id.au> 12jun2001
 #
 
 exec </dev/null

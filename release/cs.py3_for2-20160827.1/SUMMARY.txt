@@ -1,0 +1,1 @@
+Ghastly python 3 port of pure python 2 code because my release tool imports the module it releases.

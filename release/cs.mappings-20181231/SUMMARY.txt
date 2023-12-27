@@ -1,0 +1,2 @@
+Bugfix for mapping of column names to row indices.
+New subclass._fallback method for when a stack is empty.

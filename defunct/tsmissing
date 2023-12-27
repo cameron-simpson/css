@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Dispatch complaints about unsubmitted timesheets.
-#	- Cameron Simpson <cs@zip.com.au> 19feb97
+#	- Cameron Simpson <cs@cskk.id.au> 19feb97
 #
 # Perlify, just do due month.	- cameron, 02sep98
 #

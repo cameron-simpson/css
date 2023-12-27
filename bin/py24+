@@ -1,7 +1,0 @@
-#!/bin/sh
-which python2.7 >/dev/null 2>&1 && exec python2.7 ${1+"$@"}
-which python2.6 >/dev/null 2>&1 && exec python2.6 ${1+"$@"}
-which python2.5 >/dev/null 2>&1 && exec python2.5 ${1+"$@"}
-which python2.4 >/dev/null 2>&1 && exec python2.4 ${1+"$@"}
-echo "$0: no python 2.7, 2.6, 2.5 or 2.4, aborting: $0 $*" >&2
-exit 1

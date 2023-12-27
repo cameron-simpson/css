@@ -1,19 +1,9 @@
 #!/bin/sh
 #
 # Make a random password string.
-#	- Cameron Simpson <cs@zip.com.au> 28feb2002
+# - Cameron Simpson <cs@cskk.id.au> 28feb2002
+#
+# Just use openssl, suggestion by Chris Adams. - cameron 16may2019
 #
 
-: ${LOGDIR:=$HOME/var/log}
-
-len=16
-
-pw=`exec 2>/dev/null
-    ( dd if=/dev/urandom bs=1024 count=1
-      date
-      tail -100 $LOGDIR/procmail
-    ) | md5sum | dd bs=$len count=1`
-
-####[ -n "$DISPLAY" ] && ( exec >/dev/null; necho "$pw" | xclip & )
-
-echo "$pw"
+exec openssl rand -hex 8

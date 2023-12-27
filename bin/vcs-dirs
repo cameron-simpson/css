@@ -1,0 +1,26 @@
+#!/usr/bin/env python
+#
+# Search the named directories for VCS repositories; when found report terse summary for each.
+#   - Cameron Simpson <cs@cskk.id.au> 11may2016
+#
+
+from __future__ import print_function
+import os
+import os.path
+import sys
+
+def main(argv):
+  cmd = argv.pop(0)
+  if not argv:
+    argv = ['.']
+  for rootpath in argv:
+    for dirpath, dirnames, filenames in os.walk(rootpath):
+      if '.git' in dirnames + filenames:
+        print(dirpath)
+        dirnames[:] = []
+      elif '.hg' in dirnames:
+        print(dirpath)
+        dirnames[:] = []
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

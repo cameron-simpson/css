@@ -1,0 +1,11 @@
+  lib/python/cs/README-sharedfile.rst: README-sharedfile.rst: README for cs.sharedfile
+  lib/python/cs/sharedfile.py: cs.sharedfile: linting and a python 2/3 fix
+  lib/python/cs/sharedfile.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/sharedfile.py: resolve merge from default
+  lib/python/cs/sharedfile.py: my email address has changed - update Python code
+  lib/python/cs/sharedfile.py: merge default ==> pypi
+  lib/python/cs/sharedfile.py: cs.*: update @contextmanager formalism to use try/finally for the cleanup phase
+  lib/python/cs/sharedfile.py: cs.sharedfile: clean some lint
+  lib/python/cs/sharedfile.py: cs.sharedfile: update PyPI requirements
+  lib/python/cs/sharedfile.py: cs.sharedfile: docstring updates, clean lint
+  lib/python/cs/sharedfile.py: cs.sharedfile: fix up DISTINFO

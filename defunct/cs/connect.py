@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Facilities for connections.
-#       - Cameron Simpson <cs@zip.com.au> 06oct2012
+#       - Cameron Simpson <cs@cskk.id.au> 06oct2012
 #
 
 from collections import namedtuple

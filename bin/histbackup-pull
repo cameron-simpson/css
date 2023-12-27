@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Update local histbackup trees from remote trees.
-#       - Cameron Simpson <cs@zip.com.au> 29jan2009
+#       - Cameron Simpson <cs@cskk.id.au> 29jan2009
 # 
 
 set -ue

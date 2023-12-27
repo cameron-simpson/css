@@ -1,0 +1,2 @@
+lib/python/cs/progress.py: cs.progress: progressbar,iterbar: accept optional RunState to cancel iteration
+lib/python/cs/progress.py: cs.progress: BaseProgress.iterbar: make update_min_size properly optional, was making update_frequency ineffective

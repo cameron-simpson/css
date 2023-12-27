@@ -1,0 +1,1 @@
+Turn Progress.count_of_total_bytes_text into a function (was a property). Exercise new __version__ setting.

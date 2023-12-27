@@ -1,0 +1,2 @@
+New lc_() function to lowercase and dash a string, new titleify_lc() to mostly reverse lc_().
+New format_as function, FormatableMixin and related FormatAsError.

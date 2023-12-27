@@ -1,0 +1,6 @@
+  lib/python/cs/units.py: cs.units: convert nonnegative integers to human friendly text
+  lib/python/cs/units.py: cs.units: add DECIMAL_SCALE, update module docstring
+  lib/python/cs/units.py: cs.units: new function parse()  to convert string to value; transcribe: rename parameter "max" to "max_parts"
+  lib/python/cs/units.py: cs.units: new function multiparse which accepts multiple unit scale lists
+  lib/python/cs/units.py: cs.units: new convenience functions transcribe_* to convert via various scales
+  lib/python/cs/units.py: cs.units: prep for PyPI, clean lint

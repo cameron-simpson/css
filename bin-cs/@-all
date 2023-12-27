@@ -1,4 +1,4 @@
 #!/bin/sh
-# Wrapper for "@ host -A". - Cameron Simpson <cs@zip.com.au> 22apr2005
+# Wrapper for "@ host -A". - Cameron Simpson <cs@cskk.id.au> 22apr2005
 [ $# = 1 ] || { echo "Usage: $0 host[,host...]" >&2; exit 2; }
 exec @ "$1" -A

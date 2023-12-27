@@ -1,0 +1,6 @@
+  lib/python/cs/progress.py: include ETA in status line during copy
+  lib/python/cs/progress.py: cs.progress: Progress: be somewhat like an int: int() returns the position, comparisons work against the position, make orderable, support += and -=
+  lib/python/cs/progress.py: cs.progress: new status() method returning a convenient one line progress status report; resolve duplicated __iadd__ method
+  lib/python/cs/progress.py: cs.progress: Progress.status: bugfix int conversion, include position/total in the status message
+  lib/python/cs/progress.py: cs.progress: Progress.status: update docstring
+  lib/python/cs/progress.py: cs.progress: Progress.status: bugfix remaining=None case

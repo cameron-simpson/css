@@ -2,7 +2,7 @@
 #
 # Read an imlist (x y pathname) from stdin, choose images from it as specified.
 # See also: pickim.
-#	- Cameron Simpson <cs@zip.com.au> 16jun2004
+#	- Cameron Simpson <cs@cskk.id.au> 16jun2004
 #
 
 use strict qw(vars);

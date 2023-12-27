@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: Release information for cs.deco-20201025.
+lib/python/cs/deco.py: cs.deco: @decorator: tweak test for callable(da[0]) to accord with the docstring; some docstring minor fixes

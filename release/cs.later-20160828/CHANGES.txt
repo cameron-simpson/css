@@ -1,0 +1,43 @@
+  lib/python/cs/later.py: remove bare "except:"s from code, use "except Exception:"
+  lib/python/cs/later.py: cs.later: add LatePool, a context manager after the flavour of subprocess.Pool
+  lib/python/cs/later.py: cs.later: some docstrings for LatePool
+  lib/python/cs/later.py: cs.later: py2 port - no "yield from"
+  lib/python/cs/later.py: cs.resources: rename NestingOpenCloseMixin to MultiOpenMixin - easier to type, say and remember, not to mention being more accurate
+  lib/python/cs/later.py: cs.later: Later: add .startup, call .shutdown on .__del__ if not closed
+  lib/python/cs/later.py: cs.later: _Pipeline: use RLock
+  lib/python/cs/later.py: cs.later: MultiOpenMixin defines ._lock for us
+  lib/python/cs/later.py: cs.later: _Pipeline: add requires .startup method
+  lib/python/cs/later.py: cs.later: remove .retry method, too hard to use and in fact never used to date
+  lib/python/cs/later.py: cs.later: add RetryError exception for use by Later.retriable
+  lib/python/cs/later.py: cs.later: LateFunction: support RetryError exception from function, causing requeue; accept retry_delay parameter, used to delay function retry; Later._submit: accept LF parameter to specify preexisting LateFunction
+  lib/python/cs/later.py: cs.later: LateFunction: move resubmission out into private ._retry method
+  lib/python/cs/later.py: cs.later: Later.defer_iterable: accept `test_ready` callable to support deferring iteration until the callable returns truthiness
+  lib/python/cs/later.py: cs.later: Later: accept retry_delay parameter; LateFunction: get default retry_delay from Later
+  lib/python/cs/later.py: cs.later: RetryError: derive from Exception since STandardError does not seem to exist in Python 3
+  lib/python/cs/later.py: cs.later: new function retry(retry_interval, func, *a, **kw) to call func until it does not raise RetryError
+  lib/python/cs/later.py: cs.later: docstring for LateFunction._worker_complete
+  lib/python/cs/later.py: cs.later: _Pipeline._pipeline_func: wrap function calls in retry() to implement in-iterator retry
+  lib/python/cs/later.py: cs.later: LateFunction: rename ._retry to ._resubmit, more evocative
+  lib/python/cs/later.py: cs.later: _PipelinePushQueue: accept retry_interval parameter; fix up various calls to retry()
+  lib/python/cs/later.py: cs.later: remove some debugging
+  lib/python/cs/later.py: cs.later: Later: wrap several methods in @MultiOpenMixin.is_opened
+  lib/python/cs/later.py: cs.later: Later: use main lock with ._busy
+  lib/python/cs/later.py: cs.later: fix typo in docstring
+  lib/python/cs/later.py: cs.later: Later.__repr__: more detail about the busy list
+  lib/python/cs/later.py: cs.later: import updates
+  lib/python/cs/later.py: cs.later: additional debugging
+  lib/python/cs/later.py: cs.later: Later: remove unused and confusing is_finished method
+  lib/python/cs/later.py: cs.later: Later.shutdown: test/set .finished inside lock; Later.wait: simplify
+  lib/python/cs/later.py: cs.later: Later: track outstanding LateFUnctions in .outstanding, add .complete method to gather outstanding functions as they complete
+  lib/python/cs/later.py: cs.later: remove Later.quiesce, obsoleted by Later.complete
+  lib/python/cs/later.py: cs.later: Later.complete: fix logic for until_idle
+  lib/python/cs/later.py: cs.later: Later: new method wait_outstanding, a wrapper for complete() which discards the LateFunctions i.e. not a generator
+  lib/python/cs/later.py: cs.later: _Late_context_manager: rename .complete to .completed for readability
+  lib/python/cs/later.py: cs.later: Later: elaborate on docstring explaining that shutdown does not wait for outstanding functions
+  lib/python/cs/later.py: cs.later: replace finish logic with a threading.Event; spin out a Thread to wait for termination
+  lib/python/cs/later.py: cs.later: Later: finishing: swap wait for dispatch and workers; discard unused .is_idle method
+  lib/python/cs/later.py: cs.asynchron,cs.later: move PendingFunction and OnDemandFunction from cs.later to cs.asynchron, rename PendingFunction to _PendingFunction
+  lib/python/cs/later.py: rename cs.asynchron.Asynchron to Result
+  lib/python/cs/later.py: cs.later: add Later.pool() to return a LatePool for managing a subset of tasks; LatePool: bugfix .sbutmit, add .add
+  lib/python/cs/later.py: cherrypick later ==> venti: cs.later: experimental @capacity decorator to provide a Later to a function
+  lib/python/cs/later.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

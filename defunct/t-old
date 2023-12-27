@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # TOC or extract various archive formats.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 # Iterative analysis of extensions; the combinations were getting too numerous.
 #	- cameron 22jan99

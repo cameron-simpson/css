@@ -2,7 +2,7 @@
 #
 # Handle a single xscreensaver event.
 # Called from watchxscreensaver.
-#	- Cameron Simpson <cs@zip.com.au> 28jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 28jul2003
 #
 
 cmd=$0

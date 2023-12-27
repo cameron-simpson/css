@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # List audio files for selection.
-#	- Cameron Simpson <cs@zip.com.au> 01jun2002
+#	- Cameron Simpson <cs@cskk.id.au> 01jun2002
 #
 
 : ${AUDIODIR:=$HOME/ogg}

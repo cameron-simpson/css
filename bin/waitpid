@@ -2,7 +2,7 @@
 #
 # Wait for a set of process ids to die.
 # Needs kill privilege on the processes.
-#	- Cameron Simpson <cs@zip.com.au> 26sep2000
+#	- Cameron Simpson <cs@cskk.id.au> 26sep2000
 #
 
 usage="Usage: $0 [-v] [-d delay] [-t timeout] pids..."

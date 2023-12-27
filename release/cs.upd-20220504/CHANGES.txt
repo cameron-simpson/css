@@ -1,0 +1,3 @@
+lib/python/cs/upd.py: cs.upd: docstring tweak
+lib/python/cs/upd.py: cs.upd: Upd.above: disable/eanble around outermost yield, use try/finally for reliability
+lib/python/cs/upd.py: cs.upd: Upd.delete: just warn about index out of range, seems it can happen during shutdown - not that it really should

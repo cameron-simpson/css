@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read URLs, convert to absolute ones w.r.t to supplied base.
-#	- Cameron Simpson, cs@zip.com.au, 24aug97
+#	- Cameron Simpson <cs@cskk.id.au> 24aug97
 #
 # -h to restrict results to origin page's host.	- cameron, 17apr98
 #

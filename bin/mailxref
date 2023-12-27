@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # File the email on stdin through the xref procmailrc.
-#	- Cameron Simpson <cs@zip.com.au> 18jan2005
+#	- Cameron Simpson <cs@cskk.id.au> 18jan2005
 #
 
 exec procmail "$HOME/rc/mail/procmailrc.xref"

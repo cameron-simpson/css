@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read path pairs from stdin and copy the modes from one to the other.
-#	- Cameron Simpson <cs@zip.com.au> 30sep99
+#	- Cameron Simpson <cs@cskk.id.au> 30sep99
 #
 
 use strict qw(vars);

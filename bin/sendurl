@@ -1,3 +1,0 @@
-#!/bin/sh
-# Stub to dispatch URL from FireBird. - Cameron Simpson <cs@zip.com.au> 24oct2003
-echo "$*" | mutt -s 'page url' cs@zip.com.au

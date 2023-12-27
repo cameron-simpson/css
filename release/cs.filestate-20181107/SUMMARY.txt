@@ -1,0 +1,1 @@
+FileState.__eq__ now handles the other being None.

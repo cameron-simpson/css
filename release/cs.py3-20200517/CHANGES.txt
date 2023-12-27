@@ -1,0 +1,6 @@
+lib/python/cs/py3/__init__.py: cs.py3.__init__: add date_fromisoformat and datetime_fromisoformat being the datetime.date and datetime.datetime isoformat factories
+lib/python/cs/py3/__init__.py: cs.py3.__init__: add missing import
+lib/python/cs/py3/__init__.py: cs.py3.__init__: autoformat
+lib/python/cs/py3/__init__.py: cs.py3.__init__: some docstrings
+lib/python/cs/py3/__init__.py: cs.py3: implementation for contextlib.nullcontext for older Pythons; cd.cmdutils: get nullcontext from cs.py3
+lib/python/cs/py3/__init__.py: cs.py3,cs.context: move the stub nullcontext from cs.py3 to cs.context

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# The good morning stuff.	- Cameron Simpson <cs@zip.com.au>
+# The good morning stuff.	- Cameron Simpson <cs@cskk.id.au>
 #
 
 : ${TMPDIR:=/tmp}

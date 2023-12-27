@@ -1,0 +1,5 @@
+  lib/python/cs/mailutils.py: merge default ==> beyonwiz
+  lib/python/cs/mailutils.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/mailutils.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/mailutils.py: my email address has changed - update Python code
+  lib/python/cs/mailutils.py: cs.app.mailutils: clean some lint

@@ -1,8 +1,8 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Do a bunch of simplistic recodings to effect a lot of the
 # grunt work of converting an HTML file into a POD file.
-#	- Cameron Simpson <cs@zip.com.au> 10apr2004
+#	- Cameron Simpson <cs@cskk.id.au> 10apr2004
 #
 
 # headings

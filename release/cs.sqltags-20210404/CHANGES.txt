@@ -1,0 +1,6 @@
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet._get_db_entity: check that the entity exists
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: new cmd_dbshell to drop you into the database
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__getitem__: when autocreating an entity, do it in a new session so that the entity is commited to the database before any further use
+lib/python/cs/sqltags.py: cs.cmdutils: BaseCommand: new __init_subclass__ method to append the subclass usage_text() to the class docstring; update related modules to match
+lib/python/cs/sqltags.py: update module DISTINFOs for recent cs.cmdutils BaseCommand change
+lib/python/cs/sqltags.py: cs.sqltags: clean a little lint

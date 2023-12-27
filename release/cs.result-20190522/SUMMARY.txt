@@ -1,0 +1,4 @@
+Result.__call__ now accepts an optional callable and args.
+Result.call: set the Result state to "running" before dispatching the function.
+Rename OnDemandFunction to OnDemandResult, keep old name around for compatibility.
+Result._complete: also permitted if state==cancelled.

@@ -1,0 +1,1 @@
+  lib/python/cs/py3_for2.py: cs.py3_for2: awful py3 adjustment so that I can import this in python 3 when publishing to PyPI, even though this is _supposed_ to be python 2 code :-(

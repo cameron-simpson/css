@@ -1,0 +1,31 @@
+#!/usr/bin/env python
+#
+# Summarise the output of a tcpdump of traffic not for our modem, as from:
+#   tcpdump -nle -ttt -i vr0 not host our.ip.address.here
+# - Cameron Simpson <cs@cskk.id.au> 21feb2017
+#
+
+from __future__ import print_function
+import sys
+
+dayflows = {}
+
+for tcpline in sys.stdin:
+  month, mday, when, srcmac, dstmac, _, size, srcip, _, dstip, flags, *_ = tcpline.split()
+  key = srcmac + '->' + dstmac
+  day = month + ' ' + mday
+  packets = dayflows.setdefault(day, {}).setdefault(key, [])
+  packets.append({
+        'day': day, 'when': when,
+        'srcmac': srcmac, 'dstmac': dstmac,
+        'srcip': srcip, 'dstip': dstip,
+  })
+
+##print(repr(dayflows))
+
+for day in sorted(dayflows.keys()):
+  flows = dayflows[day]
+  for key, packets in flows.items():
+    start = min(P['when'] for P in packets)
+    end = max(P['when'] for P in packets)
+    print(day, key, start+'..'+end, len(packets), "packets")

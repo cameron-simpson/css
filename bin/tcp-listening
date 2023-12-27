@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Test if the specified local port is listening.
-#	- Cameron Simpson <cs@zip.com.au> 03jan2006
+#	- Cameron Simpson <cs@cskk.id.au> 03jan2006
 #
 
 cmd=$0

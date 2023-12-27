@@ -1,0 +1,3 @@
+lib/python/cs/queues.py: Release information for cs.queues-20200718.
+lib/python/cs/queues_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/queues.py: cs.queues: drop obsolete call to MultiOpenMixin.__init__, update __str__, drop redundant pass

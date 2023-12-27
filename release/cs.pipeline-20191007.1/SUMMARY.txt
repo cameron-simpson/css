@@ -1,0 +1,1 @@
+Pipeline functionality extracted from cs.later: asynchronous pipelines mediated with a cs.later.Later.

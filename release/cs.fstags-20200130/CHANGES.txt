@@ -1,0 +1,24 @@
+lib/python/cs/fstags.py: cs.fstags: new FSTagsConfig class which parses the .fstagsrc as a .ini file; related adjustments
+lib/python/cs/fstags.py: cs.fstags: move FSTags up the top so we can define HasFSTagsMixin early enough
+lib/python/cs/fstags.py: cs.fstags: new HasFSTagsMixin presenting a settable .fstags property with a shared default
+lib/python/cs/fstags.py: cs.fstags: plumb the current FSTags into various HasFSTagsMixin instance setups
+lib/python/cs/fstags.py: cs.fstags: FSTagsConfig: deferthe rc file load to make this and FSTags setups cheaper, since we bind FSTags to more classes now; define the [xattr] and [autotag] sections up front
+lib/python/cs/fstags.py: cs.fstags: HasFSTagsMixin: compute default FSTags on demand, removing the need to reorder class definitions in the module
+lib/python/cs/fstags.py: cs.fstags: honour the [xattr] config section, reading and writing equivalent xattr values when loading/saving TagSets
+lib/python/cs/fstags.py: cs.fstags: FSTagsConfig: new __getitem__ method to access .ini config sections by name
+lib/python/cs/fstags.py: cs.fstags: FSTagsConfig: turn .config and .rules into computed on demand attributes
+lib/python/cs/fstags.py: cs.fstags: FSTags: new .use_xattrs attribute to support override of the default extendaed attribute support mode
+lib/python/cs/fstags.py: cs.fstags: TagSet: new .modified attribute, initially False, set by .add and .discard
+lib/python/cs/fstags.py: cs.fstags: TagFile.save: do nothing if file never loaded, do nothing if no TagSets have been modified
+lib/python/cs/fstags.py: cs.fstags: FSTags.use_xattrs: the missing part
+lib/python/cs/fstags.py: cs.fstags: FSTags: rename ._tagmaps to ._tagfiles for clarity
+lib/python/cs/fstags.py: cs.fstags: FSTags: add cs.resources.MultiOpenMixin, save TagFiles on shutdown; wrap various modification activities in context managers
+lib/python/cs/fstags.py: cs.fstags: remove use of os.path.realpath, some things were calling it per-file - this may change inferred tags access via symlinks
+lib/python/cs/fstags.py: cs.fstags: DISTINFO: require cs.resources for MultiOpenMixin
+lib/python/cs/fstags.py: cs.fstags: parsing changes, including a bugfix for date transcription; clean some lint
+lib/python/cs/fstags.py: cs.fstags: add "-" support for stdin to "tag" and "tagpaths" subcommands
+lib/python/cs/fstags.py: cs.fstags: rpaths: compute the absolute path of the root path, avoids a billion subsequent getcwd calls elsewhere
+lib/python/cs/fstags.py: cs.fstags: add new xattr_import and xattr_export subcommands, remove implicit xattr access/update from other operations
+lib/python/cs/fstags.py: cs.fstags: bugfix TagFile.decode_name: get JSON_DECODER from the Tag class
+lib/python/cs/fstags.py: cs.fstags: add USAGE_FORMAT to FSTagsCommand.__doc__; tweak a sanity check
+lib/python/cs/fstags.py: cs.fstags: new TagSet.__len__ returning the number of tags

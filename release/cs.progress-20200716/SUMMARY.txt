@@ -1,0 +1,2 @@
+BaseProgress.status: distinguish "idle" (position >= total) from "stalled" (position < total).
+BaseProgress.status: make the status very short if the progress is idle.

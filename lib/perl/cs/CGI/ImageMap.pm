@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # ImageMap routines.
-#	- Cameron Simpson <cs@zip.com.au> 21mar97
+#	- Cameron Simpson <cs@cskk.id.au> 21mar97
 #
 
 use strict qw(vars);

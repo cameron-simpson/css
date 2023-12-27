@@ -1,259 +1,126 @@
-#!/usr/bin/perl
+#!/usr/bin/env python3
 #
-# Look up phone lists. Each entry has a non-blank in column one.
-#	- Cameron Simpson <cs@zip.com.au>
+# Reimplement ring in Python, presume gpg-agent available.
+# - Cameron Simpson <cs@cskk.id.au> 16apr2018
 #
 
-use POSIX;
-use Fcntl;
+import os
+from os.path import expanduser, basename, isdir, isfile, join as joinpath
+import re
+from subprocess import Popen, PIPE
+import sys
+from cs.ansi_colour import colourise_patterns
 
-($cmd=$0) =~ s:.*/::;
-$usage="Usage: $cmd [-alLvV] [+l] [-f phonelist]... patterns...
-	-a	Search all phonelists.
-	-l	List names of relevant files.
-	+l	List relevant entries (default).
-	-L	Prefix matches with filenames.
-	-p	Use PGP. (Decode encrypted phonelists.)
-	+v	Not verbose (default).
-	-v	Verbose.
-	-V	Very verbose.
-	-f	Explicitly specify phonelists.
-	patterns Regular expressions to locate.
-";
+CMD = basename(__file__)
+USAGE = 'Usage: %s [-f {-|pathname}] regexps...'
 
-$telnos=(defined($ENV{TELNOS})
-	? $ENV{TELNOS}
-	: "$ENV{HOME}/.phonelist"
-	);
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
+  cmd = argv.pop(0)
+  CMD = cmd
+  usage = USAGE % (cmd,)
+  do_colour = sys.stdout.isatty()
+  pathses = None
+  badopts = False
+  if argv and argv[0] == '-f':
+    pathses = [['-']]
+    argv = argv[2:]
+  if not argv:
+    print("%s: missing paterrns" % (cmd,), file=sys.stderr)
+    badopts = True
+  else:
+    patterns = argv
+    ptns = []
+    for pattern in patterns:
+      ptns.append(re.compile(pattern, re.I))
+  if pathses is None:
+    pathses = [
+        pathsof(path) for path in
+        os.environ.get('TELNOS', expanduser('~/rc/telnos')).split(':') if path
+    ]
+  paths = []
+  for pathses0 in pathses:
+    paths.extend(pathses0)
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+  for path in paths:
+    if path == '-':
+      lines = txtfrom(sys.stdin)
+    elif path.endswith('.gpg'):
+      lines = gpgfrom(path)
+    else:
+      lines = txtfrom(path)
+    for clause in clausesof(lines):
+      matched = True
+      for ptn in ptns:
+        if not ptn.search(clause):
+          matched = False
+          break
+      if not matched:
+        continue
+      clause = clause.rstrip()
+      if do_colour:
+        clause0 = clause
+        clause = colourise_patterns(clause, ptns)
+      print(clause)
+  return 0
 
-$badopts=0;
-$verbose=0;
-$VERBOSE=0;
-$listnames=0;
-$shownames=0;
-$usepgp=0;
-@phonelists=();
+def pathsof(path):
+  if path == '-' or isfile(path):
+    yield path
+  elif isdir(path):
+    for dirpath, dirnames, filenames in os.walk(path):
+      dirnames[:] = [
+          name for name in sorted(dirnames)
+          if name and not name.startswith('.')
+      ]
+      for name in sorted(filenames):
+        if not name or name.startswith('.'):
+          continue
+        filepath = joinpath(dirpath, name)
+        if isfile(filepath):
+          yield filepath
+  else:
+    print(
+        "%s: warning: not a file or directory: %s" % (CMD, path),
+        file=sys.stderr
+    )
 
-$::_GPG2=( length($ENV{GPG_AGENT_INFO}) && system("have-gpg-agent") == 0 );
-##warn "GPG2=$::GPG2";
+def clausesof(lines):
+  clause_lines = []
+  for line in lines:
+    line = line.rstrip()
+    if line and not line[0].isspace():
+      if clause_lines:
+        yield '\n'.join(clause_lines)
+      clause_lines = []
+    clause_lines.append(line)
+  if clause_lines:
+    yield '\n'.join(clause_lines)
 
-OPTION:
-while (@ARGV)
-{ $_=shift;
-  if (! /^-./)	{ unshift(@ARGV,$_); last OPTION; }
+def txtfrom(fp):
+  if isinstance(fp, str):
+    path = fp
+    with open(path) as fp:
+      yield from txtfrom(fp)
+  else:
+    for line in fp:
+      yield line
 
-  last OPTION if ($_ eq '--');
+def gpgfrom(fp):
+  if isinstance(fp, str):
+    path = fp
+    print(path, '...', file=sys.stderr)
+    with open(path, 'rb') as fp:
+      yield from gpgfrom(fp)
+  else:
+    argv = ['gpg2', '-q', '--use-agent', '--decrypt']
+    print('+', *argv, file=sys.stderr)
+    P = Popen(argv, stdin=fp.fileno(), stdout=PIPE)
+    yield from txtfrom(bline.decode(errors='replace') for bline in P.stdout)
+    P.wait()
 
-  if ($_ eq '-l')	{ $listnames=1; }
-  elsif ($_ eq '+l')	{ $listnames=0; }
-  elsif ($_ eq '-L')	{ $shownames=1; $listnames=0; }
-  elsif ($_ eq '+v')	{ $verbose=0; $VERBOSE=0; }
-  elsif ($_ eq '-p')	{ $usepgp=1; }
-  elsif ($_ eq '-v')	{ $verbose=1; }
-  elsif ($_ eq '-V')	{ $verbose=1; $VERBOSE=1; }
-  elsif ($_ eq '-f')	{ push(@phonelists,
-				grep(length,split(/:/,shift)));
-			}
-  else			{ warn "$cmd: $_: unrecognised option\n";
-			  $badopts=1;
-			}
-}
-
-if (! @phonelists)
-{ @phonelists=();
-  for (split(/:/,$telnos))
-  { unshift(@phonelists,$_) if -e $_;
-  }
-}
-
-if (! @ARGV)
-{ warn "$cmd: missing patterns\n";
-  $badopts=1;
-}
-
-if ($usepgp && ! length($ENV{PGPPASS}))
-{ warn "$cmd: asked for PGP but no \$PGPPASS set\n";
-  $badopts=1;
-}
-
-die $usage if $badopts;
-
-$ringptn=join('|',@ARGV);
-
-for (@phonelists)
-{ phone($_);
-}
-
-sub phone
-{ local($_)=@_;
-
-  $verbose && warn "$_ ...\n";
-
-  if ($_ eq '-')
-  { phonefile($_);
-  }
-  elsif (-d "$_/.")
-  { if (opendir(DIR,$_))
-    { local(@entries)=readdir(DIR);
-      close(DIR);
-
-      for $e (@entries)
-      { next if $e =~ /^\./;
-	&phone("$_/$e");
-      }
-    }
-    else
-    { if ($! != POSIX->EACCES)
-      { warn "$cmd: can't opendir($_): $!\n";
-      }
-    }
-  }
-  else
-  { phonefile($_);
-  }
-}
-
-sub readphrase($)
-{ my($prompt)=@_;
-
-  return undef if ! -t STDIN || ! -t STDERR;
-  system("stty -echo");
-  print STDERR "$prompt: ";
-  my $phrase = <STDIN>;
-  system("stty echo");
-  return undef if ! defined $phrase;
-  print STDERR "\n";
-  chomp($phrase);
-  return undef if ! length $phrase;
-  return $phrase;
-}
-
-sub getgpgphrase()
-{ if (! $::_askedForGPG)
-  { $::_GPGPhrase=readphrase("Enter GPG pass phrase");
-    $::_askedForGPG=1;
-  }
-
-  return $::_GPGPhrase;
-}
-
-# return gpg command with fd for pass phrase
-# phrase stored in handle GPGPHRASEFD - close this after use
-sub gpgwith($)
-{ my($phrase)=@_;
-  
-  open(GPGPHRASEFD, "+>", undef) || die "$0: can't make temp file for pass phrase: $!";
-  my $oldout = select(GPGPHRASEFD); $|=1;
-  select($oldout);
-  print GPGPHRASEFD "$phrase\n" || die "$0: can't write passphrase to temp file: $!";
-  seek(GPGPHRASEFD,0,0) || die "$0: rewind of GPGPHRASEFD fails: $!";
-  sysseek(GPGPHRASEFD,0,0) || die "$0: rewind of GPGPHRASEFD fails: $!";
-  my $tmpfd = fileno(GPGPHRASEFD);
-  die "$0: fileno(GPGPHRASEFD) returns undef! \$! = $!" if ! defined $tmpfd;
-  ##fcntl(GPGPHRASEFD, Fcntl::F_SETFL(), 0) || die "$0: can't clear close-on-exec for GPGPHRASEFD: $!";
-  if ($tmpfd > $^F)
-  { warn "$cmd: raising \$^F to $tmpfd and retrying\n" if $^F > 2;
-    $^F = $tmpfd;
-    close(GPGPHRASEFD);
-    return gpgwith($phrase);
-  }
-
-  return "gpg --batch -q --passphrase-fd $tmpfd";
-}
-
-sub phonefile
-{ local($file)=@_;
-
-  if ($file =~ /\.gpg$/)
-  {
-    my $gpgcmd;
-
-    if ($::_GPG2)
-    { $gpgcmd = "gpg2 -q --use-agent";
-    }
-    else
-    {
-      my $phr = getgpgphrase();
-      if (! defined $phr)
-      { warn "$cmd: skipping $file\n";
-	return;
-      }
-
-      $gpgcmd = gpgwith($phr);
-    }
-
-    if (! open(PHONES, " set -x; exec $gpgcmd --decrypt <'$file' |"))
-    { if ($! != POSIX->EACCES)
-      { warn "$cmd: pgp -fd <$file: $!\n";
-      }
-      close(GPGPHRASEFD);
-      return;
-    }
-  }
-  elsif ($file =~ /\.pgp$/)
-  { if (! $usepgp)
-    { return;
-    }
-
-    if (! open(PHONES,"pgp -fd <'$file' |"))
-    { if ($! != POSIX->EACCES)
-      { warn "$cmd: pgp -fd <$file: $!\n";
-      }
-      return;
-    }
-  }
-  elsif ($usepgp)
-  { return;
-  }
-  elsif ($file eq '-'
-	? open(PHONES,'<&STDIN')
-	: $file =~ /\.Z$/
-	  ? open(PHONES,"zcat '$file' 2>/dev/null |")
-	  : open(PHONES,"< $file\0"))
-  {}
-  else
-  { if ($! != POSIX->EACCES)
-    { warn "$cmd: can't open $file: $!\n";
-    }
-    return;
-  }
-
-  local($context,$first,$entry)=($file,1);
-  undef $entry;
-
-  while (defined($_=<PHONES>))
-  {
-    if (/^\S/)
-    { checkit($file,$entry) if defined $entry;
-      $entry=$_;
-    }
-    else
-    { $entry.=$_;
-    }
-  }
-
-  close(PHONES);
-
-  checkit($file,$entry) if defined $entry;
-}
-
-sub checkit
-{ local($file,$_)=@_;
-
-  if ($listnames && $named{$file})
-  {}
-  elsif (/$ringptn/oi)
-  { if ($listnames)
-    { print $file, "\n";
-      $named{$file}=1;
-    }
-    else
-    { if ($first)
-      { ($verbose || $shownames) && print $context, ":\n";
-	$first=0;
-      }
-
-      print;
-    }
-  }
-}
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

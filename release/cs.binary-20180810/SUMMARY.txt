@@ -1,0 +1,1 @@
+BytesesField.from_buffer: make use of the buffer's skipto method if discard_data is true.

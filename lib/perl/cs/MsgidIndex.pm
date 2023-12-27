@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Index data keyed on RFC822 Message-IDs.
-#	- Cameron Simpson <cs@zip.com.au> 06jun1997
+#	- Cameron Simpson <cs@cskk.id.au> 06jun1997
 #
 
 use strict qw(vars);

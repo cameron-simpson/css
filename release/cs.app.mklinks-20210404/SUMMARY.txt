@@ -1,0 +1,2 @@
+FileInfo.checksum: bump read size to 1MiB.
+Requirements bump to match cs.cmdutils change.

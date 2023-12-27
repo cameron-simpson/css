@@ -1,0 +1,3 @@
+PrefixedMappingProxy: swap to_subkey/from_subkey prefix/unprefix actions, were backwards.
+PrefixedMappingProxy: make the key and subkey conversion methods public static methods for reuse.
+Assorted minor internal changes.

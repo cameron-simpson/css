@@ -3,7 +3,7 @@
 # Synchronise two directories.
 # Wrapper for rsync which takes two directories and synchronises them,
 # because rsync takes a directory and a parent and I keep forgetting.
-#	- Cameron Simpson <cs@zip.com.au> 05oct98
+#	- Cameron Simpson <cs@cskk.id.au> 05oct98
 #
 
 tty=

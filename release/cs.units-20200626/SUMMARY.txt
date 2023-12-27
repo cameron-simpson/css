@@ -1,0 +1,1 @@
+transcribe: use "%.1f" to format the count if it is not == int(count) ==> a float-with-fraction.

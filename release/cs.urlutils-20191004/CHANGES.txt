@@ -1,0 +1,4 @@
+lib/python/cs/urlutils.py: cs.*: adjust imports of cs.pfx.Pfx
+lib/python/cs/urlutils.py: cs.*: import X from cs.x instead of cs.logutils
+lib/python/cs/urlutils.py: cs.urlutils: import for for new cs.pfx
+lib/python/cs/urlutils.py: my email address has changed - update Python code

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Collect a file via HTTP.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict qw(vars);

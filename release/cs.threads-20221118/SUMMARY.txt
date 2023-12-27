@@ -1,0 +1,1 @@
+REMOVE WorkerThreadPool, pulls in too many other things and was never used.

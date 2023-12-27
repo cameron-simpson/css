@@ -2,7 +2,7 @@
 #
 # Fetchmail returns several error codes, some of which are ok.
 # Transmute.
-#	- Cameron Simpson <cs@zip.com.au> 26jan2003
+#	- Cameron Simpson <cs@cskk.id.au> 26jan2003
 #
 set -x
 fetchmail ${1+"$@"}

@@ -1,14 +1,14 @@
 #!/usr/bin/python
 
-import re
+from __future__ import absolute_import
+from io import StringIO
 import os
 import os.path
+import re
 import sys
-from cs.lex import lastlinelen
 import cs.io
 from cs.obj import T_SEQ, T_MAP, T_SCALAR, flavour
 from cs.mixin.ucattrs import UCdict
-from cs.py3 import StringIO
 
 DEFAULT_OPTS={'dictSep': ' =>',
               'bareWords': True,
@@ -53,6 +53,12 @@ class _Hier:
 class HierOutput(_Hier):
   def __init__(self,opts=None):
     _Hier.__init__(self,opts=opts)
+
+  @staticmethod
+  def _lastlinelen(s):
+    ''' The length of text after the last newline in a string.
+    '''
+    return len(s) - s.rfind('\n') - 1
 
   def h2a(self,obj,i=None):
     """ ``Hier'' to ``ASCII''- convert an object to text.
@@ -204,7 +210,7 @@ class HierOutput(_Hier):
         self.fp.write(self.dictSep)
         self.fp.write(" ")
 
-        self.fp.adjindent(lastlinelen(keytxt)+len(self.dictSep)+1)
+        self.fp.adjindent(self.lastlinelen(keytxt)+len(self.dictSep)+1)
         self.__h2f(dictobj[k])
         self.fp.popindent()
 

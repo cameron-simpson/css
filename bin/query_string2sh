@@ -2,7 +2,7 @@
 #
 # Take argument as a $QUERY_STRING CGI parameter and emit shell to
 # turn the values into PARAM_x for each parameter x.
-#	- Cameron Simpson <cs@zip.com.au> 11aug1999
+#	- Cameron Simpson <cs@cskk.id.au> 11aug1999
 #
 # Use $QUERY_STRING itself if no arg.
 #

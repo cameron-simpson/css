@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Transcribe MS-Word files to text.
-#       - Cameron Simpson <cs@zip.com.au> 27may2013
+#       - Cameron Simpson <cs@cskk.id.au> 27may2013
 #
 
 usage="Usage: $0 filename"

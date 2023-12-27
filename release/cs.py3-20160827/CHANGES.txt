@@ -1,0 +1,10 @@
+  lib/python/cs/py3.py: cs.py3: do not bother with StringIO and BytesIO, modules can get them directly from the io module
+  lib/python/cs/py3.py: cs.py3: remove unused debug import
+  lib/python/cs/py3.py: cs.py3: redo python 2 bytes class, old one was bitten by str's self reuse for short strings
+  lib/python/cs/py3.py: cs.py3: separate py2/3 implementations of raise3()
+  lib/python/cs/py3.py lib/python/cs/py3_for2.py lib/python/cs/py3_for3.py: cs.{py3,py3_for2,py3_for3}: distinct source files for python 2/3 syntax differences
+  lib/python/cs/py3.py lib/python/cs/py3_for2.py lib/python/cs/py3_for3.py: cs.py3: add exec_code for py3 exec() function with implementations in cs.py3for_2 and cs.py3_for3
+  lib/python/cs/py3.py: cs.py3: python 2 bytes.as_str just returns self.__s
+  lib/python/cs/py3.py lib/python/cs/py3_for2.py lib/python/cs/py3_for3.py: cs.py3: move python 2 bytes class into cs.py3_for2, no longer subclasses list; add BytesFile - identity in python3, wrapper for binary files with bytes-flavoured methods in python2
+  lib/python/cs/py3.py: cs.py3: present python3 compatible versions of struct.pack and struct.unpack
+  lib/python/cs/py3.py lib/python/cs/py3_for2.py lib/python/cs/py3_for3.py: cs.py3,py3_for2,py3_for3: connect the dots for PyPI release

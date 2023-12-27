@@ -1,0 +1,7 @@
+lib/python/cs/lex.py: cs.lex: new lc_() function to lowercase and dash a string, new titleify_lc() to mostly reverse lc_()
+lib/python/cs/lex.py: merge media ==> default: cs.fstags: improvements to "rename" subcommand and small related updates
+lib/python/cs/lex.py: cs.lex: bugfix parameter spelling in titleify_lc
+lib/python/cs/lex.py: merge default ==> media
+lib/python/cs/lex.py: cs.lex: new format_as function, FormatableMixin and related FormatAsError
+lib/python/cs/lex.py: cs.lex: FormatAsError: grammar fix for message
+lib/python/cs/lex.py: cs.lex: move default FormatAsError separator to FormatAsError.DEFAULT_SEPARATOR; update docstrings and DISTINFO

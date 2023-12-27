@@ -1,0 +1,7 @@
+ILST: recognise @cpy as copyright, sfID as itunes_store_country_code.
+ILST: new SFID_ISO_3166_1_ALPHA_3_CODE and STIK_MEDIA_TYPES providing context data for various field values, as yet unused.
+Make various list fields of some boxes deferred because they are expensive to parse (uses new cs.binary deferred_field).
+add_generic_sample_boxbody: drop __iter__, causes dumb iterators to parse the samples.
+ILST: iTunes "Date" metadata seem to contain plain years or ISO8601 datestamps.
+mp4 autotag: add -n (no action) and -p,--prefix (set tag prefix, default 'mp4') options.
+mp4 autotag: use "mp4." as the tag prefix.

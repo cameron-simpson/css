@@ -4,7 +4,7 @@
 # or \c etc, I resort to this cumbersome wrapper for the common
 #	blah=`echo "$blah" | sed 's/this/that/g'`
 # thing.
-#	- Cameron Simpson <cs@zip.com.au> 25aug1997
+#	- Cameron Simpson <cs@cskk.id.au> 25aug1997
 #
 
 ($cmd=$0) =~ s:.*/::;

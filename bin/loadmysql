@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Load up a mysql server from scratch, using dumped tables from another db.
-#	- Cameron Simpson <cs@zip.com.au> 04aug2005
+#	- Cameron Simpson <cs@cskk.id.au> 04aug2005
 #
 
 trace=set-x

@@ -1,0 +1,3 @@
+  lib/python/cs/obj.py: cs.obj: autopep8
+  lib/python/cs/obj.py: cs.obj: remove "A if B else C" construction
+  lib/python/cs/obj.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

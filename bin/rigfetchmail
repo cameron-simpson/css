@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Dispatch a daemon mode fetchmail.
-#	- Cameron Simpson <cs@zip.com.au> 14dec2003
+#	- Cameron Simpson <cs@cskk.id.au> 14dec2003
 #
 
 : ${LOGDIR:=$HOME/var/log}

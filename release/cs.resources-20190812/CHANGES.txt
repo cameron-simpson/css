@@ -1,0 +1,7 @@
+lib/python/cs/resources.py: cs.resources: MultiOpenMixin: no longer subclass cs.obj.O
+lib/python/cs/resources.py: cs.resources: MultiOpenMixin: remove `lock` param support, the mixin has its own lock; remove vestiges of subopen support, might warrant a distinct type of open call later
+lib/python/cs/resources.py: cs.resources: MultiOpen: drop `lock` param support, no longer used by MultiOpenMixin, possibly drop the MultiOpen class altogether later; tweak an import
+lib/python/cs/resources.py: cs.resources: MultiOpenMixin: do finalise inside the lock for the same reason as shutdown (competition with open/startup) - I see to recall that we moved this out for some deadlock reason in the past, will need to debug if reencountered
+lib/python/cs/resources.py: cs.resources: MultiOpenMixin.close: new `unopened_ok=False` parameter intended for callback closes which might fire even if the initial open does not occur
+lib/python/cs/resources.py: cs.resources: autoformat, some docstring tweaks
+lib/python/cs/resources.py: cs.resources: docstring updates, no semantic changes

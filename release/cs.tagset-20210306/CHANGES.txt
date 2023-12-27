@@ -1,0 +1,173 @@
+lib/python/cs/tagset.py: cs.upd,cs.fstags,cs.tagset: require cs.obj>=20200716 for SingletonMixin API change
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace,TagSetNamespace: move the .[:alpha:]* attribute support form ExtendedNamespace to TagSetNamespace because it requires Tags
+lib/python/cs/tagset.py: cs.tagset: docstring tweaks
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__getattr__: move isalpha fallback clause to the bottom of the function, should not preempt other special names
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace: new experimental __bool__ method, True unless ._bool is false, intended so that ghost "subtag" namespaces look false - not terribly pleased with this
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__getattr__: new _i, _s, _f suffixes to return int, str or float tag values (or None); fold _lc in with these
+lib/python/cs/tagset.py: cs.tagset: comment out TagSet.from_bytes, seems unused
+lib/python/cs/tagset.py: cs.tagset: pull most of `TaggedEntity` out into `TaggedEntityMixin` for reuse by domain specific tagged entities
+lib/python/cs/tagset.py: cs.tagset: docstring tweak
+lib/python/cs/tagset.py: merge default ==> sqltags
+lib/python/cs/tagset.py: cs.tagset: docstrings and comments
+lib/python/cs/tagset.py: cs.tagset: TaggedEntity: new .set and .discard methods
+lib/python/cs/tagset.py: cs.tagset: TagsCommandMixin: parse_tag_choices: honour optional tag_choice_class and cls.TAG_CHOICE_CLASS values for the class of the returned TagChoice
+lib/python/cs/tagset.py: cs.tagset: docstring tweaks
+lib/python/cs/tagset.py: cs.tagset: new TagChoice.from_any factory method to return a TagChoice from some other object
+lib/python/cs/tagset.py: cs.fstags,tagset: move RegexpTagRule from cs.fstags to cs.tagset
+lib/python/cs/tagset.py: cs.tagset: new TagChoice.match(TagSet) method to test this choice against a TagSet
+lib/python/cs/tagset.py: cs.tagset: new TagSetCriterion base class, rework TagChoice as subclass, add TagSetContainsTest
+lib/python/cs/tagset.py: cs.tagset: TaggedEntityMixin.format_tagset: drop entity.isotime, replace with entity.isodatetime, add entity.isodate
+lib/python/cs/tagset.py: merge fstags ==> sqltags
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion.parse: bugfix tag_name= and tag_name~ parse
+lib/python/cs/tagset.py: cs.tagset: Tag.parse_value: bugfix parse cascade of EXTRA_TYPES
+lib/python/cs/tagset.py: cs.tagset: TaggedEntity: no longer a namedtuple, not modifiable to support TaggedEntity.edit_entities and similar
+lib/python/cs/tagset.py: cs.tagset: TaggedEntity: new as_editable_line, from_editable_line, edit and edit_entities methods to support editing entities using a text editor
+lib/python/cs/tagset.py: cs.tagset: TagSet.edit: only call set_from once, at the end
+lib/python/cs/tagset.py: cs.tagset: clean lint, update docstrings
+lib/python/cs/tagset.py: cs.tagset: TaggedEntity.edit_entities: rename old_te to te for clarity
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion: rework .parse and .from_any to be parameterisable, particularly the parse trying a list of TagSetCriterion subclasses' .parse methods in order
+lib/python/cs/tagset.py: cs.tagset: adjust some TagSetCriterion classes, update some docstrings
+lib/python/cs/tagset.py: cs.sqltags,tagset: abstract methods raise NotImplementedError
+lib/python/cs/tagset.py: cs.tagset: ontologies: type entries are now prefixed with "type." and metadata entries are prefixed with "meta."; provide a worked ontology example in the introduction and improve related docstrings
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: new .types(), .types_names(), .meta(type_name,value), .meta_names() methods
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.__getitem__: create missing TagSets on demand
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.value_to_tag_name: ensure this returns a valid dotted identifier
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.meta_names: accept optional type_name parameter to return value_names defined for that type
+lib/python/cs/tagset.py: cs.tagset: new TagsOntologyCommand, initially with a "type [type_name [{edit|list}]]" subcommand, ready for use as the cmd_ont subcommand of other tag related commands
+lib/python/cs/tagset.py: cs.tagset: spelling fix
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.__getitem__: rename index to name for clarity
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: new methods meta_index, type_index, entity and associated small refactors
+lib/python/cs/tagset.py: cs.tagset: TaggedEntity: new __str__
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: new edit_indices method for batch editing entries via TaggedEntity.edit_entities
+lib/python/cs/tagset.py: cs.tagset: TagsOntologyCommand.cmd_type: editing for metadata matching type and glob
+lib/python/cs/tagset.py: cs.tagset: comment tweak
+lib/python/cs/tagset.py: cs.fstags: Tag.parse_value: improve JSON decode exception
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace: some docstring improvements
+lib/python/cs/tagset.py: cs.tagset,fstags,sqltags: replace TagChoice with a general purpose TagBasedTest supporting various operators
+lib/python/cs/tagset.py: cs.tagset,fstags,sqltags: common TagsCommandMixin.parse_tag_choices
+lib/python/cs/tagset.py: cs.tagset: clean lint
+lib/python/cs/tagset.py: merge sqltags ==> fstags: pull recent parsing changes
+lib/python/cs/tagset.py: cs.tagset: tweak change message
+lib/python/cs/tagset.py: cs.tagset: tweak context string
+lib/python/cs/tagset.py: cs.tagset: TagBasedTest: include choice indicator in __str__
+lib/python/cs/tagset.py: cs.tagset: TagBasedTest: set the comparison to '=' instead of None
+lib/python/cs/tagset.py: cs.tagset: TagsCommandMixin.parse_tag_choices: use TagSetCriterion.from_str instead of TagBasedTest.from_str to get criteria instead of dicts
+lib/python/cs/tagset.py: cs.tagset: tiny logic refactor
+lib/python/cs/tagset.py: cs.tagset: pull Tag criterion logic out of parse_tagset_criteria as parse_tagset_criterion, change parse_tagset_criteria to take (argv) and return (criteria,argv)
+lib/python/cs/tagset.py: merge default ==> sqltags
+lib/python/cs/tagset.py: cs.sqltags,cs.tagset: rename TagSetCriterion to TaggedEntityCriterion
+lib/python/cs/tagset.py: cs.tagset: TaggedEntityCriterion: rename parse to from_str2 to avoid loop with subclass .prase methods when missing
+lib/python/cs/tagset.py: cs.tagset: TaggedEntityCriterion: rename match to match_entity to clarify its application to TaggedEntity instead of TagSet
+lib/python/cs/tagset.py: cs.tagset: another stray rename of TagSetCriterion to TaggedEntityCriterion
+lib/python/cs/tagset.py: cs.tagset: clean up some debugging, tweak docstring
+lib/python/cs/tagset.py: cs.tagset: clean a little lint
+lib/python/cs/tagset.py: cs.tagset: TagBasedTest: rename match_entity to match_tagged_entity
+lib/python/cs/tagset.py: cs.tagset: TagSet: support initialisation like a dict including keywords, and move the `ontology` parameter to `_onotology`
+lib/python/cs/tagset.py: cs.fstags,cs.tagset: adjust TagSet initialisations' _ontology parameter
+lib/python/cs/tagset.py: cs.tagset: TagSet: new tag(tag_name) method to return a Tag or None
+lib/python/cs/tagset.py: cs.tagset: drop long commented out method
+lib/python/cs/tagset.py: cs.tagset: docstring updates
+lib/python/cs/tagset.py: cs.tagset: more docstring updates
+lib/python/cs/tagset.py: cs.tagset: drop ValueMetadata and KeyValueMetadata, too confusing; now Tag.metadata returns a TagSet, list[TagSet] or dict(key->TagSet) depending on the value type
+lib/python/cs/tagset.py: cs.tagset: some docstring typo fixes
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.value_metadata: accept int tag values, return the metadat TagSet directly instead of a (dropped) ValueMetadata
+lib/python/cs/tagset.py: cs.tagset: TagSet: include AttrableMappingMixin to enable attribute access to values when there is no conflict with normal methods
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace._public_keys: improve idiom
+lib/python/cs/tagset.py: cs.tagset: TagBasedTest: new ~/ regexp based test
+lib/python/cs/tagset.py: cs.tagset: UUID encode/decode support
+lib/python/cs/tagset.py: cs.tagset: honour $TAGSET_EDITOR or $EDITOR as preferred interactive editor for tags
+lib/python/cs/tagset.py: cs.tagset: TaggedEntityCriterion: rename abstract method match_entity to match_tagged_entity to match other uses
+lib/python/cs/tagset.py: cs.tagset: rename Tag.from_string to Tag.from_str for consistency
+lib/python/cs/tagset.py: cs.tagset: TagBasedTest: make ~ use a glob via fnmatch.fnmatchcase
+lib/python/cs/tagset.py: cs.tagset: new TagSet.subtags(prefix) to extract a ubset of the tags
+lib/python/cs/tagset.py: cs.tagset: TagSet.subtags: return a plain TagSet, do not try to make an instance of our own class
+lib/python/cs/tagset.py: cs.tagsset: new TaggedEntity.subtags returning self.tags.subtags()
+lib/python/cs/tagset.py: cs.tagset: TagSet.tag: acception optional ontology parameter overriding self.ontology
+lib/python/cs/tagset.py: cs.tagset: Tag.meta replaced the former .metadata property, .metadata now a method accepting an optional ontology and name conversion function
+lib/python/cs/tagset.py: cs.tagset: TaggedEntity.update(**kw): calls self.tags.update(kw)
+lib/python/cs/tagset.py: cs.tagset: TaggedEntity.tag: return a Tag for the supplied tag_name
+lib/python/cs/tagset.py: cs.tagset: TaggedEntity: __repr__=__str__, __gettiem__ fetches from self.tags, __contains__ checks self.tags
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.value_metadata: new optional convert parameter to override the default "convert human friendly name" algorithm, particularly to pass convert=str to things which are already the basic id
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: now returns a TaggedEntity
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: like TaggedEntities, we generally return TaggedEntities and have a more directly mapping to the underlying TaggedEntities instance
+lib/python/cs/tagset.py: cs.tagset: new TaggedEntities base class to underlie mappings of name->TaggedEntity such as FSTags and SQLTags; subclasses must implement the .add and .get methods, and may provide a few other customisations
+lib/python/cs/tagset.py: cs.tagset: Tag.metadata property is now named .meta for convenience
+lib/python/cs/tagset.py: cs.tagset: Tag.type - get the type name more directly
+lib/python/cs/tagset.py: cs.tagset: note that Tag.typedata is now a TaggedEntity
+lib/python/cs/tagset.py: cs.tagset: TaggedEntities.__missing__: correct semantics
+lib/python/cs/tagset.py: cs.tagset: update imports, clean lint
+lib/python/cs/tagset.py: cs.tagset: TaggedEntities: shift _missing to the top of the class definition
+lib/python/cs/tagset.py: cs.tagset: TaggedEntities: make default_factory() mandatory and provide a working add()
+lib/python/cs/tagset.py: cs.*: rename TaggedEntity to TagSet towards their merge
+lib/python/cs/tagset.py: cs.fstags,sqltags,tagset: rename TaggedEntities to TagSets a part of the merge
+lib/python/cs/tagset.py: cs.tagset: TagSet.__init__: new options _id parameter to set self.id, part of merge of TaggedEntity
+lib/python/cs/tagset.py: cs.tagset: TagSet: update docsting for .id, .name and .unixtime properties, implement .name and .unixtime
+lib/python/cs/tagset.py: cs.tagset: TagSet: new edit_many class method pulled from obsolete TaggedEntityMixin class
+lib/python/cs/tagset.py: cs.tagset: TagSet: new csvrow and from_csvrow methods imported from obsolete TaggedEntityMixin class
+lib/python/cs/tagset.py: cs.tagset: drop obsolete TaggedEntity related classes
+lib/python/cs/tagset.py: cs.tagset: drop TagsOntology.add, now done as a side effect of __getitem__, clean imports
+lib/python/cs/tagset.py: cs.tagset: new @tag_or_tag_value decorator for functions accepting (name[,value]) or (Tag)
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.__init__: use a default default_factory, supports te_mapping being a simple dict
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.get: default need not be a keyword argument, and indeed isn't for dict
+lib/python/cs/tagset.py: cs.tagset: supply a simple test function when invoked as __main__
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace: doctest example without an ontology
+lib/python/cs/tagset.py: cs.tagset: clean some lint
+lib/python/cs/tagset.py: cs.tagset: TagSet: drop .add method, covered by .set
+lib/python/cs/tagset.py: cs.tagset: TagSet: add .add() synonym for .set() to look set-like, had dropped it as redundant
+lib/python/cs/tagset.py: cs.tagset: TagSet.as_tags: returned Tags inherit out ontology; related tweaks
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.__bool__ returning True, aids `ontology or self.ontology` style defaults
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__str__: render `str(self._tag.value)` if there is a ._tag
+lib/python/cs/tagset.py: cs.tagset: update the documentation to provide working examples of TagSet.ns() and its use in format strings
+lib/python/cs/tagset.py: cs.fstags,tagset: move BaseTagFile from cs.fstags to TagFile in cs.tagset
+lib/python/cs/tagset.py: cs.tagset: corresponding with __getattr__, implement TagSet.__setattr__(attr,value): set the Tag named attr if attr is not in __dict__
+lib/python/cs/tagset.py: cs.tagset: TagSet.__setattr__: show example __init__ code for subclasses which need some ordinary instance attributes
+lib/python/cs/tagset.py: cs.fstags: drop obsolete uses of TaggedPath.direct_tags from this and related modules
+lib/python/cs/tagset.py: cs.mappings: AttrableMappingMixin.__getattr__: bugfix lookup fall through logic
+lib/python/cs/tagset.py: Backed out changeset 22d444880082, accidental commit of wrong file
+lib/python/cs/tagset.py: cs.tagset: TagSet: define ATTRABLE_MAPPING_DEFAULT=None so that missing tag names are available as attributes with value None
+lib/python/cs/tagset.py: cs.tagset: TagSet.as_tags: new optional ontology parameter, apply it or self.ontology to the yielded Tags
+lib/python/cs/tagset.py: cs.tagset: TagSet._from_named_tags_line: skip 'name' tag, is special
+lib/python/cs/tagset.py: cs.tagset: TagSet.edit_many: do not try to change the name, just pass back the old and new names for the caller to manage
+lib/python/cs/tagset.py: cs.tagset: some trite fixes
+lib/python/cs/tagset.py: cs.tagset: TagBasedTest: te is a TagSet, no .tags attribute
+lib/python/cs/tagset.py: cs.tagset: TagSet.csvrow: omit any 'name' Tag, special field
+lib/python/cs/tagset.py: cs.tagset: TagSets: update docs for default_factory, plumb **kw through __missing__ and default_factory, have __missing__ record the new entity against the name
+lib/python/cs/tagset.py: cs.tagset: TagSets: require a __setitem__ method to complement .get
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: provide a __setitem__; TODO: maybe we want an intermeidate TagSetsWithMapping subclass between this and TagSets proviing .te_maping based methods
+lib/python/cs/tagset.py: cs.TagsOntology.edit_indices: te is a TagSet, there are no .tags
+lib/python/cs/tagset.py: cs,tagset: TagFile: presupply ._tagsets, may happy the linter and also allows a simple test against None elsewhere
+lib/python/cs/tagset.py: cs.tagset: TagFile.default_factory: just create a new TagSet, do not check for conflicts or register it
+lib/python/cs/tagset.py: cs.tagset: TagFile: provide .__setitem__
+lib/python/cs/tagset.py: cs.tagset: TagFile: drop .__getitem__, superclass method is sufficient
+lib/python/cs/tagset.py: cs.tagset: TagFile.tagsets: prepare properly classed TagSet subinstances and apply the prevailing ontology
+lib/python/cs/tagset.py: cs.tagset: TagFile.load_tagsets: drop 'name' Tag if supplied
+lib/python/cs/tagset.py: cs.tagset: TagFile.save: logic cleanup now that we set ._tagsets=None on __init__
+lib/python/cs/tagset.py: cs.tagset: drop unwanted @typechecked
+lib/python/cs/tagset.py: cs.tagset: TagFile: push the TagSetClass and default_actory up to the TagSet superclass
+lib/python/cs/tagset.py: cs.tagset: TagFile.save: include filename in error message
+lib/python/cs/tagset.py: cs.tagset: improve warning message, autoformat
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace: new __str__ and __repr__
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace: new ._value to return the _tag.value
+lib/python/cs/tagset.py: merge default => beyonwiz
+lib/python/cs/tagset.py: merge default ==> beyonwiz
+lib/python/cs/tagset.py: cs.tagset: drop Tag.prefix_name, not used
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace.__getattr__: improve exception message
+lib/python/cs/tagset.py: merge default ==> beyonwiz
+lib/python/cs/tagset.py: cs.tagset: TagSet: support access to the tag "c.x" via attributes provided there is no "c" tag in the way
+lib/python/cs/tagset.py: cs.tagset: TagFile.save_tagsets: bugfix error message
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace: update the namespace examples/doctests
+lib/python/cs/tagset.py: cs.tagset: fix some docstring typos
+lib/python/cs/tagset.py: cs.tagset TagFile.tags_line: the line starts with the name, skip any 'name' Tag (but check its value for consistency)
+lib/python/cs/tagset.py: cs.tagset: TagFile.save: no makedirs for dirpath=""
+lib/python/cs/tagset.py: cs.tagset: TagSet.unixtime: implement the autoset-to-now semantics.
+lib/python/cs/tagset.py: cs.tagset: new as_timestamp(): convert date, datetime, int or float to a UNIX timestamp
+lib/python/cs/tagset.py: merge default ==> sqltags
+lib/python/cs/tagset.py: cs.tagset: TagBasedTest.by_tag_value() factory
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.__init__: update initialisation idiom for attrable classes
+lib/python/cs/tagset.py: cs.tagset: TagSet.__getattr__: hand the superclass having no actual __getattr__ method, improve exception message
+lib/python/cs/tagset.py: cs.tagset: clean lint, autoformat
+lib/python/cs/tagset.py: cs.tagset: formatting
+lib/python/cs/tagset.py: cs.tagset: TagSet.set: skip message prep if not verbose
+lib/python/cs/tagset.py: cs.tagset: Tag.parse: fix call to cropped_repr
+lib/python/cs/tagset.py: cs.tagset: Tag.__str__: fall back to str(value) if JSON fails
+lib/python/cs/tagset.py: cs.tagset: TagsOntologyCommand: update for new cs.cmdutils.BaseCommand API

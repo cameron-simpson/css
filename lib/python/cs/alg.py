@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Assorted algorithms.
-#       - Cameron Simpson <cs@zip.com.au> 26sep2010
+#       - Cameron Simpson <cs@cskk.id.au> 26sep2010
 #
 
 from cs.py3 import StringTypes

@@ -1,0 +1,4 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: make argv optional, get additional usage keywords from self.USAGE_KEYWORDS
+lib/python/cs/cmdutils.py: cs.cmdutils: @BaseCommand.add_usage_to_docstring: honour cls.USAGE_KEYWORDS
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: do not require GETOPT_SPEC for commands with no defined options
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: call setup_logging

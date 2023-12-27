@@ -2,7 +2,7 @@
 #
 # Submit a CD description to the FreeDB CD Database.
 # Also write a cache entry into ~/.cddb for use by programs.
-#	- Cameron Simpson <cs@zip.com.au> 25aug2001
+#	- Cameron Simpson <cs@cskk.id.au> 25aug2001
 #
 
 : ${TMPDIR:=/tmp}
@@ -180,7 +180,7 @@ echo "# Disc length: $totallen seconds"
 echo "#"
 
 echo "# Revision: 0"
-echo "# Submitted via: $cmd $version by Cameron Simpson <cs@zip.com.au>"
+echo "# Submitted via: $cmd $version by Cameron Simpson <cs@cskk.id.au>"
 echo "#"
 
 read -r dummydiscid || exit 1

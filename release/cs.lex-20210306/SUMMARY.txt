@@ -1,0 +1,5 @@
+New cropped() function to crop strings.
+Rework cropped_repr() to do the repr() itself, and to crop the interiors of tuples and lists.
+cropped_repr: new inner_max_length for cropping the members of collections.
+cropped_repr: special case for length=1 tuples.
+New typed_str(o) object returning type(o).__name__:str(o) in the default case, useful for debugging.

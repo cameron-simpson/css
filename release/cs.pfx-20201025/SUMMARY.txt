@@ -1,0 +1,4 @@
+Refactor @pfx using @cs.deco.contextdecorator.
+New unpfx() function, a crude hack to strip an applpied cs.pfx prefix from a string.
+XP: just shim cs.x.X as callers expect, toss dubious extra functionality.
+exception(): plumb keyword arguments.

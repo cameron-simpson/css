@@ -1,0 +1,40 @@
+arrow
+b2sdk
+bs4
+build
+## not a package, no pyproject.toml
+## -e git+https://github.com/noDRM/DeDRM_tools.git@v7.2.1#egg=dedrm&subdirectory=DeDRM_plugin
+discid
+enum34
+-e git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python
+icontract
+lmdb
+lxml
+matplotlib
+mobi
+mypy
+musicbrainzngs
+numpy
+pandas
+pillow
+pycodestyle
+# used by dedrm
+pycryptodome
+pyflakes
+pyicontract-lint
+pylint
+##pyobjc[allbindings]  ## macos only
+pytest
+python-dateutil
+railroad-diagrams
+requests
+sqlalchemy
+tkmacosx
+tomli-w
+trove-classifiers
+twine
+typeguard
+watchdog
+yapf
+##youtube-dl
+-e git+https://github.com/ytdl-org/youtube-dl.git@26035bde4#egg=youtube-dl

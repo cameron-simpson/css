@@ -1,15 +1,17 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Report a minimal set of distinct spanning subdirectories including the
 # specified subdirectories.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys
 import os.path
-from cs.logutils import setup_logging, error, cmd
+from cs.logutils import setup_logging, error
 
+cmd = os.path.basename(sys.argv[0])
 usage="Usage: "+cmd+" topdir [subpaths...]\n"
+setup_logging(cmd)
 
 badopts=False
 

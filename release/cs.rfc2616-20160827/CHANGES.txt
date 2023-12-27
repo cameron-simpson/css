@@ -1,0 +1,20 @@
+  lib/python/cs/rfc2616.py lib/python/cs/rfc2616_tests.py: cs.rfc2616: convenience routines for HTTP/1.1 as defined by RFC2616; incomplete
+  lib/python/cs/rfc2616.py lib/python/cs/rfc2616_tests.py: cs.rfc2616: complete parse_chunk_line1, add unit tests
+  lib/python/cs/rfc2616.py: cs.rfc2616: add read_headers, pass_chunked and pass_length
+  lib/python/cs/rfc2616.py: cs.rfc2616: add missing import
+  lib/python/cs/rfc2616.py: cs.rfc2616: add another missing import
+  lib/python/cs/rfc2616.py: cs.rfc2616: convenience bytes<->str encode/decode functions; CRLFb constant for byte encoding of CRLF
+  lib/python/cs/rfc2616.py: cs.rfc2616: add message_has_body, function for default test for message body from RFC2616 part 4.4
+  lib/python/cs/rfc2616.py: cs.rfc2616: pass_length: cap read buffer size, cope with potential short writes
+  lib/python/cs/rfc2616.py: cs.rfc2616: pass_length now just a wrapper for cs.fileutils.copy_data)
+  lib/python/cs/rfc2616.py: cs.rfc2616: add get_space, to collect SP or HT chars
+  lib/python/cs/rfc2616.py: cs.rfc2616: parse_chunk_line1: support spaces on chunk size line
+  lib/python/cs/rfc2616.py: cs.rfc2616: pass_chunked: cope with no trailing "0" chunk; fix bytes/str issue checking CRLF
+  lib/python/cs/rfc2616.py: cs.rfc2616: add missing import
+  lib/python/cs/rfc2616.py: cs.rfc2616: pass_chunked: bugfix loop, also raise ValueError on unexpected data
+  lib/python/cs/rfc2616.py: cs.rfc2616: read_http_request_line: read HTTP Request-Line, return method, uri, version (RFC2616 section 5.1)
+  lib/python/cs/rfc2616.py: cs.rfc2616: update docstring to correct return value
+  lib/python/cs/rfc2616.py: cs.rfc2616: split core code from pass_chunked out into read_chunked generator
+  lib/python/cs/rfc2616.py: cs.rfc2616: fix calls to cs.lex.get_chars
+  lib/python/cs/rfc2616.py: cs.rfc2616: add datetime_from_{http_date,rfc1123,rfc850,asctime}_date functions to parse headers such as Last-Modified
+  lib/python/cs/rfc2616.py: cs.rfc2616: DISTINFO for PyPI

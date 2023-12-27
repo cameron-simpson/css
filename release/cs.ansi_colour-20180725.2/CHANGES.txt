@@ -1,0 +1,1 @@
+  lib/python/cs/ansi_colour.py: cs.ansi_colour: markdownification of some docstrings

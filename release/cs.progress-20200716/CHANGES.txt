@@ -1,0 +1,3 @@
+lib/python/cs/progress.py: Release information for cs.progress-20200627.
+lib/python/cs/progress.py: cs.progress: BaseProgress.status: distinguish "idle" (position >= total) from "stalled" (position < total)
+lib/python/cs/progress.py: cs.progress: BaseProgress.status: make the status very short if the progress is idle

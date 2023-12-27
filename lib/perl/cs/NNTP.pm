@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Access an NNTP service.	- Cameron Simpson <cs@zip.com.au>
+# Access an NNTP service.	- Cameron Simpson <cs@cskk.id.au>
 #
 
 =head1 NAME
@@ -419,7 +419,7 @@ cs::Newsrc(3cs)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

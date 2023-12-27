@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Do the common image selection bit from rootbg/menubg.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 : ${BGPATH:=$HOME/im}

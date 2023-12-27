@@ -1,0 +1,17 @@
+lib/python/cs/app/ydl.py: cs.app.ydl: new wrapper for the youtube_dl module to make for easy parallel downloads with nice progress; it is intended to supplant my "ydl" shell script once I prise the metadata from the YoutubeDL class instance
+lib/python/cs/app/ydl.py: cs.app.ydl: put the uploader at the start of the output filename template
+lib/python/cs/app/ydl.py: cs.app.ydl: prise metadata out of YoutubeDL's clutches and save as fstags
+lib/python/cs/app/ydl.py: cs.app.ydl: remove debugging
+lib/python/cs/app/ydl.py: cs.app.ydl: small cleanups
+lib/python/cs/app/ydl.py: cs.app.ydl: new YDL.output_filename property
+lib/python/cs/app/ydl.py: cs.app.ydl: emit output filenames as downloads complete
+lib/python/cs/app/ydl.py: cs.app.ydl: pass loginfo.logger to the YDL init
+lib/python/cs/app/ydl.py: cs.app.ydl: tweak message
+lib/python/cs/app/ydl.py: cs.app.ydl: YDL: default YoutubeDL options: turn off writeinfojson and updatetime, reenable cachedir
+lib/python/cs/app/ydl.py: cs.app.ydl: document YDL.__init__
+lib/python/cs/app/ydl.py: cs.app.ydl: make use of the new cs.upd.UpdProxy.prefix attribute for the per-URL status lines
+lib/python/cs/app/ydl.py: cs.app.ydl: lint
+lib/python/cs/app/ydl.py: cs.app.ydl: PyPI prep
+lib/python/cs/app/ydl.py: cs.app.ydl: tweak docstrings
+lib/python/cs/app/ydl.py: cs.app.ydl: further docstring improvements
+lib/python/cs/app/ydl.py: cs.app.ydl: sort install_requires

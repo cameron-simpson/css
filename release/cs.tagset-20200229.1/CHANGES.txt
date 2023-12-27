@@ -1,0 +1,1 @@
+lib/python/cs/tagset.py: cs.tagset: pull TagSet, Tag, TagChoice from cs.fstags for independent use

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Invoke mutt to send several files.
-#	- Cameron Simpson <cs@zip.com.au> 28apr2001
+#	- Cameron Simpson <cs@cskk.id.au> 28apr2001
 #
 
 cmd=`basename "$0"`

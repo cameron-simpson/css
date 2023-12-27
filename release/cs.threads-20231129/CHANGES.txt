@@ -1,0 +1,3 @@
+lib/python/cs/threads.py: cs.threads: HasThreadState.thread_states: *policy change*: the default now makes a mapping only for this class, not for all HasThreadState subclasses, on the premise that this class can manage use of other classes if required; new bg() class method like Thread() but also starting the Thread; notes on special use cases for the `thread_states` parameter
+lib/python/cs/threads.py: cs.threads: make HasThreadState.bg an instance method so that it can set `self` as the current instance and update its signature to be like the global `cs.threads.bg`
+lib/python/cs/threads.py: cs.threads: HasThreadState.thread_states class method: special case being called on HasThreadState

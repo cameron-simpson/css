@@ -1,0 +1,10 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM.__init__: new serial_sessions parameter, default False, which serialises Sessions to accomodate since sessions dbs like sqlite
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: SQLAState.__init__: break out the orm and session parameters/attributes, happies the linter, clarifies the code a little
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: @auto_session: wordier wrapper function names for improved tracebacks
+lib/python/cs/sqlalchemy_utils.py: cs/sqlalchemy_utils: continuing the SQLite single session and per-Thread SQLite object accomodations: ORM: refactor .session with optional new and session parameters, provide .engine and .sessionmaker on-demand properties
+lib/python/cs/sqlalchemy_utils.py: cs/sqlalchemy_utils: SQLAState.new_session: call ORM.session with new=True
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: SQLAState.auto_session: use .new_session also if there is a session but it isn't assocaited with target orm
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM: new default_session property for use by code where there should already be a session
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM: put the sqlite-specific knowledge from cs.sqltags into __init__, along with the lockfile logic in startup/shutdown
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: clean lint, update imports, tweak docstrings
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: update DISTINFO

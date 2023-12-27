@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Bundle up a directory as a compressed tar file.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=`basename "$0"`

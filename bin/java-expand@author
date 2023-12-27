@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Expand @author tags to have home page and email HREFs.
-#	- Cameron Simpson <cs@zip.com.au> 14mar2003
+#	- Cameron Simpson <cs@cskk.id.au> 14mar2003
 #
 
 cmd=$0

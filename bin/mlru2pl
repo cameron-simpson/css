@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parse Carl Paukstis's mailing list roundup and emit a Perl Hier file.
-#	- Cameron Simpson <cs@zip.com.au> 21jul95
+#	- Cameron Simpson <cs@cskk.id.au> 21jul95
 #
 
 ($cmd=$0) =~ s:.*/::;

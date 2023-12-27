@@ -1,0 +1,10 @@
+Use "install_requires" instead of "requires" in DISTINFO.
+Discard str1(), pointless optimisation.
+unrfc2047: map _ to SPACE, improve exception handling.
+Add phpquote: quote a string for use in PHP code; add docstring to jsquote.
+Add is_identifier test.
+Add get_dotted_identifier.
+Add is_dotted_identifier.
+Add get_hexadecimal.
+Add skipwhite, convenince wrapper for get_white returning just the next offset.
+Assorted bugfixes and improvements.

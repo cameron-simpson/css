@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Access the opie authentication service and conduct an OTP transaction.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict qw(vars);

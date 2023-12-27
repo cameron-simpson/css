@@ -2,7 +2,7 @@
 #
 # Basis for manipulating web sites through their URLs.
 # See cs/flickr.py and cs/librarything.py for examples.
-#       - Cameron Simpson <cs@zip.com.au> 18dec2007
+#       - Cameron Simpson <cs@cskk.id.au> 18dec2007
 #
 
 from cs.logutils import debug

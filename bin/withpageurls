@@ -2,7 +2,7 @@
 #
 # For each URL in the page, fetch it to a temporary file
 # and run the supplied command with the temp file name.
-#	- Cameron Simpson <cs@zip.com.au> 14mar2005
+#	- Cameron Simpson <cs@cskk.id.au> 14mar2005
 #
 
 cmd=$0

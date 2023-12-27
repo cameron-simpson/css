@@ -2,7 +2,7 @@
 #
 # Emit a darkened version of an image on stdout, in JPEG format.
 # Essentially a wrapper for ppmdim.
-#	- Cameron Simpson <cs@zip.com.au> 21jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 21jul2000
 #
 
 dimratio=0.6

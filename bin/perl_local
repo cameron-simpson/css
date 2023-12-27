@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Figure out where /opt/perl_local/... is.
-#	- Cameron Simpson <cs@zip.com.au> 03jan2003
+#	- Cameron Simpson <cs@cskk.id.au> 03jan2003
 #
 
 echo "/opt/perl_local/$VENDORRELEASE/$PERL_VERSION"

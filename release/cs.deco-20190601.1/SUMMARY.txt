@@ -1,0 +1,1 @@
+@strable: fix the example in the docstring.

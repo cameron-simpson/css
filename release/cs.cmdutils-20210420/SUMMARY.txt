@@ -1,0 +1,2 @@
+BaseCommand.getopt_error_handler: replace error print() with warning().
+Docstring improvements.

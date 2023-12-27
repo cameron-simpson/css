@@ -1,0 +1,5 @@
+Packet.self_check: fields without a sanity check cause a warning, not a ValueError.
+New Float64BE, Float64LE and BSSFloat classes for IEEE floats and floats-as-strings.
+Additional module docstringage on subclassing Packet and PacketField.
+BSString: drop redundant from_buffer class method.
+PacketField.__init__: default to value=None if omitted.

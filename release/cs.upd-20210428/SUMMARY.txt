@@ -1,0 +1,1 @@
+Do curses.setupterm() during iinit, avoid failure when stdout is not a tty.

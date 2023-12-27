@@ -1,0 +1,13 @@
+  lib/python/cs/app/maildb.py: cs.app.maildb: list-abbrevs: slosh fold lines if output is for mutt
+  lib/python/cs/app/maildb.py: cs.app.maildb: export: add to usage message, add additional command line usage checks
+  lib/python/cs/app/maildb.py: cs.app.maildb: py3 adjustment - "file" not builtin so test for .readline method instead
+  lib/python/cs/app/maildb.py: cs.app.maildb: type factories code now in NodeDB, adjust code to match
+  lib/python/cs/app/maildb.py: merge default ==> maildb
+  lib/python/cs/app/maildb.py: cs.app.maildb: edit_groupness: set A.realname property instead of A.REALNAME attribute
+  lib/python/cs/app/maildb.py: cs.app.maildb: AddressNode.realname: take the last .REALNAME value instead of the first
+  lib/python/cs/app/README-maildb.rst: cs/app/README-maildb.rst: hyperlinks and some rewording
+  lib/python/cs/app/maildb.py: cs.app.maildb: edit_group: prefetch groupnames to avoid race against dynamic db (actually, probably this just works around another bug)
+  lib/python/cs/app/maildb.py: Automated merge with file:///Users/cameron/hg/css-nodedb
+  lib/python/cs/app/maildb.py: cs.app.maildb: edit_group: revert select-by-groupname, renam variable
+  lib/python/cs/app/maildb.py: cs.app.maildb: commentry
+  lib/python/cs/app/maildb.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

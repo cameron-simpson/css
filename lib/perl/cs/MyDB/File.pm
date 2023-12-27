@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::MyDB::File: operations on the CS_DB::FILES table
-#	- Cameron Simpson <cs@zip.com.au> 21jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 21jul2000
 #
 
 =head1 NAME
@@ -160,7 +160,7 @@ sub Method1($
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

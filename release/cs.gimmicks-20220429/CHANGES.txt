@@ -1,0 +1,2 @@
+lib/python/cs/gimmicks.py: cs.gimmicks: define DEVNULL, which only appeared in Python 3.3
+lib/python/cs/gimmicks.py: cs.gimmicks: clean lint

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Live users.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 use CISRA::UserData;

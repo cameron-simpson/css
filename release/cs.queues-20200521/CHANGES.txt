@@ -1,0 +1,1 @@
+lib/python/cs/queues.py: cs.queues: IterableQueue,IterablePriorityQueue: simplify wrappers, bypasses weird bug from overengineering these

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Announce the arrival of a new DDTS request.
-#	- Cameron Simpson <cs@zip.com.au> 05dec2001
+#	- Cameron Simpson <cs@cskk.id.au> 05dec2001
 #
 
 sed -n '1,/^$/{

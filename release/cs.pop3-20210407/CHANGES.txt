@@ -1,0 +1,13 @@
+lib/python/cs/pop3.py: cs.pop3: new module for simple POP3 stuff, including a streaming message downloader (much faster even on a low latency link)
+lib/python/cs/pop3.py: cs.pop3: use run_argv
+lib/python/cs/pop3.py: cs.pop3: initial TLS/SSL support: default to TLS/SSL, optional tcp: or ssl: prefixes for pop targets
+lib/python/cs/pop3.py: cs.pop3: accept optional "tcp_host\!" prefix to the pop target host part, supporting distinct TCP hostname and TLS/SSL SNI hostname
+lib/python/cs/pop3.py: cs.pop3: pop3 dl: account netrc account names as a connection specification (after the optional "ssl:" or "tcp:" prefix), this lets us provide simple more information from the netrc and to use simp[le names on the command line
+lib/python/cs/pop3.py: cs.pop3: POP3Command.cmd_dl: update usage message for netrc account name form
+lib/python/cs/pop3.py: cs.pop3: POP3.client_bg: accept new optional `notify` parameter to apply to the Result
+lib/python/cs/pop3.py: cs.pop3: POP3.client_bg: tighten test of `notify`, update docstring
+lib/python/cs/pop3.py: cs.pop3: POP3._client_response_worker: set R.result to a list instead of a tuple so that a handler can modify it to release memory
+lib/python/cs/pop3.py: cs.pop3: POP3.client_retr_bg: accept new optional `notify` parameter, plumb it through to POP3.client_bg
+lib/python/cs/pop3.py: cs.pop3: new POP3.dl_bg to download a single message and delete it, asynchronously
+lib/python/cs/pop3.py: cs.pop3: POP3Command.cmd_dl: use POP3.dl_bg to do the message fetching - this also makes for more timely handling and memory release
+lib/python/cs/pop3.py: cs.pop3: prep for PyPI release

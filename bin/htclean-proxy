@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Simple HTTP proxy to htclean a web feed.
-#	- Cameron Simpson <cs@zip.com.au> 5jan2001
+#	- Cameron Simpson <cs@cskk.id.au> 5jan2001
 #
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);

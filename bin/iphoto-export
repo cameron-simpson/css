@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# Direct export photos from iPhoto library, ideally as hardlinks,
+# otherwise as copies.
+# - Cameron Simpson <cs@cskk.id.au> 19sep2018
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [-d export-dir] [-q] [-x] [--] iphoto-criteria..."
+
+export_dir=.
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) export_dir=$2; shift ;;
+    -q) trace= ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing iphoto-criteria" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+$trace iphoto select "$@" \
+| \
+{ xit=0
+  while read -r path
+  do
+    base=$(basename "$path")
+    epath=$export_dir/$base
+    [ -e "$epath" ] && cmp -- "$path" "$epath" && continue
+    $trace ln -- "$path" "$export_dir/" \
+    || $trace cp -- "$path" "$export_dir/" \
+    || xit=1
+  done
+  exit $xit
+}

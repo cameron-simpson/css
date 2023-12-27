@@ -8,8 +8,6 @@
 
 set -ue
 
-: ${TMPDIR:=/tmp}
-
 cmd=$0
 usage="Usage: $cmd [-] [-u user] [--] [user] [command [args...]]"
 
@@ -69,12 +67,4 @@ do
 done
 set -- env "$@"
 
-tmpf=$TMPDIR/su.$$.sh
-trap 'rm -f "$tmpf"' 0 1 2 3 15
-echo '#!/bin/sh' >"$tmpf"
-chmod 600 "$tmpf"
-echo "rm -f '$tmpf'" >>"$tmpf"
-shqstr exec "$@" >>"$tmpf"
-
-set -x
-exec sux $su_opts -u "$su_user" -- /bin/sh "$tmpf"
+exec sux $su_opts -u "$su_user" -- "$@"

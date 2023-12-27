@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Like envssh, but much simpler and faster.
-#	- Cameron Simpson <cs@zip.com.au> 20jan1999
+#	- Cameron Simpson <cs@cskk.id.au> 20jan1999
 # 
 
 sshopts=

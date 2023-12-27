@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Stuff to fiddle with groups.
-#	- Cameron Simpson <cs@zip.com.au> 12dec97
+#	- Cameron Simpson <cs@cskk.id.au> 12dec97
 #
 
 use strict qw(vars);

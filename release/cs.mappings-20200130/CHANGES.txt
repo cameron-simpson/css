@@ -1,0 +1,1 @@
+lib/python/cs/mappings.py: cs.mappings: new dicts_to_namedtuples function to yield namedtuples from an iterable of dicts

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Fetch the last tcpdump log from del and graph usage.
-#	- Cameron Simpson <cs@zip.com.au> 07may1999
+#	- Cameron Simpson <cs@cskk.id.au> 07may1999
 #
 
 : ${TMPDIR:=/tmp}

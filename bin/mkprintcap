@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Emit an LPRng printcap for our printers.
-#	- Cameron Simpson <cs@zip.com.au> 12oct2000
+#	- Cameron Simpson <cs@cskk.id.au> 12oct2000
 #
 
 plist=/usr/local/etc/printers

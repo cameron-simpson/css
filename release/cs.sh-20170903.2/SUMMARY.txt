@@ -1,0 +1,1 @@
+bugfix __main__ boilerplate after setuptools workaround

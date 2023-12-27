@@ -1,0 +1,1 @@
+Use cs.cmdutils.BaseCommand for main programme, add better progress reporting.

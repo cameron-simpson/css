@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Prefix standard output and standard error.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 [ $# -ge 2 ] || { echo "Usage: $0 prefix command [args...]" >&2; exit 2; }
 exec tag_fd 1,2 "$@"

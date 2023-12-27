@@ -2,7 +2,7 @@
 #
 # Pull a histbackup tree from one local file tree to another.
 # Written to aid a NAS migration.
-#   - Cameron Simpson <cs@zip.com.au> 18sep2014
+#   - Cameron Simpson <cs@cskk.id.au> 18sep2014
 #
 
 set -ue

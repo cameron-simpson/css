@@ -1,0 +1,14 @@
+lib/python/cs/app/ydl.py: Release information for cs.app.ydl-20200521.
+lib/python/cs/app/ydl.py: cs.app.ydl: defer YoutubeDL instantiation until YDL.run()
+lib/python/cs/app/ydl.py: cs.app.ydl: YDL.run: use LogTime to measure elapsed time
+lib/python/cs/app/ydl.py: cs.app.ydl: keep a distinct Progress for each download phase (video, audio etc), and add the Progresses on demand inside YDL.update_progress instead of up front
+lib/python/cs/app/ydl.py: cs.app.ydl: YDL.update_progress: drop debug warning, is expected behaviour
+lib/python/cs/app/ydl.py: cs.app.ydl: initial refactor on the way to daemon mode, reading indefinitely from standard input
+lib/python/cs/app/ydl.py: cs.app.ydl: drop debug
+lib/python/cs/app/ydl.py: cs.app.ydl: accumulate YoutubeDL options as a single options.ydl_opts attribute, split out the core of queue_urls(urls) as queue(url)
+lib/python/cs/app/ydl.py: cs.app.ydl: drop "cachedir: False" from default YDL options now that we have the -f command line option; drop debug from status line
+lib/python/cs/app/ydl.py: cs.app.ydl: support for stdin via "-" command line argument
+lib/python/cs/app/ydl.py: cs.app.ydl: YDLCommand.main: bugfix url queue call
+lib/python/cs/app/ydl.py: cs.app.ydl: add YDL.__str__
+lib/python/cs/app/ydl.py: cs.app.ydl: OverYDL: call update0() as soon as the instance is initialised, looks tidier in daemon mode; autoformat a function call
+lib/python/cs/app/ydl.py: cs.app.ydl: YDL.run: catch and report exceptions, always remove the proxy status line

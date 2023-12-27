@@ -3,7 +3,7 @@
 # Add a
 #	<BASE HREF=url>
 # markup to the HTML on stdin, writing result to stdout.
-#	- Cameron Simpson <cs@zip.com.au> 13jan2003
+#	- Cameron Simpson <cs@cskk.id.au> 13jan2003
 #
 
 cmd=`basename "$0"`

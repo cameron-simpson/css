@@ -1,0 +1,1 @@
+setup_logging: honour $NO_COLOR if ansi_mode not specified, per https://no-color.org/

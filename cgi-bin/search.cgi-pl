@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Search arbitrary indices.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 use strict qw(vars);

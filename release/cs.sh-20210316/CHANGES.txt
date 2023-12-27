@@ -1,0 +1,1 @@
+lib/python/cs/sh.py: cs.sh: docstrings: not that a modern Python shlex module provides these facilities

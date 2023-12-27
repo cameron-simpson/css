@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Notice changes in disc usage.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 # Timestamping.	- cameron, 21mar1999
 # Async multidir mode. - cameron 23mar2007

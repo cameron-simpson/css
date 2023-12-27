@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Use the babelfish translator.
-#	- Cameron Simpson <cs@zip.com.au> 19nov1998
+#	- Cameron Simpson <cs@cskk.id.au> 19nov1998
 #
 
 usage="Usage: $0 [-t dl] sl {url|text}

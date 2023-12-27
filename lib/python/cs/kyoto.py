@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Mapping interface to a KyotoCabinet dbm store.
-#       - Cameron Simpson <cs@zip.com.au> 05feb2012
+#       - Cameron Simpson <cs@cskk.id.au> 05feb2012
 #
 
 from kyotocabinet import DB as KDB

@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Maintain mirrors of rsync repositories.
-#	- Cameron Simpson <cs@zip.com.au> 25aug2000
+#	- Cameron Simpson <cs@cskk.id.au> 25aug2000
 #
 # =head1 NAME
 #
@@ -509,5 +509,5 @@ exit $xit
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson E<lt>cs@zip.com.auE<gt> 25 August 2000
+# Cameron Simpson E<lt>cs@cskk.id.auE<gt> 25 August 2000
 #

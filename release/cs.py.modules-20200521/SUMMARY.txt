@@ -1,0 +1,2 @@
+New import_module_from_file function to import a Python file as a module instance.
+New direct_imports(src_filename,module_name=None) returning the set of directly imports module names.

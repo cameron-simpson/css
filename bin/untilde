@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Replace ~ or ~user with a pathname.
-#	- Cameron Simpson <cs@zip.com.au> 21nov2001
+#	- Cameron Simpson <cs@cskk.id.au> 21nov2001
 #
 
 use strict qw(vars);

@@ -1,0 +1,3 @@
+Autocreate slot 0 on first use.
+Reliable cleanup at exit.
+Fix a display small display issue.

@@ -1,0 +1,2 @@
+Progress.iterbar: only update the status line once per iteration, either before or after the yield according to incfirst.
+Progress.iterbar: fix the meaning of update_frequency to count iterations, add update_min_size to count progress advance.

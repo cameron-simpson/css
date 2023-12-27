@@ -1,0 +1,1 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: have the decorators set __module__; tweak docstrings; drop Python 2 support from DISTINFO (we use icontract)

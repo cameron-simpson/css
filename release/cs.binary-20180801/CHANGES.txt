@@ -1,0 +1,32 @@
+  lib/python/cs/binary.py: cs.binary: initial commit: facilities associated with binary data, initially support for packet parsing
+  lib/python/cs/binary.py: cs.binary: move UInt32 nd UInt64 predefined StructFields up to under struct_field; move BoxHeader class back into cs.iso14496 to replace previous implementation
+  lib/python/cs/binary.py: cs.binary: plumb optional keyword arguments through the add_from_bytes and add_from_buffer methods
+  lib/python/cs/binary.py: cs.binary: Packet: type check some arguments against mistakes
+  lib/python/cs/binary.py: cs.binary: new BytesesField class for collection bytes instances up to an end offset; add UInt8 struct_field; strip some debug
+  lib/python/cs/binary.py: cs.binary: new BytesRunField to compactly store a run of identical bytes - note that its `from_buffer` method DOES NOT verify that the skipped bytes have the expected value
+  lib/python/cs/binary.py: cs.binary: requires Python 3 for a proper bytes class; make this rather in your face for python 2 users
+  lib/python/cs/binary.py: cs.binary: BytesRunField: keep a cache of byte runs and use it to underlie various runs and to transcribe runs without using lots of memory
+  lib/python/cs/binary.py: cs.binary: BytesRunField: the rest of the run cache diff
+  lib/python/cs/binary.py: cs.binary: Packet: move repeated field_name check to the base add_field method
+  lib/python/cs/binary.py: cs.binary: send python 3 warning to stderr
+  lib/python/cs/binary.py: cs.binary: PacketField: new .value_s proprty for the string representation of the value so that it can be overridden; override value_s in FixedBytesField
+  lib/python/cs/binary.py: cs.binary: new BytesField for a flat bytes field
+  lib/python/cs/binary.py: cs.binary: BytesesField: add __len__ method
+  lib/python/cs/binary.py: cs.binary: BytesRunField: move the cache inside the class and fix it
+  lib/python/cs/binary.py: cs.binary: rework struct_field and fix the cache
+  lib/python/cs/binary.py: cs.binary: define some struct_field classes for common 1, 2, 4 and 8 byte integers
+  lib/python/cs/binary.py: cs.binary: new ListField which is just a list of other fields; new multi_struct_field for complex structs which stored a namedtuple in the value, and structtuple its namedtuplesque convenience function
+  lib/python/cs/binary.py: cs.binary: Packet: accept str and int proxies for struct_field and fixed_bytes_field factories, update docstrings; drop some debug
+  lib/python/cs/binary.py: cs.binary: clean some lint
+  lib/python/cs/binary.py: cs.binary: flatten: accept a None chunk, yielding nothing; this supports transcribe methods transcribing no data
+  lib/python/cs/binary.py: cs.binary: PacketField: define __bytes__ as the concatenation of the transcription
+  lib/python/cs/binary.py: cs.binary: PacketField: add stub methods for from_buffer and transcribe raising NotImplementedError; fix docstring typo
+  lib/python/cs/binary.py: cs.binary: Packet.add_from_bytes: rename the return value of from_buffer
+  lib/python/cs/binary.py: cs.binary: new UTF8NULField, a NUL terminated UTF-8 string
+  lib/python/cs/binary.py: cs.binary: make various __str__ implementations friendlier
+  lib/python/cs/binary.py: cs.binary: add Packet.__getitem__ to return the actual field with a given name
+  lib/python/cs/binary.py: cs.binary: UTF8NULField.from_buffer: bugfix NUL detection, handle zero length strings
+  lib/python/cs/binary.py: cs.binary: UTF8NULField.from_buffer: convert memoryview into bytes for utf-8 decode
+  lib/python/cs/binary.py: cs.binary: docstring improvements
+  lib/python/cs/binary.py: cs.binary: struct_field and multi_struct_field now write a __doc__ for the generated class; add initial DISTINFO for PyPI release
+  lib/python/cs/binary.py: cs.binary: fixed_bytes_field: write a __doc__ for the generated class

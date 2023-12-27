@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Replacement for Sun's mknetid because our group table has blown its mind.
-#	- Cameron Simpson <cs@zip.com.au> 18dec2001
+#	- Cameron Simpson <cs@cskk.id.au> 18dec2001
 #
 
 use strict qw(vars);

@@ -1,0 +1,4 @@
+lib/python/cs/deco.py: cs.deco: @decorator: drop unused arguments, they get used by the returned decorator
+lib/python/cs/deco.py: cs.deco: docstring format tweaks
+lib/python/cs/deco.py: cs.deco: rework the @cached logic
+lib/python/cs/deco.py: cs.deco: docstring tweaks

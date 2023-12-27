@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: @decorator: comment the fact that func2=deco(func1,args...,kwargs,...) does not work, must be func2=deco(args...,kwargs...)(fun1) for now
+lib/python/cs/deco.py: cs.deco: @decorator: propagate subdecorator's docstring to the returned metadecorator; fix some other docstring typos

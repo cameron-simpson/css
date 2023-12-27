@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run htclean on the supplied web page.
-#	- Cameron Simpson <cs@zip.com.au> 03mar99
+#	- Cameron Simpson <cs@cskk.id.au> 03mar99
 #
 
 . `dirname "$0"`/.cgienv.sh

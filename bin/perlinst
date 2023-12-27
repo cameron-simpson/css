@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Install a perl module.
-#	- Cameron Simpson <cs@zip.com.au> 01jun99
+#	- Cameron Simpson <cs@cskk.id.au> 01jun99
 #
 
 force=

@@ -1,0 +1,4 @@
+lib/python/cs/cmdutils.py: cs.vt: docstring tweaks, format tweak
+lib/python/cs/cmdutils.py: merge vt ==> default: cs.vt: fix datadir_tests, provide status line around some worker threads; cs.upd: bugfix and new features; cs.progress: bugfix
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new __init_subclass__ method to append the subclass usage_text() to the class docstring; update related modules to match
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring updates

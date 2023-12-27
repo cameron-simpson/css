@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Kill a job started with bgproc.
-#	- Cameron Simpson <cs@zip.com.au> 25aug99
+#	- Cameron Simpson <cs@cskk.id.au> 25aug99
 # 
 
 cmd=`basename "$0"`

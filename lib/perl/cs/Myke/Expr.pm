@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parse and evaluate myke expressions.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 # A parsed expression is either:
 #  A scalar:	Its value.

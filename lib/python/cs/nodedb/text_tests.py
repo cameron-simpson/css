@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.nodebd.text.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys
@@ -11,6 +11,8 @@ from .text import totoken, fromtoken, get_commatext
 from .mappingdb import MappingBackend
 
 class TestTokeniser(unittest.TestCase):
+  ''' Tests for `cs.nodedb.text`.
+  '''
 
   def nodedb(self):
     self.backend = MappingBackend(self.mapping)
@@ -28,7 +30,9 @@ class TestTokeniser(unittest.TestCase):
     self.assertTrue(totoken(0) == "0")
     self.assertTrue(totoken(1) == "1")
     self.assertTrue(totoken("abc") == "\"abc\"")
-    self.assertTrue(totoken("http://foo.example.com/") == "http://foo.example.com/")
+    self.assertTrue(
+        totoken("http://foo.example.com/") == "http://foo.example.com/"
+    )
 
   def test02roundtrip(self):
     ''' Test totoken()/fromtoken() round trip.
@@ -37,9 +41,10 @@ class TestTokeniser(unittest.TestCase):
       for value in 0, 1, "abc", "http://foo.example.com/":
         token = totoken(value)
         value2 = fromtoken(token, db)
-        self.assertTrue(value == value2,
-                     "round trip %s -> %s -> %s fails"
-                     % (repr(value), repr(token), repr(value2)))
+        self.assertTrue(
+            value == value2, "round trip %s -> %s -> %s fails" %
+            (repr(value), repr(token), repr(value2))
+        )
 
   def test03get_commatext(self):
     ''' Test get_commatext word parser.

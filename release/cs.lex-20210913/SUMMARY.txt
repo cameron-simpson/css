@@ -1,0 +1,4 @@
+FormatableFormatter.FORMAT_RE_ARG_NAME_s: strings commencing with digits now match \d+(\.\d+)[a-z]+, eg "02d".
+Alias typed_str as s and typed_repr as r.
+FormatableFormatter: new .format_mode thread local state object initially with strict=False, used to control whether unknown fields leave a placeholder or raise KeyError.
+FormatableFormatter.format_field: assorted fixes.

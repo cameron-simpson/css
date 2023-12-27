@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Report attributes of specified interface.
-#       - Cameron Simpson <cs@zip.com.au> 03jan2013
+#       - Cameron Simpson <cs@cskk.id.au> 03jan2013
 #
 
 set -ue

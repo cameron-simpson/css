@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run up X with settings suitable for Tribes2.
-#	- Cameron Simpson <cs@zip.com.au> 02feb2002
+#	- Cameron Simpson <cs@cskk.id.au> 02feb2002
 #
 
 exec xinit -layout Tribes2

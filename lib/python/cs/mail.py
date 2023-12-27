@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Mail related facilities.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 import os
@@ -13,11 +13,10 @@ import email
 from email.parser import HeaderParser, FeedParser
 import email.Parser
 import email.FeedParser
+from io import StringIO
 import string
-import StringIO
 import re
 from contextlib import closing
-from cs.logutils import OBSOLETE
 from cs.seq import seq
 from cs.fileutils import saferename
 
@@ -202,7 +201,7 @@ class Maildir:
       if len(line) == 0 or line == "\n":
         break
 
-    fp=StringIO.StringIO(headertext)
+    fp=StringIO(headertext)
     return self.__parser.parse(fp, headersonly=True)
 
   def importPath(self,path):

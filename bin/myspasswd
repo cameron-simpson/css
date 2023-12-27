@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Set user password in MySQL database.
-#	- Cameron Simpson <cs@zip.com.au> 11nov2002
+#	- Cameron Simpson <cs@cskk.id.au> 11nov2002
 #
 
 cmd=$0

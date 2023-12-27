@@ -37,14 +37,14 @@ class IdSet(WithUC_Attrs, object):
   def byName(self,name):
     if is_name(name):
       try:
-        sym=os.readlink(os.path.join(self.path,name))
-        if is_idnum(sym):
-          id=int(sym)
-          E=self[id]
-          if E['name'] == name:
-            return E
-      except:
-        pass
+        sym = os.readlink(os.path.join(self.path,name))
+      except Exception:
+        return None
+      if is_idnum(sym):
+        id = int(sym)
+        E = self[id]
+        if E['name'] == name:
+          return E
     return None
 
   def _newid(self):

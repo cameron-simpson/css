@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Copy a file to stdout, with progress metering to stderr.
-#	- Cameron Simpson <cs@zip.com.au> 18sep2002
+#	- Cameron Simpson <cs@cskk.id.au> 18sep2002
 #
 
 use cs::Misc;
@@ -11,7 +11,7 @@ use Getopt::Std;
 
 sub copyout($;$);
 
-$::BSize=65536;
+$::BSize=1048576;
 $::Type=BINARY;
 $::Units=CHAR;
 

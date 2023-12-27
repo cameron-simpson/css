@@ -2,7 +2,7 @@
 #
 # Set up a server which forwards to another server, logging things as
 # they go. Intended for debugging web transactions.
-#	- Cameron Simpson <cs@zip.com.au> 04sep2001
+#	- Cameron Simpson <cs@cskk.id.au> 04sep2001
 #
 
 cmd=`basename "$0"`

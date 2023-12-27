@@ -1,0 +1,5 @@
+StackableValues is obsolete, add recommendation for cs.context.stackattrs to the docstring.
+New AttrableMappingMixin with a __getattr__ which looks up unknown attributes as keys.
+New JSONableMappingMixin with methods for JSON actions: from_json, as_json, append_ndjson and a __str__ and __repr__.
+New LoadableMappingMixin to load .by_* attributes on demand.
+New AttrableMapping(dict, AttrableMappingMixin).

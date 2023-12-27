@@ -5,7 +5,7 @@
 # (in place) only if the data differ on close.
 # Handy for rebuilding indices when you don't want to change the mtime
 # unless the index changes.
-#	- Cameron Simpson <cs@zip.com.au> 07may99
+#	- Cameron Simpson <cs@cskk.id.au> 07may99
 #
 
 use strict qw(vars);

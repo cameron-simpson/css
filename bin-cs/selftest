@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run self tests.
-#       - Cameron Simpson <cs@zip.com.au> 10dec2011
+#       - Cameron Simpson <cs@cskk.id.au> 10dec2011
 #
 
 set -ue

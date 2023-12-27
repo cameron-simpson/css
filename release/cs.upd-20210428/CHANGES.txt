@@ -1,0 +1,2 @@
+lib/python/cs/upd.py: cs.upd: @upd_proxy: add an example to the docstring
+lib/python/cs/upd.py: cs.upd: call curses.setupterm on init, with the correct file descriptor - avoids a tricky corner case with stderr a tty and stdout not a tty

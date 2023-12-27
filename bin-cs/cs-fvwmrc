@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Emit my FVWM RC file.
-#	- Cameron Simpson <cs@zip.com.au> 19aug2002
+#	- Cameron Simpson <cs@cskk.id.au> 19aug2002
 #
 
 : ${XSESSIONMODE:=''}

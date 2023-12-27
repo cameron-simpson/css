@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# Lowercase and space-to-dash stdin. - Cameron Simpson <cs@cskk.id.au> 31dec2016
+#
+
+tr '[A-Z ]' '[a-z-]'

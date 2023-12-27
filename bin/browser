@@ -2,7 +2,7 @@
 #
 # Dispatch my preferred browser.
 # Compare to $BROWSER, which is for opening a fresh window in the browser.
-#	- Cameron Simpson <cs@zip.com.au> 08aug2004
+#	- Cameron Simpson <cs@cskk.id.au> 08aug2004
 #
 
 : ${VARRUN:="$HOME/var/run"}

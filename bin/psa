@@ -1,24 +1,41 @@
-#!/bin/sh -ue
+#!/bin/sh
+#
+# pt wrapper - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
 
 : ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
 
 ptopts=
+gaopts=
+[ -t 1 ] && gaopts=-C
+
 while [ $# -gt 0 ]
 do
   case $1 in
     +?*)ptopts="$ptopts $1" ;;
-    *)	break ;;
+    *)  break ;;
   esac
   shift
 done
 
 case $OS in
-    solaris)	        exec pt -e  $ptopts ;;
-    darwin|*bsd|linux)  exec pt wwwax $ptopts ;;
+    solaris)            pt="pt -e  $ptopts" ;;
+    darwin|*bsd|linux)  pt="pt wwwax $ptopts" ;;
     ultrix|domainos|sunos)
-			exec ps agxuww ;;
-    *)			echo "$0: don't know how to psa when \$OS=\"$OS\"" >&2
-			exit 1
-			;;
-esac \
+                        pt="ps agxuww" ;;
+    *)                  echo "$0: don't know how to psa when \$OS=\"$OS\"" >&2
+                        exit 1
+                        ;;
+esac
+
+if [ $# = 0 ]
+then  $pt
+else  $pt | grepall -H -i $gaopts "$@"
+fi \
+| case $OS in
+    linux)  awk '$3 != 2 || $6 != "\\_" || $7 !~ /^\[.*\]/ { print }' ;;
+    *)      cat ;;
+  esac \
 | entilde

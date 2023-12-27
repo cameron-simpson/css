@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Report image sizes.
-#	- Cameron Simpson <cs@zip.com.au> 01jun1999
+#	- Cameron Simpson <cs@cskk.id.au> 01jun1999
 #
 # Usage: imsize [filenames...]
 #

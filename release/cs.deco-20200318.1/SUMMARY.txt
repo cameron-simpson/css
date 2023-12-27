@@ -1,0 +1,1 @@
+New @OBSOLETE to issue a warning on a call to an obsolete function, like an improved @cs.logutils.OBSOLETE (which needs to retire).

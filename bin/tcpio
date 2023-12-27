@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # tcpio - shell level TCP stream access
-#	- Cameron Simpson <cs@zip.com.au> 04feb1994
+#	- Cameron Simpson <cs@cskk.id.au> 04feb1994
 #
 
 require 'flush.pl';

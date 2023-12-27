@@ -1,0 +1,2 @@
+lib/python/cs/progress.py: Release information for cs.progress-20200718.
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar, progressbar: new optional update_frequency parameter for less frequent updates

@@ -1,0 +1,2 @@
+Bugfix @decorator decorator, do not decorate twice.
+Have a cut at inheriting the decorated function's docstring.

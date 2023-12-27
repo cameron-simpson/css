@@ -2,7 +2,7 @@
 #
 # Take a set of URL lists and generate a block for manual insertion into a
 # bookmark file.
-#	- Cameron Simpson <cs@zip.com.au> 07apr2003
+#	- Cameron Simpson <cs@cskk.id.au> 07apr2003
 #
 
 tmpdir=`mkdirn /tmp/hi2bm` || exit 1

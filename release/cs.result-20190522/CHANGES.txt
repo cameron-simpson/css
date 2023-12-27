@@ -1,0 +1,8 @@
+lib/python/cs/result.py: cs.result: autoformat with yapf
+lib/python/cs/result_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/result.py: cs.result: Result.__call__ now accepts an optional callable and args; update some docstrings
+lib/python/cs/result.py: cs.result: use icontract to sanity check Result.call and Result._complete
+lib/python/cs/result.py: cs.result: Result.call: set the Result state to "running" before dispatching the function
+lib/python/cs/result.py: cs.result: Result.bg: drop the lock; drop the state==pending check, done by Result.call
+lib/python/cs/result.py: cs.result: rename OnDemandFunction to OnDemandResult, keep old name around for compatibility
+lib/python/cs/result.py: cs.result: Result._complete: also permitted if state==cancelled

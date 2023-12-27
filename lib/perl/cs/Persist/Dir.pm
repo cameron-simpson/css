@@ -3,7 +3,7 @@
 # Save/restore a hash in a directory.
 # The directory entries are %escaped for "%" and "/", and for a leading ".".
 # The zero-length key is still not supported.
-#	- Cameron Simpson <cs@zip.com.au> 11jun97
+#	- Cameron Simpson <cs@cskk.id.au> 11jun97
 #
 
 use strict qw(vars);

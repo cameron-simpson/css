@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: @observable_class: bugfix __init__ wrapper function

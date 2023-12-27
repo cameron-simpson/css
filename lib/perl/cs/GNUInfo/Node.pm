@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::GNUInfocs::GNUInfo::Node: a node in a cs::GNUInfo object
-#	- Cameron Simpson <cs@zip.com.au> 5nov2000
+#	- Cameron Simpson <cs@cskk.id.au> 5nov2000
 #
 
 =head1 NAME
@@ -528,7 +528,7 @@ cs::GNUInfo(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

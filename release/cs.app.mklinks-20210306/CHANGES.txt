@@ -1,0 +1,15 @@
+lib/python/cs/app/mklinks.py: cs.app.mklinks: use cs.cmdutils.BaseCommand for main programme, add better progress reporting
+lib/python/cs/app/mklinks.py: cs.app.mklinks: clean lint, autoformat
+lib/python/cs/app/mklinks.py: cs.app.mklinks: better merge progress reporting
+lib/python/cs/app/mklinks.py: cs.app.mklinks: Linker: use track() to recite link actions
+lib/python/cs/app/mklinks.py: cs.app.mklinks: FileInfo.path: return None if there are no paths
+lib/python/cs/app/mklinks.py: cs.app.mklinks: put in progress reporting
+lib/python/cs/app/mklinks.py: cs.app.mklinks: new -n (no action) option, plumbed through to FileInfo.assimilate()
+lib/python/cs/app/mklinks.py: cs.app.mklinks: clean lint, autoformat
+lib/python/cs/app/mklinks.py: cs.app.mklinks: tweak progress meter
+lib/python/cs/app/mklinks.py: cs.app.mklinks: Linker.scan: status line showing the current scan directory
+lib/python/cs/app/mklinks.py: cs.app.mklinks: Linker: new min_size-512 to ignore small files, not yet hooked up to the command line
+lib/python/cs/app/mklinks.py: cs.app.mklinks: add missing import
+lib/python/cs/app/mklinks.py: cs.app.mklinks: Linker.scan: use a progress bar instead of naming every file
+lib/python/cs/app/mklinks.py: cs.app.mklinks: strip a few redundant parameters
+lib/python/cs/app/mklinks.py: cs.app.mklinks: update for new BaseCommand API, clean imports

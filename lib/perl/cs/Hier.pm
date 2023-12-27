@@ -4,7 +4,7 @@
 # In fact, the expressions written are very nearly perl syntax.
 # This will break when reference tracking comes in.
 # Also has assorted hierarchical utility functions.
-#	- Cameron Simpson <cs@zip.com.au> 14mar95
+#	- Cameron Simpson <cs@cskk.id.au> 14mar95
 #
 # Added tags to fix recursive references.	- cameron 21feb96
 # Fixed tag parsing bug.			- cameron 02jun96
@@ -1181,7 +1181,7 @@ B<cs::Sink>(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

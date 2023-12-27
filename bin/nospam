@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Filter spam from a mail feed.
-#	- Cameron Simpson <cs@zip.com.au> 25jul97
+#	- Cameron Simpson <cs@cskk.id.au> 25jul97
 #
 
 use strict qw(vars);

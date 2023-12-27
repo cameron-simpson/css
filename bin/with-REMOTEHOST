@@ -2,7 +2,7 @@
 #
 # Ssh to the host specified by $REMOTEHOST and run a command with a copy
 # of a local file.
-#       - Cameron Simpson <cs@zip.com.au> 08dec2009
+#       - Cameron Simpson <cs@cskk.id.au> 08dec2009
 #
 
 set -ue

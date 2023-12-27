@@ -1,0 +1,13 @@
+  lib/python/cs/result.py: cs.result: derive CancellationError from Exception instead of RuntimeError, fix initialiser
+  lib/python/cs/result.py: cs.result: rename AsynchState to ResultState and make it an Enum
+  lib/python/cs/result.py: cs.result: backport to python 2, with dummy Enum
+  lib/python/cs/result.py: cs.result: Result: make Results hashable and comparable for equality for use as mapping keys: equality is identity
+  lib/python/cs/result.py: cs.result: clean lint
+  lib/python/cs/result.py: cs.result: improve Result.__str__
+  lib/python/cs/result.py: cs.result: docstring tweaks
+  lib/python/cs/result.py: cs.result: new Result.collected attribute, set true if .result or .exc_info are accessed, logs an error if Result.__del__ is called when false, may be set true externally if a Result is not required
+  lib/python/cs/result.py: cs.result,cs.later: drop `final` parameter, never used and supplanted by Result.notify
+  lib/python/cs/result.py: cs.result: Result.join: return the .result and .exc_info properties in order to cark the Result as collected
+  lib/python/cs/result.py: cs.result: Result: set .collected to True when a notifier has been called successfully
+  lib/python/cs/result.py: merge default ==> venti
+  lib/python/cs/result.py: cs.result: bugfix Result.cancel: apply the new cancelled state

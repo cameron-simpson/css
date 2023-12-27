@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Intercept email items and deposit in the named directories.
-#	- Cameron Simpson <cs@zip.com.au> 01nov96
+#	- Cameron Simpson <cs@cskk.id.au> 01nov96
 #
 # Each directory contains a short shell script, viz:
 #	case "$subject" in

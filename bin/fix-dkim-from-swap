@@ -8,7 +8,7 @@
 # fix-dkim-from-swap is for lists where (arguably more sensibly)
 # the original from header has been renamed to (by default)
 # X-Original-From:. We just swap them around.
-#   - Cameron Simpson <cs@zip.com.au> 02jan2015
+#   - Cameron Simpson <cs@cskk.id.au> 02jan2015
 #
 
 set -ue

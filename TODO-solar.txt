@@ -1,0 +1,11 @@
+splink plot POWER: aggregate bar graphs to the right showing total power by category
+list ts keys to aid plotting
+splink plot: help should list modes etc
+splink plot: bar chart version with window/label function showing aggregate stuff per window
+splink plot: tick marks at 4 or 6 hours intervals?
+make plots of more days wider
+aggregate summaries on plots eg total power of some type over the time frame
+battery state in power graph on secondary axis
+stacked power graph
+identifierish event name selection
+histograms grouped by time period?

@@ -1,13 +1,13 @@
 #!/bin/sh
 #
 # Install local CSS to remote CSS.
-#	- Cameron Simpson <cs@zip.com.au> 18jan2004
+#	- Cameron Simpson <cs@cskk.id.au> 18jan2004
 #
 
 set -ue
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-d dstdir] hostslists..."
+usage="Usage: $cmd [-d dstdir] hostlists..."
 
 : ${OPTCSS:=/opt/css}
 
@@ -19,5 +19,5 @@ dstdir=$OPTCSS
 
 for hostlist
 do
-  mrsync -iO -aH --delete --delete-excluded '--exclude=*.pyc' "$srcdir/." "$hostlist:$dstdir/."
+  mrsync -iO -aH --delete --delete-excluded --exclude=/release '--exclude=*.pyc' "$srcdir/." "$hostlist:$dstdir/."
 done

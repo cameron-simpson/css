@@ -1,0 +1,1 @@
+Bugfix TagSet.set: internal in place changes to a complex tag value were not noticed, causing TagFile to not update on shutdown.

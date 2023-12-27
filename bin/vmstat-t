@@ -2,7 +2,7 @@
 #
 # Run vmstat as with the modern -t option. Written for vmstats with
 # no -t option.
-#   - Cameron Simpson <cs@zip.com.au> 28oct2014
+#   - Cameron Simpson <cs@cskk.id.au> 28oct2014
 #
 
 vmstat ${1+"$@"} \

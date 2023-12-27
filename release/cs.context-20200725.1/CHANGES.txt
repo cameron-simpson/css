@@ -1,0 +1,2 @@
+lib/python/cs/context.py: Release information for cs.context-20200725.
+lib/python/cs/context.py: cs.context: docstring tweaks

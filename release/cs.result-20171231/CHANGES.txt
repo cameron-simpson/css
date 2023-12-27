@@ -1,0 +1,4 @@
+  lib/python/cs/result.py: merge later ==> pilfer
+  lib/python/cs/result.py: cs.result: new convenience function bg(func) to dispatch `func` in a separate Thread and return a Result to collect its value
+  lib/python/cs/result.py: cs.result: fix docstring typo
+  lib/python/cs/result.py: cs.result: Result.call: catch BaseException instead of Exception

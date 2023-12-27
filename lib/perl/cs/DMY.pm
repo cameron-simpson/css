@@ -3,7 +3,7 @@
 # Date related functions.
 # Purer DMY version written 02dec2002 with some basis on the old
 # cs::Date object.
-#	- Cameron Simpson <cs@zip.com.au> 02dec2002
+#	- Cameron Simpson <cs@cskk.id.au> 02dec2002
 #
 
 =head1 NAME
@@ -258,7 +258,7 @@ cs::TM(3)
 
 =head1 AUTHOR
 
-Cameron Simpson <cs@zip.com.au> 04dec2002
+Cameron Simpson <cs@cskk.id.au> 04dec2002
 
 =cut
 

@@ -1,0 +1,2 @@
+  lib/python/cs/range.py: cs.range: Span: provide __len__
+  lib/python/cs/range.py: cs.range: update docstrings, clean lint

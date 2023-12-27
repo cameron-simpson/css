@@ -3,7 +3,7 @@
 # Fetch a web page that's a table of contents, and all the pages it references.
 # Peruse the TOC, offer up the links in document order for selection.
 # Generate a fresh flat page with everything in it for printing.
-#	- Cameron Simpson <cs@zip.com.au> 18may2004
+#	- Cameron Simpson <cs@cskk.id.au> 18may2004
 #
 
 cmd=`basename "$0"`

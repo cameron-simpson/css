@@ -1,0 +1,2 @@
+New twostep() and setup_cmgr() functions to split a context manager into set up and teardown phases for when these must occur in different parts of the code.
+New thread local StackableState class which can be called to push attribute changes with stackattrs - intended for use as shared global state to avoiod passing through deep function call chains.

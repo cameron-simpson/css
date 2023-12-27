@@ -1,0 +1,9 @@
+  lib/python/cs/debug.py: cs.debug: add POST context manager to evaluate a post condition after a suite
+  lib/python/cs/debug.py: cs.debug: add DebugShell, a cmd.Cmd subclass for debugging - current use case calls this with self.__dict__ in a test case tearDwon
+  lib/python/cs/debug.py: cs.debug: POST moved to cs.predicate as post_condition
+  lib/python/cs/debug.py: cs.debug: debug_object_shell: convenience wrapper for DebugShell to call it on an object's attributes
+  lib/python/cs/debug.py: cs.debug: trite debug tweaks
+  lib/python/cs/debug.py: cs.debug: python 3 fix for exec
+  lib/python/cs/debug.py: cs.debug: new function selftest() to invoke unittests with benefits
+  lib/python/cs/debug.py: cs.debug: selftest: make argv parameter optional, default from sys.argv
+  lib/python/cs/debug.py: cs.debug: new function openfiles() to return selected pathnames of open files via lsof(8)

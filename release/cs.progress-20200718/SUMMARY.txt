@@ -1,0 +1,2 @@
+Readability improvement for default status line.
+progressbar: default units_scale=UNSCALED_SCALE.

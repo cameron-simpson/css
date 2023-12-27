@@ -3,7 +3,7 @@
 # New spam is coming in base64 encoded, and bogofilter doesn't decode
 # before measuring keywords. This script makes a crude decode before
 # handing to bogofilter.
-#	- Cameron Simpson <cs@zip.com.au> 27oct2002
+#	- Cameron Simpson <cs@cskk.id.au> 27oct2002
 #
 
 tmp=${TMPDIR:-/tmp}/unb64bf$$

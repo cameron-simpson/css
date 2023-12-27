@@ -1,0 +1,30 @@
+lib/python/cs/fsm.py: cs.fsm: new module for basic Finite state machine support: state transitions and also duping the state transition diagram from the specification (idea from @thingskatedid)
+lib/python/cs/fsm.py: cs.fsm: add FSMSubType type definition
+lib/python/cs/fsm.py: cs.fsm: new FSMError for FSM related exceptions
+lib/python/cs/fsm.py: cs.fsm: FSM: new __getattr__ providing .STATENAME, .is_statename and .eventname()
+lib/python/cs/fsm.py: cs.fsm: FSM.fsm_event: raise an FSMError for a bad event instead of a KeyError
+lib/python/cs/fsm.py: cs.fsm: FSM: break out new fsm_transitions_as_dot(transitions_dict) method from fsm_dot property
+lib/python/cs/fsm.py: cs.fsm: FSM: new fsm_events() returning valid events for the current state
+lib/python/cs/fsm.py: cs.fsm: FSM.gvprint: adjust arguments for cs.gvutils.gvprint parameter change
+lib/python/cs/fsm.py: cs.fsm: new fsm_callback(state,callback) registration method
+lib/python/cs/fsm.py: cs.fsm: update imports, update self test for recent (uncommitted) Task change
+lib/python/cs/fsm.py: cs.fsm: new FSMTransitionEvent to represent a state transition, update FSM.fsm_event to record these is .fsm_history is not None
+lib/python/cs/fsm.py: cs.fsm: FSM.fsm_event: callbacks now take (FSM,FSMTransitionEvent) arguments
+lib/python/cs/fsm.py: cs.fsm: FSM.fsm_callback: update docstring for new callback signature
+lib/python/cs/fsm.py: cs.fsm: update the self test code for recent taskqueue changes, also print the DOT to stderr because we print the DOT render to stdout
+lib/python/cs/fsm.py: cs.fsm: docstring tweaks
+lib/python/cs/fsm.py: cs.fsm: FSM.fsm_transitions_as_dot: quote graph, state and event names
+lib/python/cs/fsm.py: cs.fsm: FSM: use a mutex around critical sections, allow that mutex to be supplied at init
+lib/python/cs/fsm.py: cs.fsm: FSM.__getattr__: better handling of no super().__getattr__
+lib/python/cs/fsm.py: cs.fsm: add missing import
+lib/python/cs/fsm.py: cs.fsm: FIXUP: fix import spelling
+lib/python/cs/fsm.py: cs.fsm: FSM: new FSM_ANY_STATE sentinel used to apply a callback to any state
+lib/python/cs/fsm.py: cs.fsm: FSM.__init__: accept optional instance specific transitions mapping
+lib/python/cs/fsm.py: cs.fsm: FSM: new __str__ method
+lib/python/cs/fsm.py: cs.fsm: FSM.__getattr__(event_name): accept keyword parameters in the returned lambda
+lib/python/cs/fsm.py: cs.fsm: FSM.fsm_event: docstring improvement
+lib/python/cs/fsm.py: cs.fsm: FSM.fsm_callback: document FSM.FSM_ANY_STATE wildcard event value, add doctest
+lib/python/cs/fsm.py: cs.fsm: FSM.fsm_transitions_as_dot: now a class method, new optional graph_name parameter defaulting to the class name
+lib/python/cs/fsm.py: cs.fsm: FSM: new fsm_callback_discard method to remove a callback
+lib/python/cs/fsm.py: cs.fsm: fix docstring typo
+lib/python/cs/fsm.py: cs.fsm: add DISTINFO

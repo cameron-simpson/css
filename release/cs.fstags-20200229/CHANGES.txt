@@ -1,0 +1,33 @@
+lib/python/cs/fstags.py: cs.fstags: new TaggedPath.modified property aliasing the TagSet.modified attribute
+lib/python/cs/fstags.py: cs.fstags: Tag.parse_value: switch to seek-forgivenness model for name parsing, fixes bare identifier bug
+lib/python/cs/fstags.py: cs.fstags: FSTags.attach_path: handle EACCESS in dst_taggedpath.save; autoformat
+lib/python/cs/fstags.py: fstags: ls: new -d option to treat directories like files (do not recurse), aiding reporting of tags for a directory
+lib/python/cs/fstags.py: cs.fstags: find,ls subcommands: work off the realpath of the supplied top level path
+lib/python/cs/fstags.py: cs.fstags: Tag: subclass namedtuple
+lib/python/cs/fstags.py: cs.fstags: use a PurePath instead of a Path to avoid accidental OS access
+lib/python/cs/fstags.py: cs.fstags: rewrite rpaths() to use scandir and to also yield (is_dir,path) tuples
+lib/python/cs/fstags.py: cs.fstags: bugfix for rpaths() - catch modern exceptions
+lib/python/cs/fstags.py: cs.fstags: TagSet, Tag, TagChoice moved into new cs.tagset module for reuse; keep xattr stuff here
+lib/python/cs/fstags.py: cs.fstags: TagSet no longer has a reference to the FSTags
+lib/python/cs/fstags.py: cs.fstags: "json_import" subcommand: make --prefix mandatory, is "." as separator if not empty
+lib/python/cs/fstags.py: merge media ==> default: move TagSet, Tag, TagChoice from cs.fstags into new cs.tagset; fstags json_import: make --prefix mandatory; mp4 autotag: use "mp4." prefix; ydl: use "youtube-dl." prefix
+lib/python/cs/fstags.py: cs.fstags: json_import: bugfix call to str.join
+lib/python/cs/fstags.py: merge media ==> default: cs.fstags: small bugfix for json_import
+lib/python/cs/fstags.py: cs.fstags: tweak docstrings and comments
+lib/python/cs/fstags.py: cs.fstags: rpath: do not apply the name_selector to the initial path
+lib/python/cs/fstags.py: cs.fstags: move filename regexp rules to [filename_rules] config section, adjust behaviour of "autotag" subcommand, use cs.upd for progress reporting
+lib/python/cs/fstags.py: cs.fstags: plumb "verbose" setting through to TagSet.{add,discard}; rpaths: make yield_dirs and name_selector keyword only
+lib/python/cs/fstags.py: cs.fstags: drop obsolete inference code, clean lint, note TODO
+lib/python/cs/fstags.py: cs.fstags: FSTags.__exit__: emit error messages for unsaved TagFiles
+lib/python/cs/fstags.py: cs.fstags: rpaths: do not follow symlinks
+lib/python/cs/fstags.py: cs.fstags: cmd_autotag: annotate files with filesize=stat.st_size instead of doing an expensive stat during output formatting
+lib/python/cs/fstags.py: cs.fstags: optional Upd progress reporting in rpaths, use this with cmd_find
+lib/python/cs/fstags.py: cs.fstags: new CascadeRule for representing a "target_tag_name = tag_name1 tag_name2..." config rules
+lib/python/cs/fstags.py: cs.fstags: FSTags: rename .rules to .filename_rules
+lib/python/cs/fstags.py: cs.fstags: FSTags.config: .cascade_rules and support
+lib/python/cs/fstags.py: cs.fstags: cmd_autotag: include the cascade rules in the autotagging after the filename rules
+lib/python/cs/fstags.py: merge media ==> default: cs.fstags: cmd_autotag: add cascade rules after processing filename rules; ydl: remove info file after import into fstags
+lib/python/cs/fstags.py: cs.fstags: FSTagsConfig: new config sections
+lib/python/cs/fstags.py: cs.fstags: drop StackableValues in favour of new cs.context.stackattrs context manager
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_autotag: bugfix stat call
+lib/python/cs/fstags.py: cs.fstags: adjust usage of BaseCommand.cmd_* methods for recent API simplification

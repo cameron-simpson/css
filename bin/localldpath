@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wire in the core ldpath.
-#	- Cameron Simpson <cs@zip.com.au> 01feb2000
+#	- Cameron Simpson <cs@cskk.id.au> 01feb2000
 #
 
 [ $# = 0 ] && set -- "$SHELL"

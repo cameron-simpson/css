@@ -1,0 +1,1 @@
+funccite: handle callables with no __code__ attribute.

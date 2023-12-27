@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+# Wrapper for get-ssl-certs to save the certs.
+#
+# 
+
+set -ue
+
+certdir=$HOME/rc/certs
+force=
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$0
+usage="Usage: $cmd [-d dir] [-f] [-x] host[:port]..."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) certdir=$2; shift ;;
+    -f) force=1 ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ -d "$certdir" ] || { echo "$cmd: cert dir missing: $certdir" >&2; badopts=1; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing host[:port]..." >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for target
+do
+  saveas=$certdir/$target.pem
+  if [ -e "$saveas" ]
+  then
+    if [ $force ]
+    then
+      echo "$cmd: warning: overwriting $saveas" >&2
+    else
+      echo "$cmd: target save file already exists: $saveas" >&2
+      xit=1
+      pfx "$target" $trace openssl x509  -noout -fingerprint <"$saveas"
+      continue
+    fi
+  fi
+  $trace get-ssl-certs "$target" >"$saveas" || { xit=1; continue; }
+  pfx "$target" $trace openssl x509  -noout -fingerprint <"$saveas"
+done
+
+exit $xit

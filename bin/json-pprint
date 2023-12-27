@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+#
+# Read JSON on standard input, emit indented format on standard output.
+#   - Cameron Simpson <cs@cskk.id.au>
+#
+
+from __future__ import print_function
+import sys
+import json
+
+input_data = sys.stdin.read()
+if isinstance(input_data, str):
+  text = input_data
+else:
+  text = input_data.decode('utf-8')
+data = json.loads(text.strip())
+print(json.dumps(data, sort_keys=True, indent=4))

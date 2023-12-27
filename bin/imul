@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Annotate a PNG image file, writing result to stdout.
-#	- Cameron Simpson <cs@zip.com.au> 08jan2002
+#	- Cameron Simpson <cs@cskk.id.au> 08jan2002
 #
 
 use strict qw(vars);

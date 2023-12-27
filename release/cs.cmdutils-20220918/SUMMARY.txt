@@ -1,0 +1,2 @@
+BaseCommand.run_context: expand default signals to include SIGHUP, expose as BaseCommand.DEFAULT_SIGNALS.
+BaseCommand.run: pass in the subclass handle_signal method if present.

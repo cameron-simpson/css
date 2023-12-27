@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Look for music. in several search engines.
-#	- Cameron Simpson <cs@zip.com.au> 21nov2005
+#	- Cameron Simpson <cs@cskk.id.au> 21nov2005
 #
 
 cmd=`basename "$0"` || cmd=$0

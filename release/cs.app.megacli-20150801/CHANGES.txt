@@ -1,0 +1,7 @@
+  lib/python/cs/app/megacli.py: cs.app.megacli: report mode: report error counts if nonzero
+  lib/python/cs/app/megacli.py: cs.app.megacli: update usage message for "status" command; "report" mode now shows error counts if nonzero
+  lib/python/cs/app/megacli.py: cs.app.megacli: indentation fix
+  lib/python/cs/app/megacli.py: cs.app.megacli: error counts: cope with removed drive - no error count attributes
+  lib/python/cs/app/megacli.py: cs.app.megacli: make other_error_count more like media_error_count
+  lib/python/cs/app/megacli.py: cs.app.megacli: add "locate enc_slot [start|stop]" command
+  lib/python/cs/app/megacli.py: cs.app.megacli: add "offline" command

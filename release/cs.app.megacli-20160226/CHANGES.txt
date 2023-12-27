@@ -1,0 +1,3 @@
+  lib/python/cs/app/megacli.py: cs.app.megacli: get MegaCLI executable path from $MEGACLI, fall back to default if not present
+  lib/python/cs/app/megacli.py: cs.app.megacli: remove dependence on external scripts
+  lib/python/cs/app/megacli.py: cs.app.megacli: mention Dell PowerEdge RAID Controller (PERC), which is also a MegaRAID (or compatible)

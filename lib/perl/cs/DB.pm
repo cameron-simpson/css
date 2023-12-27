@@ -2,7 +2,7 @@
 #
 # The database, direct access.
 # See cs::DB::Meta for more flexible access.
-#	- Cameron Simpson <cs@zip.com.au> 15apr1997
+#	- Cameron Simpson <cs@cskk.id.au> 15apr1997
 #
 # External variables:
 #	$Dir	The dir containing the files,

@@ -1,0 +1,3 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: new BaseCommand.add_usage_to_docstring class method to be called after class setup, to append the usage message to the class docstring - this might be a metaclass thing
+lib/python/cs/cmdutils.py: cs.cmdutils: autoformat
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: remove spurious Pfx(cmd), as logutils does this for us already

@@ -1,0 +1,5 @@
+New PolyValueMixin pulled out of Tags for common support of the (float_value,string_value,structured_value).
+SQLTagsORM: new TagSubValues relation containing broken out values for values which are sequences, to support efficient lookup if sequence values such as log entry categories.
+New BaseSQLTagsCommand.parse_categories static method to parse FOO,BAH into ['foo','bah'].
+sqltags find: change default format to "{datetime} {headline}".
+Assorted small changes.

@@ -3,7 +3,7 @@
 # Simple wrapper for snoop to parse the packet info.
 # Originally written to measure X11 or ssh traffic for a cable modem
 # feasibility estimate.
-#	- Cameron Simpson <cs@zip.com.au> 14jan99
+#	- Cameron Simpson <cs@cskk.id.au> 14jan99
 #
 
 snoop -V ${1+"$@"} \

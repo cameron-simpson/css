@@ -1,0 +1,12 @@
+lib/python/cs/app/portfwd.py: cs.app.portfwd: Portfwd.test_func: report test failures if verbose
+lib/python/cs/app/portfwd.py: cs.app.{portfwd,svcd}: support alert groups
+lib/python/cs/app/portfwd.py: cs.app.portfwd: Portfwd: ssh_argv no longer a property in order to support `bare` param; new method `ssh_options` to wrapping ssh_argv; drop sig_func, use ssh_options instead
+lib/python/cs/app/portfwd.py: cs.app.portfwd: Portfwd.wait: SvcD.wait has no return value
+lib/python/cs/app/portfwd.py: cs.app.portfwd: clean lint
+lib/python/cs/app/portfwd.py: cs.app.portfwd: remove local UNIX domain socket forward endpoints before starting ssh tunnel
+lib/python/cs/app/portfwd.py: cs.app.portfwd: tweak module docstring, drop unused import
+lib/python/cs/app/portfwd.py: cs.app.portfwd: improve option parse, remove control sockets before starting tunnels
+lib/python/cs/app/portfwd.py: cs.app.portfwd: strip debug
+lib/python/cs/app/portfwd.py: cs.app.portfwd: Portfwd: Pfx context in ssh_options function
+lib/python/cs/app/portfwd.py: cs.app.{portfwd,svcd}: clean some lint
+lib/python/cs/app/portfwd.py: cs.app.portfwd: docstring improvements

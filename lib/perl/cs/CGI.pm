@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Replacement for the CGI package.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 =head1 NAME
@@ -898,7 +898,7 @@ B<cs::HTML::Form>(3).
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

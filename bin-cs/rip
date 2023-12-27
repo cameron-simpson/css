@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# Transcode media files.
+#   - Cameron Simpson <cs@cskk.id.au> 27aug2016
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage: $cmd UNRIPPED/media-files..."
+
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing media-files" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for f
+do
+  case "$f" in
+    UNRIPPED/*) ;;
+    *)  echo "$cmd: not in UNRIPPED/, skipping: $f" >&2
+        continue
+        ;;
+  esac
+  subpath=${f:9}
+  subdir=$(dirname "$subpath")
+  if  case "$f" in
+        *.tvwiz)
+            $trace beyonwiz mconvert "$f"
+            ;;
+        *)  echo "$cmd: unsupported format, skipping: $f" >&2
+            continue
+            ;;
+      esac
+  then  todir=RIPPED/$subdir
+  else  todir=FAILED/$subdir
+        xit=1
+  fi
+  [ -d "$todir/." ] || $trace mkdir -p "$todir"
+  $trace mv -i "$f" "$todir/."
+done
+
+exit $xit

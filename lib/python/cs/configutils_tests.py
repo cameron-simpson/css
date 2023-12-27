@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.configutils.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from copy import deepcopy
@@ -17,14 +17,21 @@ testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.configutils')
 test_config_file = joinpath(testdatadir, 'test.ini')
 
 class TestConfigUtils(unittest.TestCase):
+  ''' Test `cs.configutils`.
+  '''
 
   def setUp(self):
     self.tmpdir = mkdtemp()
     self.tmpfile = joinpath(self.tmpdir, basename(test_config_file))
     copy(test_config_file, self.tmpfile)
-    self.state0 = { 'clause1': { 'clause1_value1': '1' },
-                    'clause2': { 'clause2_value1': '2' },
-                  }
+    self.state0 = {
+        'clause1': {
+            'clause1_value1': '1'
+        },
+        'clause2': {
+            'clause2_value1': '2'
+        },
+    }
 
   def tearDown(self):
     rmtree(self.tmpdir)

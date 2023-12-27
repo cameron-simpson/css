@@ -1,16 +1,18 @@
 #!/bin/sh -u
 #
 # Bring down a logical interface, partner to addif.
-#	- Cameron Simpson <cs@zip.com.au> 25jun2005
+#	- Cameron Simpson <cs@cskk.id.au> 25jun2005
 #
 
 : ${TMPDIR:=/tmp}
-trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-n] ip-addrs..."
 
 badopts=
+
+trace=
+[ -t 2 ] && trace=set-x
 
 [ $# -gt 0 ] && [ "x$1" = x-n ] && { trace=echo; shift; }
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Kill my x2x process.
-#	- Cameron Simpson <cs@zip.com.au> 08mar2005
+#	- Cameron Simpson <cs@cskk.id.au> 08mar2005
 #
 set -x
 exec killpidfile ${1+"$@"} "x2x@$HOST-$DISPLAY"

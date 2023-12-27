@@ -2,7 +2,7 @@
 #
 # Core object. Really just a dummy DESTROY so we can always call
 # SUPER::DESTROY.
-#	- Cameron Simpson <cs@zip.com.au> 21jul97
+#	- Cameron Simpson <cs@cskk.id.au> 21jul97
 #
 
 =head1 NAME
@@ -130,7 +130,7 @@ sub GetSet($$;$)
 
 =head1 AUTHOR
 
-Cameron Simpson <cs@zip.com.au> 21jul1997
+Cameron Simpson <cs@cskk.id.au> 21jul1997
 
 =cut
 

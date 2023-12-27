@@ -1,0 +1,1 @@
+  lib/python/cs/id3.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

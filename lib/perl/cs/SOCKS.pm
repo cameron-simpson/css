@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # SOCKS5 protocol.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 use strict qw(vars);

@@ -2,7 +2,7 @@
 #
 # fastfs	Make local solaris filesystems asynchronous.
 #
-# Cameron Simpson <cs@zip.com.au> 26jun2000
+# Cameron Simpson <cs@cskk.id.au> 26jun2000
 #
 # chkconfig: 2345 90 10
 # description: Turn on asynchronous mode for local UFS filesystems.

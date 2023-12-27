@@ -1,0 +1,5 @@
+lib/python/cs/sharedfile_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/sharedfile.py: cs.sharedfile: autoformat
+lib/python/cs/sharedfile.py: cs.sharedfile: SharedAppendLines: logic cleanup
+lib/python/cs/sharedfile.py: cs.sharedfile: new SharedWriteable class to manage concurrent output with a mutexed .write method and a context manager for grouping larger uses
+lib/python/cs/sharedfile_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring

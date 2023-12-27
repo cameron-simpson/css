@@ -4,7 +4,7 @@
 #	- Cameron Simpson, 17feb94
 #
 # -t Order by Date: (or mtime failing that) and drop duplicate msgids.
-#	- Cameron Simpson <cs@zip.com.au> 18oct94
+#	- Cameron Simpson <cs@cskk.id.au> 18oct94
 #
 
 use strict qw(vars);

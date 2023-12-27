@@ -1,0 +1,8 @@
+lib/python/cs/fstags.py: cs.fstags: FSTagsConfig: do the run-once using the new FSPathBasedSingleton.__init__ return value, add empty .provided dict for config overrides
+lib/python/cs/fstags.py: cs.fstags: FSTagsConfig: set FSPATH_DEFAULT=RCFILE for use by FSPathBasedSingleton._singleton_key
+lib/python/cs/fstags.py: cs.fstags: FSTagsConfig: accept optional `physical` parameter to choose `realpath` over `abspath` and new `.physical` property
+lib/python/cs/fstags.py: cs.fstags: FSTags.__getitem__: use `abspath` or `realpath` depending on `self.config.physical`
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand: new -P option for "physical" mode, plumb though to the config and self.options
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.run_context: fix the self.options.physical setting
+lib/python/cs/fstags.py: cs.fstags: update imports, tweak assignment
+lib/python/cs/fstags.py: cs.fstags: provide a DEFAULT_FSTAGS instance and an @uses_fstags decorator

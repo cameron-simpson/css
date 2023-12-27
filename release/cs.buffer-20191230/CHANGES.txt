@@ -1,0 +1,6 @@
+lib/python/cs/buffer.py: cs.buffer: docstring updates
+lib/python/cs/buffer.py: cs.buffer: autoformat
+lib/python/cs/buffer.py: merge media ==> default: cs.iso14496: start on human friendly report function with deeper structural knowledge, a step towards enough knowledge to implement a patch function
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: accept a size of Ellipsis in .take and .extend methods, indicating "all the remaining data"
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: refactor the buffering, replacing .buf with .bufs as an array of chunks; this enables support for the new .push method and reduces memory copying
+lib/python/cs/buffer.py: cs.buffer: make .take return bytes again

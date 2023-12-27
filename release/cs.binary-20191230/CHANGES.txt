@@ -1,0 +1,25 @@
+lib/python/cs/binary_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/binary.py: cs.binary: autoformat
+lib/python/cs/binary.py: cs.binary: docstring updates
+lib/python/cs/binary.py: cs.binary: logic fix for Python version check and warning message updates
+lib/python/cs/binary.py: cs.binary: ListField: add __iter__ method
+lib/python/cs/binary.py: cs.binary: improve exception messages
+lib/python/cs/binary.py: cs.binary: Packet.self_check: improve ValueError message with class name of failed Packet
+lib/python/cs/binary.py: cs.binary: new warning() function broadly compatible with cs.logutils.warning to supplant print()ed warnings (still avoiding dependency on cs.logutils)
+lib/python/cs/binary.py: cs.binary: Packet.self_check: now just a Boolean test which prints warnings, no longer raises ValueErrror
+lib/python/cs/binary.py: default ==> vt: cs.iso14496 and cs.binary updates from the "media" branch
+lib/python/cs/binary.py: cs.binary: docstring updates and autoformatting
+lib/python/cs/binary.py: cs.binary: BytesesField: handle bfr_end_offset=None
+lib/python/cs/binary.py: cs.binary: Packet.__str__: accept optional `skip_fields` parameter to omit some field names, used by cs.iso14496 to omit the subboxes
+lib/python/cs/binary.py: cs.binary: Packet: new .add_from_value method to add a named field with a presupplied value, used by cs.iso14496 to when postparsing ilst subboxes
+lib/python/cs/binary.py: cs.binary: Packet: new remove_field(field_name) and pop_field() methods to remove fields, used by cs.iso14496 to pop the `unparsed` field during ilst subbox postparse
+lib/python/cs/binary.py: cs.binary: BytesesField: __iter__ yields the bytes values, transcribe=__iter__
+lib/python/cs/binary.py: cs.binary: small docstring updates
+lib/python/cs/binary.py: cs.binary: PacketField: propagate keyword arguments through various methods, required for parameterised PacketFields like UTF16NULField which keeps the encoding
+lib/python/cs/binary.py: cs.binary: new UTF16NULField, a NUL terminated UTF16 string
+lib/python/cs/binary_tests.py: cs.binary_tests: _TestPacketFields: run the round trip stuff in a subtest to improve the context information for failures
+lib/python/cs/binary.py: cs.binary: UTF8NULField: provide transcribe_value instead of transcribe
+lib/python/cs/binary.py: cs.binary: docstring tweak
+lib/python/cs/binary.py: cs.binary: small bugfix for Python version check
+lib/python/cs/binary.py: cs.binary: PacketField: provide a default `.transcribe_value` method which makes a new instance and calls its `.transcribe` method
+lib/python/cs/binary.py: cs.binary: improve the documentation, particularly around making a nontrivial `PacketField`

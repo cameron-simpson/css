@@ -1,0 +1,6 @@
+lib/python/cs/xml.py: cs.xml: Basic XML conveniences. Initially just imports etree.
+lib/python/cs/xml.py: xml-pprint,cs.xml: move pprint logic into cs.xml modul
+lib/python/cs/xml.py: cs.xml: pprint: decode XML bytes to string for output
+lib/python/cs/xml.py: my email address has changed - update Python code
+lib/python/cs/xml.py: cs.xml: python 3
+lib/python/cs/xml.py: cs.xml: module docstring, DISTINFO

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Make an MPEG2 Transport Stream file from a TVWiz directory.
-#       - Cameron Simpson <cs@zip.com.au> 25may2014
+#       - Cameron Simpson <cs@cskk.id.au> 25may2014
 #
 
 set -ue

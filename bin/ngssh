@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Bgssh to a netgroup.
-#	- Cameron Simpson <cs@zip.com.au> 08feb2001
+#	- Cameron Simpson <cs@cskk.id.au> 08feb2001
 #
 
 login=

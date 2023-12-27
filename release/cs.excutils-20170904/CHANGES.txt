@@ -1,0 +1,5 @@
+  lib/python/cs/excutils.py: cs.*: add empty "install_requires" for completeness
+  lib/python/cs/excutils.py: merge default ==> beyonwiz
+  lib/python/cs/excutils.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/excutils.py: my email address has changed - update Python code
+  lib/python/cs/README-excutils.rst lib/python/cs/excutils.py: cs.excutils: move README into module docstring and flesh it out more; a little linting

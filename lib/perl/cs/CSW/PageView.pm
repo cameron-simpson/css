@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Web::CSW::PageView: display a web page
-#	- Cameron Simpson <cs@zip.com.au> 6mar2000
+#	- Cameron Simpson <cs@cskk.id.au> 6mar2000
 #
 
 =head1 NAME
@@ -90,7 +90,7 @@ Advance forward
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

@@ -2,7 +2,7 @@
 #
 # Monitor throughput on the named interfaces.
 # Linux specific, alas, since it uses the /proc/net/dev file.
-#	- Cameron Simpson <cs@zip.com.au> 22may2002
+#	- Cameron Simpson <cs@cskk.id.au> 22may2002
 #
 
 use cs::Upd;

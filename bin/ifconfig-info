@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Return specified value from an interface.
-#	- Cameron Simpson <cs@zip.com.au> 10apr2006
+#	- Cameron Simpson <cs@cskk.id.au> 10apr2006
 #
 
 : ${NET_IF:=''}

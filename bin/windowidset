@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Manage details for window ids in a desktop.
-#	- Cameron Simpson <cs@zip.com.au> 18jul2002
+#	- Cameron Simpson <cs@cskk.id.au> 18jul2002
 #
 : ${DISPLAY:=''}
 : ${XSESSIONID:="$HOST-$DISPLAY"}

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Extract tokens from HTML.
-#	- Cameron Simpson, cs@zip.com.au, 15jun94
+#	- Cameron Simpson <cs@cskk.id.au> 15jun94
 #
 
 use strict qw(vars);

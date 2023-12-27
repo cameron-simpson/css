@@ -1,0 +1,5 @@
+lib/python/cs/app/flag.py: cs.app.flags: docstring updates
+lib/python/cs/app/flag.py: cs.app.flags: drop redundant assignment, provide context around os.makedirs in case of failure
+lib/python/cs/app/flag.py: cs.app.flag: autoformat
+lib/python/cs/app/flag.py: cs.app.flag: FlaggedMixin.__setattr__: python 2 backport for super call
+lib/python/cs/app/flag.py: cs.app.flag: FlaggedMixin: improve exception message

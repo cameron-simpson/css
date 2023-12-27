@@ -1,0 +1,4 @@
+lib/python/cs/packetstream_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/packetstream.py: cs.packetstream: dispatch PacketConnection sender and receiver Threads using cs.threads.bg
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: new optional parameter `packet_grace` to tune the send delay for additional packets before a flush, default DEFAULT_PACKET_GRACE (0.01s), 0 for no delay
+lib/python/cs/packetstream.py: cs.packetstream: add a crude packet level activity ticker

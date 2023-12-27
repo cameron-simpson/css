@@ -1,0 +1,10 @@
+lib/python/cs/upd.py: cs.upd: Upd: tweaks to support __str__ and shutdown before the object is fully initialised
+lib/python/cs/upd.py: cs.upd: UpdProxy: new extend_prefix context manager to extend the proxy prefix
+lib/python/cs/upd.py: cs.upd: new global "state" StackableStatei object with an automatic .upd attribute
+lib/python/cs/upd.py: cs.upd: new @upd_proxy decorator to create an UpdProxy for the duration of a function call and record it as state.proxy
+lib/python/cs/upd.py: cs.upd: update imports and DISTINFO
+lib/python/cs/upd.py: cs.upd: small optimisation
+lib/python/cs/upd.py: cs.upd: Upd.insert: add slots.insert and proxies.insert missing from the no-display path
+lib/python/cs/upd.py: cs.upd: rename private method Upd._adjust_text_v to public method Upd.diff
+lib/python/cs/upd.py: cs.upd: fix docstring typo
+lib/python/cs/upd.py: cs.upd: update DISTINFO

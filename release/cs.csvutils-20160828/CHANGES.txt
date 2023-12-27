@@ -1,0 +1,13 @@
+  lib/python/cs/csvutils.py: cherrypick csbug ==> py3: cs.csvutils: py3 fix: get StringIO from cs.py3
+  lib/python/cs/csvutils.py: cs.csvutils: autopep8
+  lib/python/cs/csvutils.py: cs.csvutils: get StringIO from io instead of cs.py3
+  lib/python/cs/csvutils.py: use __future__.absolute_import in modules importing "io", avoids soon to be defunct cs.io module
+  lib/python/cs/csvutils.py: cs.csvutils: adjustments to use the CSV module in both py2 and py3 via the io module
+  lib/python/cs/csvutils.py: cs.csvutils: improve debugging for exceptions from csv_writerow
+  lib/python/cs/csvutils.py: cs.csvutils: reorder py2/3 code - py3 simple code first
+  lib/python/cs/csvutils.py: cs.csvutils: SharedCSVFile: python 2 and 3 versions of transcribe_update
+  lib/python/cs/csvutils.py: cs.csvutils: improve debugging for exceptions from csv_writerow
+  lib/python/cs/csvutils.py: cs.csvutils: reorder py2/3 code - py3 simple code first
+  lib/python/cs/csvutils.py: cs.csvutils: SharedCSVFile: python 2 and 3 versions of transcribe_update
+  lib/python/cs/csvutils.py: cs.csvutils: py3 fix: get StringIO from cs.py3
+  lib/python/cs/csvutils.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

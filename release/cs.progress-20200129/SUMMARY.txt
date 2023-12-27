@@ -1,0 +1,1 @@
+New Progress.count_of_total_bytes_text property presenting "3kB/40MB" style text.

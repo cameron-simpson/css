@@ -1,0 +1,17 @@
+  lib/python/cs/queues.py: remove bare "except:"s from code, use "except Exception:"
+  lib/python/cs/queues.py: cs.resources: rename NestingOpenCloseMixin to MultiOpenMixin - easier to type, say and remember, not to mention being more accurate
+  lib/python/cs/queues.py: cs.queues: _QueueIterator: add required .startup method
+  lib/python/cs/queues.py: cs.threads,cs.queues: use ._lock=RLock() in MultiOpenMixins
+  lib/python/cs/queues.py: cs.queues: PushQueue: use RLock, add required .startup method
+  lib/python/cs/queues.py: cs.queues: _QueueIterator: MultiOpenMixin defines ._lock for us, remove call to O.__init__ - not a subclass of O
+  lib/python/cs/queues.py: cs.queues: NullQueue: add required .startup method
+  lib/python/cs/queues.py: cs.queues: _QueueIterator.put: raise ClosedError if queue is closed
+  lib/python/cs/queues.py: cs.queues: _QueueIterator.__next__: correctly raise StopIteration, always requeue the end-of-queue sentinel
+  lib/python/cs/queues.py: cs.queues: _QueueIterator.__next__: add sanity check for _item_count underflow
+  lib/python/cs/queues.py: cs.queues: remove debugging, promote debug to warning for event I do not think should happen
+  lib/python/cs/queues.py: cs.queues: docstring indentation fix
+  lib/python/cs/queues.py: cs.queues: TimerQueue.add: support optional *a and **kw arguments for func
+  lib/python/cs/queues.py: merge default ==> csbug
+  lib/python/cs/queues.py: cs.queues: _QueueIterator: workaround for sanity check on ._item_count - raise if cs.logutils.D_mode else issue warning
+  lib/python/cs/queues.py: cs.queues: _QueueIterator: only report _item_count underflows when different to last report
+  lib/python/cs/queues.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

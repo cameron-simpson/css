@@ -1,0 +1,5 @@
+New UpdProxy.extend_prefix context manager to extend the proxy prefix around a suite.
+New global "state" StackableStatei object with an automatic .upd attribute.
+New @upd_proxy decorator to create an UpdProxy for the duration of a function call and record it as state.proxy.
+Bugfix Upd.insert: add slots.insert and proxies.insert missing from the no-display path.
+Rename private method Upd._adjust_text_v to public method Upd.diff.

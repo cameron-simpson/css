@@ -1,0 +1,5 @@
+Make into a package subsuming cs.py3_for2 and cs.py3_for3.
+Implementation of struct.iter_unpack.
+Make bytes.__eq__ work with str for Python 2.
+New name joinbytes for Python 2 and 3.
+Backports for Python 2.5.

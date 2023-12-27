@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Extract forms from HTML on stdin.
-#	- Cameron Simpson <cs@zip.com.au> 03mar1999
+#	- Cameron Simpson <cs@cskk.id.au> 03mar1999
 #
 
 use strict qw(vars);

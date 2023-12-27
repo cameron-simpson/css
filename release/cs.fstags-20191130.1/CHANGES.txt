@@ -1,0 +1,7 @@
+lib/python/cs/fstags.py: fstags,cs.fstags: simple filesystem based tags and associated command line tool
+lib/python/cs/fstags.py: cs.fstags: clean lint
+lib/python/cs/fstags.py: cs.fstags: docstring updates
+lib/python/cs/fstags.py: cs.fstags: bugfix command line parse
+lib/python/cs/fstags.py: cs.fstags: initial support for direct recognistion of some extra types (date and datetime)
+lib/python/cs/fstags.py: cs.fstags: add console_scripts to DISTINFO, adapt script to match
+lib/python/cs/fstags.py: cs.fstags: rc file support, new autotag command to apply rules from rc file

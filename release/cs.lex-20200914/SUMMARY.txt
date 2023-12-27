@@ -1,0 +1,2 @@
+Hide terribly special purpose lastlinelen() in cs.hier under a private name.
+New common_prefix and common_suffix function to compare strings.

@@ -3,7 +3,7 @@
 # Wrapper for handbrake, accepting handbrake options and some convenience
 # options:
 #	--ipod	Default options for iPod conversation at 320x240 resolution.
-# - Cameron Simpson <cs@zip.com.au> 25apr2006
+# - Cameron Simpson <cs@cskk.id.au> 25apr2006
 #
 
 trace=set-x

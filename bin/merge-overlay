@@ -2,7 +2,7 @@
 #
 # Merge two directories by overlaying on on the other and using a
 # merge command to combine conflicting files.
-#       - Cameron Simpson <cs@zip.com.au> 17feb2012
+#       - Cameron Simpson <cs@cskk.id.au> 17feb2012
 #
 
 set -ue

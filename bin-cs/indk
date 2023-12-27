@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Start a shell on the primary docker service.
+# - Cameron Simpson <cs@cskk.id.au> 07apr2020
+#
+
+set -ue
+
+: ${DK_PRIMARY_SERVICE:=''}
+export DK_PRIMARY_SERVICE
+
+cmd=$0
+usage="Usage: $cmd [servicename]"
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  DK_PRIMARY_SERVICE=$1
+  shift
+fi
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+exec dk exec

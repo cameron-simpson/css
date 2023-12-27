@@ -1,0 +1,2 @@
+module_doc: include properties/descriptors.
+DISTINFO: this is not Python 2 compatible, drop tag.

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # CGI script to PUT files for publishing tools.
-#	- Cameron Simpson <cs@zip.com.au> 16feb2001
+#	- Cameron Simpson <cs@cskk.id.au> 16feb2001
 #
 
 echo Content-Type: text/html

@@ -1,0 +1,1 @@
+transcribe: pad units by default, produces less jitter in dynamic displays like progress bars.

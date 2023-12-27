@@ -2,7 +2,7 @@
 #
 # Given a date, report the latest Monday not preceeding it.
 # Code reefed from ts.
-#	- Cameron Simpson <cs@zip.com.au> 22dec2005
+#	- Cameron Simpson <cs@cskk.id.au> 22dec2005
 #
 
 when=today

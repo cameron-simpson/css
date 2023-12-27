@@ -1,0 +1,2 @@
+lib/python/cs/app/svcd.py: cs.app.svcd: improve test command failure reporting, update a docstring
+lib/python/cs/app/svcd.py: cs.app.{portfwd,svcd}: get DEVNULL via cs.py3 instead of directly from subprocess

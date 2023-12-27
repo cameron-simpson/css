@@ -1,0 +1,1 @@
+lib/python/cs/logutils.py: cs.logutils: new TRACK constant equal to logging.INFO + 5 to provide a level higher than INFO (which seems inreasonably noisy) and lower than warning for tracking salient events; new track() function to use this level

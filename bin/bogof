@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Wrapper for bogofilter to subvert the fsync()-happy nature of its db backend.
-#	- Cameron Simpson <cs@zip.com.au> 17mar2006
+#	- Cameron Simpson <cs@cskk.id.au> 17mar2006
 # 
 #
 

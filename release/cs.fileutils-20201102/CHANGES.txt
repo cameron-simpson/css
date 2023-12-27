@@ -1,0 +1,23 @@
+lib/python/cs/fileutils.py: Release information for cs.fileutils-20200914.
+lib/python/cs/fileutils.py: cs.fileutils: fix comment typo
+lib/python/cs/fileutils.py: cs.fileutils: new iter_fd and iter_file to return iterators of a file's data by utilising a CornuCopyBuffer
+lib/python/cs/fileutils.py: cs.fileutils: new byteses_as_fd to return a readable file descriptor receiving an iterable of bytes via a CornuCopyBuffer
+lib/python/cs/fileutils.py: cs.fileutils: datafrom_fd: support nonseekable file descriptors, document that for these the file position is moved (no pread support)
+lib/python/cs/fileutils.py: cs.fileutils: import os.read
+lib/python/cs/fileutils.py: cs.fileutils: datafrom: make the offset parameter optional, tweak the @strable open function
+lib/python/cs/fileutils.py: cs.fileutils: tweak module docstring
+lib/python/cs/fileutils.py: cs.fileutils: rewrite(): tweak docstring, add Pfx context
+lib/python/cs/fileutils.py: cs.fileutils: rewrite_cmgr: turn into a simple wrapper for rewrite()
+lib/python/cs/fileutils.py: cs.fileutils: new scan_ndjson() function to yield newline delimiter JSON records
+lib/python/cs/fileutils.py: cs.fileutils: new write_ndjson() function to write newline delimiter JSON to a file
+lib/python/cs/fileutils.py: cs.fileutils: new append_ndjson() function to append a single newline delimited JSON record to a file
+lib/python/cs/fileutils.py: cs.fileutils: scan_ndjson: better dictclass instantiation
+lib/python/cs/fileutils.py: cs.fileutils,mappings: move UUIDNDJSONMapping from cs.mappings to cs.fileutils - it is file related and preserves the import hierarchy
+lib/python/cs/fileutils.py: cs.fileutils: fix imports
+lib/python/cs/fileutils.py: cs.fuleutils: new NamedTemporaryCopy for creating a temporary copy of a file withan optional progress bar
+lib/python/cs/fileutils.py: cs.fileutils: rewrite_cmgr: open the temp file and supply it as the rewrite data for rewrite() - this does do a double copy (here and inside rewrite()), to be fixed later
+lib/python/cs/fileutils.py: cs.fileutils: UUIDNDJSONMapping: new rewrite_mapping function, necessary occasional maintenance since normal updates are appends
+lib/python/cs/fileutils.py: cs.fileutils: scan_ndjson: warn about syntax instead of aborting
+lib/python/cs/fileutils.py: cs.fileutils: UUIDNDJSONMapping: make into a singleton keyed on the filename absolute path, add nice __str__
+lib/python/cs/fileutils.py: cs.fileutils: UUIDNDJSONMapping: update the scan_mapping_length after a rewrite
+lib/python/cs/fileutils.py: cs.fileutils: rewrite: rename `data` to srcf` for greater clarify

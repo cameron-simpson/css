@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Mount a filesystem and run a command inside the mountpoint.
+# - Cameron Simpson <cs@cskk.id.au> 18apr2020
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd mountpoint [command...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing mountpoint" >&2
+  badopts=1
+else
+  mountpoint=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# -gt 0 ] || set -- "$SHELL"
+
+$trace mount "$mountpoint" || exit $?
+
+xit=0
+( set -uex
+  cd "$mountpoint"
+  "$@"
+) || xit=$?
+
+$trace umount "$mountpoint"
+
+exit $xit
+

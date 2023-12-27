@@ -1,0 +1,8 @@
+lib/python/cs/result.py: remove WorkerThreadPool, pulls in too many other things and was never used
+lib/python/cs/result.py: cs.result: CancellationError: rename msg to message
+lib/python/cs/result.py: merge default ==> taskqueue
+lib/python/cs/result.py: cs.result: CancellationError: make .message a plain old attribute, lets cs.pfx update it
+lib/python/cs/result.py: cs.result: Result.run_func_in_thread: new method to run an arbitrary function in a separate Thread and return it via the Result
+lib/python/cs/result.py: cs.result: new @in_thread decorator to cause a function to run in a separate Thread using Result.run_in_thread; new call_in_thread to run an arbitrary function in a distinct Thread
+lib/python/cs/result.py: cs.result: import update
+lib/python/cs/result.py: cs.result: @in_thread: expose the original function as the decorated function's .direct attribute

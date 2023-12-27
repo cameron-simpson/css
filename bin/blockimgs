@@ -3,7 +3,7 @@
 # Read a Mozilla cookperm.txt file, rather poorly documents here:
 #	http://moz.zope.org/Members/fabian/drafts/cookperm.txt
 # and set the "block images" flag for the hosts on the command line.
-#	- Cameron Simpson <cs@zip.com.au> 09oct2002
+#	- Cameron Simpson <cs@cskk.id.au> 09oct2002
 # 
 
 use strict qw(vars);

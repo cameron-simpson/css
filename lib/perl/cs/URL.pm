@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Code to handle URLs.
-#	- Cameron Simpson <cs@zip.com.au> 11jan1996
+#	- Cameron Simpson <cs@cskk.id.au> 11jan1996
 #
 
 =head1 NAME
@@ -1783,7 +1783,7 @@ of the form B<I<host>:I<port>>.
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

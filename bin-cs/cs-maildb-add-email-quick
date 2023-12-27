@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+#
+# Quick'n'dirty add addresses from a message to the end of the maildb.csv.
+#   - Cameron Simpson <cs@cskk.id.au> 18sep2016
+# 
+
+import os
+import sys
+from cs.sharedfile import SharedCSVFile
+from cs.mailutils import message_addresses, Message
+from cs.nodedb.csvdb import write_csv_file
+
+if len(sys.argv) > 1:
+  groups = sys.argv[1:]
+else:
+  groups = ('known',)
+
+csvpath = os.environ['MAILDB']
+M = Message(sys.stdin, headersonly=True)
+addresses = list(message_addresses(M, ['from', 'to', 'cc', 'bcc', 'reply-to']))
+csv = SharedCSVFile(csvpath)
+with csv.writer() as w:
+  for realname, addr in addresses:
+    for group in groups:
+      row = [ 'ADDRESS', addr.lower(), 'GROUP', group ]
+      w.writerow(row)

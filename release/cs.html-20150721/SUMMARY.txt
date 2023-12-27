@@ -1,0 +1,5 @@
+Completely redo transcribers as generators, keeping convenience wrapper.
+Transcribe XHTML as well as HTML.
+Add support for HTML comment transcription.
+Add several convenience routines.
+Add and use attrquote() function, with strict adherence to HTML 4.01 section 3.2.2.

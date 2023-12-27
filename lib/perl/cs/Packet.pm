@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # A packet queue with logging. Used by Multio et al.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 # new(@extras) -> Packet
 # Size -> number of packets

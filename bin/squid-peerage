@@ -1,16 +1,18 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Read peer access patterns and emit squid directives.
-#       - Cameron Simpson <cs@zip.com.au> 23jul2012
+#       - Cameron Simpson <cs@cskk.id.au> 23jul2012
 #
 
 from __future__ import print_function
+from collections import namedtuple
 import re
 import sys
-from collections import namedtuple
+from types import SimpleNamespace as NS
 from cs.env import envsub
-from cs.logutils import setup_logging, Pfx, error, warning, X
-from cs.obj import O
+from cs.logutils import setup_logging, error, warning
+from cs.pfx import Pfx
+from cs.x import X
 
 PEERAGE = "$HOME/.peerage"
 
@@ -144,7 +146,7 @@ class Proxies(dict):
     else:
       self.acs.append(AC(pattern, proxy_names))
 
-class Proxy(O):
+class Proxy(NS):
 
   def __init__(self, name, peername, all_proxies):
     self.name = name

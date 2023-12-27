@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Check for undeliverable addresses in system aliases.
-#	- Cameron Simpson <cs@zip.com.au> 26jul95
+#	- Cameron Simpson <cs@cskk.id.au> 26jul95
 #
 
 aliasfile=/usr/lib/aliases

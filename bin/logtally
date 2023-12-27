@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parse generic logs and graph. Generalised from squidlogtally.
-#	- Cameron Simpson <cs@zip.com.au> 14jan99
+#	- Cameron Simpson <cs@cskk.id.au> 14jan99
 #
 # Input format:
 #	start duration size class other-fields

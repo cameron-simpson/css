@@ -1,0 +1,2 @@
+Update for changed cs.obj.SingletonMixin API.
+Pull in TaggedEntity from cs.sqltags and add the .csvrow property and the .from_csvrow factory.

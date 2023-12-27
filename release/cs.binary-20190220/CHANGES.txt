@@ -1,0 +1,3 @@
+  lib/python/cs/binary.py: cs.binary: Packet.self_check: fields without a sanity check cause a warning, not a ValueError
+  lib/python/cs/binary.py: cs.binary: new Float64BE, Float64LE and BSSFloat classes for IEEE floats and floats-as-strings; addition module docstringage on subclassing Packet and PacketField; BSString: drop redundant from_buffer class method
+  lib/python/cs/binary.py: cs.binary: PacketField.__init__: default to value=None is omitted; tweak some other docstrings

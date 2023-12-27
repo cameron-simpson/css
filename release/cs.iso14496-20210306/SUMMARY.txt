@@ -1,0 +1,8 @@
+Huge refactor of the Box classes to the new Binary* classes from cs.binary.
+mp4: new "tags" subcommand to print the tags parsed from a file.
+BoxHeader: fix the definition of MAX_BOX_SIZE_32.
+BoxBody: new parse_boxes utility method to part the remainder of a Box as subBoxes.
+MP4.cmd_parse: run the main parse in discard_data=True mode.
+METABoxBody.__getattr__: fix ILST typo.
+MP4Command: update for new cs.cmdutils.BaseCommand API.
+Many small fixes and tweaks.

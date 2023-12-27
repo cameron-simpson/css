@@ -1,0 +1,10 @@
+  lib/python/cs/README-py3.rst lib/python/cs/py3.py: merge pypi ==> default
+  lib/python/cs/README-py3.rst lib/python/cs/py3.py: merge default ==> beyonwiz
+  lib/python/cs/README-py3.rst lib/python/cs/py3.py: merge default ==> iphoto
+  lib/python/cs/README-py3.rst lib/python/cs/py3.py: merge default ==> venti
+  lib/python/cs/README-py3.rst lib/python/cs/py3.py: merge default ==> later
+  lib/python/cs/README-py3.rst lib/python/cs/py3.py: merge later ==> pilfer
+  : cs.py3._for2: update try/except to ue "as" instead of comma, largel to placate a linting tool
+  lib/python/cs/README-py3.rst lib/python/cs/py3.py: merge default ==> media
+  : cs.py3: implement pread for systems lacking os.pread
+  : cs.py3.__init__: move some conditional imports up with the main imports

@@ -1,0 +1,26 @@
+  lib/python/cs/socketutils.py: cs.fileutils,cs.socketutils: move cs.fileutils.OpenSocket into new module cs.socketutils
+  lib/python/cs/socketutils.py: cs.socketutils: add missing imports
+  lib/python/cs/socketutils.py: cs.socketutils: add bind_next_port() to bind a socket to the next free port starting at `base_port`
+  lib/python/cs/socketutils.py: cs.socketutils: track original fd and dup more closely, be more detailed in messages
+  lib/python/cs/socketutils.py: cs.socketutils: OpenSocket: add trite selfcheck method; allow multiple .close calls
+  lib/python/cs/socketutils.py: cs.socketutils: bind_next_port: catch socket.error in addition to OSError; OpenSocket.close: improve error message context, handle errors slightly differently
+  lib/python/cs/socketutils.py: cs.socketutils: OpenSocket: define __str__
+  lib/python/cs/socketutils.py: cs.stream: OpenSocket.close: context update
+  lib/python/cs/socketutils.py: cs.socketutils: use cs.debug.selftest
+  lib/python/cs/socketutils.py: cs.{socketutils,socketutils_tests}: simplify call to cs.debug.selftest
+  lib/python/cs/socketutils.py: cs.socketutils: OpenSocket.close: catch socket.error with EBADF
+  lib/python/cs/socketutils.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/socketutils.py: cs.*: import XP from cs.pfx instead of cs.logutils
+  lib/python/cs/socketutils.py: cs.socketutils,stream: more import tidyups
+  lib/python/cs/socketutils.py: cs.socketutils: lint fixes, add a little debug
+  lib/python/cs/socketutils.py: cs.socketutils: OpenSocket.close: ENOTCONN (socket not connected) is not an error - far end may have gone away
+  lib/python/cs/socketutils.py: cs.socketutils: OpenSocket.close: short circuit check for _sock, add some tracing for unexpected exceptions
+  lib/python/cs/socketutils.py: my email address has changed - update Python code
+  lib/python/cs/socketutils.py: cs.socketutils: OpenSocket._close: catch broken pipe on self._fp.close and warn, reraise other exceptions
+  lib/python/cs/socketutils.py: cs.socketutils: OpenSocket._close: catch broken pipe on self._fp.close and warn, reraise other exceptions
+  lib/python/cs/socketutils.py: cs.socketutils: clean lint
+  lib/python/cs/socketutils.py: cs.socketutils: OpenSocket: try to use _fp.read1 if available; issue warnings on unexpected errors
+  lib/python/cs/socketutils.py: cs.socketutils: bind_next_port: merge try/except; OpenSocket: drop read method, now set from read or read1 in __init__
+  lib/python/cs/socketutils.py: cs.socketutils: suppress a minor warning on multiple .close calls
+  lib/python/cs/socketutils.py: cs.socketutils: OpenSocket.close: bad off a warning for EBADF to debug, always happens if the other half has closed
+  lib/python/cs/socketutils.py: cs.socketutils: lnt and prep for PyPI

@@ -1,0 +1,1 @@
+Mirror tags to user.cs.fstags xattr to honour Linux namespace requirements. Add "filesize" to available tag string format (-o option). Small bugfixes.

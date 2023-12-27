@@ -7,7 +7,7 @@
 #	- Cameron Simpson, February 1992
 #
 # Support "| command" in place of mailbox.
-#	- Cameron Simpson <cs@zip.com.au> 12jun2001
+#	- Cameron Simpson <cs@cskk.id.au> 12jun2001
 #
 
 use strict qw(vars);

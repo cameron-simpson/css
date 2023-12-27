@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Patch group file to match auto/group db.
-#	- Cameron Simpson <cs@zip.com.au> 20nov97
+#	- Cameron Simpson <cs@cskk.id.au> 20nov97
 #
 
 use strict qw(vars);

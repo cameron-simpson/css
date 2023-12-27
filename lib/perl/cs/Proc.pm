@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Module for dealing with processes.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 # proc(pid) -> { proc details }
 # sync([force]) -> void

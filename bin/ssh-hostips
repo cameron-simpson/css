@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Emit /etc/hosts lines for hosts named in the ssh configuration,
+# ready for patching into one's local /etc/hosts.
+# - Cameron Simpson <cs@cskk.id.au> 19jul2020
+#
+
+set -ue
+
+ssh_cfg=$HOME/.ssh/config
+
+sed -n 's/^[Hh]ost //p' "$ssh_cfg" \
+| sort -u \
+| {
+    while read host1 hosts_etc
+    do
+      case "$host1" in *\**) continue ;; esac
+      ssh -F "$ssh_cfg" -G "$host1" 2>/dev/null | sed -n 's/^hostname //p' | {
+        read hostname || exit 1
+        case "$hostname" in
+          127.0.*)
+            addrs=
+            ;;
+          [0-9]* | *:* )
+            addrs=$hostname
+            ;;
+          *.[a-z]?*)
+            addrs=$(
+              host "$hostname" | sed -n '/ address 127\./d; s/.* has IPv6 address \(.*\)/\1/p; s/.* has address \(.*\)/\1/p'
+            ) || :
+            ;;
+          *)addrs=
+            ;;
+        esac
+        for addr in $addrs
+        do
+          echo "$addr $host1 $hosts_etc"
+        done
+      } || :
+    done
+}

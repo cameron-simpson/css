@@ -8,7 +8,7 @@
 #
 # Procedure: copy filename to temp file, edit temp file, if ok then
 # copy temp file back over filename. With lots of checking.
-#	- Cameron Simpson <cs@zip.com.au> 27apr2005
+#	- Cameron Simpson <cs@cskk.id.au> 27apr2005
 #
 
 cmd=`basename "$0"` || exit 1

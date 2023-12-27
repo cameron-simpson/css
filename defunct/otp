@@ -6,7 +6,7 @@
 #   otp user		Print challenge on stdout.
 #   otp user response	Try response, set exit value to success/fail.
 #
-#	- Cameron Simpson <cs@zip.com.au> 05dec96
+#	- Cameron Simpson <cs@cskk.id.au> 05dec96
 #
 
 use cs::OTP;

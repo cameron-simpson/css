@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run identical tcpdumps on multiple interfaces.
-#       - Cameron Simpson <cs@zip.com.au> 30dec2012
+#       - Cameron Simpson <cs@cskk.id.au> 30dec2012
 #
 
 usage="Usage: $0 interface,... [tcpdump-args...]"

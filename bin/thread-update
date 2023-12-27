@@ -3,7 +3,7 @@
 # Check the message on stdin to see if it's tracked by a message-id file.
 # Exit true if so, false if not. Add this message to the message-id file if
 # so in order to track this message's descendants too.
-#	- Cameron Simpson <cs@zip.com.au> 16apr2002
+#	- Cameron Simpson <cs@cskk.id.au> 16apr2002
 #
 
 cmd=$0

@@ -1,6 +1,6 @@
 #!/usr/bin/perl -p
 #
 # Add line number anchors to HTML input.
-#	- Cameron Simpson <cs@zip.com.au> 11nov2003
+#	- Cameron Simpson <cs@cskk.id.au> 11nov2003
 #
 s:^:<a name="$."></a>: unless /<script>/i../<\/script>/i;

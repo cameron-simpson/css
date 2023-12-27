@@ -1,0 +1,1 @@
+StackableValues: fix typo, make deprecation overt.

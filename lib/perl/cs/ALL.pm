@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Load all subclasses of a class.
-#	- Cameron Simpson <cs@zip.com.au> 23jul96
+#	- Cameron Simpson <cs@cskk.id.au> 23jul96
 #
 # Usage:
 #  In the top-level Foo.pm file, put

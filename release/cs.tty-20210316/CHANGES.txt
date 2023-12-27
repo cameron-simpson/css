@@ -1,0 +1,2 @@
+lib/python/cs/tty.py: cs.tty: ttysize: discard the Popen object earlier
+lib/python/cs/tty.py: cs.tty: ttysize: close Popen.stdout after use. seems to leak

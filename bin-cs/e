@@ -1,22 +1,42 @@
-#!/bin/sh -u
+#!/bin/sh
 #
-# As with t, v and x, edit a file.
-#	- Cameron Simpson <cs@zip.com.au> 04may2002
+# Edit something.
+#   - Cameron Simpson <cs@cskk.id.au> 02jun2016
 #
 
-: ${dirname:=${PWD:-`pwd`}}
-: ${HOST:=`hostname | sed 's/\\.//'`}
+set -ue
 
-asyncopt=
-if [ $# -gt 0 ] && [ "x$1" = x+a ]
+: ${TMPDIR:=/tmp}
+: ${FSTAGS_EDITOR:=vim-nowrap}
+
+tmppfx=$TMPDIR/e.$$
+trap 'rm -f -- "$tmppfx".*' 0 1 3 15
+
+cmd=$0
+usage="Usage:
+  $0            Edit the clipboard.
+  $0 dirname    Edit the filenames in a directory.
+  $0 ...        Invoke editor on ..."
+
+if [ $# = 0 ]
 then
-  asyncopt=+a
-  shift
+  tmpf=$tmppfx.txt
+  pbpaste >"$tmpf"
+  "$0" "$tmpf"
+  [ -s "$tmpf" ] && pbcopy <"$tmpf"
+else
+  if [ $# = 1 ] && [ -d "$1/." ]
+  then
+    cd "$1"
+    EDITOR="$FSTAGS_EDITOR" fstags edit
+    ##erename -a
+  else
+    if [ -n "${ITERM_SESSION_ID:-}" ]
+    then
+      # subl ${1+"$@"}
+      set-x open -n -W "$@"
+    else
+      $EDITOR "$@"
+    fi
+  fi
 fi
-
-exec \
-term $asyncopt \
-     -window \
-     -g M \
-     -n "E [$dirname]@$HOST $*" \
-     -e edit ${1+"$@"}

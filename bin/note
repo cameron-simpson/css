@@ -2,7 +2,7 @@
 #
 # Stash strings for later.
 # Adapted from noteurl.
-#	- Cameron Simpson <cs@zip.com.au> 15nov1996
+#	- Cameron Simpson <cs@cskk.id.au> 15nov1996
 #
 # Streamlined the logic.	- cameron, 16feb1998
 # Fix race condition on tag existence. - cameron, 14sep1998

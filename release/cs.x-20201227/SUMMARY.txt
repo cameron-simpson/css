@@ -1,0 +1,1 @@
+New Y() which calls X(...,colour=yellow) - I now often go `from cs.x import Y as X`.

@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Implementation of mkfifo implemented using mknod.
+# It presumes that mknod accepts the "p" (pipe) type, so it tends
+# not to work on systems that actually have a mkfifo.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [-m mode] fifo-name..."
+
+mode_args=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -m) mode_args="$mode_args $1 $2"; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing fifo-names" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for fifo
+do
+  mknod $mode_args "$fifo" p || xit=1
+done
+
+exit $xit

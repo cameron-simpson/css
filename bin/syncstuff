@@ -2,7 +2,7 @@
 #
 # Synchronise files between the usual spots.
 # I normally run synclinks after this, too.
-#	- Cameron Simpson <cs@zip.com.au> 22nov1998
+#	- Cameron Simpson <cs@cskk.id.au> 22nov1998
 #
 # Use -R, just call rsync once. - cameron, 23jul1999
 # Let the transport do the compression. - cameron, 23jul1999
@@ -308,5 +308,5 @@ exit $xit
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson <cs@zip.com.au>
+# Cameron Simpson <cs@cskk.id.au>
 #

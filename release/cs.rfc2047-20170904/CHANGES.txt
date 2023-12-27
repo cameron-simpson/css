@@ -1,0 +1,6 @@
+  lib/python/cs/rfc2047.py: cs.lex,cs.rfc2047,cs.app.mailfiler: move unrfc2047 into new cs.rfc2047 module
+  lib/python/cs/rfc2047.py: cs.rfc2047: add missing imports
+  lib/python/cs/rfc2047.py: cs.rfc2047: redo unrfc2047 more robustly
+  lib/python/cs/rfc2047.py: cs.rfc2047: unrfc2047: catch ValueErrors
+  lib/python/cs/rfc2047.py: cs.rfc2047: catch UnicodeDecodeError
+  lib/python/cs/rfc2047.py: cs.rfc2047: prep for PyPI, less burdensome warning default

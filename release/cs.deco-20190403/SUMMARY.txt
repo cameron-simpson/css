@@ -1,0 +1,2 @@
+@cached: bugfix: avoid using unset sig_func value on first pass.
+@observable_class: further tweaks.

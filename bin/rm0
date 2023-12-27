@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Remove empty files.
-#	- Cameron Simpson <cs@zip.com.au> 05dec2005
+#	- Cameron Simpson <cs@cskk.id.au> 05dec2005
 #
 
 cmd=`basename "$0"`

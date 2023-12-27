@@ -1,0 +1,1 @@
+New common_prefix_length and common_suffix_length for comparing prefixes and suffixes of sequences.

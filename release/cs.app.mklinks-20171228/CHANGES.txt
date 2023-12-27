@@ -1,0 +1,20 @@
+  lib/python/cs/app/mklinks.py: mklinks: move code into cs.app.mklinks
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: recode, still buggy
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: recode, still buggy
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: fix bugs, turn on doit mode, add -n option
+  lib/python/cs/app/mklinks.py: cs/**.py: trim other trailing whitespace
+  lib/python/cs/app/mklinks.py: cs/**.py: detab
+  lib/python/cs/app/mklinks.py: cs.*: make use of new Pfx deferred argument formatting
+  lib/python/cs/app/mklinks.py: cs.*: adjust a lot of except clauses
+  lib/python/cs/app/mklinks.py: cs.*: lots of print, import and exception fixes for python3 compatibility
+  lib/python/cs/app/mklinks.py: resolve conflicts from merge from mainline
+  lib/python/cs/app/mklinks.py: assorted py3 fixes, mostly StringTypes
+  lib/python/cs/app/mklinks.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/app/mklinks.py: my email address has changed - update Python code
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: import fixes
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: improve import idiom
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: recode again: prefer younger files over older file, cleaner logic
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: process files in reverse order: largest/oldest to smallest/youngest
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: be more up front about sort order
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: make messages a little terser
+  lib/python/cs/app/mklinks.py: cs.app.mklinks: prep for PyPI release

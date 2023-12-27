@@ -1,0 +1,5 @@
+Default logging level for ttys is now INFO, not STATUS.
+New VERBOSE level below INFO but above DEBUG.
+infer_logging_level: if verbose unspecified, logging=WARNING on a tty and TRACK otherwise, else if verbose, level=VERBOSE, otherwise WARNING.
+Include .verbose in the loginfo.
+New verbose() and ifverbose().

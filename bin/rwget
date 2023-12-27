@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Do remote wget. Expects .netrc file at the far end for passwords.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue

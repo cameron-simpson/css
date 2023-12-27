@@ -1,0 +1,2 @@
+Add `nullcontext` like the one from recent contextlib.
+stackattrs: expose the push and pop parts as pushattrs() and popattrs().

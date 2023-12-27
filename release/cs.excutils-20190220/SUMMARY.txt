@@ -1,0 +1,1 @@
+New decorator @exc_fold to catch particular exceptions, log an error and return a defined value.

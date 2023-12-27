@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Code to parse and render VRML.
-#	- Cameron Simpson <cs@zip.com.au> 30dec96
+#	- Cameron Simpson <cs@cskk.id.au> 30dec96
 # VERY INCOMPLETE!!
 #
 

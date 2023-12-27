@@ -3,7 +3,7 @@
 # Expect the output of
 #	xscreensaver-command -watch
 # on stdin and log job activity accordingly.
-#	- Cameron Simpson <cs@zip.com.au> 28jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 28jul2003
 #
 
 cmd=$0

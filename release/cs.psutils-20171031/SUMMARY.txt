@@ -1,0 +1,1 @@
+run: accept optional pids parameter, a setlike collection of process ids.

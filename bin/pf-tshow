@@ -1,13 +1,33 @@
 #!/bin/sh -ue
 #
 # Show IP addresses and their "Cleared" timestamps from a PF table.
-#       - Cameron Simpson <cs@zip.com.au> 07oct2009
+#       - Cameron Simpson <cs@cskk.id.au> 07oct2009
 #
 
-cmd=$0
-usage="Usage: $cmd table"
+set -ue
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+cmd=$0
+usage="Usage: $cmd [-a|table...]"
+
+# no table name? recite tables
+[ $# -gt 0 ] || exec pfctl -sT
+
+if [ "x$*" = x-a ]
+then
+  set -- $("$0")
+fi
+
+# multiple table names? prefix output with table name
+if [ $# -gt 1 ]
+then
+  for table
+  do
+    "$0" "$table" | sed "s/^/$table	/"
+  done
+  exit 0
+fi
+
+# must be exactly one table name
 table=$1; shift
 
 pfctl -t "$table" -T show -v \

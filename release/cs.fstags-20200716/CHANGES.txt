@@ -1,0 +1,4 @@
+lib/python/cs/fstags.py: Release information for cs.fstags-20200521.1.
+lib/python/cs/fstags.py: cs.fstags: new "export" and "import" subcommands roughly paralleling those from "sqltags", providing CSV formatted export/import
+lib/python/cs/fstags.py: cs.fstags: cmd_export: new -a (all paths) option - the default is not to not export paths with no tags
+lib/python/cs/fstags.py: cs.*: update uses of SingletonMixin for new regime: normal __init__ method with a guard against reinitialisation

@@ -1,0 +1,3 @@
+CornuCopyBuffer: accept a size of Ellipsis in .take and .extend methods, indicating "all the remaining data".
+CornuCopyBuffer: refactor the buffering, replacing .buf with .bufs as an array of chunks;
+this enables support for the new .push method and reduces memory copying.

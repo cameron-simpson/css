@@ -2,7 +2,7 @@
 #
 # Translate Perl POD format into Wiki format (specificly that of MediaWiki).
 # A horrible idea, but people like Wikis. No idea why:-(
-#       - Cameron Simpson <cs@zip.com.au> 01nov2006
+#       - Cameron Simpson <cs@cskk.id.au> 01nov2006
 #
 
 use Pod::Parser;

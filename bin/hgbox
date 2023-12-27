@@ -9,7 +9,7 @@
 # but more clunky - doesn't poll with inotify or kqueue yet.
 # On the upside, it supports cloning out-of-tree content via an "rsync in,
 # sync, rsync out" scheme.
-#       - Cameron Simpson <cs@zip.com.au> 03jun2011
+#       - Cameron Simpson <cs@cskk.id.au> 03jun2011
 #
 
 set -ue

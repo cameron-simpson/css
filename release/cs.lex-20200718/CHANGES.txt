@@ -1,0 +1,2 @@
+lib/python/cs/lex.py: Release information for cs.lex-20200613.
+lib/python/cs/lex.py: cs.lex: get_chars: accept a callable for gochars, indicating a per character test function

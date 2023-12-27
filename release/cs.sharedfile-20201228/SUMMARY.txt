@@ -1,0 +1,1 @@
+New SharedWriteable class to manage concurrent output with a mutexed .write method and a context manager for grouping larger uses.

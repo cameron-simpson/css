@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run the gimp in batch mode with less pain.
-#	- Cameron Simpson <cs@zip.com.au> 10nov2003
+#	- Cameron Simpson <cs@cskk.id.au> 10nov2003
 #
 
 cmd=`basename "$0"`

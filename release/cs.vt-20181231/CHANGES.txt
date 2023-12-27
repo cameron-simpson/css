@@ -1,0 +1,984 @@
+  : move cs.venti to cs.vt - it only shares concepts with Venti
+  : adjust embedded strings mentioning the old package name - needs less fragility
+  : cs.vt.__init__: update docstring
+  : remove hardwired references to the package name
+  : fix import syntax
+  : cs.vt.vtfuse: readonly support
+  : cs.vt.__main__: "mount": add -r (aka -o readonly) option
+  : cs.vt: mount: implement "-o append"; StoreFS_LLFUSE: pass oserror=FuseOSError to _StoreFS_core
+  : cs.vt.archive: drop the various *_archive functions, replace with Archive class; one lint detected bugfix
+  : cs.vt.vtfuse: lint fixes
+  : cs.vt.vtfuse: replace syncfp with archive object
+  : cs.vt.__main__: lint fixes
+  : cs.vt.__main__: updates for new Archive class
+  : cs.vt.__main__: cmd_mount: add "-a" (all dates) mount option for browsing filesystem history
+  : merge default ==> venti
+  : cs.vt.compose: parse_store_spec: tweak docstring to reflect planned HTTP path scheme
+  : cs.vt.cache: lint
+  : cs.vt.cache: FileCacheStore.add_bg: deliberately very fast; just return a completed Result directly
+  : cs.vt.datadir: DataDir: move to modern format string for STATE_FILENAME_FORMAT and INDEX_FILENAME_FORMAT
+  : cs.vt.datadir: add is_supported classmethod to all index classes, which probes the relevant import; order the indexclasses by preference and modify register_index to support ordering; choose an index for a DataDir based on existing index db or preferred supported index; improve some docstrings and do some linting
+  : cs.vt.datadir: initial LMDB index implementation, untested
+  : cs.vt.datadir: fix teething problems with recent change to indexclass arrangements
+  : cs.vt.datadir: LMDBIndex.flush: workaround apparent doc bug
+  : cs.vt: import fixes
+  : cs.vt.datadir: LMDBIndex.__setitem__: use a writable transaction
+  : cs.vt.store: make Stores hashable for use in sets
+  : cs.vt.store: ChainStore: minor fixes
+  : cs.vt.store: new ProxyStore class for managing access to multiple sub Stores
+  : cs.vt.cache: FileCacheStore: docstring
+  : cs.vt.vtfuse: add debug for removexattr
+  : cs.vt.archive: _BasicStoreCommon: basic hooks for named archives
+  : cs.vt.dir: support for optional UUIDs on Dirents; will underlie d_ino and e used during Dir reconcialiation/update
+  : cs.vt.meta: Meta: support for st_ctime "c" field, will be useful for Dir reconciliation
+  : cs.vt.dir: Dir: new method absorb to pull another variable of this Dir into ourself, supporting remote updates
+  : cs.vt.dir: _Dirent.encode: include the UUID, all _Dirents get one now
+  : cs.vt.dir: _Dirent: docstring fix
+  : cs.vt.tcp: TCPStoreClient: add mandatory `name` param to initialiser, may be None
+  : cs.vt.tcp_tests: adjust for new `name` param to TCPStoreClient
+  : cs.vt.compose: ConfigFile.Store: move per type clause constructors out into separate functions
+  : cs.vt.cache: FileCacheStore: support backend=None, make .backend a property which can be changed at any time
+  : cs.vt.compose: support "filecache" clauses, making FileCacheStores
+  : cs.vt.__main__: main: get the cache from the [cache] config clause
+  : cs.vt.cache: FileCacheStore: pass max_cachefile_size and max_cachefiles params through to FileDataMappingProxy
+  : cs.vt.compose: Store_from_filecache_clause: pass in max_files and max_file_size fields
+  : vt.index: move hashcode index classes out from vt.datadir for separation and reuse by upcoming PlatonicStore
+  : cs.vt.cache: FileDataMappingProxy.__getitem__: raise KeyError if .backend is None and required
+  : cs.vt.index: _Index subclasses get hashclass and decode parameters, the latter to support decoding other entry formats; other tidyups
+  : cs.vt.datadir: upgrade the index entries to a proper IndexEntry class with a .encode method
+  : cs.vt.datadir: decode_index_entry: now just calls the IndexEntry.from_bytes class method
+  : cs.vt.datadir: DataDir: choose the indexclass using cs.vt.index.choose_indexclass
+  : cs.vt.datadir: all the index classes now live in cs.vt.index
+  : cs.vt.datadir: DataDir: pass IndexEntry.from_bytes to the indexclass constructor as the decode function; some tidyup and lint
+  : cs.vt.dir: uuid related updates for DirentComponents
+  : cs.vt.dir: regularise _Dirent subclass setups
+  : cs.vt.__main__: fix hang at the end of cmd_op: if we use a cache, detach the backend when finished, providing the final backend.close
+  : cs.vt.__main__: describe default cache definition in usage message
+  : cs.vt.index: provide class_names and class_by_name for indexclass lookup
+  : cs.vt.datadir: drop decode_index_entry and encode_index_entry, now accessed via the index class
+  : cs.vt.datadir: rename IndexEntry to DataDirIndexEntry
+  : cs.vt.datadir: update indexclass lookup, polish some lint
+  : cs.vt.datadir_tests: update for recent datadir and index refactors
+  : cs.vt.datadir_tests: rename unused variable
+  : cs.vt.datadir: drop unused import
+  : cs.vt.datadir: DataDir: drop .indexpath, unused; clean more lint
+  : cs.vt.datadir: restore dropped import
+  : cs.vt.index: GDBMIndex: Pfx around dbm.gnu.open for context
+  : cs.vt.datadir: split DataDir into _FilesDir base class and DataDir subclass for the .vtd backing files, with new DataDirIndexEntry for the index records; this is prep for the new PlatonicDir
+  : cs.vt.datadir: move _open_datafile and fetch from _FilesDir to DataDir
+  : cs.vt.datadir: add PlatonicDir, a block mapping based off a preexisting ideal file tree
+  : cs.vt.datafile: scan_chunks: plumb the do_decompress parameter; DataFile.add: honour the no_compress parameter; a little lint
+  : cs.vt.compose: support "platonic" store clauses
+  : cs.vt.datadir: PlatonicDir: small teething logic fixes
+  : cs.vt.store: new PlatonicStore like DataDirStore
+  : cs.vt.datadir: PlatonicDir: implement follow_symlinks flag, default False
+  : cs.vt.compose,store: plumb the Platonic follow_symlinks flag
+  : cs.vt.datadir: _FilesDir: put the index data inside the state directory where it belongs
+  : cs.vt.datadir: use cs.pfx.PfxThread instead of threading.Thread
+  : cs.vt.datadir: add a little debugging
+  : cs.vt.datadir: _save_state: narrow up the window where the lock is held
+  : cs.vt.datadir: implement _del_datafilestate, to discard some state and replace with a placeholder
+  : cs.vt.datadir: catch and report exceptions from the index updater worker thread
+  : cs.vt.datadir: index updater: flush the index and save the state on file switch or after 128K updates, to conserve memory and to reduce out of dateness
+  : cs.vt.datadir: fix debug call
+  : cs.vt.datadir: wind back PlatonicDir state file sync to every 1024 updates
+  : cs.vt.index: LMDBIndex: start the map_size small and double when we exceedit
+  : cs.vt: new _scan C module for scanning input buffers at machine speed, untested
+  : cs.vt._scan: release the GIL around the buffer scan
+  : cs.vt.datadir: PlatonicDir: scan files in 1MiB chunks to maximise the usefulness of the C scan phase
+  : cs.vt.blockify: fall back to pure python scanbuf if C scanner not available; blocked_chunks_of: fix call to scanbuf in main loop
+  : cs.vt._scan: scan_scanbuf: assorted bugfixes and restructures
+  : cs.vt.blockify: blocked_chunks_of: drop inline rolling scan and associated next_rolling_point and max_rolling_point variables, merge scanned offsets with parser offsets
+  : cs.vt._scan: scan_scanbuf: drop the GIL around the buffer scan
+  : cs.vt.datadir: _FilesDir: additional validation loading the state CSV file
+  : cs.vt.datadir: PlatonicDir: back off some debugging
+  : cs.vt.__main__: main: logging bodge for when stderr is not a tty
+  : cs.vt.compose: ConfigFile: logic fix for store type switch
+  : cs.vt.index: LMDBIndex: __setitem__: embiggen the mapping repeatedly until it is big enough instead of just once; _embiggen_lmdb: do not let go of the old lmdb instance until the new one is open - seems to work but is probably still a bit early
+  : cs.vt.store: ChainStore._work: fix association of LateFunctions and Stores
+  : cs.vt.blockify: debugging wrapper for scanbuf to monitor buffer sizes received; move DEFAULT_SCAN_SIZE into this file
+  : cs.vt.datadir: DEFAULT_SCAN_SIZE now comes from cs.vt.blockify
+  : cs.vt.datadir: _FilesDir: reorder init method, particularly dealing with the `datadirpath` parameter after loading the state file
+  : cs.vt.datadir: make the _load_state method less opinionated and make .datadir and .current_save_filenum properties, all to aid subclassing
+  : cs.vt.file: File.high_level_blocks: bugfix reference to the File's backing_block
+  : cs.vt.file: get cs.vt.blockify.DEFAULT_SCAN_SIZE and use it, intending to vastly improve blockification efficiency
+  : cs.vt.blockify_tests: use blockify.DEFAULT_SCAN_SIZE to read file data; needs folding into a convenience function from blockify
+  : vt.dir: drop blank line
+  : cs.vt.blockify: new function spliced_blocks yielding component blocks after splicing in an iterable of (offset, Block); back off some debug
+  : cs.vt.store: drop ChainStore, superceded by ProxyStore
+  : cs.vt.store: ProxyStore: bugfix found by lint, other nonsemantic lint
+  : cs.vt.index: LMDBIndex: back off warning to debug, situation normal and handled
+  : cs.vt.store: PlatonicStore: plumb `archive` keyword parameter
+  : cs.vt.compose: drop ChainStore for ProxyStore, add "proxy" clause type and ProxyStore plumbing, rework parser a bit
+  : cs.vt.datadir: PlatonicDir: support meta_store and archive to track and expose a Dir for the backing store tree
+  : cs.vt.__main__: set up RunState for interrupt/shutdown control; new VTCmd class for main() state with cmd_* as methods
+  : cs.vt.compose: drop get_colon, unused and also overly greedy
+  : cs.vt.compose: completely redo the Store spec syntax parser
+  : cs.vt.__main__: VTCmd.main: update to use cs.vt.compose.Config.from_ini(self.configpath), use [clause_name] as well
+  : cs.vt.datadir: implement DataDir.scan, lost during the PlationicDir refactor
+  : cs.vt.store: add _BasicStoreCommon.bg(func,*a,**kw): runs func in separate thread with this Store as default context, returns Result
+  : cs.vt.datadir: PlatonicDir: run the blockifier via _BasicStoreCommon.bg(meta_store) to provide a Store context
+  : cs.vt.datadir: PlatonicDir: close blockifier Block queue before computing File top Block, set state update flag
+  : cs.vt.hash: use __slots__ on _Hash and subclasses to minimise memory footprint
+  : cs.vt.compose: split out Store spec parse and construction into separate Stores_from_spec function for reuse
+  : cs.vt.{compose,config}: leave the Store specification parser in cs.vt.compose and move the Store assembly into cs.vt.config with the configuration parsing
+  : cs.vt.__main__: VTCmd.main: rely on the defaults in cs.vt.config.Config
+  : cs.vt.__main__: VTCmd.main: unadorned default Config
+  : cs.vt.config: new [GLOBAL] config section for common definitions like basedir=~/var/vt
+  : cs.vt.datadir: _FilesDir: simplify FileSTate switch detection test; PlatonicDir: INFO log on creation of initial top Dir
+  : cs.vt.datadir: drop tty based tracer
+  : cs.vt.dir: fix docstring typo
+  : cs.vt.blockify,scan: move scanbuf import into new cs.vt.scan, with updated setup() incantation
+  : cs.vt.scan: cleanups before merge
+  : cs.vt.datadir: PlatonicDir: mark Dir as changed if a content file is added, clean up tracing messages
+  : cs.vt.store: _BasicStoreCommon.bg: bugfix Result construction
+  : cs.vt.index: LMDBIndex: add locking logic to prevent reopening the database while a transaction is in progress; TODO: promote to a general purpose IdleMixin class or facility in cs.resources
+  : cs.vt.index: LMDBIndex: remove locking from _embiggen_lmdb, put it all in _txn; distinct flag for need_resize; distinct lock for txn blocking
+  : cs.vt.datadir: _FilesDir: fix reference to _extra_state
+  : cs.vt.blockify: blocked_chunks_of: nonsemntic reshuffles for improved clarity
+  : cs.vt.blockify: blocked_chunks_of: bugfix - set release=True when accepting a edge offset
+  : cs.vt.block: Block: reshuffle code for clarity
+  : cs.vt.index: LMDBIndex: pull shutdown to just below startup, wait for idle transactions before sync and close
+  : cs.vt.index: LMDBIndex._txn: ensure reliable undo phase
+  : cs.vt.index: LMDBIndex.__setitem__: just set the resize flag, do not call embiggen directly
+  : cs.vt.__main__: turn the dump op into a data dumper for debugging, starting with .vtd files
+  : cs.vt.debug: new function dump_chunk, general purpose byte block dumper
+  : cs.vt.__main__: cmd_dump: outsource data dump to cs.vt.debug.dump_chunk
+  : cs.vt.debug: add missing import
+  : cs.vt.index: LMDBIndex: new .items() method yielding hashcodes and entries
+  : cs.vt.index: LMDBIndex: bugfix __setitem__, consistent naming of entry (db entry class instance) vs record (in db bytes).
+  : cs.vt.__main__: cmd_dump: add support for dumping LMDBIndex
+  : cs.vt.block: Block,HashCodeBlock: new `added` parameter indicating that this Block is already Stored
+  : cs.vt.datadir: PlatonicDir._monitor_datafiles: drop use_meta_store param and its impl, construct metaBlocks out of "added" Blocks
+  : cs.vt.datadir: PlatonicDir: open/close the meta_store in startup/shutdown, avoiding early meta_store shutdown
+  : cs.vt.datadir: bump INDEX_FLUSH_RATE from 1024 to 16384, still produces timely state update frequency
+  : cs.vt.datadir: _FilesDir: less wordy __str__
+  : cs.vt.datadir: PlatonicFile: less wordy __str__
+  : cs.vt.dir,vtfuse: make Dir.changed a property, drop Dir.change(). Add Dir.path.
+  : cs.vt.archive: Archive.__str__
+  : cs.vt.block: lint
+  : cs.vt.config: docstring fixes
+  : cs.vt.datadir: PlatonicDir: bugfix handling of top Dir
+  : cs.vt.datadir: cap the size of the index Queue at 64 to limit memory consumption
+  : cs.vt.datadir: improve tracing, minor fixes
+  : cs.vt.__main__: do not send X() debugging to the main logger
+  : cs.vt.dir: include object ids in __str__ for debugging
+  : cs.vt.scan: disable debugging scanbuf wrapper
+  : cs.vt.index: strip some debug
+  : cs.vt.datadir: PlatonicDir._monitor_datafiles: use meta_store when looking up Dir contents
+  : cs.vt.datadir: _FilesDir: fix default computation of create_datadir
+  : cs.vt.datadir: simplify superclass hookup
+  : cs.vt.hash_tests: drop obsolete and unused import
+  : cs.vt.store_tests: run a DataDirStore test for each supported index class
+  : cs.vt.stream: StreamStore: initial untested connect on demand support, prep for reconnect after failure and disconnect on idle
+  : cs.vt.stream_tests: fix obsolete import
+  : cs.vt.__main__: rename "listen" to "serve", tidy up usage message
+  : cs.t.store: ProxyStore._multicall: bugfix Store/LateFunction matchup code
+  : cs.vt.datadir: _FilesDir: back off missing hash log from error to info
+  : cs.vt.stream: StreamStore.__init__: sanity check connect/send_fp/recv_fp, fix comment text
+  : cs.vt.stream: StreamStore: rework as a sync store instead of an async store, inline a lot of the payload decoding
+  : cs.vt.datadir: _FilesDir: add RunStateMixin, control the monitor thread with the RunState
+  : cs.vt.datadir: _FilesDir: drop `rollover` parameter to DataDir; add FlaggedMixin to support control via flags; suspend data dir scans when VT_{name}_SCAN_DISABLED flag is set
+  : cs.vt.config: pass config file clause name as flag_prefix=VT_{clause_name} automatically to support flag based control of named stores
+  : cs.vt.config: Config: fix PlatonicStore creation call
+  : cs.vt.store: DataDirStore: pass `indexclass` as a named parameter; PlatonicStore now a factory function which creates a read only ProxyStore if meta_store is not None; plumb the flag_prefix argument; PlatonicStores are readonly
+  : cs.vt.tcp_tests: modernise setup
+  : cs.vt.vtfuse: mount: set `readonly` from `S.readonly` if unspecified
+  : cs.vt.tcp: TCPStoreClient: set up to use on demand connection
+  : cs.vt.config: Config: simplify platonic archive param - just expand the file path, let the data dir o the file open
+  : cs.vt.datadir: PlatonicDir: default archive is now "data.vt" within the state directory
+  : cs.vt.datadir: adjust flag spelling, strip debugging
+  : cs.vt.__main__: VTCmd.cmd_mount: default readonly to None, let the mount forget the Archive if specified
+  : cs.vt.store: ProxyStore: set readonly if len(save) == 0
+  : cs.vt.datadir: _FilesDir.datadirpath.setter: only turn into a relative path if a subpath of statedirpath
+  : cs.vt.datadir: do more type check on the index queue entries to aid debugging some bad intex entries
+  : cs.vt.dir: Dir.size: return the number of Dirents instead of the length of the data; this avoids spurious block creation
+  : cs.vt.vtfuse: do not default readonly=False, derive it from the Store f not specified; correct and warn if readonly specified as False but Store is readonly
+  : cs.vt.datadir: bugfix _FilesDir.startup: pass in self.index_entry_class.from_bytes as the decode function
+  : cs.vt.datadir: drop noisy info message, fires like mad when there are multiple Stores in use
+  : cs.vt.vtfuse: bugfix StoreFS_LLFUSE.readdir: provide the Store context, missing because this is a generator
+  : cs.vt.__main__: VTCmd.cmd_mount: fix typo in docstring
+  : cs.vt.archive: Archive() now a factory to return singleton _Archives path archive path because they may easily be requested from multiple places
+  : cs.vt.archive: drop _Archive._entries__filename, unused
+  : cs.vt.vtfuse: _StoreFS_core: do not set archive=None if readonly, just avoid updating it on close; fix docstring typo
+  : cs.vt.archive: _Archive: make .last a persistent property and update it on .save()
+  : cs.vt.datadir: PlatonicDir: drop "top_dirref" from state CSV, use the archive file "data.vt"
+  : cs.vt.dir: Dir: add .on_change(notifier) method to record a callback for when Dirs are marked as changed
+  : cs.vt.datadir: PlatonicDir: bugfix directory content comparison, was modifying a mapping during iteration
+  : cs.vt.datadir: PlatonicDir: report scan throughput
+  : cs.vt.transcribe: new module with classes to transcribe and parse textual forms of objects
+  : cs.vt.__init__: vt is not venti
+  : cs.vt.hash,hash_tests: make _Hash subclass cs.vt.transcribe.transcriber, implement transcribe_inner and parse_inner, register prefix "H"
+  : cs.vt.hash,hash_tests: str(_Hash) now returns text transcription
+  : cs.vt.transcribe: add Transcriber.register_transcriber class method, drop register() convenience function; add transcribe.transcribe_s method; add transcribe and transcribe_s and parse convenience functions
+  : cs.vt.archive: use @Pfx.gen on generators, simplifying control structure; untested change
+  : cs.vt.hash: set _Hash.transcribe_prefix to save mentioning it elsewhere
+  : cs.vt.transcribe: add tests, support ints and str and UUID, various fixes
+  : cs.vt.transcibe: Transcriber: drop .register_transcriber, require `T` context in .transcribe_inner and .parse_inner; add new register function and parse_mapping function; many docstring improvements
+  : cs.vt.hash: adapt Transcribe registration
+  : cs.vt.transcribe: Transcribe.transcribe_mapping: drop values which are None
+  : cs.vt.meta: Meta: now a Transcriber
+  : cs.vt.dir: FileDirent: initialise _lock for @locked methods
+  : cs.vt.transcribe: Transcribe: pass Transcribe context to Transcriber transcribe_inner and parse_inner methods
+  : cs.vt.dir: drop DirentComponents; make _Dirents transcribable; do not store meta in text form; move decode_Dirent to _Dirent.from_bytes; drop decode_Dirents
+  : cs.vt: changes from cs.vt.dir.decode_Dirent becoming cs.vt.dir._Dirent._from_bytes
+  : cs.vt.hash: _Hash: fix signatures of transcribe_inner and parse_inner
+  : cs.vt.dir: _Dirent: accept uuid keyword argument, improve handling of meta argument
+  : cs.vt.block: make Blocks transcribable
+  : cs.vt.transcribe: Transcriber: provide __str__ which calls transcribe_s; remove some debug
+  : cs.vt.dir: _Dirent and Dir get __str__ from Transcriber; remove some debug
+  : cs.vt.block: register the various Block types for transcription
+  : cs.vt.block: fix some names
+  : cs.vt.transcribe: UUIDTranscriber.parse_inner: honour the `stopchar` parameter
+  : cs.vt.transcribe: global parse_mapping: fix call to class parse_mapping
+  : cs.vt.transcribe: new Transcribe.parse_qs method to fetch possibly optional quoted string
+  : cs.vt.dir: _Dirent: transcribe_inner/parse_inner: put the name first, outside the attribute map
+  : cs.vt.transcribe: Transcribe.parse_qs: fix no-string return
+  : cs.vt.transcribe: Transcribe.parse_qs: make offset optional, add docstring; Transcribe.parse_mapping: add optional `required` and `optional` parameters specifying required or optional fields to add validation, changing the return signature
+  : cs.vt.dir: _Dirent.parse_inner: use the validating form of transcribe.parse_mapping
+  : cs.vt.archive: change archive format to use transcibe() for the dirent
+  : cs.vt.dir: _Dirent: drop unused .as_dict method, use ._uuid instead of .uuid in transcribe_inner
+  : cs.vt.archive: _Archive.write: fix call to transcribe
+  : cs.vt.transcribe: transcribe bools as the ints 0 (False) and 1 (True)
+  : cs.vt.transcribe: support registering classes against multiple prefixes; pass the prefix to parse_inner as a cue
+  : cs.vt.transcribe: Transcribe.transcribe_mapping: provide debug context
+  : cs.vt.block: transcribe direct and indirect blocks with the prefixes "B" and "IB"
+  : cs.vt.block: plumb the prefix parameter to the parse_inner methods
+  : cs.vt.hash: plumb the prefix parameter to the parse_inner method
+  : cs.vt.dir: refactor initialisation and transcription
+  : cs.vt.archive: Archive.save: prevent multiple saves of the same state; Archive.write: compute strings before writing to avoid file corruption; some lint
+  : cs.vt.datadir: back off some debug
+  : cs.vt.__main__: VTCmd.cmd_mount: give the top Dir the basename of the mountpoint if "."
+  : cs.vt.__main__: VTCmd.cmd_mount: fix early variable initialisation
+  : cs.vt.cache: FileDataMappingProxy: move .close next to .__init__
+  : cs.vt.cache: FileCacheStore: __init__: update superclass call, call superclass from startup and shutdown, update _attrs on backend update
+  : cs.vt.datadir: _FilesDir: move __str__ up, drop shadow, drop debug
+  : cs.vt.store: _BasicStoreCommon: use __str__ as __repr__ so that lists come out nicely
+  : cs.vt.store: make abstract methods raise NotImplemented just in case
+  : cs.vt.cache: bugfix: FileCacheStore.backend: propagate new backend to the file cache
+  : cs.vt.cache: FileDataMappingProxy.shutdown: add sanity check for completed work
+  : cs.vt.cache: FileDataMappingProxy: mark work queue items with a flag to suppress updating the backend, for data known to already be in the backend - this supports running the cache in front of a read only backend
+  : cs.vt.store: ProxyStore.add: if the ProxyStore is readonly, do not throw an error if we already have the data chunk
+  : cs.vt.store: remove debugging
+  : cs.vt.file: File.flush: make quick return if no updates and no pending syncher, remove redundant join of the previous syncher
+  : cs.vt.debug: simplify dumps
+  : cs.vt.file: File: fix variable name typo
+  : cs.vt.archive: _Archive: logic fix for archive load
+  : cs.vt.__main__: VTCmd.cmd_mount: accept a Dir transcription as an alternative to an archive path
+  : cs.vt.datadir: PlatonicDir: walk the ideal tree with followlinks=True and do loop detection for the subdirectories - this lets one assemble the ideal tree by symlinking stuff into it
+  : cs.vt.stream: StreamStore.__getattr__(_conn): turn connection failure into AttributeError
+  : cs.vt.tcp: TCPStoreClient._tcp_connect: clear self.sock on connection failure
+  : cs.block: _Block: .span and .indirect common to all subclasses, plumbing to pass these parameters through genericly
+  : cs.vt.{blockmap,blockmap_tests}: flat index of leaf offsets and hashcodes to bypass indirect block tree traversal, to be used by "files" backed by indirect blocks
+  : cs.vt.blockmap: remove some calls to BlockMap.self_check
+  : cs.vt.block: drop chunksOf, unused - functionality comes from Block.slices
+  : cs.vt.block: Block.slices: use "yield from" form
+  : cs.vt.block: Block.chunks: accept start and end, use .slices to obtain the data
+  : cs.vt.block: Block.chunks now a method instead of a property; fix a syntax error
+  : cs.vt.archive: adjust call to B.chunks(), now a method
+  : cs.vt.blockmap: fall back to block.chunks for data regions not yet mapped
+  : cs.vt.block: integrate BlockMap support: new method .get_blockmap to create a blockmap for a Block; .chunks and .slices utilise the blockmap if present
+  : cs.vt.block: clean some lint
+  : cs.vt.blockmap_tests: reordertest permuations to reuse the generated test Block with different map sizes
+  : cs.vt.blockmap: MappedFD.close: remove duplicate file descriptor close
+  : cs.vt.blockmap: BlockMap.chunks: now a wrapper for BlockMap.slices, matching Block methods (but with different signatures, alas)
+  : cs.vt.blockmap: BlockMap: add missing update of .mapped_to; BlockMap.slices: drop debug array, clean up offset/span adjustment
+  : cs.vt.file: File: add ._auto_blockmap method to request a blockmap
+  : cs.vt.file: add BlockFile._auto_blockmap method; call from relevant read* methods
+  : cs.vt.file: clean some lint
+  : cs.vt.block: Block: fix constructions of LiteralBlock (span is computed)
+  : cs.vt.file: File: attach our own .flush method to the BackedFile
+  : cs.vt.file_tests: repair tests
+  : cs.vt.block: SubBlock: return empty LiteralBlock for empty subspan, return original Block for full subspan, warning for both cases
+  : cs.vt.block_tests: fix range of SubBlock tests, tweak returned block type for special case; run more IndirectBlock tests
+  : cs.vt.block: RLEBlock.transcribe_inner: fix call to transcribe_mapping
+  : cs.vt.block_tests: clean some lint
+  : cs.vt.block: drop unused dump_block, parallel exists in cs.vt.debug; drop debug calls
+  : cs.vt.block: _SubBlock.parse_inner: fix call and return, improve parse_mapping call
+  : cs.vt.transcribe: add transcriber for bytes, strip some debug
+  : cs.vt.block: clean some lint
+  : cs.vt.block: prevent accidental SubBlock nesting, restructure Pfx
+  : cs.vt.__main__: update import of dump_Block
+  : cs.vt.{file,block}: shift blockmap debug message to the actual startup of the BlockMap for less noise
+  : cs.vt.blockmap_tests: import tidy
+  : cs.vt.blockify: drop the notion of min_autoblocksize - we always scan the whole block - this is just cleanup of a now unused bound
+  : cs.vt.blockify: a few more comments
+  : cs.vt.__main__: add "test blockify filename" operation
+  : cs.vt.blockify: blocked_chunks_of: bugfix failure to use scanbuf offsets as edges - big recode, merge scanner offsets and scanbuf offsets at chunk fetch time, greatly simplifying logic
+  : cs.vt.block: clean some lint
+  : cs.vt.blockmap: do not hold "with S" over yield statement, just hold it while fetching a leaf; drop some debug
+  : cs.vt.dir: FileDirent: do not set up ._lock, MultiOpenMixin does this for us
+  : cs.vt.config: clean some lint
+  : cs.vt.datadir: PlatonicDir: clear need_save before _save_state instead of afterwards; add some tracing
+  : cs.vt.file: File._reset: delete the internal BlockMap of the old backing block if any
+  : cs.vt.file: File.read: no longer a locked method
+  : cs.vt.config: Config.new_Store: bugfix "type" => "type_" parameter shuffle
+  : cs.vt.config: Config.new_Store: always turn "params" into a dict to support modification
+  : cs.vt.blockify: blocked_chunks_of: ignore next_offset <= offset
+  : cs.vt.blockify: blocked_chunks_of: break from main loop instead of returning so that we can flush the emaining unblocked data
+  : cs.vt.blockmap: BlockMap: promote nonhashcode blocks to HashCodeBlocks for index purposes
+  : cs.vt.datadir: _FilesDir: performance tweak: only flush the index if the incoming queue is empty
+  : cs.vt.datadir: PlatonicDir: performance tweak, only update the state file once per tree walk, not once per file
+  : cs.vt.datadir: PlatonicDir: require a meta_store
+  : cs.vt.datadir: clean some lint
+  : cs.vt.block: minor refactors to clean up some definitions, simplify some implementations, maybe gain some tiny speedups
+  : cs.vt.blockify_tests: drop minimum block size test - flushing the buffer may leave a short block, and it is better to accept this and get back in sync with the block edges than to prevent it
+  : cs.vt.dir: _Dirent.from_bytes: convert namedata to bytes from memoryview for decode
+  : cs.vt.cache: FileDataMappingProxy: cope with .backend=None
+  : cs.vt.blockmap: MappedFD.__init__: fill out docstring
+  : cs.vt.blockmap: refactor and bugfix BlockMap._load_maps, now correct but still needs a tweak for asynchronous access by other threads during the map load
+  : cs.vt.block: new caching get_HashCodeBlock function to improve reuse of leaves derived from hashcodes
+  : cs.blockmap: BlockMap: experiment with a ._load_lock to try to prevent building a blockmap from interfering so much with accessing the data from a block during the build; rework the slices logic to better take advantage of a blockmap growing during the slice iteration
+  : cs.vt.file: File.read: additional optional longread parameter, default False, to encourage gathering data from a single iteration over the block structure
+  : cs.vt.debug: dump_Block: .subblocks is a property, not a method
+  : cs.vt.block: big refactor of indirect blocks, making them their own class but keeping the F_INDIRECT flag in the superblock's serialisation.
+  : cs.vt.blockmap: BlockMap: adjust call to get_HashCodeBlock to omit the span and indirect parameters
+  : cs.vt.blockmap: BlockMap.slices: bugfix assertion
+  : cs.vt.blockmap_tests: reduce complexity so that the tests finish in a sane amount of time
+  : cs.vt.archive,cs.vt.dir: fix obsolete references to Block.all_data()
+  : cs.vt.dir: InvalidDirent: bugfix parameter handling
+  : cs.vt.dir: support .prev_block revision tracking for Dirents
+  : cs.vt.vtfuse: _StoreFS_core.sync: call E.snapshot() for revision tracing
+  : cs.vt.dir: bugfix prev_dirent handling
+  : cs.vt.dir_tests: include round trip test after adding a Dirent snapshot
+  : cs.vt.dir: streamline the prev Block encoding by avoiding run length wrapping it twice
+  : cs.vt.file: File._high_level_blocks_from_front_back: bugfix for default range end, could be shorter than the backing Block; add a test that sufficient Blocks were yielded
+  : cs.vt.file: File: add .flush_count debugging aid
+  : cs.vt.file: File.flush: use cs.result.bg() to run the syncer
+  : cs.vt.file: File.truncate: special case length=0, let pending flushes complete before truncating
+  : cs.vt.vtfuse: StoreFS_LLFUSE.setattr: implement setting st_size by opening the Dirent and calling its .truncate method
+  : cs.vt.vtfuse: move opendir's private _OpenDir class out to be DirHandle, a peer of FileHandle
+  : cs.vt.vtfuse: FileHandle: fix default `lock` value - the filesystem doesn't have a lock to reuse
+  : cs.vt.dir: _Dirent: store the prevblock as a _Block subtype consistently
+  : cs.vt.dir: _Dirent.encode: include encoding length with prevblock; lint an assertion
+  : cs.vt.dir: _Dirent.prev_dirent: make into a caching locked property, support setting it (reduces the scope for wrong data types etc)
+  : cs.vt.vtfuse: StoreFS_LLFUSE: new static method _stat_EntryAttributes to return an llfuse.EntryAttributes from an os.stat value
+  : cs.vt.vtfuse: initial "show_prev_dirent" mount mode support, presenting the previous fs revision as "..." at the top level
+  : cs.vt.vtfuse: add a couple of comments
+  : cs.vt.__init__: _Defaults: create a global Store stack as a fallback for the per thread stack, crudely supporting access from Threads without a Store scope (arguably a bug, so this emits a warning
+  : cs.vt.__main__: VTCmd.cmd_op: push the Store onto the global stack as a fallback
+  : cs.vt.__init__: _Defaults: recode with simpler implementation and fallback for no current per-Thread Store
+  : cs.vt.vtfuse: _StoreFS_core: add a close method to do a sync and formally shut down the logger worker, have the logger worker hold the current Store for context; StoreFS_LLFUSE.destroy not calls _StoreFS_core.close instead of just _StoreFS_core._sync
+  : cs.vt.__init__: _Defaults: open and close Stores in pushSTore and popStore
+  : cs.vt.archive: remove debug
+  : cs.vt.archive: remove unused import
+  : cs.vt.dir: remove debug
+  : cs.vt.hash: _Hash: new property .filename providing "{hashcodehex}.{hashtypename}" as a basis value for pathname componented based on this hash value
+  : cs.vt.index: choose: improve error message when an index class cannot be chosen, listing the known index classes
+  : cs.vt.vtfuse: StoreFS_LLFUSE._vt_runfuse: hold the Store `S` during the mainloop to set the per-Thread default Store; add @logexc to report exceptions from the main loop
+  : cs.vt.blockmap: replace use of magic number 4 with OFF_STRUCT.size
+  : cs.vt.blockmap: initial changes for persistent BlockMaps: link blockmap files to a well defined place, detect them on rescan and skip construction; several more changes to follow
+  : cs.vt.datadir: _FilesDir: new incomplete .get_blockmap method to provide persistent BlockMap storage (TODO)
+  : cs.vt.datadir: clean some lint, fix a typo
+  : cs.vt.block: _Block.get_blockmap: plumb new `savedir` parameter to support persistent blockmaps
+  : cs.vt.blockmap: put sanity check back after mmap setup
+  : cs.vt.blockmap: MappedFD: rename "mmap" attribute to "mapped", shuts up lint and improves readability
+  : cs.vt.blockmap: MappedFD: rename `fp` to `f`, accept both file and file pathname to support opening an existing persistent blockmap file
+  : cs.vt.blockmap: fixup `fp` => `f` change
+  : cs.vt.blockmap_tests: blockmaps require indirect blocks - transmute generates direct blocks into single element indirect blocks
+  : cs.vt.block: IndirectBlock: document `force` parameter
+  : cs.vt.blockmap: big refactor of BlockMap and MappedFD
+  : cs.vt.__init_: _Defaults.S: disable debugging exception
+  : cs.vt.dir: Dir.entries: catch exceptions fetching the block data, report and return empty map
+  : cs.vt.meta: Meta.stat: tweak docstring
+  : cs.vt.vtfuse: StoreFS_LLFUSE.readdir: drop entries we cannot stat
+  : cs.vt.datadir: default state archive is now {datadir}/default.vt
+  : cs.vt.compose: get_store_spec: bugfix parse of "tcp:[host]:port"
+  : cs.vt.vtfuse: StoreFS_LLFUSE._vt_runfuse: push the STore onto the global fallback stack so that separate syscall threads also find it
+  : cs.vt.vtfuse: StoreFS_LLFUSE.entries: improve error handling; just issue a warning and drop the prev_dirent entry if required hashes are unavailable
+  : cs.vt.dir: _Dirent.transcribe: do not fetch/decode the prev blockref, just recite it - avoids spurious I/O when just printing things out
+  : cs.vt.archive: Archive(): add optional missing_ok and weird_ok parameters, default False; archive need not exist if missing_ok; archive path need not end in .vt if weird_ok
+  : cs.vt.datadir: make default archive file basename "default.vt"; add get_Archive methods to _FilesDir and PlatonicDir with support for optional archive name
+  : cs.vt.store: add _PlatonicStore.get_Archive and DataDirStore.get_Archive methods that call self._datadir.get_Archive; PlatonicStore: add a .get_Archive to the constructed ProxyStore which calls the internal _PlatonicStore.get_Archive
+  : cs.vt.__main__: get default Store from $VT_STORE, with default "[default]"; mount: add support for directly mounting via a .vtrc clause name "[foo]": update usage message to match
+  : cs.vt.block: _Block: always have a .blockmap attribute, initially None; add a little more debug tracing
+  : cs.vt.blockmap: BlockMap.__init__: preload existing submap files if present immediately, only use the worker thread to scan unmapped leaves - this avoids any window where a premapped Block might look unmapped from outside
+  : cs.vt.block: _Block.slices: small efficiency gain for the initial scan of pre-range subblocks
+  : cs.vt.file: File: refactor .read to wrap expose the core reading scan as the new .datafrom generator method, and to collect data from a reusable CornuCopyBuffer using datafrom
+  : cs.vt.block: tweak debugging
+  : cs.vt.file: BlockFile: drop ._auto_blockmap, .read and .readinto, the latter two now from the ReadMixin; provide .datafrom method
+  : cs.vt.file: File: provide .datafrom method for the ReadMixin; drop .read and .readall
+  : cs.vt.blockmap: MapEntry.leaf: return leaf Block without trying to fetch any data
+  : cs.vt.blockmap: Blockmap._load_maps: initialise mapsize earlier; fix leaf scan rate debug reporting
+  : cs.vt.block,blockmap: reshuffle imports and fix an unimported name; turn on some more debugging
+  : cs.vt.blockmap: BlockMap._load_maps: attach new blockmaps to persistent files, logic lost during the recent refactor?
+  : cs.vt.datadir: PlatonicFile: work with OS file descriptors and use a single os.pread call to fetch data; some efficiency gain but it seems small, may have a larger effect with random access
+  : cs.vt.vtfuse: FileHandle.read: simpler direct call to the file read method
+  : cs.vt.datafile: DataFile: big refactor around inheriting from cs.fileutils.ReadMixin
+  : cs.vt.datafile: DataFile.datafrom now returns cs.fileutils.datafrom_fd(self._rfd)
+  : cs.vt.{__main__,datadir,parsers}: updates to match recent changes to cs.vt.datafile
+  : cs.vt.__main__: VTCmd.cmd_op: bugfix subcall for "profile" op
+  : cs.vt.datafile: DataFile.datafrom: bump default readsize from 512 to 2048, document the rationale for this value
+  : cs.vt.datadir: PlatonicFile: subclass ReadMixin, use its .read in .fetch
+  : cs.vt: use "DF" to refer to DataFiles instead of "D" (usually indicating a Dir)
+  : cs.vt.config: Config.__getitem__: set the .mountdir attribute on the returned Store if defined
+  : cs.vt.__main__: VTCmd.cmd_mount: upgrade mountpoint inference to support Dirs and [clauses]
+  : cs.vt.stream: StreamStore._handle_request: catch and report unexpected excpetions to aid debugging
+  : cs.vt.datadir: remove debug
+  : cs.vt: clean up the implementation of Store.mountdir aka [clause].mountdir
+  : cs.vt.store: some linting
+  : cs.vt.config: support for the "blockmapdir" clause field where persistent BlockMaps may be stored
+  : cs.vt.blockmap,block: use the name "blockmapdir" consistently
+  : cs.vt.store: _BasicStoreCommon: implement the .blockmapdir property
+  : cs.vt: mount: plumb through the "special" as the filesystem "fsname" option
+  : cs.vt.cache: FileCacheStore: elaborate docstring
+  : cs.vt.datadir: PlatonicDir: fix docstring typo
+  : cs.vt.tcp,socket: rename tcp.py to socket.py, include unix domain socket support
+  : cs.vt.socket: linting
+  : cs.vt.__main__: unix domain socket support for "serve"
+  : rename cs.vt.tcp_tests to cs.vt.socket_tests, do some linting; TODO: add UNIX domain socket tests
+  : vt/store.py: _SocketStoreServer: make the server thread a nondaemon; UNIXSocketStoreClient: remove the socket file
+  : cs.vt.config: Config: support for new "socket" clause type for UNIX domain sockets
+  : cs.vt.__main__: VTCmd: import fix, improve some messages
+  : cs.vt.datadir: PlatonicDir: bugfix scanfrom call
+  : cs.vt.socket: _SocketStoreServer: inherit from RunStateMixin; mediate cancellation etc via the RunState; swap init params to put the Store first
+  : cs.vt.server: convenience functions for serving Stores, presently over TCP and UNIX domain sockets
+  : cs.vt.__main__: serve: use the new cs.vt.serve functions
+  : cs.vt: rename cs.vt.SEP to cs.vt.PATHSEP for clarity
+  : cs.vt.control: control operations to support the command line, ftp-like interfaces and the FUSE setxattr(x-vt-control,..) operation
+  : cs.vt.compose: sotre specification lists now comma separated instead of colon separated
+  : cs.vt: rename TCPStoreClient to TCPClientStore, rename UNIXSocketStoreClient to UNIXSocketClientStore
+  : cs.vt.stream: StreamStore: initial support for changing the local_store on the fly, plumbing for exports Stores
+  : cs.vt.stream: linting and exception format fixes
+  : cs.vt.compose: CommandStore: fix docstring typo
+  : cs.vt.__init__: _Defaults: include a RunState and a push_runstate context manager to save/restore it
+  : cs.vt.__main__: VTCmd.main: create a RunState for this invocation and push it onto the default state; cause signals to call runstate.cancel()
+  : cs.vt.hash: HashCodeUtilsMixin: indentation tweak
+  : cs.vt.config: plumb a RunState through the Config and to the various created Stores
+  : cs.vt.datadir: _FilesDir: plumb the runstate through
+  : cs.vt.datadir: drop debugging, clean some lint
+  : cs.vt.cache: FileCacheStore,FileDataMappingProxy: plumb in a RunState
+  : cs.vt.server: plumb through the `runstate` parameter
+  : cs.vt.store: _BasicStoreCommon: inherit from RunStateMixin; flow on runstate plumbing
+  : cs.vt.datadir: _FilesDir: do not .start() or .cancel() the runstate - we do not own it, we just watch it
+  : cs.vt.__main__: VTCmd.cmd_serve: parse an list of exported Store specifications after the address, pass it through to the server
+  : cs.vt.socket: _SocketStoreServer: support for a mapping of exported Stores
+  : cs.vt.socket: _RequestHandler: get the current Store and the exports from the controlling server; pass the main server instead of its Store to socket servers; other small updates for consistency
+  : cs.vt.store: _BasicStoreCommon: make __str__ more debuggable, do not start/end the runstate - we do not own it, just consult it
+  : cs.vt.store: new method Store.pushto to create a Queue for pushing Blocks to another Store (UNTESTED)
+  : cs.vt.store: _BasicStoreCommon: update the .bg method to use the internal Later.bg method, improve its docstring
+  : cs.vt.store: _BasicStoreCommon.pushto: rework the worker to simplify the call chain, include more message context, all still untested
+  : cs.vt.block: new _Block.pushto method for push a Block and its contents to a secondary Store; UNTESTED
+  : cs.vt.block: _Block.pushto: fix docstring typos
+  : cs.vt.dir: FileDirent: new .pushto method to push file contents to a secondary Store
+  : cs.vt.dir: Dir: new .pushto method to push Dir contents to a secondary Store; pull out the Dir data decoder into Dirents_from_data for reuse
+  : cs.vtdir: clean some lint
+  : cs.vt.block: clean some lint
+  : cs.vt.__init__: clean lint
+  : cs.vt.store: _BasicStoreCommon.pushto: new optional `block_progress` and `bytes_progress` parameters for Progress instances
+  : cs.vt.datadir: _FilesDir.shutdown: call .runstate.cancel() to ask the worker threads to terminate; tweak some indents
+  : cs.vt.transcribe: tweak exception message text
+  : cs.vt.store: _BasicStoreCommon.pushto: bugfix notify and bg calls
+  : cs.vt.__main__: VTCmd: new cmd_pushto for pushing objects to a secondary Store
+  : cs.vt.block: _IndirectBlock: bugfix initialiser: set .hashcode from superB.hashcode
+  : cs.vt.datadir: _FilesDir._index_updater: remove pointless check, has many false positives under load
+  : cs.vt.store: _BasicStoreCommon.pushto: require Queue `capacity` >= 1, constrain `S2` bg tasks with a semaphore of the same value to prevent Thread exhaustion during load; streamline B.data fetch, improve tracing
+  : cs.vt.store: _BasicStoreCommon.pushto: pass more parameters to the worker function to speed up name lookup
+  : cs.vt.{block,dir}: *.pushto: accept optional RunState to support cancelling the push
+  : cs.vt.__main__: main: start/stop the global RunState around the main operation; VTCmd.cmd_pushto: pass the global RunState to the pushto operation, implementing nice shutdown on SIGINT etc
+  : cs.vt.socket: rename _RequestHandler to _ClientConnectionHandler, reduces confusion with request packet handling
+  : cs.vt.cache: FileCacheStore: reject None backend
+  : cs.vt.compose: get_params: include unparsed text in exception message for context
+  : cs.vt.vtfuse: clean a lot of lint, add a lot of docstrings, fix some misused exception arguments
+  : cs.vt.dir: SymlinkDirent: update initialiser, fallout from lint of cs.vt.vtfuse
+  : cs.vt.compose: initial support for /path/to/socket, UNTESTED
+  : cs.vt.__main__: VTCmd: move cmd_serve down into lexical order (was formerly cmd_listen)
+  : cs.vt.__main__: VTCmd: move cmd_pushto to below cmd_pull
+  : cs.vt.__main__: VTCmd: cmd_pushto and cmd_pullfrom to transfer data between Stores
+  : cs.vt.__main__: clean some lint
+  : cs.vt.__main__: VTcmd.cmd_mount: improve the fsname by including the Config path
+  : cs.vt.vtfuse: Inodes: fix inode lookup
+  : cs.vt.cache: FileCacheStore: open the backend during __init__, but still close during shutdown
+  : cs.vt.cache: new MemoryCacheStore and MemoryCacheMapping, lossy Store and Mapping implementations
+  : cs.vt.convert: functions to convert strings to values and to convert string parameters
+  : cs.vt.compose: move get_integer to cs.vt.convert, fix exception construction
+  : cs.vt.config: convert clause parameters in new_Store instead of in the factories
+  : cs.vt.config: Config.filecache_Store: require a backend Store
+  : cs.vt.config: new "memory" clause type
+  : cs.vt.cache: MemoryCacheMapping: implement __len__
+  : cs.vt.__main__: VTCmd: modify -C option to accept a cache Store specification, use $VT_CACHE_STORE or "[cache]" if unspecified
+  : cs.vt.config: drop debug
+  : cs.vt.pushpull: drop complete_Block, obsoleted by Block.pushto
+  : cs.vt.__main__: drop VTCmd.cmd_init, not needed
+  : cs.vt.__main__: VTCmd: drop "datadir" commands, may reimplement later
+  : cs.vt.__main__: VTCmd.main: handle "-f config_file" option; cs.vt.config: require expliciti config_map, leave guessing to VTCmd.main
+  : cs.vt.stream: replace cs.inttypes.Enum with stdlib enum.IntEnum
+  : cs.vt.datafile: new DataFlag(enum.IntFlags) replacing F_COMPRESSED; cs.vt.__main__: adjust F_COMPRESSED use
+  : cs.vt.dir: _Dirent.uuid: now a normal attribute, new method .get_uuid() to make one if missing
+  : cs.vt.dir: Dir.get: refactor, less racy
+  : cs.vt.store: _BasicStoreCommon: drop .missing(), unused; group methods by purpose
+  : cs.vt.archive: _Archive: .write now flushes the file; update some docstrings
+  : cs.vt.__main__: VTCmd.main: attach current config to the ProxyStore made from the cache and the main Store
+  : cs.vt.convert: add expand_path and convert_param_path
+  : cs.vt.config: Config: call convert_param_path on socket_path for "socket" Store clauses
+  : cs.vt.socket: pass address family to socket.socket(), fix super() call in _ClientConnectionHandler.__init__, improve some error reporting
+  : cs.vt.__main__: VTCmd.cmd_serve: fix parameter name
+  : cs.vt.socket: rename a bunch of internal attributes for clarity
+  : cs.vt.stream: bugfix StreamStore.local_store.setter
+  : cs.vt.store: new StreamStore.switch_to to change the local_store for one named in the exports, will be being dropped from cs.vt.socket
+  : cs.vt.stream: lint and comments
+  : cs.vt.socket: drop _SocketStoreServer.switch_to, now part of cs.vt.stream.StreamStore
+  : cs.vt.socket: _SocketStoreServer.startup/shutdown: do not open/close self.S, this belongs in the connection handlers
+  : merge venti ==> default: simplify cs.fileutils.RWFileBlockCache; new "pushto" command; new MemoryCacheStore and MemoryCacheMapping; new "memory" clause type; change -C option; assorted bugfixes and cleanups
+  : cs.vt.nodedb: defunct, never used, incomplete
+  : cs.vt.edgeDetect.c: defunct, never completed, suppplanted by much simpler cs.vt._scan.c
+  : cs.vt.socket: _ClientConnectionHandler: rename internal variable/attribute named `server` to `socket_server` for clarity; make self.S a plain attribute local to this instance instead of a property derived from `self.socket_server.store_server.S` because we can switch this around per connection
+  : cs.vt: rename Archive.save() to Archive.update()
+  : cs.vt.archive: rename Archive.save method to Archive.update
+  : cs.vt.archive: _Archive: update initialiser docstring to describe `previous`
+  : cs.vt.archive: _Archive.__init__ docstring
+  : cs.vt.dir: Dir.absorb: rename to .update, rework algorithm a bit, add .update_notification method to receive Archive.update information
+  : cs.vt.archive: Archive.update: simplify logic, drop string support for Dirent, add update notification hook
+  : cs.vt.vtfuse: move core classes to new nonFUSE cs.vt.fs module, prep for moving vtfuse out of the cs.vt tree to avoid FUSE dependency in PyPI for cs.vt; lots of associated linting and minor cleanup
+  : cs.vt.archive: some lint cleanup
+  : cs.vt: move cs.vt.vtfuse to cs.vtfuse, removing FUSE from the cs.vt package requirements
+  : cs.vt.__main__: VTCmd.cmd_mount: improve error message if cs.vtfuse is not installed
+  : cs.vt.dir: new _Dirent.from_str class method for parsing a _Dirent from a text transcription
+  : cs.vt.archive: _Archive: use _Dirent.__str__ and __Dirent.from_str to transcribe and parse records
+  : cs.vt.socket: bugfix _ClientConnectionHandler, drop unused .handlers set
+  : cs.vt.__main__: clean a little lint
+  : cs.vt.datadir: rename FileState to DataFileState for disambiguation purposes
+  : cs.vt.datafile: use fcntl.flock(wfd,LOCK_EX) to protect against external writers, to support shared data file updates (UNTESTED)
+  : cs.vt.datafile: clean some lint; drop DataFile.tell and DataFile.seek, both unused
+  : cs.vt.datafile: DataFile: replace scan_records with scanbuffer, fix scanfrom accordingly
+  : cs.vt.{__main__,parsers}: replace DataFile.scan_records with DataFile.scanbuffer
+  : cs.vt.__main__: fix some error() parameters
+  : cs.vt.datadir: _FilesDir: fix init docstring
+  : cs.vt.blockify: fold blocks_of into blockify
+  : cs.vt.smuggling: blocks_of folded into blockify
+  : cs.vt.blockify: clean some lint
+  : cs.blockmap: drop redundant import, add a little whitespace
+  : cs.vt.cache: clean some lint; plumb `runstate` through the FileCacheStore init
+  : cs.vt.config: Store: make `config` mandatory, drop some unused imports
+  : cs.vt.convert: add some missing docstrings
+  : cs.vt.datadir: clean a lot of lint, rename `F` variables to `DFstate` for clarity
+  : cs.vt.debug: clean lint
+  : cs.vt.datadir: DataDir._monitor_datafiles: bugfix size check, handle None return for nonfiles
+  : cs.vt.smuggling: fix import
+  : cs.vt.store: _BasicStoreCommon.bg: make the Store open robust
+  : cs.vt.store: ProxyStore: improve docstring
+  : cs.vt.store: drop irrelevant junk from module docstring
+  : cs.vt.socket: _ClientConnectionHandler.setup: call super().setup() for StreamRequestHandler setup
+  : cs.vt.config: Config.proxy_Store: plumb the `save2` parameter
+  : cs.vt.__main__: VTCmd.main: initialise cacheS when cache_store_spec is None
+  : cs.vt.store: ProxyStore.__init__: make optional parameters keyword only, plumb the save2 parameter here and elsewhere
+  : cs.vt.store: clean some lint
+  : merge venti ==> default: internal StreamStore support for switchable Stores, Archive update notification hooks, move cs.vt.vtfuse to cs.vtfuse to remove FUSE from cs.vt dependencies, drop assorted dead code, some lint cleanup and other small changes
+  : cs.vt.datadir: consistently plumb the do_decompress parameter for scanfrom
+  : cs.vt.store: _BasicStoreCommon.bg: drop arguments which are made available via a closure
+  : cs.vt.hash: define MissingHashcodeError in vt.hash
+  : cs.vt.store: moved MissingHashcodeError to cs.vt.hash, define new StoreError exception in order to catch recognised Store issues as distinct from other exceptions
+  : cs.vt.datadir: PlatonicDir: catch MissingHashcodeError during scan and reset the file's scanned_to to 0 to force a full rescan; back off some debugging messages and remove a redundant Pfx layer
+  : cs.vt.store: Store.bg: keep the Store open, and set it as the default context Store for the duration of the supplied function
+  : cs.vt.stream: StreamStore: new .do method wrapping ._conn.do, raising StoreError in some well defined situations
+  : cs.vt.socket: debugging improvements
+  : cs.vt.__main__: VTCmd.cmd_mount: initialise special to None if missing from argv
+  : cs.vt.datadir: debugging and comment changes
+  : cs.vt.datadir: PlatonicDir monitor: init D to None is no meta_store in order to trip up later misuse, if any
+  : cs.vt.datadir: PlatonicDir monitor: bugfix replacement of existing nonfile with file from ideal directory
+  : cs.vt.store: bool(_BasicStoreCommon)=True
+  : cs.vt.stream: raise StoreErrors from various backend stream failures
+  : cs.vt.stream: call the StreamStore.do method instead of _conn.do throughout
+  : cs.vt.stream: tweak raised exception
+  : cs.vt.stream: clean some lint, add a debugging statement
+  : cs.vt.__init__: _Defaults.S: emit a stack dump if we resort to the global default Store
+  : cs.vt.datadir: PlatonicDir monitor: error recovery - if we had a filemap entry for a file but it isn't named in the live DIr, scan the file anew; tweak the meta_store test now that bool(Store) is always True
+  : cs.vt.store: Store.bg: tweak the func2 function name setup
+  : cs.vt.__init__: fix import
+  : cs.vt.dir: _Dirent.transcribe_inner: drop leading name if empty or "."
+  : cs.vt.datadir: PlatonicDir monitor: tiny logic cleanup
+  : cs.vt.datadir: better __str_ for DataFileState; _FilesDir: add "force" mode to _add_datafilestate, possible a bad idea - intended for recovery; fix a misspelt attribute
+  : cs.vt.__main__: VTCmd.cmd_op: report ValueError from Store(storespec,...) nicely, report other exceptions more loudly
+  : cs.vt.compose: get_store_spec: recognise sockets by ".sock" extension instead of stat so that a socket Store which is inactive is not a syntax error
+  : cs.vt.datadir: _FilesDir: fix logic errors in sanity checks while loading the file state
+  : cs.vt.datadir: PlatonicFile: add seek and tell methods maintaining a dummy offset value
+  : cs.vt.store: ProxyStore: bugfix get: avoid early return of None; tweak Pfx nesting in a generator
+  : merge default ==> pypi
+  : merge default ==> pypi
+  : merge default ==> media
+  : cs.vt.store: _BasicStoreCommon.pushto: formatting and docstring tweaks
+  : cs.vt.datadir: markdown some docstrings
+  : cs.vt.compose: drop debug
+  : cs.vt.datafile: process data chunk records via new class DataRecord(cs.binary.PacketField); drop a bunch of obsolete methods; the scan methods now yield DataRecords
+  : cs.vt.datafile_tests: run the tests the usual way, add a PacketField test for the new DataRecord
+  : cs.vt.datadir_tests: TestDataDir: update DataDir construction as `indexclass` is now an optional keyword only parameter
+  : cs.vt.hash: new function decode_buffer to read an arbitrary hash (i.e. one with a leading hash type enum) from a buffer; _Hash: new from_buffer method to read a known type hash (without a leading hash type enum) from a buffer
+  : cs.vt.__init__: _TestAdditionsMixin.assertLen: be silent on things with no length
+  : cs.hash: new HashCodeField(PacketField) class for hashcode parsing and transcription
+  : cs.vt.hash: clean some lint
+  : cs.vt.hash_tests: update for cs.vt.hash changes, clean lots of lint
+  : cs.vt.stream: refactor to make all requests subclasses of PacketField and to make the connect match recent changes to PacketConnection; some docstring improvements
+  : cs.vt.stream_tests: simplify StreamStore construction matching recent PacketConnection improvements
+  : cs.vt.stream: some docstrings and lint
+  : cs.vt.stream_tests: some docstrings
+  : cs.vt.dir: debugging and a docstring tweak
+  : cs.vt.block: bugfix verify_block: for indirect blocks we hash the data of the superblock
+  : cs.vt.transcribe_tests: clean lint
+  : cs.vt.hash: HashCodeField: bugfix value_from_buffer; _Hash base class: rename to HashCode for reuse, add .from_buffer and .transcribe_b for binary parse/transcribe, drop former from_buffer method
+  : cs.vt.block: new BlockRecord(PacketField) class for blockref parsing and transcription; not yet in play
+  : cs.vt.block_tests: initial round trip tests for the new BlockRecord class; drop use of Pfx in favour of unittest.subTest
+  : cs.vt.block: clean lint
+  : cs.vt.block: _Block.slices: bugfix leaf-in-range test
+  : cs.vt.block: BlockRecord: bugfix indirect block transcription and subblock transcription
+  : cs.vt.block: _Block.__eq__: bugfix leaves2 iteration, clean up the aligned-leaf hashcode comparison, improve some comments
+  : cs.vt.block: drop all the old encode/decode functions in favour of the new BlockRecord parse/transcribe code; rename decodeBlock to Block_from_bytes and decodeBlocks to Blocks_from_bytes; add some more sanity checks, tweak some docstrings and comments, strip some debug
+  : cs.vt.block_tests: update for recent cs.vt.block changes
+  : cs.vt.blockmap: add some more sanity check assertions
+  : cs.vt.parsers: scan_mp4: fix spelling of parse_mp4_from_buffer discard_data parameter
+  : cs.vt.__main__: adjust decodeBlock to Block_from_bytes
+  : cs.vt.dir: replace encodeBlock and decodeBlock to match recent cs.vt.block changes
+  : cs.vt.blockify_tests: drop obsolete import
+  : cs.vt.block: drop unused imports, makeBlock_from_bytes and alias for BlockRecord.value_from_bytes
+  : cs.vt.block_tests: clean lint
+  : cs.vt.blockify: tweak a docstring, brush off some lint
+  : cs.vt.blockify_tests: clean some lint
+  : cs.vt.blockify,blockify_tests: clean some lint
+  : cs.vt.cache: add docstring
+  : cs.vt.cache_tests: 2 docstrings
+  : cs.vt.compose: clean a little lint
+  : cs.vt.file: BlockFile.slices: bugfix Block.slices call
+  : cs.vt.pushpull: missing_hashcodes_by_checksum: bugfix: set after=True for follow on hashcode fetches
+  : cs.vt.pushpull_tests: tweak docstring, tweak unused loop variable
+  : cs.vt.socket: _SocketStoreServer: accept optional `local_store`, expand docstring
+  : cs.vt.socket_tests: make_tcp_store: pass `mapping_S` as `local_store` keyword parameter
+  : cs.vt.datafile: DataFile.scanfrom: make offset optional, default 0, adjust docstring
+  : cs.vt.__main__: scan: adjust for new DataFile.scanfrom method
+  : cs.vt.fs: drop Inodes.krefcount mapping, unused
+  : cs.vt.meta: turn username, userid, groupname, groupid functions into @lru_cache functions
+  : cs.vt.meta: rename access control prefix to "audience" for clarity; start turning an access control into a namedtuple
+  : cs.vt.meta: Meta.textencode: sanity check the fields before transcription
+  : cs.vt.meta: drop AC_Owner, AC_Group, AC_Other subclasses, replace with factory functions; decodeAC: simpler parse with direct call to constructor
+  : cs.vt.dir: make Dirent types and Dirent serialisation flags enums
+  : cs.vt: rename cs.file.BlockFile to ROBlockFile and cs.file.File to RWBlockFile to reduce a longstanding confusion
+  : cs.vt: vt.dir.FileDirent: expose ._open_file as .open_file; cs.fs.FileHandle: use FileDirent.open_file directly, drop confusing Eopen alias
+  : cs.vt.dir: port the binary parse/transcode over to cs.binary.PacketField
+  : cs.vt.block: _Block.open: slight exception message improvement
+  : cs.vt.dir: FileDirent.__init__: plumb the optional `lock` parameter through to `MultiOpenMixin`
+  : cs.vt.dir: supplant _Dirent.encode with __bytes__, keep .encode for compatibility
+  : cs.vt.dir: _Dirent.prev_dirent.setter: better handling of None, discard setting if it matches the current state
+  : cs.vt.dir: drop _Dirent.path, should not be used and used os.sep and should have been called "pathname" anyway
+  : cs.vt.dir: update lots of docstrings
+  : cs.vt.dir: Dir: simplify change notification implementation
+  : cs.vt.dir: clean some lint
+  : cs.vt.dir_tests: clean lint
+  : cs.vt.file: docstring updates
+  : cs.vt.fs: update some docstrings
+  : cs.vt.meta,cs.vtfuse: a few docstring updates
+  : cs.vtfuse,cs.vt.fs: cs.vt.fs.FileHandle.read: swap arguments to be (size,offset) like most other read methods (reverse of llfuse read method)
+  : cs.vtfuse,cs.vt.fs: drop llfuse ctx from calls to cs.vt.fs.FileSystem.open and open2, not used
+  : cs.vtfuse,cs.vt.fs: rename cs.vt.fs.FileSystem._Eaccess to access, not private method
+  : cs.vt.datadir: _FilesDir: make datadirpath an ordinary attribute, replace weird default logic with convention default logic; make optional arguments keyword only
+  : cs.vt.store: DataDirStore: make optional arguments keyword only; pretty up the call to DataDir slightly
+  : cs.vt.config: Config.datadir_Store: adjust call to DataDirStore call for new signature, strip debugging
+  : cs.vt.meta: docstring and formatting tweaks
+  : cs.vt.dir: rename DirentType.SYM to SYMBOLIC
+  : cs.vtfuse,cs.vt.fs: drop cs.vt.fs.FileSystem `oserror` parameter, just raise OSError, catch and convert silently in cs.vtfuse @handler decorator
+  : cs.vt.fs: clean out a few oserror=>OSError loose ends
+  : cs.vtfuse,cs.vt.fs: make the mounted filesystem backing Store an optional argument
+  : cs.vt.fs: Inode: bugfix __iadd__ and __isub__: they should return the Inode
+  : cs.vt.fs: FileSystem: add .__setitem__(inum,Dirent) to associate an inode number with a Dirent
+  : cs.vtfuse,cs.vt.fs: move the llfuse specific association of inode 1 with the mount point into cs.vtfuse; remove the FileSystem.mnt_inum attribute, now unused
+  : cs.vt.config: docstring improvement
+  : cs.vt.__init__: _Defaults: now subclasses cs.mappings.StackableValues in order to easily support a .fs context value
+  : cs.vt.config: docstring tweak
+  : cs.vt.dir: _Dirent: make optional arguments keyword only, add docstring
+  : cs.vt.dir: DirentRecord: support for optional extended_data field for future types; _Dirent: default ingest_extended_data and get_extended_methods for "no extended data"
+  : cs.vt.fs: Inodes: rename _inode_map to _by_inum, add _by_uuid, start on docstring
+  : cs.vt.dir: _Dirent: mark as changed if new UUID allocated, include UUID in __str__
+  : cs.vt.dir: _Dirent: new reconcile method, sketch of method required to fold Dirents together
+  : cs.vt.dir: _Dirent.reconcile: include optional `force` parameter, default False
+  : cs.vt.dir: add missing import
+  : cs.vt.dir: new IndirectDirent to reference other _Dirents by UUID, will be replacing HardLinkDirent
+  : cs.vt.fs: rework the Inodes to support lookup by _Dirent.uuid and to remove all inums from _Dirents; drop a lot of old methods that are now basicly unused
+  : cs.vt.fs: FileSystem.__init__: tweak attachment of mntE for subsequent use of `mntE` name
+  : cs.vt.fs: Inodes: drop obsolete decode_inode_data, encode and _ipathelems methods
+  : cs.vt.fs: bugfix some variable names, drop unused import of HardLinkDirent
+  : cs.vt.fs: Inodes.add: bugfix inode number allocation for presupplied inum
+  : cs.vt.fs: drop debug
+  : cs.vt.fs: Inode: drop refcount support, add `referenced` flag for persistence
+  : cs.vt.dir: bugfix spelling of DirentFlags.EXTENDED
+  : cs.vt.fs: FileSystem: remove another stray inode reference decrement
+  : cs.vt.file: RWBlockFile.flush: drop obsolete and unused PfxThread creation, since supplanted by Result.bg
+  : cs.vt.__init__: _Defaults: push a runstate and a None filesystem
+  : cs.vt.dir: special support for IndirectDirents for decode and encode: skip meta and block, which live in the referenced Dirent
+  : cs.vt.dir: IndirectDirent: emit error message if the referent UUID isn't available; .ref: transmute KeyError into AttributeError; implement meta.setter
+  : cs.vt.fs: Inodes.add: bugfix: store the Inode in the index, not the Dirent
+  : cs.vt.fs: FileSystem: E2i: deference IndirectDirents; __init__: provide filesystem context for dump; tweak docstring
+  : merge default ==> iphoto
+  : cs.vt.fs: drop FileSystem._Estat, unused
+  : cs.vt.transcribe: docstring upgrades
+  : cs.transcribe: new class decorator @mapping_transcriber for Transcriber subclasses to provide mapping flavoured parse_inner and transcribe_inner methods; more docstring improvements and lint scourings
+  : cs.vt.transcribe: @mapping_transcriber: new `factory` parameter to accept the parsed mapping, defaults to the class; bugfix the decorator to return the class
+  : cs.vt.transcribe: Transcriber: add support for bare floats transcribed as "%f", matching support in parse method
+  : cs.vt.dir: reorder imports
+  : cs.vt.dir: drop HardlinkDirent, superceded by IndirectDirent
+  : cs.vt.dir: Dir: add pop method to remove and return a named Dirent, and make __delitem__ = pop; this aids promoting ordinary Dirents to IndirectDirents on link
+  : cs.vt.dir: _Dirent: some support for bogus Dirents and missing attributes so as to not make things crash if a bad/obsolete filesystem gets used
+  : cs.vt.meta: remove the association of a Meta with a Dirent and also any nothing of an inode or link count; this means that we can return permission bits but not file types etc, and that we can't do a POSIX stat(), which will move to the Dirent
+  : cs.vt.meta: formalise an ACL class which is a list subclass holding AC instances
+  : cs.vt.meta: drop Stat and Meta.stat method
+  : cs.vt.meta: keep the ACLs and the xattrs directly in the dict to avoid keeping two versions; redo how the transcription is done
+  : cs.vt.meta: redo the xattrs storage: now it is always bytes-encoded-as-ISO8859-1 for trite JSON transcription
+  : cs.vt.meta: Meta: bugfix parse_inner parameters, tweak __str__ and __repr__
+  : cs.vt.dir: _Dirent: add unix_typemode property and modify stat method to reflect that Meta doesn't have the Dirent type or other filesystem level information
+  : cs.vt.dir: add some further debugging for lack of FileSystem context and lack of UUID mapping
+  : cs.vt.fs: make Inode transcribeable
+  : cs.vt.fs: rework Inode persistence, drop hardlink_for method
+  : cs.vt.smuggling: adjust obsolete stat call
+  : cs.vt.dir: _Dirent.stat: get st_nlink from Inode if not a Dir
+  : cs.vt.fs: Inode: mention `refcount` in docstring, default to 1 instead of 0
+  : cs.vt.dir: Dir: markdown docstring
+  : cs.vt.meta: Meta: update pathref implementation, support setting, return None if not present instead of AttributeError or KeyError
+  : cs.vt.meta: Meta: we do not store the ctime
+  : cs.vt.dir: _Dirent: the st_size of a Symlink is the length of its pathref; note that _Dirent.size==None for _Dirents with block==None
+  : cs.vt.dir: SymlinkDirent: update initialiser signature to accept optional target keyword parameter, tweak logic to support init via metatxt (as from an existing Dir)
+  : cs.vt.dir: _Dirent.__init__: set mtime to now if missing
+  : cs.vt.meta: Meta.update_from_text: xattrs are stored as str->str, no decode required
+  : cs.vt.meta: Meta: access: adjust to use .unix_perm_bits instead of obsolete .unix_perms; setxattr: fix dict update
+  : cs.vt.meta: drop debugging
+  : cs.vt.transcribe: transcribe dicts in compact JSON form
+  : cs.vt.{archive,meta}: move Meta.apply_posix to cs.vt.archive.apply_posix_stat, reshape to take a stat object
+  : cs.vt.meta: clean lint
+  : cs.vt.archive: clean some lint
+  : cs.vt.fs: clean some lint
+  : cs.vt.dir: _Dirent.from_components: back off the debug
+  : cs.vt.datadir: PlatonicDir: skip nonfiles during scan
+  : cs.vt.datadir: PlatonicDir._monitor_datafile: always sleep for 1s between scans; back off the debugging
+  : cs.vt.compose: get_store_spec: `offset` now optional, default `0`; various docstring markdownage
+  : cs.vt.config: Config: new `get_clause` method to return a clause without opening it as a Store
+  : cs.vt.config: new Config.basedir, Config.mountdir properties; Config.archive method to open a named archive from within basedir
+  : cs.vt.datadir: move get_Archive into the _FilesDir base class, put archives adjacent to the top dir
+  : cs.vt.datadir: PlatonicDir: put a 0.1s delay at each directory during the scan, stops the monitoring spinnning out the machine
+  : cs.vt.__main__: cmd_mount: [clause]: get the archive path from the config, not the Store
+  : cs.vt.store: drop DataDirStore.get_Archive, trying to disassociate Archives from Stores
+  : cs.vt.store: ProxyStore._bg_add: fix init of hashcode1
+  : cs.vt.__main__: some docstrings and lint
+  : cs.vt.datadir: PlatonicDir: monitor: add a small post file scan delay, parameterise the delay values
+  : cs.vt.datadir: _FilesDir.shutdown: cope with incomplete startup
+  : cs.vt.__main__: VTCmd.cmd_mount: make D{...} mounts readonly
+  : cs.vt.store: _BasicStoreCommon: the default RunState is now per Store instead of shared, start and stop it in startup/shutdown; fill out the __init__ docstring
+  : cs.vt.stream: StreamStore.do: transmute CancellationError into StoreError; transmute retval=None into StoreError
+  : cs.vt.store: ProxyStore: drasticly shorten __str__
+  : cs.vt.store: _BasicStoreCommon.shutdown: cancel the runstate at the top, mark it as stopped at the bottom
+  : cs.vt.store: ProxyStore.add: handle case where there is no fallback
+  : cs.vt.store: _BasicStoreCommon: tweak class reference in default name
+  : cs.vt.store: remove the runstate plumbing - Stores generally allocate their own RunState for sane cascading control
+  : cs.vt.__main__: VTCmd: drop "with self.runstate", let the main Store manage this runstate
+  : cs.vt.blockmap: name the BlockMap RunState
+  : cs.vt.config: Config: remove the automatic runstate setup of clause Stores and the Config wide RunState; plumb an optional runstate through Store() and Store_from_spec
+  : cs.vt.datadir: _FilesDir: remove plumbing for `runstate`, always make our own
+  : cs.vt.datadir: _FilesDir: move the runtime setup into the `startup` method, pruning __init__ down to settings and dir prep; this supports repeat startup/shutdown
+  : cs.vt.datafile: DataFile.shutdown: release the locks
+  : cs.vt.paths: resolve: tweak docstring
+  : cs.vt.stream: StreamStore: associate the disconnect code with setting ._conn
+  : cs.vt.socket: TCPClientStore: reset .sock to None on close, override superclass _packet_disconnect method to close the socket
+  : cs.vt.store: bugfix startup/shutdown: open the Later queue in startup, always call super().startup() in subclasses, keep Store open in ._defer and multicalls, slight reorders in subclass startup/shutdown
+  : cs/vt/store: _BasicStoreCommon: simpler Later use: create Later at startup, remove at shutdown
+  : cs.vt.meta: Meta._xattrify: bugfix conversion of str, should be str.encode(utf-8).decode(iso8859-1)
+  : cs.vt.store: bugfix ProxyStore._bg_add: drop spurious self.close(), add missing assignment to hashcode1
+  : cs.vt.__init__: defaults: pushStore/popStore: drop open/close of Store, done in __enter__/__exit__ where it matters
+  : cs.vt.fs: FileSystem.__init__: hold the Store open while dumping the initial file tree
+  : cs.vt.store: restore dropping import
+  : cs: clean some lint after recent bugfixes
+  : cs.vt.__main__: restore dropped import
+  : cs.vt: mount: the default mountpoint is now the special base name, drop use of Config "mountdir"
+  : cs.vt: serve: make address optional, default from [server] clause; default Store for "serve" now also the [server] clause
+  : cs.vt.datadir_tests: remove use of datadir_spec
+  : cs.vt.datadir: drop datadir_spec, not useful
+  : cs.vt.datadir: drop parameterised `datadirpath`, now always the "data" subdir
+  : cs.vt.datadir: drop _indexclass method (called only from __init__), replace with direct call to choose_indexclass function
+  : cs.vt.datadir: docstring tweaks
+  : cs.vt.datafile: DataFile.add: notice short writes, warn and recover
+  : cs.vt.datafile: split DataFile into distinct DataFileReader and DataFileWriter classes
+  : cs.vt.__main__: replace DataFile with DataFileReader
+  : cs.vt.parsers: DataFile => DataFileReader
+  : cs.vt.config: Config: drop `data` param from DataDirStore factory
+  : cs.vt.datadir_tests: drop datadirpath param from DataDir constructor
+  : cs.vt.store: DataDirStore: drop `datadirpath` parameter, handle unspecified hashclass parameter
+  : cs.vt.config: Config: drop another datadirpath param, tweak a docstring
+  : cs.vt.store: drop some more datadirpath params
+  : cs.vt.datadir: replace CSV state file with shareable SQLite3 database, also more scalable
+  : cs.vt.__main__: VTCmd.cmd_op: set self.store_spec after computing default
+  : cs.vt.config: Config.__getitem__: pop the type off the clause and discard the "address" setting (used for server mode)
+  : cs.vt.datadir: DataDir: bugfix taking the lockfile for the save vtd file; PlatonicDir: make kwargs kw only, tweak docstring for recent shift to sqlite from CSV
+  : cs.vt.store: _PlatonicStore.__init__: drop unused `indexclass` param
+  : cs.vt.datadir: DataDir: close save datafile during shutdown, driop _new_datafile (no longer used), bugfix a reference to DFstate.pathname
+  : cs.vt.config: Config.Store_from_spec: bugfix multistore chain ProxyStore call
+  : cs.vt.datadir: DataDir SQL debug: include the datadir path
+  : cs.vt.__main__: serve: addresses with a slash are socket paths, expand the provided path
+  : cs.vt.cache: initial implementation of a TemporaryFile based Block data cache, UNTESTED
+  : cs.vt.cache: BlockCache: provide a RunState to aid shutdown, particularly cancelling the Block filling Threads; fill out some docstrings and add a little tracing
+  : cs.vt.cache: pread methods: switch params to conventional (size, offset) order
+  : cs.vt.fs: FileHandle.read: initial support for BlockMapping backend, UNTESTED
+  : cs.vt.fs: lint: indent fix
+  : cs.vt.meta: expose Meta.xattrify method, initially for use by cs.vt.fs
+  : cs.vtfuse,cs.vt.fs: move the extended attribute code from vtfuse to vt.fs and prepare for special treatment of the x-vt- attribute names
+  : cs.vt.fs: initial implementation of x-vt-block {getxattr,setxattr}, UNTESTED
+  : cs.vt.block: new isBlock function to check an object for blockiness
+  : cs.vt.fs: it seems that OSError() requires both an errno and a strerror (but does not enforce it), raise all such via a function to issue a warning and construct the error correctly
+  : cs.vt.fs: spellfix reference to _block_mapping attribute
+  : cs.vt.fs: FileSystem.setxattr: do ordinary attribute first, add skeleton for x-vt-control with no control commands yet
+  : cs.vt.block: drop _Block.rq_data(), unused and likely to be supplanted by the BlockCache
+  : cs.vt.{archive,block,blockmap}: rename "chunks" methods to "datafrom" to match other data iterators
+  : cs.vt.blockmap: adjust .chunks method call
+  : cs.vt.dir: replace Dirents_from_data with Dirents_from_chunks, removes a use of Block.data property
+  : cs.vt.block: new method _Block.bufferfrom returning a CornuCopyBuffer of .datafrom for parsing
+  : cs.vt.dir: replace Dirents_from_chunks with Dirents_from_buffer using new _Block.bufferfrom
+  : cs.vt.dir: new _Dirent.from_buffer factory, intended to supplant all uses of from_bytes; adjust .prev_dirent property to use from_buffer
+  : cs.vt.dir: drop _Dirent.complete, unused, this use case will be covered by the .pushto methods
+  : cs.vt.cache: BlockTempfile._infill: fetch data using Block.datafrom
+  : cs.vt.blockmap: BlockMap.__getitem__: initial slice support
+  : cs.vt.block: _IndirectBlock.subblocks: parse directly from Block.datafrom, removing another use of Block.data
+  : cs.vt.block: drop Blocks_from_buffer function, inline BlockRecord.parse_buffer_values in _IndirectBlock.subblocks
+  : cs.vt.dir: Dir: drop Dirents_from_buffer function, use DirentRecord.parse_buffer_values directly
+  : cs.vt.{block,block_tests}: replace uses of .data with methods using .datafrom; provide .get_spanned_data() to collate all the bytes in a block when really needed
+  : cs.vt.blockify_tests: adjust tests to use _Block.datafrom
+  : cs.vt.__main__: change Block_from_bytes into BlockRecord.value_from_bytes
+  : cs.vt.__init__: _Defaults.__init__: push block_cache=None
+  : cs.vt.store: _BasicStoreCommon.block_cache=None
+  : cs.vt.cache: BlockMapping.datafrom method; BlockCache.__getitem__(hashcode)
+  : cs.vt.fs: FileSystem: push a BlockCache onto the Store at startup; tweak __str__
+  : cs.vt.cache: BlockTempfile: bugfix TemporaryFile call; BlockCache: do not convert non-indirect Blocks
+  : cs.vt.cache: BlockTempfile._infill: provide missing Store context
+  : cs.vt.file: RWBlockFile.datafrom: call backing_block.datafrom for backing data instead of backing_block.slices
+  : cs.vt.fs: FileHandle.read: drop the blockmapping stuff, now all done by IndirectBlock.datafrom
+  : cs.vt.fs: implement xattr "x-vt-control cache", putting a file's IndirectBlock into the block_cache
+  : cs.vt.block: IndirectBlock.datafrom: fetch from the block cache if present
+  : cs.vt.dir: bugfix FileDirent.shutdown: File.close nowreturns a Result, not the synched Block, adjust calls
+  : cs.vt.dir: FileDirent.block.setter: self check before applying change
+  : cs.vt.file: RWBlockFile.flush: return a Result that completes when the file is synched
+  : cs.vt.file: RWBlockFile.flush: keep the file open while synching, preventing early shutdown
+  : cs.vt.fs: FileSystem.close: instead of closing the Dirent file directly (which delays until the synch completes), queue a flush and arrange the close when the flush sync is complete
+  : cs.vt: remove some debugging
+  : cs.vt: cmd_mount: streamline mount Thread join
+  : cs.vt.dir: Dir: indent tweak for encoding phase
+  : cs.vt.dir: wrap Dir.block in @logexc to report exceptions
+  : cs.vt.fs: FileHandle.close: push a context Store for the FileDirent.close step
+  : cs.vt.file: ROBlockFile.datafrom: segue directly to Block.datafrom
+  : cs.vt.file: RWBlockFile.flush: return the backing Block immediately if no changes, wrap the update_store worker in @logexc
+  : cs.vt.file: RWBlockFile.flush: reset ._syncer to None at end of update_store() if we're current
+  : cs.vt.file: RWBlockFile.sync: get the Block from the active syncer if there is one
+  : cs.vt.file: RWBlockFile: fix docstring typo, tweak Pfx context
+  : cs.vt.file: RWBlockFile.flush: return the backing block if unchanged
+  : cs.vt.socket: _packet_disconnect: do not close the socket if already closed
+  : cs.vt.store: ProxyStore: update docstring, add copy2 param to the TODO
+  : cs.vt.store: ProxyStore: more docstring tweaking
+  : cs.vt.store: ProxyStore: initial implementation of `copy2` (copies data obtained from `read2`), UNTESTED
+  : cs.vt.config: Config.proxy_Store: plumb the `copy2` parameter
+  : cs.vt.meta: Meta.access: treat missing Meta.uid as owner match, missing Meta.gid as group match
+  : cs.vt.fs: FileSystem.open: initial symlink handling; a bit surprised that this even fires
+  : cs.vt: new DebuggingLock class to detect and report lock contention; adjust imports of Lock and RLock throughout to use it
+  : cs.vt.__init__: monkeypatch MultiOpenMixin to use DebuggingLock
+  : cs.vt.__init__: DebuggingLock: add _is_owned method to support use by threading.Condition
+  : cs.vt.__init__: DebuggingLock: add __repr__, fix up some uses of ._held
+  : cs.vt.__init__: adjust MultiOpenMixin lock monkeypatch for recent change, disable monkeypatch, add warning to DebuggingLock for timedout acquire
+  : cs.vt.fs: add missing import; FileSystem: use distinct lock from the Store
+  : cs.vt.dir: FileDirent: drop `lock` param
+  : cs.vt.store: _BasicStoreCommon: use _defer instead of bg, avoids unbounded Thread creation; tweak a docstring
+  : cs.vt.stream: StreamStore: limit the reconnection rate, fail requests immediately during the downtime
+  : cs.vt.blockmap: bugfix debug statement
+  : cs.vt.dir: _Dirent: tweak __repr__
+  : cs.vt.__main__: cmd_op: arrange for data read from the backend Store to be copied to the frontend cache
+  : cs.vt.debug: use %r instead of %s with _Dirent to avoid incidental computation of a Block
+  : cs.vt.fs: Inode: new __repr__ using %r for the _Dirent; adjust other debugging statements to use %r with _Dirents
+  : cs.vt.__main__: VTcmd: adjust another debug message to use %r instead of %s with a _Dirent
+  : cs.vt.store: _BasicStoreCommon: set up a SubLater to dispatch tasks
+  : cs.vt.store: _BasicStoreCommon: drop bg() method
+  : cs.vt.datadir: PlatonicDir: replace use of Store.bg with Store._defer
+  : cs.vt.store: bugfix _BasicStoreCommon._defer: issue the STore.close form the post function notification instead of from inside the function wrapper, avoids shutdown deadlock
+  : cs.vt.store: ProxyStore._bg_add: replace checks on hashcode1 with checks on ch being None, more robust
+  : cs.vt.dir: FileDirent.flush: plumb optional dispatch parameter
+  : cs.vtfile: RWBlockFile.flush: plumb optional dispatch parameter, default cs.result.bg
+  : cs.vt.fs: FileSystem: use a Later to limit thread capacity, plumb through FileHandle to flush operations
+  : cs.vt.block: _Block.slices: make start and end mandatory, use icontract to test preconditions; drop obsolete method; strip debug
+  : cs.vt.block: _Block.top_slices: use icontract for preconditions, make start and end mandatory
+  : cs.vt.block: _Block.top_blocks: use icontract for preconditions
+  : cs.vt.block: _Block: new spliced and splice methods to produce new Blocks splieced from an existing Block
+  : cs.vt.block: bugfix call to Block.spliced
+  : cs.vt.blockmap: bugfix call to Block.slices to match new mandatory end argument; tweak docstring and note a pending TODO
+  : cs.vt.file: filedata: now a thin shim for cs.fileutils.datafrom; file_top_block: adjust call to filedata for new signature
+  : cs.vt.file: simplify file_top_block signature (no rsize), update some earlier top_block_for and filedata calls
+  : cs.vt.file: File: new _sync_file worker method to update file contents, which will be dispatched in a background Thread as required
+  : cs.vt.file: File.flush: drop old implementation which leaked file descriptors and might hold several open; just arrange that there's a ._sync_file running; modify .sync for the new scheme
+  : cs.vt.file: File: close the BackedFile on shutdown; modify _reset to accept block=None as a cleanup mode
+  : cs.vt.file: drop File.high_level_blocks, unused; clean lint
+  : cs.vt.dir: Dir: tweak some debugging, report stack on Dir block recompute
+  : cs.vt.block: streamline start:end precondition checks; add a docstring
+  : cs.vt.dir: _Dirent.prev_dirent: drop lock, bugfix bfr setup invocation
+  : cs.vt.stream: StreamStore: drop magic ._conn attribute, explicitly call new .connection() which makes a PacketCOnnection at need and may return None if it is too soon since the last failure
+  : cs.vt.stream: AddRequest.__str__: compact form, more useful in messages
+  : cs.vt.block: _IndirectBlock: replace __getattr__ mediates "subblocks" with a property, avoids tricksy AttributeErrors
+  : cs.vt.file: RWBlockFile.flush/_sync_file: hold the lock only briefly at the start and end of each sync span; bugfix __len__ to accomodate active _sync_file; bugfix datafrom to pull from the current sync span instead of the backend block during a sync
+  : cs.vt.blockmap: BlockMap: handle join with no active worker
+  : cs.vt.cache: FileCacheStore: support for no backend, plumb optional hashclass parameter
+  : cs.vt.store: ProxyStore: comment out some debug
+  : cs.vt.__init__: move debugging lock setup up the top where it can be seen
+  : cs.vt.__init__: DebuggingLock.release: reset ._held to None on release
+  : cs.vt.debug: new dump_Store function to print Store hierarchies
+  : cs.vt.file: RWBlockFile.__len__: work correctly during the shutdown phase when the BackedFile is None
+  : cs.vt.file: strip debugging
+  : cs.vt.fs: FileSystem.getxattr: return ENOATTR for missing xattrs
+  : cs.vt.__init__: DebuggingLock: add .trace_acquire flag to report the stack when specific a specific lock is acquired
+  : cs.vt.__main__: VTCmd: debug: dump the constructed Store after initialisation
+  : cs.vt.config: Config.filecache_Store: accept backend=None - pure lossy cache
+  : cs.vt.dir: FileDirent.block: narrow the scope of the lock
+  : cs.vt.dir: FileDirent.size: remove lock and self check
+  : cs.vt.fs: remove debug
+  : cs.vt.config: minor tweaks and linting
+  : cs.vt.__init__: clean up debugging locks and turn them off
+  : cs.vt.index: clean lint
+  : cs.vt.__main__: strip out some superflous legacy command line ops
+  : cs.vt.__main__: restore dropped import
+  : cs.vt.archive,cs.vt.fs: drop Archive.strfor_Dirent, just use bytes(_Dirent) for a signature
+  : cs.vt.paths: new DirLike and FileLike abstract classes to support substrate agnostic operations like tree merges; new OSDir and OSFile classes to provide wrappers for OS directory and file paths; clean a little lint
+  : cs.vt.merge: substrate agnostic tree merge, will be used to support the "pack" command and other tree update operations
+  : cs.vt.dir: update Dir and FileDirent to be DirLike and FileLike respectively, ready for the merge code
+  : cs.vt.__main__: cmd_pack: replace with implementation using cs.vt.merge
+  : cs.vt.stream_tests: cleaner test setup
+  : cs.vt.datadir: strip debugging
+  : cs.vt.merge: merge: fix up file import logic, catching loose end
+  : cs.vt.{paths,dir}: provide .exists methods
+  : cs.vt.dir: move Dir.exists to _Dirent.exists
+  : cs.vt.paths: new OSDir.create
+  : cs.vt.merge: merge: return ok success/failure; create the target root if missing
+  : cs.vt.__main__: cmd_unpack: implement using merge; strip a little debug
+  : cs.vt.paths: OSDir: turn path='' into '.', add __str__, wrap os.mkdir call in Pfx
+  : cs.vt.paths: clean lint, strip some debug
+  : cs.vt.merge: clean some lint, strip some debug
+  : vt.1.md: markdown basis for the vt(1) manual entry
+  : cs.vt.__main__: present a better fsname in the mount table, adjust some documentation terminology
+  : cs.vt.transcribe: use JSON to transcribe strings with double quotes instead of single quotes to make quoting ranscriptions on the command line easier
+  : cs.vt.config: tiny readability tweak
+  : vt.5.md: markdown source for the vt.5 manual entry
+  : cs.vt.blockmap: comment and docstring tweaks
+  : vt5.md: binary data formats for cs.vt
+  : vtrc.5.md: the vtrc(5) manual entry - the configuration file for vt(1)
+  : vt.1.md: small text corrections for the vt(1) manual entry
+  : vt.5.md: fix some underscore escaping
+  : vt.1.md: clean a few typos
+  : vt.5.md: fix a few typos
+  : cs.vt.paths: DirLike and FileLike require an lstat method
+  : cs.vt.dir: Dir and File use their stat method for DirLike and FileLike lstat; stat not works with no filesystem, degraded
+  : cs.vt.dir: clean some lint
+  : cs.vt: clean a lot of lint
+  : cs.vt.archive: drop copy functions, to be superceded by the cs.vt.merge code
+  : cs.vt.merge: note some missing functionality for later implementation
+  : cs.vt.__main__: import: drop cs.vt.smuggling, port "import" to cs.vt.merge
+  : cs.vt.dir: py3.5 syntax backport
+  : cs.vt.__init__: drop obsolete URL from docstring
+  : cs.vt.dir,cs.vt.archive: move FTPlike class off into scratch vt/ftp.py file for later
+  : cs.vt.randutils: moved from cs.randutils; adjust test modules to match
+  : cs.vt.randutils: revert to builtin bytes type because cs.vt is Python 3 only
+  : cs.vt.__init__: start sketch for PyPI DISTINFO
+  : cs.vt: provide default configuration, port cs.vt.config to modern configparser, new subcommand "config" to recite configuration
+  : cs.vt: add "init" subcommand to set up config file and defined local datadir Stores
+  : cs.vt: update usage message and vt.1.md manual entry
+  : vt.1.md: GETTING STARTED section
+  : vtrc.5.md: document socket_path param for socket Stores and host:port params for tcp Stores
+  : cs.vt.__main__: main: new `subcmd` option argument to presupply the subcommand - supports the cs.vtfuse mount.vtfs command
+  : cs.vt.__main__: cmd_mount: catch and report other exceptions so that the comand exits on failure
+  : cs.vt.fs: FileSystem.__init__: catch exceptions during the post attach reporting so that the mount proceeds
+  : cs.vt.__init__: DISTINFO.console_scripts: vt = cs.vt.__main__:main
+  : cs.vt.__init__: DISTINFO: mark as prealpha until happy with PyPI release
+  : cs.vt.httpd: drop, will make properly later
+  : cs.vt: drop cs.html and cs.configutils requirements, add lmdb

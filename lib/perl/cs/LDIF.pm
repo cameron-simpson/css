@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # LDIF routines.
-#	- Cameron Simpson <cs@zip.com.au> 28nov97
+#	- Cameron Simpson <cs@cskk.id.au> 28nov97
 #
 
 use strict qw(vars);

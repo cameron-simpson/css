@@ -1,0 +1,7 @@
+lib/python/cs/x.py: cs.x: new Xtty hack function to support "from cs.x import Xtty as X" to write to the tty during test debugging
+lib/python/cs/x.py: cs.x: set X_via_tty if $CS_X_VIA_TTY, put X into builtins if $CS_X_GLOBAL, update docstrings
+lib/python/cs/x.py: cs.x: docstring updates
+lib/python/cs/x.py: cs.x: docstring updates
+lib/python/cs/x.py: cs.x: put X() into builts if $CS_X_BUILTIN instead of on $CS_X_GLOBAL
+lib/python/cs/x.py: merge default ==> testing
+lib/python/cs/x.py: cs.x: more docstring updates

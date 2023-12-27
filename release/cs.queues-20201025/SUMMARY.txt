@@ -1,0 +1,1 @@
+Drop obsolete call to MultiOpenMixin.__init__.

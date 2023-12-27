@@ -1,57 +1,79 @@
 #!/bin/sh
 #
 # Grep all lines from stdin containing all the command line regexps.
-#	- Cameron Simpson <cs@zip.com.au> 12nov2001
+# - Cameron Simpson <cs@cskk.id.au> 12nov2001
 #
 
-cmd=$0
-usage="Usage: $cmd [-i] [-o] sed-regexps...
-	-i	Ignore case.
-	-o	OR words instead of AND."
+set -ue
 
+cmd=$0
+usage="Usage: $cmd [-H]... [-i] [-o] sed-regexps...
+    -C  Highlight regexp matches in colour. Default if stdout is a tty.
+    -H  Always print the first (header) line.
+        Additional -H options increment the number of header lines.
+    -i  Ignore case.
+    -o  OR words instead of AND.
+    -x  Trace execution."
 
 any=
 icase=
+nheaders=0
+trace=
+colour=
+[ -t 1 ] && colour=1
 
 badopts=
-while :
-do  case $1 in
-      -i)	icase=1 ;;
-      -o)	any=1 ;;
-      --)	shift; break ;;
-      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-      *)	break ;;
-    esac
-    shift
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -C) colour=1 ;;
+    -H) nheaders=$((nheaders + 1)) ;;
+    -i) icase=1 ;;
+    -o) any=1 ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
 done
 
 if [ $# = 0 ]
 then
-    echo "$cmd: missing sed-regexps" >&2
-    badopts=1
+  echo "$cmd: missing sed-regexps" >&2
+  badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+[ $colour ] && replsubst=$( with-colour cyan printf '%s' '&' | sed 's|;|\\&|g' )
+
 ok=1
 
 first=1
+replwords=
 for word
 do
-  [ $first ] && { set x; shift; }
+  [ $first ] && set --
 
   case "$word" in
-    */*)  word=`echo "$word" | sed 's;/;\\\\/;g'`
+    */*)  word=$( echo "$word" | sed 's;/;\\/;g' )
   esac
   case "$word" in
-    !*)   word=`expr "x$word" : 'x.\(.*\)'`
-	  set -- -e "/$word/d" ${1+"$@"}
-	  ;;
-    *)    if [ $any ]
-	  then set -- ${1+"$@"} -e "/$word/b ok"
-	  else set -- ${1+"$@"} -e "/$word/!d"
-	  fi
-	  ;;
+    !*)
+      word=`expr "x$word" : 'x.\(.*\)'`
+      set -- -e "/$word/d" ${1+"$@"}
+      ;;
+    *)if [ $any ]
+      then set -- ${1+"$@"} -e "/$word/b ok"
+      else set -- ${1+"$@"} -e "/$word/!d"
+      fi
+      if [ $colour ]
+      then
+        [ -z "$replwords" ] || replwords="$replwords; "
+        [ $colour ] && replwords="${replwords}s${word}${replsubst}g"
+      fi
+      ;;
   esac
 
   first=
@@ -62,6 +84,11 @@ done
 [ $icase ] && set -- -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/' ${1+"$@"}
 [ $any ] && set -- ${1+"$@"} -e d -e ':ok'
 [ $icase ] && set -- ${1+"$@"} -e g
+[ $colour ] && set -- ${1+"$@"} -e "$replwords"
+while [ $nheaders -gt 0 ]
+do
+  set -- -e "${nheaders}{p;d;}" ${1+"$@"}
+  nheaders=$((nheaders - 1))
+done
 
-##set -x
-exec sed "$@"
+exec $trace sed "$@"

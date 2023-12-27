@@ -1,0 +1,109 @@
+#!/bin/sh
+#
+# Run a series of histbackups.
+# - Cameron Simpson <cs@cskk.id.au> 17nov2018
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [opts...] [tag=value:...][remote:]srcpath:dstpath... rsync-opts...
+  -i            Itemise changes.
+  -x            Trace execution.
+  --copy-times, --no-symlink-if-unchanged
+                Passed to histbackup.
+  tag=value     Optional fstags tags to constrain the backup.
+  remote        Ssh target for a remote source tree.
+  srcpath       Source tree path.
+  dstpath       Destination tree path.
+  rsync-opts    Options after the paths are passed to histbackup for rsync."
+
+tags=
+rsopts=
+hbopts=
+trace=
+[ -t 2 ] && { trace=set-x hbopts="$hbopts -x" rsopts="$rsopts --progress"; }
+
+tmpf=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmpf"' 0 1 3 15
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -i) hbopts="$hbopts $1" ;;
+    -x) trace=set-x hbopts="$hbopts $1" ;;
+    --copy-times | --no-symlink-if-unchanged )
+        hbopts="$hbopts $1" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing srcpath:dstpath" >&2
+  badopts=1
+else
+  # gather up the rsync-opts after the src:dst targets
+  rspart=
+  for src_dst
+  do
+    if [ $rspart ]
+    then
+      rsopts="$rsopts $src_dst"
+    else
+      case "$src_dst" in
+        ?*:?*) ;;
+        -*) rsopts="$rsopts $src_dst" rspart=1 ;;
+        *)  echo "$cmd: invalid srcpath:dstpath: $src_dst" >&2
+            badopts=1
+            ;;
+      esac
+    fi
+  done
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for src_dst
+do
+  # check for first rsync-opt, exit loop
+  case "$src_dst" in
+    -*) break ;;
+  esac
+  # look for leading tag=value: parameters
+  tags=
+  while :
+  do
+    tag_spec=$( expr "x$src_dst" : 'x\([a-z][-._a-z0-9]*=[^:][^:]*\):.*' ) || break
+    # matched tag, adjust $src_dst, accumulate tag
+    src_dst=$( expr "x$src_dst" : 'x[a-z][-._a-z0-9]*=[^:][^:]*:\(.*\)' )
+    tags="$tags $tag_spec"
+  done
+  src=$( expr "x$src_dst" : 'x\(.*\):..*' )
+  dst=$( expr "x$src_dst" : 'x.*:\(..*\)' )
+  [ -d "$dst/." ] || {
+    echo "$cmd: $src_dst: skipping missing destination: $dst" >&2
+    xit=1
+    continue
+  }
+  if [ -n "$tags" ]
+  then
+    $trace fstags find --for-rsync "$src" $tags > "$tmpf"
+    $trace histbackup $hbopts -- "$src" "$dst" $rsopts "--include-from=$tmpf" || xit=1
+  else
+    $trace histbackup $hbopts -- "$src" "$dst" $rsopts || xit=1
+  fi
+done
+
+exit $xit

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Collect timesheet information for a week.
-#	- Cameron Simpson <cs@zip.com.au> 17dec96
+#	- Cameron Simpson <cs@cskk.id.au> 17dec96
 #
 
 use strict qw(vars);

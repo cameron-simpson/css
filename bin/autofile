@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Try to file a file based on its name.
-#	- Cameron Simpson <cs@zip.com.au> 13jan2005
+#	- Cameron Simpson <cs@cskk.id.au> 13jan2005
 #
 
 trace=set-x

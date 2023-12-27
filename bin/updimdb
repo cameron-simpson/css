@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Update an image db.
-#	- Cameron Simpson <cs@zip.com.au> 13apr1999
+#	- Cameron Simpson <cs@cskk.id.au> 13apr1999
 #
 
 use cs::Misc;

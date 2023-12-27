@@ -1,0 +1,5 @@
+lib/python/cs/deco.py: cs.deco: @decorator: do not override __doc__ on the decorated function, just provide default
+lib/python/cs/deco.py: cs.deco: @contextual: fix docstring formatting
+lib/python/cs/deco.py: cs.deco: prevent circular import between cs.deco and cs.logutils by importing the latter at need
+lib/python/cs/deco.py: cs.deco: new @logging_wrapper which bumps the `stacklevel` parameter in Python 3.8 and above so that shims recite the correct caller
+lib/python/cs/deco.py: cs.deco: autoformat

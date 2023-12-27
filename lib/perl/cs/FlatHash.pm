@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Make a tied hash which is flattened version of an existing hash.
-#	- Cameron Simpson <cs@zip.com.au> 05jul98
+#	- Cameron Simpson <cs@cskk.id.au> 05jul98
 #
 
 use strict qw(vars);

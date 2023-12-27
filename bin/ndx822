@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Adjust the indices associated with archived news/mail items.
-#	- Cameron Simpson, cs@zip.com.au, 23jun94
+#	- Cameron Simpson <cs@cskk.id.au> 23jun94
 #
 # Indices:
 #	msgids	Msgids present in the archive, forward and backward refs.

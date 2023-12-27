@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # This is a front end for a Sink.
-#	- Cameron Simpson <cs@zip.com.au> 23may1996
+#	- Cameron Simpson <cs@cskk.id.au> 23may1996
 #
 # new cs::Encode Sink, \&encoder[, args-to-encoder]
 #   The encoder routine takes a data string and the args-to-encoder

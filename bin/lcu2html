@@ -2,7 +2,7 @@
 #
 # Read a .CSV file from my credit union's internet banking facility
 # and emit an HTML table.
-#	- Cameron Simpson <cs@zip.com.au> 04jun2001
+#	- Cameron Simpson <cs@cskk.id.au> 04jun2001
 #
 
 use cs::Misc;

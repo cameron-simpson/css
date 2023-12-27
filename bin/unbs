@@ -1,8 +1,8 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Remove nroff-style underlining and overstriking.
 # Works for other stuff, too.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 s/*$//

@@ -1,0 +1,45 @@
+lib/python/cs/iso14496_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/iso14496.py: cs.iso14496: autoformat
+lib/python/cs/iso14496.py: cs.iso14496: OverBox.__getattr__ matching Box.__getattr__
+lib/python/cs/iso14496.py: cs.iso14496: Box.__getattr__: streamline case checks
+lib/python/cs/iso14496.py: cs.iso14496: Box.offset: now a property accessing .header.offset; rename .start_offset for consistency
+lib/python/cs/iso14496.py: cs.iso14496: new deref_box() and parse_deref_path(0 to parse and access inner boxes via a dotted box type path
+lib/python/cs/iso14496.py: cs.iso14496: Box.boxes: a property accessing .body.boxes
+lib/python/cs/iso14496.py: cs.iso14496: docstring updates
+lib/python/cs/iso14496.py: cs.iso14496: make it more clear that the parse functions yield multiple OverBoxes, though since an OverBox is just a list of Boxes we will only ever get more than one if special keyword arguments get used
+lib/python/cs/iso14496.py: cs.iso14496: make Boxes iterable; usually this iterates over the .boxes attribute of container boxes, but sample boxes iterate over the samples
+lib/python/cs/iso14496.py: cs.iso14496: move the .TYPE and .TYPEs attributes into the BoxBody class, add .TYPE0 for optional singleton subboxes
+lib/python/cs/iso14496.py: cs.iso14496: Box.__getattr__: look in the .header and .body parts for the attribute if not directly present; this eases friction around the slightly artificial .header/.body subdivision of a Box
+lib/python/cs/iso14496.py: cs.iso14496: dump_box: new `indent_incr` str parameter, default '  '
+lib/python/cs/iso14496.py: cs.iso14496: new Box.ancestor(box_type) method locating the closest ancestor/enclosing box of that type
+lib/python/cs/iso14496.py: cs.iso14496: TKHDBoxBody: new timescale property with the timescale from the enclosing mvhd Box
+lib/python/cs/iso14496.py: cs.iso14496: main: new "info" op and associated report function to produce a more human friendly report with deeper structural knowledge
+lib/python/cs/iso14496.py: cs.iso14496: clean up the output of dump_box
+lib/python/cs/iso14496.py: cs.iso14496: dump_box: support crop_length=None to prevent cropping the box summary
+lib/python/cs/iso14496.py: cs.iso14496: Box.__str__: include Box.length in the summary
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__str__: omit the .boxes field, too verbose
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__str__: tweak representation of the unparsed data
+lib/python/cs/iso14496.py: cs.iso14496: ContainerBoxBody.parse_buffer: drop overt `copy_boxes` kwarg - passed thorugh implicitly via **kw
+lib/python/cs/iso14496.py: cs.iso14496: the b'dinf' box is just a container
+lib/python/cs/iso14496.py: cs.iso14496: new ILSTBoxBody (iTunes Information List) with initial parse of the various metadata subboxes
+lib/python/cs/iso14496.py: cs.iso14496: Box: improve handling of EOFError during body parse
+lib/python/cs/iso14496.py: cs.iso14496: minor docstring tweaks, drop a debug statement
+lib/python/cs/iso14496.py: cs.iso14496: DREFBoxBody: fill out PACKET_FIELDS to placate the post parse self check
+lib/python/cs/iso14496.py: cs.iso14496: rework main to use cs.cmdutils.BaseCommand
+lib/python/cs/iso14496.py: cs.iso14496: Box.__getattr__: special case 'header' and 'body'; Box.{from_buffer,parse_buffer}: adjust offset reporting
+lib/python/cs/iso14496.py: cs.iso14496: Box.__repr__=__str__, fix error message
+lib/python/cs/iso14496.py: cs.iso14496: Box: new .reparse_buffer context manager method which pops .unparsed as a ConruCopyBuffer for further parsing and then pushes it back with any unconsumed data
+lib/python/cs/iso14496.py: cs.iso14496: METABoxBody: __getattr__ which looks in .ILST0 as a fallback
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse_buffer: big rejig of the parsing with support for the b'---' subboxes, etc
+lib/python/cs/iso14496.py: cs.iso14496: reduce noise
+lib/python/cs/iso14496.py: cs.iso14496: new TimeStampMixin to convert ISO14496 timestampts to Python datetime or UNIX timestamps; TimeStamp32 and TimeStamp64 subclassing UInt32BE and UInt64BE
+lib/python/cs/iso14496.py: cs.iso14496: CPRTBoxBody (8.10.2) and associated UTF8or16Field (untested)
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody: new .tags attribute referencing a cs.fstags.TagSet composed from the contained subboxes
+lib/python/cs/iso14496.py: cs.iso14496: Box.walk method
+lib/python/cs/iso14496.py: cs.iso14496: UTF8or16Field: subclass PacketField instead of Packet, provide test cases, fix parse/transcribe
+lib/python/cs/iso14496_tests.py: cs.iso14496_tests: new TestISO14496PacketFields to run PacketField test cases
+lib/python/cs/iso14496.py: cs.iso14496: TimeStampMixin: .datetime: handle out of range values by returning None, likewise for .unixtime - it seems that some MP4s have various flavours of -1 and -2 in these fields, presumably indicating "unknown"
+lib/python/cs/iso14496.py: cs.iso14496: Box: new metatags method returning a cs.fstags.TagSet, currently parses a udta.ilst if found; new gather_metadata method to yield (box,tagset) for any subsidiary moov or trak boxes; tweak docstring
+lib/python/cs/iso14496.py: cs.iso14496: command line: new "autotag" subcommand to apply embedded metadata to fstags
+lib/python/cs/iso14496.py: cs.iso14496: ILST: parse cnID, hdvd and stik atoms
+lib/python/cs/iso14496.py: cs.iso14496: command line: info: polish; backup a parsing warning, add warning about unparsed ILST atoms

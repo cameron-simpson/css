@@ -1,0 +1,20 @@
+  lib/python/cs/debug.py: merge default ==> beyonwiz
+  lib/python/cs/debug.py: cs.app.beyonwiz: merge from default
+  lib/python/cs/debug.py: cs.debug: add missing import
+  lib/python/cs/debug.py: cs.debug: new context manager TraceSuite to trace start and end of a code suite
+  lib/python/cs/debug.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/debug.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/debug.py: cs.*: more cs.pfx import fixes
+  lib/python/cs/debug.py: my email address has changed - update Python code
+  lib/python/cs/debug.py: rename cs.asynchron to cs.result
+  lib/python/cs/README-debug.rst lib/python/cs/debug.py: cs.debug: move README into module docstring, move DISTINFO below imports
+  lib/python/cs/debug.py: cs.debug: clean some lint
+  lib/python/cs/README-debug.rst: merge pypi ==> default: linting and releasing, some cs-release improvements, improve @cs.deco.cached
+  lib/python/cs/README-debug.rst: merge default ==> beyonwiz
+  lib/python/cs/README-debug.rst: merge default ==> iphoto
+  lib/python/cs/README-debug.rst: merge default ==> venti
+  lib/python/cs/README-debug.rst: merge default ==> later
+  lib/python/cs/debug.py: cs.debug: trace_caller: use cs.logutils.X instead of cs.logutils.D
+  lib/python/cs/debug.py: default ==> pilfer
+  lib/python/cs/README-debug.rst lib/python/cs/debug.py: merge later ==> pilfer
+  lib/python/cs/debug.py: cs.debug: general tidyup, no semantic changes

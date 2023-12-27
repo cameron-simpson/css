@@ -1,0 +1,25 @@
+#!/bin/sh -u
+#
+# Dispatch an adzapper squid.
+# - Cameron Simpson <cs@cskk.id.au> 01jul2004
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd"
+
+trace=set-x
+rc=$HOME/rc-local/adzapper.conf
+
+badopts=
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+( cd $HOME/rc-local
+  myke adzapper.conf
+)
+exec squid -N -f "$rc"

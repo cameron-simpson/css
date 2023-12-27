@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Print current time in UNIX seconds.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 print time."\n";

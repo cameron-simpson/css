@@ -2,7 +2,7 @@
 #
 # Image routines.
 # We expect the PBMPLUS or NetPBM tools to be in our execution path.
-#	- Cameron Simpson <cs@zip.com.au> 24oct95
+#	- Cameron Simpson <cs@cskk.id.au> 24oct95
 #
 # imsize(path) -> (x,y) or undef
 #	Return image dimensions.

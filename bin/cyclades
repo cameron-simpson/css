@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Connect to our Cyclades console server.
-#	- Cameron Simpson <cs@zip.com.au> 18dec2002
+#	- Cameron Simpson <cs@cskk.id.au> 18dec2002
 #
 
 cycuser=${USER:-`id -un`}

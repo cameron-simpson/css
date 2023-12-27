@@ -1,0 +1,1 @@
+Rename @cached to @cachedmethod, leave compatible @cached behind which issues a warning (will be removed in a future release).

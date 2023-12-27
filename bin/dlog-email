@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Read an email message from stdin and log with dlog.
-#	- Cameron Simpson <cs@zip.com.au> 30oct2005
+#	- Cameron Simpson <cs@cskk.id.au> 30oct2005
 #
 
 import os.path

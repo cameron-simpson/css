@@ -1,0 +1,2 @@
+lib/python/cs/lex_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/lex_tests.py: cs.*: fix bad slosh escapes in strings

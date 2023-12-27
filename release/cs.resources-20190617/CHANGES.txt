@@ -1,0 +1,2 @@
+lib/python/cs/resources.py: cs.resources: docstring tweak
+lib/python/cs/resources.py: cs.resources: RunState.__exit__: if an exception was raised call .canel() before calling .stop(); assorted docstring updates

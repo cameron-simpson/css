@@ -1,0 +1,15 @@
+  lib/python/cs/queues.py: merge default ==> beyonwiz
+  lib/python/cs/queues.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/queues.py: cs.*: import XP from cs.pfx instead of cs.logutils
+  lib/python/cs/queues.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/queues.py: cs.*: more cs.pfx import fixes
+  lib/python/cs/queues.py: my email address has changed - update Python code
+  lib/python/cs/queues.py: cs.queues: docstring indent change
+  lib/python/cs/queues.py: cs.queues: docstring indent fix
+  lib/python/cs/queues.py: cs.queues: drasticly simplify PushQueue, removing all knowledge of a Later - the .put method now simply directly puts to the outQ
+  lib/python/cs/queues.py: default ==> pilfer
+  lib/python/cs/queues.py: merge later ==> pilfer
+  lib/python/cs/queues.py: cs.queues: _QueueIterator: add .task_done and .join methods; simplify the item count tracking
+  lib/python/cs/queues.py: cs.queues: Channel: better __str__
+  lib/python/cs/queues.py: cs.queues: Channel: drop bogus close(), probably left over from debugging misused single use Channels
+  lib/python/cs/queues.py: cs.queues: clean lint

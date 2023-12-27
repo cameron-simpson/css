@@ -1,4 +1,4 @@
-#!/bin/sed -nf
+#!/usr/bin/env sed -nf
 #
 # Read mutt alias file.
 # Emit:

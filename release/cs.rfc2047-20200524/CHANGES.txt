@@ -1,0 +1,2 @@
+lib/python/cs/rfc2047.py: cs.rfc2047: handle unknown charsets (parochially and abitrarily) and oher dcode failures; get warning from cs.gimmicks; rename variables to better match the RFC2047 grammar token names; autoformat
+lib/python/cs/rfc2047.py: cs.rfc2047: docstring improvements

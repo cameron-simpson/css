@@ -1,93 +1,149 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
+# pylint: disable=too-many-lines
+#
+
+r'''
+Queue functions for execution later in priority and time order.
+
+I use `Later` objects for convenient queuing of functions whose
+execution occurs later in a priority order with capacity constraints.
+
+Why not futures?
+I already had this before futures came out,
+I prefer its naming scheme and interface,
+and futures did not then support prioritised execution.
+
+Use is simple enough: create a `Later` instance and typically queue
+functions with the `.defer()` method::
+
+    L = Later(4)      # a Later with a parallelism of 4
+    ...
+    LF = L.defer(func, *args, **kwargs)
+    ...
+    x = LF()          # collect result
+
+The `.defer` method and its siblings return a `LateFunction`,
+which is a subclass of `cs.result.Result`.
+As such it is a callable,
+so to collect the result you just call the `LateFunction`.
+'''
 
 from __future__ import print_function
 
-DISTINFO = {
-    'description': "queue functions for execution later",
-    'keywords': ["python2", "python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.py3', 'cs.py.func', 'cs.debug', 'cs.excutils', 'cs.queues', 'cs.threads', 'cs.asynchron', 'cs.seq', 'cs.logutils'],
-}
-
 from contextlib import contextmanager
 from functools import partial
+from heapq import heappush, heappop
+from itertools import zip_longest
+import logging
 import sys
-from collections import deque
-import threading
-import traceback
-from cs.py3 import Queue, raise3
-from cs.py.func import funcname
+from threading import Lock, Event
 import time
-from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
-from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
-from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
-                        NestingOpenCloseMixin, TimerQueue
-from cs.threads import AdjustableSemaphore, \
-                       WorkerThreadPool, locked
-from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
-from cs.seq import seq, TrackingCounter
-from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, exception, D, OBSOLETE
+from typing import Callable, Iterable, Optional
 
-# function signature designators, used with Later.pipeline()
-FUNC_ONE_TO_MANY = 0
-FUNC_ONE_TO_ONE = 1
-FUNC_SELECTOR = 2
-FUNC_MANY_TO_MANY = 3
+from typeguard import typechecked
 
-class _ThreadLocal(threading.local):
-  ''' Thread local state to provide implied context withing Later context managers.
-  '''
+from cs.deco import OBSOLETE, decorator, default_params
+from cs.excutils import logexc
+import cs.logutils
+from cs.logutils import error, warning, info, debug, ifdebug, exception, D
+from cs.pfx import pfx, pfx_method
+from cs.py.func import funccite, funcname
+from cs.queues import IterableQueue, TimerQueue
+from cs.resources import MultiOpenMixin
+from cs.result import Result, report, after
+from cs.seq import seq
+from cs.threads import ThreadState, HasThreadState
 
-  def __init__(self):
-    self.stack = []
+__version__ = '20230612-post'
 
-  @property
-  def current(self):
-    return self.stack[-1]
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.deco',
+        'cs.excutils',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.queues',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+        'cs.threads',
+        'typeguard',
+    ],
+}
 
-  def push(self, L):
-    self.stack.append(L)
+DEFAULT_RETRY_DELAY = 0.1
 
-  def pop(self):
-    return self.stack.pop()
+# decorator to provide the `later` parameter
+# lambda because of the forward reference to Later
+# pylint: disable=unnecessary-lambda
+uses_later = default_params(later=lambda: Later.default())
 
-default = _ThreadLocal()
-
-def later(func, *a, **kw):
+def defer(func, *a, **kw):
   ''' Queue a function using the current default Later.
-      Return the LateFunction.
+      Return the `LateFunction`.
   '''
-  return default.current.defer(func, *a, **kw)
+  return Later.default().defer(func, *a, **kw)  # pylint: disable=no-member
+
+class RetryError(Exception):
+  ''' Exception raised by functions which should be resubmitted to the queue.
+  '''
+
+def retry(retry_interval, func, *a, **kw):
+  ''' Call the callable `func` with the supplied arguments.
+
+      If it raises `RetryError`,
+      run `time.sleep(retry_interval)`
+      and then call again until it does not raise `RetryError`.
+  '''
+  while True:
+    try:
+      return func(*a, **kw)
+    except RetryError:
+      time.sleep(retry_interval)
 
 class _Late_context_manager(object):
-  ''' The _Late_context_manager is a context manager to run a suite via an
+  ''' The `_Late_context_manager` is a context manager to run a suite via an
       existing Later object. Example usage:
 
-        L = Later(4)    # a 4 thread Later
-        ...
-        with L.ready( ... optional Later.submit() args ... ):
-          ... do stuff when L queues us ...
+          L = Later(4)    # a 4 thread Later
+          ...
+          with L.ready( ... optional Later.submit() args ... ):
+            ... do stuff when L queues us ...
 
       This permits easy inline scheduled code.
   '''
 
-  def __init__(self, L, priority=None, delay=None, when=None, name=None, pfx=None):
-    self.later = L
-    self.parameters = { 'priority': priority,
-                        'delay': delay,
-                        'when': when,
-                        'name': name,
-                        'pfx': pfx,
-                      }
+  # pylint: disable=too-many-arguments
+  @uses_later
+  def __init__(
+      self,
+      *,
+      later,
+      priority=None,
+      delay=None,
+      when=None,
+      name=None,
+      pfx=None,  # pylint: disable=redefined-outer-name
+  ):
+    self.later = later
+    self.parameters = {
+        'priority': priority,
+        'delay': delay,
+        'when': when,
+        'name': name,
+        'pfx': pfx,
+    }
     self.commence = Lock()
-    self.commence.acquire()
-    self.complete = Lock()
-    self.commence.acquire()
+    self.commence.acquire()  # pylint: disable=consider-using-with
+    self.completed = Lock()
+    self.commence.acquire()  # pylint: disable=consider-using-with
 
   def __enter__(self):
     ''' Entry handler: submit a placeholder function to the queue,
@@ -96,395 +152,321 @@ class _Late_context_manager(object):
     '''
 
     def run():
-      ''' This is the placeholder function dispatched by the Later instance.
-          It releases the "commence" lock for __enter__ to acquire,
-          permitting to with-suite to commence.
-          It then blocks waiting to acquire the "complete" lock;
-          __exit__ releases that lock permitting the placeholder to return
-          and release the Later resource.
+      ''' This is the placeholder function dispatched by the `Later` instance.
+          It releases the "commence" lock for `__enter__` to acquire,
+          permitting the with-suite to commence.
+          It then blocks waiting to acquire the "completed" lock;
+          `__exit__` releases that lock permitting the placeholder to return
+          and release the `Later` resource.
       '''
-      self.commence.release()
-      self.complete.acquire()
+      self.commence.release()  # pylint: disable=consider-using-with
+      self.completed.acquire()  # pylint: disable=consider-using-with
       return "run done"
 
     # queue the placeholder function and wait for it to execute
     self.latefunc = self.later.submit(run, **self.parameters)
-    self.commence.acquire()
+    self.commence.acquire()  # pylint: disable=consider-using-with
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
-    ''' Exit handler: release the "complete" lock; the placeholder
+    ''' Exit handler: release the "completed" lock; the placeholder
         function is blocking on this, and will return on its release.
     '''
-    self.complete.release()
+    self.completed.release()  # pylint: disable=consider-using-with
     if exc_type is not None:
       return False
     W = self.latefunc.wait()
     self.latefunc = None
-    lf_ret, lf_exc_info = W
+    _, lf_exc_info = W
     if lf_exc_info is not None:
-      raise lf_exc_type(lf_exc_info)
+      raise lf_exc_info[1]
     return True
 
-class PendingFunction(Asynchron):
+class LateFunction(Result):
+  ''' State information about a pending function,
+      a subclass of `cs.result.Result`.
 
-  def __init__(self, func, *a, **kw):
-    final = kw.pop('final', None)
-    Asynchron.__init__(self, final=final)
-    if a or kw:
-      func = partial(func, *a, **kw)
-    self.func = func
+      A `LateFunction` is callable,
+      so a synchronous call can be done like this:
 
-class OnDemandFunction(PendingFunction):
-  ''' Wrap a callable, call it later.
-      Like a LateFunction, you can call the wrapper many times; the
-      inner function will only run once.
-  '''
-
-  def __call__(self):
-    with self._lock:
-      state = self.state
-      if state == ASYNC_CANCELLED:
-        raise CancellationError()
-      if state == ASYNCH_PENDING:
-        self.state = ASYNCH_RUNNING
-      else:
-        raise RuntimeError("state should be ASYNCH_PENDING but is %s" % (self.state))
-    result, exc_info = None, None
-    try:
-      result = self.func()
-    except:
-      exc_info = sys.exc_info()
-      self.exc_info = exc_info
-      raise
-    else:
-      self.result = result
-    return result
-
-class LateFunction(PendingFunction):
-  ''' State information about a pending function.
-      A LateFunction is callable, so a synchronous call can be done like this:
-
-        def func():
-          return 3
-        L = Later(4)
-        LF = L.defer()
-        x = LF()
-        print(x)        # prints 3
+          def func():
+            return 3
+          L = Later(4)
+          LF = L.defer(func)
+          x = LF()
+          print(x)        # prints 3
 
       Used this way, if the called function raises an exception it is visible:
 
-        LF = L.defer()
-        try:
-          x = LF()
-        except SomeException as e:
-          # handle the exception ...
+          LF = L.defer()
+          try:
+            x = LF()
+          except SomeException as e:
+            # handle the exception ...
 
       To avoid handling exceptions with try/except the .wait()
       method should be used:
 
-        LF = L.defer()
-        x, exc_info = LF.wait()
-        if exc_info:
-          # handle exception
-          exc_type, exc_value, exc_traceback = exc_info
-          ...
-        else:
-          # use `x`, the function result
+          LF = L.defer()
+          x, exc_info = LF.wait()
+          if exc_info:
+            # handle exception
+            exc_type, exc_value, exc_traceback = exc_info
+            ...
+          else:
+            # use `x`, the function result
 
-      TODO: .cancel()
-            timeout for wait()
+      TODO: .cancel(), timeout for wait().
   '''
 
-  def __init__(self, later, func, name=None, final=None):
-    ''' Initialise a LateFunction.
-        `later` is the controlling Later instance.
-        `func` is the callable for later execution.
-        `name`, if supplied, specifies an identifying name for the LateFunction.
+  def __init__(self, func, name=None, retry_delay=None, thread_states=None):
+    ''' Initialise a `LateFunction`.
+
+        Parameters:
+        * `func` is the callable for later execution.
+        * `name`, if supplied, specifies an identifying name for the `LateFunction`.
+        * `retry_local`: time delay before retry of this function on RetryError.
+          Default from `later.retry_delay`.
+        * `thread_states`: optional thread states passed to `HasThreadState.Thread`
     '''
-    PendingFunction.__init__(self, func, final=final)
+    Result.__init__(self)
+    self.func = func
     if name is None:
-      name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
+      name = "LF-%d[%s]" % (seq(), funcname(func))
+    if retry_delay is None:
+      retry_delay = DEFAULT_RETRY_DELAY
     self.name = name
-    self.later = L = later.open()
-    L._busy.inc(name)
-    ##D("NEW LATEFUNCTION %r - busy ==> %d", name, L._busy.value)
-    ##for sn, s in ('running', L.running), ('pending', L.pending):
-    ##  D("    %s=%r", sn, s)
+    self.retry_delay = retry_delay
+    # we prepare the Thread now in order to honour the perThread states
+    self.thread = HasThreadState.Thread(
+        name=name,
+        target=partial(self.run_func, func),
+        thread_states=thread_states,
+    )
 
   def __str__(self):
-    return "<LateFunction %s>" % (self.name,)
+    return "%s[%s]" % (type(self).__name__, self.name)
 
-  def _complete(self, result, exc_info):
-    ''' Record the completion result of this LateFunction and update the parent Later.
+  def _resubmit(self):
+    ''' Resubmit this function for later execution.
     '''
-    PendingFunction._complete(self, result, exc_info)
-    self.later._completed(self, result, exc_info)
-    self.later._busy.dec(self.name)
-    self.later.close()
+    # TODO: put the retry logic in Later notify func, resubmit with delay from there
+    self.later.submit(
+        self.func, force=True, delay=self.retry_delay, name=self.name, LF=self
+    )
 
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    L = self.later
-    L.debug("DISPATCH %s", self)
-    with self._lock:
-      if not self.pending:
-        raise RuntimeError("should be pending, but state = %s", self.state)
-      self.state = ASYNCH_RUNNING
-      L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
-      self.func = None
+    T = self.thread
+    T.start()
+    return T
 
   @OBSOLETE
   def wait(self):
+    ''' Obsolete name for `.join`.
+    '''
     return self.join()
 
-  def _worker_complete(self, work_result):
-    result, exc_info = work_result
+  @pfx_method(use_str=True)
+  def _complete(self, result, exc_info):
+    ''' Wrapper for `Result._complete` which handles `RetryError`s.
+
+        Further,
+        if the function raises one of `NameError`, `AttributeError`
+        or `RuntimeError`
+        (broadly: "programmer errors"),
+        report the stack trace to aid debugging.
+    '''
     if exc_info:
-      if isinstance(exc_info[1], (NameError, AttributeError, RuntimeError)):
-        warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
-        with Pfx('>>'):
-          for formatted in traceback.format_exception(*exc_info):
-            for line in formatted.rstrip().split('\n'):
-              warning(line)
-    self._complete(result, exc_info)
+      e = exc_info[1]
+      if isinstance(e, RetryError):
+        # resubmit this function
+        warning("resubmit after RetryError: %s", e)
+        self._resubmit()
+        return
+      if isinstance(e, (NameError, AttributeError, RuntimeError)):
+        error("%s", e, exc_info=exc_info)
+    Result._complete(self, result, exc_info)
 
-class _PipelinePushQueue(PushQueue):
-  ''' A _PipelinePushQueue subclasses cs.queues.PushQueue, adding some item tracking.
-      We raise the pipeline's _busy counter for every item in play,
-      and also raise it while the finalisation function has not run.
-      This lets us inspect a pipeline for business, which we use in the
-      cs.app.pilfer termination process.
-  '''
-
-  def __init__(self, name, pipeline, func_iter, outQ, func_final=None):
-    ''' Initialise the _PipelinePushQueue, wrapping func_iter and func_final in code to inc/dec the main pipeline _busy counter.
-    '''
-    self.pipeline = pipeline
-
-    # wrap func_iter to raise _busy while processing item
-    @logexc_gen
-    def func_push(item):
-      self.pipeline._busy.inc()
-      try:
-        for item2 in func_iter(item):
-          yield item2
-      except Exception:
-        self.pipeline._busy.dec()
-        raise
-      self.pipeline._busy.dec()
-    func_push.__name__ = "busy(%s)" % (func_iter.__name__,)
-
-    # if there is a func_final, raise _busy until func_final completed
-    if func_final is not None:
-      self.pipeline._busy.inc()
-      func_final0 = func_final
-      @logexc
-      def func_final():
-        try:
-          result = func_final0()
-        except Exception:
-          self.pipeline._busy.dec()
-          raise
-        self.pipeline._busy.dec()
-        return result
-      func_final.__name__ = "pipeline_dec_busy(%s)" % (func_final0.__name__,)
-
-    PushQueue.__init__(self, name, self.pipeline.later, func_push, outQ, func_final=func_final)
-
-  def __str__(self):
-    return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
-
-class _Pipeline(NestingOpenCloseMixin):
-  ''' A _Pipeline encapsulates the chain of PushQueues created by a call to Later.pipeline.
-  '''
-
-  def __init__(self, name, L, filter_funcs, outQ):
-    ''' Initialise the _Pipeline from `name`, Later instance `L`, list  of filter functions `filter_funcs` and output queue `outQ`.
-    '''
-    self.name = name
-    self.later = L
-    self.queues = [outQ]
-    self._lock = Lock()
-    NestingOpenCloseMixin.__init__(self)
-    # counter tracking items in play
-    self._busy = TrackingCounter(name="Pipeline<%s>._items" % (name,))
-    RHQ = outQ
-    count = len(filter_funcs)
-    while filter_funcs:
-      func_iter, func_final = self._pipeline_func(filter_funcs.pop())
-      count -= 1
-      pq_name = ":".join( (name,
-                           "%s/%s" % ( (funcname(func_iter) if func_iter else "None"),
-                                       (funcname(func_final) if func_final else "None"),
-                                     ),
-                           str(count),
-                           str(seq()),
-                          )
-                        )
-      PQ = _PipelinePushQueue(pq_name, self, func_iter, RHQ, func_final=func_final).open()
-      self.queues.insert(0, PQ)
-      RHQ = PQ
-
-  def __str__(self):
-    return "cs.later._Pipeline:%s" % (self.name,)
-
-  def __repr__(self):
-    return "<%s %d queues, later=%s>" % (self, len(self.queues), self.later)
-
-  def put(self, item):
-    ''' Put an `item` onto the leftmost queue in the pipeline.
-    '''
-    return self.inQ.put(item)
-
-  @property
-  def inQ(self):
-    ''' Property returning the leftmost queue in the pipeline, the input queue.
-    '''
-    return self.queues[0]
-
-  @property
-  def outQ(self):
-    ''' Property returning the rightmost queue in the pipeline, the output queue.
-    '''
-    return self.queues[-1]
-
-  def shutdown(self):
-    ''' Close the leftmost queue in the pipeline.
-    '''
-    self.inQ.close(enforce_final_close=True)
-
-  def join(self):
-    ''' Wait for completion of the output queue.
-    '''
-    self.outQ.join()
-
-  def _pipeline_func(self, o):
-    ''' Accept a pipeline element. Return (func_iter, func_final).
-        A pipeline element is either a single function, in which case it is
-        presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
-        or a tuple of (func_sig, func).
-
-        The returned func_iter and func_final take the following
-        values according to the supplied func_sig:
-
-          func_sig              func_iter, func_final
-
-          FUNC_ONE_TO_MANY      func, None
-                                Example: a directory listing.
-
-          FUNC_SELECTOR         func is presumed to be a Boolean test, and
-                                func_iter is a generator that yields its
-                                argument if the test succeeds.
-                                func_final is None.
-                                Example: a test for inclusion.
-
-          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a
-                                list and yield nothing. func_final applies
-                                func to the list and yields the results.
-                                Example: a sort.
-    '''
-    if callable(o):
-      func = o
-      func_sig = FUNC_ONE_TO_MANY
-    else:
-      # expect a tuple
-      func_sig, func = o
-    func_final = None
-    if func_sig == FUNC_ONE_TO_ONE:
-      def func_iter(item):
-        yield func(item)
-      func_iter.__name__ = "func_iter_1to1(func=%s)" % (funcname(func),)
-    elif func_sig == FUNC_ONE_TO_MANY:
-      func_iter = func
-    elif func_sig == FUNC_SELECTOR:
-      def func_iter(item):
-        if func(item):
-          yield item
-      func_iter.__name__ = "func_iter_1toMany(func=%s)" % (funcname(func),)
-    elif func_sig == FUNC_MANY_TO_MANY:
-      gathered = []
-      def func_iter(item):
-        debug("GATHER %r FOR %s", item, funcname(func))
-        gathered.append(item)
-        if False:
-          yield
-      func_iter.__name__ = "func_iter_gather(func=%s)" % (funcname(func),)
-      def func_final():
-        for item in func(gathered):
-          yield item
-      func_final.__name__ = "func_final_gather(func=%s)" % (funcname(func),)
-    else:
-      raise ValueError("unsupported function signature %r" % (func_sig,))
-    return func_iter, func_final
-
-class Later(NestingOpenCloseMixin):
+# pylint: disable=too-many-public-methods,too-many-instance-attributes
+class Later(MultiOpenMixin, HasThreadState):
   ''' A management class to queue function calls for later execution.
-      If `capacity` is an int, it is used to size a Semaphore to constrain
-      the number of dispatched functions which may be in play at a time.
-      If `capacity` is not an int it is presumed to be a suitable
-      Semaphore-like object.
-      `inboundCapacity` can be specified to limit the number of undispatched
-      functions that may be queued up; the default is 0 (no limit).
-      Calls to submit functions when the inbound limit is reached block
-      until some functions are dispatched.
-      The `name` parameter may be used to supply an identifying name
-      for this instance.
+
+      Methods are provided for submitting functions to run ASAP or
+      after a delay or after other pending functions. These methods
+      return `LateFunction`s, a subclass of `cs.result.Result`.
+
+      A Later instance' close method closes the Later for further
+      submission.
+      Shutdown does not imply that all submitted functions have
+      completed or even been dispatched.
+      Callers may wait for completion and optionally cancel functions.
+
+      TODO: __enter__ returns a SubLater, __exit__ closes the SubLater.
+
+      TODO: drop global default Later.
   '''
-  def __init__(self, capacity, name=None, inboundCapacity=0):
+
+  THREAD_STATE_ATTR = 'later_perthread_state'
+
+  later_perthread_state = ThreadState()
+
+  def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
+    ''' Initialise the Later instance.
+
+        Parameters:
+        * `capacity`: resource contraint on this Later; if an int, it is used
+          to size a Semaphore to constrain the number of dispatched functions
+          which may be in play at a time; if not an int it is presumed to be a
+          suitable Semaphore-like object, perhaps shared with other subsystems.
+        * `name`: optional identifying name for this instance.
+        * `inboundCapacity`: if >0, used as a limit on the number of
+          undispatched functions that may be queued up; the default is 0 (no
+          limit).  Calls to submit functions when the inbound limit is reached
+          block until some functions are dispatched.
+        * `retry_delay`: time delay for requeued functions.
+          Default: `DEFAULT_RETRY_DELAY`.
+    '''
     if name is None:
       name = "Later-%d" % (seq(),)
-    self._lock = RLock()
-    self._finished = threading.Condition(self._lock)
-    self.finished = False
-    NestingOpenCloseMixin.__init__(self)
     if ifdebug():
-      import inspect
+      import inspect  # pylint: disable=import-outside-toplevel
       filename, lineno = inspect.stack()[1][1:3]
       name = "%s[%s:%d]" % (name, filename, lineno)
-    debug("Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity, inboundCapacity, name)
-    if type(capacity) is int:
-      capacity = AdjustableSemaphore(capacity)
+    debug(
+        "Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity,
+        inboundCapacity, name
+    )
+    if retry_delay is None:
+      retry_delay = DEFAULT_RETRY_DELAY
     self.capacity = capacity
     self.inboundCapacity = inboundCapacity
+    self.retry_delay = retry_delay
     self.name = name
-    self.delayed = set()        # unqueued, delayed until specific time
-    self.pending = set()        # undispatched LateFunctions
-    self.running = set()        # running LateFunctions
-    self._busy = TrackingCounter(name="Later<%s>._busy" % (name,)) # counter tracking jobs queued or active
-    self._quiescing = False
+    self._lock = Lock()
+    self.outstanding = set()  # dispatched but uncompleted LateFunctions
+    self.delayed = set()  # unqueued, delayed until specific time
+    self.pending = []  # undispatched LateFunctions, a heap
+    self.running = set()  # running LateFunctions
+    # counter tracking jobs queued or active
     self._state = ""
-    self.logger = None          # reporting; see logTo() method
+    self.logger = None  # reporting; see logTo() method
     self._priority = (0,)
-    self._timerQ = None         # queue for delayed requests; instantiated at need
+    self._timerQ = None  # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._pendingq = IterablePriorityQueue(inboundCapacity, name="%s._pendingq" % (self.name,))
-    self._workers = WorkerThreadPool(name=name+":WorkerThreadPool").open()
-    self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
-    self._dispatchThread.daemon = True
-    self._dispatchThread.start()
+    self.finished_event = None
+
+  def __enter_exit__(self):
+    ''' Run both the inherited context managers.
+    '''
+    for _ in zip_longest(
+        MultiOpenMixin.__enter_exit__(self),
+        HasThreadState.__enter_exit__(self),
+    ):
+      yield
+
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      self.finished_event = Event()
+      try:
+        yield
+      finally:
+        # Shut down the Later instance:
+        # - queue the final job to set the finished_event Event
+        # - close the request queue
+        # - close the TimerQueue if any
+        # - close the worker thread pool
+        # - dispatch a Thread to wait for completion and fire the
+        #   finished_event Event
+        # queue final action to mark activity completion
+        self.defer(
+            dict(thread_states=False),
+            self.finished_event.set,
+            _force_submit=True,
+        )
+        if self._timerQ:
+          self._timerQ.close()
+          self._timerQ.join()
+
+  def _try_dispatch(self):
+    ''' Try to dispatch the next `LateFunction`.
+        Does nothing if insufficient capacity or no pending tasks.
+        Return the dispatched `LateFunction` or `None`.
+    '''
+    LF = None
+    with self._lock:
+      if len(self.running) < self.capacity:
+        try:
+          pri_entry = heappop(self.pending)
+        except IndexError:
+          pass
+        else:
+          LF = pri_entry[-1]
+          self.running.add(LF)
+          # NB: we set up notify before dispatch so that it cannot
+          # fire before we release the lock (which would happen if
+          # the LF completes really fast - notify fires immediately
+          # in the current thread if the function is already complete).
+          LF.notify(self._complete_LF)
+          LF._dispatch()  # pylint: disable=protected-access
+      elif self.pending:
+        debug("LATER: at capacity, nothing dispatched: %s", self)
+    return LF
+
+  def _complete_LF(self, LF):
+    ''' Process a completed `LateFunction`: remove from .running,
+        try to dispatch another function.
+    '''
+    with self._lock:
+      self.running.remove(LF)
+    self._try_dispatch()
+
+  @property
+  def finished(self):
+    ''' Probe the finishedness.
+    '''
+    finished = self.finished_event
+    return finished is not None and finished.is_set()
+
+  @pfx_method
+  def wait(self, timeout=None):
+    ''' Wait for the `Later` to be finished.
+        Return the result of `self.finished_event.wait(timeout)`.
+    '''
+    f = self.finished_event
+    if f is None:
+      waited = False
+    else:
+      if not f.is_set():
+        info("Later.WAIT: %r", self)
+      waited = f.wait(timeout)
+      if not waited:
+        warning("timed out after %fs", timeout)
+    return waited
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%s closed=%s>' \
-           % ( self.__class__.__name__, self.name,
-               self.capacity,
-               len(self.running), ','.join( repr(LF.name) for LF in self.running ),
-               len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
-               len(self.delayed),
-               int(self._busy), self._busy,
-               self.closed
-             )
+    return (
+        '<%s "%s" capacity=%s running=%d pending=%d delayed=%d closed=%s>' % (
+            self.__class__.__name__, self.name, self.capacity, len(
+                self.running
+            ), len(self.pending), len(self.delayed), self.closed
+        )
+    )
 
   def __str__(self):
-    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s opens=%d>" \
-           % (self.name, self.capacity,
-              len(self.pending), len(self.running), len(self.delayed),
-              int(self._busy), self._busy,
-              self._opens)
+    return (
+        "<%s:%s[%s] pending=%d running=%d delayed=%d>" % (
+            self.__class__.__name__, self.name, self.capacity,
+            len(self.pending), len(self.running), len(self.delayed)
+        )
+    )
 
   def state(self, new_state, *a):
+    ''' Update the state of this Later.
+    '''
     if a:
       new_state = new_state % a
     D("STATE %r [%s]", new_state, self)
@@ -492,8 +474,8 @@ class Later(NestingOpenCloseMixin):
 
   def __call__(self, func, *a, **kw):
     ''' A Later object can be called with a function and arguments
-	with the effect of deferring the function and waiting for
-	it to complete, returning its return value.
+        with the effect of deferring the function and waiting for
+        it to complete, returning its return value.
 
         Example:
 
@@ -503,78 +485,9 @@ class Later(NestingOpenCloseMixin):
     '''
     return self.defer(func, *a, **kw)()
 
-  def shutdown(self):
-    ''' Shut down the Later instance:
-        - close the TimerQueue, if any, and wait for it to complete
-        - close the request queue
-        - wait for the job dispatcher to finish
-	- close the worker thread pool, which waits for any of its
-          outstanding threads to complete
-    '''
-    with Pfx("%s.shutdown()" % (self,)):
-      if not self.closed:
-        error("NOT CLOSED")
-      if self.finished:
-        warning("_finish: finished=%r, early return", self.finished)
-        return
-      self.finished = True
-      if self._timerQ:
-        self._timerQ.close()
-        self._timerQ.join()
-      self._pendingq.close()              # prevent further submissions
-      self._workers.close()           # wait for all worker threads to complete
-      self._dispatchThread.join()     # wait for all functions to be dispatched
-      self._finished.acquire()
-      self._finished.notify_all()
-      self._finished.release()
-
-  @locked
-  def is_idle(self):
-    with self._lock:
-      status = not self._busy and not self.delayed and not self.pending and not self.running
-    return status
-
-  def quiesce(self):
-    ''' Block until there are no jobs queued or active.
-    '''
-    self._quiescing = True
-    self._busy.wait(0)
-    self._quiescing = False
-
-  @locked
-  def is_finished(self):
-    return self.closed and self.is_idle()
-
-  def wait(self):
-    ''' Wait for all active and pending jobs to complete, including
-        any jobs they may themselves queue.
-    '''
-    if self.finished:
-      debug("%s.wait: already finished - return immediately", self)
-      pass
-    else:
-      self._finished.acquire()
-      self._finished.wait()
-
-  def _track(self, tag, LF, fromset, toset):
-    def SN(s):
-      if s is None: return "None"
-      if s is self.delayed: return "delayed"
-      if s is self.pending: return "pending"
-      if s is self.running: return "running"
-      return repr(s)
-    debug("_track %s => %s: %s %s", SN(fromset), SN(toset), tag, LF.name)
-    if not LF:
-      raise ValueError("LF false! (%r)", LF)
-    if fromset is None and toset is None:
-      raise ValueError("fromset and toset are None")
-    with self._lock:
-      if fromset is not None:
-        fromset.remove(LF)
-      if toset is not None:
-        toset.add(LF)
-
   def log_status(self):
+    ''' Log the current delayed, pending and running state.
+    '''
     for LF in list(self.delayed):
       self.debug("STATUS: delayed: %s", LF)
     for LF in list(self.pending):
@@ -582,160 +495,165 @@ class Later(NestingOpenCloseMixin):
     for LF in list(self.running):
       self.debug("STATUS: running: %s", LF)
 
-  def _completed(self, LF, result, exc_info):
-    self.debug("COMPLETE %s: result = %r, exc_info = %r", LF, result, exc_info)
-    self.log_status()
-    self.capacity.release()
-    self._track("_completed(%s)" % (LF.name,), LF, self.running, None)
-
-  def __enter__(self):
-    debug("%s: __enter__", self)
-    global default
-    L = NestingOpenCloseMixin.__enter__(self)
-    default.push(L)
-    return L
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    ''' Exit handler: release the "complete" lock; the placeholder
-        function is blocking on this, and will return on its release.
-    '''
-    debug("%s: __exit__: exc_type=%s", self, exc_type)
-    NestingOpenCloseMixin.__exit__(self, exc_type, exc_val, exc_tb)
-    global default
-    default.pop()
-    return False
-
-  @contextmanager
-  def more_capacity(self, increment=1):
-    self.capacity.adjust_delta(increment)
-    yield
-    self.capacity.adjust_delta(-increment)
-
   def logTo(self, filename, logger=None, log_level=None):
     ''' Log to the file specified by `filename` using the specified
         logger named `logger` (default the module name, cs.later) at the
         specified log level `log_level` (default logging.INFO).
     '''
-    import logging
-    import cs.logutils
     if logger is None:
       logger = self.__module__
     if log_level is None:
       log_level = logging.INFO
     logger, handler = cs.logutils.logTo(filename, logger=logger)
-    handler.setFormatter(logging.Formatter("%(asctime)-15s %(later_name)s %(message)s"))
+    handler.setFormatter(
+        logging.Formatter("%(asctime)-15s %(later_name)s %(message)s")
+    )
     logger.setLevel(log_level)
     self.logger = logger
 
   def error(self, *a, **kw):
+    ''' Issue an error message with `later_name` in `'extra'`.
+    '''
     if self.logger:
-      kw.setdefault('extra', {}).update(later_name = str(self))
+      kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.error(*a, **kw)
 
   def warning(self, *a, **kw):
+    ''' Issue a warning message with `later_name` in `'extra'`.
+    '''
     if self.logger:
-      kw.setdefault('extra', {}).update(later_name = str(self))
+      kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.warning(*a, **kw)
 
   def info(self, *a, **kw):
+    ''' Issue an info message with `later_name` in `'extra'`.
+    '''
     if self.logger:
-      kw.setdefault('extra', {}).update(later_name = str(self))
+      kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.info(*a, **kw)
 
   def debug(self, *a, **kw):
+    ''' Issue a debug message with `later_name` in `'extra'`.
+    '''
     if self.logger:
-      kw.setdefault('extra', {}).update(later_name = str(self))
+      kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.debug(*a, **kw)
 
-  def __del__(self):
-    if not self.closed:
-      self._close()
-
-  def _dispatcher(self):
-    ''' Read LateFunctions from the inbound queue as capacity is available
-        and dispatch them. The LateFunction's ._dispatch() method will
-        release the capacity on completion.
-    '''
-    while True:
-      self.capacity.acquire()   # will be released by the LateFunction
-      try:
-        pri_entry = self._pendingq.next()
-      except StopIteration:
-        self.capacity.release() # end of queue, not calling the handler
-        break
-      LF = pri_entry[-1]
-      self._track("_dispatcher: dispatch", LF, self.pending, self.running)
-      self.debug("dispatched %s", LF)
-      LF._dispatch()
-
-  @property
-  def submittable(self):
-    ''' May new tasks be submitted?
-        This normally tracks "not self.closed", but running tasks
-        are wrapped in a thread local override to permit them to
-        submit further related tasks.
+  def is_submittable(self) -> bool:
+    ''' Test whether this `Later` is accepting new submissions.
     '''
     return not self.closed
 
-  def bg(self, func, *a, **kw):
-    ''' Queue a function to run right now, ignoring the Later's capacity and
-        priority system. This is really an easy way to utilise the Later's
-        thread pool and get back a handy LateFunction for result collection.
-        It can be useful for transient control functions that
-        themselves queue things through the Later queuing system
-        but do not want to consume capacity themselves, thus avoiding
-        deadlock at the cost of transient overthreading.
+  @decorator
+  def submittable(method):
+    ''' Decorator requiring the `Later` to be submittable unless `force` is true.
     '''
-    if not self.submittable:
-      raise RuntimeError("%s.bg(...) but not self.submittable" % (self,))
-    funcname = None
+    citation = funccite(method)
+
+    def submittable_method(self, *a, _force_submit=False, **kw):
+      if not _force_submit and not self.is_submittable():
+        raise RuntimeError("%s: %s: not submittable" % (self, citation))
+      return method(self, *a, **kw)
+
+    return submittable_method
+
+  @submittable
+  def bg(self, func, *a, **kw):
+    ''' Queue a function to run right now,
+        ignoring the `Later`'s capacity and priority system.
+
+        This is really just an easy way to utilise the `Later`'s thread pool
+        and get back a handy `LateFunction` for result collection.
+        Frankly, you're probably better off using `cs.result.bg` instead.
+
+        It can be useful for transient control functions that themselves
+        queue things through the `Later` queuing system but do not want to
+        consume capacity themselves, thus avoiding deadlock at the cost of
+        transient overthreading.
+
+        The premise here is that the capacity limit
+        is more about managing compute contention than pure `Thread` count,
+        and that control functions should arrange other subfunctions
+        and then block or exit,
+        thus consuming neglible compute.
+        It is common to want to dispatch a higher order operation
+        via such a control function,
+        but that higher order would itself normally consume some
+        of the capacity
+        thus requiring an an hoc increase to the required capacity
+        to avoid deadlock.
+    '''
+    name = None
     if isinstance(func, str):
-      funcname = func
+      name = func
       a = list(a)
       func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = LateFunction(self, func, funcname)
-    self._track("bg: dispatch", LF, None, self.running)
-    LF._dispatch()
+    LF = LateFunction(func, name=name)
+    LF._dispatch()  # pylint: disable=protected-access
     return LF
 
   def ready(self, **kwargs):
     ''' Awful name.
-        Return a context manager to block until the Later provides a timeslot.
+        Return a context manager to block until the `Later` provides a timeslot.
     '''
     return _Late_context_manager(self, **kwargs)
 
-  def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
+  # pylint: disable=too-many-arguments
+  @submittable
+  def submit(
+      self,
+      func,
+      priority=None,
+      delay=None,
+      when=None,
+      name=None,
+      pfx=None,  # pylint: disable=redefined-outer-name
+      LF=None,
+      retry_delay=None,
+      thread_states=None,
+  ):
     ''' Submit the callable `func` for later dispatch.
-        Return the corresponding LateFunction for result collection.
+        Return the corresponding `LateFunction` for result collection.
+
         If the parameter `priority` is not None then use it as the priority
         otherwise use the default priority.
+
         If the parameter `delay` is not None, delay consideration of
         this function until `delay` seconds from now.
+
         If the parameter `when` is not None, delay consideration of
         this function until the time `when`.
         It is an error to specify both `when` and `delay`.
-        If the parameter `name` is not None, use it to name the LateFunction.
+
+        If the parameter `name` is not None, use it to name the `LateFunction`.
+
         If the parameter `pfx` is not None, submit pfx.partial(func);
           see the cs.logutils.Pfx.partial method for details.
-    '''
-    if not self.submittable:
-      raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
-    return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
 
-  def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
+        If the parameter `LF` is not None, construct a new `LateFunction` to
+          track function completion.
+    '''
     if delay is not None and when is not None:
-      raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
+      raise ValueError(
+          "you can't specify both delay= and when= (%s, %s)" % (delay, when)
+      )
     if priority is None:
       priority = self._priority
-    elif type(priority) is int:
+    elif isinstance(priority, int):
       priority = (priority,)
     if pfx is not None:
       func = pfx.partial(func)
-    LF = LateFunction(self, func, name=name)
+    if LF is None:
+      LF = LateFunction(
+          func,
+          name=name,
+          retry_delay=retry_delay,
+          thread_states=thread_states
+      )
     pri_entry = list(priority)
-    pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
+    pri_entry.append(seq())  # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
 
     now = time.time()
@@ -744,76 +662,128 @@ class Later(NestingOpenCloseMixin):
     if when is None or when <= now:
       # queue the request now
       self.debug("queuing %s", LF)
-      self._track("_submit: _pendingq.put", LF, None, self.pending)
-      self._pendingq.put( pri_entry )
+      heappush(self.pending, pri_entry)
+      self._try_dispatch()
     else:
       # queue the request at a later time
       def queueFunc():
         LF = pri_entry[-1]
         self.debug("queuing %s after delay", LF)
-        self._track("_submit: _pendingq.put after delay", LF, self.delayed, self.running)
-        self._pendingq.put( pri_entry )
+        heappush(self.pending, pri_entry)
+        self._try_dispatch()
+
       with self._lock:
         if self._timerQ is None:
-          self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>"%(self.name))
+          self._timerQ = TimerQueue(
+              name="<TimerQueue %s._timerQ>" % (self.name,)
+          )
       self.debug("delay %s until %s", LF, when)
-      self._track("_submit: delay", LF, None, self.delayed)
       self._timerQ.add(when, queueFunc)
-
+    # record the function as outstanding and attach a notification
+    # to remove it from the outstanding set on completion
+    self.outstanding.add(LF)
+    LF.notify(self.outstanding.remove)
     return LF
 
-  ##@trace_caller
+  def complete(self, outstanding=None, until_idle=False):
+    ''' Generator which waits for outstanding functions to complete and yields them.
+
+        Parameters:
+        * `outstanding`: if not None, an iterable of `LateFunction`s;
+          default `self.outstanding`.
+        * `until_idle`: if true,
+          continue until `self.outstanding` is empty.
+          This requires the `outstanding` parameter to be `None`.
+    '''
+    if outstanding is not None:
+      if until_idle:
+        raise ValueError("outstanding is not None and until_idle is true")
+      for LF in report(outstanding):
+        yield LF
+      return
+    # outstanding is None: loop until self.outstanding is empty
+    while True:
+      outstanding = list(self.outstanding)
+      if not outstanding:
+        break
+      for LF in self.complete(outstanding):
+        yield LF
+      if not until_idle:
+        break
+
+  def wait_outstanding(self, until_idle=False):
+    ''' Wrapper for complete(), to collect and discard completed `LateFunction`s.
+    '''
+    for _ in self.complete(until_idle=until_idle):
+      pass
+
+  @submittable
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
         default priority with the specified arguments `*a` and `**kw`.
-        Return the corresponding LateFunction for result collection.
-        `func` may optionally be preceeded by one or both of:
-          a string specifying the function's descriptive name
-	  a mapping containing parameters for `priority`,
-            `delay`, and `when`.
-        Equivalent to:
-          submit(functools.partial(func, *a, **kw), **params)
-    '''
-    if not self.submittable:
-      raise RuntimeError("%s.defer(...) but not self.submittable" % (self,))
-    return self._defer(func, *a, **kw)
+        Return the corresponding `LateFunction` for result collection.
 
-  def _defer(self, func, *a, **kw):
+        `func` may optionally be preceeded by one or both of:
+        * a string specifying the function's descriptive name,
+        * a mapping containing parameters for `priority`,
+          `delay`, and `when`.
+
+        Equivalent to:
+
+            submit(functools.partial(func, *a, **kw), **params)
+    '''
+    # snapshot the arguments as supplied
+    # note; a shallow snapshot
     if a:
       a = list(a)
+    if kw:
+      kw = dict(kw)
     params = {}
+    # pop off leading parameters before the function
     while not callable(func):
       if isinstance(func, str):
         params['name'] = func
-        func = a.pop(0)
       else:
         params.update(func)
-        func = a.pop(0)
+      func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = self._submit(func, **params)
+    LF = self.submit(func, _force_submit=True, **params)  # pylint: disable=unexpected-keyword-arg
     return LF
 
+  def with_result_of(self, callable1, func, *a, **kw):
+    ''' Defer `callable1`, then append its result to the arguments for
+        `func` and defer `func`.
+        Return the `LateFunction` for `func`.
+    '''
+
+    def then():
+      LF1 = self.defer(callable1)
+      return self.defer(func, *[a + [LF1.result]], **kw)
+
+    return then()
+
+  @submittable
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
-        Return a Result for later collection of the function result.
+        Return a `Result` for collection of the result of `func`.
 
         This function will not be submitted until completion of
-        the supplied LateFunctions `LFs`.
-        If `R` is None a new cs.threads.Result is allocated to
+        the supplied `LateFunction`s `LFs`.
+        If `R` is `None` a new `Result` is allocated to
         accept the function return value.
-            After `func` completes, its return value is passed to R.put().
+        After `func` completes, its return value is passed to `R.put()`.
 
         Typical use case is as follows: suppose you're submitting
-        work via this Later object, and a submitted function itself
-        might submit more LateFunctions for which it must wait.
+        work via this `Later` object, and a submitted function itself
+        might submit more `LateFunction`s for which it must wait.
         Code like this:
 
               def f():
                 LF = L.defer(something)
                 return LF()
 
-        may deadlock if the Later is at capacity. The after() method
+        may deadlock if the Later is at capacity. The `after()` method
         addresses this:
 
               def f():
@@ -822,190 +792,331 @@ class Later(NestingOpenCloseMixin):
                 R = L.after( [LF1, LF2], None, when_done )
                 return R
 
-        This submits the when_done() function after the LFs have
-        completed without spawning a thread or using the Later's
+        This submits the `when_done()` function after the LFs have
+        completed without spawning a thread or using the `Later`'s
         capacity.
 
         See the retry method for a convenience method that uses the
         above pattern in a repeating style.
     '''
-    if not self.submittable:
-      raise RuntimeError("%s.after(...) but not self.submittable" % (self,))
-    return self._after(LFs, R, func, *a, **kw)
-
-  def _after(self, LFs, R, func, *a, **kw):
+    if not isinstance(LFs, list):
+      LFs = list(LFs)
     if R is None:
-      R = Result()
-    elif not isinstance(R, Asynchron):
-      raise TypeError("Later.after(LFs, R, func, ...): expected Asynchron for R, got %r" % (R,))
-    LFs = list(LFs)
-    count = len(LFs)
+      R = Result("Later.after(%s)" % (",".join(str(_) for _ in LFs)))
+    elif not isinstance(R, Result):
+      raise TypeError(
+          "Later.after(LFs, R, func, ...): expected Result for R, got %r" %
+          (R,)
+      )
 
-    def put_func():
+    def _after_put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
-      R.call(func, *a, **kw)
-    put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
+      R.run_func(func, *a, **kw)
 
-    if count == 0:
-      # nothing to wait for - queue the function immediately
-      debug("Later.after: len(LFs) == 0, func=%s", funcname(func))
-      self._defer(put_func)
-    else:
-      # create a notification function which submits put_func
-      # after sufficient notifications have been received
-      self._busy.inc("Later._after")
-      L = self.open()
-      countery = [count]  # to stop "count" looking like a local var inside the closure
-      def submit_func(LF):
-        ''' Notification function to submit `func` after sufficient invocations.
-        '''
-        countery[0] -= 1
-        if countery[0] != 0:
-          return
-        self._defer(put_func)
-        L.close()
-        self._busy.dec("Later._after")
-      # submit the notifications
-      for LF in LFs:
-        LF.notify(submit_func)
-    return R
+    _after_put_func.__name__ = "%s._after(%r)[func=%s]" % (
+        self, LFs, funcname(func)
+    )
+    return after(LFs, None, lambda: self.defer(_after_put_func))
 
-  def retry(self, R, func, *a, **kw):
-    ''' Queue the call `func` for later dispatch and possible
-        repetition.
-        If `R` is None a new cs.threads.Result is allocated to
-        accept the function return value.
-        The return value from `func` should be a tuple:
-          LFs, result
-        where LFs, if not empty, is a sequence of LateFunctions
-        which should complete. After completion, `func` is queued
-        again.
-        When LFs is empty, result is passed to R.put() and `func`
-        is not requeued.
+  @submittable
+  @typechecked
+  def defer_iterable(
+      self,
+      it: Iterable,
+      outQ,
+      *,
+      greedy: bool = False,
+      test_ready: Optional[Callable[[], bool]] = None
+  ):
+    ''' Submit an iterable `it` for asynchronous stepwise iteration
+        to put results onto the queue `outQ`.
+        Return a `Result` for final synchronisation.
+
+        This prepares a function to perform a single iteration of
+        `it`, call `outQ.put(result)` with the result, and to queue
+        itself again until the iterator is exhausted.
+        That function is queued.
+
+        Parameters:
+        * `it`: the iterable for for asynchronous stepwise iteration
+        * `outQ`: an `IterableQueue`like object
+          with a `.put` method to accept items
+          and a `.close` method to indicate the end of items.
+          When the iteration is complete,
+          call `outQ.close()` and complete the `Result`.
+          If iteration ran to completion then the `Result`'s `.result`
+          will be the number of iterations, otherwise if an iteration
+          raised an exception the the `Result`'s .exc_info will contain
+          the exception information.
+        * `test_ready`: if not `None`, a callable to test if iteration
+          is presently permitted; iteration will be deferred until
+          the callable returns a true value.
     '''
-    if R is None:
-      R = Result()
-    def retry():
-      LFs = []
-      LFs, result = func(LFs, *a, **kw)
-      if LFs:
-        self.after(LFs, R, retry)
-      else:
-        R.put(result)
-    self.defer(retry)
-    return R
-
-  def defer_iterable(self, I, outQ):
-    ''' Submit an iterable `I` for asynchronous stepwise iteration
-        to return results via the queue `outQ`.
-        `outQ` must have a .put method to accept items and a .close method to
-        indicate the end of items.
-        When the iteration is complete, call outQ.close().
-    '''
-    if not self.submittable:
-      raise RuntimeError("%s.defer_iterable(...) but not self.submittable" % (self,))
-    return self._defer_iterable(I, outQ=outQ)
-
-  def _defer_iterable(self, I, outQ):
-    iterate = partial(next, iter(I))
+    iterate = partial(next, iter(it))
+    R = Result()
+    iteration_counter_v = [0]
 
     @logexc
     def iterate_once():
       ''' Call `iterate`. Place the result on outQ.
+
           Close the queue at end of iteration or other exception.
           Otherwise, requeue ourself to collect the next iteration value.
       '''
+      if test_ready is not None and not test_ready():
+        raise RetryError("iterate_once: not ready yet")
       try:
         item = iterate()
       except StopIteration:
         outQ.close()
-      except Exception as e:
-        exception("defer_iterable: iterate_once: exception during iteration: %s", e)
+        R.result = iteration_counter_v[0]
+      except Exception as e:  # pylint: disable=broad-except
+        exception(
+            "defer_iterable: iterate_once: exception during iteration: %s", e
+        )
         outQ.close()
+        R.exc_info = sys.exc_info()
       else:
+        iteration_counter_v[0] += 1
+        if greedy:
+          # now queue another iteration to run ahead of tasks from
+          # the .put(item) below
+          self.defer(iterate_once)
         # put the item onto the output queue
         # this may itself defer various tasks (eg in a pipeline)
         debug("L.defer_iterable: iterate_once: %s.put(%r)", outQ, item)
         outQ.put(item)
-        # now queue another iteration to run after those defered tasks
-        self._defer(iterate_once)
+        if not greedy:
+          # now queue another iteration to run after those defered tasks
+          self.defer(iterate_once)
 
-    iterate_once.__name__ = "%s:next(iter(%s))" % (funcname(iterate_once),
-                                                   getattr(I, '__name__', repr(I)))
-    self._defer(iterate_once)
-
-  def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
-    ''' Construct a function pipeline to be mediated by this Later queue.
-        Return:
-          input, output
-        where `input`` is a closeable queue on which more data items can be put
-        and `output` is an iterable from which result can be collected.
-
-        `filter_funcs`: an iterable of filter functions accepting the
-          single items from the iterable `inputs`, returning an
-          iterable output.
-        `inputs`: the initial iterable inputs; this may be None.
-          If missing or None, it is expected that the caller will
-          be supplying input items via `input.put()`.
-        `outQ`: the optional output queue; if None, an IterableQueue() will be
-          allocated.
-        `name`: name for the PushQueue implementing this pipeline.
-
-        If `inputs` is None or `open` is true, the returned `input` requires
-        a call to `input.close()` when no further inputs are to be supplied.
-
-        Example use with presupplied 
-
-          input, output = L.pipeline(
-                  [
-                    ls,
-                    filter_ls,
-                    ( FUNC_MANY_TO_MANY, lambda items: sorted(list(items)) ),
-                  ],
-                  ('.', '..', '../..'),
-                 )
-          for item in output:
-            print(item)
-    '''
-    if not self.submittable:
-      raise RuntimeError("%s.pipeline(...) but not self.submittable" % (self,))
-    return self._pipeline(filter_funcs, inputs, outQ=outQ, name=name)
-
-  def _pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
-    filter_funcs = list(filter_funcs)
-    debug("%s._pipeline: filter_funcs=%r", self, filter_funcs)
-    if not filter_funcs:
-      raise ValueError("no filter_funcs")
-    if outQ is None:
-      outQ = IterableQueue(name="pipelineIQ")
-    if name is None:
-      name = "pipelinePQ"
-    pipeline = _Pipeline(name, self, filter_funcs, outQ)
-    inQ = pipeline.inQ
-    if inputs is not None:
-      self._defer_iterable( inputs, inQ )
-    else:
-      debug("%s._pipeline: no inputs, NOT setting up _defer_iterable( inputs, inQ=%r)", self, inQ)
-    return pipeline
+    iterate_once.__name__ = "%s:next(iter(%s))" % (
+        funcname(iterate_once), getattr(it, '__name__', repr(it))
+    )
+    self.defer(pfx(iterate_once))
+    return R
 
   @contextmanager
   def priority(self, pri):
     ''' A context manager to temporarily set the default priority.
+
         Example:
-          L = Later(4)
-          with L.priority(1):
-            L.defer(f)  # queue f() with priority 1
-          with L.priority(2):
-            L.defer(f, 3)  # queue f(3) with priority 2
+
+            L = Later(4)
+            with L.priority(1):
+              L.defer(f)  # queue f() with priority 1
+            with L.priority(2):
+              L.defer(f, 3)  # queue f(3) with priority 2
+
         WARNING: this is NOT thread safe!
+
         TODO: is a thread safe version even a sane idea without a
               per-thread priority stack?
     '''
     oldpri = self._priority
     self._priority = pri
-    yield
-    self._priority = oldpri
+    try:
+      yield
+    finally:
+      self._priority = oldpri
+
+  def pool(self, *a, **kw):
+    ''' Return a `LatePool` to manage some tasks run with this `Later`.
+    '''
+    return LatePool(*a, later=self, **kw)
+
+  # forget the @submittable decorator
+  del submittable
+
+class SubLater(object):
+  ''' A class for managing a group of deferred tasks using an existing `Later`.
+  '''
+
+  @uses_later
+  def __init__(self, *, later: Later):
+    ''' Initialise the `SubLater` with its parent `Later`.
+
+        TODO: accept `discard=False` param to suppress the queue and
+        associated checks.
+    '''
+    self._later = later
+    self._later.open()
+    self._lock = Lock()
+    self._deferred = 0
+    self._queued = 0
+    self._queue = IterableQueue()
+    self.closed = False
+
+  def __str__(self):
+    return "%s(%s%s,deferred=%d,completed=%d)" % (
+        type(self),
+        self._later,
+        "[CLOSED]" if self.closed else "",
+        self._deferred,
+        self._queued,
+    )
+
+  def __iter__(self):
+    ''' Iteration over the `SubLater`
+        iterates over the queue of completed `LateFUnction`s.
+    '''
+    return iter(self._queue)
+
+  def close(self):
+    ''' Close the SubLater.
+
+        This prevents further deferrals.
+    '''
+    with self._lock:
+      closed = self.closed
+      if closed:
+        self._later.warning("repeated close of %s", self)
+      else:
+        self.closed = True
+        self._queue.close()
+        self._later.close()
+
+  def defer(self, func, *a, **kw):
+    ''' Defer a function, return its `LateFunction`.
+
+        The resulting `LateFunction` will queue itself for collection
+        on completion.
+    '''
+    with self._lock:
+      LF = self._later.defer(func, *a, **kw)
+      self._deferred += 1
+
+      def on_complete(R):
+        with self._lock:
+          self._queue.put(R)
+          self._queued += 1
+          if self.closed and self._queued >= self._deferred:
+            self._queue.close()
+
+    LF.notify(on_complete)
+    return LF
+
+  def reaper(self, handler=None):
+    ''' Dispatch a `Thread` to collect completed `LateFunction`s.
+        Return the `Thread`.
+
+        `handler`: an optional callable to be passed each `LateFunction`
+        as it completes.
+    '''
+
+    @logexc
+    def reap(Q):
+      for LF in Q:
+        if handler:
+          try:
+            handler(LF)
+          except Exception as e:  # pylint: disable=broad-except
+            exception("%s: reap %s: %s", self, LF, e)
+
+    T = HasThreadState.Thread(
+        name="reaper(%s)" % (self,), target=reap, args=(self._queue,)
+    )
+    T.start()
+    return T
+
+class LatePool(object):
+  ''' A context manager after the style of subprocess.Pool
+      but with deferred completion.
+
+      Example usage:
+
+          L = Later(4)    # a 4 thread Later
+          with LatePool(L) as LP:
+            # several calls to LatePool.defer, perhaps looped
+            LP.defer(func, *args, **kwargs)
+            LP.defer(func, *args, **kwargs)
+          # now we can LP.join() to block for all `LateFunctions`
+          #
+          # or iterate over LP to collect `LateFunction`s as they complete
+          for LF in LP:
+            result = LF()
+            print(result)
+  '''
+
+  # pylint: disable=too-many-arguments
+  @uses_later
+  def __init__(
+      self,
+      *,
+      later,
+      priority=None,
+      delay=None,
+      when=None,
+      pfx=None,  # pylint: disable=redefined-outer-name
+      block=False
+  ):
+    ''' Initialise the `LatePool`.
+
+        Parameters:
+        * `later`: optional `Later` instance, default from `Later.default()`
+        * `priority`, `delay`, `when`, `name`, `pfx`:
+          default values passed to Later.submit.
+        * `block`: if true, wait for `LateFunction` completion
+          before leaving __exit__.
+    '''
+    self.later = later
+    self.parameters = {
+        'priority': priority,
+        'delay': delay,
+        'when': when,
+        'pfx': pfx,
+    }
+    self.block = block
+    self.LFs = []
+
+  def __enter__(self):
+    ''' Entry handler: submit a placeholder function to the queue,
+        acquire the "commence" lock, which will be made available
+        when the placeholder gets to run.
+    '''
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    ''' Exit handler.
+        If .block is true, wait for `LateFunction` completion before return.
+    '''
+    if self.block:
+      self.join()
+    return False
+
+  def add(self, LF):
+    ''' Add a `LateFunction` to those to be tracked by this LatePool.
+    '''
+    self.LFs.append(LF)
+
+  def submit(self, func, **params):
+    ''' Submit a function using the LatePool's default parameters, overridden by `params`.
+    '''
+    submit_params = dict(self.parameters)
+    submit_params.update(params)
+    LF = self.later.submit(func, **submit_params)
+    self.add(LF)
+    return LF
+
+  def defer(self, func, *a, **kw):
+    ''' Defer a function using the LatePool's default parameters.
+    '''
+    if a or kw:
+      func = partial(func, *a, **kw)
+    return self.submit(func)
+
+  def __iter__(self):
+    ''' Report completion of the `LateFunction`s.
+    '''
+    for LF in report(self.LFs):
+      yield LF
+
+  def join(self):
+    ''' Wait for completion of all the `LateFunction`s.
+    '''
+    for _ in self:
+      pass
 
 if __name__ == '__main__':
   import cs.later_tests

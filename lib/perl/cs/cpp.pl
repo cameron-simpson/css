@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parse C Preprocessor directives.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use cs::Misc;

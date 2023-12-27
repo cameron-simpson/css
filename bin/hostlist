@@ -10,7 +10,7 @@
 #  host/tag or host/{tag,...}
 #               Optional tags which are preserved.
 #               On some shells the { will need escaping by the caller.
-# - Cameron Simpson <cs@zip.com.au> 02nov2008
+# - Cameron Simpson <cs@cskk.id.au> 02nov2008
 #
 
 cmd=`basename "$0"`

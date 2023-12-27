@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::MyDB: do stuff with my database
-#	- Cameron Simpson <cs@zip.com.au> 21jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 21jul2000
 #
 
 =head1 NAME
@@ -81,7 +81,7 @@ sub fileByPath($)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

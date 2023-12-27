@@ -2,7 +2,7 @@
 #
 # For each line of input run the supplied perl code.
 # A lot like "perl -ne" but with progress reporting.
-#	- Cameron Simpson <cs@zip.com.au> 01jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 01jul2004
 #
 
 use cs::Misc;

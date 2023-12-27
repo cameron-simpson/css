@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Assorted stats routines.
-#	- Cameron Simpson <cs@zip.com.au> 30oct96
+#	- Cameron Simpson <cs@cskk.id.au> 30oct96
 #
 
 use strict qw(vars);

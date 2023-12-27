@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Legato::Networker::Dump: a dump record in Legato's Networker backup system
-#	- Cameron Simpson <cs@zip.com.au> 11oct2000
+#	- Cameron Simpson <cs@cskk.id.au> 11oct2000
 #
 
 =head1 NAME
@@ -163,7 +163,7 @@ cs::Legato::Networker
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

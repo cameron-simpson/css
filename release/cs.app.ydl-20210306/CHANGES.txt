@@ -1,0 +1,10 @@
+lib/python/cs/app/ydl.py: cs.app.ydl: YDL.run: put print(output_path) inside the try/except, avoiding undefined use after an exception
+lib/python/cs/app/ydl.py: cs.app.ydl: clean lint
+lib/python/cs/app/ydl.py: cs.app.ydl: YDL: handle no total_bytes in ydl_progress, falling back to total_bytes_estimate - this is definitely inadequate
+lib/python/cs/app/ydl.py: cs.app.ydl: YDL: only report warnings once
+lib/python/cs/app/ydl.py: cs.app.ydl: once warn once when Progress position>total
+lib/python/cs/app/ydl.py: cs.app.ydl: OverYDL: bugfix use of the over progress
+lib/python/cs/app/ydl.py: cs.app.ydl: update for new "no initial status lines" cs.upd behaviour
+lib/python/cs/app/ydl.py: cs.fstags: drop obsolete uses of TaggedPath.direct_tags from this and related modules
+lib/python/cs/app/ydl.py: cs.app.ydl: updatefor new BaseCommand API
+lib/python/cs/app/ydl.py: cs.app.ydl: update DISTINFO

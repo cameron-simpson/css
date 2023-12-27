@@ -1,0 +1,2 @@
+lib/python/cs/fstags.py: Release information for cs.fstags-20200716.
+lib/python/cs/fstags.py: cs.upd,cs.fstags,cs.tagset: require cs.obj>=20200716 for SingletonMixin API change

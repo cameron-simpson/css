@@ -1,0 +1,4 @@
+New `TRACK` constant equal to `logging.INFO+5` to provide a level higher than `INFO`
+(which seems unreasonably noisy) and lower than `WARNING`
+warning for tracking salient events.
+New `track()` function to match.

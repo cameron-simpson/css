@@ -1,0 +1,2 @@
+  lib/python/cs/py/func.py: cs.py.func: break import loop by removing use of cs.excutils.transmute
+  lib/python/cs/py/func.py: cs.py.func: use cs.py3.raise_from for portability

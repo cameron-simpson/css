@@ -3,7 +3,7 @@
 # Code by John Rosauer <jar@rmb.com.au>
 # Widget to monitor UNIX time as Sun Sep 09 11:46:40 EST 2001
 # approaches (1000000000 epoch seconds).
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 # \
 exec wish "$0" "$@"

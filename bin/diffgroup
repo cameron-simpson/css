@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Report differences between two group files.
-#	- Cameron Simpson <cs@zip.com.au> 12dec97
+#	- Cameron Simpson <cs@cskk.id.au> 12dec97
 #
 
 use cs::Misc;

@@ -1,0 +1,16 @@
+  lib/python/cs/asynchron.py: cs.asynchron: autopep8
+  lib/python/cs/asynchron.py: remove bare "except:"s from code, use "except Exception:"
+  lib/python/cs/asynchron.py: cs.asynchron: report: docstring update
+  lib/python/cs/asynchron.py: cs.asynchron: bugfix .exc_info (actually call sys.exc_info); add new .raise_ convenience wrapper for .exc_info that accepts an exception (default from sys.exc_info())
+  lib/python/cs/asynchron.py: cs.asynchron: Asynchron.__init__: accept optional `lock` parameter
+  lib/python/cs/asynchron.py: cs.asynchron: Asynchron.__init__: slight reordering, no semantic change
+  lib/python/cs/asynchron.py: cs.asynchron: Asynchron.cancel: comment decision paths
+  lib/python/cs/asynchron.py: cs.asynchron: Asynchron.cancel: fix up decision comment
+  lib/python/cs/asynchron.py: merge default ==> venti
+  lib/python/cs/asynchron.py: cs.synchron: Asynchron: new `result` parameter to prefill the .result property
+  lib/python/cs/asynchron.py: cs.asynchron,cs.later: move PendingFunction and OnDemandFunction from cs.later to cs.asynchron, rename PendingFunction to _PendingFunction
+  lib/python/cs/asynchron.py: cs.asynchron: rename Asynchron to Result
+  lib/python/cs/asynchron.py: cs.asynchron: more flexible CancellationError.__init__; docstring spelling fix
+  lib/python/cs/asynchron.py: merge default ==> metaproxy
+  lib/python/cs/asynchron.py: merge default ==> metaproxy
+  lib/python/cs/asynchron.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

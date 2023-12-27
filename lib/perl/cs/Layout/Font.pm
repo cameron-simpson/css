@@ -2,7 +2,7 @@
 #
 # Font description.
 # Dummied up as for FixedText for now.
-#	- Cameron Simpson <cs@zip.com.au> 06jul97
+#	- Cameron Simpson <cs@cskk.id.au> 06jul97
 #
 
 use strict qw(vars);

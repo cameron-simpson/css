@@ -2,7 +2,7 @@
 #
 # Convenience script to open the portforwarded IBM Integrated
 # Management Module HTTP console.
-#       - Cameron Simpson <cs@zip.com.au> 18oct2010
+#       - Cameron Simpson <cs@cskk.id.au> 18oct2010
 #
 
 [ $# -gt 0 ] || { echo "Usage: $0 hosts..." >&2; exit 2; }

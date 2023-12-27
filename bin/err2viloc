@@ -3,7 +3,7 @@
 # Expecting a compile error message on stdin, pull out the filename and
 # line number and emit vi commands to go there.
 # Doesn't like files with whitespace in their names.
-#	- Cameron Simpson <cs@zip.com.au> 08sep2002
+#	- Cameron Simpson <cs@cskk.id.au> 08sep2002
 # 
 
 TMPDIR=${TMPDIR:-/tmp}

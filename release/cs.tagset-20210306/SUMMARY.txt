@@ -1,0 +1,23 @@
+ExtendedNamespace,TagSetNamespace: move the .[:alpha:]* attribute support from ExtendedNamespace to TagSetNamespace because it requires Tags.
+TagSetNamespace.__getattr__: new _i, _s, _f suffixes to return int, str or float tag values (or None); fold _lc in with these.
+Pull most of `TaggedEntity` out into `TaggedEntityMixin` for reuse by domain specific tagged entities.
+TaggedEntity: new .set and .discard methods.
+TaggedEntity: new as_editable_line, from_editable_line, edit and edit_entities methods to support editing entities using a text editor.
+ontologies: type entries are now prefixed with "type." and metadata entries are prefixed with "meta."; provide a worked ontology example in the introduction and improve related docstrings.
+TagsOntology: new .types(), .types_names(), .meta(type_name,value), .meta_names() methods.
+TagsOntology.__getitem__: create missing TagSets on demand.
+New TagsOntologyCommand, initially with a "type [type_name [{edit|list}]]" subcommand, ready for use as the cmd_ont subcommand of other tag related commands.
+TagSet: support initialisation like a dict including keywords, and move the `ontology` parameter to `_onotology`.
+TagSet: include AttrableMappingMixin to enable attribute access to values when there is no conflict with normal methods.
+UUID encode/decode support.
+Honour $TAGSET_EDITOR or $EDITOR as preferred interactive editor for tags.
+New TagSet.subtags(prefix) to extract a subset of the tags.
+TagsOntology.value_metadata: new optional convert parameter to override the default "convert human friendly name" algorithm, particularly to pass convert=str to things which are already the basic id.
+Rename TaggedEntity to TagSet.
+Rename TaggedEntities to TagSets.
+TagSet: new csvrow and from_csvrow methods imported from obsolete TaggedEntityMixin class.
+Move BaseTagFile from cs.fstags to TagFile in cs.tagset.
+TagSet: support access to the tag "c.x" via attributes provided there is no "c" tag in the way.
+TagSet.unixtime: implement the autoset-to-now semantics.
+New as_timestamp(): convert date, datetime, int or float to a UNIX timestamp.
+Assorted docstring updates and bugfixes.

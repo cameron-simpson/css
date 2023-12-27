@@ -3,7 +3,7 @@
 # Link something into my bins, usually a script.
 # Obsolete these days; I'm back to using a long PATH
 # instead of doing it The Plan 9 Way.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 for d in $HOME/bin/*.*.*/.

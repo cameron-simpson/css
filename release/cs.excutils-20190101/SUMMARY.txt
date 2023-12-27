@@ -1,0 +1,1 @@
+@logexc: handle missing func.__name__.

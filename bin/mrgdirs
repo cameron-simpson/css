@@ -2,7 +2,7 @@
 #
 # Merge directories created with mkdirn into another directory
 # of such subdirs.
-#	- Cameron Simpson <cs@zip.com.au> 31jan2001
+#	- Cameron Simpson <cs@cskk.id.au> 31jan2001
 #
 
 [ $# -gt 1 ] || { echo "$Usage: $0 targetdir dirs..." >&2; exit 2; }

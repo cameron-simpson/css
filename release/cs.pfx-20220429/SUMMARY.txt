@@ -1,0 +1,2 @@
+New Pfx.scope() context manager and Pfx.push(msg,*a) nonindenting Pfx push.
+pfxprint: new optional print_func keyword parameter.

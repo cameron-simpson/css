@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Package for images with colour tables.
-#	- Cameron Simpson <cs@zip.com.au> 05sep96
+#	- Cameron Simpson <cs@cskk.id.au> 05sep96
 #
 # Migrate to GD from GIF.	- cameron, 01nov97
 #

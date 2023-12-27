@@ -1,0 +1,6 @@
+  lib/python/cs/fileutils.py: cs.fileutils: BackedFile: redo implementation of .front_file to fix resource leak; add .__len__; add methods .spans, .front_spans and .back_spans to return information about front vs back data
+  lib/python/cs/fileutils.py: merge default ==> venti
+  lib/python/cs/fileutils.py: merge default ==> venti
+  lib/python/cs/fileutils.py: cs.fileutils: seek: bugfix: seek should return the new file offset
+  lib/python/cs/fileutils.py: cs.fileutils: BackedFile does not subclass RawIOBase, it just works like one
+  lib/python/cs/fileutils.py: cs.fileutils: add cs.lex to install_requires

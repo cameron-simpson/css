@@ -1,3 +1,3 @@
 #!/bin/sh
-# "Clean" URLshow. - Cameron Simpson <cs@zip.com.au> 07may2001
+# "Clean" URLshow. - Cameron Simpson <cs@cskk.id.au> 07may2001
 exec us -c ${1+"$@"}

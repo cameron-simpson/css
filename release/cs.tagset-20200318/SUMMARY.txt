@@ -1,0 +1,12 @@
+*Note that the TagsOntology stuff is in flux and totally alpha.*
+Tag.prefix_name factory returning a new tag if prefix is not empty, ptherwise self.
+TagSet.update: accept an optional prefix for inserting "foreign" tags with a distinguishing name prefix.
+Tag.as_json: turn sets and tuples into lists for encoding.
+Backport for Python < 3.7 (no fromisoformat functions).
+TagSet: drop unused and illplaced .titleify, .episode_title and .title methods.
+TagSet: remove "defaults", unused.
+Make TagSet a direct subclass of dict, adjust uses of .update etc.
+New ExtendedNamespace class which is a SimpleNamespace with some inferred attributes and a partial mapping API (keys and __getitem__).
+New TagSet.ns() returning the Tags as an ExtendedNamespace, which doubles as a mapping for str.format_map; TagSet.format_kwargs is now an alias for this.
+New Tag.from_string factory to parse a str into a Tag.
+New TagsOntology and TypedTag classes to provide type and value-detail information; very very alpha and subject to change.

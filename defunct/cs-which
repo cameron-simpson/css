@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Locate a command.	- Cameron Simpson <cs@zip.com.au>
+# Locate a command.	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict vars;

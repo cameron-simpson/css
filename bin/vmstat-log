@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Run vmstat with date(1) output interleaved.
-#       - Cameron Simpson <cs@zip.com.au> 29may2008
+#       - Cameron Simpson <cs@cskk.id.au> 29may2008
 #
 
 cmd=`basename "$0"`

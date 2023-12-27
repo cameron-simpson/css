@@ -1,0 +1,2 @@
+  lib/python/cs/ansi_colour.py: cs.ansi_colour: autopep8
+  lib/python/cs/ansi_colour.py: cs.colour_ansi,cs.tty: Environment :: Console and Topic :: Terminals; sort classifiers

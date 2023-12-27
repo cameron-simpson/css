@@ -1,0 +1,6 @@
+  lib/python/cs/py/func.py: cs.py.func: pep8 linting
+  lib/python/cs/py/func.py: cs.py.func: pylint
+  lib/python/cs/py/func.py: cs.py.func: pylint again
+  lib/python/cs/py/func.py: cs.py.func: @prop: raise e2, not e
+  lib/python/cs/py/func.py: my email address has changed - update Python code
+  lib/python/cs/py/func.py: cs.py.func: import fix

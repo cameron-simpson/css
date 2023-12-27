@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run command with output redirected to self-named log file.
-#	- Cameron Simpson <cs@zip.com.au> 15dec2000
+#	- Cameron Simpson <cs@cskk.id.au> 15dec2000
 #
 
 : ${LOGDIR:=$HOME/var/log}

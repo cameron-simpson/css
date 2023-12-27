@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Dump an OS X plist file as xml. Trite wrapper for a plutil(1) incantation.
+#   - Cameron Simpson <cs@cskk.id.au> 12feb2017
+#
+
+cmd=$0
+usage="Usage: $cmd [plist-file]"
+
+badopts=
+
+input=-
+[ $# = 0 ] || { input=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments after plist-file: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ "x$input" = x- ] || exec <"$input"
+
+exec plutil -convert xml1 -o - -

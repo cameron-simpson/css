@@ -1,22 +1,61 @@
-#!/bin/sh -ue
+#!/usr/bin/env python3
 #
-# Highlight content matching sed regexps with a colour.
-#	- Cameron Simpson <cs@zip.com.au> 22sep1999
+# Highlight content matching regexps with a colour.
+#	- Cameron Simpson <cs@cskk.id.au> 22sep1999
 #
 
-usage="Usage: $0 colour regexps..."
+from __future__ import print_function
+from collections import namedtuple
+import os
+from os.path import basename
+import re
+import sys
+from cs.ansi_colour import COLOURS, DEFAULT_HIGHLIGHT, make_patterns, colourise_patterns
+from cs.logutils import setup_logging, error, warning
+from cs.pfx import Pfx
 
-[ $# -ge 2 ] || { echo "missing regexps" >&2; echo "$usage" >&2; exit 2; }
-colour=$1; shift
+USAGE = '''Usage: %%s default-colour [colour:]regexp...
+  If default-colour is empty or the word "DEFAULT" then the colour
+    cs.ansi_colour.DEFAULT_HIGHT will be used (%r).
+  Known colours: %s''' % (
+    DEFAULT_HIGHLIGHT,
+    ','.join(sorted(COLOURS.keys())),
+)
 
-sedf=
-repl=`with-colour "$colour" necho '&'` \
-|| repl=`with-colour bold necho '&'` \
-|| repl='&'
+def main(argv, stdin=None, stdout=None, stderr=None):
+  if stdin is None:
+    stdin = sys.stdin
+  if stdout is None:
+    stdout = sys.stdout
+  if stderr is None:
+    stderr = sys.stderr
+  cmd = basename(argv.pop(0))
+  setup_logging(cmd)
+  usage = USAGE % (cmd,)
+  badopts = False
+  if not argv:
+    error("missing default-colour")
+    badopts = True
+  else:
+    default_colour = argv.pop(0)
+    if not default_colour or default_colour == 'DEFAULT':
+      default_colour = None
+    elif default_colour not in COLOURS:
+      error("invalid default-colour: %r", default_colour)
+      badopts = True
+  if not argv:
+    error("missing [colour:]regexp")
+    badopts = True
+  if badopts:
+    print(usage, file=stderr)
+    return 2
+  patterns = make_patterns(argv)
+  for line in stdin:
+    try:
+      stdout.write(colourise_patterns(line, patterns))
+    except BrokenPipeError:
+      return 1
+  return 0
 
-for regexp
-do  sedf="$sedf
-          s$regexp$replg"
-done
-
-exec sed "$sedf"
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

@@ -1,0 +1,2 @@
+Result.call: report baser exceptions than BaseException.
+Drop _PendingFunction abstract class.

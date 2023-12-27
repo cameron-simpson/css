@@ -1,0 +1,7 @@
+lib/python/cs/debug.py: cs.debug,cs.secret: adjust to dropping cs.logutils.{logging_level,trace_level} globals
+lib/python/cs/debug.py: cs.debug: docstring updates
+lib/python/cs/debug.py: cs.debug: autoformat
+lib/python/cs/debug.py: cs.debug: @trace: improve tracing detail
+lib/python/cs/debug.py: cs.debug,cs.py.func: move @trace from debug to py.func, defer log call imports to avoid loops
+lib/python/cs/debug.py: cs.debug: tidy up
+lib/python/cs/debug.py: cs.debug: fix requirements

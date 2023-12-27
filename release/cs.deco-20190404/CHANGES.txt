@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: new @fmtdoc decorator to format a function's doctsring against its module's globals

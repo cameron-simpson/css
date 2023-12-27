@@ -1,10 +1,10 @@
 #!/bin/sh
 #
 # Wrapper for the vnc programs.
-#	- Cameron Simpson <cs@zip.com.au> 26jul1999
+#	- Cameron Simpson <cs@cskk.id.au> 26jul1999
 #
 # Recode to act more like the "scr" script.
-#       - Cameron Simpson <cs@zip.com.au> 03nov2006
+#       - Cameron Simpson <cs@cskk.id.au> 03nov2006
 #
 
 trace=set-x

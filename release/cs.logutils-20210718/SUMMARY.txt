@@ -1,0 +1,1 @@
+setup_logging: new supplant_root_logger=False parameter to pop the existing handler, typical use supplant_root_logger=sys.stderr.isatty().

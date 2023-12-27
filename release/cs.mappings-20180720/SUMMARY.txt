@@ -1,0 +1,1 @@
+Initial PyPI release specificly for named_column_tuple and named_column_tuples.

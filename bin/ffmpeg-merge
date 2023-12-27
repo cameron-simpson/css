@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Trite FFMpeg incantation to merge multiple streams (eg a video
+# stream and an audio stream) to standard output.
+#   - Cameron Simpson <cs@cskk.id.au> 13jan2017
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd output-file input-files..."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing output-file" >&2
+  badopts=1
+else
+  output=$1
+  shift
+  if [ -e "$output" ]
+  then
+    echo "$cmd: output already exists: $output" >&2
+    badopts=1
+  fi
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing input-files" >&2
+  badopts=1
+fi
+
+first=1
+for f
+do
+  [ -e "$f" ] || { echo "$cmd: missing input-file: $f" >&2
+                   badopts=1
+                   continue
+                 }
+  if [ $first ]
+  then  set -- ffmpeg -i "$f"; first=
+  else  set -- "$@" -i "$f"
+  fi
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+exec "$@" -acodec copy -vcodec copy "$output"

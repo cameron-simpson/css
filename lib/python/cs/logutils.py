@@ -1,111 +1,236 @@
 #!/usr/bin/python
 #
 # Convenience routines for logging.
-#       - Cameron Simpson <cs@zip.com.au> 29aug2009
+#       - Cameron Simpson <cs@cskk.id.au> 29aug2009
 #
 
+r'''
+Logging convenience routines.
+
+The logging package is very useful, but a little painful to use.
+This package provides low impact logging setup and some extremely
+useful if unconventional context hooks for logging.
+
+The default logging verbosity output format has different defaults
+based on whether an output log file is a tty
+and whether the environment variable `$DEBUG` is set, and to what.
+
+On terminals warnings and errors get ANSI colouring.
+
+A mode is available that uses `cs.upd` for certain log levels.
+
+Log messages dispatched via `warning` and friends from this module
+are automatically prefixed with the current `cs.pfx` prefix string,
+providing automatic message context.
+
+Some examples:
+--------------
+
+Program initialisation:
+
+    from cs.logutils import setup_logging
+
+    def main(argv):
+        cmd = os.path.basename(argv.pop(0))
+        setup_logging(cmd)
+
+Basic logging from anywhere:
+
+    from cs.logutils import info, warning, error
+    [...]
+    def some_function(...):
+        [...]
+        error("nastiness found! bad value=%r", bad_value)
+'''
+
 from __future__ import with_statement
+import codecs
+from contextlib import contextmanager
+try:
+  import importlib
+except ImportError:
+  importlib = None
+import logging
+from logging import Formatter, StreamHandler
+import os
+import os.path
+from pprint import pformat
+import stat
+import sys
+from threading import Lock
+import time
+import traceback
+from types import SimpleNamespace as NS
+from cs.ansi_colour import colourise, env_no_color
+from cs.context import stackattrs
+from cs.deco import fmtdoc, logging_wrapper
+from cs.lex import is_dotted_identifier
+import cs.pfx
+from cs.pfx import Pfx, XP
+from cs.py.func import funccite
+
+__version__ = '20230212-post'
 
 DISTINFO = {
-    'description': "Logging convenience routines.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.ansi_colour', 'cs.excutils', 'cs.obj', 'cs.py3'],
+    ],
+    'install_requires': [
+        'cs.ansi_colour>=20200729',
+        'cs.context>=stackable_state',
+        'cs.deco',
+        'cs.lex',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.upd',
+    ],
 }
 
-import codecs
-from contextlib import contextmanager
-import logging
-from logging import Formatter, StreamHandler
-import os
-import os.path
-import stat
-import sys
-import time
-import threading
-from threading import Lock
-import traceback
-from cs.ansi_colour import colourise
-from cs.excutils import noexc
-from cs.obj import O_str
-from cs.py3 import unicode, StringTypes, ustr
-
-cmd = __file__
-
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
-DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
-DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
+DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'
+DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
-logging_level = logging.INFO
-trace_level = logging.DEBUG
+# High level action tracking, above INFO and below WARNING.
+TRACK = logging.INFO + 5
+
+# Quiet messaging, below TRACK and above the rest.
+QUIET = TRACK - 1
+
+# Special status line tracking, above INFO and below TRACK and WARNING
+STATUS = QUIET - 1
+
+# Special verbose value, below INFO but above DEBUG.
+VERBOSE = logging.INFO - 1
+
+# check the hierarchy
+assert (
+    logging.DEBUG < VERBOSE < logging.INFO < STATUS < QUIET < TRACK <
+    logging.WARNING
+)
+
+loginfo = None
 D_mode = False
 
 def ifdebug():
-  global logging_level
-  return logging_level <= logging.DEBUG
-
-def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None):
-  ''' Arrange basic logging setup for conventional UNIX command
-      line error messaging.
-      Sets cs.logging.cmd to `cmd_name`; default from sys.argv[0].
-      If `main_log` is None, the main log will go to sys.stderr; if
-      `main_log` is a string, is it used as a filename to open in append
-      mode; otherwise main_log should be a stream suitable for use
-      with logging.StreamHandler().
-      if `format` is None, use DEFAULT_PFX_FORMAT_TTY when main_log is a tty
-      or FIFO, otherwise DEFAULT_PFX_FORMAT.
-      If `level` is None, infer a level from the environment using
-      infer_logging_level().
-      If `flags` is None, infer the flags from the environment using
-      infer_logging_level().
-      If `upd_mode` is None, set it to True if flags contains 'UPD',
-      otherwise to False if flags contains 'NOUPD', otherwise set
-      it from main_log.isatty().
-      A true value causes the root logger to use cs.upd for logging.
-      If `ansi_mode` is None, set it from main_log.isatty().
-      A true value causes the root logger to colour certain logging levels
-      using ANSI terminal sequences (currently only if cs.upd is used).
-      If `trace_mode` is None, set it according to the presence of
-      'TRACE' in flags.
-      If trace_mode is true, set the global trace_level to logging_level;
-      it defaults to logging.DEBUG.
-      Returns the logging level.
+  ''' Test the `loginfo.level` against `logging.DEBUG`.
   '''
-  global cmd, logging_level, trace_level, D_mode
+  global loginfo  # pylint: disable=global-statement
+  if loginfo is None:
+    loginfo = setup_logging()
+  return loginfo.level <= logging.DEBUG
 
-  default_level, default_flags = infer_logging_level()
+# pylint: disable=too-many-branches,too-many-statements,too-many-locals
+# pylint: disable=too-many-arguments,redefined-builtin
+def setup_logging(
+    cmd_name=None,
+    main_log=None,
+    format=None,
+    level=None,
+    flags=None,
+    upd_mode=None,
+    ansi_mode=None,
+    trace_mode=None,
+    module_names=None,
+    function_names=None,
+    verbose=None,
+    supplant_root_logger=False,
+):
+  ''' Arrange basic logging setup for conventional UNIX command
+      line error messaging; return an object with informative attributes.
+      That object is also available as the global `cs.logutils.loginfo`.
+
+      Amongst other things, the default logger now includes
+      the `cs.pfx` prefix in the message.
+
+      This function runs in two modes:
+      - if logging has not been set up, it sets up a root logger
+      - if the root logger already has handlers,
+        monkey patch the first handler's formatter to prefix the `cs.pfx` state
+
+      Parameters:
+      * `cmd_name`: program name, default from `basename(sys.argv[0])`.
+        Side-effect: sets `cs.pfx.cmd` to this value.
+      * `main_log`: default logging system.
+        If `None`, the main log will go to `sys.stderr`;
+        if `main_log` is a string, is it used as a filename to
+        open in append mode;
+        otherwise main_log should be a stream suitable
+        for use with `logging.StreamHandler()`.
+        The resulting log handler is added to the `logging` root logger.
+      * `format`: the message format for `main_log`.
+        If `None`, use `DEFAULT_PFX_FORMAT_TTY`
+        when `main_log` is a tty or FIFO,
+        otherwise `DEFAULT_PFX_FORMAT`.
+      * `level`: `main_log` logging level.
+        If `None`, infer a level from the environment
+        using `infer_logging_level()`.
+      * `flags`: a string containing debugging flags separated by commas.
+        If `None`, infer the flags from the environment using
+        `infer_logging_level()`.
+        The following flags have meaning:
+        `D`: set cs.logutils.D_mode to True;
+        `TDUMP`: attach a signal handler to SIGHUP to do a thread stack dump;
+        `TRACE`: enable various noisy tracing facilities;
+        `UPD`, `NOUPD`: set the default for `upd_mode` to True or False respectively.
+      * `upd_mode`: a Boolean to activate cs.upd as the `main_log` method;
+        if `None`, set it to `True` if `flags` contains 'UPD',
+        otherwise to `False` if `flags` contains 'NOUPD',
+        otherwise set it from `main_log.isatty()`.
+        A true value causes the root logger to use `cs.upd` for logging.
+      * `ansi_mode`: if `None`,
+        set it from `main_log.isatty() and not cs.colourise.env_no_color()`,
+        which thus honours the `$NO_COLOR` environment variable
+        (see https://no-color.org/ for the convention).
+        A true value causes the root logger to colour certain logging levels
+        using ANSI terminal sequences (currently only if `cs.upd` is used).
+      * `trace_mode`: if `None`, set it according to the presence of
+        'TRACE' in flags. Otherwise if `trace_mode` is true, set the
+        global `loginfo.trace_level` to `loginfo.level`; otherwise it defaults
+        to `logging.DEBUG`.
+      * `verbose`: if `None`, then if stderr is a tty then the log
+        level is `INFO` otherwise `WARNING`. Otherwise, if `verbose` is
+        true then the log level is `INFO` otherwise `WARNING`.
+  '''
+  global D_mode, loginfo  # pylint: disable=global-statement
+
+  # infer logging modes, these are the initial defaults
+  inferred = infer_logging_level(verbose=verbose)
   if level is None:
-    level = default_level
+    level = inferred.level
   if flags is None:
-    flags = default_flags
+    flags = inferred.flags
+  if module_names is None:
+    module_names = inferred.module_names
+  if function_names is None:
+    function_names = inferred.function_names
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
-  cmd = cmd_name
+  cs.pfx.cmd = cmd_name
 
   if main_log is None:
     main_log = sys.stderr
-  elif type(main_log) is str:
-    main_log = open(main_log, "a")
+  elif isinstance(main_log, str):
+    # pylint: disable=consider-using-with
+    main_log = open(main_log, "a", encoding='utf-8')
 
   # determine some attributes of main_log
   try:
     fd = main_log.fileno()
   except (AttributeError, IOError):
     is_fifo = False
-    is_reg = False
+    ##is_reg = False                        # unused
     is_tty = False
   else:
     st = os.fstat(fd)
     is_fifo = stat.S_ISFIFO(st.st_mode)
-    is_reg = stat.S_ISREG(st.st_mode)
+    ##is_reg = stat.S_ISREG(st.st_mode)     # unused
     is_tty = stat.S_ISCHR(st.st_mode)
 
-  if main_log.encoding is None:
+  if getattr(main_log, 'encoding', None) is None:
     main_log = codecs.getwriter("utf-8")(main_log)
 
   if trace_mode is None:
@@ -123,7 +248,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       upd_mode = is_tty
 
   if ansi_mode is None:
-    ansi_mode = is_tty
+    ansi_mode = is_tty and not env_no_color()
 
   if format is None:
     if is_tty or is_fifo:
@@ -133,92 +258,264 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   if 'TDUMP' in flags:
     # do a thread dump to the main_log on SIGHUP
+    # pylint: disable=import-outside-toplevel
     import signal
-    import cs.debug
-    def handler(sig, fr):
-      cs.debug.thread_dump(None, main_log)
+    import cs.debug as cs_debug
+
+    # pylint: disable=unused-argument
+    def handler(sig, frame):
+      cs_debug.thread_dump(None, main_log)
+
     signal.signal(signal.SIGHUP, handler)
 
+  upd_ = None
   if upd_mode:
-    main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
-  else:
-    main_handler = logging.StreamHandler(main_log)
+    from cs.upd import Upd  # pylint: disable=import-outside-toplevel
+    upd_ = Upd()
 
-  rootLogger = logging.getLogger()
-  rootLogger.setLevel(level)
-  main_handler.setFormatter(PfxFormatter(format))
-  rootLogger.addHandler(main_handler)
-  logging_level = level
+  root_logger = logging.getLogger()
+  if root_logger.handlers:
+    # The logging system is already set up.
+    # Just monkey patch the leading handler's formatter.
+    PfxFormatter.patch_formatter(root_logger.handlers[0].formatter)
+  else:
+    # Set up a handler etc.
+    main_handler = logging.StreamHandler(main_log)
+    if upd_mode:
+      main_handler = UpdHandler(
+          main_log, ansi_mode=ansi_mode, over_handler=main_handler
+      )
+      upd_ = main_handler.upd
+    root_logger.setLevel(level)
+    if loginfo is None:
+      # only do this the first time
+      # TODO: fix this clumsy hack, some kind of stackable state?
+      main_handler.setFormatter(PfxFormatter(format))
+      if supplant_root_logger:
+        root_logger.handlers.pop(0)
+      root_logger.addHandler(main_handler)
+
   if trace_mode:
-    trace_level = logging_level
-  return level
+    # enable tracing in the thread that called setup_logging
+    Pfx._state.trace = info
+    trace_level = level
+  else:
+    trace_level = logging.DEBUG
+
+  if module_names or function_names:
+    if importlib is None:
+      warning(
+          "setup_logging: no importlib (python<2.7?),"
+          " ignoring module_names=%r/function_names=%r", module_names,
+          function_names
+      )
+    else:
+      for module_name in module_names:
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError:
+          warning("setup_logging: cannot import %r", module_name)
+        else:
+          M.DEBUG = True
+      for module_name, func_name in function_names:
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError:
+          warning("setup_logging: cannot import %r", module_name)
+          continue
+        F = M
+        for funcpart in func_name.split('.'):
+          M = F
+          try:
+            F = M.getattr(funcpart)
+          except AttributeError:
+            F = None
+            break
+        if F is None:
+          warning("no %s.%s() found", module_name, func_name)
+        else:
+          setattr(M, funcpart, _ftrace(F))
+
+  loginfo = NS(
+      logger=root_logger,
+      level=level,
+      verbose=verbose,
+      trace_level=trace_level,
+      flags=flags,
+      module_names=module_names,
+      function_names=function_names,
+      cmd=cmd_name,
+      upd=upd_,
+      upd_mode=upd_mode,
+      ansi_mode=ansi_mode,
+      format=format,
+  )
+
+  return loginfo
+
+def ftrace(func):
+  ''' Decorator to trace a function if `__module__.DEBUG` is true.
+  '''
+  M = func.__module__
+
+  def func_wrap(*a, **kw):
+    do_debug = M.__dict__.get('DEBUG', False)
+    wrapper = _ftrace(func) if do_debug else func
+    return wrapper(*a, **kw)
+
+  return func_wrap
+
+def _ftrace(func):
+  ''' Decorator to trace the call and return of a function.
+  '''
+  fname = '.'.join((func.__module__, funccite(func)))
+
+  def traced_func(*a, **kw):
+    citation = "%s(*%s, **%s)" % (
+        fname, pformat(a, depth=1), pformat(kw, depth=2)
+    )
+    XP("CALL %s", citation)
+    try:
+      result = func(*a, **kw)
+    except Exception as e:
+      XP("EXCEPTION from %s: %s %s", citation, type(e), e)
+      raise
+    else:
+      XP("RESULT from %s: %r", citation, result)
+      return result
+
+  return traced_func
 
 class PfxFormatter(Formatter):
-  ''' A Formatter subclass that has access to the program's cmd and Pfx state.
+  ''' A Formatter subclass that has access to the program's `cmd` and `Pfx` state.
   '''
 
-  def __init__(self, fmt=None, datefmt=None, cmd=None, context_level=None):
-    ''' Initialise the PfxFormatter.
-        `fmt` and `datefmt` are passed to Formatter.
-        If `fmt` is None, DEFAULT_PFX_FORMAT is used.
-        If `cmd` is not None, the message is prefixed with the string `cmd`.
-        If `context_level` is None, records with .level < context_level will not have the Pfx state inserted at the front of the message.
+  @fmtdoc
+  def __init__(self, fmt=None, datefmt=None, cmd=None):
+    ''' Initialise the `PfxFormatter`.
+
+        Parameters:
+        * `fmt`: format template,
+          default from `DEFAULT_PFX_FORMAT` `{DEFAULT_PFX_FORMAT!r}`.
+          Passed through to `Formatter.__init__`.
+        * `datefmt`:
+          Passed through to `Formatter.__init__`.
+        * `cmd`: the "command prefix" made available to format strings.
+          If not set, `cs.pfx.cmd` is presented.
     '''
+    if fmt is None:
+      fmt = DEFAULT_PFX_FORMAT
     self.cmd = cmd
-    self.context_level = context_level
     Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
 
   def format(self, record):
-    ''' Set .cmd and .pfx to the global cmd and Pfx context prefix respectively, then call Formatter.format.
+    ''' Set `record.cmd` and `record.pfx`
+        to the global `cmd` and `Pfx` context prefix respectively,
+        then call `Formatter.format`.
     '''
-    record.cmd = self.cmd if self.cmd else globals()['cmd']
+    record.cmd = self.cmd if self.cmd else cs.pfx.cmd
     record.pfx = Pfx._state.prefix
     try:
-      fmts = Formatter.format(self, record)
+      s = Formatter.format(self, record)
     except TypeError as e:
-      X("cs.logutils.format: record=%r, self=%s: %s", record, self, e)
-      X("record=%s", record.__dict__)
-      X("self=%s", self.__dict__)
+      XP(
+          "cs.logutils: PfxFormatter.format: record=%r, self=%s: %s", record,
+          self, e
+      )
       raise
-    message_parts = []
-    if self.context_level is None or record.level >= self.context_level:
-      message_parts.append(self.formatTime(record))
-      message_parts.append(record.pfx)
-    message_parts.append(record.message)
-    record.message = ': '.join(message_parts)
-    return record.message
+    record.message = s
+    return s
 
-def infer_logging_level():
-  ''' Infer a logging level from the environment.
-      Usually default to logging.WARNING, but if sys.stderr is a terminal,
-      default to logging.INFO.
-      Parse the environment variable $DEBUG as a comma separated
+  @staticmethod
+  def patch_formatter(formatter):
+    ''' Monkey patch an existing `Formatter` instance
+        with a `format` method which prepends the current `Pfx` prefix.
+    '''
+    if isinstance(formatter, PfxFormatter):
+      return
+    try:
+      getattr(formatter, 'PfxFormatter__monkey_patched')
+    except AttributeError:
+      old_format = formatter.format
+
+      def new_format(record):
+        ''' Call the former `formatter.format` method
+            and prepend the current `Pfx` prefix to the start.
+        '''
+        ##msg0 = record.msg
+        ##args0 = record.args
+        cur_pfx = Pfx._state.prefix
+        if not cur_pfx:
+          return old_format(record)
+        if not isinstance(record.args, tuple):
+          # TODO: dict support
+          return old_format(record)
+        if record.args:
+          new_msg = '%s' + str(record.msg)
+          new_args = (cur_pfx + cs.pfx.DEFAULT_SEPARATOR,) + tuple(record.args)
+        else:
+          new_msg = cur_pfx + cs.pfx.DEFAULT_SEPARATOR + str(record.msg)
+          new_args = record.args
+        try:
+          with stackattrs(record, msg=new_msg, args=new_args):
+            return old_format(record)
+        except Exception as e:  # pylint: disable=broad-except
+          # unsupported in some way, fall back to the original
+          # and lose the prefix
+          return old_format(record)
+
+      formatter.format = new_format
+      formatter.PfxFormatter__monkey_patched = True
+
+# pylint: disable=too-many-branches,too-many-statements,redefined-outer-name
+def infer_logging_level(env_debug=None, environ=None, verbose=None):
+  ''' Infer a logging level from the `env_debug`, which by default
+      comes from the environment variable `$DEBUG`.
+
+      Usually default to `logging.WARNING`, but if `sys.stderr` is a terminal,
+      default to `logging.INFO`.
+
+      Parse the environment variable `$DEBUG` as a comma separated
       list of flags.
+
       Examine the in sequence flags to affect the logging level:
-        numeric < 1 => logging.WARNING
-        numeric >= 1 and < 2: logging.INFO
-        numeric >= 2 => logging.DEBUG
-        "DEBUG" => logging.DEBUG
-        "INFO"  => logging.INFO
-        "WARNING" => logging.WARNING
-        "ERROR" => logging.ERROR
-      Return the inferred logging level and the flags.
+      * numeric < 1: `logging.WARNING`
+      * numeric >= 1 and < 2: `logging.INFO`
+      * numeric >= 2: `logging.DEBUG`
+      * `"DEBUG"`: `logging.DEBUG`
+      * `"STATUS"`: `STATUS`
+      * `"INFO"`: `logging.INFO`
+      * `"TRACK"`: `TRACK`
+      * `"WARNING"`: `logging.WARNING`
+      * `"ERROR"`: `logging.ERROR`
+
+      Return an object with the following attributes:
+      * `.level`: A logging level.
+      * `.flags`: All the words from `$DEBUG` as separated by commas and uppercased.
+      * `.module_names`: Module names to be debugged.
+      * `.function_names`: Functions to be traced in the form *module_name*`.`*func_name*.
   '''
-  level = logging.WARNING
-  if sys.stderr.isatty():
-    level = logging.INFO
-  env_debug = os.environ.get('DEBUG', '')
-  flags = [ F.upper() for F in env_debug.split(',') if len(F) ]
-  for flag in flags:
-    if flag == 'DEBUG':
-      level = logging.DEBUG
-    elif flag == 'INFO':
-      level = logging.INFO
-    elif flag == 'WARN' or flag == 'WARNING':
+  if env_debug is None:
+    if environ is None:
+      environ = os.environ
+    env_debug = environ.get('DEBUG', '')
+  if verbose is None:
+    if sys.stderr.isatty():
+      level = TRACK
+    else:
       level = logging.WARNING
-    elif flag == 'ERROR':
-      level = logging.ERROR
-    elif flag.isdigit():
+  elif verbose:
+    level = logging.VERBOSE
+  else:
+    level = logging.WARNING
+  flags = [F.upper() for F in env_debug.split(',') if len(F)]
+  module_names = []
+  function_names = []
+  for flag in env_debug.split(','):
+    flag = flag.strip()
+    if not flag:
+      continue
+    if flag.isdigit():
       flag_level = int(flag)
       if flag_level < 1:
         level = logging.WARNING
@@ -226,63 +523,71 @@ def infer_logging_level():
         level = logging.DEBUG
       else:
         level = logging.INFO
-  return level, flags
+    elif flag[0].islower() and is_dotted_identifier(flag):
+      # modulename
+      module_names.append(flag)
+    elif ':' in flag:
+      # module:funcname
+      module_name, func_name = flag.split(':', 1)
+      if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
+        function_names.append((module_name, func_name))
+    else:
+      uc_flag = flag.upper()
+      if uc_flag == 'DEBUG':
+        level = logging.DEBUG
+      elif uc_flag == 'STATUS':
+        level = STATUS
+      elif uc_flag == 'INFO':
+        level = logging.INFO
+      elif uc_flag == 'TRACK':
+        level = TRACK
+      # pylint: disable=consider-using-in
+      elif uc_flag == 'WARN' or uc_flag == 'WARNING':
+        level = logging.WARNING
+      elif uc_flag == 'ERROR':
+        level = logging.ERROR
+  return NS(
+      level=level,
+      flags=flags,
+      module_names=module_names,
+      function_names=function_names
+  )
 
 def D(msg, *args):
-  ''' Print formatted debug string straight to sys.stderr if D_mode is true,
-      bypassing the logging modules entirely.
+  ''' Print formatted debug string straight to `sys.stderr` if
+      `D_mode` is true, bypassing the logging modules entirely.
       A quick'n'dirty debug tool.
   '''
+  # pylint: disable=global-statement
   global D_mode
   if D_mode:
-    X(msg, *args)
+    XP(msg, *args)
 
-def X(msg, *args):
-  ''' Unconditionally write the message `msg` to sys.stderr.
-      If `args` is not empty, format `msg` using %-expansion with `args`.
-  '''
-  return nl(msg, *args, file=sys.stderr)
+# pylint: disable=too-many-arguments,redefined-builtin
+def add_logfile(
+    filename,
+    logger=None,
+    mode='a',
+    encoding=None,
+    delay=False,
+    format=None,
+    no_prefix=False
+):
+  ''' Add a `FileHandler` logging to the specified `filename`;
+      return the chosen logger and the new handler.
 
-def nl(msg, *args, **kw):
-  ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
-      If `args` is not empty, format `msg` using %-expansion with `args`.
-  '''
-  try:
-    file = kw.pop('file')
-  except KeyError:
-    file = sys.stdout
-  if kw:
-    raise ValueError("unexpected keyword arguments: %r" % (kw,))
-  msg = str(msg)
-  if args:
-    omsg = msg
-    try:
-      msg = msg % args
-    except TypeError as e:
-      nl("cannot expand msg: %s; msg=%r, args=%r", e, msg, args, file=sys.stderr)
-      msg = "%s[%r]" % (msg, args)
-  file.write(msg)
-  file.write("\n")
-  try:
-    flush = file.flush
-  except AttributeError:
-    pass
-  else:
-    flush()
-
-def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None, no_prefix=False):
-  ''' Add a FileHandler logging to the specified `filename`; return the chosen logger and the new handler.
-      If `logger` is supplied and not None, add the FileHandler to that
-      Logger, otherwise to the root Logger. If `logger` is a string, call
-      logging.getLogger(logger) to obtain the logger.
-      `mode`, `encoding` and `delay` are passed to the logging.FileHandler
-      initialiser.
-      `format` is used to override the handler's default format.
-      `no_prefix`: do not put the Pfx context onto the front of the message.
+      Parameters:
+      * `logger`: if supplied and not `None`, add the `FileHandler` to that
+        `Logger`, otherwise to the root Logger. If `logger` is a string, call
+        `logging.getLogger(logger)` to obtain the logger.
+      * `mode`, `encoding` and `delay`: passed to the `FileHandler`
+        initialiser.
+      * `format`: used to override the handler's default format.
+      * `no_prefix`: if true, do not put the `Pfx` context onto the front of the message.
   '''
   if logger is None:
     logger = logging.getLogger()
-  elif type(logger) is str:
+  elif isinstance(logger, str):
     logger = logging.getLogger(logger)
   handler = logging.FileHandler(filename, mode, encoding, delay)
   if no_prefix:
@@ -295,21 +600,30 @@ def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=
   logger.addHandler(handler)
   return logger, handler
 
-logTo = add_log
+logTo = add_logfile
 
 @contextmanager
 def with_log(filename, **kw):
-  logger, handler = add_log(filename, **kw)
-  yield logger, handler
-  logger.removeHandler(handler)
+  ''' Context manager to add a `Logger` to the output logs temporarily.
+  '''
+  logger, handler = add_logfile(filename, **kw)
+  try:
+    yield logger, handler
+  finally:
+    logger.removeHandler(handler)
 
 class NullHandler(logging.Handler):
+  ''' A `Handler` which discards its requests.
+  '''
+
   def emit(self, record):
-    pass
+    ''' Discard the log record.
+    '''
 
 __logExLock = Lock()
+
 def logException(exc_type, exc_value, exc_tb):
-  ''' Replacement for sys.excepthook that reports via the cs.logutils
+  ''' Replacement for `sys.excepthook` that reports via the `cs.logutils`
       logging wrappers.
   '''
   with __logExLock:
@@ -317,366 +631,235 @@ def logException(exc_type, exc_value, exc_tb):
     sys.excepthook = sys.__excepthook__
     exception("EXCEPTION: %s:%s" % (exc_type, exc_value))
     for line in traceback.format_exception(exc_type, exc_value, exc_tb):
-      exception("EXCEPTION> "+line)
+      exception("EXCEPTION> " + line)
     sys.excepthook = curhook
 
-class _PfxThreadState(threading.local):
-  ''' _PfxThreadState is a thread local class to track Pfx stack state.
-  '''
-
-  def __init__(self):
-    self.raise_needs_prefix = False
-    self.stack = []
-
-  @property
-  def cur(self):
-    ''' .cur is the current/topmost Pfx instance.
-    '''
-    global cmd
-    stack = self.stack
-    if not stack:
-      # I'd do this in __init__ except that cs.logutils.cmd may get set too late
-      stack.append(Pfx(cmd))
-    return stack[-1]
-
-  @property
-  def prefix(self):
-    ''' Return the prevailing message prefix.
-    '''
-    marks = []
-    for P in reversed(list(self.stack)):
-      marks.append(P.umark)
-      if P.absolute:
-        break
-    return unicode(': ').join(reversed(marks))
-
-  def append(self, P):
-    ''' Push a new Pfx instance onto the stack.
-    '''
-    self.stack.append(P)
-
-  def pop(self):
-    ''' Pop a Pfx instance from the stack.
-    '''
-    return self.stack.pop()
-
-def OBSOLETE(func):
-  ''' Decorator for obsolete functions.
-      Use:
-        @OBSOLETE
-        def f(...):
-  '''
-  def wrapped(*args, **kwargs):
-    import traceback
-    frame = traceback.extract_stack(None, 2)[0]
-    warning("OBSOLETE call to %s:%d %s(), called from %s:%d %s",
-         func.__code__.co_filename, func.__code__.co_firstlineno,
-         func.__name__, frame[0], frame[1], frame[2])
-    return func(*args, **kwargs)
-  return wrapped
-
-def pfx_iter(tag, iter):
-  ''' Wrapper for iterators to prefix exceptions with `tag`.
-  '''
-  with Pfx(tag):
-    for i in iter:
-      yield i
-
-def pfx(func):
-  ''' Decorator for functions that should run inside:
-        with Pfx(func_name):
-      Use:
-        @pfx
-        def f(...):
-  '''
-  def wrapped(*args, **kwargs):
-    with Pfx(func.__name__):
-      return func(*args, **kwargs)
-  return wrapped
-
-def pfxtag(tag, loggers=None):
-  ''' Decorator for functions that should run inside:
-        with Pfx(tag, loggers=loggers):
-      Use:
-        @pfxtag(tag)
-        def f(...):
-  '''
-  def wrap(func):
-    if tag is None:
-      wraptag = func.__name__
-    else:
-      wraptag = tag
-    def wrapped(*args, **kwargs):
-      with Pfx(wraptag, loggers=loggers):
-        return func(*args, **kwargs)
-    return wrapped
-  return wrap
-
-class Pfx(object):
-  ''' A context manager to maintain a per-thread stack of message prefices.
-  '''
-
-  # instantiate the thread-local state object
-  _state = _PfxThreadState()
-
-  def __init__(self, mark, *args, **kwargs):
-    absolute = kwargs.pop('absolute', False)
-    loggers = kwargs.pop('loggers', None)
-    if kwargs:
-      raise TypeError("unsupported keyword arguments: %r" % (kwargs,))
-
-    self.mark = mark
-    self.mark_args = args
-    self.absolute = absolute
-    self._umark = None
-    self._loggers = None
-    if loggers is not None:
-      if not hasattr(loggers, '__getitem__'):
-        loggers = (loggers, )
-      self.logto(loggers)
-
-  def __enter__(self):
-    _state = self._state
-    _state.append(self)
-    _state.raise_needs_prefix = True
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    _state = self._state
-    if exc_value is not None:
-      if _state.raise_needs_prefix:
-        prefix = self._state.prefix
-        ##prefixify = lambda text: prefix + ': ' + text.replace('\n', '\n'+prefix)
-        def prefixify(text):
-          X("prefixy(text=%r)", text)
-          if not isinstance(text, StringTypes):
-            D("%s: not a string, not prefixing: %r", prefix, text)
-            return text
-          return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
-        if hasattr(exc_value, 'args'):
-          args = exc_value.args
-          if args:
-            if isinstance(args, StringTypes):
-              D("%s: expected args to be a tuple, got %r", prefix, args)
-              args = prefixify(args)
-            else:
-              args = list(args)
-              if len(exc_value.args) == 0:
-                args = prefix
-              else:
-                args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
-            exc_value.args = args
-        elif hasattr(exc_value, 'message'):
-          exc_value.message = prefixify(str(exc_value.message))
-        elif hasattr(exc_value, 'reason'):
-          if isinstance(exc_value.reason, StringTypes):
-            exc_value.reason = prefixify(exc_value.reason)
-          else:
-            warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
-        elif hasattr(exc_value, 'msg'):
-          exc_value.msg = prefixify(str(exc_value.msg))
-        else:
-          # we can't modify this exception - at least report the current prefix state
-          D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
-          error(prefixify(str(exc_value)))
-        # prevent outer Pfx wrappers from hacking stuff as well
-        _state.raise_needs_prefix = False
-    _state.pop()
-    return False
-
-  @property
-  def umark(self):
-    ''' Return the unicode message mark for use with this Pfx.
-        Used by Pfx._state.prefix to compute to full prefix.
-    '''
-    u = self._umark
-    if u is None:
-      mark = ustr(self.mark)
-      if not isinstance(mark, unicode):
-        mark = unicode(mark, errors='replace')
-      u = mark
-      if self.mark_args:
-        u = u % self.mark_args
-      self._umark = u
-    return u
-
-  def logto(self, newLoggers):
-    ''' Define the Loggers anew.
-    '''
-    self._loggers = newLoggers
-
-  def partial(self, func, *a, **kw):
-    ''' Return a function that will run the supplied function `func`
-        within a surrounding Pfx context with the current mark string.
-        This is intended for deferred call facilities like
-        WorkerThreadPool, Later, and futures.
-    '''
-    pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
-    def pfxfunc():
-      with pfx2:
-        return func(*a, **kw)
-    return pfxfunc
-
-  @property
-  def loggers(self):
-    ''' Return the loggers to use for this Pfx instance.
-    '''
-    _loggers = self._loggers
-    if _loggers is None:
-      for P in reversed(self._state.stack):
-        if P._loggers is not None:
-          _loggers = P._loggers
-          break
-      if _loggers is None:
-        _loggers = (logging.getLogger(),)
-    return _loggers
-
-  enter = __enter__
-  exit = __exit__
-
-  # Logger methods
-  def exception(self, msg, *args):
-    for L in self.loggers:
-      L.exception(msg, *args)
-  @noexc
-  def log(self, level, msg, *args, **kwargs):
-    ## to debug format errors ## D("msg=%r, args=%r, kwargs=%r", msg, args, kwargs)
-    for L in self.loggers:
-      L.log(level, msg, *args, **kwargs)
-  def debug(self, msg, *args, **kwargs):
-    self.log(logging.DEBUG, msg, *args, **kwargs)
-  def info(self, msg, *args, **kwargs):
-    self.log(logging.INFO, msg, *args, **kwargs)
-  def warning(self, msg, *args, **kwargs):
-    self.log(logging.WARNING, msg, *args, **kwargs)
-  @OBSOLETE
-  def warn(self, *args, **kwargs):
-    self.warning(*args, **kwargs)
-  def error(self, msg, *args, **kwargs):
-    self.log(logging.ERROR, msg, *args, **kwargs)
-  def critical(self, msg, *args, **kwargs):
-    self.log(logging.CRITICAL, msg, *args, **kwargs)
-
-class PfxCallInfo(Pfx):
-  ''' Subclass of Pfx to insert current function an caller into messages.
-  '''
-
-  def __init__(self):
-    import traceback
-    grandcaller, caller, myframe = traceback.extract_stack(None, 3)
-    Pfx.__init__(self,
-                 "at %s:%d %s(), called from %s:%d %s()",
-                 caller[0], caller[1], caller[2],
-                 grandcaller[0], grandcaller[1], grandcaller[2])
-
 # Logger public functions
-def exception(msg, *args):
-  Pfx._state.cur.exception(msg, *args)
-@noexc
-def log(level, msg, *args, **kwargs):
-  Pfx._state.cur.log(level, msg, *args, **kwargs)
-def debug(msg, *args, **kwargs):
-  log(logging.DEBUG, msg, *args, **kwargs)
-def info(msg, *args, **kwargs):
-  log(logging.INFO, msg, *args, **kwargs)
-def warning(msg, *args, **kwargs):
-  log(logging.WARNING, msg, *args, **kwargs)
-@OBSOLETE
-def warn(*args, **kwargs):
-  warning(*args, **kwargs)
-def error(msg, *args, **kwargs):
-  log(logging.ERROR, msg, *args, **kwargs)
-def critical(msg, *args, **kwargs):
-  log(logging.CRITICAL, msg, *args, **kwargs)
-def trace(msg, *args, **kwargs):
-  log(trace_level, msg, *args, **kwargs)
-
-def listargs(args, kwargs, tostr=None):
-  ''' Take the list 'args' and dict 'kwargs' and return a list of
-      strings representing them for printing.
+def exception(msg, *args, **kwargs):
+  ''' Emit an exception log with the current `Pfx` prefix.
   '''
-  if tostr is None:
-    tostr = unicode
-  arglist = [ tostr(A) for A in args ]
-  kw=kwargs.keys()
-  if kw:
-    kw.sort()
-    for k in kw:
-      arglist.append("%s=%s" % (k, tostr(kwargs[k])))
-  return arglist
+  Pfx._state.cur.exception(msg, *args, **kwargs)
 
+@logging_wrapper
+def log(level, msg, *args, **kwargs):
+  ''' Emit a log at the specified level with the current `Pfx` prefix.
+  '''
+  Pfx._state.cur.log(level, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def debug(msg, *args, **kwargs):
+  ''' Emit a log at `logging.DEBUG` level with the current `Pfx` prefix.
+  '''
+  log(logging.DEBUG, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def info(msg, *args, **kwargs):
+  ''' Emit a log at `logging.INFO` level with the current `Pfx` prefix.
+  '''
+  log(logging.INFO, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def status(msg, *args, **kwargs):
+  ''' Emit a log at `STATUS` level with the current `Pfx` prefix.
+  '''
+  log(STATUS, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def track(msg, *args, **kwargs):
+  ''' Emit a log at `TRACK` level with the current `Pfx` prefix.
+  '''
+  log(TRACK, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def quiet(msg, *args, **kwargs):
+  ''' Emit a log at `QUIET` level with the current `Pfx` prefix.
+  '''
+  log(QUIET, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def verbose(msg, *args, **kwargs):
+  ''' Emit a log at `VERBOSE` level with the current `Pfx` prefix.
+  '''
+  log(VERBOSE, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def ifverbose(is_verbose, msg, *args, **kwargs):
+  ''' Conditionally log a message.
+
+      If `is_verbose` is `None`, log at `VERBOSE` level and rely on the logging setup.
+      Otherwise, if `is_verbose` is true, log at `INFO` level.
+  '''
+  if is_verbose is None:
+    # emit at VERBOSE level, use the logging handler levels to emit or not
+    verbose(msg, *args, **kwargs)
+  elif is_verbose:
+    # emit at INFO level
+    info(msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def warning(msg, *args, **kwargs):
+  ''' Emit a log at `logging.WARNING` level with the current `Pfx` prefix.
+  '''
+  log(logging.WARNING, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def error(msg, *args, **kwargs):
+  ''' Emit a log at `logging.ERROR` level with the current `Pfx` prefix.
+  '''
+  log(logging.ERROR, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def critical(msg, *args, **kwargs):
+  ''' Emit a log at `logging.CRITICAL` level with the current `Pfx` prefix.
+  '''
+  log(logging.CRITICAL, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def trace(msg, *args, **kwargs):
+  ''' Emit a log message at `loginfo.trace_level` with the current `Pfx` prefix.
+  '''
+  log(loginfo.trace_level, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def upd(msg, *args, **kwargs):
+  ''' If we're using an `UpdHandler`,
+      update the status line otherwise write an info message.
+
+      Note that this calls `Upd.out` directly with `msg%args`
+      and thus does not include the current `Pfx` prefix.
+      You may well want to use the `status()` function instead.
+  '''
+  _upd = loginfo.upd
+  if _upd:
+    _upd.out(msg, *args)
+  else:
+    info(msg, *args, **kwargs)
+
+# pylint: disable=too-many-instance-attributes
 class LogTime(object):
-  ''' LogTime is a content manager that logs the elapsed time of the enclosed
+  ''' LogTime is a context manager that logs the elapsed time of the enclosed
       code. After the run, the field .elapsed contains the elapsed time in
       seconds.
   '''
+
   def __init__(self, tag, *args, **kwargs):
+    ''' Set up a LogTime.
+
+        Parameters:
+        * `tag`: label included at the start of the log entry
+        * `args`: optional array; if not empty `args` is applied to
+          `tag` with `%`
+        * `level`: keyword argument specifying a log level for a
+          default log entry, default `logging.INFO`
+        * `threshold`: keyword argument specifying minimum time to
+          cause a log, default None (no minimum)
+        * `warning_level`: keyword argument specifying the log level
+          for a warning log entry, default `logging.WARNING`
+        * `warning_threshold`: keyword argument specifying a time
+          which raises the log level to `warning_level`
+    '''
     threshold = kwargs.pop('threshold', 1.0)
     level = kwargs.pop('level', logging.INFO)
-    warnThreshold = kwargs.pop('warnThreshold', None)
-    warnLevel = kwargs.pop('warnLevel', logging.WARNING)
+    warning_threshold = kwargs.pop('warning_threshold', None)
+    warning_level = kwargs.pop('warning_level', logging.WARNING)
     self.tag = tag
     self.tag_args = args
     self.threshold = threshold
     self.level = level
-    self.warnThreshold = warnThreshold
-    self.warnLevel = warnLevel
+    self.warning_threshold = warning_threshold
+    self.warning_level = warning_level
+    self.start = None
+    self.end = None
+    self.elapsed = None
+
   def __enter__(self):
     self.start = time.time()
     return self
-  def __exit__(self, exc_type, exc_value, traceback):
-    now = time.time()
-    elapsed = now - self.start
+
+  def __exit__(self, *_):
+    now = self.end = time.time()
+    elapsed = self.elapsed = now - self.start
     if self.threshold is not None and elapsed >= self.threshold:
       level = self.level
-      if self.warnThreshold is not None and elapsed >= self.warnThreshold:
-        level = self.warnLevel
+      if self.warning_threshold is not None and elapsed >= self.warning_threshold:
+        level = self.warning_level
       tag = self.tag
       if self.tag_args:
         tag = tag % self.tag_args
       log(level, "%s: ELAPSED %5.3fs" % (tag, elapsed))
-    self.elapsed = elapsed
     return False
 
 class UpdHandler(StreamHandler):
-  ''' A StreamHandler subclass whose .emit method uses a cs.upd.Upd for transcription.
+  ''' A `StreamHandler` subclass whose `.emit` method
+      uses a `cs.upd.Upd` for transcription.
   '''
 
-  def __init__(self, strm=None, nlLevel=None, ansi_mode=None):
-    ''' Initialise the UpdHandler.
-        `strm` is the output stream, default sys.stderr.
-        `nlLevel` is the logging level at which conventional line-of-text
-        output is written; log messages of a lower level go via the
-        update-the-current-line method. Default is logging.WARNING.
-        If `ansi_mode` is None, set if from strm.isatty().
-        A true value causes the handler to colour certain logging levels
-        using ANSI terminal sequences.
+  def __init__(
+      self, strm=None, upd_level=None, ansi_mode=None, over_handler=None
+  ):
+    ''' Initialise the `UpdHandler`.
+
+        Parameters:
+        * `strm`: the output stream, default `sys.stderr`.
+        * `upd_level`: the magic logging level which updates the status line
+          via `Upd`. Default: `STATUS`.
+        * `ansi_mode`: if `None`, set from `strm.isatty()`.
+          A true value causes the handler to colour certain logging levels
+          using ANSI terminal sequences.
     '''
-    from cs.upd import Upd
+    from cs.upd import Upd  # pylint: disable=import-outside-toplevel
     if strm is None:
       strm = sys.stderr
-    if nlLevel is None:
-      nlLevel = logging.WARNING
+    if upd_level is None:
+      upd_level = STATUS
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
-    self.__upd = Upd(strm)
-    self.__nlLevel = nlLevel
-    self.__ansi_mode = ansi_mode
+    self.upd = Upd(strm)
+    self.upd_level = upd_level
+    self.ansi_mode = ansi_mode
+    self.over_handler = over_handler
     self.__lock = Lock()
 
   def emit(self, logrec):
-    with self.__lock:
-      if logrec.levelno >= self.__nlLevel:
-        with self.__upd._withoutContext():
-          if self.__ansi_mode:
-            if logrec.levelno >= logging.ERROR:
-              logrec.msg = colourise(logrec.msg, 'red')
-            elif logrec.levelno >= logging.WARN:
-              logrec.msg = colourise(logrec.msg, 'yellow')
-          StreamHandler.emit(self, logrec)
-      else:
-        self.__upd.out(logrec.getMessage())
+    ''' Emit a `LogRecord` `logrec`.
+
+        For the log level `self.upd_level` update the status line.
+        For other levels write a distinct line
+        to the output stream, possibly colourised.
+    '''
+    upd = self.upd
+    if logrec.levelno == self.upd_level:
+      line = self.format(logrec)
+      with self.__lock:
+        upd.out(line)
+    else:
+      if self.ansi_mode:
+        if logrec.levelno >= logging.ERROR:
+          logrec.msg = colourise(logrec.msg, 'red')
+        elif logrec.levelno >= logging.WARNING:
+          logrec.msg = colourise(logrec.msg, 'yellow')
+      line = self.format(logrec)
+      with self.__lock:
+        if upd.disabled:
+          self.over_handler.emit(logrec)
+        else:
+          upd.nl(line)
 
   def flush(self):
-    if self.__upd._backend:
-      self.__upd._backend.flush()
+    ''' Flush the update status.
+    '''
+    return self.upd.flush()
+
+if __name__ == '__main__':
+
+  @logging_wrapper
+  def test_warning(msg, *a, **kw):
+    'test function for warning'
+    warning(msg, *a, **kw)
+
+  setup_logging(
+      sys.argv[0],
+      format='%(pfx)s: from %(funcName)s:%(filename)s:%(lineno)d: %(message)s'
+  )
+  test_warning("test warning")

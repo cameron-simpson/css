@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Archive a log file in a separate archival area.
-#	- Cameron Simpson <cs@zip.com.au> 19nov97
+#	- Cameron Simpson <cs@cskk.id.au> 19nov97
 #
 
 archdir=

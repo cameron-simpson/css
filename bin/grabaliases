@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Read mail item, grab unknown addresses, prepend to mutt aliases file, edit.
-#	- Cameron Simpson <cs@zip.com.au> 10dec2005
+#	- Cameron Simpson <cs@cskk.id.au> 10dec2005
 #
 
 : ${TMPDIR:=/tmp}

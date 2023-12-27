@@ -1,0 +1,6 @@
+Multiline support!
+Multiline support!
+Multiline support!
+New UpdProxy class to track a status line of a multiline Upd in the face of further inserts and deletes.
+Upd(...) now returns a context manager to clean up the display on its exit.
+Upd(...) is now a SingletonMixin in order to use the same state if set up in multiple places.

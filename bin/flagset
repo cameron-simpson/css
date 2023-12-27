@@ -1,0 +1,86 @@
+#!/bin/sh
+#
+# Utility for batch updating sets of flags.
+#   - Cameron Simpson <cs@cskk.id.au> 05jan2017
+#
+
+set -ue
+
+trace=
+##[ -t 2 ] && trace=set-x
+
+cmd=$0
+usage="Usage: $cmd prefix [{set|clear}[-all]]
+  prefix    Prefix of flags involved: implies flags commencing {prefix}_
+  set       Set all flags whose suffixes are named on the input.
+  set-all   Set all flags whose suffixes are named on the input,
+            clear the remainder.
+  clear     Clear all flags whose suffixes are named on the input.
+  clear-all Clear all flags whose suffixes are named on the input,
+            set the remainder."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing pfx" >&2
+  badopts=1
+else
+  pfx=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  flag "${pfx}_*"
+  exit 0
+fi
+
+op=$1
+shift
+case "$op" in
+  set)        do_set=1 do_all= ;;
+  set-all)    do_set=1 do_all=1 ;;
+  clear)      do_set= do_all= ;;
+  clear-all)  do_set= do_all=1 ;;
+  *)          echo "$cmd: unrecognised operation: $op" >&2
+              badopts=1
+              ;;
+esac
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -- $( sed "s^${pfx}_" )
+
+for flag
+do
+  if [ $do_set ]
+  then  $trace flag -v -w "$flag" 1
+  else  $trace flag -v -w "$flag" 0
+  fi
+done
+
+if [ $do_all ]
+then
+  flag "${pfx}_*" \
+  | \
+  while read -r flag value
+  do
+    case " $* " in
+      *" $flag "*) ;; # skip "on" flags
+      *)
+        case "$do_set,$value" in
+          1,TRUE) $trace flag -v "$flag" 0 ;;
+          ,FALSE) $trace flag -v "$flag" 1 ;;
+        esac
+        ;;
+    esac
+  done
+fi
+

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Utility functions based around srand() and rand().
-#	- Cameron Simpson <cs@zip.com.au>, 01aug94
+#	- Cameron Simpson <cs@cskk.id.au>, 01aug94
 #
 
 srand(time^(40503*$$));

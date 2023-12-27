@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Update a mirror of the RedHat updates for just the RPMs on this machine.
-#	- Cameron Simpson <cs@zip.com.au> 07sep2003
+#	- Cameron Simpson <cs@cskk.id.au> 07sep2003
 #
 
 : ${TMPDIR:=/tmp}

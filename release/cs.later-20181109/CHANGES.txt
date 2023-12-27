@@ -1,0 +1,46 @@
+  lib/python/cs/later.py: cs.later: clarify docstring
+  lib/python/cs/later.py: merge default ==> venti
+  lib/python/cs/later.py: cs.later: remove unused import
+  lib/python/cs/later.py: merge pypi ==> venti: cs-release: new "check" mode to report module status, related changes
+  lib/python/cs/later.py: merge default ==> beyonwiz
+  lib/python/cs/later.py: cs.app.beyonwiz: merge from default
+  lib/python/cs/later.py: cs.later: Later.after: turn into wrapper for cs.asynchron.after
+  lib/python/cs/later.py: cs.later: adjust for cs.asynchron using an enum
+  lib/python/cs/later.py: cs.later: Later._after: better name for default Result
+  lib/python/cs/later.py: cs.later: Later._after: bugfix: do not reuse supplied `R`
+  lib/python/cs/later.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/later.py: cs.*: import XP from cs.pfx instead of cs.logutils
+  lib/python/cs/later.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/later.py: cs.*: more cs.pfx import fixes
+  lib/python/cs/README-later.rst lib/python/cs/later.py: rename cs.asynchron to cs.result
+  lib/python/cs/README-later.rst lib/python/cs/later.py: cs.later: move README into module docstring, clean lint
+  lib/python/cs/later.py: cs.later: update DISTINFO, tidy imports
+  lib/python/cs/README-later.rst: merge pypi ==> default: linting and releasing, some cs-release improvements, improve @cs.deco.cached
+  lib/python/cs/README-later.rst: merge default ==> beyonwiz
+  lib/python/cs/README-later.rst: merge default ==> iphoto
+  lib/python/cs/README-later.rst: merge default ==> venti
+  lib/python/cs/later.py: cs.later: experimental @capacity decorator to provide a Later to a function
+  lib/python/cs/README-later.rst: merge default ==> later
+  lib/python/cs/later.py: cs.later: lint: one bugfix and some lint
+  lib/python/cs/later.py: cs.later: Later.defer_iterable: now returns a Result for finalisation; .result will be true if iteration completed or have a .exc_info if an iteration raised an exception
+  lib/python/cs/later.py: cs.later. Later.defer_iterable: on completion the Result holds the iteration count
+  lib/python/cs/later.py: cs.later: replace _PipelinePushQueue with _PipelineStage and its various subclasses.
+  lib/python/cs/later.py: cs.later: strip removed debug
+  lib/python/cs/later.py: cs.later: Later.defer_iterable: bugfix closure based return of interaction count from the Result
+  lib/python/cs/later.py: cs.later,later_tests: rework pipelines to accept (sig, function) or an "action" onject with .sig attribute and .functor method
+  lib/python/cs/later.py: cs.later: _Pipeline: pass self.later to functor for context; add a docstring and a little debug
+  lib/python/cs/later.py: default ==> pilfer
+  lib/python/cs/README-later.rst lib/python/cs/later.py: merge later ==> pilfer
+  lib/python/cs/later.py: cs.later: imports for debugging
+  lib/python/cs/later.py: cs.*: update @contextmanager formalism to use try/finally for the cleanup phase
+  lib/python/cs/README-later.rst: merge default ==> media
+  lib/python/cs/later.py: cs.app.myke.make,cs.later: rename cs.result.AsynchState to ResultState
+  lib/python/cs/later.py: cs.result,cs.later: drop `final` parameter, never used and supplanted by Result.notify
+  lib/python/cs/later.py: cs.later: Later: move startup and shutdown to just under __init__
+  lib/python/cs/later.py: cs.later: Later: no longer subclass MultiOpenMixin, users now call close to end submission, shutdown to terminate activity and wait to await finalisation
+  lib/python/cs/later.py: cs.later: Later.shutdown: drop spurious _pendingq.close, done by .close
+  lib/python/cs/later.py: cs.later: tidy up some debug
+  lib/python/cs/later.py: cs.later: clean some lint, also rename top level "later" function to "defer"
+  lib/python/cs/later.py: cs.later: clean some lint, add some docstrings
+  lib/python/cs/later.py: cs.later: clean lint, update docstrings, update later_tests, remove some MultiOpenMixin vestiges
+  lib/python/cs/later.py: cs.later: update DISTINFO

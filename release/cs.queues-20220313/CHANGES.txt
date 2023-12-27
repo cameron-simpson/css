@@ -1,0 +1,3 @@
+lib/python/cs/queues.py: cs.queues: ListQueue: new .prepend(items[,offset=0]) method
+lib/python/cs/queues.py: cs.queues: brush off some lint
+lib/python/cs/queues.py: cs.queues: ListQueue: new .prepend(iterable) method

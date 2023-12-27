@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Create a CGI and the wrapper.
-#	- Cameron Simpson <cs@zip.com.au> 09jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 09jul2003
 #
 
 ext=pl

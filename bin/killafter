@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Run a command and then kill a process afterwards.
-#	- Cameron Simpson <cs@zip.com.au> 16sep2006
+#	- Cameron Simpson <cs@cskk.id.au> 16sep2006
 #
 
 cmd=$0

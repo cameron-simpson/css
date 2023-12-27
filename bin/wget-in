@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Read URLs from standard input, fetch in random sequence with random delays.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+default_delay=2
+delay=${WGET_DELAY:-$default_delay}
+
+cmd=$0
+usage="Usage: $cmd [delay] <urls
+  A single digit leading argument sets the base delay, passed to
+  the wget --wait option. The default is $default_delay or the value
+  of \$WGET_DELAY."
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    [1-9])  delay=$1; shift ;;
+    *)      break ;;
+  esac
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec wget -nv -c -i - "--wait=$delay" --random-wait

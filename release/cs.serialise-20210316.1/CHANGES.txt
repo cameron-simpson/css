@@ -1,0 +1,1 @@
+lib/python/cs/serialise.py: cs.serialise: still obolete (use cs.binary), but do not raise ImportError, just print warning to sys.stderr

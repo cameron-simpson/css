@@ -1,0 +1,3 @@
+Update for changed cs.obj.SingletonMixin API.
+fstags: new "export" and "import" subcommands roughly paralleling those from "sqltags", providing CSV formatted export/import.
+fstags export: ew -a (all paths) option - the default is not to not export paths with no tags.

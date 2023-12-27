@@ -2,7 +2,7 @@
 #
 # Present a paged view of an array of lines of text.
 # In normal use the array is tied to some object.
-#	- Cameron Simpson <cs@zip.com.au> 29mar1997
+#	- Cameron Simpson <cs@cskk.id.au> 29mar1997
 #
 
 use strict qw(vars);

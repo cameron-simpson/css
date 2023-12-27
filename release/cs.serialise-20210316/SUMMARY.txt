@@ -1,0 +1,2 @@
+Make obviously obsolete, yea, even unto raising an ImportError on import.
+Point users as cs.binary instead.

@@ -1,0 +1,3 @@
+lib/python/cs/progress.py: cs.progress: first step towards making progress throughput less prone to reporting "stalled" - always keep that last 2 positions of the window to allow extrapolating a rate between them
+lib/python/cs/progress.py: cs.progress: docstring tweak
+lib/python/cs/progress.py: cs.progress: progressbar: accept new optional `position` parameter, used to initialise the Progress

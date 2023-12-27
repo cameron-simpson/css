@@ -5,7 +5,7 @@
 # to the form
 #	nnnn/nnnn
 # for squid acl lists.
-#	- Cameron Simpson <cs@zip.com.au> 30apr2000
+#	- Cameron Simpson <cs@cskk.id.au> 30apr2000
 #
 
 use strict vars;

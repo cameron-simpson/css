@@ -1,0 +1,36 @@
+  lib/python/cs/app/svcd.py: cs.app.svcd: recode of svcd in Python, supporting other apps running multiple svcd instances
+  lib/python/cs/app/svcd.py: cs.app.svcd: assorted logic fixes
+  lib/python/cs/app/svcd.py: cs.app.svcd: Svcd: drop `varrun` and `logdir` parameters, improve default pidfile name
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: change `test_flags` to have values indicating truishness instead of invertion - makes for more intuitive flag map definitions
+  lib/python/cs/app/svcd.py: cs.app.svcd: fix up delay time logic for tests and respawn
+  lib/python/cs/app/svcd.py: cs.app.svcd: keep a pid file for the svcd itself; simplify the default pidfile name for the subprocess
+  lib/python/cs/app/svcd.py: cs.app.svcd: clean shutdown on HUP, INT, TERM
+  lib/python/cs/app/svcd.py: cs.app.svcd: use pidfile management facilities from cs.psutils
+  lib/python/cs/app/svcd.py: cs.app.svcd: bugfix call to self._kill_subproc
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: make restart delay separately tunable, cut it down a bit from the shell implementation
+  lib/python/cs/app/svcd.py: cs.app.svcd: honour the -1 (once) flag
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: docstring
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: set and clear flag_running around process start/stop
+  lib/python/cs/app/svcd.py: cs.app.svcd: handle not having a pidfile to maintain
+  lib/python/cs/app/svcd.py: cs.app.svcd: use a dummy flags object if no name is supplied
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: new `trace` parameter, default False
+  lib/python/cs/app/svcd.py: cs.app.svcd: pass command line -x in as trace; minor bugfixes
+  lib/python/cs/app/svcd.py: cs.app.svcd: fix spelling of "disable" flag
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: add on_spawn and on_reap to be called after spawn and reap on subprocess respectively
+  lib/python/cs/app/svcd.py: cs.app.svcd: remove spurious altert
+  lib/python/cs/app/svcd.py: cs.app.{portfwd,svcd}: remove debug
+  lib/python/cs/app/svcd.py: cs.app.svcd: fix creation of stub SvcD instances
+  lib/python/cs/app/svcd.py: cs.app.svcd: fix import
+  lib/python/cs/app/svcd.py: cs.app.svcd: honour the -q (quiet) option; SvcD: implement `quiet` parameter
+  lib/python/cs/app/svcd.py: cs.app.svcd: import subprocess.PIPE
+  lib/python/cs/app/svcd.py: cs.app.svcd: sig_func: fix Popen return object
+  lib/python/cs/app/svcd.py: cs.app.svcd: Svcd: new parameter `debug`, passed to cs.app.flag.Flags
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: saner `debug` default, turn on if stderr is a tty
+  lib/python/cs/app/svcd.py: cs.app.svcd: main: implement -p (service pidfule) and -P (svcd pidfile) options; various lintings
+  lib/python/cs/app/svcd.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/app/svcd.py: cs.app.svcd: fix broken import left over from cs.pfx introduction
+  lib/python/cs/app/svcd.py: cs.app.svcd: drop command word before acting on remaining arguments for disable/enable/restart/stop
+  lib/python/cs/app/svcd.py: cs.app.svcd: fix spelling of disable flag for enable
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD.start.monitor: Pfx context to support better logging
+  lib/python/cs/app/svcd.py: my email address has changed - update Python code
+  lib/python/cs/app/svcd.py: cs.app.svcd: PyPI prep

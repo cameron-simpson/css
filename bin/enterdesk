@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Operations to perform when entering a desktop.
-#	- Cameron Simpson <cs@zip.com.au> 24mar2003
+#	- Cameron Simpson <cs@cskk.id.au> 24mar2003
 #
 
 : ${LOGDIR:=$HOME/var/log}

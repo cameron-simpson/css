@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+#
+# Tell Messages app to send some text to someone.
+# Not reliable.
+#   - Cameron Simpson <cs@cskk.id.au>
+#
+
+from __future__ import print_function
+import sys
+import subprocess
+from cs.applescript import quotestr
+
+USAGE = "Usage: %s -b buddy-name text-string"
+
+def main(argv):
+  cmd = argv.pop(0)
+  usage = USAGE % (cmd,)
+  badopts = False
+  if not argv:
+    print("%s: missing -b" % (cmd,), file=sys.stderr)
+    badopts = True
+  else:
+    opt = argv.pop(0)
+    if opt != '-b':
+      print("%s: missing -b" % (cmd,), file=sys.stderr)
+      badopts = True
+    elif not argv:
+      print("%s: -b: missing buddy-name", file=sys.stderr)
+      badopts = True
+    else:
+      buddy = argv.pop(0)
+  if not argv:
+    print("%s: missing text-string" % (cmd,))
+    badopts = True
+  else:
+    text = argv.pop(0)
+  if argv:
+    print("%s: extra arguments after text-string: %s" % (cmd, ' '.join(argv)))
+    badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+  script = 'tell application "Messages" to send %s to buddy %s' % (quotestr(text), quotestr(buddy))
+  subargv = ['osascript', '-e', script]
+  ##print("subargv=%r" % (subargv,))
+  return subprocess.call(subargv)
+
+sys.exit(main(sys.argv))

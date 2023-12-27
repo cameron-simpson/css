@@ -1,7 +1,7 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Read mysqlbinlog(1) output from standard input and report on standard output.
-#       - Cameron Simpson <cs@zip.com.au> 01may2009
+#       - Cameron Simpson <cs@cskk.id.au> 01may2009
 #
 
 import os.path

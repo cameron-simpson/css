@@ -1,0 +1,2 @@
+New function upd_for(stream) returning singleton Upds.
+Drop noStrip keyword argument/mode - always strip trailing whitespace.

@@ -1,0 +1,1 @@
+Sweeping removal of cs.obj.O, universally supplanted by types.SimpleNamespace.

@@ -1,0 +1,3 @@
+lib/python/cs/queues.py: cs.queues: drop _QueueIterator_Sentinel, just use object() - no semantic change
+lib/python/cs/queues.py: cs.queues: new ListQueue simple iterable queue based on a list with list-like .append and .extend
+lib/python/cs/queues.py: cs.queues: ListQueue.__init__: tighten check on queued, assert no a str

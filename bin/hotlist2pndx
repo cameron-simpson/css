@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Convert hotlist data to an HTML permuted index.
-#	- Cameron Simpson <cs@zip.com.au> 06may97
+#	- Cameron Simpson <cs@cskk.id.au> 06may97
 #
 
 cmd=`basename "$0"`

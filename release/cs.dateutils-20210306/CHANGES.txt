@@ -1,0 +1,13 @@
+lib/python/cs/dateutils.py: cs.app.osx.objc: move _offsetTZInfo to cs.dateutils.tzinfoHHMM for general use
+lib/python/cs/dateutils.py: cs.*: lots of print, import and exception fixes for python3 compatibility
+lib/python/cs/dateutils.py: cs.misc: move isodate and a2date into cs.dateutils
+lib/python/cs/dateutils.py: cs.dateutils: autopep8
+lib/python/cs/dateutils.py: cs.dateutils: add parse_date, to read some common human dates and return a datetime.date
+lib/python/cs/dateutils.py: cs.dateutils: isodate: add optional dashed parameter, default True
+lib/python/cs/dateutils.py: cs.dateutils: clean some lint
+lib/python/cs/dateutils.py: cs.dateutils: drop a2date and parse_date, long obsolete
+lib/python/cs/dateutils.py: cs.dateutils: new datetime2unixtime and unixtime2datetime functions pulled from cs.sqltags, new UNIXTimeMixin providing datetime related properties associated with a presumed .unixtime attribute
+lib/python/cs/dateutils.py: cs.dateutils: correct the spelling of UNIXTimeMixin.as_datetime
+lib/python/cs/dateutils.py: cs.dateutils: DISTINFO for PyPI since cs.tagset now uses this
+lib/python/cs/dateutils.py: cs.dateutils: new localdate2unixtime(): incantation to convert a naive/localtime date or datetime to a UNIX timestamp
+lib/python/cs/dateutils.py: cs.dateutils: module docstring: clarify that this is a little kit, not a large facility

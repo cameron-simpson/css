@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Report the X11 extensions on the current display.
-#	- Cameron Simpson <cs@zip.com.au> 07jun2006
+#	- Cameron Simpson <cs@cskk.id.au> 07jun2006
 # 
 
 xdpyinfo ${1+"$@"} \

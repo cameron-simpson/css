@@ -46,7 +46,7 @@ Notably, the core address syntax also accepts: "@example.com" to match any addre
 My Setup
 --------
 
-Like others, I run my personal email fairly decoupled: I use one tool (getmail, currently) to collect email and deliver to a spool folder, another tool (this one, mailfiler) to monitor that spool and file to other mail folders, a third tool to read and dispatch email (mutt) and my local machine's mail system to actually queue and send the email.
+Like others, I run my personal email fairly decoupled: I use one tool (getmail, currently) to collect email and deliver to a spool folder, another tool (this one, mailfiler) to monitor that spool and file to other mail folders, a third tool to read and compose email (mutt) and my local machine's mail system to actually queue and send the email.
 
 I start an instance of mailfiler at login, in a tmux session, and an instance of getmail likewise. My email is then collected and filed.
 
@@ -72,7 +72,7 @@ It is sloppy:
 It is slow:
   Procmail is invoked separately for each message to file, and it must read its rules and compile all its regular expressions every time.
   The expressions are applied as encountered, effectively reparsing each message header every time it is tested for a match.
-  By contrast, mailfiler parses its rules once at startup (and again if the rules file is modified); also, during message matching mailfiler parses address headers only once, as requested, and keeps the post-parse data (core address) around for direct access in any future match.
+  By contrast, mailfiler parses its rules once at startup (and again whenever the rules file is modified); also, during message matching mailfiler parses address headers only once, as requested, and keeps the post-parse data (core address) around for direct access in any future match.
   The match tests are also largely direct string comparisons, much cheaper than a regexp even discounting the regexp compile cost.
 
 It is hard to use for ad hoc message filing:

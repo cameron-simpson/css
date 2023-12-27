@@ -1,23 +1,45 @@
 #!/bin/sh
 #
 # Write a possibly-colourised string to the alert log.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
+
+alert_to_default='log stderr'
 
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert-local}
 
 cmd=$0
-usage="Usage: $cmd [-c colour] [-e command [args...] --] [-G] [-l level] [-s subtitle] [-t title] {-|echo-args...]}"
+usage="Usage: $cmd [options...] [--] {-|echo-args...}
+  Options:
+    -A alert_to Space separated list of alert destinations.
+                Default from \$ALERT_TO, or \"$alert_to_default\".
+    -c colour   Colour messages sent to \"log\" with this colour.
+    -e command [args...] --
+                Associate this command with clicking on the alert popup, if supported.
+                End the command arguments with \"--\".
+    -g group    Alert group, default from \$ALERT_GROUP.
+    -l level    Alert level, default 1.
+    -s subtitle Alert subtitle.
+                If unspecified and the alert text begins with an
+                \"UPPERCASEWORD:\" (after possible extraction of a
+                title), pull off the UPPERCASEWORD and use it for
+		        the subtitle.
+    -t title    Alert title.
+                If unspecified and the alert text begins with an \"UPPERCASEWORD:\",
+                pull off the UPPERCASEWORD and use it for the title.
+    -           Read the alert text from standard input.
+    echo-args   The alert text, passed to the echo(1) command."
 
+alert_to=${ALERT_TO:-$alert_to_default}
 colour=
-dlog=1
 level=1
 growl=
 tnotify=
+group=${ALERT_GROUP:-''}
 title=
 subtitle=
 execute=
@@ -36,9 +58,8 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -A) alert_to=$2; shift ;;
     -c) colour=$2; shift ;;
-    -D) dlog=1 ;;
-    +D) dlog= ;;
     -e) shift
         firstarg=1
         tailargs=
@@ -57,7 +78,7 @@ do
                 badopts=1
               else
                 execute=$( as-script "$@" )
-                execute='>>"$ALERTLOG" 2>&1; '$execute
+                execute='exec >>"$ALERTLOG" 2>&1; '$execute
               fi
               set --
               tailargs=1
@@ -74,8 +95,7 @@ do
         fi
         continue
         ;;
-    -G) growl=1 ;;
-    +G) growl= ;;
+    -g) group=$2; shift ;;
     -l) level=$2; shift ;;
     -t) title=$2; shift ;;
     -s) subtitle=$2; shift ;;
@@ -97,6 +117,21 @@ else
     -)  set -- "`cat`" ;;
   esac
 fi
+
+to_log=
+to_desktop=
+to_dlog=
+to_stderr=
+for alert_target in $alert_to
+do
+  case $alert_target in
+    log)        to_log=1 ;;
+    desktop)    to_desktop=1 ;;
+    dlog)       to_dlog=1 ;;
+    stderr)     to_stderr=1 ;;
+    *)          echo "$cmd: unsupported alert_to target ignored: $alert_target" >&2 ;;
+  esac
+done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -129,35 +164,46 @@ set -- "$message"
 [ -n "$subtitle" ] && set -- "$subtitle;" ${1+"$@"}
 [ -n "$title" ] && set -- "$title:" ${1+"$@"}
 
-if [ -n "$colour" ]
-then  colour_echo "$colour" "$*"
-else  echo "$*"
-fi >>"$ALERTLOG" || xit=1
-
-[ $dlog ] && dlog "ALERT: $*"
-
-if [ $growl ]
+if [ $to_log ]
 then
-  # try growlnotify, otherwise hope /dev/tty is an iTerm
-  growlnotify -m "$*" || echo $'\e]9;$*\a' >/dev/tty || xit=1
+  if [ -n "$colour" ]
+  then  colour_echo "$colour" "$*"
+  else  echo "$*"
+  fi >>"$ALERTLOG" || xit=1
 fi
 
-if [ $tnotify ]
+[ $to_dlog ] && dlog log ALERT: "$*"
+
+if [ $to_desktop ]
 then
-  for var in title subtitle message
-  do  eval "val=\$$var"
-      val=`echo $val`
-      case "$val" in
-        *[\'\\]*)        val=`shqstr "$val"` ;;
-      esac
-      eval "$var=\$val"
-  done
-  set -- terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
-  [ -n "$execute" ] && set -- "$@" -execute "$execute"
-  set -- timeout 10 reattach-to-user-namespace "$@"
-  # async because I've seen terminal-notifier hang, stalling my mail filer
-  # timeout also to stop hanging processes filling the process table
-  "$@" >/dev/null &
+  if [ $growl ]
+  then
+    # try growlnotify, otherwise hope /dev/tty is an iTerm
+    growlnotify -m "$*" || echo $'\e]9;$*\a' >/dev/tty || xit=1
+  fi
+
+  if [ $tnotify ]
+  then
+    for var in title subtitle message
+    do  eval "val=\$$var"
+        val=`echo $val`
+        case "$val" in
+          *[\'\\]*)        val=`shqstr "$val"` ;;
+        esac
+        eval "$var=\$val"
+    done
+    set -- terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
+    # message group - this message updates/replaces last message in this group
+    [ -n "$group" ] && set -- "$@" -group "$group"
+    # command to run when notifier clicked
+    [ -n "$execute" ] && set -- "$@" -execute "$execute"
+    set -- timeout 10 reattach-to-user-namespace "$@"
+    # async because I've seen terminal-notifier hang, stalling my mail filer
+    # timeout also to stop hanging processes filling the process table
+    "$@" </dev/null >/dev/null &
+  fi
 fi
+
+[ $to_stderr ] && echo ALERT: "$title $subtitle $message" >&2
 
 exit $xit

@@ -1,0 +1,1 @@
+Still obsolete (use cs.binary) but do not raise ImportError, just print a warning to sys.stderr.

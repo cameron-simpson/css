@@ -1,0 +1,14 @@
+lib/python/cs/tagset.py: cs.tagset: TagSet: also subclass cs.dateutils.UNIXTimeMixin
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.from_tagset: include a ._tagset attribute referencing the TagSet, to allow supporting access to TagSet properties
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__getattr__: support access to the source TagSet properties
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__getattr__: support access to properties of ._tag
+lib/python/cs/tagset.py: cs.tagset: drop debug, tweak docstring
+lib/python/cs/tagset.py: cs.tagset: DISTINFO+cs.dateutils
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__bool__: now true if the ._tagset is not empty
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace: new ._subns() factory method overriding ExtendedNamespace._subns by adorning the new namespace with ._tag and ._tagset, also drops obsolete ._bool attribute
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__getitem__: now defers to self.__getattr__ before falling back to super().__getitem__
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__getattr__: big refactor to streamline logic, also fixes AttributeError for unknown Tags
+lib/python/cs/tagset.py: cs.tagset: TagSet.update: accept keyword arguments
+lib/python/cs/tagset.py: cs.tagset: new TagSet.tag_metadata(tag_name) returning a list of the metadata for a Tag
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.from_tagset: provide subtags for each dotted_subpath
+lib/python/cs/tagset.py: cs.agset: remove debugging, replace X() with print() in main test

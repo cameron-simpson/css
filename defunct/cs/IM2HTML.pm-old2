@@ -2,7 +2,7 @@
 #
 # Generate HTML indexing a directory full of JPEG images.
 # Use descriptions from corresponding .html files if present.
-#	- Cameron Simpson <cs@zip.com.au> 30mar95
+#	- Cameron Simpson <cs@cskk.id.au> 30mar95
 #
 # Convert to Perl.	- cameron, 11oct95
 #

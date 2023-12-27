@@ -1,0 +1,2 @@
+Many many changes to FormatableMixin, FormatableFormatter and friends around supporting {foo|conv1|con2|...} instead of {foo!conv}. Still in flux.
+New typed_repr like typed_str but using repr.

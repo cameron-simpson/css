@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Instantiatie the usual load meters.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 xmhostlist= xmvoff=3 xmhoff=100 xmdx=40 xmdy=40

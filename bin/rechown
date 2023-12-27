@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Chown objects in the specified file trees from one uid to another.
-#	- Cameron Simpson <cs@zip.com.au> 19jun2005
+#	- Cameron Simpson <cs@cskk.id.au> 19jun2005
 #
 
 passwd=/etc/passwd

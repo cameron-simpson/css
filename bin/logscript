@@ -2,7 +2,7 @@
 #
 # Run and log a script session.
 # Hands the output log to buglog if there is a log message..
-#	- Cameron Simpson <cs@zip.com.au> 18may2002
+#	- Cameron Simpson <cs@cskk.id.au> 18may2002
 #
 
 cmd=`basename "$0"`
