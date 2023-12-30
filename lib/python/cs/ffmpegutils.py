@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Convenience facilities for using FFmpeg (ffmpeg.org).
-#   - Cameron Simpson <cs@cskk.id.au> 30oct2016
+# - Cameron Simpson <cs@cskk.id.au> 30oct2016
 #
 
 '''
@@ -12,6 +12,7 @@ with invocation via `ffmpeg-python`.
 from collections import namedtuple
 from dataclasses import dataclass
 import json
+import os
 from os.path import (
     basename,
     dirname,
@@ -61,7 +62,9 @@ DISTINFO = {
 }
 
 FFMPEG_EXE_DEFAULT = 'ffmpeg'
+FFMPEG_EXE_ENVVAR = 'FFMPEG_EXE'
 
+# executable and image for use with docker
 FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
 FFMPEG_DOCKER_IMAGE_DEFAULT = 'linuxserver/ffmpeg'
 
@@ -79,6 +82,7 @@ class MetaData(TagSet):
           'copyright',
           'description',
           'episode_id',
+          'disc',
           'genre',
           'grouping',
           'lyrics',
@@ -94,15 +98,16 @@ class MetaData(TagSet):
   # pylint: disable=redefined-builtin
   def __init__(self, format, **kw):
     super().__init__()
-    try:
-      allowed_fields = MetaData.FIELDNAMES[format]
-    except KeyError:
-      # pylint: disable=raise-missing-from
-      raise ValueError("unsupported target format %r" % (format,))
-    self.__dict__.update(format=format, allow_fields=allowed_fields)
+    ##try:
+    ##  allowed_fields = MetaData.FIELDNAMES[format]
+    ##except KeyError:
+    ##  # pylint: disable=raise-missing-from
+    ##  ##raise ValueError("unsupported target format %r" % (format,))
+    ##  allowed_fields = MetaData.FIELDNAMES['mp4']
+    ##self.__dict__.update(format=format, allowed_fields=allowed_fields)
     for k, v in kw.items():
-      if k not in allowed_fields:
-        raise ValueError("format %r does not support field %r" % (format, k))
+      ##if k not in allowed_fields:
+      ##  raise ValueError("format %r does not support field %r" % (format, k))
       self[k] = v
 
   def options(self):
@@ -111,7 +116,7 @@ class MetaData(TagSet):
     opts = []
     for field_name, value in self.items():
       if value is not None:
-        opts.extend(('-metadata', '='.join((field_name, value))))
+        opts.extend(('-metadata', f'{field_name}={value}'))
     return opts
 
 # source specification
@@ -196,9 +201,10 @@ class FFmpegSource:
 # A mapping of ffmpeg codec_name values to default converted names.
 # If there's no entry here, use copy mode.
 DEFAULT_CONVERSIONS = {
-    'aac_latm': 'aac',
-    'mp2': 'aac',
-    'mpeg2video': 'h264',
+    'audio/aac_latm': 'aac',
+    'audio/mp2': 'aac',
+    'audio/pcm_s16le': 'aac',
+    'video/mpeg2video': 'h264',
 }
 DEFAULT_MEDIAFILE_FORMAT = 'mp4'
 
@@ -210,6 +216,7 @@ def convert(
     dstpath: str,
     doit=True,
     dstfmt=None,
+    ffmpeg_exe=None,
     fstags: FSTags,
     conversions=None,
     metadata: Optional[dict] = None,
@@ -218,7 +225,7 @@ def convert(
     acodec=None,
     vcodec=None,
     extra_opts=None,
-):
+) -> List[str]:
   ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
   '''
   if conversions is None:
@@ -231,6 +238,8 @@ def convert(
   srcpath = srcs[0].source
   if dstfmt is None:
     dstfmt = DEFAULT_MEDIAFILE_FORMAT
+  if ffmpeg_exe is None:
+    ffmpeg_exe = os.environ.get(FFMPEG_EXE_ENVVAR, FFMPEG_EXE_DEFAULT)
   # set up the initial source path, options and metadata
   ffinopts = {
       'loglevel': 'repeat+error',
@@ -238,42 +247,35 @@ def convert(
       ##'2': None,
   }
   # choose output formats
-  probed = ffprobe(srcpath)
-  for i, stream in enumerate(probed.streams):
-    codec_type = stream.get('codec_type', 'unknown')
-    codec_key = stream.get('codec_name', stream.codec_tag)
-    with Pfx("stream[%d]: %s/%s", i, codec_type, codec_key):
-      if codec_type not in ('audio', 'video'):
-        ##warning("not audio or video, skipping")
-        continue
-      try:
-        new_codec = conversions[codec_key]
-      except KeyError:
-        warning("no conversion, skipping")
-      else:
-        warning("convert to %r", new_codec)
-        if codec_type == 'audio':
-          if acodec is None:
-            acodec = new_codec
-          elif acodec != new_codec:
-            warning(
-                "already converting %s/%s to %r instead of default %r",
-                codec_type, codec_key, acodec, new_codec
-            )
-        elif codec_type == 'video':
-          if vcodec is None:
-            vcodec = new_codec
+  if acodec is None or vcodec is None:
+    probed = ffprobe(srcpath)
+    for i, stream in enumerate(probed.streams if doit else ()):
+      codec_type = stream.get('codec_type', 'unknown')
+      codec_key = stream.get('codec_name', stream.codec_tag)
+      conv_key = f'{codec_type}/{codec_key}'
+      with Pfx("stream[%d]: %s", i, conv_key):
+        if (codec_type == 'audio' and acodec is None
+            or codec_type == 'video' and vcodec is None):
+          try:
+            new_codec = conversions[conv_key]
+          except KeyError:
+            ##warning("no conversion, skipping")
+            pass
           else:
-            warning(
-                "already converting %s/%s to %r instead of default %r",
-                codec_type, codec_key, acodec, new_codec
-            )
-        else:
-          warning(
-              "no option to convert streams of type %s/%s, ignoring new_codec=%r",
-              codec_type, codec_key, new_codec
-          )
-  ffmeta_kw = dict(probed.format.get('tags', {}))
+            warning("convert to %r", new_codec)
+            if codec_type == 'audio':
+              if acodec is None:
+                acodec = new_codec
+            elif codec_type == 'video':
+              if vcodec is None:
+                vcodec = new_codec
+            else:
+              warning(
+                  "no option to convert streams of type %s/%s, ignoring new_codec=%r",
+                  codec_type, codec_key, new_codec
+              )
+
+  ffmeta_kw = dict(probed.format.get('tags', {}) if doit else {})
   ffmeta_kw.update(metadata)
   # construct ffmpeg command
   ff = ffmpeg.input(srcpath, **ffinopts)
@@ -297,13 +299,13 @@ def convert(
   ff = ff.output(
       dstpath,
       format=dstfmt,
-      metadata=list(map('='.join, ffmeta_kw.items())),
+      metadata=[f'{k}={v}' for k, v in ffmeta_kw.items()],
       **output_opts,
   )
   if overwrite:
     ff = ff.overwrite_output()
   ff_args = ff.get_args()
-  ff_argv = [FFMPEG_EXE_DEFAULT, *ff_args]
+  ff_argv = [ffmpeg_exe, *ff_args]
   if doit:
     print_argv(*ff_argv)
     fstags[dstpath]['ffmpeg.argv'] = ff_argv
@@ -311,6 +313,7 @@ def convert(
     ff.run()
   else:
     print_argv(*ff_argv, fold=True)
+  return ff_argv
 
 def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
   ''' Run `ffprobe -print_format json` on `input_file`,

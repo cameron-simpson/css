@@ -8,20 +8,26 @@ from dataclasses import dataclass, field
 import filecmp
 from functools import cached_property, partial
 from getopt import GetoptError
+import importlib
 import os
 from os.path import (
+    basename,
     exists as existspath,
     expanduser,
+    isfile as isfilepath,
+    join as joinpath,
 )
 import sys
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from threading import RLock
 from typing import Optional, Union
 from uuid import UUID
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
+from cs.fileutils import atomic_filename
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import s
@@ -31,9 +37,6 @@ from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 
 from .calibre import CalibreTree
-from .dedrm import import_obok, decrypt_obok
-
-obok = import_obok()
 
 pfx_listdir = partial(pfx_call, os.listdir)
 
@@ -46,6 +49,9 @@ KOBO_LIBRARY_ENVVAR = 'KOBO_LIBRARY'
 KOBO_LIBRARY_DEFAULT_OSX = '~/Library/Application Support/Kobo/Kobo Desktop Edition'
 
 KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.kobo.Kobo Desktop Edition'
+
+OBOK_PACKAGE_PATH_ENVVAR = 'OBOK_PACKAGE_PATH'
+OBOK_PACKAGE_ZIPFILE = 'Obok DeDRM.zip'
 
 @fmtdoc
 def default_kobo_library():
@@ -65,6 +71,85 @@ def default_kobo_library():
       (sys.platform,)
   )
 
+@pfx
+@fmtdoc
+def import_obok(obok_package_path=None):
+  ''' Import the `obok.py` module.
+
+      This looks in `obok_package_path`, which defaults to
+      `${OBOK_PACKAGE_PATH_ENVVAR}` if defined,
+      otherwise {OBOK_PACKAGE_ZIPFILE!r} in the default `CalibreTree`
+      plugins directory.
+  '''
+  if obok_package_path is None:
+    obok_package_path = pfx_call(os.environ.get, OBOK_PACKAGE_PATH_ENVVAR)
+    if obok_package_path is None:
+      from .calibre import CalibreTree
+      obok_package_path = joinpath(
+          CalibreTree().plugins_dirpath, OBOK_PACKAGE_ZIPFILE
+      )
+  if not existspath(obok_package_path):
+    raise ValueError(
+        f'obok_package_path does not exist: {obok_package_path!r}'
+    )
+  if isfilepath(obok_package_path):
+    with stackattrs(sys, path=[obok_package_path] + sys.path):
+      obok = pfx_call(importlib.import_module, '.obok', package='obok')
+  else:
+    with TemporaryDirectory() as tmpdirpath:
+      pfx_call(os.symlink, obok_package_path, joinpath(tmpdirpath, 'obok'))
+      with stackattrs(sys, path=[tmpdirpath] + sys.path):
+        obok = pfx_call(importlib.import_module, '.obok', package='obok')
+  return obok
+
+obok = import_obok()
+
+@pfx
+def decrypt_obok(obok_lib, obok_book, dstpath: str, exists_ok=False):
+  ''' Decrypt the encrypted kepub file of `obok_book` and save the
+      decrypted form at `dstpath`.
+
+      This is closely based on the `decrypt_book()` function from
+      `obok.obok` in the DeDRM Obok_plugin.
+  '''
+  userkeys = obok_lib.userkeys
+  with pfx_call(ZipFile, obok_book.filename, "r") as zin:
+    with open(os.devnull, 'w') as devnull:
+      with stackattrs(sys, stdout=devnull):
+        with atomic_filename(
+            dstpath,
+            exists_ok=exists_ok,
+            suffix=f'--{basename(obok_book.filename)}.zip',
+        ) as f:
+          with ZipFile(f.name, 'w', ZIP_DEFLATED) as zout:
+            for filename in zin.namelist():
+              with Pfx(filename):
+                contents = zin.read(filename)
+                try:
+                  file = obok_book.encryptedfiles[filename]
+                except KeyError:
+                  plain_contents = contents
+                else:
+                  for userkey in userkeys:
+                    with Pfx("userkey %s", userkey):
+                      try:
+                        plain_contents = file.decrypt(userkey, contents)
+                      except ValueError as e:
+                        warning("%s", e)
+                        continue
+                      try:
+                        file.check(plain_contents)
+                      except (IndexError, ValueError) as e:
+                        # Parse failures mean the key is probably wrong.
+                        ##warning("file.check fails: %s", e)
+                        continue
+                      break
+                  else:
+                    raise ValueError(
+                        f'could not decrypt using any keys from userkeys:{userkeys!r}'
+                    )
+                zout.writestr(filename, plain_contents)
+
 class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kobo ebook tree.
 
@@ -74,7 +159,7 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CONTENT_DIRNAME = 'kepub'
 
-  FSPATH_FACTORY = default_kobo_library
+  FSPATH_DEFAULT = default_kobo_library
   FSPATH_ENVVAR = KOBO_LIBRARY_ENVVAR
 
   def __init__(self, fspath=None):
@@ -92,9 +177,13 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
     try:
       yield
     finally:
+      # close the library
+      try:
+        del self.books
+      except AttributeError:
+        pass
       self.lib.close()
       self.lib = None
-      # TODO: flush the .books cache
 
   @cached_property
   def books(self):
@@ -360,3 +449,6 @@ class KoboCommand(BaseCommand):
       print(book.uuid, book)
       print(" ", book.author, book.title)
       print(" ", book.filename)
+
+if __name__ == '__main__':
+  sys.exit(KoboCommand(sys.argv).run())

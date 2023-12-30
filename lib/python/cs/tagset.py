@@ -3174,7 +3174,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
                 self.metadata(key_type_name, k, convert=convert),
                 self.metadata(member_type_name, v, convert=convert),
             )
-            for k, v in items
+            for k, v in items()
         }
     if md is None:
       # neither mapping nor iterable
