@@ -39,6 +39,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs, stack_signals
 from cs.deco import fmtdoc
+from cs.excutils import unattributable
 from cs.ffmpegutils import convert as ffconvert, MetaData as FFMetaData
 from cs.fileutils import atomic_filename
 from cs.fs import needdir, shortpath
@@ -824,7 +825,13 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
           ##X("MB_INFO: %s", mb_info)
           ##breakpoint()
           return mb_info
-    raise AttributeError(f'no medium+disc found for discid:{discid!r}')
+    discids = set()
+    for medium in media:
+      for disc_entry in medium['disc-list']:
+        discids.add(disc_entry['id'])
+    raise AttributeError(
+        f'no medium+disc found for discid:{discid!r}: saw {sorted(discids)!r}'
+    )
 
   @property
   def medium(self):
