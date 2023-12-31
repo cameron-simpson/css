@@ -739,7 +739,6 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
   ''' A Musicbrainz disc entry.
   '''
 
-
   @property
   def discid(self):
     ''' The disc id to be used in lookups.
@@ -816,8 +815,6 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
               medium=medium,
               medium_count=medium_count,
           )
-          ##X("MB_INFO: %s", mb_info)
-          ##breakpoint()
           return mb_info
     discids = set()
     for medium in media:
@@ -1096,7 +1093,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         warning("typename=%r: need to be logged in for collections", typename)
         return {}
       if any(map(lambda inc: inc in self.QUERY_INCLUDES_NEED_LOGIN, includes)):
-        warning(
+        debug(
             "includes contains some of %r, dropping because not logged in",
             self.QUERY_INCLUDES_NEED_LOGIN
         )
@@ -1108,9 +1105,9 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         and self.dev_info is not None and self.dev_info.id == db_id):
       getter_kw.update(toc=self.dev_info.toc_string)
     assert ' ' not in db_id, "db_id:%r contains a space" % (db_id,)
-    warning(
-        "QUERY typename=%r db_id=%r includes=%r ...", typename, db_id, includes
-    )
+    ##warning(
+    ##    "QUERY typename=%r db_id=%r includes=%r ...", typename, db_id, includes
+    ##)
     if typename == 'releases':
       try:
         UUID(db_id)
