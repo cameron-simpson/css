@@ -927,6 +927,14 @@ class MBRecording(MBHasArtistsMixin, _MBTagSet):
         raise AttributeError("no .title: {e}") from e
     return title
 
+class MBRelease(MBHasArtistsMixin, _MBTagSet):
+  ''' A Musicbrainz recording entry, a single track.
+  '''
+
+  @property
+  def artist_refs(self):
+    return self.query_result['artist-credit']
+
 class MBSQLTags(SQLTags):
   ''' Musicbrainz `SQLTags` with special `TagSetClass`.
   '''
@@ -938,6 +946,7 @@ class MBSQLTags(SQLTags):
       'artist': MBArtist,
       'disc': MBDisc,
       'recording': MBRecording,
+      'release': MBRelease,
   }
 
   def default_factory(
