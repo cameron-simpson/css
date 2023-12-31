@@ -2354,19 +2354,18 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
             index = int(name)
           except ValueError:
             index = name
-          te = sqltags.get(index)
-          if te is None:
+          tags = sqltags.get(index)
+          if tags is None:
             error("missing")
             xit = 1
             continue
-          tags = te.tags
           for tag_choice in tag_choices:
             if tag_choice.choice:
               if tag_choice.tag not in tags:
-                te.set(tag_choice.tag)
+                tags.set(tag_choice.tag)
             else:
               if tag_choice.tag in tags:
-                te.discard(tag_choice.tag)
+                tags.discard(tag_choice.tag)
     return xit
 
 class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
