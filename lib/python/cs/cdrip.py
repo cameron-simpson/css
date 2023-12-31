@@ -500,10 +500,6 @@ def rip(
             f" - {track_tags.track_title}"
             f" -- {track_tags.track_artist_credit}"
         )
-        ##wav_filename = fmtpath('wav')
-        ##aac_filename = fmtpath('m4a')
-        ##flac_filename = fmtpath('flac')
-        ##mp3_filename = fmtpath('mp3')
         for acodec in 'wav', 'flac', 'aac', 'mp3':
           # skip unmentioned codec except for "wav"
           if acodec != 'wav' and (acodec not in audio_outputs):
@@ -743,14 +739,6 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
   ''' A Musicbrainz disc entry.
   '''
 
-  def __getattr__(self, attr):
-    if attr != 'release':
-      release = self.release
-      try:
-        return getattr(release, attr)
-      except AttributeError:
-        pass
-    return super().__getattr__(attr)
 
   @property
   def discid(self):
