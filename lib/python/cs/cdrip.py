@@ -354,15 +354,15 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
       with Pfx("discid %s", disc_id):
         disc = MB.discs[disc_id]
         disc.mb_toc = mb_toc
-        tags = disc.disc_track_tags(track_index=None)
-        print(tags.disc_title)
-        print(tags.disc_artist_credit)
+        disc_tags = disc.disc_tags()
+        print(disc_tags.disc_title)
+        print(disc_tags.disc_artist_credit)
         for track_index, recording in enumerate(disc.recordings):
-          tags = disc.disc_track_tags(track_index)
+          track_tags = disc.track_tags(track_index)
           track_title = (
-              f"{tags.track_number:02}"
-              f" - {tags.track_title}"
-              f" -- {tags.track_artist_credit}"
+              f"{track_tags.track_number:02}"
+              f" - {track_tags.track_title}"
+              f" -- {track_tags.track_artist_credit}"
           )
           print(track_title)
     return 0
@@ -473,11 +473,10 @@ def rip(
     if disc_id == dev_info.id:
       disc.mb_toc = mb_toc
     recordings = disc.recordings
-    disc_fstags = TagSet(
-        discid=disc.id,
-        title=disc.title,
-        artists=disc.artist_names,
-    )
+    disc_tags = disc.disc_tags()
+    # filesystem paths
+    artist_part = disc_tags.disc_artist_credit
+    disc_part = disc_tags.disc_title
 
     def fmtpath(acodec, ext):
       ''' Compute the output filesystem path.
@@ -493,14 +492,12 @@ def rip(
     for track_index in range(len(recordings)):
       track_number = track_index + 1
       with Pfx("track %d", track_number):
-        tags = disc.disc_track_tags(track_index)
+        track_tags = disc.track_tags(track_index)
         # filesystem paths
-        artist_part = tags.disc_artist_credit
-        disc_part = tags.disc_title
         track_part = (
-            f"{tags.track_number:02}"
-            f" - {tags.track_title}"
-            f" -- {tags.track_artist_credit}"
+            f"{track_tags.track_number:02}"
+            f" - {track_tags.track_title}"
+            f" -- {track_tags.track_artist_credit}"
         )
         ##wav_filename = fmtpath('wav')
         ##aac_filename = fmtpath('m4a')
@@ -520,13 +517,13 @@ def rip(
           fmt_filename = fmtpath(acodec, ext)
           ffmetadata = FFMetaData(
               fmt,
-              album=tags.disc_title,
-              album_artist=tags.disc_artist_credit,
-              disc=f'{tags.disc_number}/{tags.disc_total}',
-              track=f'{tags.track_number}/{tags.track_total}',
-              title=tags.track_title,
-              artist=tags.track_artist_credit,
-              ##author=tags.track_artist_credit,
+              album=disc_tags.disc_title,
+              album_artist=disc_tags.disc_artist_credit,
+              disc=f'{disc_tags.disc_number}/{disc_tags.disc_total}',
+              track=f'{track_tags.track_number}/{track_tags.track_total}',
+              title=track_tags.track_title,
+              artist=track_tags.track_artist_credit,
+              ##author=track_tags.track_artist_credit,
           )
           with Pfx(shortpath(fmt_filename)):
             if existspath(fmt_filename):
@@ -535,7 +532,7 @@ def rip(
             else:
               fmt_dirpath = dirname(fmt_filename)
               needdir(fmt_dirpath, use_makedirs=True)
-              fstags[fmt_dirpath].update(disc_fstags)
+              fstags[fmt_dirpath].update(disc_tags)
               if fmt == 'wav':
                 # rip from CD
                 argv = rip_to_wav(
@@ -556,10 +553,10 @@ def rip(
                   )
                   print("CONVERTED:", *argv)
             if no_action:
-              print("fstags[%r].update(%s)" % (fmt_filename, tags))
+              print("fstags[%r].update(%s)" % (fmt_filename, track_tags))
             else:
               fstags[fmt_filename].conversion_command = argv
-              fstags[fmt_filename].update(tags)
+              fstags[fmt_filename].update(track_tags)
 
 def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   ''' Rip a track from the CDROM device to a WAV file.
@@ -862,36 +859,51 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
       recordings.append(recording)
     return recordings
 
-  @require(
-      lambda self, track_index: track_index is None or
-      (track_index >= 0 and track_index < len(self.recordings))
-  )
-  @typechecked
-  def disc_track_tags(self, track_index: Optional[int]) -> TagSet:
-    ''' Return a `TagSet` for track `tracknum` (counting from 0).
-        Pass `track_index=None` to omit the per-track tags.
+  @property
+  def disc_title(self):
+    ''' The per-disc title, used as the subdirectory name when ripping.
+        This is:
+
+            release-title[ (n of m)][ - disc-title]
+
+        The `(n of m)` suffix is appended if there is more than one
+        medium in the release.
+        The `disc-title` suffix is appended if the per-disc title is
+        not the same as the release title.
     '''
     disc_title = self.release_title
     if self.medium_count > 1:
       disc_title += f" ({self.medium_position} of {self.medium_count})"
     if self.title != self.release_title:
       disc_title += f' - {self.title}'
-    tags = TagSet(
+    return disc_title
+
+  def disc_tags(self):
+    ''' Return a `TagSet` for the disc.
+    '''
+    return TagSet(
         disc_id=self.mbkey,
-        disc_artist_credit=self.artist_credit,
-        disc_title=disc_title,
+        disc_artist_credit=self.release.artist_credit,
+        disc_title=self.title,
         disc_number=self.medium_position,
         disc_total=self.medium_count,
     )
-    if track_index is not None:
-      recording = self.recordings[track_index]
-      tags.update(
-          track_number=track_index + 1,
-          track_total=int(self.medium['track-count']),
-          track_artist_credit=recording.artist_credit,
-          track_title=recording.title,
-      )
-    return tags
+
+  @require(
+      lambda self, track_index: track_index >= 0 and track_index <
+      len(self.recordings)
+  )
+  @typechecked
+  def track_tags(self, track_index: int) -> TagSet:
+    ''' Return a `TagSet` for track `tracknum` (counting from 0).
+    '''
+    recording = self.recordings[track_index]
+    return TagSet(
+        track_number=track_index + 1,
+        track_total=int(self.medium['track-count']),
+        track_artist_credit=recording.artist_credit,
+        track_title=recording.title,
+    )
 
 class MBRecording(MBHasArtistsMixin, _MBTagSet):
   ''' A Musicbrainz recording entry.
