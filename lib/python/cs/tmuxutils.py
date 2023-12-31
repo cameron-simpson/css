@@ -232,6 +232,8 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
   @pfx_method
   @typechecked
   def __call__(self, tmux_command: str) -> TmuxCommandResponse:
+    ''' Submit `tmux_command`, return a `TmuxCommandResponse` when it completes.
+    '''
     with self:
       R = self.submit(tmux_command)
       return R()
