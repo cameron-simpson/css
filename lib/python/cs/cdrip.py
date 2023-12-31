@@ -45,14 +45,14 @@ from cs.fileutils import atomic_filename
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import cutsuffix, is_identifier, r
-from cs.logutils import error, warning, info
+from cs.logutils import error, warning, info, debug
 from cs.mappings import AttrableMapping
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.psutils import run
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import unrepeated
-from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
+from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommandsMixin
 from cs.tagset import TagSet, TagsOntology
 from cs.upd import run_task, print
 
@@ -249,7 +249,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     options = self.options
     mbdb = options.mbdb
     badopts = False
-    tag_criteria, argv = SQLTagsCommand.parse_tagset_criteria(argv)
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
       warning("missing tag criteria")
       badopts = True
