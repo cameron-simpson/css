@@ -39,19 +39,20 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs, stack_signals
 from cs.deco import fmtdoc
+from cs.excutils import unattributable
 from cs.ffmpegutils import convert as ffconvert, MetaData as FFMetaData
 from cs.fileutils import atomic_filename
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import cutsuffix, is_identifier, r
-from cs.logutils import error, warning, info
+from cs.logutils import error, warning, info, debug
 from cs.mappings import AttrableMapping
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.psutils import run
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import unrepeated
-from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
+from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommandsMixin
 from cs.tagset import TagSet, TagsOntology
 from cs.upd import run_task, print
 
@@ -76,7 +77,7 @@ def main(argv=None):
   '''
   return CDRipCommand(argv).run()
 
-class CDRipCommand(BaseCommand):
+class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
   ''' 'cdrip' command line.
   '''
 
@@ -101,7 +102,7 @@ class CDRipCommand(BaseCommand):
   Environment:
     {CDRIP_DEV_ENVVAR}            Default CDROM device.
                          default {CDRIP_DEV_DEFAULT}.
-    {CDRIP_DIR_ENVVAR}            Default output directory path.,
+    {CDRIP_DIR_ENVVAR}            Default output directory path,
                          default {CDRIP_DIR_DEFAULT}.
     {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
                          default {MBDB_PATH_DEFAULT}.'''
@@ -199,8 +200,6 @@ class CDRipCommand(BaseCommand):
         if self.options.device == CDRIP_DEV_DEFAULT else self.options.device
     )
 
-  cmd_dbshell = SQLTagsCommand.cmd_dbshell
-
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [-a] [-R] [entity...]
           Dump each entity.
@@ -250,7 +249,7 @@ class CDRipCommand(BaseCommand):
     options = self.options
     mbdb = options.mbdb
     badopts = False
-    tag_criteria, argv = SQLTagsCommand.parse_tagset_criteria(argv)
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
       warning("missing tag criteria")
       badopts = True
@@ -260,7 +259,7 @@ class CDRipCommand(BaseCommand):
     if badopts:
       raise GetoptError("bad arguments")
     tes = list(mbdb.find(tag_criteria))
-    changed_tes = SQLTagSet.edit_entities(tes)  # verbose=state.verbose
+    changed_tes = SQLTagSet.edit_tagsets(tes)  # verbose=state.verbose
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
@@ -309,7 +308,7 @@ class CDRipCommand(BaseCommand):
     fstags = options.fstags
     dirpath = options.dirpath
     disc_id = None
-    self.popopts(argv, attrfor=options, F_='codecs_spec', n='dry_run')
+    options.popopts(argv, F_='codecs_spec', n='dry_run')
     if argv:
       disc_id = argv.pop(0)
     if argv:
@@ -356,15 +355,15 @@ class CDRipCommand(BaseCommand):
       with Pfx("discid %s", disc_id):
         disc = MB.discs[disc_id]
         disc.mb_toc = mb_toc
-        tags = disc.disc_track_tags(track_index=None)
-        print(tags.disc_title)
-        print(tags.disc_artist_credit)
+        disc_tags = disc.disc_tags()
+        print(disc_tags.disc_title)
+        print(disc_tags.disc_artist_credit)
         for track_index, recording in enumerate(disc.recordings):
-          tags = disc.disc_track_tags(track_index)
+          track_tags = disc.track_tags(track_index)
           track_title = (
-              f"{tags.track_number:02}"
-              f" - {tags.track_title}"
-              f" -- {tags.track_artist_credit}"
+              f"{track_tags.track_number:02}"
+              f" - {track_tags.track_title}"
+              f" -- {track_tags.track_artist_credit}"
           )
           print(track_title)
     return 0
@@ -475,11 +474,10 @@ def rip(
     if disc_id == dev_info.id:
       disc.mb_toc = mb_toc
     recordings = disc.recordings
-    disc_fstags = TagSet(
-        discid=disc.id,
-        title=disc.title,
-        artists=disc.artist_names,
-    )
+    disc_tags = disc.disc_tags()
+    # filesystem paths
+    artist_part = disc_tags.disc_artist_credit
+    disc_part = disc_tags.disc_title
 
     def fmtpath(acodec, ext):
       ''' Compute the output filesystem path.
@@ -495,19 +493,13 @@ def rip(
     for track_index in range(len(recordings)):
       track_number = track_index + 1
       with Pfx("track %d", track_number):
-        tags = disc.disc_track_tags(track_index)
+        track_tags = disc.track_tags(track_index)
         # filesystem paths
-        artist_part = tags.disc_artist_credit
-        disc_part = tags.disc_title
         track_part = (
-            f"{tags.track_number:02}"
-            f" - {tags.track_title}"
-            f" -- {tags.track_artist_credit}"
+            f"{track_tags.track_number:02}"
+            f" - {track_tags.track_title}"
+            f" -- {track_tags.track_artist_credit}"
         )
-        ##wav_filename = fmtpath('wav')
-        ##aac_filename = fmtpath('m4a')
-        ##flac_filename = fmtpath('flac')
-        ##mp3_filename = fmtpath('mp3')
         for acodec in 'wav', 'flac', 'aac', 'mp3':
           # skip unmentioned codec except for "wav"
           if acodec != 'wav' and (acodec not in audio_outputs):
@@ -522,13 +514,13 @@ def rip(
           fmt_filename = fmtpath(acodec, ext)
           ffmetadata = FFMetaData(
               fmt,
-              album=tags.disc_title,
-              album_artist=tags.disc_artist_credit,
-              disc=f'{tags.disc_number}/{tags.disc_total}',
-              track=f'{tags.track_number}/{tags.track_total}',
-              title=tags.track_title,
-              artist=tags.track_artist_credit,
-              ##author=tags.track_artist_credit,
+              album=disc_tags.disc_title,
+              album_artist=disc_tags.disc_artist_credit,
+              disc=f'{disc_tags.disc_number}/{disc_tags.disc_total}',
+              track=f'{track_tags.track_number}/{track_tags.track_total}',
+              title=track_tags.track_title,
+              artist=track_tags.track_artist_credit,
+              ##author=track_tags.track_artist_credit,
           )
           with Pfx(shortpath(fmt_filename)):
             if existspath(fmt_filename):
@@ -537,7 +529,7 @@ def rip(
             else:
               fmt_dirpath = dirname(fmt_filename)
               needdir(fmt_dirpath, use_makedirs=True)
-              fstags[fmt_dirpath].update(disc_fstags)
+              fstags[fmt_dirpath].update(disc_tags)
               if fmt == 'wav':
                 # rip from CD
                 argv = rip_to_wav(
@@ -558,10 +550,10 @@ def rip(
                   )
                   print("CONVERTED:", *argv)
             if no_action:
-              print("fstags[%r].update(%s)" % (fmt_filename, tags))
+              print("fstags[%r].update(%s)" % (fmt_filename, track_tags))
             else:
               fstags[fmt_filename].conversion_command = argv
-              fstags[fmt_filename].update(tags)
+              fstags[fmt_filename].update(track_tags)
 
 def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   ''' Rip a track from the CDROM device to a WAV file.
@@ -747,27 +739,24 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
   ''' A Musicbrainz disc entry.
   '''
 
-  def __getattr__(self, attr):
-    if attr != 'release':
-      release = self.release
-      try:
-        return getattr(release, attr)
-      except AttributeError:
-        pass
-    return super().__getattr__(attr)
-
   @property
   def discid(self):
-    '''The disc id.'''
-    return self.query_result['id']
+    ''' The disc id to be used in lookups.
+        For most discs with is `self.mbkey`, but if our discid is unknown
+        and another is in the database, the `use_discid` tag will supply
+        that discid.
+    '''
+    return getattr(self, 'use_discid', self.mbkey)
 
   @property
+  @unattributable
   def title(self):
     ''' The medium title or failing that the release title.
     '''
     return self.medium_title or self.release['title']
 
   @property
+  @unattributable
   def artist_refs(self):
     # we get the artist refs from the release
     return self.release.artist
@@ -810,6 +799,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     return self.release.title
 
   @cached_property
+  @unattributable
   def mb_info(self):
     ''' Salient data from the MusicbrainzNG API response.
     '''
@@ -826,12 +816,17 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
               medium=medium,
               medium_count=medium_count,
           )
-          ##X("MB_INFO: %s", mb_info)
-          ##breakpoint()
           return mb_info
-    raise AttributeError(f'no medium+disc found for discid:{discid!r}')
+    discids = set()
+    for medium in media:
+      for disc_entry in medium['disc-list']:
+        discids.add(disc_entry['id'])
+    raise AttributeError(
+        f'no medium+disc found for discid:{discid!r}: saw {sorted(discids)!r}'
+    )
 
   @property
+  @unattributable
   def medium(self):
     '''The recording's medium.'''
     return self.mb_info.medium
@@ -849,6 +844,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     return self.mb_info.medium_count
 
   @property
+  @unattributable
   def medium_title(self):
     ''' The medium title.
     '''
@@ -864,39 +860,54 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
       recordings.append(recording)
     return recordings
 
-  @require(
-      lambda self, track_index: track_index is None or
-      (track_index >= 0 and track_index < len(self.recordings))
-  )
-  @typechecked
-  def disc_track_tags(self, track_index: Optional[int]) -> TagSet:
-    ''' Return a `TagSet` for track `tracknum` (counting from 0).
-        Pass `track_index=None` to omit the per-track tags.
+  @property
+  def disc_title(self):
+    ''' The per-disc title, used as the subdirectory name when ripping.
+        This is:
+
+            release-title[ (n of m)][ - disc-title]
+
+        The `(n of m)` suffix is appended if there is more than one
+        medium in the release.
+        The `disc-title` suffix is appended if the per-disc title is
+        not the same as the release title.
     '''
     disc_title = self.release_title
     if self.medium_count > 1:
       disc_title += f" ({self.medium_position} of {self.medium_count})"
     if self.title != self.release_title:
       disc_title += f' - {self.title}'
-    tags = TagSet(
+    return disc_title
+
+  def disc_tags(self):
+    ''' Return a `TagSet` for the disc.
+    '''
+    return TagSet(
         disc_id=self.mbkey,
-        disc_artist_credit=self.artist_credit,
-        disc_title=disc_title,
+        disc_artist_credit=self.release.artist_credit,
+        disc_title=self.title,
         disc_number=self.medium_position,
         disc_total=self.medium_count,
     )
-    if track_index is not None:
-      recording = self.recordings[track_index]
-      tags.update(
-          track_number=track_index + 1,
-          track_total=int(self.medium['track-count']),
-          track_artist_credit=recording.artist_credit,
-          track_title=recording.title,
-      )
-    return tags
+
+  @require(
+      lambda self, track_index: track_index >= 0 and track_index <
+      len(self.recordings)
+  )
+  @typechecked
+  def track_tags(self, track_index: int) -> TagSet:
+    ''' Return a `TagSet` for track `tracknum` (counting from 0).
+    '''
+    recording = self.recordings[track_index]
+    return TagSet(
+        track_number=track_index + 1,
+        track_total=int(self.medium['track-count']),
+        track_artist_credit=recording.artist_credit,
+        track_title=recording.title,
+    )
 
 class MBRecording(MBHasArtistsMixin, _MBTagSet):
-  ''' A Musicbrainz recording entry.
+  ''' A Musicbrainz recording entry, a single track.
   '''
 
   @property
@@ -916,6 +927,14 @@ class MBRecording(MBHasArtistsMixin, _MBTagSet):
         raise AttributeError("no .title: {e}") from e
     return title
 
+class MBRelease(MBHasArtistsMixin, _MBTagSet):
+  ''' A Musicbrainz recording entry, a single track.
+  '''
+
+  @property
+  def artist_refs(self):
+    return self.query_result['artist-credit']
+
 class MBSQLTags(SQLTags):
   ''' Musicbrainz `SQLTags` with special `TagSetClass`.
   '''
@@ -927,6 +946,7 @@ class MBSQLTags(SQLTags):
       'artist': MBArtist,
       'disc': MBDisc,
       'recording': MBRecording,
+      'release': MBRelease,
   }
 
   def default_factory(
@@ -1085,7 +1105,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         warning("typename=%r: need to be logged in for collections", typename)
         return {}
       if any(map(lambda inc: inc in self.QUERY_INCLUDES_NEED_LOGIN, includes)):
-        warning(
+        debug(
             "includes contains some of %r, dropping because not logged in",
             self.QUERY_INCLUDES_NEED_LOGIN
         )
@@ -1097,9 +1117,9 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         and self.dev_info is not None and self.dev_info.id == db_id):
       getter_kw.update(toc=self.dev_info.toc_string)
     assert ' ' not in db_id, "db_id:%r contains a space" % (db_id,)
-    warning(
-        "QUERY typename=%r db_id=%r includes=%r ...", typename, db_id, includes
-    )
+    ##warning(
+    ##    "QUERY typename=%r db_id=%r includes=%r ...", typename, db_id, includes
+    ##)
     if typename == 'releases':
       try:
         UUID(db_id)
