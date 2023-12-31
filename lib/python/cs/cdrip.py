@@ -308,7 +308,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     fstags = options.fstags
     dirpath = options.dirpath
     disc_id = None
-    self.popopts(argv, attrfor=options, F_='codecs_spec', n='dry_run')
+    options.popopts(argv, F_='codecs_spec', n='dry_run')
     if argv:
       disc_id = argv.pop(0)
     if argv:
