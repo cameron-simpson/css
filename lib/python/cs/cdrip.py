@@ -750,12 +750,14 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     return getattr(self, 'use_discid', self.mbkey)
 
   @property
+  @unattributable
   def title(self):
     ''' The medium title or failing that the release title.
     '''
     return self.medium_title or self.release['title']
 
   @property
+  @unattributable
   def artist_refs(self):
     # we get the artist refs from the release
     return self.release.artist
