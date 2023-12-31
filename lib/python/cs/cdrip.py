@@ -789,7 +789,8 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     '''
     releases = self.releases
     if not releases:
-      return None
+      # fall back to the first release
+      return self.resolve_id('release', self.release_list[0]['id'])
     return releases[0]
 
   @property
