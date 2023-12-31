@@ -3,27 +3,39 @@
 ''' Utlity functions for working with tmux(1).
 '''
 
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from getopt import GetoptError
 import os
-from os import O_RDWR
-from os.path import join as joinpath
+from os.path import (
+    isabs as isabspath,
+    join as joinpath,
+)
 from shlex import join as shq
-from socket import socket, AF_UNIX, SHUT_RD, SHUT_WR, SOCK_STREAM
+from stat import S_ISFIFO
 from subprocess import CompletedProcess, PIPE, Popen
+import sys
+from tempfile import TemporaryDirectory
 from threading import Lock
-from typing import List
+from time import sleep
+from typing import Callable, List, Optional
 
 from icontract import require
 from typeguard import typechecked
 
+from cs.buffer import CornuCopyBuffer
+from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fs import HasFSPath
+from cs.fsm import FSMTransitionEvent
 from cs.logutils import info, warning
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.psutils import run
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
+from cs.result import Result
+from cs.threads import bg
+from cs.upd import Upd
 
 from cs.debug import trace, X, s, r
 
