@@ -76,7 +76,7 @@ def main(argv=None):
   '''
   return CDRipCommand(argv).run()
 
-class CDRipCommand(BaseCommand):
+class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
   ''' 'cdrip' command line.
   '''
 
@@ -101,7 +101,7 @@ class CDRipCommand(BaseCommand):
   Environment:
     {CDRIP_DEV_ENVVAR}            Default CDROM device.
                          default {CDRIP_DEV_DEFAULT}.
-    {CDRIP_DIR_ENVVAR}            Default output directory path.,
+    {CDRIP_DIR_ENVVAR}            Default output directory path,
                          default {CDRIP_DIR_DEFAULT}.
     {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
                          default {MBDB_PATH_DEFAULT}.'''
@@ -199,8 +199,6 @@ class CDRipCommand(BaseCommand):
         if self.options.device == CDRIP_DEV_DEFAULT else self.options.device
     )
 
-  cmd_dbshell = SQLTagsCommand.cmd_dbshell
-
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [-a] [-R] [entity...]
           Dump each entity.
@@ -260,7 +258,7 @@ class CDRipCommand(BaseCommand):
     if badopts:
       raise GetoptError("bad arguments")
     tes = list(mbdb.find(tag_criteria))
-    changed_tes = SQLTagSet.edit_entities(tes)  # verbose=state.verbose
+    changed_tes = SQLTagSet.edit_tagsets(tes)  # verbose=state.verbose
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
