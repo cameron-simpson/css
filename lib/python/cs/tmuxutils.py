@@ -190,14 +190,23 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
         R.result = rsp
 
   @require(lambda tmux_command: tmux_command and '\n' not in tmux_command)
-  def submit(self, tmux_command: str) -> Result:
+  def submit(
+      self,
+      tmux_command: str,
+      callback: Optional[Callable[Result, FSMTransitionEvent]] = None,
+  ) -> Result:
     ''' Submit `tmux_command`, return a `Result`
         for collection of the `TmuxCommandResponse`.
+
+        The optional `callback` parameter is a callable accepting
+        a `Result` and an `FSMTransitionEvent` which will be called
+        when the `Result` is done or cancelled.
     '''
     wf = self.wf
+    R = Result(f'{tmux_command}')
     with self._lock:
-      R = Result(f'{tmux_command}')
       self.pending.append(R)
+      R.dispatch()
       wf.write(tmux_command.encode('utf-8'))
       wf.write(b'\n')
       wf.flush()
