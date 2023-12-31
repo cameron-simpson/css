@@ -27,6 +27,12 @@ from cs.resources import MultiOpenMixin
 
 from cs.debug import trace, X, s, r
 
+def quote(tmux_s: str):
+  ''' Quote a string `tmux_s` for use in a tmux command.
+  '''
+  qs = tmux_s.replace('\\', '\\\\').replace("'", "\\'")
+  return f"'{qs}'"
+
 @dataclass
 class TmuxCommandResponse:
   ''' A tmux control command response.
