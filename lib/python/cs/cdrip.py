@@ -754,8 +754,12 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
 
   @property
   def discid(self):
-    '''The disc id.'''
-    return self.query_result['id']
+    ''' The disc id to be used in lookups.
+        For most discs with is `self.mbkey`, but if our discid is unknown
+        and another is in the database, the `use_discid` tag will supply
+        that discid.
+    '''
+    return getattr(self, 'use_discid', self.mbkey)
 
   @property
   def title(self):
