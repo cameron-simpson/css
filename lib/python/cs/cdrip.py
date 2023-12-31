@@ -799,6 +799,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     return self.release.title
 
   @cached_property
+  @unattributable
   def mb_info(self):
     ''' Salient data from the MusicbrainzNG API response.
     '''
@@ -825,6 +826,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     )
 
   @property
+  @unattributable
   def medium(self):
     '''The recording's medium.'''
     return self.mb_info.medium
@@ -842,6 +844,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     return self.mb_info.medium_count
 
   @property
+  @unattributable
   def medium_title(self):
     ''' The medium title.
     '''
@@ -904,7 +907,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     )
 
 class MBRecording(MBHasArtistsMixin, _MBTagSet):
-  ''' A Musicbrainz recording entry.
+  ''' A Musicbrainz recording entry, a single track.
   '''
 
   @property
