@@ -76,7 +76,7 @@ class PDFCommand(BaseCommand):
           width, height = im.size
           with Pfx("page %d, image %d, %dx%d", pagenum, imgnum, width, height):
             imgpath = f'{base}--{pagenum:02}--{imgnum:02}.png'
-            print("{width}x{height}", imgpath)
+            print(f"{width}x{height}", imgpath)
             pfx_call(im.save, imgpath)
 
   cmd_xi = cmd_extract_images
