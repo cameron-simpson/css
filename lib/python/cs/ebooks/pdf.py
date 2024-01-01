@@ -444,25 +444,25 @@ class ArrayObject(list):
   '''
 
   def __bytes__(self):
-    return b''.join(
+    return b''.join((
         b'[ ',
         *map(bytes, self),
         b' ]',
-    )
+    ))
 
 class DictObject(dict):
   ''' A PDF dictionary.
   '''
 
   def __bytes__(self):
-    return b''.join(
+    bss = [
         b'<<\r\n',
-        *chain(
-            (b'  ', bytes(k), b'\r\n    ', bytes(v), b'\r\n')
-            for k, v in sorted(self.items())
-        ),
-        b'>>',
-    )
+    ]
+    for kvbss in ((b'  ', bytes(k), b'\r\n    ', bytes(v), b'\r\n')
+                  for k, v in sorted(self.items())):
+      bss.extend(kvbss)
+    bss.append(b'>>',)
+    return b''.join(bss)
 
   @typechecked
   def __getattr__(self, key: str):
@@ -520,9 +520,11 @@ class ObjectRef:
 
   def __bytes__(self):
     return b' '.join(
-        str(self.number).encode('ascii'),
-        str(self.generation).encode('ascii'),
-        b'R',
+        (
+            str(self.number).encode('ascii'),
+            str(self.generation).encode('ascii'),
+            b'R',
+        )
     )
 
   @property
