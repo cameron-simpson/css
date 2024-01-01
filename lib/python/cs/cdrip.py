@@ -946,7 +946,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     release = self.release
     return TagSet(
         disc_id=self.mbkey,
-        disc_artist_credit='' if release is None else elease.artist_credit,
+        disc_artist_credit='' if release is None else release.artist_credit,
         disc_title=self.title,
         disc_number=self.medium_position,
         disc_total=self.medium_count,
