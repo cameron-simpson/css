@@ -336,6 +336,14 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         metadata = mbdb.ontology[metaname]
         print(' ', metaname, metadata)
 
+  def cmd_eject(self, argv):
+    ''' Usage: {cmd}
+          Eject the disc.
+    '''
+    if argv:
+      raise GetoptError("extra arguments")
+    return os.system('eject')
+
   def cmd_probe(self, argv):
     ''' Usage: {cmd} [disc_id]
           Probe Musicbrainz about the current disc.
