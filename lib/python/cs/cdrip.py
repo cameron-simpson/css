@@ -805,7 +805,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
   def release_list(self):
     ''' The query result `"release-list"` list.
     '''
-    return self.query_result['release-list']
+    return self.query_result.get('release-list', [])
 
   @cached_property
   def releases(self):
@@ -830,7 +830,15 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     releases = self.releases
     if not releases:
       # fall back to the first release
-      return self.resolve_id('release', self.release_list[0]['id'])
+      warning(
+          "%s: no matching releases, falling back to the first nonmatching release",
+          self.name
+      )
+      all_releases = self.release_list
+      if not all_releases:
+        warning("%s: no nonmatching relases", self.name)
+        return None
+      return self.resolve_id('release', all_releases[0]['id'])
     return releases[0]
 
   @property
@@ -844,8 +852,11 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
   def mb_info(self):
     ''' Salient data from the MusicbrainzNG API response.
     '''
-    release_entry = self.release.query_result
     discid = self.discid
+    release = self.release
+    if release is None:
+      raise AttributeError(f'no release for discid:{discid!r}')
+    release_entry = release.query_result
     media = release_entry['medium-list']
     medium_count = len(media)
     for medium in media:
@@ -858,6 +869,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
               medium_count=medium_count,
           )
           return mb_info
+    # gather discids for inclusion in the exception message
     discids = set()
     for medium in media:
       for disc_entry in medium['disc-list']:
@@ -923,9 +935,10 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
   def disc_tags(self):
     ''' Return a `TagSet` for the disc.
     '''
+    release = self.release
     return TagSet(
         disc_id=self.mbkey,
-        disc_artist_credit=self.release.artist_credit,
+        disc_artist_credit='' if release is None else elease.artist_credit,
         disc_title=self.title,
         disc_number=self.medium_position,
         disc_total=self.medium_count,
