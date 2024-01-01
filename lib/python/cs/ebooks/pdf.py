@@ -1204,7 +1204,11 @@ class PDFDocument(AbstractBinary):
                 "could not resolve stream length, falling back to looking for endstream"
             )
             peeklen = 24
-            end_re = re.compile(b'\r?\nendstream[\r\n]')
+            # endstream is _supposed_ to be preceeded by an end of line
+            # but some real world PDFs... don't
+            # I might be looking at you, "GPL Ghostscript 10.01.2" grr
+            ##end_re = re.compile(b'\r?\nendstream[\r\n]')
+            end_re = re.compile(b'endstream[\r\n]')
             while True:
               bs = buf.peek(peeklen)
               m = end_re.search(bs)
