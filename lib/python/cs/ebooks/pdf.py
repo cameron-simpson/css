@@ -468,8 +468,9 @@ class DictObject(dict):
   def __getattr__(self, key: str):
     ''' Provide access to the entries by name.
     '''
+    name = Name.promote(key)
     try:
-      return self[Name.promote(key)]
+      return self[name]
     except KeyError:
       raise AttributeError(
           f'{self.__class__.__name__}.{key}: keys={sorted(self.keys())}'
