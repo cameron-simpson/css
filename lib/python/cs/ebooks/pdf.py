@@ -1311,7 +1311,7 @@ class PDFPage:
   def __getitem__(self, resource: Name):
     ''' Indexing returns the named resources `XObject` entry.
     '''
-    xobjs = self.resources.XObject
+    xobjs = self.Resources.XObject.object
     try:
       ref = xobjs[resource]
     except KeyError:
