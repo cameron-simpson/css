@@ -200,6 +200,64 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         if self.options.device == CDRIP_DEV_DEFAULT else self.options.device
     )
 
+  def device_info(self, device_id=None):
+    ''' Return the device info from device `device_id`
+        as from `discid.read(device_id)`.
+        The default device comes from `self.device_id`.
+    '''
+    if device_id is None:
+      device_id = self.device_id
+    return pfx_call(discid.read, device=device_id)
+
+  @typechecked
+  def popdisc(self, argv, default=None, *, device_id=None) -> "MBDisc":
+    ''' Pop an `MBDisc` from `argv`.
+        If `argv` is empty and `default` is `None`, raise `IndexError`
+        otherwise use `default`.
+        A value of `"."` obtains the discid from the current device
+        (or `device_id` if provided).
+    '''
+    if argv:
+      disc_id = argv.pop(0)
+    elif default is None:
+      raise IndexError("missing disc_id")
+    else:
+      disc_id = default
+    dev_info = None
+    if disc_id == '.':
+      dev_info = pfx_call(self.device_info, device_id)
+      disc_id = dev_info.id
+    disc = self.options.mbdb.discs[disc_id]
+    if dev_info is not None:
+      disc.mb_toc = dev_info.toc_string
+    return disc
+
+  def cmd_disc(self, argv):
+    ''' Usage: {cmd} {{.|discid}} {{tag[=value]|-tag}}...
+          Tag the disc identified by discid.
+          If discid is "." the discid is derived from the CD device.
+          Typical example:
+            disc . use_discid=some-other-discid
+          to alias this disc with another in the database.
+    '''
+    if not argv:
+      raise GetoptError('missing discid')
+    disc = self.popdisc(argv, '.')
+    if not argv:
+      disc.dump()
+      return
+    try:
+      tag_choices = self.parse_tag_choices(argv)
+    except ValueError as e:
+      raise GetoptError(str(e)) from e
+    for tag_choice in tag_choices:
+      if tag_choice.choice:
+        if tag_choice.tag not in disc:
+          disc.set(tag_choice.tag)
+      else:
+        if tag_choice.tag in disc:
+          disc.discard(tag_choice.tag)
+
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [-a] [-R] [entity...]
           Dump each entity.
@@ -278,20 +336,26 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         metadata = mbdb.ontology[metaname]
         print(' ', metaname, metadata)
 
+  def cmd_eject(self, argv):
+    ''' Usage: {cmd}
+          Eject the disc.
+    '''
+    if argv:
+      raise GetoptError("extra arguments")
+    return os.system('eject')
+
   def cmd_probe(self, argv):
     ''' Usage: {cmd} [disc_id]
           Probe Musicbrainz about the current disc.
           disc_id   Optional disc id to query instead of obtaining
                     one from the current inserted disc.
     '''
-    disc_id = None
-    if argv:
-      disc_id = argv.pop(0)
+    disc = self.popdisc(argv, '.')
     if argv:
       raise GetoptError("extra arguments after disc_id: %r" % (argv,))
     options = self.options
     try:
-      probe_disc(self.device_id, options.mbdb, disc_id=disc_id)
+      pfx_call(probe_disc, self.device_id, options.mbdb, disc_id=disc.mbkey)
     except DiscError as e:
       error("%s", e)
       return 1
@@ -307,10 +371,8 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     options = self.options
     fstags = options.fstags
     dirpath = options.dirpath
-    disc_id = None
     options.popopts(argv, F_='codecs_spec', n='dry_run')
-    if argv:
-      disc_id = argv.pop(0)
+    disc = self.popdisc(argv, '.')
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     try:
@@ -319,7 +381,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
           options.mbdb,
           output_dirpath=dirpath,
           audio_outputs=options.codecs,
-          disc_id=disc_id,
+          disc_id=disc.mbkey,
           fstags=fstags,
           no_action=options.dry_run,
           split_by_codec=True,
@@ -334,38 +396,24 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     ''' Usage: {cmd} [disc_id]
           Print a table of contents for the current disc.
     '''
-    disc_id = None
-    if argv:
-      disc_id = argv.pop(0)
+    disc = self.popdisc(argv, '.')
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
-    MB = options.mbdb
-    if disc_id is None:
-      try:
-        dev_info = discid.read(device=self.device_id)
-      except discid.disc.DiscError as e:
-        error("disc error: %s", e)
-        return 1
-      disc_id = dev_info.id
-      mb_toc = dev_info.toc_string
-    else:
-      dev_info = None
-    with stackattrs(MB, dev_info=dev_info):
-      with Pfx("discid %s", disc_id):
-        disc = MB.discs[disc_id]
-        disc.mb_toc = mb_toc
-        disc_tags = disc.disc_tags()
-        print(disc_tags.disc_title)
-        print(disc_tags.disc_artist_credit)
-        for track_index, recording in enumerate(disc.recordings):
-          track_tags = disc.track_tags(track_index)
-          track_title = (
-              f"{track_tags.track_number:02}"
-              f" - {track_tags.track_title}"
-              f" -- {track_tags.track_artist_credit}"
-          )
-          print(track_title)
+    ##MB = options.mbdb
+    ##with stackattrs(MB, dev_info=dev_info):
+    with Pfx("discid %s", disc.mbkey):
+      disc_tags = disc.disc_tags()
+      print(disc_tags.disc_title)
+      print(disc_tags.disc_artist_credit)
+      for track_index, recording in enumerate(disc.recordings):
+        track_tags = disc.track_tags(track_index)
+        track_title = (
+            f"{track_tags.track_number:02}"
+            f" - {track_tags.track_title}"
+            f" -- {track_tags.track_artist_credit}"
+        )
+        print(track_title)
     return 0
 
 def probe_disc(device, mbdb, disc_id=None):
@@ -765,7 +813,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
   def release_list(self):
     ''' The query result `"release-list"` list.
     '''
-    return self.query_result['release-list']
+    return self.query_result.get('release-list', [])
 
   @cached_property
   def releases(self):
@@ -790,7 +838,15 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     releases = self.releases
     if not releases:
       # fall back to the first release
-      return self.resolve_id('release', self.release_list[0]['id'])
+      warning(
+          "%s: no matching releases, falling back to the first nonmatching release",
+          self.name
+      )
+      all_releases = self.release_list
+      if not all_releases:
+        warning("%s: no nonmatching relases", self.name)
+        return None
+      return self.resolve_id('release', all_releases[0]['id'])
     return releases[0]
 
   @property
@@ -804,8 +860,11 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
   def mb_info(self):
     ''' Salient data from the MusicbrainzNG API response.
     '''
-    release_entry = self.release.query_result
     discid = self.discid
+    release = self.release
+    if release is None:
+      raise AttributeError(f'no release for discid:{discid!r}')
+    release_entry = release.query_result
     media = release_entry['medium-list']
     medium_count = len(media)
     for medium in media:
@@ -818,6 +877,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
               medium_count=medium_count,
           )
           return mb_info
+    # gather discids for inclusion in the exception message
     discids = set()
     for medium in media:
       for disc_entry in medium['disc-list']:
@@ -883,9 +943,10 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
   def disc_tags(self):
     ''' Return a `TagSet` for the disc.
     '''
+    release = self.release
     return TagSet(
         disc_id=self.mbkey,
-        disc_artist_credit=self.release.artist_credit,
+        disc_artist_credit='' if release is None else elease.artist_credit,
         disc_title=self.title,
         disc_number=self.medium_position,
         disc_total=self.medium_count,
@@ -1193,6 +1254,9 @@ class MBDB(MultiOpenMixin, RunStateMixin):
               if mbtype is None:
                 warning("no MBTYPE, not refreshing")
                 continue
+              if mbtype in ('cdstub',):
+                warning("no refresh for mbtype=%r", mbtype)
+                continue
               q_result_tag = te.MB_QUERY_RESULT_TAG_NAME
               q_time_tag = te.MB_QUERY_TIME_TAG_NAME
               if (refetch or q_result_tag not in te or q_time_tag not in te
@@ -1246,7 +1310,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
                   break
               else:
                 raise TypeError(f'wrong type for recurse {r(recurse)}')
-      return te0[te0.MB_QUERY_RESULT_TAG_NAME]
+      return te0.get(te0.MB_QUERY_RESULT_TAG_NAME, {})
 
   @classmethod
   def key_type_name(cls, k):
