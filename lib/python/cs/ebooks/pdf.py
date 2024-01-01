@@ -996,7 +996,10 @@ class PDFDocument(AbstractBinary):
     '''
     catalogs = self.by_obj_type[Name(b'Catalog')]
     if not catalogs:
-      warning("no catalogs in document")
+      warning(
+          "no catalogs in document; existing obj types: %r",
+          sorted(self.by_obj_type.keys())
+      )
       return None
     if len(catalogs) > 1:
       warning("%d catalogs in document", len(catalogs))
