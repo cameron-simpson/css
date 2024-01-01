@@ -1246,6 +1246,9 @@ class MBDB(MultiOpenMixin, RunStateMixin):
               if mbtype is None:
                 warning("no MBTYPE, not refreshing")
                 continue
+              if mbtype in ('cdstub',):
+                warning("no refresh for mbtype=%r", mbtype)
+                continue
               q_result_tag = te.MB_QUERY_RESULT_TAG_NAME
               q_time_tag = te.MB_QUERY_TIME_TAG_NAME
               if (refetch or q_result_tag not in te or q_time_tag not in te
@@ -1299,7 +1302,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
                   break
               else:
                 raise TypeError(f'wrong type for recurse {r(recurse)}')
-      return te0[te0.MB_QUERY_RESULT_TAG_NAME]
+      return te0.get(te0.MB_QUERY_RESULT_TAG_NAME, {})
 
   @classmethod
   def key_type_name(cls, k):
