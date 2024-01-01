@@ -200,6 +200,64 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         if self.options.device == CDRIP_DEV_DEFAULT else self.options.device
     )
 
+  def device_info(self, device_id=None):
+    ''' Return the device info from device `device_id`
+        as from `discid.read(device_id)`.
+        The default device comes from `self.device_id`.
+    '''
+    if device_id is None:
+      device_id = self.device_id
+    return pfx_call(discid.read, device=device_id)
+
+  @typechecked
+  def popdisc(self, argv, default=None, *, device_id=None) -> "MBDisc":
+    ''' Pop an `MBDisc` from `argv`.
+        If `argv` is empty and `default` is `None`, raise `IndexError`
+        otherwise use `default`.
+        A value of `"."` obtains the discid from the current device
+        (or `device_id` if provided).
+    '''
+    if argv:
+      disc_id = argv.pop(0)
+    elif default is None:
+      raise IndexError("missing disc_id")
+    else:
+      disc_id = default
+    dev_info = None
+    if disc_id == '.':
+      dev_info = pfx_call(self.device_info, device_id)
+      disc_id = dev_info.id
+    disc = self.options.mbdb.discs[disc_id]
+    if dev_info is not None:
+      disc.mb_toc = dev_info.toc_string
+    return disc
+
+  def cmd_disc(self, argv):
+    ''' Usage: {cmd} {{.|discid}} {{tag[=value]|-tag}}...
+          Tag the disc identified by discid.
+          If discid is "." the discid is derived from the CD device.
+          Typical example:
+            disc . use_discid=some-other-discid
+          to alias this disc with another in the database.
+    '''
+    if not argv:
+      raise GetoptError('missing discid')
+    disc = self.popdisc(argv, '.')
+    if not argv:
+      disc.dump()
+      return
+    try:
+      tag_choices = self.parse_tag_choices(argv)
+    except ValueError as e:
+      raise GetoptError(str(e)) from e
+    for tag_choice in tag_choices:
+      if tag_choice.choice:
+        if tag_choice.tag not in disc:
+          disc.set(tag_choice.tag)
+      else:
+        if tag_choice.tag in disc:
+          disc.discard(tag_choice.tag)
+
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [-a] [-R] [entity...]
           Dump each entity.
@@ -284,14 +342,12 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
           disc_id   Optional disc id to query instead of obtaining
                     one from the current inserted disc.
     '''
-    disc_id = None
-    if argv:
-      disc_id = argv.pop(0)
+    disc = self.popdisc(argv, '.')
     if argv:
       raise GetoptError("extra arguments after disc_id: %r" % (argv,))
     options = self.options
     try:
-      probe_disc(self.device_id, options.mbdb, disc_id=disc_id)
+      pfx_call(probe_disc, self.device_id, options.mbdb, disc_id=disc.mbkey)
     except DiscError as e:
       error("%s", e)
       return 1
@@ -307,10 +363,8 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     options = self.options
     fstags = options.fstags
     dirpath = options.dirpath
-    disc_id = None
     options.popopts(argv, F_='codecs_spec', n='dry_run')
-    if argv:
-      disc_id = argv.pop(0)
+    disc = self.popdisc(argv, '.')
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     try:
@@ -319,7 +373,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
           options.mbdb,
           output_dirpath=dirpath,
           audio_outputs=options.codecs,
-          disc_id=disc_id,
+          disc_id=disc.mbkey,
           fstags=fstags,
           no_action=options.dry_run,
           split_by_codec=True,
@@ -334,38 +388,24 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     ''' Usage: {cmd} [disc_id]
           Print a table of contents for the current disc.
     '''
-    disc_id = None
-    if argv:
-      disc_id = argv.pop(0)
+    disc = self.popdisc(argv, '.')
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
-    MB = options.mbdb
-    if disc_id is None:
-      try:
-        dev_info = discid.read(device=self.device_id)
-      except discid.disc.DiscError as e:
-        error("disc error: %s", e)
-        return 1
-      disc_id = dev_info.id
-      mb_toc = dev_info.toc_string
-    else:
-      dev_info = None
-    with stackattrs(MB, dev_info=dev_info):
-      with Pfx("discid %s", disc_id):
-        disc = MB.discs[disc_id]
-        disc.mb_toc = mb_toc
-        disc_tags = disc.disc_tags()
-        print(disc_tags.disc_title)
-        print(disc_tags.disc_artist_credit)
-        for track_index, recording in enumerate(disc.recordings):
-          track_tags = disc.track_tags(track_index)
-          track_title = (
-              f"{track_tags.track_number:02}"
-              f" - {track_tags.track_title}"
-              f" -- {track_tags.track_artist_credit}"
-          )
-          print(track_title)
+    ##MB = options.mbdb
+    ##with stackattrs(MB, dev_info=dev_info):
+    with Pfx("discid %s", disc.mbkey):
+      disc_tags = disc.disc_tags()
+      print(disc_tags.disc_title)
+      print(disc_tags.disc_artist_credit)
+      for track_index, recording in enumerate(disc.recordings):
+        track_tags = disc.track_tags(track_index)
+        track_title = (
+            f"{track_tags.track_number:02}"
+            f" - {track_tags.track_title}"
+            f" -- {track_tags.track_artist_credit}"
+        )
+        print(track_title)
     return 0
 
 def probe_disc(device, mbdb, disc_id=None):
