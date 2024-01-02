@@ -1,3 +1,4 @@
+PDFDOcument.parse: mmap the file and use memoryviews of the mmap for the stream data
 PDFObject.parse method to parse a single object from a buf, eg int or dict or object
 read the trailer and xref index
 
