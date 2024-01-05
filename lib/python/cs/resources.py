@@ -689,7 +689,7 @@ class RunState(HasThreadState):
     self._cancelled = cancel_status
 
   def raiseif(self, msg=None, *a):
-    ''' Raise `CancellationError` is cancelled.
+    ''' Raise `CancellationError` if cancelled.
 
         Example:
 
