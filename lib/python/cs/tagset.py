@@ -3174,7 +3174,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
                 self.metadata(key_type_name, k, convert=convert),
                 self.metadata(member_type_name, v, convert=convert),
             )
-            for k, v in items
+            for k, v in items()
         }
     if md is None:
       # neither mapping nor iterable
@@ -3255,7 +3255,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       tes.append(te)
       te_old_names[id(te)] = name
     # modify tagsets
-    changed_tes = TagSet.edit_entities(tes)
+    changed_tes = TagSet.edit_tagsets(tes)
     # rename entries
     for te in changed_tes:
       old_name = te_old_names[id(te)]
