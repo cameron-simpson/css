@@ -99,9 +99,9 @@ class ServiceAPI(MultiOpenMixin):
     '''
     with self._lock:
       state = self.sqltags['login.state']
-      if do_refresh or not state or (
-          self.API_AUTH_GRACETIME is not None
-          and time.time() + self.API_AUTH_GRACETIME >= state.expiry):
+      if do_refresh or not state or (self.API_AUTH_GRACETIME is not None
+                                     and time.time() + self.API_AUTH_GRACETIME
+                                     >= state.expiry):
         for k, v in self.login().items():
           if k not in ('id', 'name'):
             state[k] = v

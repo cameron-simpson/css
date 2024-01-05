@@ -1,0 +1,3 @@
+lib/python/cs/iso14496.py: cs.threads: State renamed to ThreadState, update importing modules
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command: drop @staticmethods, do not work with the modern subcommand stuff
+lib/python/cs/iso14496.py: cs.iso14496: dump_box: fix body check

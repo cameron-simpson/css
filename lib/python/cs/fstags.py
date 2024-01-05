@@ -130,7 +130,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import Upd, UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230407-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1106,9 +1106,11 @@ class FSTags(MultiOpenMixin):
   def startup_shutdown(self):
     ''' Sync tag files and db mapping on final close.
     '''
-    yield
-    # save any modified tag files on shutdown.
-    self.sync()
+    try:
+      yield
+    finally:
+      # save any modified tag files on shutdown.
+      self.sync()
 
   @locked
   @pfx_method

@@ -1,2 +1,3 @@
+parameterise the various rip output modes - aac, flac etc
 get_recording_by_id: discarding credit ' feat. ', not a UUID: badly formed hexadecimal UUID string - notation like that is interspersed and might warrant some extra tags when seen
 

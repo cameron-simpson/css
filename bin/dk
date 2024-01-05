@@ -49,6 +49,16 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
     loaddb
       Load a postgresql dump from standard input into \$DK_PSQL_DBNAME
       ($DK_PSQL_DBNAME) in service \$DK_PSQL_SERVICE ($DK_PSQL_SERVICE).
+    login [show]
+      Show the current docker login account from \$DK_LOGGEDIN_HOST
+      and \$DK_LOGGEDIN_USERNAME.
+    login update
+      If \$DK_LOGIN_HOST and \$DK_LOGIN_USERNAME do not match
+      \$DK_LOGGEDIN_HOST and \$DK_LOGGEDIN_USERNAME, do a \"docker
+      logout\" and \"docker login\" to bring them into alignment.
+    login update-sh
+      Run \"dk login update\" and emit shell commands to update
+      \$DK_LOGGEDIN_HOST and \$DK_LOGGEDIN_USERNAME.
     logs
       Passed to $DK_COMPOSE_CMD -f \$DK_PRIMARY_SERVICE.
     rsh name command...
@@ -111,14 +121,18 @@ do
   shift
 done
 
-[ -s "$DK_COMPOSE_YML" ] || \
-  if yml=$( findup "$DK_COMPOSE_YML" )
-  then
-    DK_COMPOSE_YML=$yml
-  else
-    echo "$cmd: cannot find \$DK_COMPOSE_YML=$DK_COMPOSE_YML" >&2
-    badopts=1
-  fi
+case "$DK_COMPOSE_YML" in
+  '') if yml=$( findup "$DK_COMPOSE_YML" )
+      then
+        DK_COMPOSE_YML=$yml
+      else
+        DK_COMPOSE_YML=$PWD/docker-compose.yml
+      fi
+      ;;
+  /*) ;;
+  *)  DK_COMPOSE_YML=$PWD/$DK_COMPOSE_YML
+      ;;
+esac
 
 if [ $# = 0 ]
 then
@@ -178,7 +192,7 @@ resolve_container_path(){
   )
 }
 
-DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
+[ -e "$DK_COMPOSE_YML" ] && DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
 : ${DK_BASE_PREFIX:=${COMPOSE_PROJECT_NAME:-$( basename "$ymlbasedir" )}}
 base=$DK_BASE_PREFIX
@@ -188,6 +202,37 @@ case "$op" in
   help)
       echo "$usage"
       exit 0
+      ;;
+  build)
+      usage="Usage: $cmd $op [-f dockerfile] [--push] [-t tag] [PATH]"
+      path=.
+      dockerfile=Dockerfile
+      tag=
+      do_push=
+      badopts=
+      while [ $# -gt 0 ]
+      do
+        case "$1" in
+          -f)     dockerfile=$2; shift ;;
+          --push) do_push=1 ;;
+          -t)     tag=$2; shift ;;
+          --)     shift; break ;;
+          -?*)    echo "$cmd: $op: unrecognised option: $1" >&2
+                  badopts=1
+                  ;;
+          *)      break ;;
+        esac
+        shift
+      done
+      [ $# = 0 ] || { path=$1; shift; }
+      if [ -n "$tag" ]
+      then set-x docker build -f "$dockerfile" -t "$tag" "$path"
+      else set-x docker build -f "$dockerfile" "$path"
+      fi || exit $?
+      [ -n "$do_push" ] || exit 0
+      set-x docker tag "$tag" "$DK_REPO:$tag" || exit $?
+      set-x docker push "$DK_REPO:$tag"
+      exit $?
       ;;
   cp) [ $# = 2 ] || {
         echo "$cmd: $op: expected exactly 2 arguments" >&2
@@ -246,6 +291,71 @@ case "$op" in
             createdb -O $DK_PSQL_SETUP_USERNAME $DK_PSQL_DBNAME
             psql -e -U $DK_PSQL_SETUP_USERNAME $DK_PSQL_DBNAME
            "
+      ;;
+  login)
+      # DK_LOGIN_USERNAME DK_LOGIN_HOST
+      ##set -x
+      if [ $# = 0 ]
+      then opt1=show
+      else opt1=$1; shift
+      fi
+      case "$opt1" in
+        show)
+          [ $# = 0 ] || { echo "$cmd $op $opt1: extra arguments: $*" >&2; exit 2; }
+          set -u
+          echo "$DK_LOGGEDIN_HOST"
+          echo "$DK_LOGGEDIN_USERNAME"
+          exit 0
+          ;;
+        update)
+          case "$#" in
+            0)  new_host=$DK_LOGIN_HOST
+                new_username=$DK_LOGIN_USERNAME
+                ;;
+            2)  new_host=$1
+                new_username=$2
+                ;;
+            *)  echo "$cmd $op $opt1: expected host and username but \$#=$#: $*" >&2
+                exit 2
+                ;;
+          esac
+          old_host=${DK_LOGGEDIN_HOST:-''}
+          old_username=${DK_LOGGEDIN_USERNAME:-''}
+          [ "x$old_host" = "x$new_host" -a "x$old_username" = "x$new_username" ] \
+          || {
+               set -uex
+               docker logout
+               docker login --username "$new_username" "$new_host" >&2
+          }
+          exit $?
+          ;;
+        update-sh)
+          case "$#" in
+            0)  new_host=$DK_LOGIN_HOST
+                new_username=$DK_LOGIN_USERNAME
+                ;;
+            2)  new_host=$1
+                new_username=$2
+                ;;
+            *)  echo "$cmd $op $opt1: expected host and username but \$#=$#: $*" >&2
+                exit 2
+                ;;
+          esac
+          if "$0" login update "$new_host" "$new_username"
+          then
+            set -ue
+            new_host_qs=$( shqstr "$new_host" )
+            new_username_qs=$( shqstr "$new_username" )
+            echo "export DK_LOGGEDIN_HOST=$new_host_qs"
+            echo "export DK_LOGGEDIN_USERNAME=$new_username_qs"
+          fi
+          exit $?
+          ;;
+        *)set -x
+          exec docker login "$opt1" ${1+"$@"}
+          ;;
+      esac
+      exit 1
       ;;
   logs)
       set -x
@@ -322,7 +432,7 @@ case "$op" in
       "$0" pull
       "$0" down
       docker volume rm "${base}_var" || :
-      "$0" build
+      $DK_COMPOSE_CMD $docker_compose_opts -f "$DK_COMPOSE_YML" build
       "$0" up setup
       exit $?
       ;;

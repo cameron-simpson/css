@@ -1,0 +1,2 @@
+lib/python/cs/psutils.py: cs.psutils: run: default stdin=subprocess.DEVNULL
+lib/python/cs/psutils.py: merge default ==> cdrip
