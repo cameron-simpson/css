@@ -64,8 +64,13 @@ class BWizCmd(BaseCommand):
           the named output file (typically MP4, though the ffmpeg
           output format chosen is based on the extension).
           Most metadata are preserved.
-          start..end: Optional start and end offsets in seconds, used
-            to crop the recording output.
+          Options:
+            -n          No action, dry run.
+            -a:afmt     Specify output audio format.
+            -v:vfmt     Specify output video format.
+            --rm        Remove the source file if the conversion succeeds.
+            start..end  Optional start and end offsets in seconds, used
+              to crop the recording output.
     '''
     badopts = False
     doit = True
