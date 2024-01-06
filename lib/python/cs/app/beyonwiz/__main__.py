@@ -137,17 +137,7 @@ class BWizCmd(BaseCommand):
     ):
       return 1
     if remove_source:
-      if doit:
-        with Pfx("remove %s", R.fspath):
-          if islinkpath(R.fspath) or isfilepath(R.fspath):
-            pfx_call(os.remove, R.fspath)
-          elif isdirpath(R.fspath):
-            pfx_call(shutil.rmtree, R.fspath)
-          else:
-            warning("cannot remove, not a file or directory")
-            return 1
-      else:
-        print("remove", R.fspath)
+      R.remove(doit=doit)
 
   def cmd_ffprobe(self, argv):
     ''' Run `ffprobe` against a file.
