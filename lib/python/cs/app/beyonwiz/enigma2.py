@@ -92,7 +92,7 @@ class Enigma2(_Recording):
   def remove(self, *, doit=False):
     ''' Remove all the files associated with this recording.
     '''
-    for fspath in self.allpaths:
+    for fspath in self.fspaths:
       with Pfx(fspath):
         print("remove", fspath)
         if doit:
