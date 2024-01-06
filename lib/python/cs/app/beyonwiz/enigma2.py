@@ -71,8 +71,10 @@ class Enigma2(_Recording):
     _Recording.__init__(self, tspath)
     self.srcfmt = 'mpegts'
     self.tspath = tspath
+    tsbase = splitext(basename(tspath))[0]
     self.appath = tspath + '.ap'
     self.cutpath = tspath + '.cuts'
+    self.eitpath = tsbase + '.eit'
     self.metapath = tspath + '.meta'
     self.scpath = tspath + '.sc'
 
@@ -84,6 +86,7 @@ class Enigma2(_Recording):
         self.tspath,
         self.appath,
         self.cutpath,
+        self.eitpath,
         self.metapath,
         self.scpath,
     )
