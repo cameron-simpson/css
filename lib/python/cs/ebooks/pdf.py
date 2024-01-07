@@ -26,6 +26,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from zipfile import ZipFile, ZIP_STORED
 import zlib
 
+from icontract import ensure, require
 from PIL import Image
 from typeguard import typechecked
 
@@ -1078,18 +1079,53 @@ class PDFDocument(AbstractBinary):
           pfx_call(im.save, T.name)
           yield T.name, basename(imgpath)
 
+  @typechecked
+  def scan_obj(self, buf: CornuCopyBuffer) -> IndirectObject:
+    ''' Scan `buf` for the definition of an object (`obj`..`endobj`).
+        Return the resulting `IndirectObject`.
+    '''
+    return type(self).parse(buf, pdfdoc=self, first_obj=True)
+
   @classmethod
   @promote
-  def parse(cls, buf: CornuCopyBuffer) -> 'PDFDocument':
+  @require(lambda pdfdoc, first_obj: not first_obj or pdfdoc is not None)
+  @ensure(
+      lambda first_obj, result:
+      isinstance(result, (IndirectObject if first_obj else PDFDocument))
+  )
+  @typechecked
+  def parse(
+      cls,
+      buf: CornuCopyBuffer,
+      *,
+      pdfdoc: Optional["PDFDocument"] = None,
+      first_obj=False,
+  ) -> Union['PDFDocument', IndirectObject]:
     ''' Scan `buf`, return a `PDFDocument`.
+
+        An existing `PDFDocument` may be supplied as the optional
+        `pdfdoc` argument in which case the parse will update that
+        document instead of created a new empty document.
+
+        If the optional parameter `first_obj` is true the parse
+        will complete on the definition of the first `obj`..`endobj`
+        indirect object definition and the resulting `IndirectObject`
+        will be returned.
+        This requires a preexisting `PDFDocument` to be supplied as `pdfdoc`.
     '''
-    tokens = []
-    objmap: Mapping[Tuple[int, int], IndirectObject] = {}
-    values = []
-    by_obj_type = defaultdict(list)
-    pdfdoc = cls(
-        tokens=tokens, objmap=objmap, values=values, by_obj_type=by_obj_type
-    )
+    if pdfdoc is None:
+      tokens = []
+      objmap: Mapping[Tuple[int, int], IndirectObject] = {}
+      values = []
+      by_obj_type = defaultdict(list)
+      pdfdoc = cls(
+          tokens=tokens, objmap=objmap, values=values, by_obj_type=by_obj_type
+      )
+    else:
+      tokens = pdfdoc.tokens
+      objmap = pdfdoc.objmap
+      values = pdfdoc.values
+      by_obj_type = pdfdoc.by_obj_type
     values_stack = []
     in_obj = None
     in_obj_stack = []
@@ -1135,7 +1171,17 @@ class PDFDocument(AbstractBinary):
             pass
         if objtype is not None:
           by_obj_type[objtype].append(objvalue)
-        continue
+        if not first_obj:
+          # conventional parse, proceed as normal
+          continue
+        # we will return the new IndirectObject
+        # we should really only have the IndirectObject left on the stack
+        if len(values) != 1:
+          warning(
+              "%d spurious objects left on the stack: %r",
+              len(values) - 1, values[:-1]
+          )
+        return iobj
       # number generation "R"
       if isinstance(token, Keyword) and token == b'R':
         # an object reference
