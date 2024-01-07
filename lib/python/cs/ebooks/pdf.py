@@ -112,35 +112,43 @@ class PDFCommand(BaseCommand):
         print(' ', pdf.catalog)
         print(' ', pdf.pages)
         for pagenum, page in enumerate(pdf.pages, 1):
-          print(pagenum, '=============')
-          print(s(page))
-          print(dict(page.object))
-          ##print("I15 =>", page['I15'])
-          ##image_15 = page['I15']
-          ##print(
-          ##    "image 15 is_image", image_15.is_image(), "size",
-          ##    image_15.image.size
-          ##)
-          ##image_15.image.show()
-          content_obj = page.Contents.object
-          print(content_obj)
-          pprint(content_obj.context_dict)
-          page_content_bs = content_obj.decoded_payload
-          print("contents:", page_content_bs)
-          resources = page.Resources
-          print(s(resources))
-          print(s(resources.object))
-          print(dict(resources.object))
+          with Pfx("page %d", pagenum):
+            print('    Page', pagenum)
+            print('     ', s(page))
+            print('     ', dict(page.object))
+            ##print("I15 =>", page['I15'])
+            ##image_15 = page['I15']
+            ##print(
+            ##    "image 15 is_image", image_15.is_image(), "size",
+            ##    image_15.image.size
+            ##)
+            ##image_15.image.show()
+            content_obj = page.Contents.object
+            print('     ', content_obj)
+            pprint(content_obj.context_dict)
+            page_content_bs = content_obj.decoded_payload
+            print("contents:", page_content_bs)
+            resources = page.Resources
+            print("page.Resources", s(resources))
+            print(" ", repr(resources))
+            print(s(resources))
+            try:
+              obj = resources.object
+            except AttributeError as e:
+              warning("no Page.resources.object: %s", e)
+            else:
+              print(s(resources.object))
+              print(dict(resources.object))
 
-          def on_draw_object(obj):
-            X("page %d: obj %s", pagenum, s(obj))
-            X("  context dict %r", obj.context_dict)
-            if obj.is_image():
-              X("  width %r height %r", obj.Width, obj.Height)
+            def on_draw_object(obj):
+              X("page %d: obj %s", pagenum, s(obj))
+              X("  context dict %r", obj.context_dict)
+              if obj.is_image():
+                X("  width %r height %r", obj.Width, obj.Height)
 
-          page.render(on_draw_object=on_draw_object)
-          break
-        break
+            page.render(on_draw_object=on_draw_object)
+            ##break
+        ##break
         for (objnum, objgen), iobj in sorted(pdf.objmap.items()):
           runstate.raiseif()
           print(
