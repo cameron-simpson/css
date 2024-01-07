@@ -281,12 +281,6 @@ class Reaction:
         Returns `None` if the leadin pattern does not match
         or the pattern cannot be matched before EOF.
 
-        The optional parameter `preious_object` may be supplied
-        as the previous semantic object from the PDF token stream.
-        This intended is to support parsing `stream` objects
-        which require access to a preceeding dictionary
-        in order to know the payload length.
-
         This requires a match followed by at least one byte post
         the token or followed by EOF. The buffer is extended until
         this is achieved.  This implies that the tokens are
@@ -1071,6 +1065,9 @@ class PDFDocument(AbstractBinary):
   @uses_runstate
   def make_cbz_images(self, base: str, *, runstate: RunState):
     ''' A generator for the `images` parameter for `cs.ebooks.cbs.make_cbz`.
+       This yields a temporary filesystem path to the image
+       and the desired filename for use in the CBZ file.
+       The temporary file exists only for the duration of the yield.
     '''
     for pagenum, imgnum, im in self.page_images():
       runstate.raiseif()
