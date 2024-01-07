@@ -970,6 +970,18 @@ class BaseCommand:
           of `True`; if their synonym commences with a dash they will
           imply a value of `False`, for example `n='dry_run',y='-dry_run'`
 
+        As it happens, the `BaseCommandOptions` class provided a `popopts` method
+        which is a shim for this method with `attrfor=self` i.e. the options object.
+        So common use in a command method might look like this:
+
+            class SomeCommand(BaseCommand):
+
+                def cmd_foo(self, argv):
+                    options = self.options
+                    # accept a -j or --jobs options
+                    options.poopts(argv, jobs=1, j='jobs')
+                    print("jobs =", options.jobs)
+
         Example:
 
             >>> import os.path

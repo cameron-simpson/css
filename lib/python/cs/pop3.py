@@ -346,6 +346,7 @@ class POP3(MultiOpenMixin):
         hdr_from = str(msg.get('from', '<UNKNOWN>'))
         with Pfx("from %s", hdr_from):
           try:
+            # mailbox.Maildir.add is not thread safe, serialise it
             with self._lock:
               Mkey = maildir.add(msg)
           except UnicodeEncodeError as e:
