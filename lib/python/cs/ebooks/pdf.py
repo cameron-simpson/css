@@ -163,30 +163,6 @@ class PDFCommand(BaseCommand):
           if isinstance(obj, Stream) and obj.is_image():
             print("   ", obj.image)
         break
-        for token in pdf.tokens:
-          if runstate.cancelled:
-            return 1
-          if isinstance(token, Comment):
-            print('=>', r(token))
-          elif isinstance(token, Stream):
-            ##print('stream', len(token.payload))
-            ##pprint(token.context_dict)
-            decoded_bs = token.decoded_payload
-            ##print('  =>', len(decoded_bs), 'bytes decoded')
-            subtype = token.context_dict.get(b'Subtype')
-            ##print("  subtype", subtype)
-            if (subtype == b'Image' and (1 or token.filters)
-                and (1 or token.filters[-1] == b'DCTDecode')
-                and (1 or b'SMask' not in token.context_dict)):
-              print("Image:")
-              pprint(token.context_dict)
-              im = token.image
-              ##im.show()
-              ##exit(1)
-            else:
-              print("skip stream subtype", repr(subtype))
-              pprint(token.context_dict)
-          ##break
 
 # Binary regexps for PDF tokens.
 # Most of these consist of a pair:
@@ -969,8 +945,6 @@ class PDFDocument(AbstractBinary):
   '''
 
   objmap: Mapping[Tuple[int, int], Any] = field(default_factory=dict)
-  tokens: List = field(default_factory=list)
-  values: List = field(default_factory=list)
   # mapping of object types to a list of objects
   by_obj_type: Mapping[bytes, List[Any]] = field(
       default_factory=lambda: defaultdict(list)
@@ -979,8 +953,7 @@ class PDFDocument(AbstractBinary):
   def __str__(self):
     return (
         f'{self.__class__.__name__}('
-        f'objects[{len(self.objmap)}],t'
-        f'okens[{len(self.tokens)}],'
+        f'objects[{len(self.objmap)}],'
         f'values[{len(self.values)}]'
         ')'
     )
@@ -1114,24 +1087,18 @@ class PDFDocument(AbstractBinary):
         This requires a preexisting `PDFDocument` to be supplied as `pdfdoc`.
     '''
     if pdfdoc is None:
-      tokens = []
       objmap: Mapping[Tuple[int, int], IndirectObject] = {}
-      values = []
       by_obj_type = defaultdict(list)
-      pdfdoc = cls(
-          tokens=tokens, objmap=objmap, values=values, by_obj_type=by_obj_type
-      )
+      pdfdoc = cls(objmap=objmap, by_obj_type=by_obj_type)
     else:
-      tokens = pdfdoc.tokens
       objmap = pdfdoc.objmap
-      values = pdfdoc.values
       by_obj_type = pdfdoc.by_obj_type
+    values = []
     values_stack = []
     in_obj = None
     in_obj_stack = []
     tokens_it = tokenise(buf)
     for token in tokens_it:
-      tokens.append(token)
       if not isinstance(token, (
           Comment,
           WhiteSpace,
@@ -1192,7 +1159,6 @@ class PDFDocument(AbstractBinary):
         objref = ObjectRef(objmap, number, generation)
         # replace the last 3 values
         values[-3:] = [objref]
-        generation = tokens.pop()
         continue
       if isinstance(token, ArrayOpen):
         in_obj_stack.append(in_obj)
@@ -1289,9 +1255,7 @@ class PDFDocument(AbstractBinary):
             warning("expected EOL after payload")
           endstream = next(tokens_it)
           assert isinstance(endstream, Keyword) and endstream == b'endstream'
-          assert tokens[-1] is token
           stream = Stream(context_dict, payload)
-          tokens[-2:] = [stream]
           values[-2:] = [stream]
           continue
     return pdfdoc
@@ -1299,7 +1263,9 @@ class PDFDocument(AbstractBinary):
   def transcribe(self):
     ''' Yield `bytes` instances transcribing the PDF document.
     '''
-    yield from iter(self.tokens)
+    raise RuntimeError(
+        "no transcribe, probably best to write a whole clean PDFDocument"
+    )
 
 @dataclass
 class PDFCatalog:
