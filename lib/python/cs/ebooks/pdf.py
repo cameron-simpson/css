@@ -940,12 +940,37 @@ def tokenise(buf: CornuCopyBuffer, debug_matches=False):
     except IndexError:
       break
 
+class PDFObjectMapping(dict):
+  ''' A mapping of `(number,generation)`->`IndirectObject`
+      Which can use the xref table to fetch missing objects on demand.
+  '''
+
+  @typechecked
+  def __init__(self, pdfdoc: Optional["PDFDocument"] = None):
+    self.pdfdoc = pdfdoc
+    super().__init__()
+
+  @typechecked
+  def __missing__(self, key: Tuple[int, int]) -> IndirectObject:
+    pdfdoc = self.pdfdoc
+    obj_xrefs = pdfdoc.obj_xrefs
+    if obj_xrefs is None:
+      raise KeyError(key)
+    obj_xref = obj_xrefs[key]
+    if obj_xref.free:
+      raise KeyError("object %r is marked as free", key)
+    assert obj_xref.offset > 0
+    buf = CornuCopyBuffer([pdfdoc.mmv[obj_xref.offset:]])
+    obj = pdfdoc.scan_obj(buf)
+    self[key] = obj
+    return self
+
 @dataclass
 class PDFDocument(AbstractBinary):
   ''' A PDF document.
   '''
 
-  objmap: Mapping[Tuple[int, int], Any] = field(default_factory=dict)
+  objmap: PDFObjectMapping = field(default_factory=PDFObjectMapping)
   # mapping of object types to a list of objects
   by_obj_type: Mapping[bytes, List[Any]] = field(
       default_factory=lambda: defaultdict(list)
