@@ -971,10 +971,24 @@ class PDFDocument(AbstractBinary):
   '''
 
   objmap: PDFObjectMapping = field(default_factory=PDFObjectMapping)
+  # object number xref table if loaded
+  obj_xrefs: Optional[List[ObjectXref]] = None
   # mapping of object types to a list of objects
   by_obj_type: Mapping[bytes, List[Any]] = field(
       default_factory=lambda: defaultdict(list)
   )
+
+  def __init__(
+      self,
+      *,
+      objmap: PDFObjectMapping,
+      obj_xrefs: Optional[List[ObjectXref]] = None,
+  ):
+    self.objmap = objmap
+    self.obj_xrefs = obj_xrefs
+    if obj_xrefs is not None:
+      obj_xrefs.pdfdoc = self
+    self.by_obj_type: Mapping[bytes, List[Any]] = defaultdict(list)
 
   def __str__(self):
     return (
