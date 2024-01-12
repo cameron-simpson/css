@@ -14,10 +14,12 @@ from getopt import GetoptError
 from io import BytesIO
 from itertools import chain
 from math import floor
+from mmap import mmap, MAP_PRIVATE, PROT_READ
 import os
 from os.path import (
     basename, exists as existspath, join as joinpath, splitext
 )
+from pathlib import Path
 from pprint import pprint
 import re
 import sys
@@ -1306,6 +1308,151 @@ class PDFDocument(AbstractBinary):
     raise RuntimeError(
         "no transcribe, probably best to write a whole clean PDFDocument"
     )
+
+@pfx
+@typechecked
+def mmap_pdf(f) -> PDFDocument:
+  ''' Map the file `f` and return a `PDFDocument` whose raw payloads
+      are memoryviews of the `mmap`.
+      This requires a regular file and a conforming PDF document
+      with the standard trailer section (7.5.5).
+  '''
+  if isinstance(f, int):
+    fd = os.dup(f)
+  else:
+    fd = pfx_call(os.open, f, os.O_RDONLY)
+  mmv = memoryview(pfx_call(mmap, fd, 0, flags=MAP_PRIVATE, prot=PROT_READ))
+  startxref_offset, xref_offset = mmv_read_startxref(mmv)
+  trailer = mmv_read_trailer_dict(mmv, startxref_offset)
+  nobjs = trailer.Size
+  assert nobjs > 0
+  obj_xrefs = mmv_read_xrefs(mmv, xref_offset, nobjs)
+  pdf = PDFDocument(obj_xrefs=obj_xrefs)
+  return pdf
+
+@ensure(lambda startxref_offset, xref_offset: xref_offset < startxref_offset)
+@typechecked
+def mmv_read_startxref(mmv: memoryview) -> Tuple[int, int]:
+  ''' Read the `startxref`..`%%EOF` lines at the end of `mmv`.
+      Return a 2-tuple `(startxref_offset,xref_offset)`
+      where `startxref_offset` is the offset of the `startxref` keyword
+      and `xref_offset` is the offset of the `xref` cross reference section.
+  '''
+  # locate the startxref
+  startxref_re = re.compile(br'\nstartxref\r?\n(\d+)\r?\n%%EOF\r?\n')
+  m = None
+  pos = mmv.rindex(b'\nstartxref')
+  while pos >= 0:
+    m = startxref_re(mmv, pos)
+    if m is None:
+      pos = mmv.rindex(b'\nstartxref', pos)
+      continue
+  if m is None:
+    mmv = None
+    os.fdclose(fd)
+    raise ValueError('no startxref found')
+  startxref_offset = m.start()
+  xref_offset = int(m.group(1))
+  return startxref_offset, xref_offset
+
+@dataclass
+class InUseObjectXref:
+  ''' A record for an in-use entry in the object cross reference table.
+  '''
+  number: int
+  generation: int
+  offset: Optional[int] = None
+
+  @property
+  def free(self):
+    return False
+
+@dataclass
+class FreeObjectXref:
+  ''' A record for a free entry in the object cross reference table.
+  '''
+  number: int
+  generation: int
+  next_free: int
+
+  @property
+  def free(self):
+    return True
+
+@require(lambda mmv, xref_offset: xref_offset >= 0 and xref_offset < len(mmv))
+@require(lambda nobj: nobj >= 1)
+@typechecked
+def mmv_read_xrefs(
+    mmv: memoryview,
+    xref_offset: int,
+    nobjs: int,
+) -> List[ObjectXref]:
+  ''' Read the object cross reference section from `mmv` at `xref_offset`.
+      The `nobjs` parameter specifies the number of objects defined by the table.
+  '''
+  OBJSPEC_LINE_ENDINGS = b' \r', b' \n', b'\r\n'
+  assert all(len(bs) == 2 for bs in OBJSPEC_LINE_ENDINGS)
+  buf = CornuCopyBuffer.from_bytes(mmv[xref_offset:], offset=xref_offset)
+  with Pfx("offset %d", buf.offset):
+    xref_line = buf.readline()
+    if xref_line.rstrip() != 'xref':
+      raise ValueError("missing 'xref' header line")
+  obj_xrefs = [None] * nobjs
+  n = 0
+  while n < nobjs:
+    with Pfx("offset %d", buf.offset):
+      start, count = [int(bs) for bs in buf.readline().rstrip().split()]
+      if start < 0 or start >= nobjs:
+        raise ValueError(f'start out of range, expected 0<={start=}<{nobjs=}')
+      if count < 1 or start + count > nobjs:
+        raise ValueError(
+            f'count out of range, expected {count=}>0 and {start=}+{count=}<={objs=}'
+        )
+      assert 0 <= start < start + count <= nobjs
+    for idx in range(start, start + count):
+      with Pfx("offset %d, obj index %d", buf.offset, idx):
+        obj_line = buf.take(20)
+        n += 1
+        if obj_xrefs[idx] != None:
+          warning(
+              "SKIP, existing record for object %d exists: %s", idx,
+              obj_xrefs[idx]
+          )
+          continue
+        with Pfx("line %r", obj_line):
+          if not obj_line.endswith(OBJSPEC_LINE_ENDINGS):
+            raise ValueError(
+                'invalid line ending, should be one of %r',
+                OBJSPEC_LINE_ENDINGS
+            )
+          nnnnnnnnnn, ggggg, fn_bs = obj_line[:-2].split()
+          if fn_bs == b'n':
+            if len(nnnnnnnnnn) != 10:
+              warning(
+                  "invalid nnnnnnnnnn field, should be 10 bytes: %r",
+                  nnnnnnnnnn
+              )
+            if len(ggggg) != 10:
+              warning("invalid ggggg field, should be 5 bytes: %r", ggggg)
+            obj_xrefs[idx] = InUseObjectXref(
+                number=idx, generation=int(ggggg), offset=int(nnnnnnnnnn)
+            )
+          elif fn_bs == b'f':
+            if len(nnnnnnnnnn) != 10:
+              warning(
+                  "invalid nnnnnnnnnn field, should be 10 bytes: %r",
+                  nnnnnnnnnn
+              )
+            if len(ggggg) != 10:
+              warning("invalid ggggg field, should be 5 bytes: %r", ggggg)
+            obj_xrefs[idx] = FreeObjectXref(
+                number=idx, generation=int(ggggg), next_free=int(nnnnnnnnnn)
+            )
+          else:
+            warning("ignoring invalid n/f field %r", fn_bs)
+            continue
+  assert all(xref is not None for xref in obj_xrefs)
+  return obj_xrefs
 
 @dataclass
 class PDFCatalog:
