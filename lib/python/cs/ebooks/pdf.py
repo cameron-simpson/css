@@ -907,6 +907,7 @@ def tokenise(buf: CornuCopyBuffer, debug_matches=False):
             debug("matched %s", r(token))
           break
       else:
+        # no reactions match
         if buf.at_eof():
           # end parse loop
           if debug_matches:
@@ -919,7 +920,6 @@ def tokenise(buf: CornuCopyBuffer, debug_matches=False):
             buf.peek(8, short_ok=True),
         )
         token = buf.take(1)
-        break  ## debug
       if isinstance(token, StringOpen):
         in_str_stack.append(in_str)
         in_str = StringParts([token[1:]])
@@ -930,8 +930,9 @@ def tokenise(buf: CornuCopyBuffer, debug_matches=False):
           in_str = in_str_stack.pop()
         else:
           warning("unexpected %r, in_str is %r", token, in_str)
-      if in_str is None:
-        yield token
+    # NB: _outside_ the Pfx() context because this is a generator function
+    if in_str is None:
+      yield token
   while in_str is not None:
     warning("tokenise(%s): unclosed %s at EOF", buf, r(in_str))
     try:
