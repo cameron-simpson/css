@@ -101,6 +101,11 @@ class PDFCommand(BaseCommand):
         cbzpath = f'{base}.cbz'
         pdf.make_cbz(cbzpath)
 
+  def cmd_mmap(self, argv):
+    pdfpath, = argv
+    pdfdoc = pfx_call(mmap_pdf, pdfpath)
+    print(pdfdoc)
+
   def cmd_scan(self, argv):
     ''' Usage: {cmd} pdf-files...
           Scan the PDF-data in pdf-files and report.
