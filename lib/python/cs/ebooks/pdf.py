@@ -1335,7 +1335,7 @@ def mmap_pdf(f) -> PDFDocument:
   pdf = PDFDocument(obj_xrefs=obj_xrefs)
   return pdf
 
-@ensure(lambda startxref_offset, xref_offset: xref_offset < startxref_offset)
+@ensure(lambda result: result[0] > result[1] > 0)
 @typechecked
 def mmv_read_startxref(mmv: memoryview) -> Tuple[int, int]:
   ''' Read the `startxref`..`%%EOF` lines at the end of `mmv`.
@@ -1346,17 +1346,18 @@ def mmv_read_startxref(mmv: memoryview) -> Tuple[int, int]:
   # locate the startxref
   startxref_re = re.compile(br'\nstartxref\r?\n(\d+)\r?\n%%EOF\r?\n')
   m = None
-  pos = mmv.rindex(b'\nstartxref')
-  while pos >= 0:
-    m = startxref_re(mmv, pos)
-    if m is None:
-      pos = mmv.rindex(b'\nstartxref', pos)
-      continue
+  mmvlen = len(mmv)
+  for i, b in enumerate(mmv[:-19:-1], 20):
+    if b == 10:  # LF
+      offset = mmvlen - i
+      m = startxref_re.match(mmv, offset)
+      if m is not None:
+        print("pos", m.start(), bytes(mmv[offset:]))
+        break
   if m is None:
-    mmv = None
-    os.fdclose(fd)
     raise ValueError('no startxref found')
-  startxref_offset = m.start()
+  assert m.end() == len(mmv)
+  startxref_offset = m.start() + 1
   xref_offset = int(m.group(1))
   return startxref_offset, xref_offset
 
