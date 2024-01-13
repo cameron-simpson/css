@@ -974,7 +974,7 @@ class PDFDocument(AbstractBinary):
 
   objmap: PDFObjectMapping = field(default_factory=PDFObjectMapping)
   # object number xref table if loaded
-  obj_xrefs: Optional[List[ObjectXref]] = None
+  obj_xrefs: Optional[List["ObjectXref"]] = None
   # mapping of object types to a list of objects
   by_obj_type: Mapping[bytes, List[Any]] = field(
       default_factory=lambda: defaultdict(list)
@@ -984,7 +984,7 @@ class PDFDocument(AbstractBinary):
       self,
       *,
       objmap: PDFObjectMapping,
-      obj_xrefs: Optional[List[ObjectXref]] = None,
+      obj_xrefs: Optional[List["ObjectXref"]] = None,
   ):
     self.objmap = objmap
     self.obj_xrefs = obj_xrefs
@@ -1378,6 +1378,8 @@ class FreeObjectXref:
   @property
   def free(self):
     return True
+
+ObjectXref = Union[FreeObjectXref, InUseObjectXref]
 
 @require(lambda mmv, xref_offset: xref_offset >= 0 and xref_offset < len(mmv))
 @require(lambda nobj: nobj >= 1)
