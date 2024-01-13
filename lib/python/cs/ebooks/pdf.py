@@ -38,7 +38,7 @@ from cs.cmdutils import BaseCommand
 from cs.deco import promote
 from cs.lex import r
 from cs.logutils import debug, error, warning
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import pfx, Pfx, pfx_call, pfx_method
 from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
 from cs.threads import bg
