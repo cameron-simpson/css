@@ -25,8 +25,8 @@
     Terminology used below:
     * buffer:
       an instance of `cs.buffer.CornuCopyBuffer`,
-      which presents an iterable of bytes-like values
-      via various useful methods;
+      which manages an iterable of bytes-like values
+      and has various useful methods;
       it also has a few factory methods to make one from a variety of sources
       such as bytes, iterables, binary files, `mmap`ped files,
       TCP data streams, etc.
@@ -815,7 +815,7 @@ def BinaryMultiStruct(
 
       @classmethod
       @promote
-      def parse(cls, bfr:CornuCopyBuffer):
+      def parse(cls, bfr: CornuCopyBuffer):
         ''' Parse from `bfr` via `struct.unpack`.
         '''
         bs = bfr.take(struct.size)
