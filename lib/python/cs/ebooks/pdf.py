@@ -1462,6 +1462,44 @@ def mmv_read_xrefs(
   assert all(xref is not None for xref in obj_xrefs)
   return obj_xrefs
 
+@require(
+    lambda mmv, startxref_offset: startxref_offset > 0 and startxref_offset <
+    len(mmv)
+)
+@require(
+    lambda mmv, startxref_offset:
+    (mmv[startxref_offset:startxref_offset + 9] == b'startxref')
+)
+@typechecked
+def mmv_read_trailer_dict(
+    mmv: memoryview, startxref_offset: int
+) -> DictObject:
+  ''' Read the trailer dictionary from `mmv` preceeding the `startxref` line
+      which is at offset `startxref_offset`.
+
+      Section 7.5.5 is annoying vague about the allowed syntax here.
+      It looks like there are no inline dicts within the trailer dict,
+      just indirect dict references.
+  '''
+  # scan for the "trailer" line and dict
+  mmvlen = len(mmv)
+  # for now, start at the LF before starxref
+  for i, b in enumerate(reversed(mmv[:startxref_offset]), 1):
+    if b == 10:  # LF
+      # offset of byte after the LF
+      offset1 = startxref_offset - i + 1
+      if mmv[offset1:offset1 + 7] == b'trailer':
+        # scan for "trailer" then a dictionary
+        buf = CornuCopyBuffer([mmv[offset1:startxref_offset]], offset=offset1)
+        tokens = tokenise(buf)
+        trailer_kw = next(tokens)
+        if trailer_kw != Keyword(b'trailer'):
+          continue
+        assert False
+      breakpoint()
+  # now locate the trailer dict,
+  raise RuntimeError
+
 @dataclass
 class PDFCatalog:
   pdf: PDFDocument
