@@ -435,6 +435,60 @@ class _Block(Transcriber, ABC):
               break
             subB.pushto_queue(Q, progress=progress)
 
+  @typechecked
+  def promote(cls, blockish) -> Block:
+    ''' Promote `blockish` to a `Block` instance.
+
+        Supported promotions:
+        * `cls`: an instance of `cls` will be returned directly
+        * `(hashcode:HashCode,span:int)`: a `HashCode,span` 2-tuple
+          will be promoted to a `HashCodeBlack`
+        * `bytes`ish: other objects are converted using `bytes(blockish)`
+          and converted to a `LiteralBlock` for short objects
+          and a `HashCodeBlock` for larger objects
+
+        The conversion using `bytes(blockish)` has two features:
+        - the data become a nice readonly `bytes` instance
+        - any object which can transcribe itself as `bytes` does
+          so automatically, so that the caller may pass in objects
+          such as a `DirentRecord`
+    '''
+    if isinstance(blockish, cls):
+      return blockish
+    match blockish:
+      case HashCode() as hashcode, int() as span:
+        return HashCodeBlock(hashcode=hashcode, span=span)
+      case _:
+        data = bytes(data)
+        if span is None:
+          span = len(data)
+        else:
+          assert span == len(data)
+        if span <= 32:
+          return LiteralBlock(data=data)
+        return HashCodeBlock(data=data, span=span)
+    raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
+
+def Block(*, hashcode=None, data=None, span=None, added=False):
+  ''' Factory function for a Block.
+  '''
+  if data is None:
+    if span is None:
+      raise ValueError('data and span may not both be None')
+    B = HashCodeBlock(hashcode=hashcode, span=span)
+  else:
+    if span is None:
+      span = len(data)
+    elif span != len(data):
+      raise ValueError(
+          "span(%d) does not match data (%d bytes)" % (span, len(data))
+      )
+    if len(data) > 32:
+      B = HashCodeBlock(data=data, hashcode=hashcode, span=span, added=added)
+    else:
+      B = LiteralBlock(data=data)
+  return B
+
 class BlockRecord(BinarySingleValue):
   ''' Support for binary parsing and transcription of blockrefs.
   '''
@@ -757,26 +811,6 @@ class HashCodeBlock(_Block):
     return ok
 
 register_transcriber(HashCodeBlock, ('B', 'IB'))
-
-def Block(*, hashcode=None, data=None, span=None, added=False):
-  ''' Factory function for a Block.
-  '''
-  if data is None:
-    if span is None:
-      raise ValueError('data and span may not both be None')
-    B = HashCodeBlock(hashcode=hashcode, span=span)
-  else:
-    if span is None:
-      span = len(data)
-    elif span != len(data):
-      raise ValueError(
-          "span(%d) does not match data (%d bytes)" % (span, len(data))
-      )
-    if len(data) > 32:
-      B = HashCodeBlock(data=data, hashcode=hashcode, span=span, added=added)
-    else:
-      B = LiteralBlock(data=data)
-  return B
 
 class IndirectBlock(_Block):
   ''' An indirect block,
