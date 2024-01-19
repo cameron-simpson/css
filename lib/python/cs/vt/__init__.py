@@ -609,7 +609,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         on Stores with no persistent index-with-flags
         this yields `None` for the entry and updates nothing on return;
         callers must recognise this.
-        This is the behaviour of this default implementation.
+        That is the behaviour of this default implementation.
 
         Stores with a persistent index such as `DataDirStore` have
         functioning versions of this method which yield a non`None`
