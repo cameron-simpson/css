@@ -25,7 +25,6 @@ from cs.threads import locked, HasThreadState, State as ThreadState
 from cs.x import X
 
 from . import Lock, RLock, uses_Store
-from .block import isBlock
 from .cache import BlockCache
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
@@ -710,7 +709,7 @@ class FileSystem(HasThreadState):
           B, offset = parse(block_s)
           if offset < len(block_s):
             OS_EINVAL("unparsed text after trancription: %r", block_s[offset:])
-          if not isBlock(B):
+          if not isinstance(B, Block):
             OS_EINVAL("not a Block transcription")
           info("%s: update .block directly to %r", E, str(B))
           E.block = B

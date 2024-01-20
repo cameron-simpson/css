@@ -79,7 +79,7 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
           B = IndirectBlock.from_subblocks(subblocks, force=True)
         elif block_type == BlockType.BT_HASHCODE:
           rs = next(self.random_chunk_source)
-          B = Block(data=rs)
+          B = HashCodeBlock.promote(rs)
           # we can get a literal block back - this is acceptable
           if B.type == BlockType.BT_LITERAL:
             block_type = BlockType.BT_LITERAL
@@ -120,7 +120,7 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
       for _ in range(16):
         rs = next(self.random_chunk_source)
         size = len(rs)
-        B = Block(data=rs)
+        B = HashCodeBlock.promote(rs)
         self._verify_block(B)
         self.assertEqual(len(B), size)
         self.assertEqual(B.span, size)

@@ -50,7 +50,7 @@ def top_block_for(blocks):
       topblock = next(blocks)
     except StopIteration:
       # no blocks - return the empty block - no data
-      return Block(data=b'')
+      return LiteralBlock(data=b'')
 
     # we have a full IndirectBlock
     # if there are more, replace our blocks with
@@ -121,7 +121,7 @@ def blockify(
       units_scale=BINARY_BYTES_SCALE,
       update_frequency=32,
   ):
-    yield Block(data=chunk)
+    yield Block.promote(chunk)
 
 @promote
 def block_for(bfr: CornuCopyBuffer, **kw):

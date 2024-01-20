@@ -12,20 +12,23 @@
 from enum import IntFlag
 import sys
 from zlib import compress, decompress
+
 from icontract import require
+
 from cs.binary import BSUInt, BSData, SimpleBinary
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom
+
 from .block import Block
 
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 
 class DataFlag(IntFlag):
-  ''' Flag values for DataFile records.
+  ''' Flag values for `DataFile` records.
 
       Defined flags:
-      * `COMPRESSED`: the data are compressed using zlib.compress.
+      * `COMPRESSED`: the data are compressed using `zlib.compress`.
   '''
   COMPRESSED = 0x01
 
@@ -158,7 +161,7 @@ class DataFilePushable:
       if runstate and runstate.cancelled:
         return False
       data = DR.data
-      Q.put(Block(data=data))
+      Q.put(HashCodeBlock.promote(data))
       if progress:
         progress += len(data)
     return True

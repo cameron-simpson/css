@@ -1439,7 +1439,7 @@ class PlatonicDir(FilesDir):
         entry_bs = bytes(entry)
         with self._lock:
           index[hashcode] = entry_bs
-        B = Block(data=data, hashcode=hashcode, added=True)
+        B = HashCodeBlock(data=data, hashcode=hashcode, added=True)
         blockQ.put((pre_offset, B))
         DFstate.scanned_to = post_offset
         if self.cancelled or self.flag_scan_disable:

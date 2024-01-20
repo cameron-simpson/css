@@ -28,7 +28,7 @@ from cs.resources import uses_runstate
 from cs.threads import locked
 
 from . import PATHSEP, RLock
-from .block import Block, _Block, BlockRecord
+from .block import Block, _Block, BlockRecord, LiteralBlock
 from .blockify import top_block_for, blockify
 from .file import RWBlockFile
 from .hash import io_fail
@@ -431,7 +431,7 @@ class _Dirent(Transcriber):
       )
     else:
       Ebs = E.encode()
-      self._prev_dirent_blockref = Block(data=Ebs)
+      self._prev_dirent_blockref = HashCodeBlock.promote(Ebs)
       self.changed = True
 
   def snapshot(self):
@@ -741,7 +741,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     MultiOpenMixin.__init__(self)
     self._lock = Lock()
     if block is None:
-      block = Block(data=b'')
+      block = LiteralBlock(data=b'')
     self.open_file = None
     self._block = block
     self._check()
@@ -1040,7 +1040,7 @@ class Dir(_Dirent, DirLike):
           self[name].encode() for name in names if name != '.' and name != '..'
       )
       # TODO: if len(data) >= 16384 blockify?
-      B = self._block = Block(data=data)
+      B = self._block = Block.promote(data)
       self._changed = False
     else:
       B = self._block

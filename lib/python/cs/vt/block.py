@@ -5,7 +5,7 @@
 
 ''' Functions and classes relating to Blocks, which are data chunk references.
 
-    All Blocks derive from the base class _Block.
+    All Blocks derive from the base class `Block`.
 
     The following Block types are provided:
 
@@ -38,7 +38,6 @@
 
 from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
-from functools import lru_cache
 import sys
 from typing import Optional
 
@@ -76,12 +75,9 @@ class BlockType(IntEnum):
   BT_LITERAL = 2  # span raw-data
   BT_SUBBLOCK = 3  # a SubBlock of another Block
 
-def isBlock(o):
-  ''' Test if an object `o` is a subinstance of `_Block`.
+class Block(Transcriber, ABC):
+  ''' The base class for all `Block`s.
   '''
-  return isinstance(o, _Block)
-
-class _Block(Transcriber, ABC):
 
   @require(lambda span: span is None or span >= 0)
   @typechecked
@@ -93,14 +89,14 @@ class _Block(Transcriber, ABC):
     self._lock = RLock()
 
   def __bytes__(self):
-    ''' `bytes(_Block)` returns all the data concatenated as a single `bytes` instance.
+    ''' `bytes(Block)` returns all the data concatenated as a single `bytes` instance.
 
         Try not to do this for indirect blocks, it gets expensive.
     '''
     return b''.join(self)
 
   def __iter__(self):
-    ''' Iterating over a `_Block` yields chunks from `self.datafrom()`.
+    ''' Iterating over a `Block` yields chunks from `self.datafrom()`.
     '''
     return self.datafrom()
 
@@ -435,8 +431,9 @@ class _Block(Transcriber, ABC):
               break
             subB.pushto_queue(Q, progress=progress)
 
+  @classmethod
   @typechecked
-  def promote(cls, blockish) -> Block:
+  def promote(cls, blockish) -> "Block":
     ''' Promote `blockish` to a `Block` instance.
 
         Supported promotions:
@@ -459,35 +456,15 @@ class _Block(Transcriber, ABC):
       case HashCode() as hashcode, int() as span:
         return HashCodeBlock(hashcode=hashcode, span=span)
       case _:
-        data = bytes(data)
+        data = bytes(blockish)
         if span is None:
           span = len(data)
         else:
           assert span == len(data)
-        if span <= 32:
+        if span <= 32 and issubclass(LiteralBlock, cls):
           return LiteralBlock(data=data)
         return HashCodeBlock(data=data, span=span)
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
-
-def Block(*, hashcode=None, data=None, span=None, added=False):
-  ''' Factory function for a Block.
-  '''
-  if data is None:
-    if span is None:
-      raise ValueError('data and span may not both be None')
-    B = HashCodeBlock(hashcode=hashcode, span=span)
-  else:
-    if span is None:
-      span = len(data)
-    elif span != len(data):
-      raise ValueError(
-          "span(%d) does not match data (%d bytes)" % (span, len(data))
-      )
-    if len(data) > 32:
-      B = HashCodeBlock(data=data, hashcode=hashcode, span=span, added=added)
-    else:
-      B = LiteralBlock(data=data)
-  return B
 
 class BlockRecord(BinarySingleValue):
   ''' Support for binary parsing and transcription of blockrefs.
@@ -499,10 +476,10 @@ class BlockRecord(BinarySingleValue):
       b'\x17\0\0' + b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
   )
 
-  FIELD_TYPES = dict(value=_Block)
+  FIELD_TYPES = dict(value=Block)
 
   def __init__(self, B):
-    assert isinstance(B, _Block)
+    assert isinstance(B, Block)
     super().__init__(B)
 
   @property
@@ -593,7 +570,7 @@ class BlockRecord(BinarySingleValue):
           "unparsed data (%d bytes) follow Block %s",
           len(raw_encoding) - blockref_bfr.offset, B
       )
-    assert isinstance(B, _Block)
+    assert isinstance(B, Block)
     return B
 
   @staticmethod
@@ -634,7 +611,7 @@ class BlockRecord(BinarySingleValue):
     block_bs = b''.join(flatten_transcription(transcription))
     return BSData(block_bs).transcribe()
 
-class HashCodeBlock(_Block):
+class HashCodeBlock(Block):
   ''' A Block reference based on a Store hashcode.
   '''
 
@@ -676,7 +653,7 @@ class HashCodeBlock(_Block):
           )
     self._data = data
     self._span = span
-    _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
+    Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
 
   @property
@@ -812,7 +789,7 @@ class HashCodeBlock(_Block):
 
 register_transcriber(HashCodeBlock, ('B', 'IB'))
 
-class IndirectBlock(_Block):
+class IndirectBlock(Block):
   ''' An indirect block,
       whose direct data consists of references to subsidiary Blocks.
   '''
@@ -860,17 +837,17 @@ class IndirectBlock(_Block):
         Otherwise (the default), return an empty `LiteralBlock` if the span==0
         or a `HashCodeBlock` if `len(subblocks)==1`.
     '''
-    if isinstance(subblocks, _Block):
+    if isinstance(subblocks, Block):
       subblocks = (subblocks,)
     elif isinstance(subblocks, bytes):
-      subblocks = (Block(data=subblocks),)
+      subblocks = (Block.promote(subblocks),)
     else:
       subblocks = tuple(subblocks)
     spans = [subB.span for subB in subblocks]
     span = sum(spans)
     if not force:
       if span == 0:
-        return Block(data=b'')
+        return LiteralBlock(data=b'')
       if len(subblocks) == 1:
         return subblocks[0]
     superBdata = b''.join(subB.encode() for subB in subblocks)
@@ -978,7 +955,7 @@ class IndirectBlock(_Block):
     '''
     return S.is_complete_indirect(self.hashcode)
 
-class RLEBlock(_Block):
+class RLEBlock(Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes
       all of a specific value, typically NUL.
   '''
@@ -995,7 +972,7 @@ class RLEBlock(_Block):
       )
     if len(octet) != 1:
       raise ValueError("len(octet):%d != 1" % (len(octet),))
-    _Block.__init__(self, BlockType.BT_RLE, span=span, **kw)
+    Block.__init__(self, BlockType.BT_RLE, span=span, **kw)
     self.octet = octet
 
   def get_direct_data(self):
@@ -1049,14 +1026,14 @@ class RLEBlock(_Block):
 
 register_transcriber(RLEBlock)
 
-class LiteralBlock(_Block):
+class LiteralBlock(Block):
   ''' A LiteralBlock is for data too short to bother hashing and Storing.
   '''
 
   transcribe_prefix = 'LB'
 
   def __init__(self, data, **kw):
-    _Block.__init__(self, BlockType.BT_LITERAL, span=len(data), **kw)
+    Block.__init__(self, BlockType.BT_LITERAL, span=len(data), **kw)
     self._data = data
 
   @property
@@ -1125,7 +1102,7 @@ def SubBlock(superB, suboffset, span, **kw):
       return _SubBlock(superB.superblock, suboffset + superB.offset, span)
     return _SubBlock(superB, suboffset, span, **kw)
 
-class _SubBlock(_Block):
+class _SubBlock(Block):
   ''' A SubBlock is a view into another block.
       A SubBlock may not be empty and may not cover the whole of its superblock.
   '''
@@ -1144,7 +1121,7 @@ class _SubBlock(_Block):
         raise RuntimeError(
             'tried to make a SubBlock spanning all of of SuperB'
         )
-      _Block.__init__(self, BlockType.BT_SUBBLOCK, span, **kw)
+      Block.__init__(self, BlockType.BT_SUBBLOCK, span, **kw)
       self.superblock = superB
       self.offset = suboffset
 
