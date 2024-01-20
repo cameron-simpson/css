@@ -28,7 +28,7 @@ from cs.resources import uses_runstate
 from cs.threads import locked
 
 from . import PATHSEP, RLock
-from .block import Block, _Block, BlockRecord, LiteralBlock
+from .block import Block, BlockRecord, HashCodeBlock, LiteralBlock
 from .blockify import top_block_for, blockify
 from .file import RWBlockFile
 from .hash import io_fail
@@ -168,7 +168,7 @@ class DirentRecord(BinarySingleValue):
     if not flags & DirentFlags.NOBLOCK:
       yield BlockRecord.transcribe_value(block)
     if flags & DirentFlags.HASPREVDIRENT:
-      assert isinstance(E._prev_dirent_blockref, _Block)
+      assert isinstance(E._prev_dirent_blockref, Block)
       yield BlockRecord.transcribe_value(E._prev_dirent_blockref)
     if flags & DirentFlags.EXTENDED:
       yield extended_data
@@ -219,8 +219,8 @@ class _Dirent(Transcriber):
       self.type = type_
       self.name = name
       self.uuid = uuid
-      assert prevblock is None or isinstance(prevblock, _Block), \
-          "not _Block: prevblock=%r" % (prevblock,)
+      assert prevblock is None or isinstance(prevblock, Block), \
+          "not Block: prevblock=%r" % (prevblock,)
       self._prev_dirent_blockref = prevblock
       if not isinstance(meta, Meta):
         M = Meta({'a': DEFAULT_DIR_ACL if self.isdir else DEFAULT_FILE_ACL})
