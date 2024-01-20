@@ -61,6 +61,7 @@ class RqType(IntEnum):
   ARCHIVE_UPDATE = 7  # (archive_name,when,E)
   ARCHIVE_LIST = 8  # (count,archive_name) -> (when,E)...
   LENGTH = 9  # () -> remote-store-length
+  CONTAINS_INDIRECT = 10  # hashcode->Boolean
 
 class StreamStore(StoreSyncBase):
   ''' A `Store` connected to a remote `Store` via a `PacketConnection`.
@@ -410,6 +411,21 @@ class StreamStore(StoreSyncBase):
       self._contains_cache.add(h)
     return found
 
+  def is_complete_indirect(self, ih):
+    ''' Check whether `ih`, the hashcode of an indirect Block,
+        has its data and all its implied data present in this Store.
+    '''
+    rq = ContainsIndirectRequest(ih)
+    flags, payload = self.do(rq)
+    found = flags & 0x01
+    if found:
+      flags &= ~0x01
+    if flags:
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
+    if payload:
+      raise StoreError("unexpected payload: %r" % (payload,))
+    return found
+
   def flush(self):
     if self._conn is None:
       pass  # XP("SKIP FLUSH WHEN _conn=None")
@@ -700,6 +716,26 @@ class ContainsRequest(UnFlaggedPayloadMixin, HashCodeField):
     hashcode = self.hashcode
     return 1 if hashcode in local_store else 0
 
+class ContainsIndirectRequest(UnFlaggedPayloadMixin, HashCodeField):
+  ''' A request to test for the presence all of the blocks
+      of an indirect block hashcode.
+  '''
+
+  RQTYPE = RqType.CONTAINS_INDIRECT
+
+  @property
+  def hashcode(self):
+    return self.value
+
+  def do(self, stream):
+    ''' Test for hashcode, return `1` for present, `0` otherwise.
+    '''
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    hashcode = self.hashcode
+    return 1 if local_store.is_complete_indirect(hashcode) else 0
+
 class FlushRequest(UnFlaggedPayloadMixin, BinaryMultiValue('FlushRequest',
                                                            {})):
   ''' A flush request.
@@ -911,6 +947,7 @@ RqType.ARCHIVE_LAST.request_class = ArchiveLastRequest
 RqType.ARCHIVE_LIST.request_class = ArchiveListRequest
 RqType.ARCHIVE_UPDATE.request_class = ArchiveUpdateRequest
 RqType.LENGTH.request_class = LengthRequest
+RqType.CONTAINS_INDIRECT.request_class = ContainsIndirectRequest
 
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to a command.
