@@ -19,8 +19,14 @@ from cs.testutils import SetupTeardownMixin
 
 from . import block as block_module
 from .block import (
-    Block, _Block, IndirectBlock, RLEBlock, LiteralBlock, SubBlock, BlockType,
-    BlockRecord
+    Block,
+    HashCodeBlock,
+    IndirectBlock,
+    RLEBlock,
+    LiteralBlock,
+    SubBlock,
+    BlockType,
+    BlockRecord,
 )
 from .store import MappingStore
 from .transcribe import hexify
@@ -49,7 +55,7 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
 
   def _verify_block(self, B, **kw):
     with self.subTest(task="_verify_block", block=B, **kw):
-      assert isinstance(B, _Block)
+      assert isinstance(B, Block)
       BR = BlockRecord(B)
       BR_bs = bytes(BR)
       BR2, offset = BlockRecord.parse_bytes(BR_bs)
