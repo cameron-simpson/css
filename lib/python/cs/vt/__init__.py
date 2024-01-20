@@ -360,8 +360,8 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   ## Context manager methods via ContextManagerMixin.
   ##
   def __enter_exit__(self):
-    with HasThreadState.as_contextmanager(self):
-      with MultiOpenMixin.as_contextmanager(self):
+    with MultiOpenMixin.as_contextmanager(self):
+      with HasThreadState.as_contextmanager(self):
         yield
 
   ##########################
