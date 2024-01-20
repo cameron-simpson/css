@@ -1,3 +1,22 @@
 #!/bin/sh
-set -uex
-exec ffmpeg-remux --replace ${1+"$@"}
+#
+# Wrapper for "ffmpeg-remux --replace". - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+cmd=$0
+
+[ $# -gt 0 ] || {
+  echo "Usage: $cmd media-files..." >&2
+  exit 2
+}
+
+for media_file
+do
+    [ -s "$media_file" ] || {
+      echo "$cmd: $media_file: not a media file, aborting" >&2
+      exit 1
+    }
+    set-x ffmpeg-remux --replace "$media_file" || exit $?
+done
