@@ -1,3 +1,4 @@
+  replace users of HashCodeBlock.promote with something which can accept anything promotable to Block?
 streaming save-if-missing stuff - put-if top block, queue same for missing subblocks as these complete, some kind of progress bar
 switch to adler-32 rolling hash?
 cs.vt.debug: DebuggingLock: compare with cs.debugDebuggingLock and merge
