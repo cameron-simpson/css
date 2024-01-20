@@ -326,7 +326,8 @@ class StreamStore(StoreSyncBase):
     if local_store is None:
       raise ValueError("no local_store, request rejected")
     rq = self.decode_request(rq_type, flags, payload)
-    return rq.do(self)
+    with local_store:
+      return rq.do(self)
 
   @pfx_method
   def __len__(self):
@@ -345,9 +346,9 @@ class StreamStore(StoreSyncBase):
     ''' Add `data` to the Store, return its hashcode.
 
         The optinal `sync` parameter may be used to control whether
-        this add is synchronous (return after the remote Stpleted
-        the ore add) or asynchronous (return as soon as the add
-        requests has been queued for the remote Store).
+        this add is synchronous (return after the remote Store
+        has completed the add) or asynchronous (return as soon as
+        the add requests has been queued for the remote Store).
         If not specified, use the `sync` mode supplied when the
         `StreamStore` was initialised.
     '''
