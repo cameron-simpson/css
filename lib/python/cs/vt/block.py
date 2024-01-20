@@ -457,10 +457,7 @@ class Block(Transcriber, ABC):
         return HashCodeBlock(hashcode=hashcode, span=span)
       case _:
         data = bytes(blockish)
-        if span is None:
-          span = len(data)
-        else:
-          assert span == len(data)
+        span = len(data)
         if span <= 32 and issubclass(LiteralBlock, cls):
           return LiteralBlock(data=data)
         return HashCodeBlock(data=data, span=span)
