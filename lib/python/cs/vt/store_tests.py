@@ -26,7 +26,7 @@ from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
 from cs.testutils import SetupTeardownMixin
 
-from .block import Block, IndirectBlock
+from .block import HashCodeBlock, IndirectBlock
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashCode, HASHCLASS_BY_NAME
 from .socket import (
@@ -106,7 +106,6 @@ def get_test_stores(prefix):
     ):
       for store_type in ALL_STORE_TYPES:
         if store_type.__name__ not in STORECLASS_NAMES:
-          ##X("SKIP %s:%s", hashclass_name, store_type.__name__)
           continue
         if store_type is MappingStore:
           with stackkeys(subtest, storetype=MappingStore):
@@ -547,10 +546,10 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     data1 = make_randblock(rand0(8193))
     data2 = make_randblock(rand0(8193))
     h1 = S.add(data1)
-    B1 = Block(hashcode=h1, span=len(data1))
+    B1 = HashCodeBlock(hashcode=h1, span=len(data1), added=True)
     self.assertEqual(len(B1), len(data1))
     h2 = S.hash(data2)
-    B2 = Block(hashcode=h2, span=len(data2))
+    B2 = HashCodeBlock(hashcode=h2, span=len(data2), added=True)
     self.assertEqual(len(B2), len(data2))
     IB = IndirectBlock.from_subblocks((B1, B2))
     self.assertIn(h1, S)
