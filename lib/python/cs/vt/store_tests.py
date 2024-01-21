@@ -348,6 +348,7 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     self.assertEqual(M1[h], data)
     added_hashes.add(h)
     self.assertIn(h, M1)
+    M1.flush()
     M1_keys = set(M1.keys())
     self.assertIn(h, M1_keys)
     M1_hashcodes = set(M1.hashcodes())
