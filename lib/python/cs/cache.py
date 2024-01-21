@@ -286,6 +286,9 @@ class CachingMapping(MultiOpenMixin, MutableMapping, ABC):
         Q.close()
         T.join()
 
+  def __len__(self):
+    return len(self.backing)
+
   def __contains__(self, k):
     return k in self._cache or (k not in self._deleted and k in self.backing)
 
