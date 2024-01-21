@@ -150,6 +150,32 @@ class QueueIterator(MultiOpenMixin):
     '''
     self.q.join()
 
+  def next_batch(self, batch_size=1024, block_once=False):
+    ''' Obtain a batch of immediately available items from the queue.
+        Up to `batch_size` items will be obtained, default 1024.
+        Return a list of the items.
+        If the queue is empty and empty list is returned.
+        If the 
+    '''
+    batch = []
+    try:
+      if block_once:
+        batch.append(next(self))
+      while len(batch) < batch_size and not self.empty():
+        batch.append(next(self))
+    except StopIteration:
+      pass
+    return batch
+
+  def iter_batch(self, batch_size=1024):
+    ''' Generator to yield batches of items from the queue.
+    '''
+    while True:
+      batch = self.next_batch(batch_size=batch_size, block_once=True)
+      if not batch:
+        return
+      yield batch
+
 def IterableQueue(capacity=0, name=None):
   ''' Factory to create an iterable queue.
       Note that the returned queue is already open
