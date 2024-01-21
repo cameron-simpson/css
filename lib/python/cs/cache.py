@@ -12,7 +12,7 @@ from threading import Lock, RLock, Thread
 from typing import Mapping
 
 from cs.context import stackattrs
-from cs.lex import r
+from cs.lex import r, s
 from cs.logutils import warning
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
@@ -243,6 +243,12 @@ class CachingMapping(MultiOpenMixin, MutableMapping, ABC):
     # the sentinel for a deletion update
     self._DELETE = object()
     self._lock = Lock()
+
+  def __str__(self):
+    return f'{self.__class__.__name__}({s(self.backing)})'
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}({r(self.backing)})'
 
   @contextmanager
   def startup_shutdown(self):
