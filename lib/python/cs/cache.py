@@ -11,7 +11,7 @@ from threading import Lock, RLock, Thread
 import time
 from typing import Mapping
 
-from cs.context import stackattrs
+from cs.context import stackattrs, withif
 from cs.lex import r, s
 from cs.logutils import warning
 from cs.queues import IterableQueue
@@ -283,14 +283,15 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
               warning(f'{self}: del cache[{r(k)}]: {e}')
 
     Q = IterableQueue(self.queue_length)
-    T = Thread(target=worker, name=f'{self} worker')
-    T.start()
-    with stackattrs(self, _workQ=Q, _worker=T):
-      try:
-        yield
-      finally:
-        Q.close()
-        T.join()
+    with withif(backing):
+      T = Thread(target=worker, name=f'{self} worker')
+      T.start()
+      with stackattrs(self, _workQ=Q, _worker=T):
+        try:
+          yield
+        finally:
+          Q.close()
+          T.join()
 
   def __len__(self):
     return len(self.backing)
