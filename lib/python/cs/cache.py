@@ -245,6 +245,7 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
     self._DELETE = object()
     self._FLUSH = object()
     self._lock = Lock()
+    self._backing_lock = Lock()
 
   def __str__(self):
     return f'{self.__class__.__name__}({s(self.backing)})'
@@ -255,6 +256,7 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
   @contextmanager
   def startup_shutdown(self):
     lock = self._lock
+    backing_lock = self._backing_lock
     backing = self.backing
     cache = self._cache
     DELETE = self._DELETE
@@ -265,22 +267,24 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
       '''
       # TODO: this is synchronous
       # it would be good to have an async mode of some kind as well
-      for k, v in Q:
-        if k is FLUSH:
-          # v is a Result, complete it
-          v.result = time.time()
-        elif v is DELETE:
-          try:
-            del backing[k]
-          except KeyError:
-            pass
-        else:
-          backing[k] = v
-          with lock:
-            try:
-              del cache[k]
-            except KeyError as e:
-              warning(f'{self}: del cache[{r(k)}]: {e}')
+      for batch in Q.iter_batch(batch_size=16):
+        for k, v in batch:
+          with backing_lock:
+            if k is FLUSH:
+              # v is a Result, complete it
+              v.result = time.time()
+            elif v is DELETE:
+              try:
+                del backing[k]
+              except KeyError:
+                pass
+            else:
+              backing[k] = v
+              with lock:
+                try:
+                  del cache[k]
+                except KeyError as e:
+                  warning(f'{self}: del cache[{r(k)}]: {e}')
 
     Q = IterableQueue(self.queue_length)
     with withif(backing):
