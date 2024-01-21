@@ -433,7 +433,7 @@ class Block(Transcriber, ABC):
 
   @classmethod
   @typechecked
-  def promote(cls, blockish) -> "Block":
+  def promote(cls, blockish, added=False, literal_threshold=32) -> "Block":
     ''' Promote `blockish` to a `Block` instance.
 
         Supported promotions:
@@ -454,13 +454,13 @@ class Block(Transcriber, ABC):
       return blockish
     match blockish:
       case HashCode() as hashcode, int() as span:
-        return HashCodeBlock(hashcode=hashcode, span=span)
+        return HashCodeBlock(hashcode=hashcode, span=span, added=added)
       case _:
         data = bytes(blockish)
         span = len(data)
-        if span <= 32 and issubclass(LiteralBlock, cls):
+        if span <= literal_threshold and issubclass(LiteralBlock, cls):
           return LiteralBlock(data=data)
-        return HashCodeBlock(data=data, span=span)
+        return HashCodeBlock(data=data, span=span, added=added)
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
 
 class BlockRecord(BinarySingleValue):
