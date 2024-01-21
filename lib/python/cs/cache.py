@@ -280,9 +280,11 @@ class CachingMapping(MultiOpenMixin, MutableMapping, ABC):
     T = Thread(target=worker, name=f'{self} worker')
     T.start()
     with stackattrs(self, _workQ=Q, _worker=T):
-      yield
-      Q.close()
-      T.join()
+      try:
+        yield
+      finally:
+        Q.close()
+        T.join()
 
   def __contains__(self, k):
     return k in self._cache or (k not in self._deleted and k in self.backing)
