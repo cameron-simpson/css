@@ -1578,8 +1578,8 @@ class CachingMapping(MultiOpenMixin, Mapping, ABC):
 
       Note that this subclasses `MultiOpenMixin` to start/stop the worker `Thread`.
       Users must enclose use of a `CachingMapping` in a `with` statement.
-      If subclasses also subclass `MultiOpenMixin` their `__enter_exit__`
-      method needs to also call our `__enter_exit__` method.
+      If subclasses also subclass `MultiOpenMixin` their `startup_shutdown`
+      method needs to also call our `startup_shutdown` method.
 
       Example:
 
@@ -1613,7 +1613,8 @@ class CachingMapping(MultiOpenMixin, Mapping, ABC):
     self._DELETE = object()
     self._lock = Lock()
 
-  def __enter_exit__(self):
+  @contextmanager
+  def startup_shutdown(self):
     lock = self._lock
     backing = self.backing
     cache = self._cache
