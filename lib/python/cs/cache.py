@@ -242,6 +242,7 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
     self._workQ = None
     # the sentinel for a deletion update
     self._DELETE = object()
+    self._FLUSH = object()
     self._lock = Lock()
 
   def __str__(self):
@@ -256,6 +257,7 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
     backing = self.backing
     cache = self._cache
     DELETE = self._DELETE
+    FLUSH = self._FLUSH
 
     def worker():
       ''' The worker function which processes updates to the backing mapping.
@@ -263,7 +265,10 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
       # TODO: this is synchronous
       # it would be good to have an async mode of some kind as well
       for k, v in Q:
-        if v is DELETE:
+        if k is FLUSH:
+          # v is a Result, complete it
+          v.result = time.time()
+        elif v is DELETE:
           try:
             del backing[k]
           except KeyError:
@@ -337,3 +342,11 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
         pass
       else:
         yield k, v
+
+  def flush(self):
+    ''' Wait for outstanding requests in the queue to complete.
+        Return the UNIX time of completion.
+    '''
+    R = Result()
+    self._workQ.put((self._FLUSH, R))
+    return R()
