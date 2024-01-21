@@ -372,8 +372,6 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     self.index = None
     self._filemap = None
     self._cache = None
-    self._data_proxy = None
-    self._data_progress = None
     self._monitor_Thread = None
     # the current output datafile
     self._WDFstate = None
@@ -1402,6 +1400,7 @@ class DataDirCommand(BaseCommand):
     ''' Special class for `self.options` with various properties.
     '''
     datadirpath: Optional[str] = None
+    datadir: Optional[DataDir] = None
     store_spec: Optional[str] = None
 
   def apply_opt(self, opt, val):
@@ -1418,7 +1417,7 @@ class DataDirCommand(BaseCommand):
     options = self.options
     datadirpath = options.datadirpath
     if datadirpath is None:
-      from .store import DataDirStore
+      from .store import DataDirStore  # pylint: disable=import-outside-toplevel
       S = pfx_call(Store.promote, options.store_spec, options.config)
       if not isinstance(S, DataDirStore):
         raise GetoptError("default Store is not a DataDirStore: %s" % (s(S),))
@@ -1480,7 +1479,7 @@ class DataDirCommand(BaseCommand):
     ''' Usage: {cmd} [selftest-args...]
           Run the DataDir unit tests.
     '''
-    from .datadir_tests import selftest
+    from .datadir_tests import selftest  # pylint: disable=import-outside-toplevel
     selftest([self.options.cmd] + argv)
 
 if __name__ == '__main__':
