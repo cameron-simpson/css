@@ -202,7 +202,7 @@ def lru_cache(maxsize=None, cache=None, on_add=None, on_remove=None):
   return caching_func
 
 # pylint: disable=too-many-instance-attributes
-class CachingMapping(MultiOpenMixin, MutableMapping, ABC):
+class CachingMapping(MultiOpenMixin, MutableMapping):
   ''' A caching front end for another mapping.
       This is intended as a generic superclass for a proxy to a
       slower mapping such as a database or remote key value store.
