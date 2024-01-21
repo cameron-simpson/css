@@ -3,12 +3,12 @@
 ''' A few caching facilities.
 '''
 
-from abc import ABC
 from collections import deque
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from itertools import chain
 from threading import Lock, RLock, Thread
+import time
 from typing import Mapping
 
 from cs.context import stackattrs
@@ -16,6 +16,7 @@ from cs.lex import r, s
 from cs.logutils import warning
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
+from cs.result import Result
 from cs.seq import unrepeated
 
 DISTINFO = {
