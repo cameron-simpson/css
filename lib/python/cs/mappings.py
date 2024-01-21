@@ -19,23 +19,17 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 from inspect import isclass
-from itertools import chain
 import json
 import re
-from threading import Lock, RLock
-from typing import Mapping
+from threading import RLock
 from uuid import UUID, uuid4
 
-from cs.context import stackattrs
 from cs.deco import strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
-from cs.queues import IterableQueue
-from cs.resources import MultiOpenMixin
-from cs.seq import Seq, unrepeated
+from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
-from cs.threads import bg
 
 __version__ = '20231129-post'
 
@@ -135,6 +129,7 @@ def named_row_tuple(
     attr_seq = Seq(start=1)
     mapping = column_map
 
+    # pylint: disable=function-redefined
     def column_map(raw_column_name):
       ''' Function to map raw column names to the values in the
           supplied mapping.
