@@ -15,6 +15,7 @@ import sys
 
 from icontract import require
 
+from cs.cache import CachingMapping
 from cs.deco import fmtdoc
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx_method
@@ -488,7 +489,9 @@ class DataDirStore(MappingStore):
         indexclass=indexclass,
         rollover=rollover
     )
-    super().__init__(name, self._datadir, hashclass=hashclass, **kw)
+    super().__init__(
+        name, CachingMapping(self._datadir), hashclass=hashclass, **kw
+    )
     self._modify_index_lock = Lock()
 
   @contextmanager
