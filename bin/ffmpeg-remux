@@ -10,14 +10,18 @@ set -ue
 
 exec 3>&1 1>&2
 
+ffmpeg_exe_default=ffmpeg
+
 cmd=$0
 usage="Usage: $cmd [--replace] input [output [ffmpeg-options...]]
-  Write the output filename to standard output."
+  Write the output filename to standard output.
+  Environment:
+    \$FFMPEG_EXE the ffmpeg executable, default \"$ffmpeg_exe_default\""
 
 badopts=
 
 do_replace=
-ffmpeg_exe=${FFMPEG_EXE:-ffmpeg}
+ffmpeg_exe=${FFMPEG_EXE:-"$ffmpeg_exe_default"}
 
 [ $# -gt 0 ] && [ "x$1" = 'x--replace' ] && { do_replace=1; shift; }
 
