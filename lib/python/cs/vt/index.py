@@ -85,6 +85,12 @@ class BinaryIndex(MultiOpenMixin, ABC):
     MultiOpenMixin.__init__(self)
     self.basepath = basepath
 
+  def __repr__(self):
+    return f'{self.__class__.__name__}{shortpath(self.basepath)}'
+
+  def __str__(self):
+    return repr(self)
+
   @classmethod
   def pathof(cls, basepath):
     ''' Construct the path to the index file.
