@@ -1,3 +1,4 @@
+  cs.progress: progressbar with worker thread ticker to update the progress instead of updating on the iteration
   cs.tarutils: polling task which stats the current filename every 0.5 or so seconds
   cs.tarutils: cope with filenames which are not validly utf-8 encoded in the tar v stream
 does sqlite need the lock file or can I detect the locked exception and retry?
