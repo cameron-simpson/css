@@ -1,3 +1,4 @@
+  file checksum and tree sync tool to maintain a parallel tree based on checksums eg in a dl folder
   cs.progress: progressbar with worker thread ticker to update the progress instead of updating on the iteration
   cs.tarutils: polling task which stats the current filename every 0.5 or so seconds
   cs.tarutils: cope with filenames which are not validly utf-8 encoded in the tar v stream
