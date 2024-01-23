@@ -241,59 +241,86 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
             ... work with S ...
   '''
 
-  def __init__(self, backing: Mapping, *, cache=None, queue_length=1024):
-    if cache is None:
-      cache = {}
+  def __init__(
+      self,
+      mapping: Mapping,
+      *,
+      max_size=1024,
+      queue_length=1024,
+      delitem_bg: Optional[Callable[(Any,), Result]] = None,
+      setitem_bg: Optional[Callable[(Any, Any), Result]] = None,
+  ):
+    ''' Initialise the cache.
+
+        Parameters:
+        * `mapping`: the backing store, a mapping
+        * `max_size`: optional maximum size for the cache, default 1024
+        * `queue_length`: option size for the queue to the worker, default 1024
+        * `delitem_bg`: optional callable to queue a delete of a
+          key in the backing store; if unset then deleted are
+          serialised in the worker thread
+        * `setitem_bg`: optional callable to queue setting the value
+          for a key in the backing store; if unset then deleted are
+          serialised in the worker thread
+    '''
     # the backing mapping
-    self.backing = backing
+    self.mapping = mapping
     self.queue_length = queue_length
-    # cached entries not yet applied to the backing mapping
-    self._cache = cache
-    # cached deletions
-    self._deleted = set()
-    # a worker Thread to apply updates to the backing mapping
+    self.delitem_bg = delitem_bg
+    self.setitem_bg = setitem_bg
+    self._cache = LRU_Cache(max_size)
+    # a worker Thread to apply updates
     self._worker = None
     # a Queue to put updates to for processing by the worker
     self._workQ = None
+    # the sentinel for a queue flush
+    self.FLUSH = object()
     # the sentinel for a deletion update
-    self._DELETE = object()
-    self._FLUSH = object()
+    self.MISSING = object()
     self._lock = Lock()
     self._backing_lock = Lock()
 
   def __str__(self):
-    return f'{self.__class__.__name__}({s(self.backing)})'
+    return f'{self.__class__.__name__}({s(self.mapping)})'
 
   def __repr__(self):
-    return f'{self.__class__.__name__}({r(self.backing)})'
+    return f'{self.__class__.__name__}({r(self.mapping)})'
 
   @contextmanager
   def startup_shutdown(self):
-    lock = self._lock
-    backing_lock = self._backing_lock
-    backing = self.backing
-    cache = self._cache
-    DELETE = self._DELETE
-    FLUSH = self._FLUSH
 
-    def worker():
-      ''' The worker function which processes updates to the backing mapping.
+    def worker(
+        *,
+        lock,
+        backing_lock,
+        mapping,
+        cache,
+        delitem_bg,
+        setitem_bg,
+        MISSING,
+        FLUSH,
+    ):
+      ''' The worker function which processes updates.
       '''
-      # TODO: this is synchronous
-      # it would be good to have an async mode of some kind as well
       for batch in Q.iter_batch(batch_size=16):
         for k, v in batch:
           with backing_lock:
             if k is FLUSH:
               # v is a Result, complete it
               v.result = time.time()
-            elif v is DELETE:
-              try:
-                del backing[k]
-              except KeyError:
-                pass
+            elif v is MISSING:
+              if delitem_bg:
+                delitem_bg(k)
+              else:
+                try:
+                  del mapping[k]
+                except KeyError:
+                  pass
+            elif setitem_bg:
+              # dispatch the setitem
+              setitem_bg(k, v)
             else:
-              backing[k] = v
+              mapping[k] = v
               with lock:
                 try:
                   del cache[k]
@@ -301,8 +328,22 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
                   warning(f'{self}: del cache[{r(k)}]: {e}')
 
     Q = IterableQueue(self.queue_length)
-    with withif(backing):
-      T = Thread(target=worker, name=f'{self} worker')
+    with withif(self.mapping):
+      T = Thread(
+          target=worker,
+          name=f'{self} worker',
+          # pylint: disable=use-dict-literal
+          kwargs=dict(
+              lock=self._lock,
+              backing_lock=self._backing_lock,
+              mapping=self.mapping,
+              cache=self._cache,
+              delitem_bg=self.delitem_bg,
+              setitem_bg=self.setitem_bg,
+              MISSING=self.MISSING,
+              FLUSH=self.FLUSH,
+          ),
+      )
       T.start()
       with stackattrs(self, _workQ=Q, _worker=T):
         try:
@@ -312,41 +353,44 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
           T.join()
 
   def __len__(self):
-    return len(self.backing)
+    return len(self.mapping)
 
   def __contains__(self, k):
-    return k in self._cache or (k not in self._deleted and k in self.backing)
+    try:
+      v = self._cache[k]
+    except KeyError:
+      return k in self.mapping
+    return v is not self.MISSING
 
   def __getitem__(self, k):
-    with self._lock:
-      try:
-        return self._cache[k]
-      except KeyError:
-        if k in self._deleted:
-          raise
-        return self.backing[k]
+    try:
+      v = self._cache[k]
+    except KeyError:
+      return self.mapping[k]
+    if v is self.MISSING:
+      raise KeyError(k)
+    return v
 
   def __setitem__(self, k, v):
     with self._lock:
       self._cache[k] = v
-      self._deleted.discard(k)
       self._workQ.put((k, v))
 
   def __delitem__(self, k):
     with self._lock:
-      try:
-        del self._cache[k]
-      except KeyError:
-        pass
-      self._deleted.add(k)
-      self._workQ.put((k, self._DELETE))
+      self._cache[k] = self.MISSING
+      self._workQ.put((k, self.MISSING))
 
   def keys(self):
     ''' Generator yielding the keys.
     '''
-    for k in unrepeated(chain(self._cache.keys(), self.backing.keys())):
-      if k not in self._deleted:
-        yield k
+    MISSING = self.MISSING
+    yield from unrepeated(
+        chain(
+            (k for k, v in self._cache.items() if v is not MISSING),
+            self.mapping.keys()
+        )
+    )
 
   def __iter__(self):
     yield from self.keys()
@@ -358,7 +402,7 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
     for k in self.keys():
       try:
         v = self[k]
-      except KeyError:
+      except KeyError:  # accomodate race between keys() and contents
         pass
       else:
         yield k, v
@@ -368,5 +412,5 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
         Return the UNIX time of completion.
     '''
     R = Result()
-    self._workQ.put((self._FLUSH, R))
+    self._workQ.put((self.FLUSH, R))
     return R()
