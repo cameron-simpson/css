@@ -171,6 +171,16 @@ class LRU_Cache(object):
   def __ne__(self, other):
     return self != other
 
+  def keys(self):
+    ''' Keys from the cache.
+    '''
+    return self._cache.keys()
+
+  def items(self):
+    ''' Items from the cache.
+    '''
+    return self._cache.items()
+
   def flush(self):
     ''' Clear the cache.
     '''
