@@ -228,11 +228,11 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
 
       Example:
 
-          class Store(CachingMapping):
+          class Store:
             """ A key value store with a slower backend.
             """
-            def __init__(self, storage:Mapping):
-              super().__init__(storage)
+            def __init__(self, mapping:Mapping):
+              self.mapping = CachingMapping(mapping)
 
           .....
           S = Store(slow_mapping)
@@ -248,6 +248,7 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
       queue_length=1024,
       delitem_bg: Optional[Callable[(Any,), Result]] = None,
       setitem_bg: Optional[Callable[(Any, Any), Result]] = None,
+      missing_fallthrough: bool = False,
   ):
     ''' Initialise the cache.
 
@@ -261,12 +262,15 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
         * `setitem_bg`: optional callable to queue setting the value
           for a key in the backing store; if unset then deleted are
           serialised in the worker thread
+        * `missing_fallthrough`: is true (default `False`) always
+          fall back to the backing mapping if a key is not in the cache
     '''
     # the backing mapping
     self.mapping = mapping
     self.queue_length = queue_length
     self.delitem_bg = delitem_bg
     self.setitem_bg = setitem_bg
+    self.missing_fallthrough = missing_fallthrough
     self._cache = LRU_Cache(max_size)
     # a worker Thread to apply updates
     self._worker = None
@@ -377,7 +381,13 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
 
   def __delitem__(self, k):
     with self._lock:
-      self._cache[k] = self.MISSING
+      if self.mssing_fallthrough:
+        try:
+          del self._cache[k]
+        except KeyError:
+          pass
+      else:
+        self._cache[k] = self.MISSING
       self._workQ.put((k, self.MISSING))
 
   def keys(self):
