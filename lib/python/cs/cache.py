@@ -7,7 +7,7 @@ from collections import deque
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from itertools import chain
-from threading import Lock, RLock, Thread
+from threading import Lock, Thread
 import time
 from typing import Mapping
 
@@ -47,7 +47,7 @@ class LRU_Cache(object):
     self.maxsize = maxsize
     self.on_add = on_add
     self.on_remove = on_remove
-    self._lock = RLock()
+    self._lock = Lock()
     self._reset()
 
   def _reset(self):
@@ -131,31 +131,33 @@ class LRU_Cache(object):
   def __setitem__(self, key, value):
     ''' Store the item in the cache. Prune if necessary.
     '''
-    cache = self._cache
-    cache_seq = self._cache_seq
-    seq = self._seq
-    self._seq = seq + 1
-    cache[key] = value
-    cache_seq[key] = seq
-    callback = self.on_add
-    if callback:
-      callback(key, value)
-    cachesize = len(cache)
-    if cachesize > self.maxsize:
-      self._prune()
-    elif cachesize * 2 < len(self._stash):
-      self._winnow()
-    self._stash.append((seq, key))
+    with self._lock:
+      cache = self._cache
+      cache_seq = self._cache_seq
+      seq = self._seq
+      self._seq = seq + 1
+      cache[key] = value
+      cache_seq[key] = seq
+      callback = self.on_add
+      if callback:
+        callback(key, value)
+      cachesize = len(cache)
+      if cachesize > self.max_size:
+        self._prune()
+      elif cachesize * 2 < len(self._stash):
+        self._winnow()
+      self._stash.append((seq, key))
 
   def __delitem__(self, key):
     ''' Delete the specified `key`, calling the on_remove callback.
     '''
-    value = self._cache[key]
-    callback = self.on_remove
-    if callback:
-      callback(key, value)
-    del self._cache[key]
-    del self._cache_seq[key]
+    with self._lock:
+      value = self._cache[key]
+      callback = self.on_remove
+      if callback:
+        callback(key, value)
+      del self._cache[key]
+      del self._cache_seq[key]
 
   def __len__(self):
     return len(self._cache)
@@ -172,11 +174,12 @@ class LRU_Cache(object):
   def flush(self):
     ''' Clear the cache.
     '''
-    cache = self._cache
-    keys = list(cache.keys())
-    for key in keys:
-      del self[key]
-    self._reset()
+    with self._lock:
+      cache = self._cache
+      keys = list(cache.keys())
+      for key in keys:
+        del self[key]
+      self._reset()
 
 def lru_cache(maxsize=None, cache=None, on_add=None, on_remove=None):
   ''' Enhanced workalike of @functools.lru_cache.
