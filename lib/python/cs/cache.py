@@ -38,13 +38,13 @@ class LRU_Cache(object):
       this provides `on_add` and `on_remove` callbacks.
   '''
 
-  def __init__(self, maxsize, on_add=None, on_remove=None):
+  def __init__(self, max_size, *, on_add=None, on_remove=None):
     ''' Initialise the LRU_Cache with maximum size `max`,
         additon callback `on_add` and removal callback `on_remove`.
     '''
-    if maxsize < 1:
-      raise ValueError("maxsize must be >= 1, got: %r" % (maxsize,))
-    self.maxsize = maxsize
+    if max_size < 1:
+      raise ValueError("max_size must be >= 1, got: %r" % (max_size,))
+    self.max_size = max_size
     self.on_add = on_add
     self.on_remove = on_remove
     self._lock = Lock()
@@ -62,10 +62,10 @@ class LRU_Cache(object):
   def _selfcheck(self):
     ''' Perform various internal self checks, raise on failure.
     '''
-    if len(self) > self.maxsize:
+    if len(self) > self.max_size:
       raise RuntimeError(
-          "maxsize=%d, len(self)=%d - self too big" %
-          (self.maxsize, len(self))
+          "max_size=%d, len(self)=%d - self too big" %
+          (self.max_size, len(self))
       )
     if len(self) < len(self._stash):
       raise RuntimeError(
@@ -81,10 +81,10 @@ class LRU_Cache(object):
       )
 
   def _prune(self, limit=None):
-    ''' Reduce the cache to the specified limit, by default the cache maxsize.
+    ''' Reduce the cache to the specified limit, by default the cache max_size.
     '''
     if limit is None:
-      limit = self.maxsize
+      limit = self.max_size
     cache = self._cache
     cache_seq = self._cache_seq
     cachesize = len(cache)
@@ -181,17 +181,18 @@ class LRU_Cache(object):
         del self[key]
       self._reset()
 
-def lru_cache(maxsize=None, cache=None, on_add=None, on_remove=None):
+# TODO: use @decorator
+def lru_cache(max_size=None, cache=None, on_add=None, on_remove=None):
   ''' Enhanced workalike of @functools.lru_cache.
   '''
   if cache is None:
-    if maxsize is None:
-      maxsize = 32
-    cache = LRU_Cache(maxsize=maxsize, on_add=on_add, on_remove=on_remove)
-  elif maxsize is not None:
+    if max_size is None:
+      max_size = 32
+    cache = LRU_Cache(max_size=max_size, on_add=on_add, on_remove=on_remove)
+  elif max_size is not None:
     raise ValueError(
-        "maxsize must be None if cache is not None: maxsize=%r, cache=%r" %
-        (maxsize, cache)
+        "max_size must be None if cache is not None: max_size=%r, cache=%r" %
+        (max_size, cache)
     )
 
   def caching_func(func, *a, **kw):
