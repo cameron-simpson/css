@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from itertools import chain
 from threading import Lock, Thread
 import time
-from typing import Mapping
+from typing import Any, Callable, Mapping, Optional
 
 from cs.context import stackattrs, withif
 from cs.lex import r, s
@@ -25,7 +25,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [],
