@@ -12,10 +12,11 @@ remote_revport=12345
 cmd=$( basename "$0" )
 usage="Usage: $cmd localdir:remote:remotedir[:remote-ssh-name]...
   For each argument back up localdir to a histbackup at remote:remotedir.
+
   Since histbackup must run at the remote end as:
-    histbackup srchost:localdir remotedir
-  it is necessary to define srchost, which is specified by remote-ssh-name
-  above. The default comes from the first word in \$SSH_CONNECTION,
+    histbackup remote-ssh-name:localdir remotedir
+  it is necessary to infer remote-ssh-name if not specified.
+  The default comes from the first word in \$SSH_CONNECTION,
   the source address of the inbound ssh connection."
 
 [ $# -gt 0 ] || {
