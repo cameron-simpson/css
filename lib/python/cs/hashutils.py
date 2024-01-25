@@ -80,6 +80,9 @@ class BaseHashCode(bytes):
     except OSError:
       pass
     else:
+      S = os.fstat(fd)
+      if S.st_size == 0:
+        return cls.from_data(b'')
       try:
         with mmap.mmap(fd, 0, flags=mmap.MAP_PRIVATE,
                        prot=mmap.PROT_READ) as mmapped:
