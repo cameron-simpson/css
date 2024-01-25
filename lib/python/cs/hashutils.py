@@ -41,12 +41,13 @@ class BaseHashCode(bytes):
 
     return cls
 
+  @classmethod
   def __init_subclass__(
       cls, *, hashfunc, hashname=None, by_hashname=None, **kw
   ):
     super().__init_subclass__(**kw)
     if hashname is None:
-      hashname = cls.__name__.lower()
+      return
     if by_hashname is None:
       by_hashname = cls.by_hashname
     try:
