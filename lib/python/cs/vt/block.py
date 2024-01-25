@@ -173,8 +173,8 @@ class _Block(Transcriber, ABC):
         # we can defer fetching the data until now
         data1 = leaf1.data
         data2 = leaf2.data
-        if (data1[offset - offset1:offset - offset1 + cmplen] !=
-            data2[offset - offset2:offset - offset2 + cmplen]):
+        if (data1[offset - offset1:offset - offset1 + cmplen]
+            != data2[offset - offset2:offset - offset2 + cmplen]):
           return False
         end2 = offset2 + len(data2)
         offset += cmplen
@@ -692,7 +692,7 @@ class HashCodeBlock(_Block):
     if self._span is None:
       self._span = newspan
     else:
-      warning("setting .span a second time")
+      ##warning("setting .span a second time")
       if newspan != self._span:
         raise RuntimeError(
             "%s: tried to change .span from %s to %s" %
