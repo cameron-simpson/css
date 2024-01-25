@@ -8,6 +8,7 @@ import mmap
 import os
 
 from cs.buffer import CornuCopyBuffer
+from cs.deco import promote
 
 class BaseHashCode(bytes):
   ''' Base class for hashcodes, subclassed by `SHA1`, `SHA256` et al.
@@ -61,7 +62,8 @@ class BaseHashCode(bytes):
     return cls(cls.hashfunc(bs).digest())
 
   @classmethod
-  def from_buffer(cls, bfr):
+  @promote
+  def from_buffer(cls, bfr: CornuCopyBuffer):
     ''' Compute hashcode from the contents of the `CornuCopyBuffer` `bfr`.
     '''
     h = cls.hashfunc()
