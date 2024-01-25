@@ -35,7 +35,6 @@ from cs.binary import (
     BinaryMultiStruct,
     BinaryMultiValue,
     BinarySingleValue,
-    deferred_field,
     pt_spec,
 )
 from cs.buffer import CornuCopyBuffer
@@ -2181,14 +2180,14 @@ class CO64BoxBody(FullBoxBody):
     else:
       yield from map(UInt64BE.transcribe_value, chunk_offsets)
 
-  @deferred_field
-  def chunk_offsets(self, bfr):
-    ''' Computed on demand list of chunk offsets.
-    '''
-    offsets = []
-    for _ in range(self.entry_count):
-      offsets.append(UInt64BE.from_buffer(bfr))
-    return offsets
+  ##@deferred_field
+  ##def chunk_offsets(self, bfr):
+  ##  ''' Computed on demand list of chunk offsets.
+  ##  '''
+  ##  offsets = []
+  ##  for _ in range(self.entry_count):
+  ##    offsets.append(UInt64BE.from_buffer(bfr))
+  ##  return offsets
 
 add_body_class(CO64BoxBody)
 
