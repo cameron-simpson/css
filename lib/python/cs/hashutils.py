@@ -17,18 +17,18 @@ class BaseHashCode(bytes):
   __slots__ = ()
 
   # registry of classes
-  classes_by_hashname = {}
+  by_hashname = {}
 
   def __init_subclass__(
-      cls, *, hashfunc, hashname=None, hashclasses=None, **kw
+      cls, *, hashfunc, hashname=None, by_hashname=None, **kw
   ):
     super().__init_subclass__(**kw)
     if hashname is None:
       hashname = cls.__name__.lower()
-    if hashclasses is None:
-      hashclasses = cls.classes_by_hashname
+    if by_hashname is None:
+      by_hashname = cls.by_hashname
     try:
-      hashcls = hashclasses[hashname]
+      hashcls = by_hashname[hashname]
     except KeyError:
       hashcls = None
     else:
@@ -42,7 +42,8 @@ class BaseHashCode(bytes):
     if not cls.__doc__:
       cls.__doc__ = f'{hashfunc.__name__} hashcode class, subclass of `bytes`.'
     if hashcls is None:
-      hashclasses[hashname] = cls
+      # new hash class, register it
+      by_hashname[hashname] = cls
 
   hashfunc = lambda bs=None: None  # pylint: disable=unnecessary-lambda-assignment
 
