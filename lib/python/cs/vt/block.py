@@ -614,8 +614,15 @@ class HashCodeBlock(Block):
 
   transcribe_prefix = 'B'
 
+  @typechecked
   def __init__(
-      self, *, hashcode=None, data=None, added=False, span=None, **kw
+      self,
+      hashcode: Optional[HashCode] = None,
+      *,
+      data=None,
+      added=False,
+      span=None,
+      **kw,
   ):
     ''' Initialise a `BT_HASHCODE` Block.
 

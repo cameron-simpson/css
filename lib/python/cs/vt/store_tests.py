@@ -62,7 +62,7 @@ STORECLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__STORECLASS_NAMES'
 HASHCLASS_NAMES = tuple(
     list(filter(None,
                 os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split(' ,')))
-    or sorted(HashCode.by_name.keys())
+    or sorted(HashCode.by_hashname.keys())
 )
 INDEXCLASS_NAMES = tuple(
     list(

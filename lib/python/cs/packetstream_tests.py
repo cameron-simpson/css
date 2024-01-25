@@ -9,18 +9,16 @@ import random
 import socket
 from threading import Thread
 import unittest
-from cs.binary_tests import _TestPacketFields
+from cs.binary_tests import TestBinaryClasses
 from cs.randutils import rand0, make_randblock
 from cs.socketutils import bind_next_port, OpenSocket
 from . import packetstream
 from .packetstream import Packet, PacketConnection
 
-class TestPacketStreamPacketFields(_TestPacketFields, unittest.TestCase):
-  ''' Test for all the `PacketField`s.
+class TestPacketStreamBinaryClasses(TestBinaryClasses, unittest.TestCase):
+  ''' Test for all the `AbstractBinary` subclasses.
   '''
-
-  def setUp(self):
-    self.module = packetstream
+  test_module = packetstream
 
 class TestPacket(unittest.TestCase):
   ''' Test various trivial packets.
