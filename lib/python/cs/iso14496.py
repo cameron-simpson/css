@@ -24,7 +24,6 @@ import sys
 from cs.binary import (
     UInt8,
     Int16BE,
-    UTF16NULField,
     Int32BE,
     UInt16BE,
     UInt32BE,
@@ -411,7 +410,7 @@ class UTF8or16Field(SimpleBinary):
     '''
     if self.bom:
       yield self.bom
-      yield UTF16NULField.transcribe_value(
+      yield BinaryUTF16NUL.transcribe_value(
           self.text, encoding=self.BOM_ENCODING[self.bom]
       )
     else:
