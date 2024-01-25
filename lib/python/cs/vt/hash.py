@@ -91,7 +91,7 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
 decode_buffer = HashCodeField.parse_value
 decode = HashCodeField.parse_value_from_bytes
 
-class HashCode(Transcriber, ABC):
+class HashCode(BaseHashCode, Transcriber, ABC, hashfunc=None):
   ''' All hashes are `bytes` subclassed via `cs.hashutils.BaseHashCode`.
   '''
 
@@ -99,18 +99,20 @@ class HashCode(Transcriber, ABC):
 
   hashlen = None
 
-  by_name = {}
-  by_enum = {}
+  # local registries
+  by_hashname = {}
+  by_hashenum = {}
 
   @classmethod
-  @typechecked
-  def register(cls, hashenum: int):
+  def __init_subclass__(cls, *, hashname, hashenum, **kw):
+    super().__init_subclass__(hashname=hashname, **kw)
     hashname = cls.hashname
-    assert hashname not in cls.by_name
-    assert hashenum not in cls.by_enum
+    if hashenum is None:
+      assert hashname is None
+      return
+    assert hashenum not in cls.by_hashenum
     cls.hashenum = hashenum
-    cls.by_name[hashname] = cls
-    cls.by_enum[hashenum] = cls
+    cls.by_hashenum[hashenum] = cls
     # precompute serialisation of the enum
     cls.hashenum_bs = bytes(BSUInt(hashenum))
     # precompute the length of the serialisation of a hashcode
@@ -121,9 +123,9 @@ class HashCode(Transcriber, ABC):
     ''' Obtain a hash class from its name or enum.
     '''
     if isinstance(index, str):
-      return cls.by_name[index]
+      return cls.by_hashname[index]
     if isinstance(index, int):
-      return cls.by_enum[index]
+      return cls.by_hashenum[index]
     raise TypeError(
         "%s.by_index: expected str or int, got %s:%r" %
         (cls.__name__, type(index).__name__, index)
@@ -273,24 +275,22 @@ class HashCode(Transcriber, ABC):
 register_transcriber(HashCode)
 
 # legacy names, to be removed (TODO)
-HASHCLASS_BY_NAME = HashCode.by_name
-HASHCLASS_BY_ENUM = HashCode.by_enum
+HASHCLASS_BY_NAME = HashCode.by_hashname
+HASHCLASS_BY_ENUM = HashCode.by_hashenum
 
 # enums for hash types; TODO: remove and use names throughout
 HASH_SHA1_T = 0
 HASH_SHA256_T = 1
 
 # pylint: disable=missing-class-docstring
-class Hash_SHA1(HashCode, BaseHashCode, hashfunc=sha1, hashname='sha1'):
+class Hash_SHA1(HashCode, BaseHashCode, hashfunc=sha1, hashname='sha1',
+                hashenum=HASH_SHA1_T):
   __slots__ = ()
-
-Hash_SHA1.register(HASH_SHA1_T)
 
 # pylint: disable=missing-class-docstring
-class Hash_SHA256(HashCode, BaseHashCode, hashfunc=sha256, hashname='sha256'):
+class Hash_SHA256(HashCode, BaseHashCode, hashfunc=sha256, hashname='sha256',
+                  hashenum=HASH_SHA256_T):
   __slots__ = ()
-
-Hash_SHA256.register(HASH_SHA256_T)
 
 DEFAULT_HASHCLASS = Hash_SHA1
 
