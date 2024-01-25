@@ -19,6 +19,28 @@ class BaseHashCode(bytes):
   # registry of classes
   by_hashname = {}
 
+  @classmethod
+  def hashclass(baseclass, hashname: str, **kw):
+    ''' Return the class for the hash function named `hashname`.
+    '''
+    try:
+      cls = baseclass.by_hashname[hashname]
+    except KeyError:
+
+      class cls(
+          baseclass,
+          hashfunc=getattr(hashlib, hashname),
+          hashname=hashname,
+          **kw,
+      ):
+        ''' Hash class implementation.
+        '''
+        __slots__ = ()
+
+      cls.__name__ = hashname.upper()
+
+    return cls
+
   def __init_subclass__(
       cls, *, hashfunc, hashname=None, by_hashname=None, **kw
   ):
@@ -98,23 +120,5 @@ class BaseHashCode(bytes):
     # mmap fails, try plain open of file
     return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
 
-def hashclass(hashname: str):
-  ''' Return the class for the hash function named `hashname`.
-  '''
-  try:
-    cls = BaseHashCode.classes_by_hashname[hashname]
-  except KeyError:
-
-    class cls(
-        BaseHashCode,
-        hashfunc=getattr(hashlib, hashname),
-        hashname=hashname,
-    ):
-      ''' Hash class implementation.
-      '''
-      __slots__ = ()
-
-  return cls
-
-SHA1 = hashclass('sha1')
-SHA256 = hashclass('sha256')
+SHA1 = BaseHashCode.hashclass('sha1')
+SHA256 = BaseHashCode.hashclass('sha256')
