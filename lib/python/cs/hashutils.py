@@ -8,6 +8,7 @@ import mmap
 import os
 
 from cs.buffer import CornuCopyBuffer
+from cs.deco import promote
 
 class BaseHashCode(bytes):
   ''' Base class for hashcodes, subclassed by `SHA1`, `SHA256` et al.
@@ -15,15 +16,57 @@ class BaseHashCode(bytes):
 
   __slots__ = ()
 
-  def __init_subclass__(cls, *, hashfunc, hashname=None, **kw):
+  # registry of classes
+  by_hashname = {}
+
+  @classmethod
+  def hashclass(baseclass, hashname: str, **kw):
+    ''' Return the class for the hash function named `hashname`.
+    '''
+    try:
+      cls = baseclass.by_hashname[hashname]
+    except KeyError:
+
+      class cls(
+          baseclass,
+          hashfunc=getattr(hashlib, hashname),
+          hashname=hashname,
+          **kw,
+      ):
+        ''' Hash class implementation.
+        '''
+        __slots__ = ()
+
+      cls.__name__ = hashname.upper()
+
+    return cls
+
+  @classmethod
+  def __init_subclass__(
+      cls, *, hashfunc, hashname=None, by_hashname=None, **kw
+  ):
     super().__init_subclass__(**kw)
     if hashname is None:
-      hashname = cls.__name__.lower()
+      return
+    if by_hashname is None:
+      by_hashname = cls.by_hashname
+    try:
+      hashcls = by_hashname[hashname]
+    except KeyError:
+      hashcls = None
+    else:
+      if hashcls is not cls:
+        raise ValueError(
+            f'class {hashclass} already exists for hashname {hashname!r}'
+        )
     cls.hashname = hashname
     cls.hashfunc = hashfunc
     cls.hashlen = len(hashfunc(b'').digest())
     if not cls.__doc__:
       cls.__doc__ = f'{hashfunc.__name__} hashcode class, subclass of `bytes`.'
+    if hashcls is None:
+      # new hash class, register it
+      by_hashname[hashname] = cls
 
   hashfunc = lambda bs=None: None  # pylint: disable=unnecessary-lambda-assignment
 
@@ -43,7 +86,8 @@ class BaseHashCode(bytes):
     return cls(cls.hashfunc(bs).digest())
 
   @classmethod
-  def from_buffer(cls, bfr):
+  @promote
+  def from_buffer(cls, bfr: CornuCopyBuffer):
     ''' Compute hashcode from the contents of the `CornuCopyBuffer` `bfr`.
     '''
     h = cls.hashfunc()
@@ -62,6 +106,9 @@ class BaseHashCode(bytes):
     except OSError:
       pass
     else:
+      S = os.fstat(fd)
+      if S.st_size == 0:
+        return cls.from_data(b'')
       try:
         with mmap.mmap(fd, 0, flags=mmap.MAP_PRIVATE,
                        prot=mmap.PROT_READ) as mmapped:
@@ -74,10 +121,5 @@ class BaseHashCode(bytes):
     # mmap fails, try plain open of file
     return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
 
-# pylint: disable=missing-class-docstring
-class SHA1(BaseHashCode, hashfunc=hashlib.sha1):
-  __slots__ = ()
-
-# pylint: disable=missing-class-docstring
-class SHA256(BaseHashCode, hashfunc=hashlib.sha256):
-  __slots__ = ()
+SHA1 = BaseHashCode.hashclass('sha1')
+SHA256 = BaseHashCode.hashclass('sha256')
