@@ -15,15 +15,33 @@ class BaseHashCode(bytes):
 
   __slots__ = ()
 
-  def __init_subclass__(cls, *, hashfunc, hashname=None, **kw):
+  # registry of classes
+  classes_by_hashname = {}
+
+  def __init_subclass__(
+      cls, *, hashfunc, hashname=None, hashclasses=None, **kw
+  ):
     super().__init_subclass__(**kw)
     if hashname is None:
       hashname = cls.__name__.lower()
+    if hashclasses is None:
+      hashclasses = cls.classes_by_hashname
+    try:
+      hashcls = hashclasses[hashname]
+    except KeyError:
+      hashcls = None
+    else:
+      if hashcls is not cls:
+        raise ValueError(
+            f'class {hashclass} already exists for hashname {hashname!r}'
+        )
     cls.hashname = hashname
     cls.hashfunc = hashfunc
     cls.hashlen = len(hashfunc(b'').digest())
     if not cls.__doc__:
       cls.__doc__ = f'{hashfunc.__name__} hashcode class, subclass of `bytes`.'
+    if hashcls is None:
+      hashclasses[hashname] = cls
 
   hashfunc = lambda bs=None: None  # pylint: disable=unnecessary-lambda-assignment
 
@@ -74,10 +92,23 @@ class BaseHashCode(bytes):
     # mmap fails, try plain open of file
     return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
 
-# pylint: disable=missing-class-docstring
-class SHA1(BaseHashCode, hashfunc=hashlib.sha1):
-  __slots__ = ()
+def hashclass(hashname: str):
+  ''' Return the class for the hash function named `hashname`.
+  '''
+  try:
+    cls = BaseHashCode.classes_by_hashname[hashname]
+  except KeyError:
 
-# pylint: disable=missing-class-docstring
-class SHA256(BaseHashCode, hashfunc=hashlib.sha256):
-  __slots__ = ()
+    class cls(
+        BaseHashCode,
+        hashfunc=getattr(hashlib, hashname),
+        hashname=hashname,
+    ):
+      ''' Hash class implementation.
+      '''
+      __slots__ = ()
+
+  return cls
+
+SHA1 = hashclass('sha1')
+SHA256 = hashclass('sha256')
