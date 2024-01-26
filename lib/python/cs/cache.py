@@ -324,11 +324,6 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
               setitem_bg(k, v)
             else:
               mapping[k] = v
-              with lock:
-                try:
-                  del cache[k]
-                except KeyError as e:
-                  warning(f'{self}: del cache[{r(k)}]: {e}')
 
     Q = IterableQueue(self.queue_length)
     with withif(self.mapping):
