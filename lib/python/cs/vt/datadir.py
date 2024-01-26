@@ -414,7 +414,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       hashname = self.hashname
       # cache of open DataFiles
       cache = LRU_Cache(
-          maxsize=4, on_remove=lambda k, datafile: datafile.close()
+          max_size=4, on_remove=lambda k, datafile: datafile.close()
       )
       with self.indexclass(self.pathto(
           self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname))) as index:
