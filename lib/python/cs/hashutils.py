@@ -20,15 +20,15 @@ class BaseHashCode(bytes):
   by_hashname = {}
 
   @classmethod
-  def hashclass(baseclass, hashname: str, **kw):
+  def hashclass(cls, hashname: str, **kw):
     ''' Return the class for the hash function named `hashname`.
     '''
     try:
-      cls = baseclass.by_hashname[hashname]
+      hashcls = cls.by_hashname[hashname]
     except KeyError:
 
-      class cls(
-          baseclass,
+      class hashcls(
+          cls,
           hashfunc=getattr(hashlib, hashname),
           hashname=hashname,
           **kw,
@@ -37,9 +37,9 @@ class BaseHashCode(bytes):
         '''
         __slots__ = ()
 
-      cls.__name__ = hashname.upper()
+      hashcls.__name__ = hashname.upper()
 
-    return cls
+    return hashcls
 
   @classmethod
   def __init_subclass__(
@@ -57,7 +57,7 @@ class BaseHashCode(bytes):
     else:
       if hashcls is not cls:
         raise ValueError(
-            f'class {hashclass} already exists for hashname {hashname!r}'
+            f'class {hashcls} already exists for hashname {hashname!r}'
         )
     cls.hashname = hashname
     cls.hashfunc = hashfunc
