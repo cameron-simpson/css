@@ -532,6 +532,7 @@ class DataDirStore(MappingStore):
                 entry.flags |= FileDataIndexEntry.INDIRECT_COMPLETE
     '''
     with self._modify_index_lock:
+      self.mapping.flush()  # ensure the index is up to date
       with self._datadir.modify_index_entry(hashcode) as entry:
         yield entry
 
