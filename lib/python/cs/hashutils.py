@@ -20,12 +20,19 @@ class BaseHashCode(bytes):
   by_hashname = {}
 
   @classmethod
-  def hashclass(cls, hashname: str, **kw):
+  def hashclass(cls, hashname: str, hashfunc=None, **kw):
     ''' Return the class for the hash function named `hashname`.
+
+        Parameters:
+        * `hashname`: the name of the hash function
+        * `hashfunc`: optional hash function for the class
     '''
     try:
       hashcls = cls.by_hashname[hashname]
     except KeyError:
+
+      if hashfunc is None:
+        hashfunc = getattr(hashlib, hashname)
 
       class hashcls(
           cls,
@@ -38,6 +45,12 @@ class BaseHashCode(bytes):
         __slots__ = ()
 
       hashcls.__name__ = hashname.upper()
+    else:
+      if hashfunc is not None:
+        if hashfunc is not hashcls.hashfunc:
+          raise ValueError(
+              f'class {hashcls.__name__} already exists with a different hash function {hashcls.hashfunc} from supplied {hashfunc=}'
+          )
 
     return hashcls
 
@@ -121,5 +134,10 @@ class BaseHashCode(bytes):
     # mmap fails, try plain open of file
     return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
 
+# convenience predefined hash classes
+MD5 = BaseHashCode.hashclass('md5')
 SHA1 = BaseHashCode.hashclass('sha1')
+SHA224 = BaseHashCode.hashclass('sha224')
 SHA256 = BaseHashCode.hashclass('sha256')
+SHA384 = BaseHashCode.hashclass('sha384')
+SHA512 = BaseHashCode.hashclass('sha512')
