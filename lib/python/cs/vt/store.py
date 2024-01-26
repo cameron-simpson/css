@@ -102,18 +102,13 @@ class MappingStore(StoreSyncBase):
   def __len__(self):
     return len(self.mapping)
 
-  def __contains__(self, h):
+  def contains(self, h):
     return h in self.mapping
-
-  contains = __contains__
 
   def keys(self):
     ''' Proxy to `self.mapping.keys`.
     '''
     return self.mapping.keys()
-
-  def __iter__(self):
-    return iter(self.keys())
 
   def __getitem__(self, h):
     ''' Proxy to `self.mapping[h]`.
