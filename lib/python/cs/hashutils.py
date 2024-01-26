@@ -20,15 +20,22 @@ class BaseHashCode(bytes):
   by_hashname = {}
 
   @classmethod
-  def hashclass(baseclass, hashname: str, **kw):
+  def hashclass(cls, hashname: str, hashfunc=None, **kw):
     ''' Return the class for the hash function named `hashname`.
+
+        Parameters:
+        * `hashname`: the name of the hash function
+        * `hashfunc`: optional hash function for the class
     '''
     try:
-      cls = baseclass.by_hashname[hashname]
+      hashcls = cls.by_hashname[hashname]
     except KeyError:
 
-      class cls(
-          baseclass,
+      if hashfunc is None:
+        hashfunc = getattr(hashlib, hashname)
+
+      class hashcls(
+          cls,
           hashfunc=getattr(hashlib, hashname),
           hashname=hashname,
           **kw,
@@ -37,9 +44,15 @@ class BaseHashCode(bytes):
         '''
         __slots__ = ()
 
-      cls.__name__ = hashname.upper()
+      hashcls.__name__ = hashname.upper()
+    else:
+      if hashfunc is not None:
+        if hashfunc is not hashcls.hashfunc:
+          raise ValueError(
+              f'class {hashcls.__name__} already exists with a different hash function {hashcls.hashfunc} from supplied {hashfunc=}'
+          )
 
-    return cls
+    return hashcls
 
   @classmethod
   def __init_subclass__(
@@ -57,7 +70,7 @@ class BaseHashCode(bytes):
     else:
       if hashcls is not cls:
         raise ValueError(
-            f'class {hashclass} already exists for hashname {hashname!r}'
+            f'class {hashcls} already exists for hashname {hashname!r}'
         )
     cls.hashname = hashname
     cls.hashfunc = hashfunc
@@ -121,5 +134,10 @@ class BaseHashCode(bytes):
     # mmap fails, try plain open of file
     return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
 
+# convenience predefined hash classes
+MD5 = BaseHashCode.hashclass('md5')
 SHA1 = BaseHashCode.hashclass('sha1')
+SHA224 = BaseHashCode.hashclass('sha224')
 SHA256 = BaseHashCode.hashclass('sha256')
+SHA384 = BaseHashCode.hashclass('sha384')
+SHA512 = BaseHashCode.hashclass('sha512')
