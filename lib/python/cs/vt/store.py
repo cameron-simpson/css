@@ -485,7 +485,10 @@ class DataDirStore(MappingStore):
         rollover=rollover
     )
     super().__init__(
-        name, CachingMapping(self._datadir), hashclass=hashclass, **kw
+        name,
+        CachingMapping(self._datadir, missing_fallthrough=True),
+        hashclass=hashclass,
+        **kw,
     )
     self._modify_index_lock = Lock()
 
