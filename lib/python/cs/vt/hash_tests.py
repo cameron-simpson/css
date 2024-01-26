@@ -10,12 +10,12 @@
 import random
 import sys
 import unittest
-from cs.binary_tests import TestBinaryClasses
+from cs.binary_tests import BaseTestBinaryClasses
 from . import hash as hash_module
 from .hash import HASHCLASS_BY_NAME, decode as decode_hash
 from .transcribe import Transcriber, parse
 
-class TestDataFileBinaryClasses(TestBinaryClasses, unittest.TestCase):
+class TestDataFileBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Hook to test the hash `AbstractBinary` subclasses.
   '''
 

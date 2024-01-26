@@ -9,13 +9,13 @@ import random
 import socket
 from threading import Thread
 import unittest
-from cs.binary_tests import TestBinaryClasses
+from cs.binary_tests import BaseTestBinaryClasses
 from cs.randutils import rand0, make_randblock
 from cs.socketutils import bind_next_port, OpenSocket
 from . import packetstream
 from .packetstream import Packet, PacketConnection
 
-class TestPacketStreamBinaryClasses(TestBinaryClasses, unittest.TestCase):
+class TestPacketStreamBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Test for all the `AbstractBinary` subclasses.
   '''
   test_module = packetstream
