@@ -31,7 +31,7 @@ from .block import (
 from .store import MappingStore
 from .transcribe import hexify
 
-class TestDataFileBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
+class TestBlockBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Hook to test the `AbstractBinary` subclasses..
   '''
   test_module = block_module
