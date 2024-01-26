@@ -40,6 +40,7 @@
 '''
 
 from abc import ABC, abstractmethod
+from collections.abc import MutableMapping
 from contextlib import closing, contextmanager
 import os
 from threading import Thread
@@ -187,7 +188,7 @@ PATHSEP = '/'
 
 run_modes = NS(show_progress=True,)
 
-class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
+class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
@@ -333,7 +334,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def __iter__(self):
     ''' Return an iterator over the Store's hashcodes.
     '''
-    return self.keys()
+    return iter(self.keys())
 
   def __getitem__(self, h):
     ''' Return the data bytes associated with the supplied hashcode.
@@ -355,6 +356,9 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     h2 = self.add(data, type(h))
     if h != h2:
       raise ValueError("h:%s != hash(data):%s" % (h, h2))
+
+  def __delitem__(self, h):
+    raise NotImplementedError(f'{self.__class__.__name__}.__delitem__')
 
   ###################################################
   ## Context manager methods via ContextManagerMixin.
@@ -416,6 +420,14 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     raise NotImplementedError
 
+  def __setitem__(self, h, data):
+    if not isinstance(h, self.hashclass):
+      raise TypeError(f'h should be a {self.hashclass}, got {r(h)}')
+    if h != self.hashclass.from_bytes(data):
+      raise ValueError(f'{h=} != {self.hashclass.hashname}({data=})')
+    h2 = self.add(data)
+    assert h == h2
+
   @abstractmethod
   # pylint: disable=unused-argument
   def get(self, h, default=None):
@@ -429,6 +441,9 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     raise NotImplementedError
 
+  def __getitem__(self, h):
+    return self.get(h)
+
   @abstractmethod
   def contains(self, h):
     ''' Test whether the hashcode `h` is present in the Store.
@@ -440,6 +455,9 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     ''' Dispatch the contains request in the background, return a `Result`.
     '''
     raise NotImplementedError
+
+  def __contains__(self, h):
+    return self.contains(h)
 
   @abstractmethod
   def flush(self):
