@@ -15,14 +15,10 @@ from . import hash as hash_module
 from .hash import HASHCLASS_BY_NAME, decode as decode_hash
 from .transcribe import Transcriber, parse
 
-class TestDataFileBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
+class TestHashBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Hook to test the hash `AbstractBinary` subclasses.
   '''
-
-  def setUp(self):
-    ''' Test the hash module `AbstractBinary` subclasses.
-    '''
-    self.module = hash_module
+  test_module = hash_module
 
 class TestHashing(unittest.TestCase):
   ''' Tests for the hashcode facility.
