@@ -122,7 +122,7 @@ do
 done
 set -- -map 0 "$@"
 
-set -- "ffmpeg_exe" -i "$input" "$@" -fflags genpts "$output"
+set -- "$ffmpeg_exe" -i "$input" "$@" -fflags genpts "$output"
 
 [ $doit ] || {
   echo "$*"
@@ -130,7 +130,7 @@ set -- "ffmpeg_exe" -i "$input" "$@" -fflags genpts "$output"
 }
 
 set -x
-"$ffmpeg_exe" -i "$input" "$@" "$output" || exit $?
+"$@" || exit $?
 fstags cptags "$input" "$output" || :
 exec >&3 3>&-
 
