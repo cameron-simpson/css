@@ -554,7 +554,6 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     self.assertEqual(len(B2), len(data2))
     IB = IndirectBlock.from_subblocks((B1, B2))
     self.assertIn(h1, S)
-    sleep(0.5)  # wait for the indexing queue to flush
     with S.modify_index_entry(h1) as entry:
       if self.supports_index_entry:
         self.assertIsNotNone(entry)
