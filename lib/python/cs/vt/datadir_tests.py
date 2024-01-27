@@ -15,7 +15,7 @@ from cs.logutils import setup_logging
 from cs.randutils import randomish_chunks
 from cs.testutils import product_test
 
-from .datadir import DataDir, RawDataDir, FileDataIndexEntry
+from .datadir import DataDir, FileDataIndexEntry
 from .hash import HASHCLASS_BY_NAME
 from .index import (
     class_names as indexclass_names,
@@ -41,7 +41,7 @@ def multitest(test_method):
   '''
   return product_test(
       test_method,
-      datadirclass=[DataDir, RawDataDir],
+      datadirclass=[DataDir],
       indexclass=[
           indexclass_by_name(indexname)
           for indexname in sorted(indexclass_names())

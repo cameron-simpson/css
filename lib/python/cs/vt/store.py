@@ -33,7 +33,7 @@ from . import (
 )
 from .backingfile import BackingFileIndexEntry, BinaryHashCodeIndex, CompressibleBackingFile
 from .cache import FileDataMappingProxy, MemoryCacheMapping
-from .datadir import DataDir, RawDataDir, PlatonicDir
+from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS
 from .index import choose as choose_indexclass
 
@@ -439,7 +439,7 @@ class ProxyStore(StoreSyncBase):
         seen.add(h)
 
 class DataDirStore(MappingStore):
-  ''' A `MappingStore` using a `DataDir` or `RawDataDir` as its backend.
+  ''' A `MappingStore` using a `DataDir` as its backend.
   '''
 
   @fmtdoc
@@ -452,7 +452,6 @@ class DataDirStore(MappingStore):
       indexclass=None,
       rollover=None,
       lock=None,
-      raw=False,
       **kw
   ):
     ''' Initialise the DataDirStore.
@@ -465,8 +464,6 @@ class DataDirStore(MappingStore):
         * `indexclass`: passed to the data dir.
         * `rollover`: passed to the data dir.
         * `lock`: passed to the mapping.
-        * `raw`: option, default `False`.
-          If true use a `RawDataDir` otherwise a `DataDir`.
     '''
     if lock is None:
       lock = RLock()
@@ -477,8 +474,7 @@ class DataDirStore(MappingStore):
     self.hashclass = hashclass
     self.indexclass = indexclass
     self.rollover = rollover
-    datadirclass = RawDataDir if raw else DataDir
-    self._datadir = datadirclass(
+    self._datadir = DataDir(
         self.topdirpath,
         hashclass=hashclass,
         indexclass=indexclass,

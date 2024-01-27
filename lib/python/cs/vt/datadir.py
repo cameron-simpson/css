@@ -22,12 +22,6 @@
     updates from other programmes simply by watching file sizes
     and scanning the new data.
 
-    A `RawDataDir` behaves like an ordinary `DataDir`
-    except that the data files contain the raw uncompressed data bytes.
-    This notional use case is as a local cache of efficiently accessed data.
-    The intent is that one might pull all the leaf data of a "file"
-    into the store contiguously in order to obtain more efficient data access.
-
     A `PlatonicDir` uses an ordinary directory tree as the backing store,
     obviating the requirement to copy original data into a `DataDir`.
     Such a tree should generally just acquire new files;
@@ -117,7 +111,6 @@ pfx_listdir = partial(pfx_call, os.listdir)
 
 DEFAULT_DATADIR_STATE_NAME = 'default'
 
-RAWFILE_DOT_EXT = '.data'
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -946,37 +939,6 @@ class DataDir(FilesDir):
         self.flush()
       if not self.cancelled:
         sleep(0.1)
-
-class RawDataDir(FilesDir):
-  ''' Maintenance of a collection of raw data files in a directory.
-
-      This is intended as a fairly fast local data cache directory.
-      Records are read directly from the files, which are not
-      compressed or encapsulated.
-
-      Intended use case is the pull the leaf data of a large
-      file into the store contiguously to effect efficient reads
-      of that data later.
-
-      A `RawDataDir` may be used as the `Mapping` for a `MappingStore`.
-
-      NB: _not_ thread safe; callers must arrange that.
-  '''
-
-  DATA_DOT_EXT = RAWFILE_DOT_EXT
-  DATA_ROLLOVER = DEFAULT_ROLLOVER
-
-  @staticmethod
-  def data_save_information(data):
-    ''' Return data and associated information to be appended to
-        the current save file.
-
-        A raw data file just stores the data directly.
-    '''
-    return data, 0, len(data), 0
-
-  def _monitor_datafiles(self):
-    pass
 
 class PlatonicFile(MultiOpenMixin, HasFSPath, ReadMixin):
   ''' A PlatonicFile is a normal file whose content is used as the
