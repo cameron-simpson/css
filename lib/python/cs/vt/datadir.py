@@ -37,7 +37,7 @@ from collections.abc import MutableMapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 import errno
-from functools import partial
+from functools import cached_property, partial
 from getopt import GetoptError
 import os
 from os import (
@@ -64,7 +64,6 @@ from typeguard import typechecked
 
 from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.binary import BinaryMultiValue, BSUInt
-from cs.buffer import CornuCopyBuffer
 from cs.cache import LRU_Cache
 from cs.cmdutils import BaseCommand
 from cs.context import nullcontext, stackattrs
@@ -94,7 +93,7 @@ from .block import HashCodeBlock
 from .blockify import (
     DEFAULT_SCAN_SIZE, blocked_chunks_of, spliced_blocks, top_block_for
 )
-from .datafile import DataRecord, DATAFILE_DOT_EXT
+from .datafile import DataFile, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
 from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
 from .index import choose as choose_indexclass
@@ -111,6 +110,7 @@ pfx_listdir = partial(pfx_call, os.listdir)
 
 DEFAULT_DATADIR_STATE_NAME = 'default'
 
+##RAWFILE_DOT_EXT = '.data'
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -167,7 +167,7 @@ class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
       bs = decompress(bs)
     return bs
 
-class DataFileState(SimpleNamespace):
+class DataFileState(SimpleNamespace, HasFSPath):
   ''' General state information about a data file
       in use by a files based data dir
       (any subclass of `FilesdDir`).
@@ -199,15 +199,26 @@ class DataFileState(SimpleNamespace):
     return "%s(%d:%r)" % (type(self).__name__, self.filenum, self.filename)
 
   @property
-  def pathname(self):
+  def fspath(self):
     ''' Return the full pathname of this data file.
     '''
     return self.datadir.datapathto(self.filename)
 
+  @cached_property
+  def datafile(self):
+    ''' The `DataFile` associated with this `DataFileState`.
+    '''
+    df = DataFile(self.fspath)
+    df.open()
+    return df
+
+  def __del__(self):
+    self.datafile.close()
+
   def stat_size(self, follow_symlinks=False):
     ''' Stat the datafile, return its size.
     '''
-    path = self.pathname
+    path = self.fspath
     if follow_symlinks:
       S = os.stat(path)
     else:
@@ -223,7 +234,9 @@ class DataFileState(SimpleNamespace):
         We use the `DataDir`'s `.scanfrom` method because it knows the
         format of the file.
     '''
-    yield from self.datadir.scanfrom(self.pathname, offset=offset)
+    yield from self.datafile.scanfrom(
+        self.fspath, offset=offset, with_offsets=True
+    )
 
 class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                RunStateMixin, FlaggedMixin, MutableMapping):
@@ -439,7 +452,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                     joinif(_monitor_Thread)
                     with self._lock:
                       self.flush()
-                      self.wf_close()
+                      self.WDFclose()
                       # update state to substrate
                       self._filemap.close()
                       # close the read file descriptors
@@ -447,13 +460,10 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                         pfx_call(os.close, rfd)
 
   @property
-  def wf(self):
-    ''' The current open-for-append datafile file object.
-    '''
+  def WDFstate(self) -> DataFileState:
     with self._lock:
-      wf = self._wf
-      if wf is None:
-        assert self._WDFstate is None
+      WDFstate = self._WDFstate
+      if WDFstate is None:
         # create a new data file
         while True:
           filename = str(uuid4()) + self.DATA_DOT_EXT
@@ -470,19 +480,16 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                 continue
               raise
           break
-        dfstate = self._filemap.add_path(filename)
-        wf = pfx_call(open, dfstate.pathname, 'ab')
-        self._WDFstate = dfstate
-        self._wf = wf
-    return wf
+        WDFstate = self._WDFstate = self._filemap.add_path(filename)
+      return WDFstate
 
-  def wf_close(self):
-    ''' Close `self.wf` if it is open.
-    '''
+  def WDFclose(self):
+    ''' Close the current writable `DataFileState` if open.
+   '''
     with self._lock:
-      if self._wf is not None:
-        self._wf.close()
-        self._wf = None
+      WDFstate = self._WDFstate
+      if WDFstate is not None:
+        ##WDFstate.close()
         self._WDFstate = None
 
   def __len__(self):
@@ -531,26 +538,12 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     '''
     assert isinstance(h, self.hashclass)
     assert h == self.hashclass.from_chunk(data)
-    bs, data_offset, data_length, flags = self.data_save_information(data)
     with self._lock:
-      wf = self.wf
-      DFstate = self._WDFstate
-      offset = wf.tell()
-      wf.write(bs)
-      wf.flush()
-      length = len(bs)
-      post_offset = offset + length
-      self.index[h] = bytes(
-          FileDataIndexEntry(
-              filenum=DFstate.filenum,
-              data_offset=offset + data_offset,
-              data_length=data_length,
-              flags=flags,
-          )
-      )
-      if post_offset >= self.rollover:
+      index_entry = self.append(data)
+      self.index[h] = bytes(index_entry)
+      if index_entry.data_offset + index_entry.data_length >= self.rollover:
         # file is full, make a new one next time
-        self.wf_close()
+        self.WDFclose()
 
   def __delitem__(self, h):
     raise RuntimeError('we do notexpect to delete from a DataDir')
@@ -822,22 +815,20 @@ class DataDir(FilesDir):
   DATA_DOT_EXT = DATAFILE_DOT_EXT
   DATA_ROLLOVER = DEFAULT_ROLLOVER
 
-  @staticmethod
-  def data_save_information(data):
-    ''' Return data and associated information to be appended to
-        the current save file.
-
-        A `DataFile` stores a serialised `DataRecord`.
+  def append(self, data) -> FileDataIndexEntry:
+    ''' Append `data` to the current output file.
     '''
-    DR = DataRecord(data)
-    return bytes(DR), DR.data_offset, DR.raw_data_length, DR.flags
-
-  @staticmethod
-  def scanfrom(filepath, offset=0):
-    ''' Scan the specified `filepath` from `offset`, yielding `DataRecord`s.
-    '''
-    bfr = CornuCopyBuffer.from_filename(filepath, offset=offset)
-    yield from DataRecord.scan(bfr, with_offsets=True)
+    with self._lock:
+      WDFstate = self.WDFstate
+      with WDFstate.datafile as df:
+        DR, offset, length = df.append(data)
+      index_entry = FileDataIndexEntry(
+          filenum=WDFstate.filenum,
+          data_offset=DR.data_offset,
+          data_length=DR.raw_data_length,
+          flags=DR.flags,
+      )
+    return index_entry
 
   def datafilenames(self):
     ''' Return a list of the datafile basenames. '''
@@ -850,7 +841,7 @@ class DataDir(FilesDir):
       raise
     return [
         filename for filename in listing if
-        (filename.endswith(DATAFILE_DOT_EXT) and not filename.startswith('.'))
+        (not filename.startswith(',') and filename.endswith(DATAFILE_DOT_EXT))
     ]
 
   def _monitor_datafiles(self):
@@ -881,7 +872,7 @@ class DataDir(FilesDir):
           break
         # don't monitor the current datafile: our own actions will update it
         WDFstate = self._WDFstate
-        if WDFstate and filenum == WDFstate.filenum:
+        if WDFstate is not None and filenum == WDFstate.filenum:
           continue
         try:
           DFstate = filemap[filenum]
@@ -1347,6 +1338,8 @@ class PlatonicDir(FilesDir):
         offset = post_offset
 
 class DataDirCommand(BaseCommand):
+  ''' Command line implementation for `DataDir`s.
+  '''
 
   GETOPT_SPEC = 'd:'
 
