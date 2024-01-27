@@ -156,7 +156,10 @@ def fnmatchdir(dirpath, fnglob):
 
 # pylint: disable=too-few-public-methods
 class HasFSPath:
-  ''' An object with a `.fspath` attribute representing a filesystem location.
+  ''' A mixin for an object with a `.fspath` attribute representing a filesystem location.
+
+      The `__init__` method just sets the `.fspath` attribute, and
+      need not be called if the main class takes care of that itself.
   '''
 
   def __init__(self, fspath):
