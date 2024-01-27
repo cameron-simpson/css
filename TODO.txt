@@ -1,3 +1,4 @@
+  hashindex linkto: -i inputfile?
   hashindex linkto: -n, -h, -s: symlink, -f force
   hashindex: -h hashname
   file checksum and tree sync tool to maintain a parallel tree based on checksums eg in a dl folder
