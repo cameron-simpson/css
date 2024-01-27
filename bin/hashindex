@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+#
+# Emit a listing of file checksums or read such a listing and
+# construct a matching directory tree.
+# - Cameron Simpson <cs@cskk.id.au> 24jan2024
+#
+
+from contextlib import contextmanager
+from getopt import GetoptError
+import os
+from os.path import (
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+)
+from stat import S_ISREG
+import sys
+from typing import Optional, Tuple
+
+from typeguard import typechecked
+
+from cs.cmdutils import BaseCommand
+from cs.fstags import FSTags, uses_fstags
+from cs.hashutils import BaseHashCode
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx
+
+from cs.debug import X, trace
+
+DEFAULT_HASHNAME = 'sha256'
+
+def main(argv=None):
+  ''' Commandline implementation.
+  '''
+  return HashIndexCommand(argv).run()
+
+class HashIndexCommand(BaseCommand):
+
+  @contextmanager
+  @uses_fstags
+  def run_context(self, *, fstags: FSTags):
+    with fstags:
+      with super().run_context():
+        yield
+
+  @uses_fstags
+  def cmd_ls(self, argv, *, fstags: FSTags):
+    ''' Usage: {cmd} paths...
+          Walk the filesystem paths and emit a listing.
+    '''
+    if not argv:
+      raise GetoptError("missing paths")
+    xit = 0
+    for path in argv:
+      with Pfx(path):
+        if isfilepath(path):
+          h = file_checksum(path)
+          print(h, path)
+        elif isdirpath(path):
+          for dirpath, dirnames, filenames in os.walk(path):
+            dirnames[:] = sorted(dirnames)
+            for filename in sorted(filenames):
+              if filename == fstags.tagsfile_basename:
+                continue
+              filepath = joinpath(dirpath, filename)
+              h = file_checksum(filepath)
+              print(h, filepath)
+        else:
+          warning("invalid path, not file or directory")
+          xit = 1
+    return xit
+
+@uses_fstags
+@pfx
+def file_checksum(
+    fspath: str,
+    hashname: str = DEFAULT_HASHNAME,
+    *,
+    fstags: FSTags,
+) -> BaseHashCode:
+  ''' Return the hashcode for the contents of the file at `fspath`.
+  '''
+  hashcode, S = get_fstags_hashcode(fspath, hashname)
+  if hashcode is None:
+    X("no hashcode from get_fstags_hashcode %r", fspath)
+    hashclass = BaseHashCode.hashclass(hashname)
+    hashcode = hashclass.from_fspath(fspath)
+    set_fstags_hashcode(fspath, hashcode, S, fstags=fstags)
+  return hashcode
+
+@uses_fstags
+@typechecked
+def get_fstags_hashcode(
+    fspath: str,
+    hashname: str,
+    fstags: FSTags,
+) -> Tuple[Optional[BaseHashCode], os.stat_result]:
+  ''' Obtain the hashcode cached in the fstags if still valid.
+      Return a 2-tuple of `(hashcode,stat_result)`
+      where `hashcode` is a `BaseHashCode` subclass instance is valid
+      or `None` if missing or no longer valid
+      and `stat_result` is the current `os.stat` result for `fspath`
+      used to confirm validity 
+  '''
+  S = os.stat(fspath)
+  if not S_ISREG(S.st_mode):
+    raise ValueError("not a regular file")
+  tags = fstags[fspath]
+  csum = tags.subtags(f'checksum.{hashname}')
+  csum_hash = csum.get('hashcode', '')
+  if not csum_hash:
+    return None, S
+  if (S.st_size != int(csum.get('st_size', 0))
+      or int(S.st_mtime) != int(csum.get('st_mtime', 0))):
+    # file has changed, do not return the cached hashcode
+    return None, S
+  hashcode = BaseHashCode.from_prefixed_hashbytes_hex(csum_hash)
+  if hashcode.hashname != hashname:
+    warning("ignoring unexpected hashname %r", hashcode.hashname)
+    return None, S
+  return hashcode, S
+
+##@trace
+@uses_fstags
+@typechecked
+def set_fstags_hashcode(
+    fspath: str,
+    hashcode,
+    S: os.stat_result,
+    fstags: FSTags,
+):
+  ''' Record `hashcode` against `fspath`.
+  '''
+  tags = fstags[fspath]
+  csum = tags.subtags(f'checksum.{hashcode.hashname}')
+  csum.hashcode = str(hashcode)
+  csum.st_size = S.st_size
+  csum.st_mtime = S.st_mtime
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
