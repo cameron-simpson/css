@@ -412,7 +412,6 @@ class Config(SingletonMixin, HasThreadState):
       path=None,
       basedir=None,
       hashclass=None,
-      raw=False,
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
@@ -429,9 +428,7 @@ class Config(SingletonMixin, HasThreadState):
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
         path = joinpath(basedir, path)
-    if isinstance(raw, str):
-      raw = truthy_word(raw)
-    return DataDirStore(store_name, path, hashclass=hashclass, raw=raw)
+    return DataDirStore(store_name, path, hashclass=hashclass)
 
   def datafile_Store(
       self,
