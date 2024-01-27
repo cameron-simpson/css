@@ -3,6 +3,7 @@
 ''' Convenience hashing facilities.
 '''
 
+from binascii import hexlify, unhexlify
 import hashlib
 import mmap
 import os
@@ -92,6 +93,53 @@ class BaseHashCode(bytes):
     '''
     return self.__class__.__name__.lower()
 
+  def hex(self) -> str:
+    ''' Return the hashcode bytes transcribes as a hexadecimal ASCII `str`.
+    '''
+    return hexlify(self).decode('ascii')
+
+  @classmethod
+  def from_hashbytes(cls, hashbytes):
+    ''' Factory function returning a `BaseHashCode` object from the hash bytes.
+    '''
+    assert len(hashbytes) == cls.hashlen, (
+        "expected %d bytes, received %d: %r" %
+        (cls.hashlen, len(hashbytes), hashbytes)
+    )
+    return cls(hashbytes)
+
+  @classmethod
+  def from_hashbytes_hex(cls, hashhex: str):
+    ''' Factory function returning a `BaseHashCode` object
+        from the hash bytes hex text.
+    '''
+    bs = unhexlify(hashhex)
+    return cls.from_hashbytes(bs)
+
+  @classmethod
+  def from_named_hashbytes_hex(cls, hashname, hashhex):
+    ''' Factory function to return a `HashCode` object
+        from the hash type name and the hash bytes hex text.
+    '''
+    hashclass = cls.hashclass(hashname)
+    if not issubclass(hashclass, cls):
+      raise ValueError(
+          f'{cls.__name__}.from_named_hashbytes_hex({hashname!r},{hashhex!r}):'
+          f' inferred hash class {hashclass.__name__}:{hashclass!r}'
+          f' is not a subclass of {cls.__name__}:{cls!r}'
+      )
+    bs = unhexlify(hashhex)
+    return hashclass.from_hashbytes(bs)
+
+  @classmethod
+  def from_prefixed_hashbytes_hex(cls, hashtext: str):
+    ''' Factory function returning a `BaseHashCode` object
+        from the hash bytes hex text prefixed by the hashname.
+        This is the reverse of `__str__`.
+    '''
+    hashname, hashhex = hashtext.split(':')
+    return cls.from_named_hashbytes_hex(hashname, hashhex)
+
   @classmethod
   def from_data(cls, bs):
     ''' Compute hashcode from the data `bs`.
@@ -133,6 +181,24 @@ class BaseHashCode(bytes):
         os.close(fd)
     # mmap fails, try plain open of file
     return cls.from_buffer(CornuCopyBuffer.from_filename(fspath, **kw))
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote to a `BaseHashCode` instance.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if insinstance(obj, bytes):
+      return cls.from_hashbytes(obj)
+    if isinstance(obj, str):
+      return cls.from_prefixed_hashbytes_hex(obj)
+    try:
+      hashname, hashhex = obj
+    except (TypeError, ValueError):
+      pass
+    else:
+      return cls.from_named_hashbytes_hex(hashname, hashhex)
+    raise TypeError(f'{cls.__name__}.promote({r(obj)}): cannot promote')
 
 # convenience predefined hash classes
 MD5 = BaseHashCode.hashclass('md5')
