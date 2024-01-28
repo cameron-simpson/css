@@ -1565,14 +1565,16 @@ class FSTags(MultiOpenMixin):
       old_modified = dst_taggedpath.modified
       for tag in src_taggedpath:
         dst_taggedpath.add(tag)
-      try:
-        dst_taggedpath.save()
-      except OSError as e:
-        if e.errno == errno.EACCES:
-          warning("save tags: %s", e)
-          dst_taggedpath.modified = old_modified
-        else:
-          raise
+      if not self.is_open():
+        # we're not expecting save-on-final-close, so save now
+        try:
+          dst_taggedpath.save()
+        except OSError as e:
+          if e.errno == errno.EACCES:
+            warning("save tags: %s", e)
+            dst_taggedpath.modified = old_modified
+          else:
+            raise
       return result
 
 # pylint: disable=too-few-public-methods
