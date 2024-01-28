@@ -55,19 +55,24 @@ class HashIndexCommand(BaseCommand):
     '''
     options = self.options
     hashname = options.hashname
+    runstate = options.runstate
     if not argv:
       raise GetoptError("missing paths")
     xit = 0
     for path in argv:
+      runstate.raiseif()
       with Pfx(path):
         if isfilepath(path):
           h = file_checksum(path)
           print(h, path)
         elif isdirpath(path):
           for dirpath, dirnames, filenames in os.walk(path):
+            runstate.raiseif()
             dirnames[:] = sorted(dirnames)
             for filename in sorted(filenames):
-              if filename == fstags.tagsfile_basename:
+              runstate.raiseif()
+              if filename.startswith('.'
+                                     ) or filename == fstags.tagsfile_basename:
                 continue
               filepath = joinpath(dirpath, filename)
               h = file_checksum(filepath, hashname=hashname)
