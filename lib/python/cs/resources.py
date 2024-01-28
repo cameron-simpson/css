@@ -364,6 +364,11 @@ class MultiOpenMixin(ContextManagerMixin):
     '''
     self.__mo_getstate().join()
 
+  def is_open(self):
+    ''' Test whether this object is open.
+    '''
+    return self.__mo_getstate().opens > 0
+
   @staticmethod
   def is_opened(func):
     ''' Decorator to wrap `MultiOpenMixin` proxy object methods which
