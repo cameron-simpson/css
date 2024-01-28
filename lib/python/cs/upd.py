@@ -970,6 +970,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
       )
 
+@decorator
 def uses_upd(func):
   ''' Decorator for functions accepting an optional `upd:Upd` parameter,
       default from `Upd.default() or Upd()`.
