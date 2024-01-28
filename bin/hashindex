@@ -220,9 +220,9 @@ def file_checksum(
   '''
   hashcode, S = get_fstags_hashcode(fspath, hashname)
   if hashcode is None:
-    X("no hashcode from get_fstags_hashcode %r", fspath)
     hashclass = BaseHashCode.hashclass(hashname)
-    hashcode = hashclass.from_fspath(fspath)
+    with run_task(f'checksum {shortpath(fspath)}'):
+      hashcode = hashclass.from_fspath(fspath)
     set_fstags_hashcode(fspath, hashcode, S, fstags=fstags)
   return hashcode
 
@@ -237,8 +237,7 @@ def get_fstags_hashcode(
       Return a 2-tuple of `(hashcode,stat_result)`
       where `hashcode` is a `BaseHashCode` subclass instance is valid
       or `None` if missing or no longer valid
-      and `stat_result` is the current `os.stat` result for `fspath`
-      used to confirm validity 
+      and `stat_result` is the current `os.stat` result for `fspath`.
   '''
   S = os.stat(fspath)
   if not S_ISREG(S.st_mode):
