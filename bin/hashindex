@@ -20,7 +20,7 @@ from os.path import (
 )
 from stat import S_ISREG
 import sys
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from typeguard import typechecked
 
@@ -201,7 +201,12 @@ class HashIndexCommand(BaseCommand):
                                      ) or filename == fstags.tagsfile_basename:
                 continue
               filepath = joinpath(dirpath, filename)
-              h = file_checksum(filepath, hashname=hashname)
+              try:
+                h = file_checksum(filepath, hashname=hashname)
+              except OSError as e:
+                warning("file_checksum(%r,..)", filepath)
+                xit=1
+                continue
               print(h, filepath)
         else:
           warning("invalid path, not file or directory")
@@ -232,14 +237,18 @@ def get_fstags_hashcode(
     fspath: str,
     hashname: str,
     fstags: FSTags,
-) -> Tuple[Optional[BaseHashCode], os.stat_result]:
+) -> Tuple[Optional[BaseHashCode], Optional[os.stat_result]]:
   ''' Obtain the hashcode cached in the fstags if still valid.
       Return a 2-tuple of `(hashcode,stat_result)`
       where `hashcode` is a `BaseHashCode` subclass instance is valid
       or `None` if missing or no longer valid
       and `stat_result` is the current `os.stat` result for `fspath`.
   '''
-  S = os.stat(fspath)
+  try:
+    S = os.stat(fspath)
+  except OSError as e:
+    warning("stat %r: %s",fspath,e)
+    return None, None
   if not S_ISREG(S.st_mode):
     raise ValueError("not a regular file")
   tags = fstags[fspath]
