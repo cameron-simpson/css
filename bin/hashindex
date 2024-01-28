@@ -256,8 +256,12 @@ def get_fstags_hashcode(
   csum_hash = csum.get('hashcode', '')
   if not csum_hash:
     return None, S
-  if (S.st_size != int(csum.get('st_size', 0))
-      or int(S.st_mtime) != int(csum.get('st_mtime', 0))):
+  try:
+    st_size = int(csum.get('st_size', 0))
+    st_mtime = int(csum.get('st_mtime', 0))
+  except (TypeError,ValueError):
+    return None,S
+  if S.st_size != st_size or int(S.st_mtime) != st_mtime:
     # file has changed, do not return the cached hashcode
     return None, S
   hashcode = BaseHashCode.from_prefixed_hashbytes_hex(csum_hash)
