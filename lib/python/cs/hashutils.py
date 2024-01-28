@@ -188,7 +188,7 @@ class BaseHashCode(bytes):
     '''
     if isinstance(obj, cls):
       return obj
-    if insinstance(obj, bytes):
+    if isinstance(obj, bytes):
       return cls.from_hashbytes(obj)
     if isinstance(obj, str):
       return cls.from_prefixed_hashbytes_hex(obj)
