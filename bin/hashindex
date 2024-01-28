@@ -42,6 +42,12 @@ def main(argv=None):
   return HashIndexCommand(argv).run()
 
 class HashIndexCommand(BaseCommand):
+  ''' Tool to generate indices of file content hashcodes
+      and to link files to destinations based on their hashcode.
+  '''
+
+  USAGE_FORMAT = r'''Usage: {cmd} subcommand...
+    Generate or process file content hash listings.'''
 
   @dataclass
   class Options(BaseCommand.Options):
