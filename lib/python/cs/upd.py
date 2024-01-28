@@ -925,6 +925,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
   def run_task(
       self,
       label: str,
+      *,
       report_print=False,
       tick_delay: int = 0.3,
       tick_chars='|/-\\',
