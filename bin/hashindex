@@ -6,6 +6,7 @@
 #
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from getopt import GetoptError
 import os
 from os.path import (
@@ -36,6 +37,10 @@ def main(argv=None):
 
 class HashIndexCommand(BaseCommand):
 
+  @dataclass
+  class Options(BaseCommand.Options):
+    hashname: str = DEFAULT_HASHNAME
+
   @contextmanager
   @uses_fstags
   def run_context(self, *, fstags: FSTags):
@@ -48,6 +53,8 @@ class HashIndexCommand(BaseCommand):
     ''' Usage: {cmd} paths...
           Walk the filesystem paths and emit a listing.
     '''
+    options = self.options
+    hashname = options.hashname
     if not argv:
       raise GetoptError("missing paths")
     xit = 0
@@ -63,7 +70,7 @@ class HashIndexCommand(BaseCommand):
               if filename == fstags.tagsfile_basename:
                 continue
               filepath = joinpath(dirpath, filename)
-              h = file_checksum(filepath)
+              h = file_checksum(filepath, hashname=hashname)
               print(h, filepath)
         else:
           warning("invalid path, not file or directory")
