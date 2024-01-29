@@ -1,0 +1,4 @@
+HasFSPath: new listdir method.
+HasFSPath.pathto: accept multiple relative subpaths.
+FSPathBasedSingleton: accept cls.FSPATH_FACTORY as a factory function for the default fspath, makes it possible to defer the path lookup.
+Replace is_clean_subpath with validate_rpath/is_valid_rpath pair.

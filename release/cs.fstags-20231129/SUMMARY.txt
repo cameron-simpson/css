@@ -1,0 +1,1 @@
+FSTags.startup_shutdown: run self.sync() in a finally clause.

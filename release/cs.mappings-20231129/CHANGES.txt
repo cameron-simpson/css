@@ -1,0 +1,3 @@
+lib/python/cs/mappings.py: cs.mappings: AttrableMappingMixin: look up ATTRABLE_MAPPING_DEFAULT on the class, not the instance
+lib/python/cs/mappings.py: merge default => cdrip
+lib/python/cs/mappings.py: merge default ==> cdrip

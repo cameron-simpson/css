@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+#
+# Emit a listing of file checksums or read such a listing and
+# construct a matching directory tree.
+# - Cameron Simpson <cs@cskk.id.au> 24jan2024
+#
+
+from contextlib import contextmanager
+from dataclasses import dataclass
+from getopt import GetoptError
+import os
+from os.path import (
+    dirname,
+    exists as existspath,
+    isabs as isabspath,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+    relpath,
+)
+from stat import S_ISREG
+import sys
+from typing import Any, Optional, Tuple
+
+from typeguard import typechecked
+
+from cs.cmdutils import BaseCommand
+from cs.fs import needdir, shortpath
+from cs.fstags import FSTags, uses_fstags
+from cs.hashutils import BaseHashCode
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx
+from cs.upd import Upd, uses_upd, print, run_task
+
+from cs.debug import X, trace
+
+DEFAULT_HASHNAME = 'sha256'
+
+def main(argv=None):
+  ''' Commandline implementation.
+  '''
+  return HashIndexCommand(argv).run()
+
+class HashIndexCommand(BaseCommand):
+  ''' Tool to generate indices of file content hashcodes
+      and to link files to destinations based on their hashcode.
+  '''
+
+  USAGE_FORMAT = r'''Usage: {cmd} subcommand...
+    Generate or process file content hash listings.'''
+
+  @dataclass
+  class Options(BaseCommand.Options):
+    hashname: str = DEFAULT_HASHNAME
+
+  @contextmanager
+  @uses_fstags
+  def run_context(self, *, fstags: FSTags):
+    with fstags:
+      with super().run_context():
+        yield
+
+  @uses_fstags
+  @uses_upd
+  def cmd_linkto(self, argv, *, fstags: FSTags, upd: Upd):
+    ''' Usage: {cmd} srcdir dstdir < hashindex
+          Read a hashindex with relative paths from the input
+          and link files from srcdir to dstdir according the source hash.
+    '''
+    options = self.options
+    doit = options.doit
+    quiet = options.quiet
+    hashname = options.hashname
+    runstate = options.runstate
+    badopts = False
+    if not argv:
+      raise GetoptError('missing srcdir')
+    srcdir = argv.pop(0)
+    if not isdirpath(srcdir):
+      warning('srcdir %r: not a directory', srcdir)
+      badopts = True
+    if not argv:
+      raise GetoptError('missing dstdir')
+    dstdir = argv.pop(0)
+    if not isdirpath(dstdir):
+      warning('dstdir %r: not a directory', dstdir)
+      badopts = True
+    if argv:
+      raise GetoptError('extra arguments: %r', argv)
+    if badopts:
+      raise GetoptError('bad arguments')
+    with Pfx("scan input"):
+      with run_task("scan input"):
+        bad_input = False
+        fspath_by_hashcode = {}
+        hashcode_by_fspath = {}
+        for lineno, line in enumerate(sys.stdin, 1):
+          runstate.raiseif()
+          with Pfx("stdin:%d", lineno):
+            line = line.rstrip('\n')
+            try:
+              hashhex, rfspath = line.split(None, 1)
+            except ValueError as e:
+              warning(
+                  'invalid data, cannot split into hashcode and rfspath, %s: %r',
+                  e,
+                  line,
+              )
+              bad_input = True
+              continue
+            with Pfx(hashhex):
+              try:
+                hashcode = BaseHashCode.promote(hashhex)
+              except ValueError as e:
+                warning("cannot convert to hashcode: %s", e)
+                bad_input = True
+                continue
+              if hashcode.hashname != hashname:
+                warning(
+                    "bad hashname %r, expected %r", hashcode.hashname, hashname
+                )
+                bad_input = True
+                continue
+            with Pfx(rfspath):
+              if isabspath(rfspath):
+                warning("is an absolute path")
+                bad_input = True
+                continue
+              if rfspath in hashcode_by_fspath:
+                warning("repeated mention")
+                bad_input = True
+                continue
+            fspath_by_hashcode[hashcode] = rfspath
+            hashcode_by_fspath[rfspath] = hashcode
+    if bad_input:
+      warning("bad input data")
+      return 1
+    with Pfx("scan srcdir %r", srcdir):
+      with run_task(f'scan srcdir {shortpath(srcdir)}') as proxy:
+        srcpath_by_hashcode = {}
+        for dirpath, dirnames, filenames in os.walk(srcdir):
+          runstate.raiseif()
+          dirnames[:] = sorted(dirnames)
+          for filename in sorted(filenames):
+            runstate.raiseif()
+            if filename.startswith('.'
+                                   ) or filename == fstags.tagsfile_basename:
+              continue
+            filepath = joinpath(dirpath, filename)
+            rfilepath=relpath(filepath, srcdir)
+            proxy.text=rfilepath
+            with Pfx(filepath):
+              h = file_checksum(filepath, hashname=hashname)
+              if h is None:
+                warning("no hashcode")
+                continue
+              srcpath_by_hashcode[h] = filepath
+    ok = True
+    with Pfx("link to dstdir %r", dstdir):
+      with run_task(f'link to dstdir {shortpath(dstdir)}') as proxy:
+        for rfspath, hashcode in sorted(hashcode_by_fspath.items()):
+          runstate.raiseif()
+          proxy.text = rfspath
+          try:
+            srcpath = srcpath_by_hashcode[hashcode]
+          except KeyError:
+            warning("no srchashcode for %s %s", hashcode, rfspath)
+            continue
+          dstpath = joinpath(dstdir, rfspath)
+          if existspath(dstpath):
+            if file_checksum(dstpath) != hashcode:
+              warning(
+                  "dstpath %r already exists with different hashcode", dstpath
+              )
+            continue
+          dstdirpath = dirname(dstpath)
+          quiet or print("ln", srcpath, dstpath)
+          if doit:
+            needdir(dstdirpath, use_makedirs=True, log=warning)
+            fstags.link(srcpath, dstpath)
+    return 0 if ok else 1
+
+  @uses_fstags
+  def cmd_ls(self, argv, *, fstags: FSTags):
+    ''' Usage: {cmd} paths...
+          Walk the filesystem paths and emit a listing.
+    '''
+    options = self.options
+    hashname = options.hashname
+    runstate = options.runstate
+    if not argv:
+      raise GetoptError("missing paths")
+    xit = 0
+    for path in argv:
+      runstate.raiseif()
+      with Pfx(path):
+        if isfilepath(path):
+          h = file_checksum(path)
+          print(h, path)
+        elif isdirpath(path):
+          for dirpath, dirnames, filenames in os.walk(path):
+            runstate.raiseif()
+            dirnames[:] = sorted(dirnames)
+            for filename in sorted(filenames):
+              runstate.raiseif()
+              if filename.startswith('.'
+                                     ) or filename == fstags.tagsfile_basename:
+                continue
+              filepath = joinpath(dirpath, filename)
+              try:
+                h = file_checksum(filepath, hashname=hashname)
+              except OSError as e:
+                warning("file_checksum(%r,..)", filepath)
+                xit=1
+                continue
+              print(h, filepath)
+        else:
+          warning("invalid path, not file or directory")
+          xit = 1
+    return xit
+
+@uses_fstags
+@pfx
+def file_checksum(
+    fspath: str,
+    hashname: str = DEFAULT_HASHNAME,
+    *,
+    fstags: FSTags,
+) -> BaseHashCode:
+  ''' Return the hashcode for the contents of the file at `fspath`.
+  '''
+  hashcode, S = get_fstags_hashcode(fspath, hashname)
+  if hashcode is None:
+    hashclass = BaseHashCode.hashclass(hashname)
+    with run_task(f'checksum {shortpath(fspath)}'):
+      hashcode = hashclass.from_fspath(fspath)
+    set_fstags_hashcode(fspath, hashcode, S, fstags=fstags)
+  return hashcode
+
+@uses_fstags
+@typechecked
+def get_fstags_hashcode(
+    fspath: str,
+    hashname: str,
+    fstags: FSTags,
+) -> Tuple[Optional[BaseHashCode], Optional[os.stat_result]]:
+  ''' Obtain the hashcode cached in the fstags if still valid.
+      Return a 2-tuple of `(hashcode,stat_result)`
+      where `hashcode` is a `BaseHashCode` subclass instance is valid
+      or `None` if missing or no longer valid
+      and `stat_result` is the current `os.stat` result for `fspath`.
+  '''
+  try:
+    S = os.stat(fspath)
+  except OSError as e:
+    warning("stat %r: %s",fspath,e)
+    return None, None
+  if not S_ISREG(S.st_mode):
+    raise ValueError("not a regular file")
+  tags = fstags[fspath]
+  csum = tags.subtags(f'checksum.{hashname}')
+  csum_hash = csum.get('hashcode', '')
+  if not csum_hash:
+    return None, S
+  try:
+    st_size = int(csum.get('st_size', 0))
+    st_mtime = int(csum.get('st_mtime', 0))
+  except (TypeError,ValueError):
+    return None,S
+  if S.st_size != st_size or int(S.st_mtime) != st_mtime:
+    # file has changed, do not return the cached hashcode
+    return None, S
+  hashcode = BaseHashCode.from_prefixed_hashbytes_hex(csum_hash)
+  if hashcode.hashname != hashname:
+    warning("ignoring unexpected hashname %r", hashcode.hashname)
+    return None, S
+  return hashcode, S
+
+##@trace
+@uses_fstags
+@typechecked
+def set_fstags_hashcode(
+    fspath: str,
+    hashcode,
+    S: os.stat_result,
+    fstags: FSTags,
+):
+  ''' Record `hashcode` against `fspath`.
+  '''
+  tags = fstags[fspath]
+  csum = tags.subtags(f'checksum.{hashcode.hashname}')
+  csum.hashcode = str(hashcode)
+  csum.st_size = S.st_size
+  csum.st_mtime = S.st_mtime
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

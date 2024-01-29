@@ -130,7 +130,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import Upd, UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230407-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1106,9 +1106,11 @@ class FSTags(MultiOpenMixin):
   def startup_shutdown(self):
     ''' Sync tag files and db mapping on final close.
     '''
-    yield
-    # save any modified tag files on shutdown.
-    self.sync()
+    try:
+      yield
+    finally:
+      # save any modified tag files on shutdown.
+      self.sync()
 
   @locked
   @pfx_method
@@ -1544,7 +1546,7 @@ class FSTags(MultiOpenMixin):
         else:
           raise ValueError("destination already exists")
       try:
-        result = attach(srcpath, dstpath)
+        result = pfx_call(attach, srcpath, dstpath)
       except OSError as e:
         if e.errno == errno.ENAMETOOLONG and crop_ok:
           dstdirpath = dirname(dstpath)
@@ -1563,14 +1565,16 @@ class FSTags(MultiOpenMixin):
       old_modified = dst_taggedpath.modified
       for tag in src_taggedpath:
         dst_taggedpath.add(tag)
-      try:
-        dst_taggedpath.save()
-      except OSError as e:
-        if e.errno == errno.EACCES:
-          warning("save tags: %s", e)
-          dst_taggedpath.modified = old_modified
-        else:
-          raise
+      if not self.is_open():
+        # we're not expecting save-on-final-close, so save now
+        try:
+          dst_taggedpath.save()
+        except OSError as e:
+          if e.errno == errno.EACCES:
+            warning("save tags: %s", e)
+            dst_taggedpath.modified = old_modified
+          else:
+            raise
       return result
 
 # pylint: disable=too-few-public-methods

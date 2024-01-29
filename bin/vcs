@@ -94,15 +94,29 @@ cd "$wd"
 [ -n "$vcs_top" ] || {
   # locate VCS top
   case "$vcs_type" in
-    hg)   findup_test='[ -e "$FINDUP_DIR/.hg" ]' ;;
-    git)  findup_test='[ -e "$FINDUP_DIR/.git" ]' ;;
+    hg)   if [ -d .hg ]
+          then  vcs_top=$wd
+          elif [ -d ../.hg ]
+          then  vcs_top=$( dirname "$(pwd)" )
+          else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.hg" ]' )
+          fi
+          ;;
+    git)  if [ -d .git ]
+          then  vcs_top=$wd
+          elif [ -d ../.git ]
+          then  vcs_top=$( dirname "$(pwd)" )
+          else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.git" ]' )
+          fi
+          ;;
     ?*)   echo "$cmd: unsupported VCS \"$vcs_type\"" >&2; exit 1 ;;
-    *)    findup_test='[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' ;;
+    '')   if [ -d .hg -o -d .git ]
+          then  vcs_top=$wd
+          elif [ -d ../.hg -o -d ../.git ]
+          then  vcs_top=$( dirname "$(pwd)" )
+          else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' )
+          fi
+          ;;
   esac
-  vcs_top=$(
-      set -ue
-      findup -d . -c "$findup_test"
-  )
 } || {
   echo "$cmd: $wd: cannot locate VCS top" >&2
   exit 1
@@ -314,7 +328,7 @@ case "$op" in
                     ;;
       sibling,git)  clonedir=$1; shift
                     [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
-                    git clone "$vcs_top" "$clonedir"
+                    git clone --reference "$vcs_top" "$vcs_top" "$clonedir"
                     upstream=$( git remote get-url origin )
                     incd "$clonedir" git remote set-url origin "$upstream"
                     ;;

@@ -91,7 +91,7 @@ except ImportError as curses_e:
   warning("cannot import curses: %s", curses_e)
   curses = None
 
-__version__ = '20230401-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -925,6 +925,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
   def run_task(
       self,
       label: str,
+      *,
       report_print=False,
       tick_delay: int = 0.3,
       tick_chars='|/-\\',
@@ -969,6 +970,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
       )
 
+@decorator
 def uses_upd(func):
   ''' Decorator for functions accepting an optional `upd:Upd` parameter,
       default from `Upd.default() or Upd()`.

@@ -64,8 +64,13 @@ class BWizCmd(BaseCommand):
           the named output file (typically MP4, though the ffmpeg
           output format chosen is based on the extension).
           Most metadata are preserved.
-          start..end: Optional start and end offsets in seconds, used
-            to crop the recording output.
+          Options:
+            -n          No action, dry run.
+            -a:afmt     Specify output audio format.
+            -v:vfmt     Specify output video format.
+            --rm        Remove the source file if the conversion succeeds.
+            start..end  Optional start and end offsets in seconds, used
+              to crop the recording output.
     '''
     badopts = False
     doit = True
@@ -86,7 +91,7 @@ class BWizCmd(BaseCommand):
         elif arg0.startswith('-a:'):
           acodec = arg0[3:]
         elif arg0.startswith('-v:'):
-          acodec = arg0[3:]
+          vcodec = arg0[3:]
         elif arg0 == '--rm':
           remove_source = True
         else:
@@ -132,17 +137,7 @@ class BWizCmd(BaseCommand):
     ):
       return 1
     if remove_source:
-      if doit:
-        with Pfx("remove %s", R.fspath):
-          if islinkpath(R.fspath) or isfilepath(R.fspath):
-            pfx_call(os.remove, R.fspath)
-          elif isdirpath(R.fspath):
-            pfx_call(shutil.rmtree, R.fspath)
-          else:
-            warning("cannot remove, not a file or directory")
-            return 1
-      else:
-        print("remove", R.fspath)
+      R.remove(doit=doit)
 
   def cmd_ffprobe(self, argv):
     ''' Run `ffprobe` against a file.

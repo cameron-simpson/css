@@ -11,32 +11,32 @@ from __future__ import absolute_import
 from inspect import isclass
 import sys
 import unittest
-from cs.lex import typed_str as s
-from cs.py.modules import module_attributes
-from . import binary as binary_module
-from .binary import AbstractBinary, PacketField
 
-class _TestPacketFields(object):
+from cs.lex import typed_str as s
+from cs.gimmicks import warning
+from cs.py.modules import module_attributes
+
+from . import binary as binary_module
+from .binary import AbstractBinary
+
+class TestBinaryClasses(object):
   ''' Unit tests for the cs.binary module.
   '''
 
-  def tearDown(self):
-    ''' Tear down any setup.
+  def get_binary_classes(self):
+    ''' Return a list of the `AbstractBinary` subclasses from `self.test_module`.
     '''
+    return [
+        modattr
+        for attrname, modattr in sorted(module_attributes(self.test_module))
+        if isclass(modattr) and issubclass(modattr, AbstractBinary)
+    ]
 
   def roundtrip_from_bytes(self, cls, bs):
     ''' Perform a bytes => instance => bytes round trip test.
     '''
     # bytes -> packet -> bytes
-    if issubclass(cls, AbstractBinary):
-      P = cls.from_bytes(bs)
-    else:
-      P, offset = cls.from_bytes(bs)
-      self.assertEqual(
-          offset, len(bs),
-          "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r" %
-          (offset, bs[:offset], bs[offset:])
-      )
+    P = cls.from_bytes(bs)
     self_check = getattr(P, 'self_check', None)
     if self_check:
       self.assertTrue(
@@ -81,39 +81,33 @@ class _TestPacketFields(object):
           )
         self.assertEqual(P, P2, "%s => bytes => %s not equal" % (P, P2))
 
-  def test_PacketField_round_trip(self):
-    ''' Perform round trip tests of the `PacketField` and `AbstractBinary` subclasses
+  def test_binary_round_trip(self):
+    ''' Perform round trip tests of the `AbstractBinary` subclasses
         for which we have test cases.
     '''
-    M = self.module
-    for attrname, modattr in sorted(module_attributes(M)):
-      if isclass(modattr):
-        if issubclass(modattr, (AbstractBinary, PacketField)):
-          with self.subTest(class_name=attrname):
-            cls = modattr
-            test_cases = getattr(cls, 'TEST_CASES', None)
-            if test_cases is not None:
-              for test_case in test_cases:
-                with self.subTest(test_case=test_case):
-                  ##print("test %s vs %r" % (attrname, test_case),
-                  ##  file=open('/dev/tty', 'w'), flush=True)
-                  if isinstance(test_case, bytes):
-                    # bytes -> field -> bytes
-                    self.roundtrip_from_bytes(cls, test_case)
-                  elif isinstance(test_case, tuple):
-                    # *args[, kwargs[, bytes]]
-                    self.roundtrip_constructor(cls, test_case)
-                  else:
-                    raise ValueError("unhandled test case: %r" % (test_case,))
+    for cls in self.get_binary_classes():
+      with self.subTest(class_name=cls.__name__):
+        test_cases = getattr(cls, 'TEST_CASES', None)
+        if not test_cases:
+          warning("no test cases for %r", cls)
+          continue
+        for test_case in test_cases:
+          with self.subTest(test_case=test_case):
+            ##print("test %s vs %r" % (attrname, test_case),
+            ##  file=open('/dev/tty', 'w'), flush=True)
+            if isinstance(test_case, bytes):
+              # bytes -> field -> bytes
+              self.roundtrip_from_bytes(cls, test_case)
+            elif isinstance(test_case, tuple):
+              # *args[, kwargs[, bytes]]
+              self.roundtrip_constructor(cls, test_case)
+            else:
+              raise ValueError("unhandled test case: %r" % (test_case,))
 
-class TestCSBinaryPacketFields(_TestPacketFields, unittest.TestCase):
-  ''' `unittest.TestCase` subclass of `_TestPacketFields`.
+class TestCSBinaryClasses(TestBinaryClasses, unittest.TestCase):
+  ''' `unittest.TestCase` subclass of `TestBinaryClasses`.
   '''
-
-  def setUp(self):
-    ''' We're testing the cs.binary module.
-    '''
-    self.module = binary_module
+  test_module = binary_module
 
 def selftest(argv):
   ''' Run the unit tests.

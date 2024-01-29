@@ -1,3 +1,7 @@
+calibre popbooks: error on unknown dbids
+import dedrm and obok plugins from the calibre prefs plugins subdir by default
+command line option to specify kobo library path
+kobo: do not require dedrm and the associated envvar, only need decrypt if there are encrypted zip members
 export_to_calibre: try to decrypt azw files
 kindle export: recite src and dst libs
 calibre lint command
