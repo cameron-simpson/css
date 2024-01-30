@@ -1102,6 +1102,12 @@ class FSTags(MultiOpenMixin):
     self.update_uuid_tag_name = update_uuid_tag_name
     self._lock = RLock()
 
+  def __str__(self):
+    return "%s(%s)" % (self.__class__.__name__, self.tagsfile_basename)
+
+  def __repr__(self):
+    return "%s(%r)" % (self.__class__.__name__, self.tagsfile_basename)
+
   @contextmanager
   def startup_shutdown(self):
     ''' Sync tag files and db mapping on final close.
