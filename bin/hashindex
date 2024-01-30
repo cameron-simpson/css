@@ -267,14 +267,19 @@ def file_checksum(
     hashname: str = DEFAULT_HASHNAME,
     *,
     fstags: FSTags,
-) -> BaseHashCode:
+) -> Union[BaseHashCode, None]:
   ''' Return the hashcode for the contents of the file at `fspath`.
+      Warn and return `None` on `OSError`.
   '''
   hashcode, S = get_fstags_hashcode(fspath, hashname)
   if hashcode is None:
     hashclass = BaseHashCode.hashclass(hashname)
     with run_task(f'checksum {shortpath(fspath)}'):
-      hashcode = hashclass.from_fspath(fspath)
+      try:
+        hashcode = hashclass.from_fspath(fspath)
+      except OSError as e:
+        warning("%s.from_fspath(%r): %s", hashclass.__name__, fspath, e)
+        return None
     set_fstags_hashcode(fspath, hashcode, S, fstags=fstags)
   return hashcode
 
