@@ -42,6 +42,10 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
+    'entry_points': {
+        'console_scripts':
+        ['ffmpeg-docker = cs.ffmpegutils:main_ffmpeg_docker'],
+    },
     'install_requires': [
         'cs.dockerutils',
         'cs.fstags',
