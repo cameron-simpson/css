@@ -263,8 +263,6 @@ class DockerRun:
         The command's working directory will be /output.
         -i inputpath
             Mount inputpath as /input/basename(inputpath)
-        -I inputpath dockerpath
-            Mount inputpath as /input/dockerpath
         --root
             Do not switch to the current effective uid:gid inside
             the container.
@@ -283,12 +281,7 @@ class DockerRun:
         arg0_ = arg0[1:]
         if arg0 == '-i':
           inputpath = argv.pop(0)
-          inputmount = basename(inputpath)
-          self.add_input(inputmount, inputpath)
-        elif arg0 == '-I':
-          inputpath = argv.pop(0)
-          inputmount = argv.pop(0)
-          self.add_input(inputmount, inputpath)
+          self.add_input(inputpath)
         elif arg0 == '--root':
           self.as_root = True
         elif arg0 == '-U':
