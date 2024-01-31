@@ -64,6 +64,13 @@ FFMPEG_EXE_ENVVAR = 'FFMPEG_EXE'
 FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
 FFMPEG_DOCKER_IMAGE_DEFAULT = 'linuxserver/ffmpeg'
 
+def main_ffmpeg_docker(argv=None):
+  ''' The `ffm[peg-docker` command line implementation.
+  '''
+  if argv is None:
+    argv = sys.argv
+  sys.exit(ffmpeg_docker(*sys.argv[1:]).returncode)
+
 class MetaData(TagSet):
   ''' Object containing fields which may be supplied to ffmpeg's -metadata option.
   '''
