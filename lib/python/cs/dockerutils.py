@@ -43,8 +43,6 @@ DISTINFO = {
         'cs.context',
         'cs.pfx',
         'cs.psutils',
-        'ffmpeg-python',
-        ##'git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python',
         'typeguard',
     ],
 }
