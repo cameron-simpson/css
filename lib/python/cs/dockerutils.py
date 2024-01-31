@@ -11,10 +11,12 @@ import os
 from os.path import (
     abspath,
     basename,
+    exists as existspath,
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
     normpath,
+    splitext,
 )
 from subprocess import CompletedProcess
 import sys
@@ -25,8 +27,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, BaseCommandOptions
 from cs.context import stackattrs
-from cs.fs import validate_rpath
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.psutils import run
 
 __version__ = '20231202-post'
@@ -40,7 +41,6 @@ DISTINFO = {
     'install_requires': [
         'cs.cmdutils',
         'cs.context',
-        'cs.fs',
         'cs.pfx',
         'cs.psutils',
         'ffmpeg-python',
@@ -356,6 +356,7 @@ class DockerRun:
     return joinpath(self.output_root, outbase)
 
   # pylint: disable=too-many-branches
+  @pfx_method
   def run(self, *argv, doit=None, quiet=None, docker_exe=None):
     ''' Run a command via `docker run`.
         Return the `CompletedProcess` result or `None` if `doit` is false.
