@@ -252,6 +252,7 @@ class DockerRun:
   input_map: dict = field(default_factory=dict)
   output_root: str = OUTPUTDIR_DEFAULT
   outputpath: str = '.'
+  output_map: dict = field(default_factory=dict)
   as_root: bool = False
   pull_mode: str = 'missing'
 
@@ -319,18 +320,47 @@ class DockerRun:
           self.options.append(arg0)
           self.options.append(arg1)
 
-  def add_input(self, inputmount: str, inputpath: str):
-    ''' Add an input mount mapping. '''
-    with Pfx("inputpath:%r", inputpath):
-      if not inputpath:
+  @staticmethod
+  @pfx
+  def _mntmap_fspath(fsmap: dict, fspath) -> str:
+    ''' Add a host filesystem path to `fsmap`,
+        a mapping of container mount basenames
+        to absolute host filesystem paths (`abspath(fspath)`).
+        Return the container mount basename.
+    '''
+    base = basename(fspath)
+    if base in fsmap:
+      base_prefix, base_ext = splitext(base)
+      for n in range(2, 128):
+        base = f'{base_prefix}-{n}{base_ext}'
+        if base not in fsmap:
+          break
+      else:
+        raise ValueError('basename and variants already allocated')
+    assert base not in fsmap
+    fsmap[base] = abspath(fspath)
+    return base
+
+  @pfx_method
+  def add_input(self, infspath: str) -> str:
+    ''' Add a host filesystem path to the `input_map`
+        and return the corresponding container filesystem path.
+    '''
+    with Pfx("infspath:%r", infspath):
+      if not infspath:
         raise ValueError('may not be empty')
-    with Pfx("inputmount:%r", inputmount):
-      validate_rpath(inputmount)
-      if '/' in inputmount:
-        raise ValueError('may not contain multiple components')
-      if inputmount in self.input_map:
-        raise ValueError(f'already present in input_map:{self.input_map!r}')
-    self.input_map[inputmount] = abspath(inputpath)
+      if not existspath(infspath):
+        raise ValueError("does not exist")
+    base = self._mntmap_fspath(self.input_map, infspath)
+    return joinpath(self.input_root, base)
+
+  @pfx_method
+  def add_output(self, outfspath: str) -> str:
+    ''' Add a host filesystem path to the `output_map`
+        and return the corresponding container filesystem path.
+    '''
+    outbase = self._mntmap_fspath(self.output_map, outfspath)
+    return joinpath(self.output_root, outbase)
 
   # pylint: disable=too-many-branches
   def run(self, *argv, doit=None, quiet=None, docker_exe=None):
