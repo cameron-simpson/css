@@ -157,8 +157,6 @@ class DockerUtilCommand(BaseCommand):
           The command's working directory will be /output.
           -i inputpath
               Mount inputpath as /input/basename(inputpath)
-          -I inputpath dockerpath
-              Mount inputpath as /input/dockerpath
           --root
               Do not switch to the current effective uid:gid inside
               the container.
