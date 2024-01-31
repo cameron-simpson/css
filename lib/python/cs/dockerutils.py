@@ -30,7 +30,7 @@ from cs.context import stackattrs
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.psutils import run
 
-__version__ = '20231202-post'
+__version__ = '20240201'
 
 DISTINFO = {
     'keywords': ["python3"],
