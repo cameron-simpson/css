@@ -46,7 +46,7 @@ from cs.result import CancellationError
 from cs.typingutils import subtype
 from cs.upd import Upd
 
-__version__ = '20231129-post'
+__version__ = '20240201'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
