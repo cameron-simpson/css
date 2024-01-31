@@ -216,7 +216,7 @@ def mount_escape(*args) -> str:
   buf = StringIO()
   csvw = csv.writer(buf)
   csvw.writerow(args)
-  return buf.getvalue().rstrip('\n')
+  return buf.getvalue().rstrip('\n').rstrip('\r')
 
 # pylint: disable=too-many-instance-attributes
 @dataclass
