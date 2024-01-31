@@ -394,20 +394,21 @@ class DockerRun:
         *self.options,
     ]
     # input readonly mounts
-    for inputmount, inputpath in self.input_map.items():
-      mnt = joinpath(self.input_root, inputmount)
-      with Pfx("%r->%r", mnt, inputpath):
+    for inbase, infspath in self.input_map.items():
+      mnt = joinpath(self.input_root, inbase)
+      with Pfx("%r->%r", mnt, infspath):
         docker_argv.extend(
             [
                 '--mount',
                 mount_escape(
                     'type=bind',
                     'readonly',
-                    f'source={inputpath}',
+                    f'source={infspath}',
                     f'destination={mnt}',
                 ),
             ]
         )
+    # mount the output directory
     docker_argv.extend(
         [
             '--mount',
@@ -418,6 +419,22 @@ class DockerRun:
             ),
         ]
     )
+    # if any named outputs exist, mount them inside /output
+    for outbase, outfspath in self.output_map.items():
+      if not existspath(outfspath):
+        continue
+      mnt = joinpath(self.output_root, outbase)
+      with Pfx("%r->%r", mnt, outfspath):
+        docker_argv.extend(
+            [
+                '--mount',
+                mount_escape(
+                    'type=bind',
+                    f'source={outfspath}',
+                    f'destination={mnt}',
+                ),
+            ]
+        )
     if self.as_root:
       entrypoint = argv.pop(0)
     else:
