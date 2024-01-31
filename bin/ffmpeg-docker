@@ -14,7 +14,7 @@ run_pull_mode=missing
 ff_postopts=
 
 cmd=$0
-usage="Usage: $cmd [--tm] [-U] [input-opts...] -i inputfile [output-opts...] outputfile
+usage="Usage: $cmd [--tm] [-U] ffmpeg-command-line-arguments...
   Run ffmpeg via \"docker run ... $image ...\" as a method for
   running a modern ffmpeg on a stale system.
 
@@ -44,9 +44,8 @@ done
 
 set -- \
   python3 -c 'if 1:
-                import sys
-                from cs.ffmpegutils import ffmpeg_docker
-                sys.exit(ffmpeg_docker(*sys.argv[1:]).returncode)
+                from cs.ffmpegutils import main_ffmpeg_docker
+                main_ffmpeg_docker()
              ' ${1+"$@"}
 
 if [ $use_tmux ]
