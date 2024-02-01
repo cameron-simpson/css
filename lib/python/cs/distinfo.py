@@ -1663,21 +1663,22 @@ class Module:
     if M is None:
       problems.append("module import fails")
       return problems
-    # TODO: import_names to be a set
-    # TODO: scan all the .py files in a package
     import_names = []
-    for import_name in direct_imports(M.__file__, self.name):
-      if self.modules[import_name].isstdlib():
+    for fspath in self.paths():
+      if not fspath.endswith('.py'):
         continue
-      if import_name.endswith('_tests'):
-        continue
-      if import_name == pkg_name:
-        # tests usually import the package - this is not a dependency
-        continue
-      if pkg_prefix and import_name.startswith(pkg_prefix):
-        # package components are not a dependency
-        continue
-      import_names.append(import_name)
+      for import_name in direct_imports(fspath, self.name):
+        if self.modules[import_name].isstdlib():
+          continue
+        if import_name.endswith('_tests'):
+          continue
+        if import_name == pkg_name:
+          # tests usually import the package - this is not a dependency
+          continue
+        if pkg_prefix and import_name.startswith(pkg_prefix):
+          # package components are not a dependency
+          continue
+        import_names.append(import_name)
     import_names = sorted(set(import_names))
     # check the DISTINFO
     distinfo = getattr(M, 'DISTINFO', None)
