@@ -51,7 +51,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20240201'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
