@@ -57,7 +57,9 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'entry_points': {
-        'console_scripts': ['playon = cs.app.playon:main'],
+        'console_scripts': {
+            'playon': 'cs.app.playon:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils',

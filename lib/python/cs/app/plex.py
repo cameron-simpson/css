@@ -33,7 +33,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts': ['plex = cs.app.plex:main'],
+        'console_scripts': {
+            'plex': 'cs.app.plex:main'
+        },
     },
     'install_requires': ['cs.cmdutils', 'cs.fstags', 'cs.logutils'],
 }

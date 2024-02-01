@@ -58,7 +58,9 @@ DISTINFO = {
         'cs.upd>=20200914',
     ],
     'entry_points': {
-        'console_scripts': ['mklinks = cs.app.mklinks:main'],
+        'console_scripts': {
+            'mklinks': 'cs.app.mklinks:main'
+        },
     },
 }
 
