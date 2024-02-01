@@ -32,7 +32,7 @@ cs.env pypi.release="20230407" ok_revision=bd184cdf4bd71eaa2bb8f98b30a735ec582d9
 cs.excutils pypi.release="20230212.1" ok_revision="2e8aa06ec61e7b92454d70fa9430bda88a351076"
 cs.ffmpegutils ok_revision=d83c963ed11ebd9f4b8d2df139fe2d6f283c90d4 pypi.release="20231202"
 cs.filestate pypi.release=20181107
-cs.fileutils pypi.release="20231129" ok_revision="07405d79cb63b40c0e5ba5dae86b50bb24b03f79" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
+cs.fileutils pypi.release="20240201" ok_revision="07405d79cb63b40c0e5ba5dae86b50bb24b03f79" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
 cs.fs ok_revision="3618571a8f483ddd68e418a472a372bc8c93c89c" pypi.release="20240201" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
 cs.fsm ok_revision="64aa3ad214e95abf1768c3a3ebccd0c17461783e" pypi.release="20231020" features={"20231018":["fsm_transitions_as_dot__history_style"]}
 cs.fstags pypi.release="20230407" ok_revision=b8c1b11387cb4df2f63258f2f3384ddd4034f196 features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"]}
