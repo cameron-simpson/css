@@ -1165,7 +1165,7 @@ class Module:
     path_revs = self.vcs.file_revisions(self.paths())
     rev_latest = None
     for rev, node in sorted(path_revs.values()):
-      if rev_latest is None or rev_latest < rev:
+      if rev is not None and rev_latest is None or rev_latest < rev:
         changeset_hash = node
         rev_latest = rev
     return changeset_hash
