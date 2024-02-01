@@ -253,4 +253,9 @@ DISTINFO = {
         'sqlalchemy',
         'typeguard',
     ],
+    'entry_points': {
+        'console_scripts': {
+            'ebooks': 'cs.ebooks.__main__:main'
+        },
+    },
 }
