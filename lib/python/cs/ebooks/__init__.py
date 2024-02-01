@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 ''' Utilities and command line for working with EBooks.
-    Basic support for talking to Apple Books, Calibre, Kindle, Mobi.
+    Basic support for talking to Apple Books, Calibre, CBZ, Kindle, Kobo, Mobi, PDF.
     These form the basis of my personal Kindle/Kobo/Calibre workflow.
 
     The command `python -m cs.ebooks help -l` gives the basic usage information:
