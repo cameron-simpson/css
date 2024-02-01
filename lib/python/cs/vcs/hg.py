@@ -4,7 +4,8 @@
 '''
 
 from cs.deco import cachedmethod
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
+
 from . import VCS, ReleaseLogEntry
 
 class VCS_Hg(VCS):
@@ -70,6 +71,7 @@ class VCS_Hg(VCS):
         firstline = firstline.strip()
       yield files, firstline
 
+  @pfx_method
   def file_revisions(self, paths):
     ''' Return a mapping of `path->(rev,node)`
         containing the latest revision of each file in `paths`.
@@ -84,6 +86,8 @@ class VCS_Hg(VCS):
                             ['-l', '1', '--template', '{rev} {node}\n']):
         rev, node = line.split()
         break
+      else:
+        rev, node = None, None
       path_map[path] = int(rev), node
     return path_map
 
