@@ -49,7 +49,7 @@ from cs.upd import print
 
 # dummy comment for release test
 
-__version__ = '20240201.1'
+__version__ = '20240201.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
