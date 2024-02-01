@@ -8,7 +8,7 @@ cs.app.megacli pypi.release="20211031" ok_revision="03033cc34d810f17745cceee447a
 cs.app.mklinks pypi.release="20221228" ok_revision="25db918d3d95925205dd361638d2ddb9f279f52c"
 cs.app.myke ok_revision="2d63b52a3bd5c244e3d73b0ea1548655a154cfa0" pypi.release="20220805"
 cs.app.osx.plist ok_revision="599e3e37c0af4e7ba92c2134c0a90d17effcfc39" pypi.release="20221228"
-cs.app.playon ok_revision="4daa2daf5df50fb93a2530e5d772c356176c3f1a" pypi.release="20240201" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
+cs.app.playon ok_revision=c266484ab0a471cfef90f0f41250d2a8e253bce3 pypi.release="20240201" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
 cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
 cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9082bc3"
 cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
