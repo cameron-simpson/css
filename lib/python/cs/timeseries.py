@@ -141,9 +141,9 @@ DISTINFO = {
         'typeguard',
     ],
     'entry_points': {
-        'console_scripts': [
-            'csts = cs.timeseries:main',
-        ],
+        'console_scripts': {
+            'csts': 'cs.timeseries:main',
+        },
     },
     'extras_requires': {
         'pandas': ['pandas'],

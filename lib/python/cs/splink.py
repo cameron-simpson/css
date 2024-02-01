@@ -98,9 +98,9 @@ DISTINFO = {
         'typeguard',
     ],
     'entry_points': {
-        'console_scripts': [
-            'splink = cs.splink:main',
-        ],
+        'console_scripts': {
+            'splink': 'cs.splink:main',
+        },
     },
 }
 
