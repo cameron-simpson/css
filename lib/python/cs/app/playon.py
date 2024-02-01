@@ -45,7 +45,7 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20240201-post'
+__version__ = '20240201.1'
 
 DISTINFO = {
     'keywords': ["python3"],
