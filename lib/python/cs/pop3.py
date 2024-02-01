@@ -47,8 +47,6 @@ from cs.result import Result, ResultSet
 from cs.threads import bg as bg_thread
 from cs.upd import print
 
-# dummy comment for release test
-
 __version__ = '20240201.1-post'
 
 DISTINFO = {
