@@ -85,7 +85,7 @@ cs.tagset ok_revision="6c0d0999679ef1b6c65875959faca9c798058063" features={"2022
 cs.taskqueue ok_revision="5b2c7311b70519bea966bedf91008c797770c819" features={"20221207":["BaseTask"]} pypi.release="20230401"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
 cs.threads ok_revision="1159b96965d7bb681da56ac0420645ec653ba476" pypi.release="20231129" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"]}
-cs.timeseries ok_revision=be91f275446d9e371d09d41aff9a6ff09308973a pypi.release="20230612"
+cs.timeseries ok_revision=e3ecc5310c4602453c75ac4f9da4a7bfbd271f17 pypi.release="20230612"
 cs.tty
 cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
 cs.units
