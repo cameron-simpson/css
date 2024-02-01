@@ -130,7 +130,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import Upd, UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20231129-post'
+__version__ = '20240201.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -139,7 +139,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts': ['fstags = cs.fstags:main'],
+        'console_scripts': {
+            'fstags': 'cs.fstags:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils>=20210404',
@@ -1101,6 +1103,12 @@ class FSTags(MultiOpenMixin):
     self.update_prefix = update_prefix
     self.update_uuid_tag_name = update_uuid_tag_name
     self._lock = RLock()
+
+  def __str__(self):
+    return "%s(%s)" % (self.__class__.__name__, self.tagsfile_basename)
+
+  def __repr__(self):
+    return "%s(%r)" % (self.__class__.__name__, self.tagsfile_basename)
 
   @contextmanager
   def startup_shutdown(self):

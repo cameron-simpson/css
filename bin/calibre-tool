@@ -1,7 +1,0 @@
-#!/bin/sh
-#
-# Invoke my Calibre utility.
-#   - Cameron Simpson <cs@cskk.id.au> 21may2016
-#
-
-exec python3 -m cs.app.calibre ${1+"$@"}

@@ -89,7 +89,9 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': ['svcd = cs.app.svcd:main'],
+        'console_scripts': {
+            'svcd': 'cs.app.svcd:main'
+        },
     },
 }
 

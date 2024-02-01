@@ -1,0 +1,2 @@
+BaseCommand.run: catch CancellationError and return 1.
+BaseCommandCmd.__getattr__: recognise EOF, exit and quit to terminate the cmdloop.

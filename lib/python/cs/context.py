@@ -16,7 +16,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20230331-post'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -40,6 +40,7 @@ def contextif(flag, cmgr_func, *cmgr_args, **cmgr_kwargs):
           with contextif(run_task(....)) as proxy:
             ... do stuff, updating proxy if not None ...
   '''
+  assert isinstance(flag, bool)
   cmgr = cmgr_func(*cmgr_args, **cmgr_kwargs) if flag else nullcontext()
   with cmgr as ctxt:
     yield ctxt

@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-#
-# Emit a listing of file checksums or read such a listing and
-# construct a matching directory tree.
-# - Cameron Simpson <cs@cskk.id.au> 24jan2024
-#
 
+''' Emit a listing of file checksums or read such a listing and
+    construct a matching directory tree.
+    - Cameron Simpson <cs@cskk.id.au> 24jan2024
+'''
+
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from getopt import GetoptError
 import os
 from os.path import (
+    abspath,
     dirname,
     exists as existspath,
     isabs as isabspath,
@@ -20,7 +22,7 @@ from os.path import (
 )
 from stat import S_ISREG
 import sys
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Union
 
 from typeguard import typechecked
 
@@ -29,7 +31,7 @@ from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.upd import Upd, uses_upd, print, run_task
 
 from cs.debug import X, trace
@@ -48,10 +50,13 @@ class HashIndexCommand(BaseCommand):
 
   USAGE_FORMAT = r'''Usage: {cmd} subcommand...
     Generate or process file content hash listings.'''
+  USAGE_KEYWORDS = dict(DEFAULT_HASHNAME=DEFAULT_HASHNAME,)
 
   @dataclass
   class Options(BaseCommand.Options):
     hashname: str = DEFAULT_HASHNAME
+    move_mode: bool = False
+    symlink_mode: bool = False
 
   @contextmanager
   @uses_fstags
@@ -63,36 +68,64 @@ class HashIndexCommand(BaseCommand):
   @uses_fstags
   @uses_upd
   def cmd_linkto(self, argv, *, fstags: FSTags, upd: Upd):
-    ''' Usage: {cmd} srcdir dstdir < hashindex
+    ''' Usage: {cmd} [-f] [-h hashname] [--mv] [-n] [-q] [-s] srcdir dstdir < hashindex
           Read a hashindex with relative paths from the input
           and link files from srcdir to dstdir according the source hash.
+          -f    Force: link even if the target already exists.
+          -h hashname
+                Specify the hash algorithm, default: {DEFAULT_HASHNAME}
+          --mv  Move: unlink the original after a successful hard link.
+          -n    No action; recite planned actions.
+          -q    Quiet. Do not report actions.
+          -s    Symlink the source file instead of hard linking.
     '''
     options = self.options
+    badopts = False
+    options.popopts(
+        argv,
+        f='force',
+        h_='hashname',
+        mv='move_mode',
+        n='dry_run',
+        q='quiet',
+        s='symlink_mode',
+    )
+    if not argv:
+      warning("missing srcdir")
+      badopts = True
+    else:
+      srcdir = argv.pop(0)
+      if not isdirpath(srcdir):
+        warning('srcdir %r: not a directory', srcdir)
+        badopts = True
+    if not argv:
+      warning("missing dstdir")
+    else:
+      dstdir = argv.pop(0)
+      if not isdirpath(dstdir):
+        warning('dstdir %r: not a directory', dstdir)
+        badopts = True
+    if argv:
+      warning("extra arguments: %r", argv)
+      badopts = True
+    if options.move_mode and options.symlink_mode:
+      warning(
+          "you may not specify both --mv (move mode) and -s (symlink mode)"
+      )
+      badopts = True
+    if badopts:
+      raise GetoptError('bad arguments')
     doit = options.doit
     quiet = options.quiet
     hashname = options.hashname
+    move_mode = options.move_mode
     runstate = options.runstate
-    badopts = False
-    if not argv:
-      raise GetoptError('missing srcdir')
-    srcdir = argv.pop(0)
-    if not isdirpath(srcdir):
-      warning('srcdir %r: not a directory', srcdir)
-      badopts = True
-    if not argv:
-      raise GetoptError('missing dstdir')
-    dstdir = argv.pop(0)
-    if not isdirpath(dstdir):
-      warning('dstdir %r: not a directory', dstdir)
-      badopts = True
-    if argv:
-      raise GetoptError('extra arguments: %r', argv)
-    if badopts:
-      raise GetoptError('bad arguments')
+    symlink_mode = options.symlink_mode
+    # scan the input hashcode->file-path listing
     with Pfx("scan input"):
       with run_task("scan input"):
         bad_input = False
-        fspath_by_hashcode = {}
+        fspaths_by_hashcode = defaultdict(list)
         hashcode_by_fspath = {}
         for lineno, line in enumerate(sys.stdin, 1):
           runstate.raiseif()
@@ -130,14 +163,15 @@ class HashIndexCommand(BaseCommand):
                 warning("repeated mention")
                 bad_input = True
                 continue
-            fspath_by_hashcode[hashcode] = rfspath
-            hashcode_by_fspath[rfspath] = hashcode
+              fspaths_by_hashcode[hashcode].append(rfspath)
+              hashcode_by_fspath[rfspath] = hashcode
     if bad_input:
       warning("bad input data")
       return 1
+    ok = True
+    # scan the source tree and link according to the input
     with Pfx("scan srcdir %r", srcdir):
       with run_task(f'scan srcdir {shortpath(srcdir)}') as proxy:
-        srcpath_by_hashcode = {}
         for dirpath, dirnames, filenames in os.walk(srcdir):
           runstate.raiseif()
           dirnames[:] = sorted(dirnames)
@@ -146,38 +180,47 @@ class HashIndexCommand(BaseCommand):
             if filename.startswith('.'
                                    ) or filename == fstags.tagsfile_basename:
               continue
-            filepath = joinpath(dirpath, filename)
-            rfilepath=relpath(filepath, srcdir)
-            proxy.text=rfilepath
-            with Pfx(filepath):
-              h = file_checksum(filepath, hashname=hashname)
-              if h is None:
+            srcpath = joinpath(dirpath, filename)
+            rsrcpath = relpath(srcpath, srcdir)
+            proxy.text = rsrcpath
+            with Pfx(srcpath):
+              srchashcode = file_checksum(srcpath, hashname=hashname)
+              if srchashcode is None:
                 warning("no hashcode")
                 continue
-              srcpath_by_hashcode[h] = filepath
-    ok = True
-    with Pfx("link to dstdir %r", dstdir):
-      with run_task(f'link to dstdir {shortpath(dstdir)}') as proxy:
-        for rfspath, hashcode in sorted(hashcode_by_fspath.items()):
-          runstate.raiseif()
-          proxy.text = rfspath
-          try:
-            srcpath = srcpath_by_hashcode[hashcode]
-          except KeyError:
-            warning("no srchashcode for %s %s", hashcode, rfspath)
-            continue
-          dstpath = joinpath(dstdir, rfspath)
-          if existspath(dstpath):
-            if file_checksum(dstpath) != hashcode:
-              warning(
-                  "dstpath %r already exists with different hashcode", dstpath
-              )
-            continue
-          dstdirpath = dirname(dstpath)
-          quiet or print("ln", srcpath, dstpath)
-          if doit:
-            needdir(dstdirpath, use_makedirs=True, log=warning)
-            fstags.link(srcpath, dstpath)
+              rfspaths = fspaths_by_hashcode[srchashcode]
+              if not rfspaths:
+                warning("hashcode %s not present in the input", srchashcode)
+                continue
+              for rfspath in rfspaths:
+                dstpath = joinpath(dstdir, rfspath)
+                if existspath(dstpath):
+                  if file_checksum(dstpath) != srchashcode:
+                    warning(
+                        "dstpath %r already exists with different hashcode",
+                        dstpath
+                    )
+                  continue
+                dstdirpath = dirname(dstpath)
+                if doit:
+                  needdir(dstdirpath, use_makedirs=True, log=warning)
+                if symlink_mode:
+                  quiet or print("ln -s", abspath(srcpath), dstpath)
+                  if doit:
+                    pfx_call(os.symlink, abspath(srcpath), dstpath)
+                    fstags[dstpath].update(fstags[srcpath])
+                else:
+                  quiet or print("mv" if move_mode else "ln", srcpath, dstpath)
+                  if doit:
+                    fstags.link(srcpath, dstpath)
+                    if move_mode:
+                      if len(rfspaths) > 1:
+                        warning(
+                            "multiple dst paths for hashcode %s, not unlinking original",
+                            srchashcode
+                        )
+                      else:
+                        pfx_call(os.remove, srcpath)
     return 0 if ok else 1
 
   @uses_fstags
@@ -211,7 +254,7 @@ class HashIndexCommand(BaseCommand):
                 h = file_checksum(filepath, hashname=hashname)
               except OSError as e:
                 warning("file_checksum(%r,..)", filepath)
-                xit=1
+                xit = 1
                 continue
               print(h, filepath)
         else:
@@ -226,14 +269,19 @@ def file_checksum(
     hashname: str = DEFAULT_HASHNAME,
     *,
     fstags: FSTags,
-) -> BaseHashCode:
+) -> Union[BaseHashCode, None]:
   ''' Return the hashcode for the contents of the file at `fspath`.
+      Warn and return `None` on `OSError`.
   '''
   hashcode, S = get_fstags_hashcode(fspath, hashname)
   if hashcode is None:
     hashclass = BaseHashCode.hashclass(hashname)
     with run_task(f'checksum {shortpath(fspath)}'):
-      hashcode = hashclass.from_fspath(fspath)
+      try:
+        hashcode = hashclass.from_fspath(fspath)
+      except OSError as e:
+        warning("%s.from_fspath(%r): %s", hashclass.__name__, fspath, e)
+        return None
     set_fstags_hashcode(fspath, hashcode, S, fstags=fstags)
   return hashcode
 
@@ -253,7 +301,7 @@ def get_fstags_hashcode(
   try:
     S = os.stat(fspath)
   except OSError as e:
-    warning("stat %r: %s",fspath,e)
+    warning("stat %r: %s", fspath, e)
     return None, None
   if not S_ISREG(S.st_mode):
     raise ValueError("not a regular file")
@@ -265,8 +313,8 @@ def get_fstags_hashcode(
   try:
     st_size = int(csum.get('st_size', 0))
     st_mtime = int(csum.get('st_mtime', 0))
-  except (TypeError,ValueError):
-    return None,S
+  except (TypeError, ValueError):
+    return None, S
   if S.st_size != st_size or int(S.st_mtime) != st_mtime:
     # file has changed, do not return the cached hashcode
     return None, S
