@@ -1839,7 +1839,8 @@ class Module:
             warning("man path already exists: %r", manpath)
             continue
           with pfx_call(open, manpath, 'x') as manf:
-            cd_run('.', 'md2man-roff', path, stdout=manf)
+            ##cd_run('.', 'md2man-roff', path, stdout=manf)
+            cd_run('.', 'go-md2man', path, stdout=manf)
           continue
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
@@ -1849,8 +1850,6 @@ class Module:
         This writes the following files:
         * `MANIFEST.in`: list of additional files
         * `README.md`: a README containing the long_description
-        * `setup.py`: stub setup call
-        * `setup.cfg`: setuptool configuration
         * `pyproject.toml`: the TOML configuration file
     '''
     # write MANIFEST.in
@@ -1869,17 +1868,6 @@ class Module:
     docs = self.compute_doc(all_class_names=True)
     with pfx_call(open, joinpath(pkg_dir, 'README.md'), 'x') as rf:
       print(docs.long_description, file=rf)
-
-    # write setup.py
-    with pfx_call(open, joinpath(pkg_dir, 'setup.py'), 'x') as sf:
-      print("#!/usr/bin/env python", file=sf)
-      print("from setuptools import setup", file=sf)
-      print("setup()", file=sf)
-
-    # write the setup.cfg file
-    setup_cfg = self.compute_setup_cfg()
-    with pfx_call(open, joinpath(pkg_dir, 'setup.cfg'), 'x') as scf:
-      setup_cfg.write(scf)
 
     # write the pyproject.toml file
     proj = self.compute_pyproject()
