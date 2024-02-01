@@ -107,8 +107,8 @@ class MobiCommand(BaseCommand):
 
   def cmd_extract(self, argv):
     ''' Usage: {cmd} mobipath [outdir]
-          Extract the contents of the MOBI file mobipath
-          into the directory outdir, default based on the mobipath basename.
+          Extract the contents of the MOBI file mobipath.
+          Unpack into the directory outdir, default based on the mobipath basename.
           Prints the outdir and the name of the top file.
     '''
     outdirpath = None
