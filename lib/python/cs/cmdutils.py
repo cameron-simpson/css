@@ -178,7 +178,14 @@ class _BaseSubCommand(ABC):
     subusage_format = self.usage_format()  # pylint: disable=no-member
     if subusage_format:
       if short:
-        subusage_format, *_ = subusage_format.split('\n', 1)
+        # the summary line and opening sentence of the description
+        lines = subusage_format.split('\n')
+        subusage_lines = [lines.pop(0)]
+        while subusage_lines[-1].endswith('\\'):
+          subusage_lines.append(lines.pop(0))
+        if lines and lines[0].endswith('.'):
+          subusage_lines.append(lines.pop(0))
+        subusage_format = '\n'.join(subusage_lines)
       mapping = {
           k: v
           for k, v in sys.modules[self.method.__module__].__dict__.items()
@@ -615,9 +622,12 @@ class BaseCommand:
         self._run = subcommand
       self._subcmd = subcmd
     except GetoptError as e:
-      if self.getopt_error_handler(cmd, self.options, e,
-                                   self.usage_text(subcmd=subcmd,
-                                                   short=short_usage)):
+      if self.getopt_error_handler(
+          cmd,
+          self.options,
+          e,
+          self.usage_text(subcmd=subcmd, short=short_usage),
+      ):
         self._printed_usage = True
         return
       raise
@@ -640,8 +650,7 @@ class BaseCommand:
   ):
     ''' Compute the "Usage:" message for this class
         from the top level `USAGE_FORMAT`
-        and the `'Usage:'`-containing docstrings
-        from its `cmd_*` methods.
+        and the `'Usage:'`-containing docstrings of its `cmd_*` methods.
 
         Parameters:
         * `cmd`: optional command name, default derived from the class name
@@ -660,10 +669,12 @@ class BaseCommand:
     usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     usage_format_mapping.update(format_mapping)
     usage_format = getattr(
-        cls, 'USAGE_FORMAT', (
-            r'Usage: {cmd} subcommand [...]'
+        cls,
+        'USAGE_FORMAT',
+        (
+            'Usage: {cmd} subcommand [...]'
             if has_subcmds else 'Usage: {cmd} [...]'
-        )
+        ),
     )
     usage_message = usage_format.format_map(usage_format_mapping)
     if subcmd:
@@ -1221,8 +1232,9 @@ class BaseCommand:
   @classmethod
   def cmd_help(cls, argv):
     ''' Usage: {cmd} [-l] [subcommand-names...]
-          Print the full help for the named subcommands,
-          or for all subcommands if no names are specified.
+          Print help for subcommands.
+          This outputs the full help for the named subcommands,
+          or the short help for all subcommands if no names are specified.
           -l  Long help even if no subcommand-names provided.
     '''
     subcmds = cls.subcommands()
@@ -1259,8 +1271,8 @@ class BaseCommand:
 
   def cmd_shell(self, argv):
     ''' Usage: {cmd}
-            Run a command prompt via cmd.Cmd using this command's subcommands.
-      '''
+          Run a command prompt via cmd.Cmd using this command's subcommands.
+    '''
     self.cmdloop()
 
   def repl(self, *argv, banner=None, local=None):
