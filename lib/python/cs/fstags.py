@@ -139,7 +139,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts': ['fstags = cs.fstags:main'],
+        'console_scripts': {
+            'fstags': 'cs.fstags:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils>=20210404',

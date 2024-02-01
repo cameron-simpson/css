@@ -45,8 +45,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts': ['tagger = cs.app.tagger.__main__:main'],
-        'gui_scripts': ['tagger-gui = cs.app.tagger.gui_tk:main'],
+        'console_scripts': {
+            'tagger': 'cs.app.tagger.__main__:main'
+        },
+        'gui_scripts': {
+            'tagger-gui': 'cs.app.tagger.gui_tk:main'
+        },
     },
     'install_requires': [
         'cs.deco',
