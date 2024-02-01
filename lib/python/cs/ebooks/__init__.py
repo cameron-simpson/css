@@ -249,6 +249,7 @@ DISTINFO = {
         'cs.x',
         'icontract',
         'mobi',
+        'pillow',
         'pycryptodomex',
         'sqlalchemy',
         'typeguard',
