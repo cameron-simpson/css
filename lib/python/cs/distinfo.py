@@ -925,12 +925,12 @@ class Module:
   @property
   @pfx_method(use_str=True)
   def package(self):
-    ''' The python package Module for this Module
-        (which may be the package Module or some submodule).
+    ''' The python package module for this Module
+        (which may be the package module or some submodule).
     '''
     name = self.package_name
     if name is None:
-      raise ValueError("self.package_name is None")
+      raise AttributeError("self.package_name is None")
     return self.modules[name]
 
   @property
