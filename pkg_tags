@@ -79,7 +79,7 @@ cs.service_api ok_revision=fbbe7b8237dbb31a966b54a2a5c7dafc703a3be4 pypi.release
 cs.sh
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.splink ok_revision="2393282fa18a5db40b6312125703e7501d81a7c9" pypi.release="20230612"
-cs.sqlalchemy_utils ok_revision="25d9d95cde4d1b7280497e6a6e01d9bb9236edce" pypi.release="20230612" features={"20230612":["orchestrated_session"]}
+cs.sqlalchemy_utils ok_revision="6bffe65c02777bd9ab29edc059e111f4c02b6d74" pypi.release="20230612" features={"20230612":["orchestrated_session"]}
 cs.sqltags ok_revision="5d67d1ec1f26e3f5248d4b66304b00f2997004dd" pypi.release="20230612"
 cs.tagset ok_revision="6c0d0999679ef1b6c65875959faca9c798058063" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20240201"
 cs.taskqueue ok_revision="5b2c7311b70519bea966bedf91008c797770c819" features={"20221207":["BaseTask"]} pypi.release="20230401"
