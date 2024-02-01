@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from fnmatch import fnmatch
+from functools import cached_property
 from getopt import GetoptError
 from glob import glob
 import importlib
@@ -856,20 +857,16 @@ class Module:
     '''
     return self.modules.vcs
 
-  @property
+  @cached_property
   @pfx_method(use_str=True)
   def module(self):
-    ''' The Module for this package name.
+    ''' The module for this package name.
     '''
-    M = self._module
-    if M is None:
-      with Pfx("importlib.import_module(%r)", self.name):
-        try:
-          M = importlib.import_module(self.name)
-        except (ImportError, NameError, SyntaxError) as e:
-          error("import fails: %s", e)
-          M = None
-      self._module = M
+    try:
+      M = pfx_call(importlib.import_module, self.name)
+    except (ImportError, ModuleNotFoundError, NameError, SyntaxError) as e:
+      error("import fails: %s", e)
+      M = None
     return M
 
   @pfx_method(use_str=True)
@@ -898,8 +895,7 @@ class Module:
       return False
     return True
 
-  @property
-  @cachedmethod
+  @cached_property
   @pfx_method(use_str=True)
   def package_name(self):
     ''' The name of the package containing this module,
