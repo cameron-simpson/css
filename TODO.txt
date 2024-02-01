@@ -1,3 +1,4 @@
+taggerrc with pf-like rules instead of current arcane fstags stuff - sequential readable rules
 dlog needs a way to batch delayed updates
 does sqlite need the lock file or can I detect the locked exception and retry?
 cs.ebooks.dedrm: option to use the plugin.zip directly instead of an unpacked source tree?
