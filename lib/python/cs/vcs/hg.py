@@ -87,7 +87,7 @@ class VCS_Hg(VCS):
         rev, node = line.split()
         break
       else:
-        rev, node = None, None
+        continue
       path_map[path] = (None if rev is None else int(rev)), node
     return path_map
 
