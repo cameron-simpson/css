@@ -36,7 +36,7 @@ cs.fileutils pypi.release="20240201" ok_revision="07405d79cb63b40c0e5ba5dae86b50
 cs.fs ok_revision="3618571a8f483ddd68e418a472a372bc8c93c89c" pypi.release="20240201" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"]}
 cs.fsm ok_revision="64aa3ad214e95abf1768c3a3ebccd0c17461783e" pypi.release="20231020" features={"20231018":["fsm_transitions_as_dot__history_style"]}
 cs.fstag
-cs.fstags pypi.release="20240201" ok_revision=d8b7f38149b5d687bfdcfe5d254be1a94990bd5f features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"]}
+cs.fstags pypi.release="20240201.1" ok_revision=d8b7f38149b5d687bfdcfe5d254be1a94990bd5f features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"]}
 cs.fuleutils
 cs.gimmicks ok_revision=ec565540113a2dbea584907ffb1d19d2d3c61de8 pypi.release="20230331" features={"20211208":["TimeoutError"],"20220429":["devnull"],"20230212":["gimmick_r","gimmick_s"],"20230331":["open_append"]}
 cs.gvutils ok_revision="774f3a27029c48285a64daa52000d4132fa8a716" pypi.release="20230816" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"],"20221207":["gvsvg"]}
