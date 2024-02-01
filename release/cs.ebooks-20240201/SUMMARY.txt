@@ -1,0 +1,4 @@
+Kobo support.
+PDF support.
+CBZ support.
+Many new things and fixes.
