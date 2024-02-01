@@ -12,7 +12,7 @@ from cs.psutils import run
 
 from typeguard import typechecked
 
-__version__ = '20240201'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python3"],
