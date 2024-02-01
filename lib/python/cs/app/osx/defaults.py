@@ -12,6 +12,8 @@ from cs.psutils import run
 
 from typeguard import typechecked
 
+__version__ = '20240201'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
