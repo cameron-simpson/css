@@ -61,6 +61,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils>=20210407.1',
+        'cs.fs',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -71,7 +72,9 @@ DISTINFO = {
         'cs.upd',
     ],
     'entry_points': {
-        'console_scripts': ['pop3 = cs.pop3:main'],
+        'console_scripts': {
+            'pop3': 'cs.pop3:main'
+        },
     },
 }
 
