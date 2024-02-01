@@ -88,7 +88,7 @@ class VCS_Hg(VCS):
         break
       else:
         rev, node = None, None
-      path_map[path] = int(rev), node
+      path_map[path] = (None if rev is None else int(rev)), node
     return path_map
 
   def add_files(self, *paths):
