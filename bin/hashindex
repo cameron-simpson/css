@@ -403,5 +403,71 @@ def dir_remap(
       dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname
   )
 
+@uses_fstags
+@uses_runstate
+@require(lambda move_mode, symlink_mode: not (move_mode and symlink_mode))
+def rearrange(
+    srcdirpath: str,
+    rfspaths_by_hashcode,
+    *,
+    hashname: str,
+    move_mode: bool = False,
+    symlink_mode=False,
+    doit: bool,
+    quiet: bool = False,
+    fstags: FSTags,
+    runstate: RunState,
+):
+  ''' Rearrange the files in `dirpath` according to the
+      hashcode->[relpaths] `fspaths_by_hashcode`.
+  '''
+  with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
+    for srcpath, rfspaths in dir_remap(srcdirpath):
+      runstate.raiseif()
+      if not rfspaths:
+        continue
+      filename = basename(srcpath)
+      if filename.startswith('.') or filename == fstags.tagsfile_basename:
+        continue
+      with Pfx(srcpath):
+        rsrcpath = relpath(srcpath, srcdirpath)
+        assert is_valid_rpath(rsrcpath), (
+            "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
+        )
+        proxy.text = rsrcpath
+        ok = True
+        for rdstpath in rfspaths:
+          assert is_valid_rpath(rdstpath), (
+              "rdstpath:%r is not a clean subpath" % (rdstpath,)
+          )
+          dstpath = joinpath(srcdirpath, rdstpath)
+          with Pfx(dstpath):
+            if dstpath == srcpath:
+              continue
+            if existspath(dstpath):
+              if samefile(srcpath, rdstpath):
+                continue
+              if file_checksum(dstpath) != file_checksum(srcpath):
+                warning(
+                    "dstpath %r already exists with different hashcode",
+                    dstpath
+                )
+              ok = False
+              continue
+            dstdirpath = dirname(dstpath)
+            if doit:
+              needdir(dstdirpath, use_makedirs=True, log=warning)
+            if symlink_mode:
+              quiet or print("ln -s", abspath(srcpath), dstpath)
+              if doit:
+                pfx_call(os.symlink, abspath(srcpath), dstpath)
+                fstags[dstpath].update(fstags[srcpath])
+            else:
+              quiet or print("mv" if move_mode else "ln", srcpath, dstpath)
+              if doit:
+                fstags.link(srcpath, dstpath)
+        if ok and move_mode and rsrcpath not in rfspaths:
+          pfx_call(os.remove, srcpath)
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
