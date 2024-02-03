@@ -65,6 +65,99 @@ class HashIndexCommand(BaseCommand):
       with super().run_context():
         yield
 
+  def cmd_rearrange(
+      self,
+      argv,
+      *,
+      hashindex_exe=DEFAULT_HASHINDEX_EXE,
+      ssh_exe=DEFAULT_SSH_EXE,
+  ):
+    ''' Usage: {cmd} [-e sshcmd] [-h hashname] [--mv] [-n] [-s] {{refdir|-}} [[user@]rhost:]targetdir
+          Rearrange files in targetdir based on their positios in
+          refdir.
+    '''
+    options = self.options
+    badopts = False
+    options.popopts(
+        argv,
+        e='ssh_exe',
+        h_='hashname',
+        mv='mode_mode',
+        n='dry_run',
+        s='symlink_mode',
+    )
+    if not argv:
+      warning("missing refdir")
+      badopts = True
+    else:
+      refdir = argv.pop(0)
+      with Pfx("refdir %r", refdir):
+        if refdir != '-':
+          if not isdirpath(refdir):
+            warning("not a directory")
+            badopts = True
+    if not argv:
+      warning("missing targetdir")
+      badopts = True
+    else:
+      targetdir = argv.pop(0)
+      with Pfx("targetdir %r", targetdir):
+        ssh_target = None
+        # check for [user@]rhost
+        try:
+          prefix, suffix = targetdir.split(':', 1)
+        except ValueError:
+          pass
+        else:
+          if prefix and '/' not in prefix:
+            ssh_target = prefix
+            targetdir = suffix
+        if ssh_target is None:
+          if not isdirpath(targetdir):
+            warning("not a directory")
+            badopts = True
+    if argv:
+      warning("extra arguments: %r", argv)
+      badopts = True
+    if badopts:
+      raise GetoptError('bad arguments')
+    doit = options.doit
+    quiet = options.quiet
+    hashname = options.hashname
+    move_mode = options.move_mode
+    symlink_mode = options.symlink_mode
+    fspaths_by_hashcode = defaultdict(list)
+    with run_task(f'hashindex {refdir}'):
+      for hashcode, fspath in hashindex(refdir):
+        if hashcode is not None:
+          fspaths_by_hashcode[hashcode].append(fspath)
+    if ssh_target:
+      reflines = []
+      for hashcode, fspaths in fspaths_by_hashcode.items():
+        for fspath in fspaths:
+          reflines.append(f'{hashcode} {fspath}\n')
+      input_s = "".join(reflines)
+      hashindex_argv = [hashindex_exe, '-h', hashname]
+      if not doit:
+        hashindex.append('-n')
+      hashindex.extend(['-', targetdir])
+      run(
+          [ssh_exe, ssh_target,
+           shlex.join(hashindex_argv)],
+          input=input_s,
+          quiet=False,
+      )
+    else:
+      rearrange(
+          targetdir,
+          fspaths_by_hashcode,
+          hashname=hashname,
+          doit=doit,
+          move_mode=move_mode,
+          symlink_mode=symlink_mode,
+          quiet=quiet,
+      )
+
   @uses_fstags
   @uses_upd
   def cmd_linkto(self, argv, *, fstags: FSTags, upd: Upd):
