@@ -316,12 +316,15 @@ class HashIndexCommand(BaseCommand):
                         pfx_call(os.remove, srcpath)
     return 0 if ok else 1
 
-  @uses_fstags
-  def cmd_ls(self, argv, *, fstags: FSTags):
-    ''' Usage: {cmd} paths...
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} [-h hashname] paths...
           Walk the filesystem paths and emit a listing.
     '''
     options = self.options
+    options.popopts(
+        argv,
+        h_='hashname',
+    )
     hashname = options.hashname
     runstate = options.runstate
     if not argv:
@@ -329,30 +332,12 @@ class HashIndexCommand(BaseCommand):
     xit = 0
     for path in argv:
       runstate.raiseif()
-      with Pfx(path):
-        if isfilepath(path):
-          h = file_checksum(path)
-          print(h, path)
-        elif isdirpath(path):
-          for dirpath, dirnames, filenames in os.walk(path):
-            runstate.raiseif()
-            dirnames[:] = sorted(dirnames)
-            for filename in sorted(filenames):
-              runstate.raiseif()
-              if filename.startswith('.'
-                                     ) or filename == fstags.tagsfile_basename:
-                continue
-              filepath = joinpath(dirpath, filename)
-              try:
-                h = file_checksum(filepath, hashname=hashname)
-              except OSError as e:
-                warning("file_checksum(%r,..)", filepath)
-                xit = 1
-                continue
-              print(h, filepath)
-        else:
-          warning("invalid path, not file or directory")
+      for h, fspath in hashindex(path, hashname=hashname):
+        runstate.raiseif()
+        if h is None:
           xit = 1
+        else:
+          print(h, fspath)
     return xit
 
 @uses_fstags
