@@ -341,5 +341,67 @@ def set_fstags_hashcode(
   csum.st_size = S.st_size
   csum.st_mtime = S.st_mtime
 
+@uses_fstags
+@uses_runstate
+def hashindex(fspath, *, hashname: str, runstate: RunState, fstags: FSTags):
+  ''' Generator yielding `(BaseHashCode,filepath)` 2-tuples
+      for the files in `fspath`, which may be a file or directory path.
+      Note that it yields `(None,filepath)` for files which cannot be accessed.
+  '''
+  if isfilepath(fspath):
+    h = file_checksum(fspath)
+    yield h, fspath
+  elif isdirpath(fspath):
+    for dirpath, dirnames, filenames in os.walk(fspath):
+      runstate.raiseif()
+      dirnames[:] = sorted(dirnames)
+      for filename in sorted(filenames):
+        runstate.raiseif()
+        if filename.startswith('.') or filename == fstags.tagsfile_basename:
+          continue
+        filepath = joinpath(dirpath, filename)
+        h = file_checksum(filepath, hashname=hashname)
+        yield h, filepath
+  else:
+    warning("hashindex(%r): neither file nor directory")
+
+def dir_filepaths(dirpath: str):
+  ''' Generator yielding the filesystem paths of the files in `dirpath`.
+  '''
+  for subdirpath, dirnames, filenames in os.walk(dirpath):
+    dirnames[:] = sorted(dirnames)
+    for filename in sorted(filenames):
+      yield joinpath(subdirpath, filename)
+
+def paths_remap(
+    srcpaths: Iterable[str],
+    fspaths_by_hashcode: Mapping[BaseHashCode, List[str]],
+    *,
+    hashname: str,
+):
+  ''' Generator yielding `(srcpath,fspaths)` 2-tuples.
+  '''
+  for srcpath in srcpaths:
+    with Pfx(srcpath):
+      srchashcode = file_checksum(srcpath, hashname=hashname)
+      if srchashcode is None:
+        warning("no hashcode")
+        continue
+      fspaths = fspaths_by_hashcode.get(srchashcode, [])
+    yield srcpath, fspaths
+
+def dir_remap(
+    srcdirpath: str,
+    fspaths_by_hashcode: Mapping[BaseHashCode, List[str]],
+    *,
+    hashname: str,
+):
+  ''' Generator yielding `(srcpath,[remapped_paths])` 2-tuples
+      based on the hashcodes keying `rfspaths_by_hashcode`.
+  '''
+  yield from paths_remap(
+      dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname
+  )
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
