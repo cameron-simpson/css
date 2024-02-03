@@ -12,6 +12,7 @@ from getopt import GetoptError
 import os
 from os.path import (
     abspath,
+    basename,
     dirname,
     exists as existspath,
     isabs as isabspath,
@@ -19,24 +20,31 @@ from os.path import (
     isfile as isfilepath,
     join as joinpath,
     relpath,
+    samefile,
 )
+import shlex
 from stat import S_ISREG
 import sys
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union
 
+from icontract import require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.fs import needdir, shortpath
+from cs.fs import is_valid_rpath, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
-from cs.upd import Upd, uses_upd, print, run_task
+from cs.psutils import run
+from cs.resources import RunState, uses_runstate
+from cs.upd import Upd, uses_upd, print, run_task # pylint: disable=redefined-builtin
 
 from cs.debug import X, trace
 
 DEFAULT_HASHNAME = 'sha256'
+DEFAULT_HASHINDEX_EXE = 'hashindex'
+DEFAULT_SSH_EXE = 'ssh'
 
 def main(argv=None):
   ''' Commandline implementation.
@@ -56,6 +64,7 @@ class HashIndexCommand(BaseCommand):
   class Options(BaseCommand.Options):
     hashname: str = DEFAULT_HASHNAME
     move_mode: bool = False
+    ssh_exe: str = 'ssh'
     symlink_mode: bool = False
 
   @contextmanager
