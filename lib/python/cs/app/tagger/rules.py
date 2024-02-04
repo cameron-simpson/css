@@ -258,9 +258,6 @@ class Rule(Promotable):
           raise ValueError("unrecognised verb")
     raise RuntimeError
 
-  @strable
-  def from_file(cls, f):
-    ''' Read rules from the file `f`.
   @staticmethod
   @pops_tokens
   @trace
@@ -336,8 +333,18 @@ class Rule(Promotable):
           tokens.pop(0)
           return True
     return False
+
+  @classmethod
+  def from_file(cls, lines: [str, Iterable[str]]):
+    ''' Read rules from `lines`.
+        If `lines` is a string, treat it as a filename and open it for read.
+    '''
+    if isinstance(lines, str):
+      filename = lines
+      with open(filename) as lines:
+        return cls.from_file(lines)
     rules = []
-    for lineno, line in enumerate(f, 1):
+    for lineno, line in enumerate(lines, 1):
       with Pfx(lineno):
         R = cls.from_str(line)
         if R is not None:
