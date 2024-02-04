@@ -5,7 +5,7 @@
 
 from collections import defaultdict
 import filecmp
-from functools import partial
+from functools import cached_property, partial
 import os
 from os.path import (
     abspath,
@@ -23,6 +23,8 @@ from os.path import (
 from threading import RLock
 from typing import List, Optional
 
+from icontract import require
+
 from cs.deco import cachedmethod, default_params, fmtdoc, promote
 from cs.fs import FSPathBasedSingleton, shortpath
 from cs.fstags import FSTags, uses_fstags
@@ -35,6 +37,8 @@ from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
 from cs.threads import locked, ThreadState, HasThreadState
 from cs.upd import run_task, print
+
+from .rules import Rule
 
 __version__ = None
 
@@ -84,6 +88,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
   '''
 
   TAG_PREFIX = TAGGER_TAG_PREFIX_DEFAULT
+  TAGGERRC = '.taggerrc'
 
   perthread_state = ThreadState(current=None)
 
@@ -120,6 +125,33 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     ''' The `TaggedPath` associated with this directory.
     '''
     return fstags[self.fspath]
+
+  @cached_property
+  def rules(self):
+    ''' The `Rule`s for this `Tagger` directory.
+    '''
+    taggerrc = self.pathto(self.TAGGERRC)
+    try:
+      with open(taggerrc) as f:
+        return tuple(Rule.from_file(f))
+    except FileNotFoundError:
+      return ()
+
+  @uses_fstags
+  @require(lambda filename: filename and '/' not in filename)
+  def process(self, filename, *, fstags: FSTags):
+    ''' Process the local file `filename` according to the `Tagger` rules.
+    '''
+    fspath = self.pathto(filename)
+    tagged = fstags[fspath]
+    # start with the format_tags of the file
+    tags = tagged.format_tagset()
+    print("initial tags:", tags)
+    for rule in self.rules:
+      print("Rule", rule, '...')
+      if rule.apply(fspath, tags):
+        print("applied")
+        print("-> tags:", tags)
 
   @property
   @cachedmethod
