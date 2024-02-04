@@ -321,6 +321,21 @@ class Rule(Promotable):
           raise ValueError(f'unsupported match-op {r(match_op)}')
 
     raise ValueError("invalid match-test")
+
+  @staticmethod
+  @pops_tokens
+  @trace
+  def pop_quick(tokens: List[TokenRecord]) -> bool:
+    ''' Check if the next token is `Identifier(name="quick")`.
+        If so, pop it and return `True`, otherwise `False`.
+    '''
+    if tokens:
+      next_token = tokens[0].token
+      match next_token:
+        case Identifier(name="quick"):
+          tokens.pop(0)
+          return True
+    return False
     rules = []
     for lineno, line in enumerate(f, 1):
       with Pfx(lineno):
