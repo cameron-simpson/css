@@ -9,12 +9,12 @@ from os.path import basename
 import re
 from re import Pattern
 import sys
-from typing import Any, Callable, List, Tuple, Union
+from typing import Any, Callable, Iterable, List, Tuple, Union
 
 from typeguard import typechecked
 from icontract import ensure, require
 
-from cs.deco import Promotable
+from cs.deco import decorator, Promotable, strable
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import (
     get_identifier,
@@ -78,6 +78,8 @@ class Identifier(_Token):
 
   @classmethod
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+    ''' Parse an identifier from `test`.
+    '''
     offset0 = offset
     start_offset = skipwhite(text, offset)
     name, end_offset = get_identifier(text, start_offset)
@@ -86,6 +88,8 @@ class Identifier(_Token):
     return None, None, offset0
 
 class QuotedString(_Token):
+  ''' A double quoted string.
+  '''
 
   def __init__(self, value: str, quote: str):
     self.value = value
@@ -97,6 +101,8 @@ class QuotedString(_Token):
 
   @classmethod
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+    ''' Parse a double quoted string from `text`.
+    '''
     offset0 = offset
     start_offset = skipwhite(text, offset)
     if text.startswith('"', start_offset):
@@ -106,6 +112,9 @@ class QuotedString(_Token):
     return None, None, offset0
 
 class RegexpComparison(_Token):
+  ''' A comparison of some string using a regular expression.
+      Return is `None` on no omatch or the `Match.groupdict()` on a match.
+  '''
 
   # supported delimiters for regular expressions
   REGEXP_DELIMS = '/:!|'
@@ -233,6 +242,7 @@ class Rule(Promotable):
         Actions:
 
             mv "path-format-string"
+            tag tag_name={"tag-format-string"|int}
     '''
     tokens = list(cls.tokenise(rule_s))
     print("TOKENS:", [T[0] for T in tokens])
@@ -354,5 +364,4 @@ class Rule(Promotable):
 if __name__ == '__main__':
   from cs.logutils import setup_logging
   setup_logging()
-  R = Rule.from_str(sys.argv[1])
-  print(R)
+  print(Rule.from_str(sys.argv[1]))
