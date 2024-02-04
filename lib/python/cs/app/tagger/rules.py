@@ -27,6 +27,23 @@ from cs.pfx import Pfx, pfx_call
 
 from cs.debug import X, trace, r, s
 
+@decorator
+def pops_tokens(func):
+  ''' Decorator to save the current tokens on entry and to restore
+      them if an exception is raised.
+  '''
+
+  @typechecked
+  def pops_token_wrapper(tokens: List[TokenRecord]):
+    tokens0 = list(tokens)
+    try:
+      return func(tokens)
+    except:  # pylint: disable=
+      tokens[:] = tokens0
+      raise
+
+  return pops_token_wrapper
+
 class _Token(ABC):
 
   @abstractclassmethod
@@ -227,68 +244,15 @@ class Rule(Promotable):
       quick = False
       match verb:
         case Identifier(name="match"):
-          # quick?
-          if tokens:
-            next_token = tokens[0].token
-            match next_token:
-              case Identifier(name="quick"):
-                tokens.pop(0)
-                quick = True
-          # [match-name] match-op
-          match_attribute = "basename"
-          if tokens:
-            next_token = tokens[0].token
-            match next_token:
-              case Identifier():
-                tokens.pop(0)
-                match_attribute = next_token.name
-          if not tokens:
-            raise ValueError("missing match-op")
-          # make a match_test function
-          match_op = tokens.pop(0).token
-          with Pfx(match_op):
-            match match_op:
-              case RegexpComparison():
-                # ~/regexp/
-                def match_test(test_s: str) -> Union[dict, None]:
-                  m = match_op.regexp.search(test_s)
-                  if not m:
-                    return None
-                  return m.groupdict()
-              case _:
-                raise ValueError(f'unsupported match-op {r(match_op)}')
+          quick = cls.pop_quick(tokens)
+          match_test, match_attribute = cls.pop_match_test(tokens)
           # collect the action
-          if not tokens:
-            action = None
+          if tokens:
+            action = cls.pop_action(tokens)
           else:
-            action_token = tokens.pop(0).token
-            with Pfx(action_token):
-              match action_token:
-                case Identifier(name="mv"):
-                  if not tokens:
-                    raise ValueError("missing mv target")
-                  target_token = tokens.pop(0).token
-                  match target_token:
-                    case QuotedString():
-                      target_format = target_token.value
-
-                      def action(fspath: str, fkwargs: dict) -> str:
-                        target_fspath = target_format.format(**fkwargs)
-                        print("MV", fspath, "->", target_fspath)
-
-                      action.__doc__ = (
-                          f'Move `fspath` to {target_format!r}`.format_kwargs(**format_kwargs)`.'
-                      )
-                    case _:
-                      raise ValueError(
-                          f'expected quoted target format string, got: {target_token}'
-                      )
-                case _:
-                  raise ValueError("unrecognised action")
-            if tokens:
-              raise ValueError(
-                  f'extra tokens: {" ".join(T[0] for T in tokens)}'
-              )
+            action = None
+          if tokens:
+            raise ValueError(f'extra tokens: {" ".join(T[0] for T in tokens)}')
           return cls(rule_s, match_attribute, match_test, action, quick=quick)
         case _:
           raise ValueError("unrecognised verb")
@@ -297,7 +261,66 @@ class Rule(Promotable):
   @strable
   def from_file(cls, f):
     ''' Read rules from the file `f`.
+  @staticmethod
+  @pops_tokens
+  @trace
+  def pop_action(tokens: List[TokenRecord]) -> Union[Callable, None]:
+    ''' Pop an action from `tokens`.
     '''
+    action_token = tokens.pop(0).token
+    with Pfx(action_token):
+      match action_token:
+        case Identifier(name="mv"):
+          if not tokens:
+            raise ValueError("missing mv target")
+          target_token = tokens.pop(0).token
+          match target_token:
+            case QuotedString():
+              target_format = target_token.value
+
+              def action(fspath: str, fkwargs: dict) -> str:
+                target_fspath = target_format.format(**fkwargs)
+                print("MV", fspath, "->", target_fspath)
+
+              action.__doc__ = (
+                  f'Move `fspath` to {target_format!r}`.format_kwargs(**format_kwargs)`.'
+              )
+              return action
+    raise ValueError("invalid action")
+
+  @staticmethod
+  @pops_tokens
+  @trace
+  def pop_match_test(tokens: List[TokenRecord]) -> Tuple[Callable, str]:
+    ''' Pop a match-test from `tokens`.
+    '''
+    # [match-name] match-op
+    match_attribute = "basename"
+    if tokens:
+      next_token = tokens[0].token
+      match next_token:
+        case Identifier():
+          tokens.pop(0)
+          match_attribute = next_token.name
+    if not tokens:
+      raise ValueError("missing match-op")
+    # make a match_test function
+    match_op = tokens.pop(0).token
+    with Pfx(match_op):
+      match match_op:
+        case RegexpComparison():
+          # ~/regexp/
+          def match_test(test_s: str) -> Union[dict, None]:
+            m = match_op.regexp.search(test_s)
+            if not m:
+              return None
+            return m.groupdict()
+
+          return match_test, match_attribute
+        case _:
+          raise ValueError(f'unsupported match-op {r(match_op)}')
+
+    raise ValueError("invalid match-test")
     rules = []
     for lineno, line in enumerate(f, 1):
       with Pfx(lineno):
