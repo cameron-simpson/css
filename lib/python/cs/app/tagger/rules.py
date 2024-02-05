@@ -70,7 +70,7 @@ class _Token(ABC):
     raise NotImplementedError
 
 class Identifier(_Token):
-  ''' An identifier.
+  ''' A dotted identifier.
   '''
 
   @require(lambda name: is_identifier(name))
@@ -83,11 +83,11 @@ class Identifier(_Token):
 
   @classmethod
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
-    ''' Parse an identifier from `test`.
+    ''' Parse a dotted identifier from `test`.
     '''
     offset0 = offset
     start_offset = skipwhite(text, offset)
-    name, end_offset = get_identifier(text, start_offset)
+    name, end_offset = get_dotted_identifier(text, start_offset)
     if name:
       return text[start_offset:end_offset], cls(name), end_offset
     return None, None, offset0
