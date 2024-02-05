@@ -238,6 +238,30 @@ class Rule(Promotable):
         ')'
     )
 
+
+  @typechecked
+  def get_attribute_value(
+      self, fspath: str, tags: TagSet, attribute_name: str
+  ):
+    ''' Given the filesystem path `fspath` and the working `TagSet` `tags`,
+        return the value indicated by `attribute_name`.
+
+        The following attributes are predefined:
+        * `basename`: the basename of `fspath`
+        * `fspath`: the absolute path of `fspath`
+        Other names are used as tag names in `tags`.
+
+        `None` is returned for an unknown name.
+    '''
+    try:
+      # predefined
+      func = {
+          'basename': partial(basename, fspath),
+          'fspath': partial(abspath, fspath),
+      }[attribute_name]
+    except KeyError:
+      return tags.get(attribute_name)
+    return func()
   @classmethod
   def get_token(cls, rule_s: str, offset: int = 0) -> Tuple[str, Any, int]:
     ''' Parse a token from `rule_s` at `offset`.
