@@ -403,18 +403,10 @@ class Rule(Promotable):
     match_op = tokens.pop(0).token
     with Pfx(match_op):
       match match_op:
-        case RegexpComparison():
-          # ~/regexp/
-          def match_test(test_s: str) -> Union[dict, None]:
-            m = match_op.regexp.search(test_s)
-            if not m:
-              return None
-            return m.groupdict()
-
-          return match_test, match_attribute
+        case Comparison():
+          return match_op, match_attribute
         case _:
           raise ValueError(f'unsupported match-op {r(match_op)}')
-
     raise ValueError("invalid match-test")
 
   @staticmethod
