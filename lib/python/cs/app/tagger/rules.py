@@ -27,6 +27,11 @@ from cs.pfx import Pfx, pfx_call
 
 from cs.debug import X, trace, r, s
 
+def slosh_quote(s: str, q: str):
+  ''' Quote a string `s` with quote character `q`.
+  '''
+  return q + self.value.replace('\\', '\\\\').replace(q, '\\' + q)
+
 @decorator
 def pops_tokens(func):
   ''' Decorator to save the current tokens on entry and to restore
