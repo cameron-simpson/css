@@ -238,6 +238,25 @@ class Rule(Promotable):
         ')'
     )
 
+  @typechecked
+  def apply(self, fspath: str, tags: TagSet) -> bool:
+    ''' Apply this `Rule` to `tagged` using the working `TagSet` `tags`.
+        On no match return `False`.
+        On a match:
+        * update `tags` from the match result
+        * run the `Rule.action` if not `None`
+        * return `True`
+    '''
+    test_s = self.get_attribute_value(fspath, tags, self.match_attribute)
+    if not isinstance(test_s, str):
+      raise TypeError(
+          f'expected str for {self.match_attribute!r} but got: {s(test_s)}'
+      )
+    match_result = self.match_test(test_s, tags)
+    if match_result is None:
+      return False
+    tags.update(match_result)
+    return True
 
   @typechecked
   def get_attribute_value(
