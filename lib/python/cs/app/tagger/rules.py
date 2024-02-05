@@ -115,7 +115,42 @@ class QuotedString(_Token):
       return text[start_offset:end_offset], cls(value, q), end_offset
     return None, None, offset0
 
-class RegexpComparison(_Token):
+class Comparison(_Token, ABC):
+  ''' Abstract base class for comparisons.
+  '''
+
+  @abstractmethod
+  def __call__(self, value, tags):
+    raise NotImplementedError
+
+class EqualityComparison(Comparison):
+  ''' A comparison of some string for equality.
+      Return is `None` on no omatch or the `Match.groupdict()` on a match.
+  '''
+
+  @typechecked
+  def __init__(self, compare_s: str, tags: TagSet):
+    self.compare_s = compare_s
+
+  def __str__(self):
+    q = '"'
+    return f'== {slosh_quote(self.compare_s,q)}'
+
+  @classmethod
+  @trace
+  def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+    offset0 = offset
+    start_offset = skipwhite(text, offset)
+    if text.startswith('==', start_offset):
+      offset = skipwhite(text, start_offset + 2)
+      _, qs, end_offset = QuotedString.from_str(text, offset)
+      return text[start_offset:end_offset], cls(qs.value), end_offset
+    return None, None, offset0
+
+  def __call__(self, value_s: str, tags: TagSet):
+    return value_s == self.compare_s
+
+class RegexpComparison(Comparison):
   ''' A comparison of some string using a regular expression.
       Return is `None` on no omatch or the `Match.groupdict()` on a match.
   '''
@@ -161,6 +196,12 @@ class RegexpComparison(_Token):
       regexp = pfx_call(re.compile, re_s)
       return text[start_offset:end_offset], cls(regexp, delim), end_offset
     return None, None, offset0
+
+  def __call__(self, value: str, tags: TagSet):
+    m = self.regexp.search(value)
+    if not m:
+      return None
+    return m.groupdict()
 
 TokenRecord = namedtuple('TokenRecord', 'matched token end_offset')
 
