@@ -101,8 +101,7 @@ class QuotedString(_Token):
     self.quote = quote
 
   def __str__(self):
-    q = self.quote
-    return q + self.value.replace('\\', '\\\\').replace(q, '\\' + q)
+    return slosh_quote(self.value, self.quote)
 
   @classmethod
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
