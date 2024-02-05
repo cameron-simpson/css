@@ -215,7 +215,7 @@ class Rule(Promotable):
       self,
       definition: str,
       match_attribute: str,
-      match_test: Callable[[str], dict],
+      match_test: Callable[[str, TagSet], dict],
       action: Callable[[str, dict], str],
       *,
       quick=False
