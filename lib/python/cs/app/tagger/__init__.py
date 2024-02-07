@@ -147,11 +147,27 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     # start with the format_tags of the file
     tags = tagged.format_tagset()
     print("initial tags:", tags)
+    filed_to = []
     for rule in self.rules:
-      print("Rule", rule, '...')
-      if rule.apply(fspath, tags):
-        print("applied")
-        print("-> tags:", tags)
+      with Pfx(rule):
+        print("Rule", rule, '...')
+        applied = rule.apply(fspath, tags, doit=False, verbose=True)
+        if applied is False:
+          print("  no match")
+          continue
+        for action in applied:
+          with Pfx("action %r", action):
+            print("  applied", repr(action))
+            match action:
+              case str(new_fspath):
+                print("    filed_to +", new_fspath)
+                filed_to.append(action)
+              case [True, Tag() as tag]:
+                print("    tags +", tag)
+              case [False, Tag(name, value=None) as tag]:
+                print("    tags -", name)
+              case _:
+                warning("ignoring unsupported action")
 
   @property
   @cachedmethod
