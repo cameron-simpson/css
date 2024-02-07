@@ -88,9 +88,11 @@ class Identifier(_Token):
     offset0 = offset
     start_offset = skipwhite(text, offset)
     name, end_offset = get_dotted_identifier(text, start_offset)
-    if name:
-      return text[start_offset:end_offset], cls(name), end_offset
-    return None, None, offset0
+    if not name:
+      raise SyntaxError(
+          f'{offset}: expected dotted identifier, found {text[offset:offset+3]!r}...'
+      )
+    return text[start_offset:end_offset], cls(name), end_offset
 
 class QuotedString(_Token):
   ''' A double quoted string.
@@ -109,11 +111,13 @@ class QuotedString(_Token):
     '''
     offset0 = offset
     start_offset = skipwhite(text, offset)
-    if text.startswith('"', start_offset):
-      q = text[start_offset]
-      value, end_offset = get_qstr(text, start_offset)
-      return text[start_offset:end_offset], cls(value, q), end_offset
-    return None, None, offset0
+    if not text.startswith('"', start_offset):
+      raise SyntaxError(
+          f'{start_offset}: expected ", found {text[start_offset:start_offset+1]!r}'
+      )
+    q = text[start_offset]
+    value, end_offset = get_qstr(text, start_offset)
+    return text[start_offset:end_offset], cls(value, q), end_offset
 
 class Comparison(_Token, ABC):
   ''' Abstract base class for comparisons.
@@ -141,11 +145,13 @@ class EqualityComparison(Comparison):
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     offset0 = offset
     start_offset = skipwhite(text, offset)
-    if text.startswith('==', start_offset):
-      offset = skipwhite(text, start_offset + 2)
-      _, qs, end_offset = QuotedString.from_str(text, offset)
-      return text[start_offset:end_offset], cls(qs.value), end_offset
-    return None, None, offset0
+    if not text.startswith('==', start_offset):
+      raise SyntaxError(
+          f'{offset}: expected "==", found {text[start_offset:start_offset+2]!r}'
+      )
+    offset = skipwhite(text, start_offset + 2)
+    _, qs, end_offset = QuotedString.from_str(text, offset)
+    return text[start_offset:end_offset], cls(qs.value), end_offset
 
   def __call__(self, value_s: str, tags: TagSet):
     return value_s == self.compare_s
@@ -172,30 +178,26 @@ class RegexpComparison(Comparison):
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     offset0 = offset
     start_offset = skipwhite(text, offset)
-    if text.startswith('~', start_offset):
-      X("~")
-      offset = skipwhite(text, start_offset + 1)
-      if not text.startswith(tuple(cls.REGEXP_DELIMS), offset):
-        raise ValueError(
-            f'{offset}: expected regular expression delimited by one of {cls.REGEXP_DELIMS!r}'
-        )
-      delim = text[offset]
-      X("delim = %r", delim)
-      X("  at %r", text[offset:])
-      offset += 1
-      endpos = text.find(delim, offset)
-      X("endpos = %r", endpos)
-      if endpos < 0:
-        raise ValueError(
-            f'{offset}: count not find closing delimiter {delim!r} for regular expression'
-        )
-      re_s = text[offset:endpos]
-      X("re_s = %r", re_s)
-      end_offset = endpos + 1
-      X("offset => %r", offset)
-      regexp = pfx_call(re.compile, re_s)
-      return text[start_offset:end_offset], cls(regexp, delim), end_offset
-    return None, None, offset0
+    if not text.startswith('~', start_offset):
+      raise SyntaxError(
+          f'{start_offset}: expected "~", found {text[start_offset:start_offset+1]!r}'
+      )
+    offset = skipwhite(text, start_offset + 1)
+    if not text.startswith(tuple(cls.REGEXP_DELIMS), offset):
+      raise SyntaxError(
+          f'{offset}: expected regular expression delimited by one of {cls.REGEXP_DELIMS!r}'
+      )
+    delim = text[offset]
+    offset += 1
+    endpos = text.find(delim, offset)
+    if endpos < 0:
+      raise SyntaxError(
+          f'{offset}: count not find closing delimiter {delim!r} for regular expression'
+      )
+    re_s = text[offset:endpos]
+    end_offset = endpos + 1
+    regexp = pfx_call(re.compile, re_s)
+    return text[start_offset:end_offset], cls(regexp, delim), end_offset
 
   def __call__(self, value: str, tags: TagSet):
     m = self.regexp.search(value)
