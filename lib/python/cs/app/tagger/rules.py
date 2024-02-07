@@ -217,7 +217,7 @@ class RegexpComparison(Comparison):
     self.delim = delim
 
   def __str__(self):
-    return '~ {self.delim}{self.regexp.pattern}{self.delim}'
+    return f'~ {self.delim}{self.regexp.pattern}{self.delim}'
 
   @classmethod
   @trace
