@@ -344,6 +344,8 @@ class Rule(Promotable):
     except KeyError:
       return tags.get(attribute_name)
     return func()
+
+  # TODO: should be class method of _Token
   @classmethod
   @typechecked
   def get_token(cls, rule_s: str, offset: int = 0) -> Tuple[str, _Token, int]:
@@ -356,15 +358,23 @@ class Rule(Promotable):
         If there is no recognised token, return `(None,None,offset)`.
     '''
     offset = skipwhite(rule_s, offset)
-    if not rule_s.startswith(('#', '//'), offset):
-      for token_type in Identifier, QuotedString, RegexpComparison:
-        try:
-          matched_s, token, end_offset = token_type.from_str(rule_s, offset)
-        except ValueError:
-          continue
-        if token is not None:
-          return matched_s, token, end_offset
-    return None, None, offset0
+    if offset == len(rule_s) or rule_s.startswith(('#', '//'), offset):
+      # end of string or comment -> end of tokens
+      raise EOFError
+    for token_type in (
+        Identifier,
+        QuotedString,
+        EqualityComparison,
+        RegexpComparison,
+        TagAddRemove,
+    ):
+      try:
+        matched_s, token, end_offset = token_type.from_str(rule_s, offset)
+      except SyntaxError:  # as e:
+        ##warning("not %s: %s", token_type.__name__, e)
+        continue
+      return matched_s, token, end_offset
+    raise SyntaxError(f'unrecognised token at: {rule_s[offset:]}')
 
   @classmethod
   def tokenise(cls, rule_s: str, offset: int = 0):
@@ -374,10 +384,15 @@ class Rule(Promotable):
         * `offset`: the parse offset after the token
     '''
     while True:
-      token_s, token, offset = cls.get_token(rule_s, offset)
-      X("tokenise: %r, offset=%d -> %r", token, offset, rule_s[offset:])
-      if token_s is None:
-        break
+      try:
+        token_s, token, offset = cls.get_token(rule_s, offset)
+      except EOFError:
+        return
+      assert rule_s[:offset].endswith(token_s), (
+          f'rule_s[:offset={offset}]'
+          f' should end with token_s:{token_s!r}'
+          f' but ends with {rule_s[:offset][-len(token_s):]!r}'
+      )
       yield TokenRecord(matched=token_s, token=token, end_offset=offset)
 
   @classmethod
@@ -390,10 +405,15 @@ class Rule(Promotable):
             drop [quick] [attribute] match-op
             do [quick] action
 
+        Match ops:
+
+            attribute ~ /regexp/
+            attribute == "string"
+
         Actions:
 
             mv "path-format-string"
-            tag tag_name={"tag-format-string"|int}
+            tag -tag_name +tag_name=["tag-format-string"]
     '''
     tokens = list(cls.tokenise(rule_s))
     print("TOKENS:", [T[0] for T in tokens])
