@@ -30,7 +30,7 @@ from cs.debug import X, trace, r, s
 def slosh_quote(s: str, q: str):
   ''' Quote a string `s` with quote character `q`.
   '''
-  return q + self.value.replace('\\', '\\\\').replace(q, '\\' + q)
+  return q + s.replace('\\', '\\\\').replace(q, '\\' + q)
 
 @decorator
 def pops_tokens(func):
