@@ -188,7 +188,7 @@ class EqualityComparison(Comparison):
   '''
 
   @typechecked
-  def __init__(self, compare_s: str, tags: TagSet):
+  def __init__(self, compare_s: str):
     self.compare_s = compare_s
 
   def __str__(self):
@@ -317,7 +317,9 @@ class Rule(Promotable):
     if match_result is None:
       return False
     tags.update(match_result)
-    return True
+    if self.action is None:
+      return True
+    return self.action(fspath, tags, doit=doit, verbose=verbose)
 
   @typechecked
   def get_attribute_value(
