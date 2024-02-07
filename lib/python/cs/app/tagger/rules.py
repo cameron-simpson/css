@@ -119,6 +119,52 @@ class QuotedString(_Token):
     value, end_offset = get_qstr(text, start_offset)
     return text[start_offset:end_offset], cls(value, q), end_offset
 
+class TagAddRemove(_Token):
+  ''' A `+name[="string"]` or `-name` tag update token.
+  '''
+
+  @require(lambda tag: tag.value is None or isinstance(tag.value, (int, str)))
+  @require(lambda tag, add_remove: add_remove or tag.value is None)
+  def __init__(self, tag: Tag, add_remove: Optional[bool] = True):
+    self.tag = tag
+    self.add_remove = add_remove
+
+  def __str__(self):
+    if self.add_remove:
+      return str(self.tag)
+    return f'-{self.tag.name}'
+
+  @classmethod
+  def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+    offset0 = offset
+    start_offset = skipwhite(text, offset)
+    if text.startswith('-', start_offset):
+      add_remove = False
+    elif text.startswith('+', start_offset):
+      add_remove = True
+    else:
+      raise ValueError(f'exported + or -, got: {text[offset:offset+1]!r}')
+    offset += 1
+    name, offset = get_dotted_identifier(text, offset)
+    if not name:
+      raise SyntaxError(
+          f'{offset}: expected dotted identifier, found {text[offset:offset+3]!r}...'
+      )
+    if text.startswith("=", offset):
+      if not add_remove:
+        raise ValueError(f'{offset}: unexpected assignment following -{name}')
+      offset += 1
+      _, qs, end_offset = QuotedString.from_str(text, offset)
+      if qs is None:
+        raise ValueError(f'{offset}: expected quoted string after {name}=')
+      value = qs.value
+    else:
+      value = None
+      end_offset = offset
+    return text[start_offset:end_offset], cls(
+        tag=Tag(name, value), add_remove=add_remove
+    ), end_offset
+
 class Comparison(_Token, ABC):
   ''' Abstract base class for comparisons.
   '''
