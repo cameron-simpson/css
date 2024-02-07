@@ -253,6 +253,8 @@ class RegexpComparison(Comparison):
 
 TokenRecord = namedtuple('TokenRecord', 'matched token end_offset')
 
+Action = Union[str, Tuple[bool, Tag]]
+
 class Rule(Promotable):
   ''' A tagger rule.
   '''
@@ -264,7 +266,7 @@ class Rule(Promotable):
       definition: str,
       match_attribute: str,
       match_test: Callable[[str, TagSet], dict],
-      action: Callable[[str, dict], str],
+      action: Callable[[str, Mapping], Iterable[Action]],
       *,
       quick=False
   ):
@@ -287,13 +289,19 @@ class Rule(Promotable):
     )
 
   @typechecked
-  def apply(self, fspath: str, tags: TagSet) -> bool:
-    ''' Apply this `Rule` to `tagged` using the working `TagSet` `tags`.
+  def apply(
+      self,
+      fspath: str,
+      tags: TagSet,
+      doit: bool = True,
+      verbose: bool = True,
+  ) -> Union[bool, Iterable[Action]]:
+    ''' Apply this `Rule` to `fspath` using the working `TagSet` `tags`,
+        typically the inherited tags of `fspath`.
         On no match return `False`.
-        On a match:
-        * update `tags` from the match result
-        * run the `Rule.action` if not `None`
-        * return `True`
+        On a match, return an iterable of side effects, each of which may be:
+        * `str`: a new value for the fspath indicating a move or link
+        * `(bool,Tag)`: a 2 tuple of aan "add_remove" bool and `Tag`
     '''
     test_s = self.get_attribute_value(fspath, tags, self.match_attribute)
     if not isinstance(test_s, str):
@@ -421,14 +429,54 @@ class Rule(Promotable):
             case QuotedString():
               target_format = target_token.value
 
-              def action(fspath: str, fkwargs: dict) -> str:
+              def mv_action(
+                  fspath: str,
+                  fkwargs: dict,
+                  doit=True,
+                  verbose=False,
+              ) -> Tuple[str]:
+                ''' Move `fspath` to `target_format`, return the new fspath.
+                '''
                 target_fspath = target_format.format(**fkwargs)
-                print("MV", fspath, "->", target_fspath)
+                ifverbose(verbose, "mv %r -> %r", fspath, target_fspath)
+                # TODO: actually move the file
+                if doit:
+                  pass
+                return (target_fspath,)
 
-              action.__doc__ = (
+              mv_action.__doc__ = (
                   f'Move `fspath` to {target_format!r}`.format_kwargs(**format_kwargs)`.'
               )
-              return action
+              return mv_action
+        case Identifier(name="tag"):
+          if not tokens:
+            raise ValueError("missing tags")
+          tag_tokens = []
+          while tokens:
+            token = tokens.pop(0).token
+            if not isinstance(token, TagAddRemove):
+              raise ValueError(f'expected TagAddRemove tokens, found: {token}')
+            tag_tokens.append(token)
+
+          @typechecked
+          def tag_action(
+              fspath: str,
+              tags: TagSet,
+              doit=True,
+              verbose=False,
+          ) -> Iterable[Tuple[bool, Tag]]:
+            ''' Apply tag changes.
+            '''
+            tag_changes = []
+            for tag_token in tag_tokens:
+              if tag_token.add_remove:
+                tags.add(tag_token.tag, verbose=verbose)
+              else:
+                tags.discard(tag_token.tag.name, verbose=verbose)
+              tag_changes.append((tag_token.add_remove, tag_token.tag))
+            return tag_changes
+
+          return tag_action
     raise ValueError("invalid action")
 
   @staticmethod
