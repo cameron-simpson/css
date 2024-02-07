@@ -5,25 +5,35 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
-from os.path import basename
+from functools import partial
+from os.path import abspath, basename
 import re
 from re import Pattern
-import sys
-from typing import Any, Callable, Iterable, List, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from typeguard import typechecked
 from icontract import ensure, require
 
-from cs.deco import decorator, Promotable, strable
-from cs.fstags import FSTags, uses_fstags
+from cs.deco import decorator, promote, Promotable
+from cs.fstags import FSTags, TaggedPath, uses_fstags
 from cs.lex import (
-    get_identifier,
+    get_dotted_identifier,
     get_qstr,
-    get_nonwhite,
     is_identifier,
     skipwhite,
 )
+from cs.logutils import ifverbose, warning
 from cs.pfx import Pfx, pfx_call
+from cs.tagset import Tag, TagSet
 
 from cs.debug import X, trace, r, s
 
@@ -50,6 +60,8 @@ def pops_tokens(func):
   return pops_token_wrapper
 
 class _Token(ABC):
+  ''' Base class for tokens.
+  '''
 
   @abstractclassmethod
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
@@ -85,7 +97,6 @@ class Identifier(_Token):
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     ''' Parse a dotted identifier from `test`.
     '''
-    offset0 = offset
     start_offset = skipwhite(text, offset)
     name, end_offset = get_dotted_identifier(text, start_offset)
     if not name:
@@ -109,7 +120,6 @@ class QuotedString(_Token):
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     ''' Parse a double quoted string from `text`.
     '''
-    offset0 = offset
     start_offset = skipwhite(text, offset)
     if not text.startswith('"', start_offset):
       raise SyntaxError(
@@ -136,7 +146,6 @@ class TagAddRemove(_Token):
 
   @classmethod
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
-    offset0 = offset
     start_offset = skipwhite(text, offset)
     if text.startswith('-', start_offset):
       add_remove = False
@@ -187,9 +196,7 @@ class EqualityComparison(Comparison):
     return f'== {slosh_quote(self.compare_s,q)}'
 
   @classmethod
-  @trace
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
-    offset0 = offset
     start_offset = skipwhite(text, offset)
     if not text.startswith('==', start_offset):
       raise SyntaxError(
@@ -220,9 +227,7 @@ class RegexpComparison(Comparison):
     return f'~ {self.delim}{self.regexp.pattern}{self.delim}'
 
   @classmethod
-  @trace
   def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
-    offset0 = offset
     start_offset = skipwhite(text, offset)
     if not text.startswith('~', start_offset):
       raise SyntaxError(
@@ -338,7 +343,8 @@ class Rule(Promotable):
       return tags.get(attribute_name)
     return func()
   @classmethod
-  def get_token(cls, rule_s: str, offset: int = 0) -> Tuple[str, Any, int]:
+  @typechecked
+  def get_token(cls, rule_s: str, offset: int = 0) -> Tuple[str, _Token, int]:
     ''' Parse a token from `rule_s` at `offset`.
         Return a 3-tuple of `(token_s,token,offset)`:
         * `token_s`: the source text of the token
@@ -347,7 +353,6 @@ class Rule(Promotable):
         This skips any leading whitespace.
         If there is no recognised token, return `(None,None,offset)`.
     '''
-    offset0 = offset
     offset = skipwhite(rule_s, offset)
     if not rule_s.startswith(('#', '//'), offset):
       for token_type in Identifier, QuotedString, RegexpComparison:
@@ -414,7 +419,6 @@ class Rule(Promotable):
 
   @staticmethod
   @pops_tokens
-  @trace
   def pop_action(tokens: List[TokenRecord]) -> Union[Callable, None]:
     ''' Pop an action from `tokens`.
     '''
@@ -481,7 +485,6 @@ class Rule(Promotable):
 
   @staticmethod
   @pops_tokens
-  @trace
   def pop_match_test(tokens: List[TokenRecord]) -> Tuple[Callable, str]:
     ''' Pop a match-test from `tokens`.
     '''
@@ -507,7 +510,6 @@ class Rule(Promotable):
 
   @staticmethod
   @pops_tokens
-  @trace
   def pop_quick(tokens: List[TokenRecord]) -> bool:
     ''' Check if the next token is `Identifier(name="quick")`.
         If so, pop it and return `True`, otherwise `False`.
@@ -527,7 +529,7 @@ class Rule(Promotable):
     '''
     if isinstance(lines, str):
       filename = lines
-      with open(filename) as lines:
+      with open(filename, encoding='utf-8') as lines:
         return cls.from_file(lines)
     rules = []
     for lineno, line in enumerate(lines, 1):
@@ -538,6 +540,10 @@ class Rule(Promotable):
     return rules
 
 if __name__ == '__main__':
+  ##import sys
+  from . import Tagger
   from cs.logutils import setup_logging
   setup_logging()
-  print(Rule.from_str(sys.argv[1]))
+  ##print(Rule.from_str(sys.argv[1]))
+  tagger = Tagger('.')
+  tagger.process('test_file')
