@@ -44,6 +44,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
+from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd
 
@@ -63,6 +64,7 @@ DISTINFO = {
         'cs.py.doc',
         'cs.resources',
         'cs.result',
+        'cs.threads',
         'cs.typingutils',
         'cs.upd',
         'typeguard',
@@ -260,7 +262,7 @@ class _ClassSubCommand(_BaseSubCommand):
     return subusage_format
 
 @dataclass
-class BaseCommandOptions:
+class BaseCommandOptions(HasThreadState):
   ''' A base class for the `BaseCommand` `options` object.
 
       This is the default class for the `self.options` object
@@ -292,6 +294,7 @@ class BaseCommandOptions:
   quiet: bool = False
   runstate: Optional[RunState] = None
   verbose: bool = False
+  perthread_state = ThreadState()
 
   def copy(self, **updates):
     ''' Return a new instance of `BaseCommandOptions` (well, `type(self)`)
