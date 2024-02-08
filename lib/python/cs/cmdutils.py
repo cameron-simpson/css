@@ -25,7 +25,7 @@ except ImportError:
 import shlex
 from signal import SIGHUP, SIGINT, SIGTERM
 import sys
-from typing import Callable, List, Mapping, Optional
+from typing import Callable, List, Mapping, Optional, Tuple
 
 from typeguard import typechecked
 
@@ -46,7 +46,7 @@ from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
 from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
-from cs.upd import Upd
+from cs.upd import Upd, uses_upd
 
 __version__ = '20240201-post'
 
