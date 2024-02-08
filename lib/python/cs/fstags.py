@@ -104,7 +104,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc
+from cs.deco import default_params, fmtdoc, Promotable
 from cs.fileutils import crop_name, findup, shortpath
 from cs.fs import HasFSPath, FSPathBasedSingleton
 from cs.lex import (
@@ -1607,7 +1607,7 @@ class HasFSTagsMixin:
     self._fstags = new_fstags
 
 # pylint: disable=too-many-ancestors
-class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
+class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
   ''' Class to manipulate the tags for a specific path.
   '''
 
@@ -1629,6 +1629,15 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
 
   def __str__(self):
     return Tag.transcribe_value(str(self.fspath)) + ' ' + str(self.all_tags)
+
+  @classmethod
+  @uses_fstags
+  def from_str(cls, fspath, *, fstags: FSTags):
+    ''' Supports the `@promote` decorator.
+    '''
+    self = fstags[fspath]
+    assert isinstance(self, cls)
+    return self
 
   @property
   def name(self):
