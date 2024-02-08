@@ -1369,17 +1369,30 @@ class BaseCommandCmd(Cmd):
     with stackattrs(command, _subcmd=subcmd):
       command.run()
 
+  def get_names(self):
+    cls = self.command_class
+    names = []
+    for method_name in dir(cls):
+      if method_name.startswith(cls.SUBCOMMAND_METHOD_PREFIX):
+        subcmd = cutprefix(method_name, cls.SUBCOMMAND_METHOD_PREFIX)
+        names.append('do_' + subcmd)
+        ##names.append('help_' + subcmd)
+    return names
+
   def __getattr__(self, attr):
     cls = self.command_class
     subcmd = cutprefix(attr, 'do_')
     if subcmd is not attr:
       method_name = cls.SUBCOMMAND_METHOD_PREFIX + subcmd
-      if hasattr(cls, method_name):
-
-        def do_cmdsub(arg):
-          return self._doarg(subcmd, arg)
-
-        return do_cmdsub
+      try:
+        method = getattr(cls, method_name)
+      except AttributeError:
+        pass
+      else:
+        do_subcmd = lambda arg: self._doarg(subcmd, arg)
+        do_subcmd.__name__ = attr
+        do_subcmd.__doc__ = method.__doc__.format(cmd=subcmd)
+        return do_subcmd
       if subcmd in ('EOF', 'exit', 'quit'):
         return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
