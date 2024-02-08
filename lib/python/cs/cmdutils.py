@@ -288,11 +288,14 @@ class BaseCommandOptions(HasThreadState):
               ... optional extra fields etc ...
   '''
 
+  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGTERM
+
   cmd: Optional[str] = None
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
   runstate: Optional[RunState] = None
+  runstate_signals: Tuple[int] = DEFAULT_SIGNALS
   verbose: bool = False
   perthread_state = ThreadState()
 
@@ -459,7 +462,6 @@ class BaseCommand:
   GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = None
   Options = BaseCommandOptions
-  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGTERM
 
   def __init_subclass__(cls):
     ''' Update subclasses of `BaseCommand`.
@@ -556,7 +558,6 @@ class BaseCommand:
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
     options = self.options = self.Options()
-    options.runstate_signals = self.DEFAULT_SIGNALS
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
@@ -1140,13 +1141,12 @@ class BaseCommand:
       return 2
     options = self.options
     try:
-      with stackattrs(options, **kw_options):
-        with self.run_context():
-          try:
-            return self._run(self._subcmd, self, self._argv)
-          except CancellationError:
-            error("cancelled")
-            return 1
+      with self.run_context(**kw_options):
+        try:
+          return self._run(self._subcmd, self, self._argv)
+        except CancellationError:
+          error("cancelled")
+          return 1
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
@@ -1208,7 +1208,8 @@ class BaseCommand:
 
   @contextmanager
   @uses_runstate
-  def run_context(self, runstate: RunState):
+  @uses_upd
+  def run_context(self, runstate: RunState, upd: Upd, **kw_options):
     ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
 
         This default does several things, and subclasses should
@@ -1226,23 +1227,22 @@ class BaseCommand:
     # redundant try/finally to remind subclassers of correct structure
     try:
       options = self.options
-      ##assert not hasattr(options, 'runstate')
-      handle_signal = getattr(
-          self, 'handle_signal', lambda *_: runstate.cancel()
-      )
-      upd = getattr(options, 'upd', self.loginfo.upd) or Upd()
-      with stackattrs(self, cmd=self._subcmd or self.cmd):
-        with stackattrs(
-            options,
-            runstate=runstate,
-            upd=upd,
-        ):
-          with upd:
-            with runstate:
-              with runstate.catch_signal(options.runstate_signals,
-                                         call_previous=False,
-                                         handle_signal=handle_signal):
-                yield
+      kw_options.setdefault('runstate', runstate)
+      kw_options.setdefault('upd', upd)
+      with options(**kw_options) as run_options:
+        with run_options:  # make the default ThreadState
+          with stackattrs(self, options=run_options):
+            handle_signal = getattr(
+                self, 'handle_signal', lambda *_: runstate.cancel()
+            )
+            with stackattrs(self, cmd=self._subcmd or self.cmd):
+              with upd:
+                with runstate:
+                  with runstate.catch_signal(options.runstate_signals,
+                                             call_previous=False,
+                                             handle_signal=handle_signal):
+                    yield
+
     finally:
       pass
 
