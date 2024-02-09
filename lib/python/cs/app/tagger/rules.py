@@ -71,8 +71,12 @@ class RuleResult:
   '''
   rule: "Rule"
   matched: bool
+  # tag modifications
   tag_changes: List[TagChange] = field(default_factory=list)
+  # places the source file was filed to
   filed_to: List[str] = field(default_factory=list)
+  # exceptions running the action
+  failed: List[Exception] = field(default_factory=list)
 
 class _Token(ABC):
   ''' Base class for tokens.
@@ -343,16 +347,21 @@ class Rule(Promotable):
       for k, v in match_result.items():
         result.tag_changes.append(TagChange(add_remove=True, tag=Tag(k, v)))
     if self.action is not None:
-      for action in self.action(fspath, tags, doit=doit, verbose=verbose):
-        match action:
-          case str(fspath):
-            result.filed_to.append(fspath)
-          case TagChange() as tag_change:
-            result.tag_changes.append(tag_change)
-          case _:
-            raise RuntimeError(
-                f'unhandled action {r(action)} from {self.action}'
-            )
+      with Pfx(self.action.__doc__.strip().split()[0].strip()):
+        try:
+          side_effects = self.action(fspath, tags, doit=doit, verbose=verbose)
+        except Exception as e:
+          warning("action failed: %s", e)
+          result.failed.append(e)
+        else:
+          for side_effect in side_effects:
+            match side_effect:
+              case str(fspath):
+                result.filed_to.append(fspath)
+              case TagChange() as tag_change:
+                result.tag_changes.append(tag_change)
+              case _:
+                raise RuntimeError(f'unhandled side effect {r(side_effect)}')
     return result
 
   @typechecked
