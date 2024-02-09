@@ -506,6 +506,8 @@ class Rule(Promotable):
                 ''' Move `fspath` to `target_format`, return the new fspath.
                 '''
                 target_fspath = expanduser(target_format.format(**fkwargs))
+                if target_fspath.endswith('/'):
+                  target_fspath = joinpath(target_fspath, basename(fspath))
                 ifverbose(verbose, "mv %r -> %r", fspath, target_fspath)
                 # TODO: actually move the file
                 if not doit:
