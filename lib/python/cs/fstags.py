@@ -1585,6 +1585,34 @@ class FSTags(MultiOpenMixin):
             raise
       return result
 
+  @require(lambda srcpath: existspath(srcpath))
+  @require(lambda dstpath: not existspath(dstpath))
+  @require(lambda symlink, remove: not (symlink and remove))
+  def mv(
+      self,
+      srcpath: str,
+      dstpath: str,
+      *,
+      symlink=False,
+      remove=True,
+  ):
+    ''' Move (or link or symlink) `srcpath` to `dstpath`.
+
+        Parameters:
+        * `srcpath`: the source filesystem path
+        * `dstpath`: the destination filesystem path
+        * `symlink`: default `False`: if true, make a symbolic link
+        * `remove`: default `True`: if true, remove `srcpath` after
+          hard linking to `dstpath`
+    '''
+    if symlink:
+      pfx_call(os.symlink, abspath(srcpath), dstpath)
+      self[dstpath].update(self[srcpath])
+    else:
+      self.link(srcpath, dstpath)
+      if remove:
+        pfx_call(os.remove, srcpath)
+
 # pylint: disable=too-few-public-methods
 class HasFSTagsMixin:
   ''' Mixin providing an automatic `.fstags` property.
