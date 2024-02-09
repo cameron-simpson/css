@@ -440,7 +440,13 @@ class Rule(Promotable):
             action = None
           if tokens:
             raise ValueError(f'extra tokens: {" ".join(T[0] for T in tokens)}')
-          return cls(rule_s, match_attribute, match_test, action, quick=quick)
+          return cls(
+              rule_s.rstrip(),
+              match_attribute,
+              match_test,
+              action,
+              quick=quick
+          )
         case _:
           raise ValueError("unrecognised verb")
     raise RuntimeError
