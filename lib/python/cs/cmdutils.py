@@ -284,7 +284,7 @@ class BaseCommandOptions(HasThreadState):
       Since `BaseCommandOptions` is a data class, this typically looks like:
 
           @dataclass
-          class Options(BaseCOmmand.Options):
+          class Options(BaseCommand.Options):
               ... optional extra fields etc ...
   '''
 
@@ -355,7 +355,17 @@ class BaseCommandOptions(HasThreadState):
     self.dry_run = not new_doit
 
   def popopts(self, argv, **opt_specs):
-    ''' Convenience method to appply `BaseCommand.popopts` to the options.
+    ''' Convenience method to appply `BaseCommand.popopts` to the options (`self`).
+
+        Example for a `BaseCommand` `cmd_foo` method:
+
+            def cmd_foo(self, argv):
+                self.options.popopts(
+                    n='dry_run',
+                    x='trace',
+                )
+                if self.options.dry_run:
+                    print("dry run!")
     '''
     BaseCommand.popopts(argv, self, **opt_specs)
 
