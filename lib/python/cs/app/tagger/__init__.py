@@ -27,7 +27,7 @@ from icontract import require
 
 from cs.deco import cachedmethod, default_params, fmtdoc, promote
 from cs.fs import FSPathBasedSingleton, shortpath
-from cs.fstags import FSTags, uses_fstags
+from cs.fstags import FSTags, TaggedPath, uses_fstags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
 from cs.onttags import Ont, ONTTAGS_PATH_DEFAULT, ONTTAGS_PATH_ENVVAR
