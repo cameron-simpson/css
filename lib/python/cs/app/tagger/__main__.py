@@ -49,8 +49,14 @@ class TaggerCommand(BaseCommand):
 
   GETOPT_SPEC = 'd:nqv'
 
+  USAGE_FORMAT = '''Usage: {cmd} [-d dirpath] [-nqv] subcommand [subargs...]
+    -d dirpath  Specify the reference directory, default '.'.
+    -n          No action, dry run.
+    -q          Quiet.
+    -v          Verbose.'''
+
   @dataclass
-  class Options(BaseCommandOptions, HasFSPath):
+  class Options(BaseCommand.Options, HasFSPath):
     fspath: str = '.'
 
   # pylint: disable=no-self-use
@@ -93,38 +99,31 @@ class TaggerCommand(BaseCommand):
           -d    Treat directory paths like files - file the
                 directory, not its contents.
                 (TODO: we file by linking - this needs a rename.)
-          -n    No link (default). Just print filing actions.
+          -n    No action (default). Just print filing actions.
           -r    Recurse. Required to autofile a directory tree.
-          -x    Remove the source file if linked successfully. Implies -y.
           -y    Link files to destinations.
     '''
     options = self.options
-    tagger = options.tagger
-    direct = False
-    recurse = False
-    no_link = True
-    do_remove = False
-    opts, argv = getopt(argv, 'dnrxy')
-    for opt, _ in opts:
-      with Pfx(opt):
-        if opt == '-d':
-          direct = True
-        elif opt == '-n':
-          no_link = True
-          do_remove = False
-        elif opt == '-r':
-          recurse = True
-        elif opt == '-x':
-          no_link = False
-          do_remove = True
-        elif opt == '-y':
-          no_link = False
-        else:
-          raise RuntimeError("unimplemented option")
+    options.direct = False
+    options.once = False
+    options.recurse = False
+    options.popopts(
+        argv,
+        _1='once',
+        d='direct',
+        n='dry_run',  # no action
+        r='recurse',
+        y='doit',  # inverse of -n
+    )
     if not argv:
       raise GetoptError("missing paths")
     q = ListQueue(argv, unique=True)
     for path in q:
+    doit = options.doit
+    direct = options.direct
+    once = options.once
+    recurse = options.recurse
+    runstate = options.runstate
       with Pfx(path):
         if not existspath(path):
           warning("no such path, skipping")
