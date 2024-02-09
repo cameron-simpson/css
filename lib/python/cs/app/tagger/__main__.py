@@ -17,8 +17,10 @@ from os.path import (
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
+    realpath,
 )
 from pprint import pprint
+from stat import S_ISDIR, S_ISREG
 import sys
 
 from cs.cmdutils import BaseCommand, BaseCommandOptions
@@ -30,11 +32,11 @@ from cs.fstags import FSTags, uses_fstags
 from cs.gui_tk import BaseTkCommand
 from cs.lex import r
 from cs.logutils import warning
-from cs.pfx import Pfx, pfxprint, pfx_method
+from cs.pfx import Pfx, pfxprint, pfx_call, pfx_method
 from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag
-from cs.upd import print  # pylint: disable=redefined-builtin
+from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
 from . import Tagger
 
