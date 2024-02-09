@@ -142,38 +142,43 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
               *,
               fstags: FSTags,
               doit=False,
-              verbose=True) -> List[str]:
+              verbose=True) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.
-        Return the list of places to which the file was filed.
+        Return the list of `RuleResult`s for matches `Rule`s.
     '''
     fspath = self.pathto(filename)
     tagged = fstags[fspath]
     # start with the format_tags of the file
     tags = tagged.format_tagset()
-    filed_to = []
+    matched_results = []
+    printed_filename = False
     for rule in self.rules:
       with Pfx(rule):
         applied = rule.apply(fspath, tags, doit=doit, verbose=verbose)
-        if applied is False:
+        if not applied.matched:
           continue
-        if applied is not True:
-          for action in applied:
-            with Pfx("action %r", action):
-              match action:
-                case str(new_fspath):
-                  filed_to.append(new_fspath)
-                  print(" ", shortpath(fspath), "->", shortpath(new_fspath))
-                case [True, Tag() as tag]:
-                  print("  +", tag)
-                  pass
-                case [False, Tag(name, value=None) as tag]:
-                  print("  -", tag)
-                  pass
-                case _:
-                  warning("ignoring unsupported action")
+        matched_results.append(applied)
+        if verbose:
+          if not printed_filename:
+            print(fspath)
+            printed_filename = True
+          print("  matched:", rule.definition)
+        for new_fspath in applied.filed_to:
+          if verbose:
+            print("   ", shortpath(fspath), "->", shortpath(new_fspath))
+        for tag_change in applied.tag_changes:
+          match tag_change:
+            case TagChange(add_remove=True) as change:
+              if verbose:
+                print("    +", change.tag)
+            case TagChange(add_remove=False) as change:
+              if verbose:
+                print("    -", change.tag)
+            case _:
+              warning("ignoring unsupported action {r(action)}")
         if rule.quick:
           break
-    return filed_to
+    return matched_results
 
   @property
   @cachedmethod
