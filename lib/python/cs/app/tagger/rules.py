@@ -467,19 +467,24 @@ class Rule(Promotable):
             case QuotedString():
               target_format = target_token.value
 
+              @uses_fstags
+              @typechecked
               def mv_action(
                   fspath: str,
                   fkwargs: dict,
-                  doit=True,
-                  verbose=False,
-              ) -> Tuple[str]:
+                  *,
+                  doit=False,
+                  verbose=True,
+                  fstags: FSTags,
+              ) -> Tuple[str, ...]:
                 ''' Move `fspath` to `target_format`, return the new fspath.
                 '''
-                target_fspath = target_format.format(**fkwargs)
+                target_fspath = expanduser(target_format.format(**fkwargs))
                 ifverbose(verbose, "mv %r -> %r", fspath, target_fspath)
                 # TODO: actually move the file
-                if doit:
-                  pass
+                if not doit:
+                  return ()
+                fstags.mv(fspath, target_fspath, remove=True)
                 return (target_fspath,)
 
               mv_action.__doc__ = (
