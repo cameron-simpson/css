@@ -568,8 +568,9 @@ class Rule(Promotable):
     '''
     if isinstance(lines, str):
       filename = lines
-      with open(filename, encoding='utf-8') as lines:
-        return cls.from_file(lines)
+      with Pfx(filename):
+        with open(filename, encoding='utf-8') as lines:
+          return cls.from_file(lines)
     rules = []
     for lineno, line in enumerate(lines, 1):
       with Pfx(lineno):
