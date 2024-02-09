@@ -177,9 +177,9 @@ class TaggerCommand(BaseCommand):
             taggers.add(tagger)  # remember for reuse
             matches = tagger.process(basename(path), doit=doit)
             if matches:
-              for match in tagger.process(basename(path), doit=doit):
+              for match in matches:
                 q.extend(match.filed_to)
-              if once:
+              if once and not any([match.failed for match in matches]):
                 break
             continue
           warning("not a regular file, skipping")
