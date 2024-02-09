@@ -1,3 +1,4 @@
+batch the SQLTags changes mirrors from FSTags?
 derive SQL conditions from test value - ~:in ~/:regexp match
 can SQLTagProxies be dropped in favour of the .subdomain() method?
 
