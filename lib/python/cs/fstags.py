@@ -1585,9 +1585,12 @@ class FSTags(MultiOpenMixin):
             raise
       return result
 
-  @require(lambda srcpath: existspath(srcpath))
-  @require(lambda dstpath: not existspath(dstpath))
-  @require(lambda symlink, remove: not (symlink and remove))
+  @require(lambda srcpath: existspath(srcpath), "srcpath does not exist")
+  @require(lambda dstpath: not existspath(dstpath), "dstpath already exists")
+  @require(
+      lambda symlink, remove: not (symlink and remove),
+      "symlink and remove may not both be true"
+  )
   def mv(
       self,
       srcpath: str,
