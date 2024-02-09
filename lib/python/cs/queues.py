@@ -14,6 +14,7 @@ from threading import Timer, Lock, RLock, Thread
 import time
 
 ##from cs.debug import Lock, RLock, Thread
+from cs.lex import r
 import cs.logutils
 from cs.logutils import exception, warning, debug
 from cs.obj import Sentinel
@@ -34,6 +35,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.lex',
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
@@ -545,8 +547,14 @@ class ListQueue:
       unrepeated_signature = None
     elif unique is True:
       unrepeated_signature = lambda item: item
-    elif unique is False:
-      unrepeated_signature = None
+    elif callable(unique):
+      unrepeated_signature = unique
+    else:
+      raise ValueError(
+          "unique=%s: neither None nor False nor Ture nor a callable",
+          r(unique)
+      )
+
     self.unrepeated_signature = unrepeated_signature
     self._lock = Lock()
 
