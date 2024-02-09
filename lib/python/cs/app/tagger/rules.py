@@ -298,7 +298,7 @@ class Rule(Promotable):
       self,
       fspath: str,
       tags: TagSet,
-      doit: bool = True,
+      doit: bool = False,
       verbose: bool = True,
   ) -> Union[bool, Iterable[Action]]:
     ''' Apply this `Rule` to `fspath` using the working `TagSet` `tags`,
@@ -306,9 +306,12 @@ class Rule(Promotable):
         On no match return `False`.
         On a match, return an iterable of side effects, each of which may be:
         * `str`: a new value for the fspath indicating a move or link
-        * `(bool,Tag)`: a 2 tuple of aan "add_remove" bool and `Tag`
+        * `(bool,Tag)`: a 2 tuple of an "add_remove" bool and `Tag`
     '''
     test_s = self.get_attribute_value(fspath, tags, self.match_attribute)
+    if test_s is None:
+      # attribute unavailable
+      return False
     if not isinstance(test_s, str):
       raise TypeError(
           f'expected str for {self.match_attribute!r} but got: {s(test_s)}'
@@ -316,7 +319,10 @@ class Rule(Promotable):
     match_result = self.match_test(test_s, tags)
     if match_result is None:
       return False
-    tags.update(match_result)
+    if match_result is False:
+      return False
+    if isinstance(match_result, Mapping):
+      tags.update(match_result)
     if self.action is None:
       return True
     return self.action(fspath, tags, doit=doit, verbose=verbose)
