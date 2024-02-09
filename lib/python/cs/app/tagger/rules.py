@@ -517,7 +517,7 @@ class Rule(Promotable):
               else:
                 tags.discard(tag_token.tag.name, verbose=verbose)
               tag_changes.append((tag_token.add_remove, tag_token.tag))
-            return tag_changes
+            return tuple(tag_changes)
 
           return tag_action
     raise ValueError("invalid action")
