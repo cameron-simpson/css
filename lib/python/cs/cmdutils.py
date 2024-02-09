@@ -30,7 +30,7 @@ from typing import Callable, List, Mapping, Optional, Tuple
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import Promotable
+from cs.deco import default_params, Promotable
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -704,8 +704,7 @@ class BaseCommand:
             "subcmd=%r: unknown subcommand, I know %r" %
             (subcmd, sorted(subcmds.keys()))
         )
-      else:
-        subcmd = subcmd_
+      subcmd = subcmd_
     if has_subcmds:
       subusages = []
       for attr, subcmd_spec in (sorted(subcmds.items()) if subcmd is None else
@@ -831,21 +830,21 @@ class BaseCommand:
     '''
 
     @classmethod
-    def promote(cls, spec):
+    def promote(cls, obj):
       ''' Construct an `_OptSpec` from a list of positional parameters
           as for `poparg()`.
       '''
-      if isinstance(spec, cls):
-        return spec
-      if isinstance(spec, str):
+      if isinstance(obj, cls):
+        return obj
+      if isinstance(obj, str):
         # the help text
-        specs = spec,
-      elif callable(spec):
+        specs = (obj,)
+      elif callable(obj):
         # the factory
-        specs = spec,
+        specs = (obj,)
       else:
         # some iterable
-        specs = spec
+        specs = obj
       parse = None
       help_text = None
       validate = None
@@ -872,7 +871,7 @@ class BaseCommand:
         )
       if parse is None:
         # pass option value through unchanged
-        parse = lambda val: val
+        parse = lambda val: val  # pylint: disable=unnecessary-lambda-assignment
       if unvalidated_message is None:
         unvalidated_message = "invalid value"
       return cls(
@@ -1066,7 +1065,9 @@ class BaseCommand:
         if opt_name.startswith('_'):
           opt_name = opt_name[1:]
           if is_identifier(opt_name):
-            warning("leading underscore on valid identifier option")
+            warning(
+                "unnecessary leading underscore on valid identifier option"
+            )
         if opt_name.endswith('_'):
           needs_arg = True
           opt_name = opt_name[:-1]
@@ -1324,10 +1325,10 @@ class BaseCommand:
         like this:
 
             def cmd_repl(self, argv):
-              """ Usage: {cmd}
-                    Run an interactive Python prompt with some predefined local names.
-              """
-              return self.repl(*argv)
+                """ Usage: {cmd}
+                      Run an interactive Python prompt with some predefined local names.
+                """
+                return self.repl(*argv)
     '''
     options = self.options
     if banner is None:
@@ -1350,11 +1351,10 @@ class BaseCommand:
           banner=banner,
           local=local,
       )
-    else:
-      return embed(
-          banner=banner,
-          locals_=local,
-      )
+    return embed(
+        banner=banner,
+        locals_=local,
+    )
 
 BaseCommandSubType = subtype(BaseCommand)
 
