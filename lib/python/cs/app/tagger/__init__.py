@@ -137,35 +137,43 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
 
   @uses_fstags
   @require(lambda filename: filename and '/' not in filename)
-  def process(self, filename, *, fstags: FSTags):
+  def process(self,
+              filename,
+              *,
+              fstags: FSTags,
+              doit=False,
+              verbose=True) -> List[str]:
     ''' Process the local file `filename` according to the `Tagger` rules.
+        Return the list of places to which the file was filed.
     '''
     fspath = self.pathto(filename)
     tagged = fstags[fspath]
     # start with the format_tags of the file
     tags = tagged.format_tagset()
-    print("initial tags:", tags)
     filed_to = []
     for rule in self.rules:
       with Pfx(rule):
-        print("Rule", rule, '...')
-        applied = rule.apply(fspath, tags, doit=False, verbose=True)
+        applied = rule.apply(fspath, tags, doit=doit, verbose=verbose)
         if applied is False:
-          print("  no match")
           continue
-        for action in applied:
-          with Pfx("action %r", action):
-            print("  applied", repr(action))
-            match action:
-              case str(new_fspath):
-                print("    filed_to +", new_fspath)
-                filed_to.append(action)
-              case [True, Tag() as tag]:
-                print("    tags +", tag)
-              case [False, Tag(name, value=None) as tag]:
-                print("    tags -", name)
-              case _:
-                warning("ignoring unsupported action")
+        if applied is not True:
+          for action in applied:
+            with Pfx("action %r", action):
+              match action:
+                case str(new_fspath):
+                  filed_to.append(new_fspath)
+                  print(" ", shortpath(fspath), "->", shortpath(new_fspath))
+                case [True, Tag() as tag]:
+                  print("  +", tag)
+                  pass
+                case [False, Tag(name, value=None) as tag]:
+                  print("  -", tag)
+                  pass
+                case _:
+                  warning("ignoring unsupported action")
+        if rule.quick:
+          break
+    return filed_to
 
   @property
   @cachedmethod
