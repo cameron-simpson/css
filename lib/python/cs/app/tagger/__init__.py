@@ -38,7 +38,7 @@ from cs.tagset import Tag, TagSet, RegexpTagRule
 from cs.threads import locked, ThreadState, HasThreadState
 from cs.upd import run_task, print
 
-from .rules import Rule
+from .rules import Rule, RuleResult, TagChange
 
 __version__ = None
 
