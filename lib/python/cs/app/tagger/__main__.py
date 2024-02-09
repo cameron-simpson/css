@@ -117,39 +117,73 @@ class TaggerCommand(BaseCommand):
     )
     if not argv:
       raise GetoptError("missing paths")
-    q = ListQueue(argv, unique=True)
-    for path in q:
     doit = options.doit
     direct = options.direct
     once = options.once
     recurse = options.recurse
     runstate = options.runstate
+    taggers = set()
+    ok = True
+    paths = []
+    for path in argv:
       with Pfx(path):
-        if not existspath(path):
-          warning("no such path, skipping")
+        try:
+          S = os.stat(path)
+        except OSError as e:
+          warning("cannot stat: %s", e)
+          ok = False
           continue
-        if isdirpath(path) and not direct:
-          if recurse:
-            # queue the directory entries
-            for entry in sorted(
-                os.scandir(path),
-                key=lambda entry: entry.name,
-                reverse=True,
-            ):
-              if entry.name.startswith('.'):
-                continue
-              if (entry.is_dir(follow_symlinks=False)
-                  or entry.is_file(follow_symlinks=False)):
-                q.prepend((joinpath(path, entry.name),))
+        if S_ISREG(S.st_mode):
+          paths.append(path)
+        elif S_ISDIR(S.st_mode):
+          if direct:
+            paths.append(path)
           else:
-            warning("recursion disabled, skipping")
+            paths.extend(
+                [
+                    joinpath(path, base)
+                    for base in sorted(pfx_call(os.listdir, path))
+                    if not base.startswith('.')
+                ]
+            )
         else:
-          linked_to = tagger.file_by_tags(
-              path, no_link=no_link, do_remove=do_remove
-          )
-          for linkpath in linked_to:
-            print(shortpath(path), '=>', shortpath(linkpath))
-    return 0
+          warning("unhandled file type ignored")
+    xit = 0
+    q = ListQueue(paths, unique=realpath)
+    with run_task('autofile') as proxy:
+      for path in q:
+        runstate.raiseif()
+        with Pfx(path):
+          proxy.text = shortpath(path)
+          if not existspath(path):
+            warning("no such path, skipping")
+            xit = 1
+            continue
+          if isdirpath(path) and not direct:
+            if recurse:
+              # queue children
+              q.extend(
+                  [
+                      joinpath(path, base)
+                      for base in sorted(pfx_call(os.listdir, path))
+                      if not base.startswith('.')
+                  ]
+              )
+            continue
+          if isfilepath(path) or (direct and isdirpath(path)):
+            tagger = Tagger(dirname(path))
+            taggers.add(tagger)  # remember for reuse
+            matches = tagger.process(basename(path), doit=doit)
+            if matches:
+              for match in tagger.process(basename(path), doit=doit):
+                q.extend(match.filed_to)
+              if once:
+                break
+            continue
+          warning("not a regular file, skipping")
+          xit = 1
+          continue
+    return xit
 
   def cmd_autotag(self, argv):
     ''' Usage: {cmd} [-fn] paths...
