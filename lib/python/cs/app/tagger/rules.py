@@ -59,6 +59,20 @@ def pops_tokens(func):
 
   return pops_token_wrapper
 
+@dataclass
+class TagChange:
+  add_remove: bool
+  tag: Tag
+
+@dataclass
+class RuleResult:
+  ''' The result of applying a `Rule`.
+  '''
+  rule: "Rule"
+  matched: bool
+  tag_changes: List[TagChange] = field(default_factory=list)
+  filed_to: List[str] = field(default_factory=list)
+
 class _Token(ABC):
   ''' Base class for tokens.
   '''
@@ -300,7 +314,7 @@ class Rule(Promotable):
       tags: TagSet,
       doit: bool = False,
       verbose: bool = True,
-  ) -> Union[bool, Iterable[Action]]:
+  ) -> RuleResult:
     ''' Apply this `Rule` to `fspath` using the working `TagSet` `tags`,
         typically the inherited tags of `fspath`.
         On no match return `False`.
@@ -308,24 +322,37 @@ class Rule(Promotable):
         * `str`: a new value for the fspath indicating a move or link
         * `(bool,Tag)`: a 2 tuple of an "add_remove" bool and `Tag`
     '''
+    result = RuleResult(rule=self, matched=False)
     test_s = self.get_attribute_value(fspath, tags, self.match_attribute)
     if test_s is None:
       # attribute unavailable
-      return False
+      return result
     if not isinstance(test_s, str):
       raise TypeError(
           f'expected str for {self.match_attribute!r} but got: {s(test_s)}'
       )
     match_result = self.match_test(test_s, tags)
     if match_result is None:
-      return False
+      return result
     if match_result is False:
-      return False
+      return result
     if isinstance(match_result, Mapping):
+      result.matched = True
       tags.update(match_result)
-    if self.action is None:
-      return True
-    return self.action(fspath, tags, doit=doit, verbose=verbose)
+      for k, v in match_result.items():
+        result.tag_changes.append(TagChange(add_remove=True, tag=Tag(k, v)))
+    if self.action is not None:
+      for action in self.action(fspath, tags, doit=doit, verbose=verbose):
+        match action:
+          case str(fspath):
+            result.filed_to.append(fspath)
+          case TagChange() as tag_change:
+            result.tag_changes.append(tag_change)
+          case _:
+            raise RuntimeError(
+                f'unhandled action {r(action)} from {self.action}'
+            )
+    return result
 
   @typechecked
   def get_attribute_value(
@@ -506,7 +533,7 @@ class Rule(Promotable):
               tags: TagSet,
               doit=True,
               verbose=False,
-          ) -> Iterable[Tuple[bool, Tag]]:
+          ) -> Iterable[TagChange]:
             ''' Apply tag changes.
             '''
             tag_changes = []
@@ -515,7 +542,11 @@ class Rule(Promotable):
                 tags.add(tag_token.tag, verbose=verbose)
               else:
                 tags.discard(tag_token.tag.name, verbose=verbose)
-              tag_changes.append((tag_token.add_remove, tag_token.tag))
+              tag_changes.append(
+                  TagChange(
+                      add_remove=tag_token.add_remove, tag=tag_token.tag
+                  )
+              )
             return tuple(tag_changes)
 
           return tag_action
