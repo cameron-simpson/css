@@ -163,6 +163,10 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
             print(fspath)
             printed_filename = True
           print("  matched:", rule.definition)
+        if applied.failed:
+          warning("  failed:")
+          for failure in applied.failed:
+            warning("    %s", failure)
         for new_fspath in applied.filed_to:
           if verbose:
             print("   ", shortpath(fspath), "->", shortpath(new_fspath))
