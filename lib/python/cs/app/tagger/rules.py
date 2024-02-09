@@ -5,8 +5,9 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
+from dataclasses import dataclass, field
 from functools import partial
-from os.path import abspath, basename, expanduser
+from os.path import abspath, basename, expanduser, join as joinpath
 import re
 from re import Pattern
 from typing import (
@@ -20,8 +21,8 @@ from typing import (
     Union,
 )
 
-from typeguard import typechecked
 from icontract import ensure, require
+from typeguard import typechecked
 
 from cs.deco import decorator, promote, Promotable
 from cs.fstags import FSTags, TaggedPath, uses_fstags
