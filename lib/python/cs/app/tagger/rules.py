@@ -6,7 +6,7 @@
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from functools import partial
-from os.path import abspath, basename
+from os.path import abspath, basename, expanduser
 import re
 from re import Pattern
 from typing import (
@@ -271,7 +271,7 @@ class Rule(Promotable):
       definition: str,
       match_attribute: str,
       match_test: Callable[[str, TagSet], dict],
-      action: Callable[[str, Mapping], Iterable[Action]],
+      action: Callable[..., Iterable[Action]],
       *,
       quick=False
   ):
@@ -422,7 +422,6 @@ class Rule(Promotable):
             tag -tag_name +tag_name=["tag-format-string"]
     '''
     tokens = list(cls.tokenise(rule_s))
-    print("TOKENS:", [T[0] for T in tokens])
     if not tokens:
       # empty command
       return None
