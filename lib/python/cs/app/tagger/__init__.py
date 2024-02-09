@@ -110,9 +110,6 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     self._per_tag_auto_file_mappings = defaultdict(lambda: defaultdict(set))
     self._lock = RLock()
 
-  def __str__(self):
-    return "%s(%s)" % (self.__class__.__name__, self.shortpath)
-
   def tagger_for(self, dirpath):
     ''' Factory to return a `Tagger` for a directory
         using the same `FSTags` and ontology as `self`.
