@@ -12,6 +12,7 @@ from getopt import GetoptError
 import os
 from os.path import (
     abspath,
+    basename,
     dirname,
     exists as existspath,
     isabs as isabspath,
@@ -19,24 +20,31 @@ from os.path import (
     isfile as isfilepath,
     join as joinpath,
     relpath,
+    samefile,
 )
+import shlex
 from stat import S_ISREG
 import sys
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union
 
+from icontract import require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.fs import needdir, shortpath
+from cs.fs import is_valid_rpath, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
-from cs.upd import Upd, uses_upd, print, run_task
+from cs.psutils import run
+from cs.resources import RunState, uses_runstate
+from cs.upd import Upd, uses_upd, print, run_task # pylint: disable=redefined-builtin
 
 from cs.debug import X, trace
 
 DEFAULT_HASHNAME = 'sha256'
+DEFAULT_HASHINDEX_EXE = 'hashindex'
+DEFAULT_SSH_EXE = 'ssh'
 
 def main(argv=None):
   ''' Commandline implementation.
@@ -56,6 +64,7 @@ class HashIndexCommand(BaseCommand):
   class Options(BaseCommand.Options):
     hashname: str = DEFAULT_HASHNAME
     move_mode: bool = False
+    ssh_exe: str = 'ssh'
     symlink_mode: bool = False
 
   @contextmanager
@@ -64,6 +73,99 @@ class HashIndexCommand(BaseCommand):
     with fstags:
       with super().run_context():
         yield
+
+  def cmd_rearrange(
+      self,
+      argv,
+      *,
+      hashindex_exe=DEFAULT_HASHINDEX_EXE,
+      ssh_exe=DEFAULT_SSH_EXE,
+  ):
+    ''' Usage: {cmd} [-e sshcmd] [-h hashname] [--mv] [-n] [-s] {{refdir|-}} [[user@]rhost:]targetdir
+          Rearrange files in targetdir based on their positios in
+          refdir.
+    '''
+    options = self.options
+    badopts = False
+    options.popopts(
+        argv,
+        e='ssh_exe',
+        h_='hashname',
+        mv='mode_mode',
+        n='dry_run',
+        s='symlink_mode',
+    )
+    if not argv:
+      warning("missing refdir")
+      badopts = True
+    else:
+      refdir = argv.pop(0)
+      with Pfx("refdir %r", refdir):
+        if refdir != '-':
+          if not isdirpath(refdir):
+            warning("not a directory")
+            badopts = True
+    if not argv:
+      warning("missing targetdir")
+      badopts = True
+    else:
+      targetdir = argv.pop(0)
+      with Pfx("targetdir %r", targetdir):
+        ssh_target = None
+        # check for [user@]rhost
+        try:
+          prefix, suffix = targetdir.split(':', 1)
+        except ValueError:
+          pass
+        else:
+          if prefix and '/' not in prefix:
+            ssh_target = prefix
+            targetdir = suffix
+        if ssh_target is None:
+          if not isdirpath(targetdir):
+            warning("not a directory")
+            badopts = True
+    if argv:
+      warning("extra arguments: %r", argv)
+      badopts = True
+    if badopts:
+      raise GetoptError('bad arguments')
+    doit = options.doit
+    quiet = options.quiet
+    hashname = options.hashname
+    move_mode = options.move_mode
+    symlink_mode = options.symlink_mode
+    fspaths_by_hashcode = defaultdict(list)
+    with run_task(f'hashindex {refdir}'):
+      for hashcode, fspath in hashindex(refdir):
+        if hashcode is not None:
+          fspaths_by_hashcode[hashcode].append(fspath)
+    if ssh_target:
+      reflines = []
+      for hashcode, fspaths in fspaths_by_hashcode.items():
+        for fspath in fspaths:
+          reflines.append(f'{hashcode} {fspath}\n')
+      input_s = "".join(reflines)
+      hashindex_argv = [hashindex_exe, '-h', hashname]
+      if not doit:
+        hashindex.append('-n')
+      hashindex.extend(['-', targetdir])
+      run(
+          [ssh_exe, ssh_target,
+           shlex.join(hashindex_argv)],
+          input=input_s,
+          quiet=False,
+      )
+    else:
+      rearrange(
+          targetdir,
+          fspaths_by_hashcode,
+          hashname=hashname,
+          doit=doit,
+          move_mode=move_mode,
+          symlink_mode=symlink_mode,
+          quiet=quiet,
+      )
 
   @uses_fstags
   @uses_upd
@@ -221,12 +323,15 @@ class HashIndexCommand(BaseCommand):
                 pfx_call(os.remove(srcpath))
     return 0 if ok else 1
 
-  @uses_fstags
-  def cmd_ls(self, argv, *, fstags: FSTags):
-    ''' Usage: {cmd} paths...
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} [-h hashname] paths...
           Walk the filesystem paths and emit a listing.
     '''
     options = self.options
+    options.popopts(
+        argv,
+        h_='hashname',
+    )
     hashname = options.hashname
     runstate = options.runstate
     if not argv:
@@ -234,30 +339,12 @@ class HashIndexCommand(BaseCommand):
     xit = 0
     for path in argv:
       runstate.raiseif()
-      with Pfx(path):
-        if isfilepath(path):
-          h = file_checksum(path)
-          print(h, path)
-        elif isdirpath(path):
-          for dirpath, dirnames, filenames in os.walk(path):
-            runstate.raiseif()
-            dirnames[:] = sorted(dirnames)
-            for filename in sorted(filenames):
-              runstate.raiseif()
-              if filename.startswith('.'
-                                     ) or filename == fstags.tagsfile_basename:
-                continue
-              filepath = joinpath(dirpath, filename)
-              try:
-                h = file_checksum(filepath, hashname=hashname)
-              except OSError as e:
-                warning("file_checksum(%r,..): %s", filepath, e)
-                xit = 1
-                continue
-              print(h, filepath)
-        else:
-          warning("invalid path, not file or directory")
+      for h, fspath in hashindex(path, hashname=hashname):
+        runstate.raiseif()
+        if h is None:
           xit = 1
+        else:
+          print(h, fspath)
     return xit
 
 @uses_fstags
@@ -338,6 +425,134 @@ def set_fstags_hashcode(
   csum.hashcode = str(hashcode)
   csum.st_size = S.st_size
   csum.st_mtime = S.st_mtime
+
+@uses_fstags
+@uses_runstate
+def hashindex(fspath, *, hashname: str, runstate: RunState, fstags: FSTags):
+  ''' Generator yielding `(BaseHashCode,filepath)` 2-tuples
+      for the files in `fspath`, which may be a file or directory path.
+      Note that it yields `(None,filepath)` for files which cannot be accessed.
+  '''
+  if isfilepath(fspath):
+    h = file_checksum(fspath)
+    yield h, fspath
+  elif isdirpath(fspath):
+    for dirpath, dirnames, filenames in os.walk(fspath):
+      runstate.raiseif()
+      dirnames[:] = sorted(dirnames)
+      for filename in sorted(filenames):
+        runstate.raiseif()
+        if filename.startswith('.') or filename == fstags.tagsfile_basename:
+          continue
+        filepath = joinpath(dirpath, filename)
+        h = file_checksum(filepath, hashname=hashname)
+        yield h, filepath
+  else:
+    warning("hashindex(%r): neither file nor directory")
+
+def dir_filepaths(dirpath: str):
+  ''' Generator yielding the filesystem paths of the files in `dirpath`.
+  '''
+  for subdirpath, dirnames, filenames in os.walk(dirpath):
+    dirnames[:] = sorted(dirnames)
+    for filename in sorted(filenames):
+      yield joinpath(subdirpath, filename)
+
+def paths_remap(
+    srcpaths: Iterable[str],
+    fspaths_by_hashcode: Mapping[BaseHashCode, List[str]],
+    *,
+    hashname: str,
+):
+  ''' Generator yielding `(srcpath,fspaths)` 2-tuples.
+  '''
+  for srcpath in srcpaths:
+    with Pfx(srcpath):
+      srchashcode = file_checksum(srcpath, hashname=hashname)
+      if srchashcode is None:
+        warning("no hashcode")
+        continue
+      fspaths = fspaths_by_hashcode.get(srchashcode, [])
+    yield srcpath, fspaths
+
+def dir_remap(
+    srcdirpath: str,
+    fspaths_by_hashcode: Mapping[BaseHashCode, List[str]],
+    *,
+    hashname: str,
+):
+  ''' Generator yielding `(srcpath,[remapped_paths])` 2-tuples
+      based on the hashcodes keying `rfspaths_by_hashcode`.
+  '''
+  yield from paths_remap(
+      dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname
+  )
+
+@uses_fstags
+@uses_runstate
+@require(lambda move_mode, symlink_mode: not (move_mode and symlink_mode))
+def rearrange(
+    srcdirpath: str,
+    rfspaths_by_hashcode,
+    *,
+    hashname: str,
+    move_mode: bool = False,
+    symlink_mode=False,
+    doit: bool,
+    quiet: bool = False,
+    fstags: FSTags,
+    runstate: RunState,
+):
+  ''' Rearrange the files in `dirpath` according to the
+      hashcode->[relpaths] `fspaths_by_hashcode`.
+  '''
+  with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
+    for srcpath, rfspaths in dir_remap(srcdirpath):
+      runstate.raiseif()
+      if not rfspaths:
+        continue
+      filename = basename(srcpath)
+      if filename.startswith('.') or filename == fstags.tagsfile_basename:
+        continue
+      with Pfx(srcpath):
+        rsrcpath = relpath(srcpath, srcdirpath)
+        assert is_valid_rpath(rsrcpath), (
+            "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
+        )
+        proxy.text = rsrcpath
+        ok = True
+        for rdstpath in rfspaths:
+          assert is_valid_rpath(rdstpath), (
+              "rdstpath:%r is not a clean subpath" % (rdstpath,)
+          )
+          dstpath = joinpath(srcdirpath, rdstpath)
+          with Pfx(dstpath):
+            if dstpath == srcpath:
+              continue
+            if existspath(dstpath):
+              if samefile(srcpath, rdstpath):
+                continue
+              if file_checksum(dstpath) != file_checksum(srcpath):
+                warning(
+                    "dstpath %r already exists with different hashcode",
+                    dstpath
+                )
+              ok = False
+              continue
+            dstdirpath = dirname(dstpath)
+            if doit:
+              needdir(dstdirpath, use_makedirs=True, log=warning)
+            if symlink_mode:
+              quiet or print("ln -s", abspath(srcpath), dstpath)
+              if doit:
+                pfx_call(os.symlink, abspath(srcpath), dstpath)
+                fstags[dstpath].update(fstags[srcpath])
+            else:
+              quiet or print("mv" if move_mode else "ln", srcpath, dstpath)
+              if doit:
+                fstags.link(srcpath, dstpath)
+        if ok and move_mode and rsrcpath not in rfspaths:
+          pfx_call(os.remove, srcpath)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
