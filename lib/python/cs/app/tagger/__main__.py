@@ -37,7 +37,6 @@ from cs.tagset import Tag
 from cs.upd import print  # pylint: disable=redefined-builtin
 
 from . import Tagger
-from .gui_tk import TaggerWidget
 
 def main(argv=None):
   ''' Command line for the tagger.
@@ -48,7 +47,6 @@ class TaggerCommand(BaseCommand):
   ''' Tagger command line implementation.
   '''
 
-  DEFAULT_WIDGET_CLASS = TaggerWidget
   GETOPT_SPEC = 'd:nqv'
 
   @dataclass
