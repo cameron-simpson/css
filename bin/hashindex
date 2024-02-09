@@ -192,6 +192,7 @@ class HashIndexCommand(BaseCommand):
               if not rfspaths:
                 warning("hashcode %s not present in the input", srchashcode)
                 continue
+              filed_to = []
               for rfspath in rfspaths:
                 dstpath = joinpath(dstdir, rfspath)
                 if existspath(dstpath):
@@ -201,26 +202,23 @@ class HashIndexCommand(BaseCommand):
                         dstpath
                     )
                   continue
+                opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
+                quiet or print(opname, srcpath, dstpath)
                 dstdirpath = dirname(dstpath)
                 if doit:
-                  needdir(dstdirpath, use_makedirs=True, log=warning)
-                if symlink_mode:
-                  quiet or print("ln -s", abspath(srcpath), dstpath)
-                  if doit:
-                    pfx_call(os.symlink, abspath(srcpath), dstpath)
-                    fstags[dstpath].update(fstags[srcpath])
-                else:
-                  quiet or print("mv" if move_mode else "ln", srcpath, dstpath)
-                  if doit:
-                    fstags.link(srcpath, dstpath)
-                    if move_mode:
-                      if len(rfspaths) > 1:
-                        warning(
-                            "multiple dst paths for hashcode %s, not unlinking original",
-                            srchashcode
-                        )
-                      else:
-                        pfx_call(os.remove, srcpath)
+                  needdir(dstdirpath, use_makedirs=False, log=warning)
+                quiet or print(opname, srcpath, dstpath)
+                if doit:
+                  fstags.mv(
+                      srcpath,
+                      dstpath,
+                      exists_ok=False,
+                      symlink=symlink_mode,
+                      remove=False
+                  )
+                  filed_to.append(dstpath)
+              if filed_to and move_mode:
+                pfx_call(os.remove(srcpath))
     return 0 if ok else 1
 
   @uses_fstags
@@ -253,7 +251,7 @@ class HashIndexCommand(BaseCommand):
               try:
                 h = file_checksum(filepath, hashname=hashname)
               except OSError as e:
-                warning("file_checksum(%r,..)", filepath)
+                warning("file_checksum(%r,..): %s", filepath, e)
                 xit = 1
                 continue
               print(h, filepath)
