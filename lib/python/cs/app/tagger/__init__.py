@@ -128,11 +128,12 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     ''' The `Rule`s for this `Tagger` directory.
     '''
     taggerrc = self.pathto(self.TAGGERRC)
-    try:
-      with open(taggerrc) as f:
-        return tuple(Rule.from_file(f))
-    except FileNotFoundError:
-      return ()
+    with Pfx("%s.rules", self):
+      try:
+        with open(taggerrc) as f:
+          return tuple(Rule.from_file(f))
+      except FileNotFoundError:
+        return ()
 
   @uses_fstags
   @require(lambda filename: filename and '/' not in filename)
