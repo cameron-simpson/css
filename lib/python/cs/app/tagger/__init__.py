@@ -24,6 +24,7 @@ from threading import RLock
 from typing import List, Optional
 
 from icontract import require
+from typeguard import typechecked
 
 from cs.deco import cachedmethod, default_params, fmtdoc, promote
 from cs.fs import FSPathBasedSingleton, shortpath
@@ -137,12 +138,16 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
 
   @uses_fstags
   @require(lambda filename: filename and '/' not in filename)
-  def process(self,
-              filename,
-              *,
-              fstags: FSTags,
-              doit=False,
-              verbose=True) -> List[RuleResult]:
+  @typechecked
+  def process(
+      self,
+      filename,
+      *,
+      fstags: FSTags,
+      hashname: str,
+      doit=False,
+      verbose=False,
+  ) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.
         Return the list of `RuleResult`s for matches `Rule`s.
     '''
@@ -154,7 +159,13 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     printed_filename = False
     for rule in self.rules:
       with Pfx(rule):
-        applied = rule.apply(fspath, tags, doit=doit, verbose=verbose)
+        applied = rule.apply(
+            fspath,
+            tags,
+            hashname=hashname,
+            doit=doit,
+            verbose=verbose,
+        )
         if not applied.matched:
           continue
         matched_results.append(applied)
@@ -162,7 +173,6 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
           if not printed_filename:
             print(fspath)
             printed_filename = True
-          print("  matched:", rule.definition)
         if applied.failed:
           warning("  failed:")
           for failure in applied.failed:
