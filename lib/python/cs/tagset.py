@@ -207,7 +207,7 @@ import re
 import sys
 from threading import Lock
 import time
-from typing import Mapping, Optional, Union
+from typing import Mapping, Optional, Tuple, Union
 from uuid import UUID, uuid4
 
 from icontract import require
@@ -3385,8 +3385,12 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
   @classmethod
   @pfx_method
   def parse_tags_line(
-      cls, line, ontology=None, verbose=None, extra_types=None
-  ):
+      cls,
+      line,
+      ontology=None,
+      verbose=None,
+      extra_types=None,
+  ) -> Tuple[str, TagSet]:
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
