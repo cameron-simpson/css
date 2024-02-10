@@ -315,13 +315,17 @@ class Rule(Promotable):
         ')'
     )
 
+  @uses_fstags
   @typechecked
   def apply(
       self,
       fspath: str,
       tags: TagSet,
+      *,
+      hashname: str,
       doit: bool = False,
       verbose: bool = True,
+      fstags: FSTags,
   ) -> RuleResult:
     ''' Apply this `Rule` to `fspath` using the working `TagSet` `tags`,
         typically the inherited tags of `fspath`.
@@ -344,23 +348,31 @@ class Rule(Promotable):
       return result
     if match_result is False:
       return result
+    result.matched = True
     if isinstance(match_result, Mapping):
-      result.matched = True
       tags.update(match_result)
       for k, v in match_result.items():
         result.tag_changes.append(TagChange(add_remove=True, tag=Tag(k, v)))
     if self.action is not None:
       with Pfx(self.action.__doc__.strip().split()[0].strip()):
+        # apply the current tags in case the file gets moved
+        fstags[fspath].update(tags)
         try:
-          side_effects = self.action(fspath, tags, doit=doit, verbose=verbose)
+          side_effects = self.action(
+              fspath,
+              tags,
+              hashname=hashname,
+              doit=doit,
+              verbose=verbose,
+          )
         except Exception as e:
           warning("action failed: %s", e)
           result.failed.append(e)
         else:
           for side_effect in side_effects:
             match side_effect:
-              case str(fspath):
-                result.filed_to.append(fspath)
+              case str(new_fspath):
+                result.filed_to.append(new_fspath)
               case TagChange() as tag_change:
                 result.tag_changes.append(tag_change)
               case _:
