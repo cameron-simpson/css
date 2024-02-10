@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from getopt import GetoptError
 import os
 from os.path import (
-    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -19,13 +18,14 @@ from os.path import (
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
+    realpath,
     relpath,
     samefile,
 )
 import shlex
 from stat import S_ISREG
 import sys
-from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import Iterable, List, Mapping, Optional, Tuple, Union
 
 from icontract import require
 from typeguard import typechecked
@@ -38,9 +38,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import run
 from cs.resources import RunState, uses_runstate
-from cs.upd import Upd, uses_upd, print, run_task # pylint: disable=redefined-builtin
-
-from cs.debug import X, trace
+from cs.upd import Upd, uses_upd, print, run_task  # pylint: disable=redefined-builtin
 
 DEFAULT_HASHNAME = 'sha256'
 DEFAULT_HASHINDEX_EXE = 'hashindex'
@@ -62,6 +60,8 @@ class HashIndexCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
+    ''' Options for `HashIndexCommand`.
+    '''
     hashname: str = DEFAULT_HASHNAME
     move_mode: bool = False
     ssh_exe: str = 'ssh'
@@ -531,7 +531,7 @@ def rearrange(
       hashcode->[relpaths] `fspaths_by_hashcode`.
   '''
   with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
-    for srcpath, rfspaths in dir_remap(srcdirpath):
+    for srcpath, rfspaths in dir_remap(srcdirpath, rfspaths_by_hashcode):
       runstate.raiseif()
       if not rfspaths:
         continue
