@@ -302,27 +302,38 @@ class HashIndexCommand(BaseCommand):
     return 0 if ok else 1
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-h hashname] paths...
+    ''' Usage: {cmd} [-h hashname] [-r] paths...
           Walk the filesystem paths and emit a listing.
+          -h hahsname   Specify the file content hash alogrith name.
+          -r            Emit relative paths in the listing.
+                        This requires each path to be a directory.
     '''
     options = self.options
+    options.relative = False
     options.popopts(
         argv,
         h_='hashname',
+        r='relative',
     )
     hashname = options.hashname
+    relative = options.relative
     runstate = options.runstate
     if not argv:
       raise GetoptError("missing paths")
     xit = 0
     for path in argv:
-      runstate.raiseif()
-      for h, fspath in hashindex(path, hashname=hashname):
+      with Pfx(path):
         runstate.raiseif()
-        if h is None:
+        if relative and not isdirpath(path):
+          warning("not a directory and -r (relative) specified")
           xit = 1
-        else:
-          print(h, fspath)
+          continue
+        for h, fspath in hashindex(path, hashname=hashname):
+          runstate.raiseif()
+          if h is None:
+            xit = 1
+          else:
+            print(h, relpath(fspath, path) if relative else fspath)
     return xit
 
 @uses_fstags
