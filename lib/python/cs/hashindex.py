@@ -148,8 +148,12 @@ class HashIndexCommand(BaseCommand):
       input_s = "".join(reflines)
       hashindex_argv = [hashindex_exe, '-h', hashname]
       if not doit:
-        hashindex.append('-n')
-      hashindex.extend(['-', targetdir])
+        hashindex_argv.append('-n')
+      if move_mode:
+        hashindex_argv.append('--mv')
+      if symlink_mode:
+        hashindex_argv.append('-s')
+      hashindex_argv.extend(['-', targetdir])
       run(
           [ssh_exe, ssh_target,
            shlex.join(hashindex_argv)],
