@@ -11,6 +11,7 @@ Not to be confused with the excellent
 from contextlib import contextmanager
 import errno
 import io
+from itertools import chain
 import logging
 import os
 import shlex
@@ -222,7 +223,12 @@ def run(
         passed to `subprocess.run`
       * `subp_options`: optional mapping of keyword arguments
         to pass to `subprocess.run`
+
+      Note that `argv` is passed through `prep_argv` before use,
+      allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
   '''
+  argv = prep_argv(*argv)
   if logger is True:
     logger = logging.getLogger()
   if not doit:
@@ -265,7 +271,12 @@ def pipefrom(argv, *, quiet=False, text=True, stdin=DEVNULL, **popen_kw):
       * `text`: optional flag, default `True`; passed to `Popen`.
       * `stdin`: optional value for `Popen`'s `stdin`, default `DEVNULL`
       Other keyword arguments are passed to `Popen`.
+
+      Note that `argv` is passed through `prep_argv` before use,
+      allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
   '''
+  argv = prep_argv(*argv)
   if not quiet:
     print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
@@ -284,7 +295,12 @@ def pipeto(argv, *, quiet=False, **kw):
 
       Other keyword arguments are passed to the `io.TextIOWrapper`
       which wraps the command's input.
+
+      Note that `argv` is passed through `prep_argv` before use,
+      allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
   '''
+  argv = prep_argv(*argv)
   if not quiet:
     print_argv(*argv, indent="| ", file=sys.stderr)
   P = Popen(argv, stdin=PIPE)  # pylint: disable=consider-using-with
@@ -355,6 +371,40 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   if per:
     argvs.append(pre_argv + per + post_argv)
   return argvs
+
+def prep_argv(*argv):
+  ''' A trite list comprehension to reduce an argument list `*argv`
+      to the entries which are not `None` or `False`
+      and to flatten other entries which are not strings.
+
+      This exists ease the construction of argument lists
+      with methods like this:
+
+          >>> command_exe = 'hashindex'
+          >>> hashname = 'sha1'
+          >>> quiet = False
+          >>> verbose = True
+          >>> prep_argv(
+          ...     command_exe,
+          ...     quiet and '-q',
+          ...     verbose and '-v',
+          ...     hashname and ('-h', hashname),
+          ... )
+          ['hashindex', '-v', '-h', 'sha1']
+
+      where `verbose` is a `bool` governing the `-v` option
+      and `hashname` is either `str` to be passed with `-h hashname`
+      or `None` to omit the option.
+  '''
+  return list(
+      chain(
+          *[
+              ((arg,) if isinstance(arg, str) else arg)
+              for arg in argv
+              if arg is not None and arg is not False
+          ]
+      )
+  )
 
 def print_argv(
     *argv, indent="", subindent="  ", end="\n", file=None, fold=False
