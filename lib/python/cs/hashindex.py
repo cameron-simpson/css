@@ -566,6 +566,7 @@ def rearrange(
       hashcode->[relpaths] `fspaths_by_hashcode`.
   '''
   with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
+    to_remove = set()
     for srcpath, rfspaths in dir_remap(srcdirpath, rfspaths_by_hashcode,
                                        hashname=hashname):
       runstate.raiseif()
@@ -585,6 +586,8 @@ def rearrange(
           assert is_valid_rpath(rdstpath), (
               "rdstpath:%r is not a clean subpath" % (rdstpath,)
           )
+          if rsrcpath == rdstpath:
+            continue
           dstpath = joinpath(srcdirpath, rdstpath)
           if not quiet:
             print(opname, shortpath(srcpath), shortpath(dstpath))
@@ -600,8 +603,13 @@ def rearrange(
                 doit=doit,
                 quiet=True,  # we do our own print above
             )
-        if move_mode and rsrcpath not in rfspaths:
-          pfx_call(os.remove, srcpath)
+            if move_mode and rsrcpath not in rfspaths:
+              to_remove.add(srcpath)
+    # purge the srcpaths last because we might want them multiple
+    # times during the main loop (files with the same hashcode)
+    if doit and to_remove:
+      for srcpath in sorted(to_remove):
+        pfx_call(os.remove, srcpath)
 
 @pfx
 @uses_fstags
