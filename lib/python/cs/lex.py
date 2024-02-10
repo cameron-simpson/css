@@ -31,6 +31,7 @@ from string import (
 import sys
 from textwrap import dedent
 from threading import Lock
+from typing import Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
@@ -1248,6 +1249,24 @@ def snakecase(camelcased):
       was_lower = True
     strs.append(c)
   return ''.join(strs)
+
+def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
+  ''' Split a path with an optional leading `[user@]rhost:` prefix
+      into the prefix and the remaining path.
+      `None` is returned for the prefix is there is none.
+      This is useful for things like `rsync` targets etc.
+  '''
+  ssh_target = None
+  # check for [user@]rhost
+  try:
+    prefix, suffix = remotepath.split(':', 1)
+  except ValueError:
+    pass
+  else:
+    if prefix and '/' not in prefix:
+      ssh_target = prefix
+      remotepath = suffix
+  return ssh_target, remotepath
 
 # pylint: disable=redefined-outer-name
 def format_escape(s):
