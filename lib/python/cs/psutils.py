@@ -33,6 +33,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
         'cs.gimmicks>=devnull',
         'cs.pfx',
     ],
