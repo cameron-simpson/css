@@ -587,10 +587,7 @@ def rearrange(
           )
           dstpath = joinpath(srcdirpath, rdstpath)
           if not quiet:
-            print(
-                "ln -s" if symlink_mode else "mv" if move_mode else "ln",
-                shortpath(srcpath), shortpath(dstpath)
-            )
+            print(opname, shortpath(srcpath), shortpath(dstpath))
           if doit:
             merge(
                 srcpath,
@@ -601,7 +598,7 @@ def rearrange(
                 symlink_mode=symlink_mode,
                 fstags=fstags,
                 doit=doit,
-                quiet=quiet,
+                quiet=True,  # we do our own print above
             )
         if move_mode and rsrcpath not in rfspaths:
           pfx_call(os.remove, srcpath)
