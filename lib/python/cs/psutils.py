@@ -3,6 +3,9 @@
 
 r'''
 Assorted process and subprocess management functions.
+
+Not to be confused with the excellent
+(psutil)[https://pypi.org/project/psutil/] package.
 '''
 
 from contextlib import contextmanager
@@ -16,6 +19,7 @@ from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subpro
 import sys
 import time
 
+from cs.deco import fmtdoc
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
@@ -211,7 +215,7 @@ def run(
         if not `None` or `False` trace using `print_argv`
       * `quiet`: default `True`; if false, print the command and its output
       * `stdin`: standard input for the subprocess, default `subprocess.DEVNULL`;
-        passed to subprocess.run`
+        passed to `subprocess.run`
       * `subp_options`: optional mapping of keyword arguments
         to pass to `subprocess.run`
   '''
@@ -278,6 +282,7 @@ def pipeto(argv, *, quiet=False, **kw):
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
 
+@fmtdoc
 def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   ''' Distribute the array `argv` over multiple arrays
       to fit within `MAX_ARGV`.
@@ -288,8 +293,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
       * `argv`: the sequence of arguments to distribute; this may not be empty
       * `post_argv`: optional, the sequence of trailing arguments
       * `max_argv`: optional, the maximum length of each distributed
-        argument list, default: MAX_ARGV
-      * `encode`: default False.
+        argument list, default from `MAX_ARGV`: `{MAX_ARGV}`
+      * `encode`: default `False`.
         If true, encode the argv sequences into bytes for accurate tallying.
         If `encode` is a Boolean,
         encode the elements with their .encode() method.
