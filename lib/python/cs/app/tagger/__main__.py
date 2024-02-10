@@ -163,6 +163,7 @@ class TaggerCommand(BaseCommand):
         else:
           warning("unhandled file type ignored")
     xit = 0
+    limit = 1 if once else None
     q = ListQueue(paths, unique=realpath)
     with run_task('autofile') as proxy:
       for path in q:
@@ -195,9 +196,18 @@ class TaggerCommand(BaseCommand):
             )
             if matches:
               for match in matches:
-                q.extend(match.filed_to)
-              if once and not any([match.failed for match in matches]):
-                break
+                if match.filed_to:
+                  # process the filed paths ahead of the pending stuff
+                  # raise limit to process this file in the filed_to places
+                  q.prepend(match.filed_to)
+                  if limit is not None:
+                    limit += len(match.filed_to)
+              if limit is not None:
+                # now drop the limit by 1
+                limit -= 1
+                if limit < 1:
+                  # we're done
+                  break
             continue
           warning("not a regular file, skipping")
           xit = 1
