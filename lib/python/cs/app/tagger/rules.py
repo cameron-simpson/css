@@ -335,7 +335,7 @@ class Rule(Promotable):
       *,
       hashname: str,
       doit: bool = False,
-      verbose: bool = True,
+      quiet: bool = False,
       fstags: FSTags,
   ) -> RuleResult:
     ''' Apply this `Rule` to `fspath` using the working `TagSet` `tags`,
@@ -374,7 +374,7 @@ class Rule(Promotable):
               tags,
               hashname=hashname,
               doit=doit,
-              verbose=verbose,
+              quiet=quiet,
           )
         except Exception as e:
           warning("action failed: %s", e)
@@ -537,7 +537,7 @@ class Rule(Promotable):
                   *,
                   hashname: str,
                   doit=False,
-                  verbose=True,
+                  quiet=False,
                   fstags: FSTags,
               ) -> Tuple[str, ...]:
                 ''' Move `fspath` to `target_format`, return the new fspath.
@@ -557,7 +557,7 @@ class Rule(Promotable):
                     move_mode=True,
                     symlink_mode=False,
                     doit=doit,
-                    quiet=not verbose,
+                    quiet=quiet,
                 )
                 return (target_fspath,)
 
@@ -581,17 +581,17 @@ class Rule(Promotable):
               tags: TagSet,
               *,
               hashname: str,
-              doit=True,
-              verbose=False,
+              doit=False,
+              quiet=False,
           ) -> Iterable[TagChange]:
             ''' Apply tag changes.
             '''
             tag_changes = []
             for tag_token in tag_tokens:
               if tag_token.add_remove:
-                tags.add(tag_token.tag, verbose=verbose)
+                tags.add(tag_token.tag, verbose=not quiet)
               else:
-                tags.discard(tag_token.tag.name, verbose=verbose)
+                tags.discard(tag_token.tag.name, verbose=not quiet)
               tag_changes.append(
                   TagChange(
                       add_remove=tag_token.add_remove, tag=tag_token.tag
