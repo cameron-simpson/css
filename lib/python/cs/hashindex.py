@@ -91,7 +91,7 @@ class HashIndexCommand(BaseCommand):
         argv,
         e='ssh_exe',
         h_='hashname',
-        mv='mode_mode',
+        mv='move_mode',
         n='dry_run',
         s='symlink_mode',
     )
