@@ -592,6 +592,7 @@ def rearrange(
           if not quiet:
             print(opname, shortpath(srcpath), shortpath(dstpath))
           if doit:
+            needdir(dirname(dstpath), use_makedirs=True, log=warning)
             merge(
                 srcpath,
                 dstpath,
