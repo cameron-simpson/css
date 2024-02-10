@@ -132,9 +132,32 @@ class HashIndexCommand(BaseCommand):
     hashname = options.hashname
     move_mode = options.move_mode
     symlink_mode = options.symlink_mode
+    # scan the reference directory
     fspaths_by_hashcode = defaultdict(list)
-    with run_task(f'hashindex {refdir}'):
-      for hashcode, fspath in hashindex(refdir, hashname=hashname):
+    xit = 0
+    with run_task(f'hashindex {refspec}'):
+      if refhost is None:
+        remote = None
+        if refdir == '-':
+          hindex = read_hashindex(sys.stdin, hashname=hashname)
+        else:
+          hindex = (
+              (hashcode, relpath(fspath, refdir))
+              for hashcode, fspath in hashindex(refdir, hashname=hashname)
+          )
+      else:
+        hashindex_cmd = shlex.join(
+            prep_argv(
+                hashindex_exe,
+                'ls',
+                ('-h', hashname),
+                '-r',
+                refdir,
+            )
+        )
+        remote = pipefrom([ssh_exe, refhost, hashindex_cmd])
+        hindex = read_hashindex(remote.stdout, hashname=hashname)
+      for hashcode, fspath in hindex:
         if hashcode is not None:
           fspaths_by_hashcode[hashcode].append(fspath)
     if ssh_target:
