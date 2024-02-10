@@ -1521,7 +1521,13 @@ class FSTags(MultiOpenMixin):
 
   # pylint: disable=too-many-branches
   def attach_path(
-      self, attach, srcpath, dstpath, *, force=False, crop_ok=False
+      self,
+      attach,
+      srcpath,
+      dstpath,
+      *,
+      force=False,
+      crop_ok=False,
   ):
     ''' Attach `srcpath` to `dstpath` using the `attach` callable.
 
@@ -1571,8 +1577,7 @@ class FSTags(MultiOpenMixin):
         else:
           raise
       old_modified = dst_taggedpath.modified
-      for tag in src_taggedpath:
-        dst_taggedpath.add(tag)
+      dst_taggedpath.update(src_taggedpath)
       if not self.is_open():
         # we're not expecting save-on-final-close, so save now
         try:
