@@ -1,3 +1,4 @@
+rules: ~ prefix./regexp/ to prefix the matched names in the tags
 autotag to use the fstags autotag support, merge?
 bulk select thuymbnails
 gui - moving the LH file list does not switch images or move the scrubber
