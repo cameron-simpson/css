@@ -3392,7 +3392,13 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     '''
     if extra_types is None:
       extra_types = getattr(cls, 'EXTRA_TYPES', None)
-    name, offset = Tag.parse_value(line)
+    id_name, offset = get_dotted_identifier(line)
+    if id_name:
+      name = id_name
+    else:
+      name, offset = Tag.parse_value(line)
+    if not isinstance(name, str):
+      raise TypeError(f'line does not start with a string: {r(name)}')
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
