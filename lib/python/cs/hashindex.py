@@ -601,7 +601,8 @@ def merge(
     return
   if existspath(dstpath):
     if (samefile(srcpath, dstpath)
-        or file_checksum(dstpath) == file_checksum(srcpath)):
+        or (file_checksum(dstpath, hashname=hashname) == file_checksum(
+            srcpath, hashname=hashname))):
       fstags[dstpath].update(fstags[srcpath])
       if move_mode and realpath(srcpath) != realpath(dstpath):
         pfx_call(os.remove, srcpath)
