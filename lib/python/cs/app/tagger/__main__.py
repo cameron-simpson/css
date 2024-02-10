@@ -127,6 +127,7 @@ class TaggerCommand(BaseCommand):
         n='dry_run',  # no action
         r='recurse',
         y='doit',  # inverse of -n
+        v='verbose',
     )
     if not argv:
       raise GetoptError("missing paths")
@@ -136,6 +137,7 @@ class TaggerCommand(BaseCommand):
     once = options.once
     recurse = options.recurse
     runstate = options.runstate
+    verbose = options.verbose
     taggers = set()
     ok = True
     paths = []
@@ -192,7 +194,7 @@ class TaggerCommand(BaseCommand):
                 basename(path),
                 hashname=hashname,
                 doit=doit,
-                ##verbose=True,
+                verbose=verbose,
             )
             if matches:
               for match in matches:
