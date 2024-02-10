@@ -229,44 +229,22 @@ class HashIndexCommand(BaseCommand):
         bad_input = False
         fspaths_by_hashcode = defaultdict(list)
         hashcode_by_fspath = {}
-        for lineno, line in enumerate(sys.stdin, 1):
+        for hashcode, rfspath in read_hashindex(sys.stdin):
           runstate.raiseif()
-          with Pfx("stdin:%d", lineno):
-            line = line.rstrip('\n')
-            try:
-              hashhex, rfspath = line.split(None, 1)
-            except ValueError as e:
-              warning(
-                  'invalid data, cannot split into hashcode and rfspath, %s: %r',
-                  e,
-                  line,
-              )
+          if hashcode is None or rfspath is None:
+            bad_input = True
+            continue
+          with Pfx(rfspath):
+            if isabspath(rfspath):
+              warning("is an absolute path")
               bad_input = True
               continue
-            with Pfx(hashhex):
-              try:
-                hashcode = BaseHashCode.promote(hashhex)
-              except ValueError as e:
-                warning("cannot convert to hashcode: %s", e)
-                bad_input = True
-                continue
-              if hashcode.hashname != hashname:
-                warning(
-                    "bad hashname %r, expected %r", hashcode.hashname, hashname
-                )
-                bad_input = True
-                continue
-            with Pfx(rfspath):
-              if isabspath(rfspath):
-                warning("is an absolute path")
-                bad_input = True
-                continue
-              if rfspath in hashcode_by_fspath:
-                warning("repeated mention")
-                bad_input = True
-                continue
-              fspaths_by_hashcode[hashcode].append(rfspath)
-              hashcode_by_fspath[rfspath] = hashcode
+            if rfspath in hashcode_by_fspath:
+              warning("repeated mention")
+              bad_input = True
+              continue
+          fspaths_by_hashcode[hashcode].append(rfspath)
+          hashcode_by_fspath[rfspath] = hashcode
     if bad_input:
       warning("bad input data")
       return 1
@@ -449,6 +427,38 @@ def hashindex(fspath, *, hashname: str, runstate: RunState, fstags: FSTags):
         yield h, filepath
   else:
     warning("hashindex(%r): neither file nor directory")
+
+def read_hashindex(f, start=1):
+  ''' A generator which reads line from the file `f`
+      and yields `(hashcode,fspath)` 2-tuples.
+      If there are parse errors the `hashcode` or `fspath` may be `None`.
+  '''
+  for lineno, line in enumerate(f, start):
+    with Pfx("%s:%d", f, lineno):
+      line = line.rstrip('\n')
+      try:
+        hashhex, fspath = line.split(None, 1)
+      except ValueError as e:
+        warning(
+            'invalid data, cannot split into hashcode and fspath, %s: %r',
+            e,
+            line,
+        )
+        hashcode = None
+        fspath = None
+      with Pfx(hashhex):
+        try:
+          hashcode = BaseHashCode.promote(hashhex)
+        except ValueError as e:
+          warning("cannot convert to hashcode: %s", e)
+          hashcode = None
+        else:
+          if hashcode.hashname != hashname:
+            warning(
+                "bad hashname %r, expected %r", hashcode.hashname, hashname
+            )
+            hashcode = None
+      yield hashcode, fspath
 
 def dir_filepaths(dirpath: str):
   ''' Generator yielding the filesystem paths of the files in `dirpath`.
