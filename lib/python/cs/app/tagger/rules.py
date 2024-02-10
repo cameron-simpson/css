@@ -7,7 +7,15 @@ from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from dataclasses import dataclass, field
 from functools import partial
-from os.path import abspath, basename, expanduser, join as joinpath
+from os.path import (
+    abspath,
+    basename,
+    dirname,
+    expanduser,
+    isabs as isabspath,
+    isdir as isdirpath,
+    join as joinpath,
+)
 import re
 from re import Pattern
 from typing import (
@@ -25,7 +33,9 @@ from icontract import ensure, require
 from typeguard import typechecked
 
 from cs.deco import decorator, promote, Promotable
+from cs.fs import needdir
 from cs.fstags import FSTags, TaggedPath, uses_fstags
+from cs.hashindex import merge
 from cs.lex import (
     get_dotted_identifier,
     get_qstr,
@@ -35,6 +45,7 @@ from cs.lex import (
 from cs.logutils import ifverbose, warning
 from cs.pfx import Pfx, pfx_call
 from cs.tagset import Tag, TagSet
+from cs.upd import print
 
 from cs.debug import X, trace, r, s
 
