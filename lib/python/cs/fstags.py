@@ -1131,7 +1131,6 @@ class FSTags(MultiOpenMixin):
       except FileNotFoundError as e:
         error("%s.save: %s", tagfile, e)
 
-  @typechecked
   def _tagfile(
       self, path: str, *, no_ontology: bool = False
   ) -> "FSTagsTagFile":
@@ -1298,7 +1297,6 @@ class FSTags(MultiOpenMixin):
       current = joinpath(current, next_part)
 
   @locked
-  @typechecked
   def dir_tagfile(self, dirpath: str) -> "FSTagsTagFile":
     ''' Return the `FSTagsTagFile` associated with `dirpath`.
     '''
@@ -1950,7 +1948,6 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
       which lives in the file path's directory.
   '''
 
-  @typechecked
   def __init__(self, fspath: str, *, ontology=Ellipsis, fstags=None, **kw):
     if ontology is Ellipsis:
       ontology = fstags.ontology
@@ -1961,7 +1958,6 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
       lambda name: is_valid_basename(name),  # pylint: disable=unnecessary-lambda
       "name should be a clean file basename"
   )
-  @typechecked
   def TagSetClass(self, name: str) -> TaggedPath:
     ''' factory to create a `TaggedPath` from a `name`.
     '''
