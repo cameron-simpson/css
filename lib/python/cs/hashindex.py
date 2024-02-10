@@ -614,6 +614,7 @@ def merge(
     srcpath: str,
     dstpath: str,
     *,
+    opname=None,
     hashname: str,
     move_mode: bool = False,
     symlink_mode=False,
@@ -626,11 +627,10 @@ def merge(
       If `dstpath` does not exist, move/link/symlink `srcpath` to `dstpath`.
       Otherwise checksum their contents and raise `FileExistsError` if they differ.
   '''
+  if opname is None:
+    opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
   if not quiet:
-    print(
-        "ln -s" if symlink_mode else "mv" if move_mode else "ln",
-        shortpath(srcpath), shortpath(dstpath)
-    )
+    print(opname, shortpath(srcpath), shortpath(dstpath))
   if not doit:
     return
   if dstpath == srcpath:
