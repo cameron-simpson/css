@@ -229,7 +229,7 @@ class HashIndexCommand(BaseCommand):
         bad_input = False
         fspaths_by_hashcode = defaultdict(list)
         hashcode_by_fspath = {}
-        for hashcode, rfspath in read_hashindex(sys.stdin):
+        for hashcode, rfspath in read_hashindex(sys.stdin, hashname=hashname):
           runstate.raiseif()
           if hashcode is None or rfspath is None:
             bad_input = True
@@ -439,7 +439,7 @@ def hashindex(fspath, *, hashname: str, runstate: RunState, fstags: FSTags):
   else:
     warning("hashindex(%r): neither file nor directory")
 
-def read_hashindex(f, start=1):
+def read_hashindex(f, start=1, *, hashname: str):
   ''' A generator which reads line from the file `f`
       and yields `(hashcode,fspath)` 2-tuples.
       If there are parse errors the `hashcode` or `fspath` may be `None`.
