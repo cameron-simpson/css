@@ -34,6 +34,7 @@ from cs.cmdutils import BaseCommand
 from cs.fs import is_valid_rpath, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
+from cs.lex import split_remote_path
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import run
@@ -99,29 +100,25 @@ class HashIndexCommand(BaseCommand):
       warning("missing refdir")
       badopts = True
     else:
-      refdir = argv.pop(0)
-      with Pfx("refdir %r", refdir):
-        if refdir != '-':
-          if not isdirpath(refdir):
-            warning("not a directory")
-            badopts = True
+      refspec = argv.pop(0)
+      with Pfx("refdir %r", refspec):
+        refhost, refdir = split_remote_path(refspec)
+        if refhost is None:
+          if refdir != '-':
+            if not isdirpath(refdir):
+              warning("not a directory")
+              badopts = True
+        elif refdir == '-':
+          warning("remote - not supported")
+          badopts = True
     if not argv:
       warning("missing targetdir")
       badopts = True
     else:
-      targetdir = argv.pop(0)
-      with Pfx("targetdir %r", targetdir):
-        ssh_target = None
-        # check for [user@]rhost
-        try:
-          prefix, suffix = targetdir.split(':', 1)
-        except ValueError:
-          pass
-        else:
-          if prefix and '/' not in prefix:
-            ssh_target = prefix
-            targetdir = suffix
-        if ssh_target is None:
+      targetspec = argv.pop(0)
+      with Pfx("targetdir %r", targetspec):
+        targethost, targetdir = split_remote_path(targetspec)
+        if targethost is None:
           if not isdirpath(targetdir):
             warning("not a directory")
             badopts = True
