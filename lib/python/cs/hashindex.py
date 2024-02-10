@@ -574,6 +574,7 @@ def rearrange(
       filename = basename(srcpath)
       if filename.startswith('.') or filename == fstags.tagsfile_basename:
         continue
+      opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
       with Pfx(srcpath):
         rsrcpath = relpath(srcpath, srcdirpath)
         assert is_valid_rpath(rsrcpath), (
@@ -594,6 +595,7 @@ def rearrange(
             merge(
                 srcpath,
                 dstpath,
+                opname=opname,
                 hashname=hashname,
                 move_mode=False,
                 symlink_mode=symlink_mode,
