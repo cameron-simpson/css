@@ -554,5 +554,48 @@ def rearrange(
         if ok and move_mode and rsrcpath not in rfspaths:
           pfx_call(os.remove, srcpath)
 
+@pfx
+@uses_fstags
+@require(
+    lambda move_mode, symlink_mode: not (move_mode and symlink_mode),
+    'move_mode and symlink_mode may not both be true'
+)
+def merge(
+    srcpath: str,
+    dstpath: str,
+    *,
+    hashname: str,
+    move_mode: bool = False,
+    symlink_mode=False,
+    doit=False,
+    quiet=False,
+    fstags: FSTags,
+):
+  ''' Merge `srcpath` to `dstpath`.
+
+      If `dstpath` does not exist, move/link/symlink `srcpath` to `dstpath`.
+      Otherwise checksum their contents and raise `FileExistsError` if they differ.
+  '''
+  if not quiet:
+    print(
+        "ln -s" if symlink_mode else "mv" if move_mode else "ln",
+        shortpath(srcpath), shortpath(dstpath)
+    )
+  if not doit:
+    return
+  if dstpath == srcpath:
+    return
+  if existspath(dstpath):
+    if (samefile(srcpath, dstpath)
+        or file_checksum(dstpath) == file_checksum(srcpath)):
+      fstags[dstpath].update(fstags[srcpath])
+      if move_mode and realpath(srcpath) != realpath(dstpath):
+        pfx_call(os.remove, srcpath)
+      return
+    raise FileExistsError(
+        f'dstpath {dstpath!r} already exists with different hashcode'
+    )
+  pfx_call(fstags.mv, srcpath, dstpath, symlink=symlink_mode, remove=move_mode)
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
