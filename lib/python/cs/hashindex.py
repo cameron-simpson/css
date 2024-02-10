@@ -160,36 +160,47 @@ class HashIndexCommand(BaseCommand):
       for hashcode, fspath in hindex:
         if hashcode is not None:
           fspaths_by_hashcode[hashcode].append(fspath)
-    if ssh_target:
-      reflines = []
-      for hashcode, fspaths in fspaths_by_hashcode.items():
-        for fspath in fspaths:
-          reflines.append(f'{hashcode} {fspath}\n')
-      input_s = "".join(reflines)
-      hashindex_argv = [hashindex_exe, '-h', hashname]
-      if not doit:
-        hashindex_argv.append('-n')
-      if move_mode:
-        hashindex_argv.append('--mv')
-      if symlink_mode:
-        hashindex_argv.append('-s')
-      hashindex_argv.extend(['-', targetdir])
-      run(
-          [ssh_exe, ssh_target,
-           shlex.join(hashindex_argv)],
-          input=input_s,
-          quiet=False,
-      )
-    else:
-      rearrange(
-          targetdir,
-          fspaths_by_hashcode,
-          hashname=hashname,
-          doit=doit,
-          move_mode=move_mode,
-          symlink_mode=symlink_mode,
-          quiet=quiet,
-      )
+      if remote is not None:
+        xit = remote.returncode
+    # rearrange the target directory.
+    with run_task(f'rearrange {targetspec}'):
+      if targethost is None:
+        rearrange(
+            targetdir,
+            fspaths_by_hashcode,
+            hashname=hashname,
+            doit=doit,
+            move_mode=move_mode,
+            symlink_mode=symlink_mode,
+            quiet=quiet,
+        )
+      else:
+        hashindex_cmd = shlex.join(
+            prep_argv(
+                hashindex_exe,
+                'rearrange',
+                not doit and '-n',
+                ('-h', hashname),
+                '-',
+                targetdir,
+                move_mode and '--mv',
+                symlink_mode and '-s',
+                '-',
+                targetdir,
+            )
+        )
+        # prepare the remote input
+        reflines = []
+        for hashcode, fspaths in fspaths_by_hashcode.items():
+          for fspath in fspaths:
+            reflines.append(f'{hashcode} {fspath}\n')
+        input_s = "".join(reflines)
+        xit = run(
+            [ssh_exe, targethost, hashindex_cmd],
+            input=input_s,
+            quiet=False,
+        ).returncode
+    return xit
 
   @uses_fstags
   @uses_upd
