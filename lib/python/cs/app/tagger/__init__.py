@@ -176,18 +176,18 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
         if applied.failed:
           warning("  failed:")
           for failure in applied.failed:
-            warning("    %s", failure)
+            warning("   %s", failure)
         for new_fspath in applied.filed_to:
           if verbose:
-            print("   ", shortpath(fspath), "->", shortpath(new_fspath))
+            print("  ->", shortpath(new_fspath))
         for tag_change in applied.tag_changes:
           match tag_change:
             case TagChange(add_remove=True) as change:
               if verbose:
-                print("    +", change.tag)
+                print("  +", change.tag)
             case TagChange(add_remove=False) as change:
               if verbose:
-                print("    -", change.tag)
+                print("  -", change.tag)
             case _:
               warning("ignoring unsupported action {r(action)}")
         if rule.quick:
