@@ -37,7 +37,7 @@ from cs.hashutils import BaseHashCode
 from cs.lex import split_remote_path
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
-from cs.psutils import run
+from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
 from cs.upd import Upd, uses_upd, print, run_task  # pylint: disable=redefined-builtin
 
@@ -453,7 +453,7 @@ def set_fstags_hashcode(
 @uses_fstags
 @uses_runstate
 def hashindex(fspath, *, hashname: str, runstate: RunState, fstags: FSTags):
-  ''' Generator yielding `(BaseHashCode,filepath)` 2-tuples
+  ''' Generator yielding `(hashcode,filepath)` 2-tuples
       for the files in `fspath`, which may be a file or directory path.
       Note that it yields `(None,filepath)` for files which cannot be accessed.
   '''
