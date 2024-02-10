@@ -100,7 +100,6 @@ from threading import Lock, RLock
 from typing import Mapping, Optional
 
 from icontract import ensure, require
-from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -115,7 +114,7 @@ from cs.lex import (
 )
 from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
-from cs.resources import MultiOpenMixin, RunState
+from cs.resources import MultiOpenMixin
 from cs.tagset import (
     Tag,
     TagSet,
@@ -254,8 +253,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       with UpdProxy() as proxy:
         for top_path in argv:
           for isdir, path in rpaths(top_path, yield_dirs=True):
-            if runstate.cancelled:
-              return 1
+            runstate.raiseif()
             spath = shortpath(path)
             proxy.text = spath
             with Pfx(spath):
@@ -1105,7 +1103,9 @@ class FSTags(MultiOpenMixin):
     self._lock = RLock()
 
   def __str__(self):
-    return "%s(%s)" % (self.__class__.__name__, self.tagsfile_basename)
+    return "%s(tagsfile_basename=%r)" % (
+        type(self).__name__, self.tagsfile_basename
+    )
 
   def __repr__(self):
     return "%s(%r)" % (self.__class__.__name__, self.tagsfile_basename)
@@ -1158,11 +1158,6 @@ class FSTags(MultiOpenMixin):
     ''' The ontology file basename.
     '''
     return self.config.ontology_filepath
-
-  def __str__(self):
-    return "%s(tagsfile_basename=%r)" % (
-        type(self).__name__, self.tagsfile_basename
-    )
 
   @ensure(lambda result: result == normpath(result))
   def keypath(self, fspath):
