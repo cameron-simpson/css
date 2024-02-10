@@ -137,7 +137,7 @@ class HashIndexCommand(BaseCommand):
     symlink_mode = options.symlink_mode
     fspaths_by_hashcode = defaultdict(list)
     with run_task(f'hashindex {refdir}'):
-      for hashcode, fspath in hashindex(refdir):
+      for hashcode, fspath in hashindex(refdir, hashname=hashname):
         if hashcode is not None:
           fspaths_by_hashcode[hashcode].append(fspath)
     if ssh_target:
@@ -531,7 +531,8 @@ def rearrange(
       hashcode->[relpaths] `fspaths_by_hashcode`.
   '''
   with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
-    for srcpath, rfspaths in dir_remap(srcdirpath, rfspaths_by_hashcode):
+    for srcpath, rfspaths in dir_remap(srcdirpath, rfspaths_by_hashcode,
+                                       hashname=hashname):
       runstate.raiseif()
       if not rfspaths:
         continue
