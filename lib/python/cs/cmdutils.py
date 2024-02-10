@@ -1220,7 +1220,7 @@ class BaseCommand:
   @contextmanager
   @uses_runstate
   @uses_upd
-  def run_context(self, runstate: RunState, upd: Upd, **kw_options):
+  def run_context(self, *, runstate: RunState, upd: Upd, **kw_options):
     ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
 
         This default does several things, and subclasses should
