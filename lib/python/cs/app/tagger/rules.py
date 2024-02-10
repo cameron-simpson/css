@@ -524,6 +524,7 @@ class Rule(Promotable):
                   fspath: str,
                   fkwargs: dict,
                   *,
+                  hashname: str,
                   doit=False,
                   verbose=True,
                   fstags: FSTags,
@@ -531,13 +532,22 @@ class Rule(Promotable):
                 ''' Move `fspath` to `target_format`, return the new fspath.
                 '''
                 target_fspath = expanduser(target_format.format(**fkwargs))
+                if not isabspath(target_fspath):
+                  target_fspath = joinpath(dirname(fspath), target_fspath)
                 if target_fspath.endswith('/'):
                   target_fspath = joinpath(target_fspath, basename(fspath))
-                ifverbose(verbose, "mv %r -> %r", fspath, target_fspath)
-                # TODO: actually move the file
-                if not doit:
-                  return ()
-                fstags.mv(fspath, target_fspath, remove=True)
+                target_dirpath = dirname(target_fspath)
+                if doit and not isdirpath(target_dirpath):
+                  needdir(target_dirpath, use_makedirs=False)
+                merge(
+                    fspath,
+                    target_fspath,
+                    hashname=hashname,
+                    move_mode=True,
+                    symlink_mode=False,
+                    doit=doit,
+                    quiet=not verbose,
+                )
                 return (target_fspath,)
 
               mv_action.__doc__ = (
@@ -558,6 +568,8 @@ class Rule(Promotable):
           def tag_action(
               fspath: str,
               tags: TagSet,
+              *,
+              hashname: str,
               doit=True,
               verbose=False,
           ) -> Iterable[TagChange]:
