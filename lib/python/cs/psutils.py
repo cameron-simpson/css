@@ -197,10 +197,12 @@ def PidFileManager(path, pid=None):
 
 def run(
     argv,
+    *,
     doit=True,
     logger=None,
     quiet=True,
-    stdin=subprocess_DEVNULL,
+    input=None,
+    stdin=None,
     **subp_options,
 ):
   ''' Run a command via `subprocess.run`.
@@ -214,6 +216,8 @@ def run(
         if `True`, use `logging.getLogger()`;
         if not `None` or `False` trace using `print_argv`
       * `quiet`: default `True`; if false, print the command and its output
+      * `input`: default `None`: alternative to `stdin`;
+        passed to `subprocess.run`
       * `stdin`: standard input for the subprocess, default `subprocess.DEVNULL`;
         passed to `subprocess.run`
       * `subp_options`: optional mapping of keyword arguments
@@ -233,7 +237,12 @@ def run(
       trace("+ %s", shlex.join(argv))
     else:
       print_argv(*argv, indent="+ ", file=sys.stderr)
-  cp = pfx_call(subprocess_run, argv, stdin=stdin, **subp_options)
+  if input is None:
+    if stdin is None:
+      stdin = subprocess_DEVNULL
+  elif stdin is not None:
+    raise ValueError("you may not specify both input and stdin")
+  cp = pfx_call(subprocess_run, argv, input=input, stdin=stdin, **subp_options)
   if cp.stderr:
     print(" stderr:")
     print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
