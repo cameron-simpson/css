@@ -30,6 +30,7 @@ from cs.fileutils import shortpath
 from cs.fs import HasFSPath
 from cs.fstags import FSTags, uses_fstags
 from cs.gui_tk import BaseTkCommand
+from cs.hashindex import DEFAULT_HASHNAME
 from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint, pfx_call, pfx_method
@@ -53,13 +54,17 @@ class TaggerCommand(BaseCommand):
 
   USAGE_FORMAT = '''Usage: {cmd} [-d dirpath] [-nqv] subcommand [subargs...]
     -d dirpath  Specify the reference directory, default '.'.
+    -h hashname Specify the content hash algorithm name, default: {DEFAULT_HASHNAME}.
     -n          No action, dry run.
     -q          Quiet.
     -v          Verbose.'''
 
+  USAGE_KEYWORDS = {'DEFAULT_HASHNAME': DEFAULT_HASHNAME}
+
   @dataclass
   class Options(BaseCommand.Options, HasFSPath):
     fspath: str = '.'
+    hashname: str = DEFAULT_HASHNAME
 
   # pylint: disable=no-self-use
   @trace
@@ -67,6 +72,8 @@ class TaggerCommand(BaseCommand):
     options = self.options
     if opt == '-d':
       options.fspath = val
+    if opt == '-h':
+      options.hashname = val
     elif opt == '-n':
       options.dry_run = True
     elif opt == '-q':
@@ -101,18 +108,22 @@ class TaggerCommand(BaseCommand):
           -d    Treat directory paths like files - file the
                 directory, not its contents.
                 (TODO: we file by linking - this needs a rename.)
+          -h hashname
+                Specify the content hash algorithm name, default: {DEFAULT_HASHNAME}.
           -n    No action (default). Just print filing actions.
           -r    Recurse. Required to autofile a directory tree.
           -y    Link files to destinations.
     '''
     options = self.options
     options.direct = False
+    options.hashname = DEFAULT_HASHNAME
     options.once = False
     options.recurse = False
     options.popopts(
         argv,
         _1='once',
         d='direct',
+        h='hashname',
         n='dry_run',  # no action
         r='recurse',
         y='doit',  # inverse of -n
@@ -121,6 +132,7 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("missing paths")
     doit = options.doit
     direct = options.direct
+    hashname = options.hashname
     once = options.once
     recurse = options.recurse
     runstate = options.runstate
@@ -175,7 +187,12 @@ class TaggerCommand(BaseCommand):
           if isfilepath(path) or (direct and isdirpath(path)):
             tagger = Tagger(dirname(path))
             taggers.add(tagger)  # remember for reuse
-            matches = tagger.process(basename(path), doit=doit)
+            matches = tagger.process(
+                basename(path),
+                hashname=hashname,
+                doit=doit,
+                ##verbose=True,
+            )
             if matches:
               for match in matches:
                 q.extend(match.filed_to)
