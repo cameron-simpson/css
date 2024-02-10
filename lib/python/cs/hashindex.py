@@ -69,9 +69,9 @@ class HashIndexCommand(BaseCommand):
 
   @contextmanager
   @uses_fstags
-  def run_context(self, *, fstags: FSTags):
+  def run_context(self, *, fstags: FSTags, **kw):
     with fstags:
-      with super().run_context():
+      with super().run_context(**kw):
         yield
 
   def cmd_rearrange(
