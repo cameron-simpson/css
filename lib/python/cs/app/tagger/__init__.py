@@ -164,7 +164,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
             tags,
             hashname=hashname,
             doit=doit,
-            quiet=not verbose,
+            quiet=True,
         )
         if not applied.matched:
           continue
