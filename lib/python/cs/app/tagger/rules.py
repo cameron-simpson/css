@@ -300,15 +300,18 @@ class Rule(Promotable):
     self.action = action
     self.quick = quick
 
-  # TODO: str should write out a valid rule
-  # TODO: repr should do what str does now
   def __str__(self):
+    return self.definition
+
+  # TODO: repr should do what str does now
+  def __repr__(self):
     return (
         f'{self.__class__.__name__}('
         f'{self.definition!r},'
         f'{self.match_attribute},'
-        f'match_test={self.match_test},'
+        f'match_test={self.match_test!r},'
         f'action={self.action},'
+        f'quick={self.quick},'
         ')'
     )
 
