@@ -533,7 +533,7 @@ class Rule(Promotable):
               @typechecked
               def mv_action(
                   fspath: str,
-                  fkwargs: dict,
+                  tags: TagSet,
                   *,
                   hashname: str,
                   doit=False,
@@ -542,7 +542,7 @@ class Rule(Promotable):
               ) -> Tuple[str, ...]:
                 ''' Move `fspath` to `target_format`, return the new fspath.
                 '''
-                target_fspath = expanduser(target_format.format(**fkwargs))
+                target_fspath = expanduser(tags.format_as(target_format))
                 if not isabspath(target_fspath):
                   target_fspath = joinpath(dirname(fspath), target_fspath)
                 if target_fspath.endswith('/'):
