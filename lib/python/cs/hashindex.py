@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-''' Emit a listing of file checksums or read such a listing and
-    construct a matching directory tree.
-    - Cameron Simpson <cs@cskk.id.au> 24jan2024
+''' A command and utility functions for making listings of file content hashcodes
+    and manipulating directory trees based on such a hash index.
 '''
 
 from collections import defaultdict
