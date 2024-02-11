@@ -156,7 +156,6 @@ DISTINFO = {
         'cs.threads',
         'cs.upd',
         'icontract',
-        'typeguard',
     ],
 }
 
