@@ -971,11 +971,9 @@ def match_tokens(s, offset, getters):
       and returns `(None,offset)`.
   '''
   try:
-    tokens, offset2 = get_tokens(s, offset, getters)
+    return get_tokens(s, offset, getters)
   except ValueError:
     return None, offset
-  else:
-    return tokens, offset2
 
 def isUC_(s):
   ''' Check that a string matches the regular expression `^[A-Z][A-Z_0-9]*$`.
