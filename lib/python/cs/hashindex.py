@@ -41,7 +41,7 @@ from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
 from cs.upd import Upd, uses_upd, print, run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20240211'
+__version__ = '20240211-post'
 
 DISTINFO = {
     'keywords': ["python3"],
