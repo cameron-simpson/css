@@ -249,7 +249,7 @@ class HashIndexCommand(BaseCommand):
     ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir
           Rearrange files in targetdir based on their positions in refdir.
           Options:
-            -e sshexe   Specify the ssh executable.
+            -e ssh_exe  Specify the ssh executable.
             -h hashname Specify the file content hash algorithm name.
             -H hashindex_exe
                         Specify the remote hashindex executable.
