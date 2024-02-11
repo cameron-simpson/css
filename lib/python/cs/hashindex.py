@@ -69,6 +69,7 @@ class HashIndexCommand(BaseCommand):
     hashindex_exe: str = DEFAULT_HASHINDEX_EXE
     symlink_mode: bool = False
 
+  # pylint: disable=arguments-differ
   @contextmanager
   @uses_fstags
   def run_context(self, *, fstags: FSTags, **kw):
@@ -78,7 +79,7 @@ class HashIndexCommand(BaseCommand):
 
   @uses_fstags
   @uses_upd
-  def cmd_linkto(self, argv, *, fstags: FSTags, upd: Upd):
+  def cmd_linkto(self, argv, *, fstags: FSTags):
     ''' Usage: {cmd} [-f] [-h hashname] [--mv] [-n] [-q] [-s] srcdir dstdir < hashindex
           Link files from srcdir to dstdir according the input hash index.
           -f    Force: link even if the target already exists.
@@ -160,53 +161,44 @@ class HashIndexCommand(BaseCommand):
     # scan the source tree and link according to the input
     with Pfx("scan srcdir %r", srcdir):
       with run_task(f'scan srcdir {shortpath(srcdir)}') as proxy:
-        for dirpath, dirnames, filenames in os.walk(srcdir):
-          runstate.raiseif()
-          dirnames[:] = sorted(dirnames)
-          for filename in sorted(filenames):
-            runstate.raiseif()
-            if filename.startswith('.'
-                                   ) or filename == fstags.tagsfile_basename:
+        for srchashcode, srcpath in hashindex(srcdir, hashname=hashname):
+          rsrcpath = relpath(srcpath, srcdir)
+          proxy.text = rsrcpath
+          with Pfx(srcpath):
+            if srchashcode is None:
+              warning("no hashcode")
               continue
-            srcpath = joinpath(dirpath, filename)
-            rsrcpath = relpath(srcpath, srcdir)
-            proxy.text = rsrcpath
-            with Pfx(srcpath):
-              srchashcode = file_checksum(srcpath, hashname=hashname)
-              if srchashcode is None:
-                warning("no hashcode")
-                continue
-              rfspaths = fspaths_by_hashcode[srchashcode]
-              if not rfspaths:
-                warning("hashcode %s not present in the input", srchashcode)
-                continue
-              filed_to = []
-              for rfspath in rfspaths:
-                dstpath = joinpath(dstdir, rfspath)
-                if existspath(dstpath):
-                  if file_checksum(dstpath) != srchashcode:
-                    warning(
-                        "dstpath %r already exists with different hashcode",
-                        dstpath
-                    )
-                  continue
-                opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
-                quiet or print(opname, srcpath, dstpath)
-                dstdirpath = dirname(dstpath)
-                if doit:
-                  needdir(dstdirpath, use_makedirs=False, log=warning)
-                quiet or print(opname, srcpath, dstpath)
-                if doit:
-                  fstags.mv(
-                      srcpath,
-                      dstpath,
-                      exists_ok=False,
-                      symlink=symlink_mode,
-                      remove=False
+            rfspaths = fspaths_by_hashcode[srchashcode]
+            if not rfspaths:
+              warning("hashcode %s not present in the input", srchashcode)
+              continue
+            filed_to = []
+            for rfspath in rfspaths:
+              dstpath = joinpath(dstdir, rfspath)
+              if existspath(dstpath):
+                if file_checksum(dstpath) != srchashcode:
+                  warning(
+                      "dstpath %r already exists with different hashcode",
+                      dstpath
                   )
-                  filed_to.append(dstpath)
-              if filed_to and move_mode:
-                pfx_call(os.remove(srcpath))
+                continue
+              opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
+              quiet or print(opname, srcpath, dstpath)
+              dstdirpath = dirname(dstpath)
+              if doit:
+                needdir(dstdirpath, use_makedirs=False, log=warning)
+              quiet or print(opname, srcpath, dstpath)
+              if doit:
+                fstags.mv(
+                    srcpath,
+                    dstpath,
+                    exists_ok=False,
+                    symlink=symlink_mode,
+                    remove=False
+                )
+                filed_to.append(dstpath)
+            if filed_to and move_mode:
+              pfx_call(os.remove(srcpath))
     return 0 if ok else 1
 
   def cmd_ls(self, argv):
@@ -456,7 +448,7 @@ def set_fstags_hashcode(
 
 @uses_fstags
 @uses_runstate
-def hashindex(fspath, *, hashname: str, runstate: RunState, fstags: FSTags):
+def hashindex(fspath, *, hashname: str, fstags: FSTags):
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
       for the files in `fspath`, which may be a file or directory path.
       Note that it yields `(None,filepath)` for files which cannot be accessed.
@@ -466,10 +458,8 @@ def hashindex(fspath, *, hashname: str, runstate: RunState, fstags: FSTags):
     yield h, fspath
   elif isdirpath(fspath):
     for dirpath, dirnames, filenames in os.walk(fspath):
-      runstate.raiseif()
       dirnames[:] = sorted(dirnames)
       for filename in sorted(filenames):
-        runstate.raiseif()
         if filename.startswith('.') or filename == fstags.tagsfile_basename:
           continue
         filepath = joinpath(dirpath, filename)
