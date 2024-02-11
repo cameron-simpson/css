@@ -29,14 +29,14 @@ DISTINFO = {
 
 @contextmanager
 def contextif(flag, cmgr_func, *cmgr_args, **cmgr_kwargs):
-  ''' A context manager to call call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
-      if `flag` is true or `nullcontext()` otherwise.
+  ''' A context manager to call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
+      if `flag` is true, otherwise to call `nullcontext()`.
 
-      The driving use case in verbosity dependent status lines or
+      The driving use case is verbosity dependent status lines or
       progress bars, eg:
 
           from cs.upd import run_task
-          with contextif(verbose, run_task, ....)) as proxy:
+          with contextif(verbose, run_task, ....) as proxy:
             ... do stuff, updating proxy if not None ...
   '''
   assert isinstance(flag, bool)
