@@ -5,7 +5,6 @@
 
 from contextlib import contextmanager
 import signal
-import threading
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
@@ -37,7 +36,7 @@ def contextif(flag, cmgr_func, *cmgr_args, **cmgr_kwargs):
       progress bars, eg:
 
           from cs.upd import run_task
-          with contextif(run_task(....)) as proxy:
+          with contextif(verbose, run_task, ....)) as proxy:
             ... do stuff, updating proxy if not None ...
   '''
   assert isinstance(flag, bool)
@@ -585,7 +584,7 @@ class ContextManagerMixin:
     entered = next(eegen)
     try:
       yield entered
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
       exit_result = eegen.throw(type(e), e, e.__traceback__)
       if not exit_result:
         raise
