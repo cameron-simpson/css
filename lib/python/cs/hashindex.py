@@ -22,7 +22,7 @@ from os.path import (
     samefile,
 )
 import shlex
-from stat import S_ISREG
+from stat import S_ISLNK, S_ISREG
 import sys
 from typing import Iterable, List, Mapping, Optional, Tuple, Union
 
@@ -420,6 +420,9 @@ def file_checksum(
       Warn and return `None` on `OSError`.
   '''
   hashcode, S = get_fstags_hashcode(fspath, hashname)
+  if S_ISLNK(S.st_mode):
+    # ignore symlinks
+    return None
   if hashcode is None:
     hashclass = BaseHashCode.hashclass(hashname)
     with run_task(f'checksum {shortpath(fspath)}'):
@@ -445,10 +448,13 @@ def get_fstags_hashcode(
       and `stat_result` is the current `os.stat` result for `fspath`.
   '''
   try:
-    S = os.stat(fspath)
+    S = os.lstat(fspath)
   except OSError as e:
     warning("stat %r: %s", fspath, e)
     return None, None
+  if S_ISLNK(S.st_mode):
+    # ignore symlinks
+    return None, S
   if not S_ISREG(S.st_mode):
     raise ValueError("not a regular file")
   tags = fstags[fspath]
@@ -632,7 +638,7 @@ def rearrange(
                 dstpath,
                 opname=opname,
                 hashname=hashname,
-                move_mode=False,
+                move_mode=False,  # we do our own remove below
                 symlink_mode=symlink_mode,
                 fstags=fstags,
                 doit=doit,
