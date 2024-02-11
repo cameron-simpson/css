@@ -65,7 +65,8 @@ class HashIndexCommand(BaseCommand):
     '''
     hashname: str = DEFAULT_HASHNAME
     move_mode: bool = False
-    ssh_exe: str = 'ssh'
+    ssh_exe: str = DEFAULT_SSH_EXE
+    hashindex_exe: str = DEFAULT_HASHINDEX_EXE
     symlink_mode: bool = False
 
   @contextmanager
@@ -75,27 +76,38 @@ class HashIndexCommand(BaseCommand):
       with super().run_context(**kw):
         yield
 
-  def cmd_rearrange(
-      self,
-      argv,
-      *,
-      hashindex_exe=DEFAULT_HASHINDEX_EXE,
-      ssh_exe=DEFAULT_SSH_EXE,
-  ):
-    ''' Usage: {cmd} [-e sshcmd] [-h hashname] [--mv] [-n] [-s] {{refdir|-}} [[user@]rhost:]targetdir
+  @typechecked
+  def cmd_rearrange(self, argv):
+    ''' Usage: {cmd} [options...] {{refdir|-}} [[user@]rhost:]targetdir
           Rearrange files in targetdir based on their positios in
           refdir.
+          Options:
+            -e sshexe   Specify the ssh executable.
+            -h hashname Specify the file content hash algorithm name.
+            -H hashindex_exe
+                        Specify the remote hashindex executable.
+            --mv        Move mode.
+            -n          No action, dry run.
+            -s          Symlink mode.
     '''
     options = self.options
     badopts = False
     options.popopts(
         argv,
-        e='ssh_exe',
+        e_='ssh_exe',
         h_='hashname',
+        H_='hashindex_exe',
         mv='move_mode',
         n='dry_run',
         s='symlink_mode',
     )
+    doit = options.doit
+    hashindex_exe = options.hashindex_exe
+    hashname = options.hashname
+    move_mode = options.move_mode
+    quiet = options.quiet
+    ssh_exe = options.ssh_exe
+    symlink_mode = options.symlink_mode
     if not argv:
       warning("missing refdir")
       badopts = True
@@ -127,11 +139,6 @@ class HashIndexCommand(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError('bad arguments')
-    doit = options.doit
-    quiet = options.quiet
-    hashname = options.hashname
-    move_mode = options.move_mode
-    symlink_mode = options.symlink_mode
     # scan the reference directory
     fspaths_by_hashcode = defaultdict(list)
     xit = 0
