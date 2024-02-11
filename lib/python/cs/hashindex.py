@@ -78,9 +78,8 @@ class HashIndexCommand(BaseCommand):
 
   @typechecked
   def cmd_rearrange(self, argv):
-    ''' Usage: {cmd} [options...] {{refdir|-}} [[user@]rhost:]targetdir
-          Rearrange files in targetdir based on their positios in
-          refdir.
+    ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir
+          Rearrange files in targetdir based on their positions in refdir.
           Options:
             -e sshexe   Specify the ssh executable.
             -h hashname Specify the file content hash algorithm name.
@@ -212,8 +211,7 @@ class HashIndexCommand(BaseCommand):
   @uses_upd
   def cmd_linkto(self, argv, *, fstags: FSTags, upd: Upd):
     ''' Usage: {cmd} [-f] [-h hashname] [--mv] [-n] [-q] [-s] srcdir dstdir < hashindex
-          Read a hashindex with relative paths from the input
-          and link files from srcdir to dstdir according the source hash.
+          Link files from srcdir to dstdir according the input hash index.
           -f    Force: link even if the target already exists.
           -h hashname
                 Specify the hash algorithm, default: {DEFAULT_HASHNAME}
