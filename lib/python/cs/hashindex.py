@@ -30,6 +30,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
+from cs.context import contextif, reconfigure_file
 from cs.fs import is_valid_rpath, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
@@ -38,7 +39,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
-from cs.upd import Upd, uses_upd, print, run_task  # pylint: disable=redefined-builtin
+from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
 __version__ = '20240211.1-post'
 
@@ -55,6 +56,7 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils>=20240211',
+        'cs.context',
         'cs.fs',
         'cs.fstags',
         'cs.hashutils',
@@ -106,7 +108,6 @@ class HashIndexCommand(BaseCommand):
         yield
 
   @uses_fstags
-  @uses_upd
   def cmd_linkto(self, argv, *, fstags: FSTags):
     ''' Usage: {cmd} [-f] [-h hashname] [--mv] [-n] [-q] [-s] srcdir dstdir < hashindex
           Link files from srcdir to dstdir according the input hash index.
