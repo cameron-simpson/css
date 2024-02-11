@@ -47,6 +47,11 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
+    'entry_points': {
+        'console_scripts': {
+            'hashindex': 'cs.hashindex:main'
+        },
+    },
     'install_requires': [
         'cs.cmdutils>=20240211',
         'cs.fs',
