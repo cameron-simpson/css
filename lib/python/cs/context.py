@@ -594,3 +594,14 @@ class ContextManagerMixin:
         exit_result = next(eegen)
       except StopIteration:
         pass
+
+@contextmanager
+def reconfigure_file(f, **kw):
+  ''' Context manager flavour of `TextIOBase.reconfigure`.
+  '''
+  old = {k: getattr(f, k) for k in kw}
+  try:
+    f.reconfigure(**kw)
+    yield
+  finally:
+    f.reconfigure(**old)
