@@ -189,44 +189,50 @@ class HashIndexCommand(BaseCommand):
     # scan the source tree and link according to the input
     with Pfx("scan srcdir %r", srcdir):
       with run_task(f'scan srcdir {shortpath(srcdir)}') as proxy:
-        for srchashcode, srcpath in hashindex(srcdir, hashname=hashname):
-          rsrcpath = relpath(srcpath, srcdir)
-          proxy.text = rsrcpath
-          with Pfx(srcpath):
-            if srchashcode is None:
-              warning("no hashcode")
-              continue
-            rfspaths = fspaths_by_hashcode[srchashcode]
-            if not rfspaths:
-              warning("hashcode %s not present in the input", srchashcode)
-              continue
-            filed_to = []
-            for rfspath in rfspaths:
-              dstpath = joinpath(dstdir, rfspath)
-              if existspath(dstpath):
-                if file_checksum(dstpath) != srchashcode:
-                  warning(
-                      "dstpath %r already exists with different hashcode",
-                      dstpath
-                  )
+        with contextif(
+            not quiet,
+            reconfigure_file,
+            sys.stdout,
+            line_buffering=True,
+        ):
+          for srchashcode, srcpath in hashindex(srcdir, hashname=hashname):
+            rsrcpath = relpath(srcpath, srcdir)
+            proxy.text = rsrcpath
+            with Pfx(srcpath):
+              if srchashcode is None:
+                warning("no hashcode")
                 continue
-              opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
-              quiet or print(opname, srcpath, dstpath)
-              dstdirpath = dirname(dstpath)
-              if doit:
-                needdir(dstdirpath, use_makedirs=False, log=warning)
-              quiet or print(opname, srcpath, dstpath)
-              if doit:
-                fstags.mv(
-                    srcpath,
-                    dstpath,
-                    exists_ok=False,
-                    symlink=symlink_mode,
-                    remove=False
-                )
-                filed_to.append(dstpath)
-            if filed_to and move_mode:
-              pfx_call(os.remove(srcpath))
+              rfspaths = fspaths_by_hashcode[srchashcode]
+              if not rfspaths:
+                warning("hashcode %s not present in the input", srchashcode)
+                continue
+              filed_to = []
+              for rfspath in rfspaths:
+                dstpath = joinpath(dstdir, rfspath)
+                if existspath(dstpath):
+                  if file_checksum(dstpath) != srchashcode:
+                    warning(
+                        "dstpath %r already exists with different hashcode",
+                        dstpath
+                    )
+                  continue
+                opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
+                quiet or print(opname, srcpath, dstpath)
+                dstdirpath = dirname(dstpath)
+                if doit:
+                  needdir(dstdirpath, use_makedirs=False, log=warning)
+                quiet or print(opname, srcpath, dstpath)
+                if doit:
+                  fstags.mv(
+                      srcpath,
+                      dstpath,
+                      exists_ok=False,
+                      symlink=symlink_mode,
+                      remove=False
+                  )
+                  filed_to.append(dstpath)
+              if filed_to and move_mode:
+                pfx_call(os.remove(srcpath))
     return 0 if ok else 1
 
   def cmd_ls(self, argv):
@@ -359,15 +365,21 @@ class HashIndexCommand(BaseCommand):
     # rearrange the target directory.
     with run_task(f'rearrange {targetspec}'):
       if targethost is None:
-        rearrange(
-            targetdir,
-            fspaths_by_hashcode,
-            hashname=hashname,
-            doit=doit,
-            move_mode=move_mode,
-            symlink_mode=symlink_mode,
-            quiet=quiet,
-        )
+        with contextif(
+            not quiet,
+            reconfigure_file,
+            sys.stdout,
+            line_buffering=True,
+        ):
+          rearrange(
+              targetdir,
+              fspaths_by_hashcode,
+              hashname=hashname,
+              doit=doit,
+              move_mode=move_mode,
+              symlink_mode=symlink_mode,
+              quiet=quiet,
+          )
       else:
         hashindex_cmd = shlex.join(
             prep_argv(
