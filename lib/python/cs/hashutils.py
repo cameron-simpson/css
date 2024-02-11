@@ -11,6 +11,18 @@ import os
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.buffer',
+        'cs.deco',
+    ],
+}
+
 class BaseHashCode(bytes):
   ''' Base class for hashcodes, subclassed by `SHA1`, `SHA256` et al.
   '''
