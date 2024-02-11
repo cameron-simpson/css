@@ -188,8 +188,6 @@ class HashIndexCommand(BaseCommand):
                 'rearrange',
                 not doit and '-n',
                 ('-h', hashname),
-                '-',
-                targetdir,
                 move_mode and '--mv',
                 symlink_mode and '-s',
                 '-',
@@ -205,6 +203,7 @@ class HashIndexCommand(BaseCommand):
         xit = run(
             [ssh_exe, targethost, hashindex_cmd],
             input=input_s,
+            text=True,
             quiet=False,
         ).returncode
     return xit
