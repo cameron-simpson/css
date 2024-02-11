@@ -58,6 +58,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
+        'cs.deco',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
