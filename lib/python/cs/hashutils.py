@@ -11,6 +11,8 @@ import os
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 
+__version__ = '20240211'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
