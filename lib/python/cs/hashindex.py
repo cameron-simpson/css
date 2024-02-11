@@ -41,6 +41,28 @@ from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
 from cs.upd import Upd, uses_upd, print, run_task  # pylint: disable=redefined-builtin
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.cmdutils>=20240211',
+        'cs.fs',
+        'cs.fstags',
+        'cs.hashutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.psutils',
+        'cs.resources',
+        'cs.upd',
+        'icontract',
+        'typeguard',
+    ],
+}
+
 DEFAULT_HASHNAME = 'sha256'
 DEFAULT_HASHINDEX_EXE = 'hashindex'
 DEFAULT_SSH_EXE = 'ssh'
