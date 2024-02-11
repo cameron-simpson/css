@@ -447,7 +447,6 @@ def set_fstags_hashcode(
   csum.st_mtime = S.st_mtime
 
 @uses_fstags
-@uses_runstate
 def hashindex(fspath, *, hashname: str, fstags: FSTags):
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
       for the files in `fspath`, which may be a file or directory path.
