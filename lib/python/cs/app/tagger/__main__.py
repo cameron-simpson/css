@@ -67,7 +67,6 @@ class TaggerCommand(BaseCommand):
     hashname: str = DEFAULT_HASHNAME
 
   # pylint: disable=no-self-use
-  @trace
   def apply_opt(self, opt, val):
     options = self.options
     if opt == '-d':
