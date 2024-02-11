@@ -76,137 +76,6 @@ class HashIndexCommand(BaseCommand):
       with super().run_context(**kw):
         yield
 
-  @typechecked
-  def cmd_rearrange(self, argv):
-    ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir
-          Rearrange files in targetdir based on their positions in refdir.
-          Options:
-            -e sshexe   Specify the ssh executable.
-            -h hashname Specify the file content hash algorithm name.
-            -H hashindex_exe
-                        Specify the remote hashindex executable.
-            --mv        Move mode.
-            -n          No action, dry run.
-            -s          Symlink mode.
-    '''
-    options = self.options
-    badopts = False
-    options.popopts(
-        argv,
-        e_='ssh_exe',
-        h_='hashname',
-        H_='hashindex_exe',
-        mv='move_mode',
-        n='dry_run',
-        s='symlink_mode',
-    )
-    doit = options.doit
-    hashindex_exe = options.hashindex_exe
-    hashname = options.hashname
-    move_mode = options.move_mode
-    quiet = options.quiet
-    ssh_exe = options.ssh_exe
-    symlink_mode = options.symlink_mode
-    if not argv:
-      warning("missing refdir")
-      badopts = True
-    else:
-      refspec = argv.pop(0)
-      with Pfx("refdir %r", refspec):
-        refhost, refdir = split_remote_path(refspec)
-        if refhost is None:
-          if refdir != '-':
-            if not isdirpath(refdir):
-              warning("not a directory")
-              badopts = True
-        elif refdir == '-':
-          warning("remote - not supported")
-          badopts = True
-    if not argv:
-      warning("missing targetdir")
-      badopts = True
-    else:
-      targetspec = argv.pop(0)
-      with Pfx("targetdir %r", targetspec):
-        targethost, targetdir = split_remote_path(targetspec)
-        if targethost is None:
-          if not isdirpath(targetdir):
-            warning("not a directory")
-            badopts = True
-    if argv:
-      warning("extra arguments: %r", argv)
-      badopts = True
-    if badopts:
-      raise GetoptError('bad arguments')
-    # scan the reference directory
-    fspaths_by_hashcode = defaultdict(list)
-    xit = 0
-    with run_task(f'hashindex {refspec}'):
-      if refhost is None:
-        remote = None
-        if refdir == '-':
-          hindex = read_hashindex(sys.stdin, hashname=hashname)
-        else:
-          hindex = (
-              (hashcode, relpath(fspath, refdir))
-              for hashcode, fspath in hashindex(refdir, hashname=hashname)
-          )
-      else:
-        hashindex_cmd = shlex.join(
-            prep_argv(
-                hashindex_exe,
-                'ls',
-                ('-h', hashname),
-                '-r',
-                refdir,
-            )
-        )
-        remote = pipefrom([ssh_exe, refhost, hashindex_cmd])
-        hindex = read_hashindex(remote.stdout, hashname=hashname)
-      for hashcode, fspath in hindex:
-        if hashcode is not None:
-          fspaths_by_hashcode[hashcode].append(fspath)
-      if remote is not None:
-        xit = remote.returncode
-    # rearrange the target directory.
-    with run_task(f'rearrange {targetspec}'):
-      if targethost is None:
-        rearrange(
-            targetdir,
-            fspaths_by_hashcode,
-            hashname=hashname,
-            doit=doit,
-            move_mode=move_mode,
-            symlink_mode=symlink_mode,
-            quiet=quiet,
-        )
-      else:
-        hashindex_cmd = shlex.join(
-            prep_argv(
-                hashindex_exe,
-                'rearrange',
-                not doit and '-n',
-                ('-h', hashname),
-                move_mode and '--mv',
-                symlink_mode and '-s',
-                '-',
-                targetdir,
-            )
-        )
-        # prepare the remote input
-        reflines = []
-        for hashcode, fspaths in fspaths_by_hashcode.items():
-          for fspath in fspaths:
-            reflines.append(f'{hashcode} {fspath}\n')
-        input_s = "".join(reflines)
-        xit = run(
-            [ssh_exe, targethost, hashindex_cmd],
-            input=input_s,
-            text=True,
-            quiet=False,
-        ).returncode
-    return xit
-
   @uses_fstags
   @uses_upd
   def cmd_linkto(self, argv, *, fstags: FSTags, upd: Upd):
@@ -373,6 +242,137 @@ class HashIndexCommand(BaseCommand):
             xit = 1
           else:
             print(h, relpath(fspath, path) if relative else fspath)
+    return xit
+
+  @typechecked
+  def cmd_rearrange(self, argv):
+    ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir
+          Rearrange files in targetdir based on their positions in refdir.
+          Options:
+            -e sshexe   Specify the ssh executable.
+            -h hashname Specify the file content hash algorithm name.
+            -H hashindex_exe
+                        Specify the remote hashindex executable.
+            --mv        Move mode.
+            -n          No action, dry run.
+            -s          Symlink mode.
+    '''
+    options = self.options
+    badopts = False
+    options.popopts(
+        argv,
+        e_='ssh_exe',
+        h_='hashname',
+        H_='hashindex_exe',
+        mv='move_mode',
+        n='dry_run',
+        s='symlink_mode',
+    )
+    doit = options.doit
+    hashindex_exe = options.hashindex_exe
+    hashname = options.hashname
+    move_mode = options.move_mode
+    quiet = options.quiet
+    ssh_exe = options.ssh_exe
+    symlink_mode = options.symlink_mode
+    if not argv:
+      warning("missing refdir")
+      badopts = True
+    else:
+      refspec = argv.pop(0)
+      with Pfx("refdir %r", refspec):
+        refhost, refdir = split_remote_path(refspec)
+        if refhost is None:
+          if refdir != '-':
+            if not isdirpath(refdir):
+              warning("not a directory")
+              badopts = True
+        elif refdir == '-':
+          warning("remote - not supported")
+          badopts = True
+    if not argv:
+      warning("missing targetdir")
+      badopts = True
+    else:
+      targetspec = argv.pop(0)
+      with Pfx("targetdir %r", targetspec):
+        targethost, targetdir = split_remote_path(targetspec)
+        if targethost is None:
+          if not isdirpath(targetdir):
+            warning("not a directory")
+            badopts = True
+    if argv:
+      warning("extra arguments: %r", argv)
+      badopts = True
+    if badopts:
+      raise GetoptError('bad arguments')
+    # scan the reference directory
+    fspaths_by_hashcode = defaultdict(list)
+    xit = 0
+    with run_task(f'hashindex {refspec}'):
+      if refhost is None:
+        remote = None
+        if refdir == '-':
+          hindex = read_hashindex(sys.stdin, hashname=hashname)
+        else:
+          hindex = (
+              (hashcode, relpath(fspath, refdir))
+              for hashcode, fspath in hashindex(refdir, hashname=hashname)
+          )
+      else:
+        hashindex_cmd = shlex.join(
+            prep_argv(
+                hashindex_exe,
+                'ls',
+                ('-h', hashname),
+                '-r',
+                refdir,
+            )
+        )
+        remote = pipefrom([ssh_exe, refhost, hashindex_cmd])
+        hindex = read_hashindex(remote.stdout, hashname=hashname)
+      for hashcode, fspath in hindex:
+        if hashcode is not None:
+          fspaths_by_hashcode[hashcode].append(fspath)
+      if remote is not None:
+        xit = remote.returncode
+    # rearrange the target directory.
+    with run_task(f'rearrange {targetspec}'):
+      if targethost is None:
+        rearrange(
+            targetdir,
+            fspaths_by_hashcode,
+            hashname=hashname,
+            doit=doit,
+            move_mode=move_mode,
+            symlink_mode=symlink_mode,
+            quiet=quiet,
+        )
+      else:
+        hashindex_cmd = shlex.join(
+            prep_argv(
+                hashindex_exe,
+                'rearrange',
+                not doit and '-n',
+                ('-h', hashname),
+                move_mode and '--mv',
+                symlink_mode and '-s',
+                '-',
+                targetdir,
+            )
+        )
+        # prepare the remote input
+        reflines = []
+        for hashcode, fspaths in fspaths_by_hashcode.items():
+          for fspath in fspaths:
+            reflines.append(f'{hashcode} {fspath}\n')
+        input_s = "".join(reflines)
+        xit = run(
+            [ssh_exe, targethost, hashindex_cmd],
+            input=input_s,
+            text=True,
+            quiet=False,
+        ).returncode
     return xit
 
 @uses_fstags
