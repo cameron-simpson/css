@@ -21,7 +21,7 @@ cs.binary pypi.release="20240201" ok_revision="16496b604841897f2e0057a37326ddb1e
 cs.buffer pypi.release="20240201" ok_revision=a922678a9e58f735a95b8c8fcb56cb211963c811 features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"]}
 cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.clockutils pypi.release=20190101
-cs.cmdutils pypi.release="20240201" ok_revision="07494e8c9af4643e1d15095d428b0c965ea7152b" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"]}
+cs.cmdutils pypi.release="20240201" ok_revision="9ebc42e530b2e44b87b3eb2cc5476d78428bd869" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"]}
 cs.configutils pypi.release="20220606" ok_revision="646d06810607e97ae0aaefbcce18806fb0ded874" features={"20220430":["HasConfigIni"],"20220606":["info_dict"]}
 cs.context pypi.release="20240201" ok_revision="531f538554b5fbb0a24dcc405b98e602d571444e" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"],"20230109":["contextif"],"20230125":["ContextManagerMixin_as_contextmanager"],"20230212":["stackset"]}
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
