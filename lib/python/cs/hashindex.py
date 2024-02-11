@@ -16,6 +16,7 @@ from os.path import (
     isabs as isabspath,
     isdir as isdirpath,
     isfile as isfilepath,
+    islink,
     join as joinpath,
     realpath,
     relpath,
@@ -503,14 +504,9 @@ def hashindex(fspath, *, hashname: str, fstags: FSTags):
     h = file_checksum(fspath)
     yield h, fspath
   elif isdirpath(fspath):
-    for dirpath, dirnames, filenames in os.walk(fspath):
-      dirnames[:] = sorted(dirnames)
-      for filename in sorted(filenames):
-        if filename.startswith('.') or filename == fstags.tagsfile_basename:
-          continue
-        filepath = joinpath(dirpath, filename)
-        h = file_checksum(filepath, hashname=hashname)
-        yield h, filepath
+    for filepath in dir_filepaths(fspath):
+      h = file_checksum(filepath, hashname=hashname)
+      yield h, filepath
   else:
     warning("hashindex(%r): neither file nor directory")
 
@@ -546,13 +542,20 @@ def read_hashindex(f, start=1, *, hashname: str):
             hashcode = None
       yield hashcode, fspath
 
-def dir_filepaths(dirpath: str):
+@uses_fstags
+def dir_filepaths(dirpath: str, *, fstags: FSTags):
   ''' Generator yielding the filesystem paths of the files in `dirpath`.
   '''
   for subdirpath, dirnames, filenames in os.walk(dirpath):
     dirnames[:] = sorted(dirnames)
     for filename in sorted(filenames):
-      yield joinpath(subdirpath, filename)
+      if filename.startswith('.') or filename == fstags.tagsfile_basename:
+        continue
+      filepath = joinpath(subdirpath, filename)
+      if islink(filepath) or not isfilepath(filepath):
+        # ignore nonfiles
+        continue
+      yield filepath
 
 def paths_remap(
     srcpaths: Iterable[str],
