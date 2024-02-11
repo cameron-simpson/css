@@ -29,7 +29,7 @@ class MykeCommand(BaseCommand):
   # pylint: disable=too-many-branches
   def apply_opt(self, opt, val):
     ''' Modify the `Maker` according to a command line option.
-        '''
+    '''
     M = self.options
     if opt == '-d':
       # debug mode
