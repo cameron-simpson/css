@@ -366,8 +366,14 @@ class Rule(Promotable):
         result.tag_changes.append(TagChange(add_remove=True, tag=Tag(k, v)))
     if self.action is not None:
       with Pfx(self.action.__doc__.strip().split()[0].strip()):
-        # apply the current tags in case the file gets moved
-        fstags[fspath].update(tags)
+        # apply the current non-underscore tags in case the file gets moved
+        fstags[fspath].update(
+            {
+                k: v
+                for k, v in tags.items()
+                if k and not k.startswith('_')
+            }
+        )
         try:
           side_effects = self.action(
               fspath,
