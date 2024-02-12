@@ -16,26 +16,25 @@ spaces=.
 trace= ## set-x
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [spaces] words...
-    Select up to ${nwp} wallpapers from the directories in \$WPPATH,
+usage="Usage: $cmd [-nwp] [spaces] words...
+    Select up to nwp (${nwp}) wallpapers from the directories in \$WPPATH,
     default from \$WPDIR:\$SSV_DIR: $WPPATH
     at random matching the sed-regexps \"words\".
     Construct a scratch directoy in \$WPLINKDIR: $WPLINKDIR
     and symlink the selected images into it, then set that directory
-    as the wallpaper directory for the current space."
+    as the wallpaper directory for the current (or specified) space."
 
 badopts=
 
-while [ $# -gt 0 ]
-do
-  case "$1" in
-    -*) echo "$cmd: unrecognised option: $1" >&2
-        badopts=1
-        ;;
-    *)  break ;;
-  esac
-  shift
-done
+case "${1:-''}" in
+  -[1-9]*)
+    _nwp=$1; shift
+    nwp=$( expr "x$_nwp" : 'x-\([1-9][0-9]*\)' ) || {
+      echo "$cmd: -nwp \"$1\": invalid number" >&2
+      badopts=1
+    }
+    ;;
+esac
 
 if [ $# -gt 0 ]
 then
