@@ -175,7 +175,7 @@ class SpacesCommand(BaseCommand):
         interval=0.1,
         runstate=runstate,
     ):
-      print(old['index'] + 1, '->', new['index'] + 1)
+      print(old['index'] + 1, '->', new['index'] + 1, flush=True)
 
   def cmd_wp(self, argv):
     ''' Usage: {cmd} [{{.|space#|*}} [wp-path]]
