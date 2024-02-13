@@ -9,6 +9,8 @@ from icontract import require
 
 from cs.obj import Sentinel
 
+__version__ = '20240214'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
