@@ -59,6 +59,7 @@ from cs.progress import progressbar
 import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
+from cs.resources import RunState, uses_runstate
 from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import Upd, print, uses_upd
 from cs.vcs import VCS
@@ -177,8 +178,10 @@ class CSReleaseCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing package names")
     options = self.options
+    runstate = options.runstate
     xit = 0
     for pkg_name in argv:
+      unstate.raiseif()
       with Pfx(pkg_name):
         status("...")
         pkg = options.modules[pkg_name]
@@ -1617,8 +1620,9 @@ class Module:
     return self.DISTINFO.get('install_requires', [])
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  @uses_runstate
   @pfx_method(use_str=True)
-  def problems(self):
+  def problems(self, *, runstate=RunState):
     ''' Sanity check of this module.
 
         This is a list of problems,
@@ -1653,6 +1657,7 @@ class Module:
       if not post_ok_commits:
         return problems
       unreleased_logs = post_ok_commits
+    runstate.raiseif()
     subproblems = defaultdict(list)
     pkg_name = self.package_name
     if pkg_name is None:
@@ -1707,6 +1712,7 @@ class Module:
               )
           )
         for import_name in import_names:
+          runstate.raiseif()
           if not import_name.startswith(MODULE_PREFIX):
             continue
           import_problems = self.modules[import_name].problems()
