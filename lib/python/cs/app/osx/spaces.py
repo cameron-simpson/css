@@ -221,33 +221,13 @@ class SpacesCommand(BaseCommand):
     '''
     options = self.options
     spaces = options.spaces
-    space_indices = None
     wp_path = None
+    space_indices = spaces.popindices(argv)
     if argv:
-      with Pfx("space# %r:", argv[0]):
-        if argv[0] == '.':
-          argv.pop(0)
-          space_indices = (spaces.current_index,)
-        elif argv[0] == '*':
-          argv.pop(0)
-          space_indices = list(range(len(spaces)))
-        else:
-          try:
-            space_num = int(argv[0])
-          except ValueError:
-            pass
-          else:
-            argv.pop(0)
-            if space_num < 1:
-              raise GetoptError("space# counts from 1")
-            if space_num > len(spaces):
-              raise GetoptError("only %d spaces" % (len(spaces),))
-            space_indices = (space_num - 1,)
-      if argv:
-        with Pfx("wp-path %r", argv[0]):
-          wp_path = argv.pop(0)
-          if not existspath(wp_path):
-            raise GetoptError("not a file")
+      wp_path = argv.pop(0)
+      with Pfx("wp-path %r", wp_path):
+        if not existspath(wp_path):
+          raise GetoptError("not a file")
     if argv:
       raise GetoptError("extra aguments: %r" % (argv,))
     if wp_path is None:
@@ -258,9 +238,9 @@ class SpacesCommand(BaseCommand):
         print("Space", space_num)
         for k, v in sorted(spaces.get_wp_config(space_index).items()):
           print(" ", k, "=", str(v).replace("\n", ""))
-    elif space_indices is None:
-      raise GetoptError("setting a wallpaper requires a space specification")
     else:
+      if space_indices is None:
+        space_indices = [spaces.current_index]
       for space_index in space_indices:
         with Pfx("%d <- %r", space_index + 1, wp_path):
           if isdirpath(wp_path):
@@ -296,15 +276,16 @@ class SpacesCommand(BaseCommand):
     '''
     options = self.options
     spaces = options.spaces
-    if not argv:
+    space_indices = spaces.popindices(argv)
+    if space_indices is None:
       space_index = spaces.current_index
     else:
-      space_spec = argv.pop(0)
-      if space_spec == '.':
-        space_index = spaces.current_index
-      else:
-        space_num = int(space_spec)
-        space_index = space_num - 1
+      try:
+        space_index, = space_indices
+      except ValueError:
+        raise GetoptError(
+            "expected exactly one space index, got: %r" % (space_indices,)
+        )
     for old, new, changes in spaces.monitor_wp_config(
         space_index=space_index,
         runstate=options.runstate,
