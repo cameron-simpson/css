@@ -59,10 +59,6 @@ class Spaces:
     '''
     self.__dict__.pop('_spaces', None)
 
-  @property
-  def x(self):
-    return "X"
-
   def __getattr__(self, attr):
     if attr == '_spaces':
       obj = self._load_spaces()
