@@ -290,7 +290,7 @@ class SpacesCommand(BaseCommand):
         space_index=space_index,
         runstate=options.runstate,
     ):
-      print(changes)
+      print(changes, flush=True)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
