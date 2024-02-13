@@ -100,6 +100,42 @@ class Spaces:
         return i
     return None
 
+  def popindices(self, argv):
+    ''' Pop a leading spaces specification from `argv` if present,
+        return a list of the indices it represents.
+        If there is no spaces specification, return `None`.
+
+        Note that space indices count from `0`, and space numbers count from `1`.
+
+        The following spaces specifications are recognised:
+        * `.`: the current space index
+        * `*`: all the space indices
+        * a positive integer `spn`: `spn-1`
+    '''
+    space_indices = None
+    if argv:
+      arg0 = argv[0]
+      with Pfx("space# %r:", arg0):
+        if arg0 == '.':
+          argv.pop(0)
+          space_indices = [self.current_index]
+        elif arg0 == '*':
+          argv.pop(0)
+          space_indices = list(range(len(self)))
+        else:
+          try:
+            space_num = int(arg0)
+          except ValueError:
+            pass
+          else:
+            argv.pop(0)
+            if space_num < 1:
+              raise GetoptError("space# counts from 1")
+            if space_num > len(self):
+              raise GetoptError("only %d spaces" % (len(self),))
+            space_indices = (space_num - 1,)
+    return space_indices
+
   @property
   def current(self):
     return self._spaces["Current Space"]
