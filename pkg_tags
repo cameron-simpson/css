@@ -28,7 +28,7 @@ cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657eca
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20230613.1" ok_revision="927d70161547e2044cba9503c87faa734a244bd6" features={"20230613":["patch_builtins"]}
 cs.deco pypi.release="20240211" ok_revision="519da4792cab2a9c5a260be24cd1f34cf3fcff11" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"]}
-cs.delta ok_revision="5b52f10547252eb0513e3888673336371ae60343"
+cs.delta ok_revision="5b52f10547252eb0513e3888673336371ae60343" pypi.release="20240214"
 cs.distinfo
 cs.dockerutils ok_revision="7f6fcf1a630c661bd258cbd4830cb850d5b14a22" pypi.release="20240201"
 cs.ebooks ok_revision="6f34b0712da822ee9cde60d140010e572c1c00d2" pypi.release="20240201.4" features={"20230110":["dedrm"],"20240201.4":["cbz","kobo","pdf"]}
