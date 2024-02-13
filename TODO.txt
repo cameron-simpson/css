@@ -1,3 +1,4 @@
+hashindex rearrange --sh to emit sh quotes commands inc the mkdirs
 TagSet: parse_tag_value: a bare "nan" is a float
 mklinks: use cs.hashindex.merge
 taggerrc with pf-like rules instead of current arcane fstags stuff - sequential readable rules
