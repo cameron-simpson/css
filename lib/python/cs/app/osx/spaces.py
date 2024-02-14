@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-''' Access to the display spaces.
+''' Access to the MacOS X display spaces.
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from getopt import GetoptError
 import os
 from os.path import (
@@ -11,13 +12,11 @@ from os.path import (
     exists as existspath,
     isdir as isdirpath,
     join as joinpath,
-    realpath,
 )
 from pprint import pprint
 import random
 import sys
-
-from .objc import apple, cg
+from typing import Optional
 
 from CoreFoundation import CFUUIDCreateFromString
 from typeguard import typechecked
@@ -25,9 +24,35 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.delta import monitor
-from cs.fs import shortpath
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
+
+from .objc import apple, cg
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 3 - Beta",
+        "Environment :: MacOS X",
+        "Intended Audience :: End Users/Desktop",
+        "Programming Language :: Python :: 3",
+        "Topic :: Desktop Environment",
+    ],
+    'install_requires': [
+        'cs.app.osx.objc',
+        'cs.cmdutils',
+        'cs.context',
+        'cs.delta',
+        'cs.logutils',
+        'cs.pfx',
+        'pyobjc[allbindings]',
+    ],
+    'entry_points': {
+        'console_scripts': {
+            'spaces': 'cs.app.osx.spaces:main',
+        },
+    },
+}
 
 CG = apple.CoreGraphics
 HI = apple.HIServices
@@ -35,7 +60,7 @@ HI = apple.HIServices
 def main(argv=None):
   ''' cs.app.osx.spaces command line mode.
   '''
-  return SpacesCommand(sys.argv).run()
+  return SpacesCommand(argv).run()
 
 class Spaces:
   ''' The spaces for a particular display.
@@ -134,22 +159,32 @@ class Spaces:
 
   @property
   def current(self):
+    ''' The current space.
+    '''
     return self._spaces["Current Space"]
 
   @property
   def current_uuid(self):
+    ''' The UUID of the current space.
+    '''
     return self.current["uuid"]
 
   @property
   def display_uuid(self):
+    ''' The UUID of the display.
+    '''
     return self._spaces["Display Identifier"]
 
   @property
   def display_id(self):
+    ''' The display identifier of the display.
+    '''
     cfuuid = CFUUIDCreateFromString(None, self.display_uuid)
     return CG.CGSGetDisplayForUUID(cfuuid)
 
   def get_wp_config(self, space_index: int):
+    ''' Get the desktop picture configuration of the space at `space_index`.
+    '''
     space = self[space_index]
     return HI.DesktopPictureCopyDisplayForSpace(
         self.display_id, 0, space["uuid"]
@@ -157,6 +192,9 @@ class Spaces:
 
   @typechecked
   def set_wp_config(self, space_index: int, wp_config: dict):
+    ''' Set the desktop picture configuration of the space at
+        `space_index` using the `dict` `wp_config`.
+    '''
     pprint(wp_config)
     space = self[space_index]
     pfx_call(
@@ -186,10 +224,20 @@ class Spaces:
     )
 
 class SpacesCommand(BaseCommand):
+  ''' A command line implementation for manipulating spaces.
+  '''
+
+  @dataclass
+  class Options(BaseCommand.Options):
+    ''' Options for SpacesCommand.
+    '''
+    spaces: Optional[Spaces] = None
 
   @contextmanager
-  def run_context(self):
-    with super().run_context():
+  def run_context(self, **kw):
+    ''' Set `options.spaces` to a `Spaces` instnace during a command run.
+    '''
+    with super().run_context(**kw):
       options = self.options
       with stackattrs(options, spaces=Spaces()):
         yield
@@ -203,7 +251,7 @@ class SpacesCommand(BaseCommand):
     runstate = self.options.runstate
     spaces = self.options.spaces
     for old, new, changes in monitor(
-        lambda: (spaces.forget(), dict(index=spaces.current_index))[-1],
+        lambda: (spaces.forget(), {'index': spaces.current_index})[-1],
         interval=0.1,
         runstate=runstate,
     ):
@@ -249,6 +297,7 @@ class SpacesCommand(BaseCommand):
               return 1
             lastname = random.choice(images)
             imagepath = abspath(joinpath(wp_path, lastname))
+            # pylint: disable=use-dict-literal
             wp_config = dict(
                 BackgroundColor=(0, 0, 0),
                 Change='TimeInterval',
@@ -261,10 +310,12 @@ class SpacesCommand(BaseCommand):
                 LastName=lastname,
                 Placement='SizeToFit',
                 Random=True,
-            )
+            )  # pylint: disable=use-dict-literal
           else:
+            # pylint: disable=use-dict-literal
             wp_config = dict(ImageFilePath=abspath(wp_path),)
           spaces.set_wp_config(space_index, wp_config)
+    return 0
 
   def cmd_wpm(self, argv):
     ''' Usage: {cmd} [{{.|space#}}]
@@ -279,6 +330,7 @@ class SpacesCommand(BaseCommand):
       try:
         space_index, = space_indices
       except ValueError:
+        # pylint: disable=raise-missing-from
         raise GetoptError(
             "expected exactly one space index, got: %r" % (space_indices,)
         )
