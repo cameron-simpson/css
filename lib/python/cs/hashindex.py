@@ -244,8 +244,8 @@ class HashIndexCommand(BaseCommand):
     return 0 if ok else 1
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-h hashname] [-r] paths...
-          Walk the filesystem paths and emit a listing.
+    ''' Usage: {cmd} [-h hashname] [-r] [host:]path...
+          Walk filesystem paths and emit a listing.
           -h hahsname   Specify the file content hash alogrith name.
           -r            Emit relative paths in the listing.
                         This requires each path to be a directory.
@@ -254,26 +254,41 @@ class HashIndexCommand(BaseCommand):
     options.relative = False
     options.popopts(
         argv,
+        e_='ssh_exe',
         h_='hashname',
+        H_='hashindex_exe',
         r='relative',
     )
+    hashindex_exe = options.hashindex_exe
     hashname = options.hashname
     relative = options.relative
     runstate = options.runstate
+    ssh_exe = options.ssh_exe
     if not argv:
       raise GetoptError("missing paths")
     xit = 0
     for path in argv:
+      runstate.raiseif()
       with Pfx(path):
-        runstate.raiseif()
-        if relative and not isdirpath(path):
-          warning("not a directory and -r (relative) specified")
-          xit = 1
-          continue
-        for h, fspath in hashindex(path, hashname=hashname):
-          runstate.raiseif()
-          if h is not None:
-            print(h, relpath(fspath, path) if relative else fspath)
+        rhost, lpath = split_remote_path(path)
+        if rhost is None:
+          if relative and not isdirpath(path):
+            warning("not a directory and -r (relative) specified")
+            xit = 1
+            continue
+          for h, fspath in hashindex(path, hashname=hashname):
+            runstate.raiseif()
+            if h is not None:
+              print(h, relpath(fspath, path) if relative else fspath)
+        else:
+          for h, fspath in read_remote_hashindex(
+              rhost,
+              lpath,
+              hashname=hashname,
+              ssh_exe=ssh_exe,
+              hashindex_exe=hashindex_exe,
+          ):
+            print(h, fspath if relative else joinpath(lpath, fspath))
     return xit
 
   @typechecked
