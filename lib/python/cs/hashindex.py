@@ -246,7 +246,10 @@ class HashIndexCommand(BaseCommand):
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-h hashname] [-r] [host:]path...
           Walk filesystem paths and emit a listing.
-          -h hahsname   Specify the file content hash alogrith name.
+          -e ssh_exe    Specify the ssh executable.
+          -h hashname   Specify the file content hash algorithm name.
+          -H hashindex_exe
+                        Specify the remote hashindex executable.
           -r            Emit relative paths in the listing.
                         This requires each path to be a directory.
     '''
