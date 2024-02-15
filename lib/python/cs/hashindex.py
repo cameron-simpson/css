@@ -538,6 +538,18 @@ def read_hashindex(f, start=1, *, hashname: str):
             hashcode = None
       yield hashcode, fspath
 
+def localpath(fspath: str) -> str:
+  ''' Return a filesystem path modified so that it connot be
+      misinterpreted as a remote path such as `user@host:path`.
+
+      If `fspath` contains no colon (`:`) or is an absolute path
+      or starts with `./` then it is returned unchanged.
+      Otherwise a leading `./` is prepended.
+  '''
+  if ':' not in fspath or isabspath(fspath) or fspath.startswith('./'):
+    return fspath
+  return './' + fspath
+
 @fmtdoc
 def read_remote_hashindex(
     rhost: str,
@@ -573,7 +585,7 @@ def read_remote_hashindex(
           'ls',
           ('-h', hashname),
           '-r',
-          rdirpath,
+          localpath(rdirpath),
       )
   )
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
