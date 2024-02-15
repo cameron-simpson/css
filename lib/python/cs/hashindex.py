@@ -320,7 +320,7 @@ class HashIndexCommand(BaseCommand):
               warning("not a directory")
               badopts = True
         elif refdir == '-':
-          warning("remote - not supported")
+          warning("remote \"-\" not supported")
           badopts = True
     if not argv:
       warning("missing targetdir")
