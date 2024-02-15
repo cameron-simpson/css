@@ -1,3 +1,4 @@
+Tk widget for an interactive eg zoomable graph
 splink plot POWER: aggregate bar graphs to the right showing total power by category
 list ts keys to aid plotting
 splink plot: help should list modes etc
