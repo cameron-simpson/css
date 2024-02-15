@@ -506,7 +506,7 @@ def hashindex(fspath, *, hashname: str, fstags: FSTags):
       h = file_checksum(filepath, hashname=hashname)
       yield h, filepath
   else:
-    warning("hashindex(%r): neither file nor directory")
+    warning("hashindex(%r): neither file nor directory", fspath)
 
 def read_hashindex(f, start=1, *, hashname: str):
   ''' A generator which reads line from the file `f`
