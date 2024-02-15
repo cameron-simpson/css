@@ -24,6 +24,7 @@ from os.path import (
 )
 import shlex
 from stat import S_ISLNK, S_ISREG
+from subprocess import CalledProcessError
 import sys
 from typing import Iterable, List, Mapping, Optional, Tuple, Union
 
@@ -32,6 +33,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import contextif, reconfigure_file
+from cs.deco import fmtdoc
 from cs.fs import is_valid_rpath, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
@@ -58,6 +60,7 @@ DISTINFO = {
     'install_requires': [
         'cs.cmdutils>=20240211',
         'cs.context',
+        'cs.deco',
         'cs.fs',
         'cs.fstags',
         'cs.hashutils',
@@ -339,7 +342,6 @@ class HashIndexCommand(BaseCommand):
     xit = 0
     with run_task(f'hashindex {refspec}'):
       if refhost is None:
-        remote = None
         if refdir == '-':
           hindex = read_hashindex(sys.stdin, hashname=hashname)
         else:
@@ -348,22 +350,16 @@ class HashIndexCommand(BaseCommand):
               for hashcode, fspath in hashindex(refdir, hashname=hashname)
           )
       else:
-        hashindex_cmd = shlex.join(
-            prep_argv(
-                hashindex_exe,
-                'ls',
-                ('-h', hashname),
-                '-r',
-                refdir,
-            )
+        hindex = read_remote_hashindex(
+            refhost,
+            refdir,
+            hashname=hashname,
+            ssh_exe=ssh_exe,
+            hashindex_exe=hashindex_exe,
         )
-        remote = pipefrom([ssh_exe, refhost, hashindex_cmd])
-        hindex = read_hashindex(remote.stdout, hashname=hashname)
       for hashcode, fspath in hindex:
         if hashcode is not None:
           fspaths_by_hashcode[hashcode].append(fspath)
-      if remote is not None:
-        xit = remote.returncode
     # rearrange the target directory.
     with run_task(f'rearrange {targetspec}'):
       if targethost is None:
@@ -383,9 +379,15 @@ class HashIndexCommand(BaseCommand):
               quiet=quiet,
           )
       else:
-        hashindex_cmd = shlex.join(
-            prep_argv(
-                hashindex_exe,
+        # prepare the remote input
+        reflines = []
+        for hashcode, fspaths in fspaths_by_hashcode.items():
+          for fspath in fspaths:
+            reflines.append(f'{hashcode} {fspath}\n')
+        input_s = "".join(reflines)
+        xit = run_remote_hashindex(
+            targethost,
+            [
                 'rearrange',
                 not doit and '-n',
                 ('-h', hashname),
@@ -393,16 +395,9 @@ class HashIndexCommand(BaseCommand):
                 symlink_mode and '-s',
                 '-',
                 targetdir,
-            )
-        )
-        # prepare the remote input
-        reflines = []
-        for hashcode, fspaths in fspaths_by_hashcode.items():
-          for fspath in fspaths:
-            reflines.append(f'{hashcode} {fspath}\n')
-        input_s = "".join(reflines)
-        xit = run(
-            [ssh_exe, targethost, hashindex_cmd],
+            ],
+            ssh_exe=ssh_exe,
+            hashindex_exe=hashindex_exe,
             input=input_s,
             text=True,
             quiet=False,
@@ -541,6 +536,92 @@ def read_hashindex(f, start=1, *, hashname: str):
             )
             hashcode = None
       yield hashcode, fspath
+
+@fmtdoc
+def read_remote_hashindex(
+    rhost: str,
+    rdirpath: str,
+    *,
+    hashname: str,
+    ssh_exe=None,
+    hashindex_exe=None,
+    check=True,
+):
+  ''' A generator which reads a hashindex of a remote directory,
+      This runs: `hashindex ls -h hashname -r rdirpath` on the remote host.
+      It yields `(hashcode,fspath)` 2-tuples.
+
+      Parameters:
+      * `rhost`: the remote host, or `user@host`
+      * `rdirpath`: the remote directory path
+      * `hashname`: the file content hash algorithm name
+      * `ssh_exe`: the `ssh` executable,
+        default `DEFAULT_SSH_EXE`: `{DEFAULT_SSH_EXE!r}`
+      * `hashindex_exe`: the remote `hashindex` executable,
+        default `DEFAULT_HASHINDEX_EXE`: `{DEFAULT_HASHINDEX_EXE!r}`
+      * `check`: whether to check that the remote command has a `0` return code,
+        default `True`
+  '''
+  if ssh_exe is None:
+    ssh_exe = DEFAULT_SSH_EXE
+  if hashindex_exe is None:
+    hashindex_exe = DEFAULT_HASHINDEX_EXE
+  hashindex_cmd = shlex.join(
+      prep_argv(
+          hashindex_exe,
+          'ls',
+          ('-h', hashname),
+          '-r',
+          rdirpath,
+      )
+  )
+  remote_argv = [ssh_exe, rhost, hashindex_cmd]
+  remote = pipefrom(remote_argv)
+  yield from read_hashindex(remote.stdout, hashname=hashname)
+  if check:
+    remote.wait()
+    if remote.returncode != 0:
+      raise CalledProcessError(remote.returncode, remote_argv)
+
+@fmtdoc
+def run_remote_hashindex(
+    rhost: str,
+    argv,
+    *,
+    ssh_exe=None,
+    hashindex_exe=None,
+    check: bool = True,
+    doit: bool = True,
+    **subp_options,
+):
+  ''' Run a remote `hashindex` command.
+      Return the `CompletedProcess` result or `None` if `doit` is false.
+      Note that as with `cs.psutils.run`, the arguments are resolved
+      via `cs.psutils.prep_argv`.
+
+      Parameters:
+      * `rhost`: the remote host, or `user@host`
+      * `argv`: the command line arguments to be passed to the
+        remote `hashindex` command
+      * `ssh_exe`: the `ssh` executable,
+        default `DEFAULT_SSH_EXE`: `{DEFAULT_SSH_EXE!r}`
+      * `hashindex_exe`: the remote `hashindex` executable,
+        default `DEFAULT_HASHINDEX_EXE`: `{DEFAULT_HASHINDEX_EXE!r}`
+      * `check`: whether to check that the remote command has a `0` return code,
+        default `True`
+      * `doit`: whether to actually run the command, default `True`
+      Other keyword parameters are passed therough to `cs.psutils.run`.
+  '''
+  if ssh_exe is None:
+    ssh_exe = DEFAULT_SSH_EXE
+  if hashindex_exe is None:
+    hashindex_exe = DEFAULT_HASHINDEX_EXE
+  hashindex_cmd = shlex.join(prep_argv(
+      hashindex_exe,
+      *argv,
+  ))
+  remote_argv = [ssh_exe, rhost, hashindex_cmd]
+  return run(remote_argv, check=check, doit=doit, **subp_options)
 
 @uses_fstags
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
