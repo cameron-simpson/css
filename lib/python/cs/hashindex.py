@@ -288,6 +288,7 @@ class HashIndexCommand(BaseCommand):
               ssh_exe=ssh_exe,
               hashindex_exe=hashindex_exe,
           ):
+            runstate.raiseif()
             print(h, fspath if relative else joinpath(lpath, fspath))
     return xit
 
