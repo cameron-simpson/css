@@ -97,7 +97,7 @@ cs.timeutils
 cs.tty
 cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
 cs.units
-cs.upd ok_revision="90a354f8b2413e2b65d69cdbffdfc7e986aad576" pypi.release="20240201" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"]}
+cs.upd ok_revision=f99f57b5887747cea3f0c59e3394a5ca0984d312 pypi.release="20240201" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"]}
 cs.urlutils ok_revision="7eeaa1d7ef5d4e82b88e9d614e8646d80a5344e7" pypi.release="20231129"
 cs.x ok_revision="8d5a661008fa232fe552e0bd8443aab611829519" pypi.release="20240201" features={"20231129":["via_logger"]}
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
