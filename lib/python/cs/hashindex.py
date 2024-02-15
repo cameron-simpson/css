@@ -42,7 +42,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
-from cs.upd import print, run_task  # pylint: disable=redefined-builtin
+from cs.upd import print, run_task, without  # pylint: disable=redefined-builtin
 
 __version__ = '20240211.1-post'
 
@@ -622,7 +622,8 @@ def run_remote_hashindex(
       *argv,
   ))
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
-  return run(remote_argv, check=check, doit=doit, **subp_options)
+  with without():
+    return run(remote_argv, check=check, doit=doit, **subp_options)
 
 @uses_fstags
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
