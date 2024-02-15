@@ -272,9 +272,7 @@ class HashIndexCommand(BaseCommand):
           continue
         for h, fspath in hashindex(path, hashname=hashname):
           runstate.raiseif()
-          if h is None:
-            xit = 1
-          else:
+          if h is not None:
             print(h, relpath(fspath, path) if relative else fspath)
     return xit
 
