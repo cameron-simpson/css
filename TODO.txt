@@ -1,5 +1,5 @@
 cs.delta: monitor() to accept an iterable of states as alternative to polling
-hashindex rhashindex(rhost,dirpath[,ssh_exe=][,hashindex_exe=])
+√ hashindex rhashindex(rhost,dirpath[,ssh_exe=][,hashindex_exe=])
 hashindex rearrange --sh to emit sh quotes commands inc the mkdirs
 √ TagSet: parse_tag_value: a bare "nan" is a float
 mklinks: use cs.hashindex.merge
