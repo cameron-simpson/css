@@ -172,22 +172,27 @@ class HashIndexCommand(BaseCommand):
         bad_input = False
         fspaths_by_hashcode = defaultdict(list)
         hashcode_by_fspath = {}
-        for hashcode, rfspath in read_hashindex(sys.stdin, hashname=hashname):
+        for lineno, (hashcode,
+                     rfspath) in enumerate(read_hashindex(sys.stdin,
+                                                          hashname=hashname),
+                                           1):
           runstate.raiseif()
-          if hashcode is None or rfspath is None:
-            bad_input = True
-            continue
-          with Pfx(rfspath):
-            if isabspath(rfspath):
-              warning("is an absolute path")
+          with Pfx("stdin:%d", lineno):
+            if hashcode is None or rfspath is None:
+              warning("bad hashcode or bad fspath")
               bad_input = True
               continue
-            if rfspath in hashcode_by_fspath:
-              warning("repeated mention")
-              bad_input = True
-              continue
-          fspaths_by_hashcode[hashcode].append(rfspath)
-          hashcode_by_fspath[rfspath] = hashcode
+            with Pfx(rfspath):
+              if isabspath(rfspath):
+                warning("is an absolute path")
+                bad_input = True
+                continue
+              if rfspath in hashcode_by_fspath:
+                warning("repeated mention")
+                bad_input = True
+                continue
+            fspaths_by_hashcode[hashcode].append(rfspath)
+            hashcode_by_fspath[rfspath] = hashcode
     if bad_input:
       warning("bad input data")
       return 1
