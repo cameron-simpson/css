@@ -33,7 +33,6 @@ from shutil import rmtree
 from subprocess import run, DEVNULL
 import sys
 from types import SimpleNamespace
-from typing import Any
 
 from icontract import ensure
 import tomli_w
@@ -64,8 +63,6 @@ from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import Upd, print, uses_upd
 from cs.vcs import VCS
 from cs.vcs.hg import VCS_Hg
-
-from cs.x import X
 
 def main(argv=None):
   ''' Main command line.
@@ -127,6 +124,8 @@ class CSReleaseCommand(BaseCommand):
     cmd: str = 'cs-release'
 
     def stderr_isatty():
+      ''' Test whether `sys.stderr` is a tty.
+      '''
       try:
         return sys.stderr.isatty()
       except AttributeError:
@@ -142,6 +141,8 @@ class CSReleaseCommand(BaseCommand):
 
     @property
     def vcs(self):
+      ''' The prevailing VCS.
+      '''
       return self.modules.vcs
 
   def apply_opts(self, opts):
@@ -181,7 +182,7 @@ class CSReleaseCommand(BaseCommand):
     runstate = options.runstate
     xit = 0
     for pkg_name in argv:
-      unstate.raiseif()
+      runstate.raiseif()
       with Pfx(pkg_name):
         status("...")
         pkg = options.modules[pkg_name]
@@ -1204,9 +1205,9 @@ class Module:
     )
 
     # fill in default fields
-    for field in ('author', 'author_email', 'package_dir'):
-      with Pfx("%r", field):
-        if field in dinfo:
+    for di_field in ('author', 'author_email', 'package_dir'):
+      with Pfx("%r", di_field):
+        if di_field in dinfo:
           continue
         compute_field = {
             'author': lambda: os.environ['NAME'],
@@ -1215,8 +1216,8 @@ class Module:
             'package_dir': lambda: {
                 '': PYLIBTOP
             },
-        }[field]
-        dinfo[field] = compute_field()
+        }[di_field]
+        dinfo[di_field] = compute_field()
 
     # fill in default classifications
     classifiers = dinfo['classifiers']
@@ -1317,7 +1318,6 @@ class Module:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
     dinfo_entry_points = dinfo.pop('entry_points', {})
     if dinfo_entry_points:
-      entry_points = {}
       console_scripts = dinfo_entry_points.pop('console_scripts', [])
       if console_scripts:
         projspec['scripts'] = console_scripts
