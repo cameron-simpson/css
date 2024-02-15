@@ -102,6 +102,7 @@ class HashIndexCommand(BaseCommand):
     ssh_exe: str = DEFAULT_SSH_EXE
     hashindex_exe: str = DEFAULT_HASHINDEX_EXE
     symlink_mode: bool = False
+    relative: Optional[bool] = None
 
   # pylint: disable=arguments-differ
   @contextmanager
@@ -222,11 +223,13 @@ class HashIndexCommand(BaseCommand):
                     )
                   continue
                 opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
-                quiet or print(opname, srcpath, dstpath)
+                if not quiet:
+                  print(opname, srcpath, dstpath)
                 dstdirpath = dirname(dstpath)
                 if doit:
                   needdir(dstdirpath, use_makedirs=False, log=warning)
-                quiet or print(opname, srcpath, dstpath)
+                if not quiet:
+                  print(opname, srcpath, dstpath)
                 if doit:
                   fstags.mv(
                       srcpath,
