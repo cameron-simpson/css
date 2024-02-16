@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from getopt import GetoptError
 import os
 from os.path import (
+    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -21,8 +22,13 @@ from os.path import (
     splitext,
 )
 import sys
+
+from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags, rfilepaths
+from cs.fs import needdir
+from cs.fstags import FSTags, rfilepaths, uses_fstags
+from cs.hashindex import merge, DEFAULT_HASHNAME
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 
@@ -37,14 +43,17 @@ DISTINFO = {
             'plex': 'cs.app.plex:main'
         },
     },
-    'install_requires': ['cs.cmdutils', 'cs.fstags', 'cs.logutils'],
+    'install_requires': [
+        'cs.cmdutils',
+        'cs.fstags',
+        'cs.logutils',
+        'typeguard',
+    ],
 }
 
 def main(argv=None):
   ''' Command line mode.
   '''
-  if argv is None:
-    argv = sys.argv
   return PlexCommand(argv).run()
 
 class PlexCommand(BaseCommand):
@@ -55,35 +64,50 @@ class PlexCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
+    ''' Options for `PlexCommand`.
+    '''
     fstags: FSTags = field(default_factory=FSTags)
 
   @contextmanager
-  def run_context(self):
+  def run_context(self, **kw):
     ''' Use the FSTags context.
     '''
-    with super().run_context():
+    with super().run_context(**kw):
       with self.options.fstags:
         yield
 
   def cmd_linktree(self, argv):
-    ''' Usage: {cmd} srctrees... dsttree
-          Link media files from the srctrees into the dsttree
-          using the Plex naming conventions.
+    ''' Usage: {cmd} [-n] srctrees... dsttree
+          Link media files from the srctrees into a Plex media tree.
+          -n  No action, dry run. Print the expected actions.
     '''
+    options = self.options
+    options.popopts(
+        argv,
+        n='dry_run',
+    )
+    doit = options.doit
+    runstate = options.runstate
     if len(argv) < 2:
       raise GetoptError("missing srctrees or dsttree")
     dstroot = argv.pop()
     srcroots = argv
-    options = self.options
-    fstags = options.fstags
     if not isdirpath(dstroot):
       raise GetoptError("dstroot does not exist: %s" % (dstroot,))
     for srcroot in srcroots:
+      runstate.raiseif()
       with Pfx(srcroot):
-        for filepath in srcroot if isfilepath(srcroot) else sorted(
+        for srcpath in srcroot if isfilepath(srcroot) else sorted(
             rfilepaths(srcroot)):
-          with Pfx(filepath):
-            plex_linkpath(fstags, filepath, dstroot)
+          runstate.raiseif()
+          with Pfx(srcpath):
+            try:
+              plex_linkpath(
+                  srcpath, dstroot, symlink_mode=True, doit=doit, quiet=False
+              )
+            except ValueError as e:
+              warning("skipping: %s", e)
+              continue
 
 @uses_fstags
 @typechecked
