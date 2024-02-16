@@ -243,6 +243,7 @@ class DockerRun:
   INPUTDIR_DEFAULT = '/input'
   OUTPUTDIR_DEFAULT = '/output'
   image: str = None
+  network: str = 'none'
   options: List[str] = field(default_factory=list)
   input_root: str = INPUTDIR_DEFAULT
   input_map: dict = field(default_factory=dict)
@@ -386,6 +387,7 @@ class DockerRun:
         docker_exe,
         'run',
         '--rm',
+        ('--network', self.network),
         '-w',
         self.output_root,
         *self.options,
