@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from getopt import GetoptError
 import os
 from os.path import (
+    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -805,7 +806,19 @@ def merge(
     return
   if dstpath == srcpath:
     return
-  if existspath(dstpath):
+  if symlink_mode:
+    # check for existing symlink
+    sympath = abspath(srcpath)
+    try:
+      dstsympath = os.readlink(dstpath)
+    except FileNotFoundError:
+      pass
+    else:
+      if dstsympath == sympath:
+        # identical symlinks, just update the tags
+        fstags[dstpath].update(fstags[srcpath])
+        return
+  elif existspath(dstpath):
     if (samefile(srcpath, dstpath)
         or (file_checksum(dstpath, hashname=hashname) == file_checksum(
             srcpath, hashname=hashname))):
