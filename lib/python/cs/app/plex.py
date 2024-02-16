@@ -85,14 +85,13 @@ class PlexCommand(BaseCommand):
           with Pfx(filepath):
             plex_linkpath(fstags, filepath, dstroot)
 
-def plex_subpath(tagged_path):
+@uses_fstags
+@typechecked
+def plex_subpath(fspath: str, fstags: FSTags):
   ''' Compute a Plex filesystem subpath based on the tags of `filepath`.
   '''
-  base, ext = splitext(basename(tagged_path.fspath))
-  itags = tagged_path.infer_tags()
-  print("plex_subpath: itags:")
-  for tag in sorted(itags):
-    print(" ", tag)
+  base, ext = splitext(basename(fspath))
+  itags = fstags[fspath].infer_tags()
   t = itags.auto
   tv = t.tv
   title = tv.series_title or t.title or base
@@ -124,49 +123,37 @@ def plex_subpath(tagged_path):
 
 # pylint: disable=redefined-builtin
 def plex_linkpath(
-    fstags, filepath, plex_topdirpath, do_hardlink=False, print=None
+    srcpath: str,
+    plex_topdirpath,
+    *,
+    doit=True,
+    quiet=False,
+    hashname=DEFAULT_HASHNAME,
+    symlink_mode=True
 ):
-  ''' Link `filepath` into `plex_topdirpath`.
+  ''' Symlink `filepath` into `plex_topdirpath`.
 
       Parameters:
-      * `fstags`: the `FSTags` instance
-      * `filepath`: filesystem pathname of file to link into Plex tree
+      * `srcpath`: filesystem pathname of file to link into Plex tree
       * `plex_topdirpath`: filesystem pathname of the Plex tree
-      * `do_hardlink`: use a hard link if true, otherwise a softlink;
-        default `False`
-      * `print`: print function for the link action,
-        default from `builtins.print`
+      * `symlink_mode`: if true (default) make a symbolic link,
+        otherwise a hard link
+      * `doit`: default `True`: if false do not make the link
+      * `quiet`: default `False`; if false print the planned link
+      * `hashname`: the file content hash algorithm name
   '''
-  if print is None:
-    print = builtins.print
-  tagged_path = fstags[filepath]
-  subpath = plex_subpath(tagged_path)
+  subpath = plex_subpath(srcpath)
   plexpath = joinpath(plex_topdirpath, subpath)
-  plexdirpath = dirname(plexpath)
-  if do_hardlink:
-    if existspath(plexpath):
-      if samefile(filepath, plexpath):
-        return
-      pfx_call(os.unlink, plexpath)
-    print(subpath, "<=", basename(filepath))
-    if not isdirpath(plexdirpath):
-      pfx_call(os.makedirs, plexdirpath)
-    pfx_call(os.link, filepath, plexpath)
-  else:
-    rfilepath = relpath(filepath, plexdirpath)
-    if existspath(plexpath):
-      try:
-        sympath = os.readlink(plexpath)
-      except OSError as e:
-        warning("readlink(%r): %s", plexpath, e)
-      else:
-        if rfilepath == sympath:
-          return
-      pfx_call(os.unlink, plexpath)
-    print(subpath, "<=", basename(filepath))
-    if not isdirpath(plexdirpath):
-      pfx_call(os.makedirs, plexdirpath)
-    pfx_call(os.symlink, rfilepath, plexpath)
+  if doit and not existspath(plexpath):
+    needdir(dirname(plexpath), use_makedirs=True, log=warning)
+  merge(
+      abspath(srcpath),
+      plexpath,
+      hashname=hashname,
+      symlink_mode=symlink_mode,
+      quiet=False,
+      doit=doit
+  )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
