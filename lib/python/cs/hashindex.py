@@ -303,7 +303,7 @@ class HashIndexCommand(BaseCommand):
 
   @typechecked
   def cmd_rearrange(self, argv):
-    ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir
+    ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir [dstdir]
           Rearrange files in targetdir based on their positions in refdir.
           Options:
             -e ssh_exe  Specify the ssh executable.
@@ -313,6 +313,15 @@ class HashIndexCommand(BaseCommand):
             --mv        Move mode.
             -n          No action, dry run.
             -s          Symlink mode.
+          Other arguments:
+            refdir      The reference directory, which may be local or remote
+                        or "-" indicating that a hash index will be read from
+                        standard input.
+            targetdir   The directory containing the files to be rearranged,
+                        which may be local or remote.
+            dstdir      Optional destination directory for the rearranged files.
+                        Default is the targetdir.
+                        It is taken to be on the same host as targetdir.
     '''
     options = self.options
     badopts = False
@@ -358,6 +367,14 @@ class HashIndexCommand(BaseCommand):
           if not isdirpath(targetdir):
             warning("not a directory")
             badopts = True
+    if argv:
+      dstdir = targetdir
+    else:
+      dstdir = argv.pop(0)
+      with Pfx("dstdir %r", dstdir):
+        if targethost is None and not isdirpath(dstdir):
+          warning("not a directory")
+          badopts = True
     if argv:
       warning("extra arguments: %r", argv)
       badopts = True
@@ -421,6 +438,7 @@ class HashIndexCommand(BaseCommand):
                 symlink_mode and '-s',
                 '-',
                 targetdir,
+                dstdir,
             ],
             ssh_exe=ssh_exe,
             hashindex_exe=hashindex_exe,
