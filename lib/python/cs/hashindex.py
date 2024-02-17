@@ -368,13 +368,13 @@ class HashIndexCommand(BaseCommand):
             warning("not a directory")
             badopts = True
     if argv:
-      dstdir = targetdir
-    else:
       dstdir = argv.pop(0)
       with Pfx("dstdir %r", dstdir):
         if targethost is None and not isdirpath(dstdir):
           warning("not a directory")
           badopts = True
+    else:
+      dstdir = targetdir
     if argv:
       warning("extra arguments: %r", argv)
       badopts = True
