@@ -40,7 +40,7 @@ DISTINFO = {
     ],
     'entry_points': {
         'console_scripts': {
-            'plex': 'cs.app.plex:main'
+            'plextool': 'cs.app.plex:main'
         },
     },
     'install_requires': [
