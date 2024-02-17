@@ -40,6 +40,7 @@ from cs.tagset import Tag
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
 from . import Tagger
+from .rules import RULE_MODES
 
 def main(argv=None):
   ''' Command line for the tagger.
@@ -59,7 +60,10 @@ class TaggerCommand(BaseCommand):
     -q          Quiet.
     -v          Verbose.'''
 
-  USAGE_KEYWORDS = {'DEFAULT_HASHNAME': DEFAULT_HASHNAME}
+  USAGE_KEYWORDS = {
+      'DEFAULT_HASHNAME': DEFAULT_HASHNAME,
+      'RULE_MODES': RULE_MODES,
+  }
 
   @dataclass
   class Options(BaseCommand.Options, HasFSPath):
@@ -110,6 +114,9 @@ class TaggerCommand(BaseCommand):
                 (TODO: we file by linking - this needs a rename.)
           -h hashname
                 Specify the content hash algorithm name, default: {DEFAULT_HASHNAME}.
+          -M modes
+                Only apply actions in modes, a comma separated list of modes
+                from {RULE_MODES!r}.
           -n    No action (default). Just print filing actions.
           -r    Recurse. Required to autofile a directory tree.
           -y    Link files to destinations.
@@ -117,6 +124,7 @@ class TaggerCommand(BaseCommand):
     options = self.options
     options.direct = False
     options.hashname = DEFAULT_HASHNAME
+    options.modes = ",".join(RULE_MODES)
     options.once = False
     options.recurse = False
     options.popopts(
@@ -125,6 +133,7 @@ class TaggerCommand(BaseCommand):
         d='direct',
         h='hashname',
         n='dry_run',  # no action
+        M_=('modes', str),
         r='recurse',
         y='doit',  # inverse of -n
         v='verbose',
@@ -134,6 +143,9 @@ class TaggerCommand(BaseCommand):
     doit = options.doit
     direct = options.direct
     hashname = options.hashname
+    modes = options.modes.split(',')
+    if not all([mode in RULE_MODES for mode in modes]):
+      raise GetoptError(f'invalid modes not in {RULE_MODES!r}: {modes!r}')
     once = options.once
     recurse = options.recurse
     runstate = options.runstate
@@ -193,6 +205,7 @@ class TaggerCommand(BaseCommand):
             matches = tagger.process(
                 basename(path),
                 hashname=hashname,
+                modes=modes,
                 doit=doit,
                 verbose=verbose,
             )
