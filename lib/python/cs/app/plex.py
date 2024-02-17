@@ -66,27 +66,36 @@ class PlexCommand(BaseCommand):
   class Options(BaseCommand.Options):
     ''' Options for `PlexCommand`.
     '''
-    fstags: FSTags = field(default_factory=FSTags)
+    symlink_mode: bool = False
 
   @contextmanager
-  def run_context(self, **kw):
+  @uses_fstags
+  def run_context(self, fstags: FSTags, **kw):
     ''' Use the FSTags context.
     '''
     with super().run_context(**kw):
-      with self.options.fstags:
+      with fstags:
         yield
 
   def cmd_linktree(self, argv):
     ''' Usage: {cmd} [-n] srctrees... dsttree
           Link media files from the srctrees into a Plex media tree.
-          -n  No action, dry run. Print the expected actions.
+          -n    No action, dry run. Print the expected actions.
+          --sym Symlink mode: link media files using symbolic links
+                instead of hard links. The default is hard links
+                because that lets you bind mount the plex media tree,
+                which would make the symlinkpaths invalid in the
+                bound mount.
     '''
     options = self.options
+    options.symlink_mode = False
     options.popopts(
         argv,
         n='dry_run',
+        sym='symlink_mode',
     )
     doit = options.doit
+    symlink_mode = options.symlink_mode
     runstate = options.runstate
     if len(argv) < 2:
       raise GetoptError("missing srctrees or dsttree")
@@ -103,11 +112,17 @@ class PlexCommand(BaseCommand):
           with Pfx(srcpath):
             try:
               plex_linkpath(
-                  srcpath, dstroot, symlink_mode=True, doit=doit, quiet=False
+                  srcpath,
+                  dstroot,
+                  symlink_mode=symlink_mode,
+                  doit=doit,
+                  quiet=False,
               )
             except ValueError as e:
               warning("skipping: %s", e)
               continue
+            except OSError as e:
+              warning("failed: %s", e)
 
 @uses_fstags
 @typechecked
@@ -170,14 +185,17 @@ def plex_linkpath(
   plexpath = joinpath(plex_topdirpath, subpath)
   if doit and not existspath(plexpath):
     needdir(dirname(plexpath), use_makedirs=True, log=warning)
-  merge(
-      abspath(srcpath),
-      plexpath,
-      hashname=hashname,
-      symlink_mode=symlink_mode,
-      quiet=False,
-      doit=doit
-  )
+  try:
+    merge(
+        abspath(srcpath),
+        plexpath,
+        hashname=hashname,
+        symlink_mode=symlink_mode,
+        quiet=False,
+        doit=doit
+    )
+  except FileExistsError:
+    warning("already exists")
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
