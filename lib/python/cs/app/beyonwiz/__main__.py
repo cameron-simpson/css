@@ -59,7 +59,7 @@ class BWizCmd(BaseCommand):
   def cmd_convert(self, argv):
     ''' Convert a recording to MP4.
 
-        Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [--rm] [start..end]... recording [output.mp4]
+        Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [--rm] [-d outputdir] [start..end]... recording [output.mp4]
           Convert the video content of the named recording to
           the named output file (typically MP4, though the ffmpeg
           output format chosen is based on the extension).
@@ -68,6 +68,7 @@ class BWizCmd(BaseCommand):
             -n          No action, dry run.
             -a:afmt     Specify output audio format.
             -v:vfmt     Specify output video format.
+            -d outputdir The derived output file should be written in outputdir.
             --rm        Remove the source file if the conversion succeeds.
             start..end  Optional start and end offsets in seconds, used
               to crop the recording output.
@@ -76,6 +77,7 @@ class BWizCmd(BaseCommand):
     doit = True
     acodec = None
     vcodec = None
+    outputdir = '.'
     remove_source = False
     # parse options
     while argv:
@@ -94,9 +96,14 @@ class BWizCmd(BaseCommand):
           vcodec = arg0[3:]
         elif arg0 == '--rm':
           remove_source = True
+        if arg0 == '-d':
+          outputdir = argv.pop(0)
         else:
           warning('unexpected option')
           badopts = True
+    if not isdirpath(outputdir):
+      warning("outputdir is not a directory: %r", outputdir)
+      badopts = True
     # parse optional start..end arguments
     timespans = []
     while argv:
@@ -120,7 +127,7 @@ class BWizCmd(BaseCommand):
     if argv:
       dstpath = argv.pop(0)
     else:
-      dstpath = None
+      dstpath = f'{outputdir}/'
     if argv:
       warning("extra arguments: %s", ' '.join(argv))
       badopts = True
