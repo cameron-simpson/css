@@ -207,7 +207,7 @@ class BWizCmd(BaseCommand):
     ''' Report information about a recording.
 
         Usage: {cmd} tvwizdirs...
-          Print some summary infomation for the named tvwiz directories.
+          Print some summary information for the named tvwiz directories.
     '''
     if not argv:
       raise GetoptError("missing recordings")
