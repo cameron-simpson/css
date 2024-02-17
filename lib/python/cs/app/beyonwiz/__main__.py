@@ -41,8 +41,8 @@ class BWizCmd(BaseCommand):
     ''' Output the tvwiz transport stream data.
 
         Usage: {cmd} tvwizdirs...
-          Write the video content of the named tvwiz directories to
-          standard output as MPEG2 transport Stream, acceptable to
+          Write the video content of the named tvwiz directories to stdout.
+          The output is an MPEG2 transport Stream, acceptable to
           ffmpeg's "mpegts" format.
     '''
     if not argv:
@@ -60,9 +60,7 @@ class BWizCmd(BaseCommand):
     ''' Convert a recording to MP4.
 
         Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [--rm] [-d outputdir] [start..end]... recording [output.mp4]
-          Convert the video content of the named recording to
-          the named output file (typically MP4, though the ffmpeg
-          output format chosen is based on the extension).
+          Convert the video content of the named recording, usually to an MP4.
           Most metadata are preserved.
           Options:
             -n          No action, dry run.
