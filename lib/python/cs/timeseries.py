@@ -701,7 +701,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
-          Report infomation about the time series stored at tspath.
+          Report information about the time series stored at tspath.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
