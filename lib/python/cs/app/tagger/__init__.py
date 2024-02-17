@@ -39,7 +39,7 @@ from cs.tagset import Tag, TagSet, RegexpTagRule
 from cs.threads import locked, ThreadState, HasThreadState
 from cs.upd import run_task, print
 
-from .rules import Rule, RuleResult, TagChange
+from .rules import Rule, RuleResult, TagChange, RULE_MODES
 
 __version__ = None
 
@@ -147,6 +147,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       hashname: str,
       doit=False,
       verbose=False,
+      modes=RULE_MODES,
   ) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.
         Return the list of `RuleResult`s for matches `Rule`s.
@@ -163,6 +164,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
             fspath,
             tags,
             hashname=hashname,
+            modes=modes,
             doit=doit,
             quiet=True,
         )

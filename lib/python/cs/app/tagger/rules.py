@@ -49,6 +49,8 @@ from cs.upd import print
 
 from cs.debug import X, trace, r, s
 
+RULE_MODES = 'move', 'tag'
+
 def slosh_quote(s: str, q: str):
   ''' Quote a string `s` with quote character `q`.
   '''
@@ -336,6 +338,7 @@ class Rule(Promotable):
       hashname: str,
       doit: bool = False,
       quiet: bool = False,
+      modes=RULE_MODES,
       fstags: FSTags,
   ) -> RuleResult:
     ''' Apply this `Rule` to `fspath` using the working `TagSet` `tags`,
@@ -360,40 +363,42 @@ class Rule(Promotable):
     if match_result is False:
       return result
     result.matched = True
-    if isinstance(match_result, Mapping):
-      tags.update(match_result)
-      for k, v in match_result.items():
-        result.tag_changes.append(TagChange(add_remove=True, tag=Tag(k, v)))
+    if 'tag' in modes:
+      if isinstance(match_result, Mapping):
+        tags.update(match_result)
+        for k, v in match_result.items():
+          result.tag_changes.append(TagChange(add_remove=True, tag=Tag(k, v)))
     if self.action is not None:
       with Pfx(self.action.__doc__.strip().split()[0].strip()):
-        # apply the current non-underscore tags in case the file gets moved
-        fstags[fspath].update(
-            {
-                k: v
-                for k, v in tags.items()
-                if k and not k.startswith('_')
-            }
-        )
-        try:
-          side_effects = self.action(
-              fspath,
-              tags,
-              hashname=hashname,
-              doit=doit,
-              quiet=quiet,
-          )
-        except Exception as e:
-          warning("action failed: %s", e)
-          result.failed.append(e)
+        if not (set(self.action.modes) & set(modes)):
+          ##warning(
+          ##    "SKIP action with unwanted modes %r: %s", self.action.modes,
+          ##    self.action
+          ##)
+          pass
         else:
-          for side_effect in side_effects:
-            match side_effect:
-              case str(new_fspath):
-                result.filed_to.append(new_fspath)
-              case TagChange() as tag_change:
-                result.tag_changes.append(tag_change)
-              case _:
-                raise RuntimeError(f'unhandled side effect {r(side_effect)}')
+          # apply the current tags in case the file gets moved
+          fstags[fspath].update(tags)
+          try:
+            side_effects = self.action(
+                fspath,
+                tags,
+                hashname=hashname,
+                doit=doit,
+                quiet=quiet,
+            )
+          except Exception as e:
+            warning("action failed: %s", e)
+            result.failed.append(e)
+          else:
+            for side_effect in side_effects:
+              match side_effect:
+                case str(new_fspath):
+                  result.filed_to.append(new_fspath)
+                case TagChange() as tag_change:
+                  result.tag_changes.append(tag_change)
+                case _:
+                  raise RuntimeError(f'unhandled side effect {r(side_effect)}')
     return result
 
   @typechecked
@@ -521,6 +526,12 @@ class Rule(Promotable):
 
   @staticmethod
   @pops_tokens
+  @ensure(
+      lambda result:
+      (result is None or all([mode in RULE_MODES for mode in result.modes])),
+      f'action.modes not in RULE_MODES:f{RULE_MODES!r}'
+  )
+  @typechecked
   def pop_action(tokens: List[TokenRecord]) -> Union[Callable, None]:
     ''' Pop an action from `tokens`.
     '''
@@ -570,6 +581,7 @@ class Rule(Promotable):
               mv_action.__doc__ = (
                   f'Move `fspath` to {target_format!r}`.format_kwargs(**format_kwargs)`.'
               )
+              mv_action.modes = ('move',)
               return mv_action
         case Identifier(name="tag"):
           if not tokens:
@@ -604,6 +616,11 @@ class Rule(Promotable):
                   )
               )
             return tuple(tag_changes)
+
+          tag_action.__doc__ = (
+              f'Tag `fspath` with {" ".join(map(str,tag_tokens))}.'
+          )
+          tag_action.modes = ('tag',)
 
           return tag_action
     raise ValueError("invalid action")
