@@ -1,0 +1,3 @@
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton: drop the default_factory parameter/attribute, let default_attr specify a callable
+lib/python/cs/fs.py: merge default ==> ebooks: cs.ebooks: some PDF and CBZ support
+lib/python/cs/fs.py: cs.fs: Singleton._resolve_fspath: fix reference to class name

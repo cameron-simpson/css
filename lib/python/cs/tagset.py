@@ -207,7 +207,7 @@ import re
 import sys
 from threading import Lock
 import time
-from typing import Mapping, Optional, Union
+from typing import Mapping, Optional, Tuple, Union
 from uuid import UUID, uuid4
 
 from icontract import require
@@ -235,7 +235,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20231129-post'
+__version__ = '20240211-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1502,7 +1502,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   # pylint: disable=too-many-branches
   @classmethod
-  def parse_value(cls, s, offset=0, extra_types=None, fallback_parse=None):
+  def parse_value(cls, s, offset=0, *, extra_types=None, fallback_parse=None):
     ''' Parse a value from `s` at `offset` (default `0`).
         Return the value, or `None` on no data.
 
@@ -1520,7 +1520,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         and `new_offset` is where the parse stopped.
         The default is `cs.lex.get_nonwhite`
         to gather nonwhitespace characters,
-        intended support *tag_name*`=`*bare_word*
+        intended to support *tag_name*`=`*bare_word*
         in human edited tag files.
 
         The core syntax for values is JSON;
@@ -1548,8 +1548,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       fallback_parse = get_nonwhite
     if offset >= len(s) or s[offset].isspace():
       warning("offset %d: missing value part", offset)
-      value = None
-    elif s[offset] in '"[{':
+      return None, offset
+    if s[offset] in '"[{':
       # must be a JSON value - collect it
       value_part = s[offset:]
       try:
@@ -1559,38 +1559,33 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
             "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
         ) from e
       offset += suboffset
+      return value, offset
+    # collect nonwhitespace (or whatever fallback_parse gathers),
+    nonwhite, offset = fallback_parse(s, offset)
+    # check for the basic types - these are never overridden
+    # check for round trip int or float
+    try:
+      i = int(nonwhite)
+    except ValueError:
+      try:
+        f = float(nonwhite)
+      except ValueError:
+        pass
+      else:
+        return f, offset
     else:
-      # collect nonwhitespace (or whatever fallback_parse gathers),
-      # check for special forms
-      nonwhite, offset = fallback_parse(s, offset)
-      value = None
-      for _, from_str, _ in extra_types:
-        try:
-          value = from_str(nonwhite)
-        except ValueError:
-          pass
-        else:
-          break
-      if value is None:
-        # not one of the special formats
-        # check for round trip int or float
-        try:
-          i = int(nonwhite)
-        except ValueError:
-          try:
-            f = float(nonwhite)
-          except ValueError:
-            pass
-          else:
-            if str(f) == nonwhite:
-              value = f
-        else:
-          if str(i) == nonwhite:
-            value = i
-      if value is None:
-        # not a special value, preserve as a string
-        value = nonwhite
-    return value, offset
+      return i, offset
+    # not a basic type
+    # check for special forms
+    for _, from_str, _ in extra_types:
+      try:
+        value = from_str(nonwhite)
+      except ValueError:
+        pass
+      else:
+        return value, offset
+    # not a special value, preserve as a string
+    return nonwhite, offset
 
   @property
   @pfx_method(use_str=True)
@@ -3385,14 +3380,24 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
   @classmethod
   @pfx_method
   def parse_tags_line(
-      cls, line, ontology=None, verbose=None, extra_types=None
-  ):
+      cls,
+      line,
+      ontology=None,
+      verbose=None,
+      extra_types=None,
+  ) -> Tuple[str, TagSet]:
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
     if extra_types is None:
       extra_types = getattr(cls, 'EXTRA_TYPES', None)
-    name, offset = Tag.parse_value(line)
+    id_name, offset = get_dotted_identifier(line)
+    if id_name:
+      name = id_name
+    else:
+      name, offset = Tag.parse_value(line)
+    if not isinstance(name, str):
+      raise TypeError(f'line does not start with a string: {r(name)}')
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]

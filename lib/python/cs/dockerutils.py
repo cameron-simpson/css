@@ -11,10 +11,12 @@ import os
 from os.path import (
     abspath,
     basename,
+    exists as existspath,
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
     normpath,
+    splitext,
 )
 from subprocess import CompletedProcess
 import sys
@@ -25,11 +27,10 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, BaseCommandOptions
 from cs.context import stackattrs
-from cs.fs import validate_rpath
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.psutils import run
 
-__version__ = '20231202-post'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -40,11 +41,8 @@ DISTINFO = {
     'install_requires': [
         'cs.cmdutils',
         'cs.context',
-        'cs.fs',
         'cs.pfx',
         'cs.psutils',
-        'ffmpeg-python',
-        ##'git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python',
         'typeguard',
     ],
 }
@@ -159,8 +157,6 @@ class DockerUtilCommand(BaseCommand):
           The command's working directory will be /output.
           -i inputpath
               Mount inputpath as /input/basename(inputpath)
-          -I inputpath dockerpath
-              Mount inputpath as /input/dockerpath
           --root
               Do not switch to the current effective uid:gid inside
               the container.
@@ -216,7 +212,7 @@ def mount_escape(*args) -> str:
   buf = StringIO()
   csvw = csv.writer(buf)
   csvw.writerow(args)
-  return buf.getvalue().rstrip('\n')
+  return buf.getvalue().rstrip('\n').rstrip('\r')
 
 # pylint: disable=too-many-instance-attributes
 @dataclass
@@ -247,11 +243,13 @@ class DockerRun:
   INPUTDIR_DEFAULT = '/input'
   OUTPUTDIR_DEFAULT = '/output'
   image: str = None
+  network: str = 'none'
   options: List[str] = field(default_factory=list)
   input_root: str = INPUTDIR_DEFAULT
   input_map: dict = field(default_factory=dict)
   output_root: str = OUTPUTDIR_DEFAULT
   outputpath: str = '.'
+  output_map: dict = field(default_factory=dict)
   as_root: bool = False
   pull_mode: str = 'missing'
 
@@ -262,8 +260,6 @@ class DockerRun:
         The command's working directory will be /output.
         -i inputpath
             Mount inputpath as /input/basename(inputpath)
-        -I inputpath dockerpath
-            Mount inputpath as /input/dockerpath
         --root
             Do not switch to the current effective uid:gid inside
             the container.
@@ -282,12 +278,7 @@ class DockerRun:
         arg0_ = arg0[1:]
         if arg0 == '-i':
           inputpath = argv.pop(0)
-          inputmount = basename(inputpath)
-          self.add_input(inputmount, inputpath)
-        elif arg0 == '-I':
-          inputpath = argv.pop(0)
-          inputmount = argv.pop(0)
-          self.add_input(inputmount, inputpath)
+          self.add_input(inputpath)
         elif arg0 == '--root':
           self.as_root = True
         elif arg0 == '-U':
@@ -319,20 +310,50 @@ class DockerRun:
           self.options.append(arg0)
           self.options.append(arg1)
 
-  def add_input(self, inputmount: str, inputpath: str):
-    ''' Add an input mount mapping. '''
-    with Pfx("inputpath:%r", inputpath):
-      if not inputpath:
+  @staticmethod
+  @pfx
+  def _mntmap_fspath(fsmap: dict, fspath) -> str:
+    ''' Add a host filesystem path to `fsmap`,
+        a mapping of container mount basenames
+        to absolute host filesystem paths (`abspath(fspath)`).
+        Return the container mount basename.
+    '''
+    base = basename(fspath)
+    if base in fsmap:
+      base_prefix, base_ext = splitext(base)
+      for n in range(2, 128):
+        base = f'{base_prefix}-{n}{base_ext}'
+        if base not in fsmap:
+          break
+      else:
+        raise ValueError('basename and variants already allocated')
+    assert base not in fsmap
+    fsmap[base] = abspath(fspath)
+    return base
+
+  @pfx_method
+  def add_input(self, infspath: str) -> str:
+    ''' Add a host filesystem path to the `input_map`
+        and return the corresponding container filesystem path.
+    '''
+    with Pfx("infspath:%r", infspath):
+      if not infspath:
         raise ValueError('may not be empty')
-    with Pfx("inputmount:%r", inputmount):
-      validate_rpath(inputmount)
-      if '/' in inputmount:
-        raise ValueError('may not contain multiple components')
-      if inputmount in self.input_map:
-        raise ValueError(f'already present in input_map:{self.input_map!r}')
-    self.input_map[inputmount] = abspath(inputpath)
+      if not existspath(infspath):
+        raise ValueError("does not exist")
+    base = self._mntmap_fspath(self.input_map, infspath)
+    return joinpath(self.input_root, base)
+
+  @pfx_method
+  def add_output(self, outfspath: str) -> str:
+    ''' Add a host filesystem path to the `output_map`
+        and return the corresponding container filesystem path.
+    '''
+    outbase = self._mntmap_fspath(self.output_map, outfspath)
+    return joinpath(self.output_root, outbase)
 
   # pylint: disable=too-many-branches
+  @pfx_method
   def run(self, *argv, doit=None, quiet=None, docker_exe=None):
     ''' Run a command via `docker run`.
         Return the `CompletedProcess` result or `None` if `doit` is false.
@@ -366,25 +387,27 @@ class DockerRun:
         docker_exe,
         'run',
         '--rm',
+        ('--network', self.network),
         '-w',
         self.output_root,
         *self.options,
     ]
     # input readonly mounts
-    for inputmount, inputpath in self.input_map.items():
-      mnt = joinpath(self.input_root, inputmount)
-      with Pfx("%r->%r", mnt, inputpath):
+    for inbase, infspath in self.input_map.items():
+      mnt = joinpath(self.input_root, inbase)
+      with Pfx("%r->%r", mnt, infspath):
         docker_argv.extend(
             [
                 '--mount',
                 mount_escape(
                     'type=bind',
                     'readonly',
-                    f'source={inputpath}',
+                    f'source={infspath}',
                     f'destination={mnt}',
                 ),
             ]
         )
+    # mount the output directory
     docker_argv.extend(
         [
             '--mount',
@@ -395,6 +418,22 @@ class DockerRun:
             ),
         ]
     )
+    # if any named outputs exist, mount them inside /output
+    for outbase, outfspath in self.output_map.items():
+      if not existspath(outfspath):
+        continue
+      mnt = joinpath(self.output_root, outbase)
+      with Pfx("%r->%r", mnt, outfspath):
+        docker_argv.extend(
+            [
+                '--mount',
+                mount_escape(
+                    'type=bind',
+                    f'source={outfspath}',
+                    f'destination={mnt}',
+                ),
+            ]
+        )
     if self.as_root:
       entrypoint = argv.pop(0)
     else:

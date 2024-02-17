@@ -67,7 +67,7 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230612-post'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -98,9 +98,9 @@ DISTINFO = {
         'typeguard',
     ],
     'entry_points': {
-        'console_scripts': [
-            'splink = cs.splink:main',
-        ],
+        'console_scripts': {
+            'splink': 'cs.splink:main',
+        },
     },
 }
 

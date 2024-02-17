@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 ''' Utilities and command line for working with EBooks.
-    Basic support for talking to Apple Books, Calibre, Kindle, Mobi.
+    Basic support for talking to Apple Books, Calibre, CBZ, Kindle, Kobo, Mobi, PDF.
     These form the basis of my personal Kindle/Kobo/Calibre workflow.
 
     The command `python -m cs.ebooks help -l` gives the basic usage information:
@@ -32,6 +32,7 @@
               Subcommands:
                 add [-nqv] bookpaths...
                   Add the specified ebook bookpaths to the library.
+                  --cbz Also make a CBZ.
                   -n    No action: recite planned actions.
                   -q    Quiet: only emit warnings.
                   -v    Verbose: report all actions and decisions.
@@ -188,11 +189,28 @@
                   basename of mobipath with its extension removed.
                 shell
                   Run a command prompt via cmd.Cmd using this command's subcommands.
+          pdf subcommand [...]
+              Subcommands:
+                extract_images pdf-files...
+                  Extract the images from the named page files.
+                help [-l] [subcommand-names...]
+                  Print the full help for the named subcommands,
+                  or for all subcommands if no names are specified.
+                  -l  Long help even if no subcommand-names provided.
+                make_cbz pdf-files...
+                  Extract the images from the named page files.
+                scan pdf-files...
+                  Scan the PDF-data in pdf-files and report.
+                shell
+                  Run a command prompt via cmd.Cmd using this command's subcommands.
+                xi pdf-files...
+                  Extract the images from the named page files.
           shell
             Run a command prompt via cmd.Cmd using this command's subcommands.
+
 '''
 
-__version__ = '20230704-post'
+__version__ = '20240201.4-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -203,12 +221,16 @@ DISTINFO = {
     'install_requires': [
         'cs.app.osx.defaults',
         'cs.app.osx.plist',
+        'cs.binary',
+        'cs.buffer',
         'cs.cmdutils',
         'cs.context',
+        'cs.debug',
         'cs.deco',
         'cs.fileutils',
         'cs.fs',
         'cs.fstags',
+        'cs.gimmicks',
         'cs.lex',
         'cs.logutils',
         'cs.numeric',
@@ -216,6 +238,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.progress',
         'cs.psutils',
+        'cs.queues',
         'cs.resources',
         'cs.sqlalchemy_utils',
         'cs.sqltags',
@@ -223,10 +246,17 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'cs.x',
         'icontract',
         'mobi',
+        'pillow',
         'pycryptodomex',
         'sqlalchemy',
         'typeguard',
     ],
+    'entry_points': {
+        'console_scripts': {
+            'ebooks': 'cs.ebooks.__main__:main'
+        },
+    },
 }

@@ -24,7 +24,6 @@ import sys
 from cs.binary import (
     UInt8,
     Int16BE,
-    UTF16NULField,
     Int32BE,
     UInt16BE,
     UInt32BE,
@@ -36,7 +35,6 @@ from cs.binary import (
     BinaryMultiStruct,
     BinaryMultiValue,
     BinarySingleValue,
-    deferred_field,
     pt_spec,
 )
 from cs.buffer import CornuCopyBuffer
@@ -411,7 +409,7 @@ class UTF8or16Field(SimpleBinary):
     '''
     if self.bom:
       yield self.bom
-      yield UTF16NULField.transcribe_value(
+      yield BinaryUTF16NUL.transcribe_value(
           self.text, encoding=self.BOM_ENCODING[self.bom]
       )
     else:
@@ -2182,14 +2180,14 @@ class CO64BoxBody(FullBoxBody):
     else:
       yield from map(UInt64BE.transcribe_value, chunk_offsets)
 
-  @deferred_field
-  def chunk_offsets(self, bfr):
-    ''' Computed on demand list of chunk offsets.
-    '''
-    offsets = []
-    for _ in range(self.entry_count):
-      offsets.append(UInt64BE.from_buffer(bfr))
-    return offsets
+  ##@deferred_field
+  ##def chunk_offsets(self, bfr):
+  ##  ''' Computed on demand list of chunk offsets.
+  ##  '''
+  ##  offsets = []
+  ##  for _ in range(self.entry_count):
+  ##    offsets.append(UInt64BE.from_buffer(bfr))
+  ##  return offsets
 
 add_body_class(CO64BoxBody)
 

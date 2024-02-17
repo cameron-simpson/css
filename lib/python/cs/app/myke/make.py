@@ -89,6 +89,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   # there's no Lock type I can name
   activity_lock: Any = field(default_factory=Lock)
   basic_namespaces: list = field(default_factory=list)
+  cmd_ns: dict = field(default_factory=dict)
 
   def __str__(self):
     return (

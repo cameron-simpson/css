@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230612-post'
+__version__ = '20240201.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -87,7 +87,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts': ['sqltags = cs.sqltags:main'],
+        'console_scripts': {
+            'sqltags': 'cs.sqltags:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils>=20210404',

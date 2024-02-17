@@ -19,7 +19,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20231129-post'
+__version__ = '20240211-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1003,14 +1003,29 @@ def promote(func, params=None, types=None):
   return promoting_func
 
 # pylint: disable=too-few-public-methods
-class Promotable(ABC):
-  ''' A class which supports the `@promote` decorator.
+class Promotable:
+  ''' A mixin class which supports the `@promote` decorator.
   '''
 
   @classmethod
-  @abstractmethod
   def promote(cls, obj):
     ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
         This method supports the `@promote` decorator.
+
+        This base method will call the `from_str` class factory method
+        if called with a `str` and there is such a method.
+
+        Subclasses may override this method to promote other types.
     '''
-    raise NotImplementedError
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, str):
+      try:
+        from_str = cls.from_str
+      except AttributeError:
+        pass
+      else:
+        return from_str(obj)
+    raise TypeError(
+        f'{cls.__name__}.promote: cannot promote {obj.__class__.__name__}:{obj!r}'
+    )

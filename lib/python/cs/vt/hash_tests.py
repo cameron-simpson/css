@@ -10,17 +10,17 @@
 import random
 import sys
 import unittest
-from cs.binary_tests import _TestPacketFields
+from cs.binary_tests import TestBinaryClasses
 from . import hash as hash_module
 from .hash import HASHCLASS_BY_NAME, decode as decode_hash
 from .transcribe import Transcriber, parse
 
-class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
-  ''' Hook to test the hash PacketFields.
+class TestDataFileBinaryClasses(TestBinaryClasses, unittest.TestCase):
+  ''' Hook to test the hash `AbstractBinary` subclasses.
   '''
 
   def setUp(self):
-    ''' Test the hash module PacketField classes.
+    ''' Test the hash module `AbstractBinary` subclasses.
     '''
     self.module = hash_module
 
@@ -34,7 +34,7 @@ class TestHashing(unittest.TestCase):
     random.seed()
 
   def testSHA1(self):
-    ''' Test the SHA1 hash function.
+    ''' Test the various hash function.
     '''
     for hash_name, cls in sorted(HASHCLASS_BY_NAME.items()):
       with self.subTest(hash_name=hash_name):

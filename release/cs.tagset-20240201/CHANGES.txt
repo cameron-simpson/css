@@ -1,0 +1,2 @@
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.metadata: actually call the .items() method
+lib/python/cs/tagset.py: cs.tagset: update obsolete method name

@@ -13,16 +13,18 @@ import sys
 from threading import Timer, Lock, RLock, Thread
 import time
 
-##from cs.debug import Lock, RLock, Thread
+from cs.lex import r
 import cs.logutils
 from cs.logutils import exception, warning, debug
 from cs.obj import Sentinel
 from cs.pfx import Pfx, PfxCallInfo
 from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
-from cs.seq import seq
+from cs.seq import seq, unrepeated
 
-__version__ = '20231129-post'
+##from cs.debug import Lock, RLock, Thread
+
+__version__ = '20240211-post'
 
 DISTINFO = {
     'description':
@@ -34,6 +36,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.lex',
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
@@ -510,15 +513,50 @@ class ListQueue:
   ''' A simple iterable queue based on a `list`.
   '''
 
-  def __init__(self, queued=None):
+  def __init__(self, queued=None, *, unique=None):
     ''' Initialise the queue.
-        `queued` is an optional iterable of initial items for the queue.
+
+        Parameters:
+        * `queued` is an optional iterable of initial items for the queue
+        * `unique`: optional signature function, default `None`
+
+        The `unique` parameter provides iteration via the
+        `cs.seq.unrepeated` iterator filter which yields only items
+        not seen earlier in the iteration.
+        If `unique` is `None` or `False` iteration iterates
+        over the queue items directly.
+        If `unique` is `True`, iteration uses the default mode
+        where items are compared for equality.
+        Otherwise `unique` may be a callable which produces a
+        value to use to detect repetitions, used as the `cs.seq.unrepeated`
+        `signature` parameter.
+
+        Example:
+
+            >>> items = [1, 2, 3, 1, 2, 5]
+            >>> list(ListQueue(items))
+            [1, 2, 3, 1, 2, 5]
+            >>> list(ListQueue(items, unique=True))
+            [1, 2, 3, 5]
     '''
     self.queued = []
     if queued is not None:
       # catch a common mistake
       assert not isinstance(queued, str)
       self.queued.extend(queued)
+    if unique is None or unique is False:
+      unrepeated_signature = None
+    elif unique is True:
+      unrepeated_signature = lambda item: item
+    elif callable(unique):
+      unrepeated_signature = unique
+    else:
+      raise ValueError(
+          "unique=%s: neither None nor False nor Ture nor a callable",
+          r(unique)
+      )
+
+    self.unrepeated_signature = unrepeated_signature
     self._lock = Lock()
 
   def __str__(self):
@@ -590,7 +628,19 @@ class ListQueue:
   def __iter__(self):
     ''' A `ListQueue` is iterable.
     '''
-    return self
+    if self.unrepeated_signature is None:
+      return self
+
+    # remove duplicates from the iteration
+    def unique_items():
+      while True:
+        try:
+          item = self.get()
+        except Queue_Empty:
+          break
+        yield item
+
+    return unrepeated(unique_items())
 
   def __next__(self):
     ''' Iteration gets from the queue.

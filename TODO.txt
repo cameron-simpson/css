@@ -1,20 +1,32 @@
-does sqlite need the lock file or can I detect the locked exception and retry?
+cs.delta: monitor() to accept an iterable of states as alternative to polling
+√ hashindex rhashindex(rhost,dirpath[,ssh_exe=][,hashindex_exe=])
+hashindex rearrange --sh to emit sh quotes commands inc the mkdirs
+√ TagSet: parse_tag_value: a bare "nan" is a float
+mklinks: use cs.hashindex.merge
+taggerrc with pf-like rules instead of current arcane fstags stuff - sequential readable rules
 dlog needs a way to batch delayed updates
+does sqlite need the lock file or can I detect the locked exception and retry?
+cs.ebooks.dedrm: option to use the plugin.zip directly instead of an unpacked source tree?
+cs.ebooks.cbz: ABCF metadata? https://acbf.fandom.com/wiki/ACBF_Specifications
+hashindex linkto: -i inputfile?
+√ file checksum and tree sync tool to maintain a parallel tree based on checksums eg in a dl folder
+cs.progress: progressbar with worker thread ticker to update the progress instead of updating on the iteration
+cs.tarutils: polling task which stats the current filename every 0.5 or so seconds
+cs.tarutils: cope with filenames which are not validly utf-8 encoded in the tar v stream
 dk login update: silence on no change, same for update-sh
-rel needs to check packages against the list from the DE guys
+√ rel needs to check packages against the list from the DE guys
 run-unbound: update config check incantation
 cs.app.ydl: adopt the name format in use by cs.app.playon
-ffmpeg-docker: support "ffmpeg-docker --version"
-ListQueue should have builtin unrepeated support
+√ ffmpeg-docker: support "ffmpeg-docker --version"
+√ ListQueue should have builtin unrepeated support
 Result with placholder return until some async operation completes it? thinking Tagger rule inference
 cs.py.stack function to return the caller's current method name and class
 method for MultiOpenMixin to capture common open-in-caller-close-in-child idiom?
-cs.distinfo: cs-release seems to ignore SIGINT at least during a "rel"
+√ cs.distinfo: cs-release seems to ignore SIGINT at least during a "rel"
 cs.debug: Lock and RLock to be the same class with a different underlying lock class
 default_params: supply modified sugnature for wrapper function indicating the param is optional
 Pfx: reimplement as a linked list, use HasThreadState
 CornuCopyBuffer: improve docstring - replace references to .buf etc
-cs.cmdutils:BaseCommand - help should include the top level usage as well, currently omitted
 frename needs to be a mode of fstags to move the tags
 "Because" class containing a bool and an explaintion, start using in the SvcD test function and elsewhere
 @promote: make @strable wrap this, using params=[0],promote[0]=open
@@ -24,7 +36,6 @@ an @promote decorator to scan types in func sig and call type.promote
 progressbar/iterbar: check out len and length_hint as defaults for total
 iterbar: call back to length_hint if no len as default?
 mklinks: quit on SIGINT
-cs.cmdutils: help to include the first sentence of the subcommand usage?
 cs.fsm: better docstrings, suppress FSMSubType docstring somehow
 proxy-peerage: name acls using proxies:ptn passed through the identifier stuff from named_row_tuples - should make for better diffs and more readable configs
 proxy-peerage: host/fqdn pattern: turn into an exact regexp?
@@ -55,7 +66,6 @@ cs.logutils: context manager version of setup_logging, call it from setup_loggin
 UpdProxy: can we have an ftext property and monitor format keys for update?
 rip out all cs.daetutils and friends, use the arrow module
 unhostsify leaves temp files around, probably if interrupted
-cs.cmdutils: subcommands with no usage docstring are not listed in the usage output, need placeholder
 cs.deco: use @functools.wraps to gather up __doc__ etc
 fstags ls in / wigs out
 pfx_method no longer honours with_args, flip with_args to True and reimpl args?

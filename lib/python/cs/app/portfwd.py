@@ -65,7 +65,9 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': ['portfwd = cs.app.portfwd:main'],
+        'console_scripts': {
+            'portfwd': 'cs.app.portfwd:main'
+        },
     },
 }
 
