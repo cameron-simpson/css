@@ -1291,7 +1291,7 @@ def without(*, upd: Upd):
           from cs.upd import without
           ...
           with without():
-              os.system('ls-la')
+              os.system('ls -la')
   '''
   with upd.above():
     yield upd
