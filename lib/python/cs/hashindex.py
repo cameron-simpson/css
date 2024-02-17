@@ -713,9 +713,14 @@ def dir_remap(
     lambda move_mode, symlink_mode: not (move_mode and symlink_mode),
     'move_mode and symlink_mode may not both be true'
 )
+@require(
+    lambda dstdirpath: dstdirpath is None or isdirpath(dstdirpath),
+    'dstdirpath is not a directory'
+)
 def rearrange(
     srcdirpath: str,
     rfspaths_by_hashcode,
+    dstdirpath=None,
     *,
     hashname: str,
     move_mode: bool = False,
@@ -727,8 +732,22 @@ def rearrange(
 ):
   ''' Rearrange the files in `dirpath` according to the
       hashcode->[relpaths] `fspaths_by_hashcode`.
+
+      Parameters:
+      * `srcdirpath`: the directory whose files are to be rearranged
+      * `rfspaths_by_hashcode`: a mapping of hashcode to relative
+        pathname to which the original file is to be moved
+      * `dstdirpath`: optional target directory for the rearranged files;
+        defaults to `srcdirpath`, rearranging the files in place
+      * `hashname`: the file content hash algorithm name
+      * `move_move`: move files instead of linking them
+      * `symlink_mode`: symlink files instead of linking them
+      * `doit`: if true do the link/move/symlink, otherwise just print
+      * `quiet`: default `False`; if true do not print
   '''
   with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
+    if dstdirpath is None:
+      dstdirpath = srcdirpath
     to_remove = set()
     for srcpath, rfspaths in dir_remap(srcdirpath, rfspaths_by_hashcode,
                                        hashname=hashname):
@@ -751,7 +770,7 @@ def rearrange(
           )
           if rsrcpath == rdstpath:
             continue
-          dstpath = joinpath(srcdirpath, rdstpath)
+          dstpath = joinpath(dstdirpath, rdstpath)
           if not quiet:
             print(opname, shortpath(srcpath), shortpath(dstpath))
           if doit:
