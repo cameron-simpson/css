@@ -111,6 +111,11 @@ class PlexCommand(BaseCommand):
           runstate.raiseif()
           with Pfx(srcpath):
             try:
+              os.stat(srcpath)
+            except FileNotFoundError as e:
+              warning("%s", e)
+              continue
+            try:
               plex_linkpath(
                   srcpath,
                   dstroot,
@@ -140,7 +145,7 @@ def plex_subpath(fspath: str, fstags: FSTags):
   extra = tv.extra and int(tv.extra)
   part = tv.part and int(tv.part)
   dstbase = title
-  if tv.series_title:
+  if tv.series_title and season and episode:
     # TV Series
     dstpath = ['TV Shows', tv.series_title, f'Season {season:02d}']
     if episode:
