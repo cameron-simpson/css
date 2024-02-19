@@ -1,3 +1,4 @@
+ydl - specify preferred ffmpeg_exe + envvar?
 cs.delta: monitor() to accept an iterable of states as alternative to polling
 √ hashindex rhashindex(rhost,dirpath[,ssh_exe=][,hashindex_exe=])
 hashindex rearrange --sh to emit sh quotes commands inc the mkdirs
