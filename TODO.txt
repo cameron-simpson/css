@@ -1,3 +1,4 @@
+ydl/ffmeg-docker - newtrok=none seems to break ffmpeg - what is it fteching and why, should I tweak the filenames?
 ydl - specify preferred ffmpeg_exe + envvar?
 cs.delta: monitor() to accept an iterable of states as alternative to polling
 √ hashindex rhashindex(rhost,dirpath[,ssh_exe=][,hashindex_exe=])
