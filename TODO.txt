@@ -1,3 +1,4 @@
+ffmpeg-docker: doesnot like files in other diectories or something - some bug in atomic filename?
 dlog --daemon, and dlog named pipe to receive messages
 ydl/ffmeg-docker - newtrok=none seems to break ffmpeg - what is it fteching and why, should I tweak the filenames?
 ydl - specify preferred ffmpeg_exe + envvar?
