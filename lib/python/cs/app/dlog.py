@@ -56,7 +56,7 @@ class DLog:
   def __str__(self):
     fields = [self.dt_s]
     if self.categories:
-      fields.append(','.join(sorted(self.categories)) + ':')
+      fields.append(','.join(sorted(map(str.upper, self.categories))) + ':')
     if self.tags:
       fields.append('+' + ','.join(map(str, self.tags)))
     fields.append('; '.join(self.line.rstrip().split('\n')))
@@ -245,7 +245,7 @@ class DLogCommand(BaseCommand):
             except ValueError as e:
               warning("%s", e)
             else:
-              print(f'stdin:{lineno}:', repr(dl))
+              print(dl)
       else:
         with pfx_call(open, arg) as f:
           for lineno, line in progressbar(enumerate(f, 1)):
@@ -256,7 +256,7 @@ class DLogCommand(BaseCommand):
               except ValueError as e:
                 warning("%s", e)
               else:
-                print(f'{arg}:{lineno}:', repr(dl))
+                print(dl)
 
 @pfx
 @typechecked
