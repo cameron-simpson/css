@@ -37,12 +37,90 @@ def main(argv=None):
 
 DEFAULT_DBPATH = DBURL_DEFAULT
 DEFAULT_LOGPATH = '~/var/log/dlog-quick'
+CATS_RE = re.compile(r'([A-Z][A-Z0-9]*(,+[A-Z][A-Z0-9]*)*):\s*')
+
+@dataclass
+class DLog:
+  ''' A log entry.
+  '''
+  line: str
+  categories: List[str] = field(default_factory=set)
+  tags: TagSet = field(default_factory=TagSet)
+  when: float = field(default_factory=time.time)
+
+  def __str__(self):
+    fields = [self.dt_s]
+    if self.categories:
+      fields.append(','.join(sorted(self.categories)) + ':')
+    if self.tags:
+      fields.append('+' + ','.join(map(str, self.tags)))
+    fields.append('; '.join(self.line.rstrip().split('\n')))
+    return ' '.join(fields)
+
+  @classmethod
+  def from_str(cls, line):
+    ''' Create a `DLog` instance from a log line.
+
+        The expected format is:
+
+            YYYY-MM-DD HH:MM:SS [cats,...:] [+tag[=value]]... log text
+
+        Example:
+
+            >>> DLog.from_str('2024-02-01 11:12:13 XX: +a +b=1 +c="zot"  +9 zoo=2') # doctest: +ELLIPSIS
+            DLog(line='+9 zoo=2', categories={'XX'}, tags=TagSet:{'a': None, 'b': 1, 'c': 'zot'}, when=...)
+
+    '''
+    m = re.match(r'(\d\d\d\d-\d\d-\d\d\s+\d\d:\d\d:\d\d)\s+', line)
+    if not m:
+      raise ValueError(f'no leading YYYY-MM-DD HH:MM:SS')
+    offset = m.end()
+    dt = pfx_call(datetime.fromisoformat, m.group(1))
+    ar = Arrow.fromdatetime(dt, tzinfo='local')
+    when = ar.float_timestamp
+    # categories
+    m = CATS_RE.match(line, pos=offset)
+    if m:
+      cats = set(m.group(1).split(','))
+      offset = m.end()
+    else:
+      cats = set()
+    # tags
+    tags = TagSet()
+    while (offset < len(line) - 1 and line.startswith('+', offset)
+           and line[offset + 1].isalpha()):
+      offset += 1
+      tag, offset = Tag.from_str2(line, offset)
+      tags.add(tag)
+      offset = skipwhite(line, offset)
+    return cls(
+        line=line[offset:],
+        categories=cats,
+        tags=tags,
+        when=when,
+    )
+
+  @property
+  def dt_s(self):
+    ''' This log entry's local time as a string.
+    '''
+    return datetime.fromtimestamp(self.when).isoformat(
+        sep=" ", timespec="seconds"
+    )
+
+  def quick(self, logf):
+    ''' Write this log enty to the file `logf`.
+        If `logf` is a string, treat it as a filename and open it for append.
+    '''
+    if isinstance(logf, str):
+      with pfx_call(open, logf, 'a') as f:
+        self.quick(f)
+    else:
+      print(self, file=logf, flush=True)
 
 class DLogCommand(BaseCommand):
   ''' The `dlog` command line implementation.
   '''
-
-  CATS_RE = re.compile('^[A-Z][A-Z0-9]*(,+[A-Z][A-Z0-9]*)*:$')
 
   @dataclass
   class Options(BaseCommand.Options):
