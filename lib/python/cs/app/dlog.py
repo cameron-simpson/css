@@ -63,7 +63,7 @@ class DLog:
     return ' '.join(fields)
 
   @classmethod
-  def from_str(cls, line):
+  def from_str(cls, line, multi_categories: bool = False):
     ''' Create a `DLog` instance from a log line.
 
         The expected format is:
@@ -84,12 +84,12 @@ class DLog:
     ar = Arrow.fromdatetime(dt, tzinfo='local')
     when = ar.float_timestamp
     # categories
-    m = CATS_RE.match(line, pos=offset)
-    if m:
-      cats = set(m.group(1).split(','))
+    cats = set()
+    while m := CATS_RE.match(line, pos=offset):
+      cats.update(map(str.lower, m.group(1).split(',')))
       offset = m.end()
-    else:
-      cats = set()
+      if not multi_categories:
+        break
     # tags
     tags = TagSet()
     while (offset < len(line) - 1 and line.startswith('+', offset)
@@ -241,7 +241,7 @@ class DLogCommand(BaseCommand):
           runstate.raiseif()
           with Pfx("stdin:%d", lineno):
             try:
-              dl = DLog.from_str(line)
+              dl = DLog.from_str(line, multi_categories=True)
             except ValueError as e:
               warning("%s", e)
             else:
@@ -252,7 +252,7 @@ class DLogCommand(BaseCommand):
             runstate.raiseif()
             with Pfx("%s:%d", arg, lineno):
               try:
-                dl = DLog.from_str(line)
+                dl = DLog.from_str(line, multi_categories=True)
               except ValueError as e:
                 warning("%s", e)
               else:
