@@ -221,6 +221,37 @@ class DLogCommand(BaseCommand):
         when=options.when
     )
 
+  def cmd_scan(self, argv):
+    ''' Usage: {cmd} [{{-|filename}}]...
+          Scan log files and report.
+    '''
+    if not argv:
+      argv = ['-']
+    runstate = self.options.runstate
+    for arg in argv:
+      runstate.raiseif()
+      if arg == '-':
+        for lineno, line in progressbar(enumerate(sys.stdin, 1)):
+          runstate.raiseif()
+          with Pfx("stdin:%d", lineno):
+            try:
+              dl = DLog.from_str(line)
+            except ValueError as e:
+              warning("%s", e)
+            else:
+              print(f'stdin:{lineno}:', repr(dl))
+      else:
+        with pfx_call(open, arg) as f:
+          for lineno, line in progressbar(enumerate(f, 1)):
+            runstate.raiseif()
+            with Pfx("%s:%d", arg, lineno):
+              try:
+                dl = DLog.from_str(line)
+              except ValueError as e:
+                warning("%s", e)
+              else:
+                print(f'{arg}:{lineno}:', repr(dl))
+
 @pfx
 @typechecked
 @fmtdoc
