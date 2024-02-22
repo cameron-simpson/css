@@ -4,31 +4,36 @@
 ''' Log a line in my daily log.
 
     This is an upgrade from my venerable shell script,
-    whose logic was becoming unweildy.
+    whose logic was becoming unwieldy.
 '''
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from getopt import getopt, GetoptError
+import os
 from os.path import expanduser
 import re
 import sys
 import time
-from typing import Optional, Iterable, Union
+from typing import Optional, Iterable, List, Union
 
+from arrow import Arrow
 from typeguard import typechecked
 
+from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
-from cs.lex import get_dotted_identifier
-from cs.logutils import debug
+from cs.lex import get_dotted_identifier, skipwhite
+from cs.logutils import debug, warning
 from cs.pfx import Pfx, pfx, pfx_call
+from cs.progress import progressbar
 from cs.sqltags import SQLTags, DBURL_DEFAULT
 from cs.tagset import Tag, TagSet
+from cs.upd import print
 
 def main(argv=None):
   ''' Run the `dlog` command line implementation.
@@ -73,7 +78,7 @@ class DLog:
     '''
     m = re.match(r'(\d\d\d\d-\d\d-\d\d\s+\d\d:\d\d:\d\d)\s+', line)
     if not m:
-      raise ValueError(f'no leading YYYY-MM-DD HH:MM:SS')
+      raise ValueError('no leading YYYY-MM-DD HH:MM:SS')
     offset = m.end()
     dt = pfx_call(datetime.fromisoformat, m.group(1))
     ar = Arrow.fromdatetime(dt, tzinfo='local')
@@ -153,6 +158,7 @@ class DLogCommand(BaseCommand):
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_log(self, argv):
     ''' Usage: {cmd} [{{CATEGORIES:|tag=value}}...] headline
+          Log headline to the dlog.
           Options:
           -c categories   Alternate categories specification.
           -d datetime     Timestamp for the log entry instead of "now".
