@@ -212,19 +212,6 @@ class DLogCommand(BaseCommand):
     tags: TagSet = field(default_factory=TagSet)
     when: float = field(default_factory=time.time)
 
-  @contextmanager
-  def run_context(self):
-    ''' Prepare the logging `SQLTags` around each command invocation.
-    '''
-    with super().run_context():
-      options = self.options
-      dbpath = options.dbpath
-      with FSTags() as fstags:
-        with SQLTags(dbpath) as sqltags:
-          with stackattrs(options, fstags=fstags, sqltags=sqltags,
-                          verbose=True):
-            yield
-
   @staticmethod
   def cats_from_str(s):
     ''' Return an iterable of lowercase category names from a comma
