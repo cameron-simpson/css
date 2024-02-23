@@ -42,6 +42,8 @@ def main(argv=None):
 
 DEFAULT_DBPATH = DBURL_DEFAULT
 DEFAULT_LOGPATH = '~/var/log/dlog-quick'
+DEFAULT_PIPEPATH = '~/var/log/dlog.pipe'
+
 CATS_RE = re.compile(r'([A-Z][A-Z0-9]*(,+[A-Z][A-Z0-9]*)*):\s*')
 
 @dataclass
@@ -132,6 +134,10 @@ class DLogCommand(BaseCommand):
     categories: set = field(default_factory=set)
     dbpath: str = field(default_factory=lambda: expanduser(DEFAULT_DBPATH))
     logpath: str = field(default_factory=lambda: expanduser(DEFAULT_LOGPATH))
+    pipepath: str = field(
+        default_factory=lambda:
+        (os.environ.get('DLOG_PIPEPATH') or expanduser(DEFAULT_PIPEPATH))
+    )
     tags: TagSet = field(default_factory=TagSet)
     when: float = field(default_factory=time.time)
 
