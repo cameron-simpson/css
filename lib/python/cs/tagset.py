@@ -1472,7 +1472,13 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   @classmethod
   def from_str2(
-      cls, s, offset=0, *, ontology, extra_types=None, fallback_parse=None
+      cls,
+      s,
+      offset=0,
+      *,
+      ontology=None,
+      extra_types=None,
+      fallback_parse=None
   ):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
