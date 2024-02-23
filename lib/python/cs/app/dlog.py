@@ -127,6 +127,26 @@ class DLog:
     else:
       builtin_print(self, file=logf, flush=True)
 
+  @promote
+  def log(
+      self, logpath: Optional[str] = None, sqltags: Optional[SQLTags] = None
+  ):
+    ''' Log to `logpath` and/or `sqltags`.
+    '''
+    if logpath is None and sqltags is None:
+      raise ValueError(
+          f'{self.__class__.__name__}.log: logpath and sqltags cannot both be None'
+      )
+    if logpath is not None:
+      with pfx_call(open, logpath, 'a') as logf:
+        builtin_print(self, file=logf)
+    if sqltags is not None:
+      sql_logtags = TagSet(self.tags)
+      sql_logtags.categories = sorted(self.categories)
+      sql_logtags.headline = self.headline
+      with sqltags:
+        sqltags.default_factory(None, unixtime=self.when, tags=sql_logtags)
+
 class DLogCommand(BaseCommand):
   ''' The `dlog` command line implementation.
   '''
