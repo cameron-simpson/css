@@ -219,6 +219,21 @@ class DLogCommand(BaseCommand):
     '''
     return (category for category in cats_s.replace(',', ' ').lower().split())
 
+  def cmd_daemon(self, argv):
+    ''' Usage: {cmd} [pipepath]
+          Listen on pipepath for new dlog messages.
+          This serialises contention for the database.
+    '''
+    options = self.options
+    dbpath = options.dbpath
+    logpath = options.logpath
+    pipepath = options.pipepath
+    if argv:
+      pipepath = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    DLog.daemon(pipepath, logpath=logpath, sqltags=dbpath)
+
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_log(self, argv):
     ''' Usage: {cmd} [{{CATEGORIES:|tag=value}}...] headline
