@@ -50,7 +50,7 @@ CATS_RE = re.compile(r'([A-Z][A-Z0-9]*(,+[A-Z][A-Z0-9]*)*):\s*')
 class DLog:
   ''' A log entry.
   '''
-  line: str
+  headline: str
   categories: List[str] = field(default_factory=set)
   tags: TagSet = field(default_factory=TagSet)
   when: float = field(default_factory=time.time)
@@ -61,7 +61,7 @@ class DLog:
       fields.append(','.join(sorted(map(str.upper, self.categories))) + ':')
     if self.tags:
       fields.append('+' + ','.join(map(str, self.tags)))
-    fields.append('; '.join(self.line.rstrip().split('\n')))
+    fields.append('; '.join(self.headline.rstrip().split('\n')))
     return ' '.join(fields)
 
   @classmethod
@@ -75,7 +75,7 @@ class DLog:
         Example:
 
             >>> DLog.from_str('2024-02-01 11:12:13 XX: +a +b=1 +c="zot"  +9 zoo=2') # doctest: +ELLIPSIS
-            DLog(line='+9 zoo=2', categories={'XX'}, tags=TagSet:{'a': None, 'b': 1, 'c': 'zot'}, when=...)
+            DLog(headline='+9 zoo=2', categories={'xx'}, tags=TagSet:{'a': None, 'b': 1, 'c': 'zot'}, when=...)
 
     '''
     m = re.match(r'(\d\d\d\d-\d\d-\d\d\s+\d\d:\d\d:\d\d)\s+', line)
@@ -101,7 +101,7 @@ class DLog:
       tags.add(tag)
       offset = skipwhite(line, offset)
     return cls(
-        line=line[offset:],
+        headline=line[offset:],
         categories=cats,
         tags=tags,
         when=when,
