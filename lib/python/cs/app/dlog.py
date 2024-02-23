@@ -33,7 +33,7 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.progress import progressbar
 from cs.sqltags import SQLTags, DBURL_DEFAULT
 from cs.tagset import Tag, TagSet
-from cs.upd import print
+from cs.upd import print, builtin_print  # pylint: disable=redefined-builtin
 
 def main(argv=None):
   ''' Run the `dlog` command line implementation.
@@ -125,7 +125,7 @@ class DLog:
       with pfx_call(open, logf, 'a') as f:
         self.quick(f)
     else:
-      print(self, file=logf, flush=True)
+      builtin_print(self, file=logf, flush=True)
 
 class DLogCommand(BaseCommand):
   ''' The `dlog` command line implementation.
