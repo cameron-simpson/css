@@ -147,6 +147,47 @@ class DLog:
       with sqltags:
         sqltags.default_factory(None, unixtime=self.when, tags=sql_logtags)
 
+  @classmethod
+  @uses_runstate
+  @promote
+  @typechecked
+  def daemon(
+      cls,
+      pipepath: str,
+      logpath: Optional[str] = None,
+      sqltags: Optional[SQLTags] = None,
+      *,
+      runstate: RunState,
+  ):
+    ''' Run a daemon reeading dlog lines from `pipepath`
+        and logging them to `logpath` and/or `sqltags`.
+    '''
+    try:
+      os.stat(pipepath)
+    except FileNotFoundError:
+      pfx_call(os.mkfifo, pipepath)
+    pfd = None
+    try:
+      pfd = pfx_call(os.open, pipepath, os.O_RDWR)
+      bfr = CornuCopyBuffer.from_fd(pfd)
+      lineno = 0
+      while not runstate.cancelled:
+        with stack_signals(SIGINT, lambda *_: sys.exit(1)):
+          line = bfr.readline().decode('utf-8', errors='replace').rstrip()
+        lineno += 1
+        with Pfx(lineno):
+          if not line:
+            raise RuntimeError("EOF")
+          try:
+            dl = DLog.from_str(line, multi_categories=True)
+          except ValueError as e:
+            warning("bad log line: %s: %r", e, line)
+          else:
+            dl.log(logpath=logpath, sqltags=sqltags)
+    finally:
+      if pfd is not None:
+        os.close(pfd)
+
 class DLogCommand(BaseCommand):
   ''' The `dlog` command line implementation.
   '''
