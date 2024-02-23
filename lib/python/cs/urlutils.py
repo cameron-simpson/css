@@ -603,8 +603,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
 
 class URLLimit(namedtuple('URLLimit', 'scheme hostname port subpath')):
 
-  def ok(self, U):
-    U = URL(U)
+  @promote
+  def ok(self, U: URL):
     return (
         U.scheme == self.scheme and U.hostname == self.hostname
         and U.port == self.port and U.path.startswith(self.subpath)
@@ -620,10 +620,10 @@ def skip_errs(iterable):
       If it raises URLError or HTTPError, report the error and skip the result.
   '''
   debug("skip_errs...")
-  I = iter(iterable)
+  it = iter(iterable)
   while True:
     try:
-      i = next(I)
+      i = next(it)
     except StopIteration:
       break
     except (URLError, HTTPError) as e:
@@ -651,7 +651,7 @@ class URLs(object):
   MODE_SKIP = 1
 
   def __init__(self, urls, context=None, mode=None):
-    ''' Set up a URLs object with the iterable `urls` and the `context`
+    ''' Set up a `URLs` object with the iterable `urls` and the `context`
         object, which implements the mapping interface to store key value
         pairs.
         The iterable `urls` is kept as is, making this object a single use
@@ -686,7 +686,7 @@ class URLs(object):
 
   @can_skip_url_errs
   def map(self, func, mode=None):
-    return URLS([func(url) for url in self.urls], self.context, mode)
+    return URLs([func(url) for url in self.urls], self.context, mode)
 
   @can_skip_url_errs
   def hrefs(self, absolute=True, mode=None):
