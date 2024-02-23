@@ -98,7 +98,7 @@ class VBoxCommand(BaseCommand):
     else:
       vdipath = imgpath + '.vdi'
     try:
-      return trace(mkvdi)(imgpath, vdipath, argv, trace=True)
+      return mkvdi(imgpath, vdipath, argv, trace=True)
     except ValueError as e:
       error("mkvdi fails: %s", e)
       return 1
