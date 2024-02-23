@@ -1982,17 +1982,15 @@ class SQLTags(BaseTagSets, Promotable):
           e.add_tag(tag)
 
   @classmethod
-  def promote(cls, obj):
-    if isinstance(obj, cls):
-      return obj
-    if isinstance(obj, str):
-      if obj.startswith('~') or isabspath(obj):
-        # expect filesystem path to an SQLite file
-        if not obj.endswith('.sqlite'):
-          raise ValueError("expected path to .sqlite file")
-        obj = expanduser(obj)
-        return cls(obj)
-    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
+  def from_str(cls, db_url: str):
+    ''' Create an `SQLTags` from `db_url`.
+    '''
+    if db_url.startswith('~') or isabspath(db_url):
+      # expect filesystem path to an SQLite file
+      if not db_url.endswith('.sqlite'):
+        raise ValueError("expected path to .sqlite file")
+      db_url = expanduser(db_url)
+    return cls(db_url=db_url)
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
