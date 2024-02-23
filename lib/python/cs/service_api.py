@@ -131,7 +131,7 @@ class HTTPServiceAPI(ServiceAPI):
 
   def __init__(self, api_hostname=None, *, default_headers=None, **kw):
     if api_hostname is None:
-      api_hostname = self.API_HOSTNAME
+      api_hostname = type(self).API_HOSTNAME
     else:
       self.API_HOSTNAME = api_hostname
       self.API_BASE = f'https://{api_hostname}/'
