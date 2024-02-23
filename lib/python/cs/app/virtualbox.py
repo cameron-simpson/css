@@ -93,7 +93,7 @@ class VBoxCommand(BaseCommand):
       raise GetoptError("missing source img")
     imgpath = argv.pop(0)
     imgpfx, imgext = splitext(imgpath)
-    if imgext('.raw', '.img'):
+    if imgext in ('.raw', '.img', '.vmdk'):
       vdipath = imgpfx + '.vdi'
     else:
       vdipath = imgpath + '.vdi'
