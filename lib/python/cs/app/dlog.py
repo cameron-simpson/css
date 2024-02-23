@@ -7,13 +7,13 @@
     whose logic was becoming unwieldy.
 '''
 
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from getopt import getopt, GetoptError
 import os
 from os.path import expanduser
 import re
+from signal import SIGINT
 import sys
 import time
 from typing import Optional, Iterable, List, Union
@@ -23,14 +23,15 @@ from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
+from cs.context import stack_signals
 from cs.dateutils import datetime2unixtime
-from cs.deco import fmtdoc
-from cs.fstags import FSTags
-from cs.lex import get_dotted_identifier, skipwhite
-from cs.logutils import debug, warning
+from cs.deco import fmtdoc, promote
+from cs.fstags import FSTags, uses_fstags
+from cs.lex import skipwhite
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.progress import progressbar
+from cs.resources import RunState, uses_runstate
 from cs.sqltags import SQLTags, DBURL_DEFAULT
 from cs.tagset import Tag, TagSet
 from cs.upd import print, builtin_print  # pylint: disable=redefined-builtin
@@ -316,6 +317,7 @@ class DLogCommand(BaseCommand):
                 print(dl)
 
 @pfx
+@promote
 @typechecked
 @fmtdoc
 def dlog(
