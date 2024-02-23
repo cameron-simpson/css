@@ -208,7 +208,7 @@ class PilferCommand(BaseCommand):
           D("PINGER: L: quiescing=%s, state=%r: %s", L._quiescing, L._state, L)
           sleep(2)
 
-      ping = Thread(target=pinger, args=(LTR,))
+      ping = Thread(target=pinger, args=(later,))
       ping.daemon = True
       ping.start()
     P.later = L
@@ -287,9 +287,9 @@ class PilferCommand(BaseCommand):
       L.wait_outstanding(until_idle=True)
       # Now the diversions should have completed and closed.
     # out of the context manager, the Later should be shut down
-    LTR.state("WAIT...")
+    later.state("WAIT...")
     L.wait()
-    LTR.state("WAITED")
+    later.state("WAITED")
 
   @staticmethod
   def get_argv_pipespec(argv, argv_offset=0):
