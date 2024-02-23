@@ -235,7 +235,8 @@ class DLogCommand(BaseCommand):
     DLog.daemon(pipepath, logpath=logpath, sqltags=dbpath)
 
   # pylint: disable=too-many-branches,too-many-locals
-  def cmd_log(self, argv):
+  @uses_fstags
+  def cmd_log(self, argv, fstags: FSTags):
     ''' Usage: {cmd} [{{CATEGORIES:|tag=value}}...] headline
           Log headline to the dlog.
           Options:
@@ -243,8 +244,8 @@ class DLogCommand(BaseCommand):
           -d datetime     Timestamp for the log entry instead of "now".
     '''
     options = self.options
-    sqltags = options.sqltags
     badopts = False
+    dt = None
     opts, argv = getopt(argv, 'c:d:')
     for opt, val in opts:
       with Pfx(opt if val is None else "%s %r" % (opt, val)):
@@ -256,55 +257,32 @@ class DLogCommand(BaseCommand):
           except ValueError as e:
             # pylint: disable=raise-missing-from
             raise GetoptError("unparsed date: %s" % (e,))
-          else:
-            if dt.tzinfo is None:
-              # create a nonnaive datetime in the local zone
-              dt = dt.astimezone()
-            self.options.when = datetime2unixtime(dt)
+          self.options.when = datetime2unixtime(dt)
         else:
           raise RuntimeError("unimplemented option")
-    # Gather leading CAT: and tag= arguments
-    while argv:
-      arg0 = argv[0]
-      with Pfx(repr(arg0)):
-        # CATS,...:
-        m = self.CATS_RE.match(arg0)
-        if m:
-          argv.pop(0)
-          options.categories.update(
-              cat.lower() for cat in m.group(0)[:-1].split(',') if cat
-          )
-          continue
-        # tag_name=...
-        tag_name, offset = get_dotted_identifier(arg0)
-        if tag_name and offset < len(arg0) and arg0[offset] == '=':
-          argv.pop(0)
-          try:
-            tag = Tag.from_str(arg0)
-          except ValueError as e:
-            debug("invalid tag: %s", e)
-            options.tags.add(Tag(tag_name, arg0[offset:]))
-          else:
-            options.tags.add(tag)
-          continue
-        break
+    if dt is None:
+      dt = datetime.fromtimestamp(options.when)
     if badopts:
       raise GetoptError("invalid preargv")
     if not argv:
       raise GetoptError("no headline")
-    if not options.categories:
-      options.categories.update(
-          self.cats_from_str(options.fstags['.'].all_tags.get('cs.dlog', ''))
-      )
-    headline = ' '.join(argv)
-    dlog(
-        headline,
-        logpath=options.logpath,
-        sqltags=sqltags,
-        tags=options.tags,
-        categories=options.categories,
-        when=options.when
+    pipepath = options.pipepath
+    logpath = options.logpath
+    dbpath = options.dbpath
+    dl = DLog.from_str(
+        f'{dt.isoformat(sep=" ",timespec="seconds")} {" ".join(argv)}'
     )
+    if not dl.categories:
+      # infer categories from the working directory
+      auto_categories = self.cats_from_str(
+          fstags['.'].all_tags.get('cs.dlog', '')
+      )
+      dl.categories.update(auto_categories)
+    if pipepath:
+      with pfx_call(open, pipepath, 'a') as pipef:
+        builtin_print(dl, file=pipef)
+    else:
+      dl.log(logpath=logpath, sqltags=dbpath)
 
   def cmd_scan(self, argv):
     ''' Usage: {cmd} [{{-|filename}}]...
