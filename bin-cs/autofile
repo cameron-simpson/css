@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Run "tagger autofile".
+# - Cameron Simpson <cs@cskk.id.au> 23feb2024
+#
+
+exec tagger autofile ${1+"$@"}
