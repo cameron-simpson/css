@@ -79,12 +79,14 @@ class DLog:
 
     '''
     m = re.match(r'(\d\d\d\d-\d\d-\d\d\s+\d\d:\d\d:\d\d)\s+', line)
-    if not m:
-      raise ValueError('no leading YYYY-MM-DD HH:MM:SS')
-    offset = m.end()
-    dt = pfx_call(datetime.fromisoformat, m.group(1))
-    ar = Arrow.fromdatetime(dt, tzinfo='local')
-    when = ar.float_timestamp
+    if m:
+      offset = m.end()
+      dt = pfx_call(datetime.fromisoformat, m.group(1))
+      ar = Arrow.fromdatetime(dt, tzinfo='local')
+      when = ar.float_timestamp
+    else:
+      when = time.time()
+      offset = skipwhite(line)
     # categories
     cats = set()
     while m := CATS_RE.match(line, pos=offset):
