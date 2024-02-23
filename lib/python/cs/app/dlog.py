@@ -322,7 +322,7 @@ def dlog(
     headline: str,
     *,
     logpath: Optional[str] = None,
-    sqltags: Optional[SQLTags] = None,
+    sqltags: Optional[SQLTags] = DEFAULT_DBPATH,
     tags=None,
     categories: Optional[Iterable] = None,
     when: Union[None, int, float, datetime] = None,
@@ -339,61 +339,15 @@ def dlog(
       * `categories`: optional iterable of category strings
       * `when`: optional UNIX time or `datetime`, default now
   '''
-  if sqltags is None:
-    # pylint: disable=redefined-argument-from-local
-    with SQLTags(expanduser(DEFAULT_DBPATH)) as sqltags:
-      dlog(
-          headline,
-          logpath=logpath,
-          sqltags=sqltags,
-          tags=tags,
-          categories=categories,
-          when=when
-      )
+  dl = DLog(
+      headline=headline,
+      categories=categories or [],
+      tags=tags or TagSet(),
+      when=when or time.time(),
+  )
   if logpath is None:
     logpath = expanduser(DEFAULT_LOGPATH)
-  logtags = TagSet()
-  if tags:
-    for tag in tags:
-      logtags.add(tag)
-  categories = sorted(
-      () if categories is None else set(map(str.lower, categories))
-  )
-  if when is None:
-    when = time.time()
-  elif isinstance(when, (int, float)):
-    pass
-  elif isinstance(when, datetime):
-    dt = when
-    if dt.tzinfo is None:
-      # create a nonnaive datetime in the local zone
-      dt = dt.astimezone()
-    when = datetime2unixtime(dt)
-  else:
-    raise TypeError("when=%s:%r: unhandled type" % (type(when).__name__, when))
-  tt = time.localtime(when)
-  print_args = [
-      '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}'.format(
-          tt.tm_year,
-          tt.tm_mon,
-          tt.tm_mday,
-          tt.tm_hour,
-          tt.tm_min,
-          tt.tm_sec,
-      )
-  ]
-  if categories:
-    print_args.append(','.join(categories).upper() + ':')
-  print_args.append(headline)
-  if logtags:
-    print_args.append('[' + ' '.join(map(str, logtags)) + ']')
-  with pfx_call(open, logpath, 'a') as logf:
-    print(*print_args, file=logf)
-  # add the headline and categories to the tags
-  logtags.add('headline', headline)
-  if categories:
-    logtags.add('categories', sorted(categories))
-  sqltags.default_factory(None, unixtime=when, tags=logtags)
+  return dl.log(logpath=logpath, sqltags=sqltags)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
