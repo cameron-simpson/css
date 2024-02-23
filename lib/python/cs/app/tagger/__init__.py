@@ -420,7 +420,6 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
         We also skip subdirectories tagged with `{TAGGER_TAG_PREFIX_DEFAULT}.skip`.
     '''
     fspath = self.fspath
-    tagged = fstags[fspath]
     all_tag_names = set(tag_names)
     assert all(isinstance(tag_name, str) for tag_name in all_tag_names)
     # collect all the per-tag_name mappings which exist for self.fspath
