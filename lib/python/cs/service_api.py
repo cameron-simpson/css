@@ -27,6 +27,7 @@ from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.upd import uses_upd
+from cs.urlutils import URL
 
 __version__ = '20230703-post'
 
@@ -147,6 +148,9 @@ class HTTPServiceAPI(ServiceAPI):
     self.cookies = session.cookies
     self.default_headers = default_headers
 
+  def __div__(self, suburl) -> URL:
+    return self.suburl(suburl)
+
   @uses_upd
   @require(lambda suburl: not suburl.startswith('/'))
   def suburl(
@@ -160,7 +164,7 @@ class HTTPServiceAPI(ServiceAPI):
       headers=None,
       upd,
       **rqkw,
-  ):
+  ) -> URL:
     ''' Request `suburl` from the service, by default using a `GET`.
         The `suburl` must be a URL subpath not commencing with `'/'`.
 
