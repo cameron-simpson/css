@@ -213,11 +213,11 @@ class DLogCommand(BaseCommand):
     when: float = field(default_factory=time.time)
 
   @staticmethod
-  def cats_from_str(s):
+  def cats_from_str(cats_s):
     ''' Return an iterable of lowercase category names from a comma
         or space separated string.
     '''
-    return (category for category in s.replace(',', ' ').lower().split())
+    return (category for category in cats_s.replace(',', ' ').lower().split())
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_log(self, argv):
