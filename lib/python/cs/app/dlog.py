@@ -335,11 +335,7 @@ class DLogCommand(BaseCommand):
           fstags['.'].all_tags.get('cs.dlog', '')
       )
       dl.categories.update(auto_categories)
-    if pipepath:
-      with pfx_call(open, pipepath, 'a') as pipef:
-        builtin_print(dl, file=pipef)
-    else:
-      dl.log(logpath=logpath, sqltags=dbpath)
+    dl.log(logpath=logpath, pipepath=pipepath, sqltags=dbpath)
 
   def cmd_scan(self, argv):
     ''' Usage: {cmd} [{{-|filename}}]...
