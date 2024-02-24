@@ -319,14 +319,14 @@ class DLogCommand(BaseCommand):
     for opt, val in opts:
       with Pfx(opt if val is None else "%s %r" % (opt, val)):
         if opt == '-c':
-          self.options.categories.update(self.cats_from_str(val))
+          options.categories.update(self.cats_from_str(val))
         elif opt == '-d':
           try:
             dt = pfx_call(datetime.fromisoformat, val)
           except ValueError as e:
             # pylint: disable=raise-missing-from
             raise GetoptError("unparsed date: %s" % (e,))
-          self.options.when = datetime2unixtime(dt)
+          options.when = datetime2unixtime(dt)
         else:
           raise RuntimeError("unimplemented option")
     if dt is None:
@@ -335,11 +335,13 @@ class DLogCommand(BaseCommand):
       raise GetoptError("invalid preargv")
     if not argv:
       raise GetoptError("no headline")
+    categories = options.categories
     pipepath = options.pipepath
     logpath = options.logpath
     dbpath = options.dbpath
     dl = DLog.from_str(
-        f'{dt.isoformat(sep=" ",timespec="seconds")} {" ".join(argv)}'
+        f'{dt.isoformat(sep=" ",timespec="seconds")} {" ".join(argv)}',
+        categories=categories,
     )
     if not dl.categories:
       # infer categories from the working directory
