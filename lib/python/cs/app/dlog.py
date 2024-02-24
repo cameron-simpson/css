@@ -68,8 +68,21 @@ class DLog:
     return ' '.join(fields)
 
   @classmethod
-  def from_str(cls, line, multi_categories: bool = False):
+  def from_str(
+      cls,
+      line,
+      *,
+      categories: Iterable[str] = (),
+      multi_categories: bool = False,
+  ):
     ''' Create a `DLog` instance from a log line.
+
+        Parameters:
+        * `line`: the log line from which to derive the `DLog` object
+        * `categories`: optional iterable of category names, which will be lowercased
+        * `multi_categories`: default `False`; if true the look for
+          multiple leading *CAT*`,`...`:` preambles on the line to derive
+          caetgory names instead of just one
 
         The expected format is:
 
@@ -91,7 +104,7 @@ class DLog:
       when = time.time()
       offset = skipwhite(line)
     # categories
-    cats = set()
+    cats = set(map(str.lower, categories))
     while m := CATS_RE.match(line, pos=offset):
       cats.update(map(str.lower, m.group(1).split(',')))
       offset = m.end()
