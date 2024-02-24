@@ -237,8 +237,7 @@ class DLog:
             except ValueError as e:
               warning("bad log line: %s: %r", e, line)
             else:
-              X("daemon: dl.log...")
-              trace(dl.log)(logpath=logpath, sqltags=sqltags)
+              dl.log(logpath=logpath, sqltags=sqltags)
       finally:
         if pfd is not None:
           os.close(pfd)
