@@ -60,8 +60,8 @@ class DLog:
     fields = [self.dt_s]
     if self.categories:
       fields.append(','.join(sorted(map(str.upper, self.categories))) + ':')
-    if self.tags:
-      fields.append('+' + ','.join(map(str, self.tags)))
+    for tag in self.tags:
+      fields.append(f'+{tag}')
     fields.append('; '.join(self.headline.rstrip().split('\n')))
     return ' '.join(fields)
 
