@@ -75,6 +75,11 @@ def pops_tokens(func):
 
 @dataclass
 class TagChange:
+  ''' A change to a `Tag`.
+
+      If `add_remove` is true, add the `tag`.
+      If false, remove the `tag`; the `tag.vaue` should be `None`.
+  '''
   add_remove: bool
   tag: Tag
 
