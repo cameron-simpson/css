@@ -14,11 +14,13 @@ import os
 from os.path import expanduser
 import re
 from signal import SIGINT
+from stat import S_ISFIFO
 import sys
 import time
 from typing import Optional, Iterable, List, Union
 
 from arrow import Arrow
+from icontract import require
 from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
@@ -29,7 +31,7 @@ from cs.deco import fmtdoc, promote
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import skipwhite
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
 from cs.sqltags import SQLTags, DBURL_DEFAULT
@@ -128,12 +130,61 @@ class DLog:
     else:
       builtin_print(self, file=logf, flush=True)
 
+  @pfx_method
   @promote
+  @require(
+      lambda logpath, sqltags: logpath is not None or sqltags is not None,
+      "one of logpath or sqltags must be supplied"
+  )
   def log(
-      self, logpath: Optional[str] = None, sqltags: Optional[SQLTags] = None
+      self,
+      logpath: Optional[str] = None,
+      *,
+      pipepath: Optional[str] = None,
+      sqltags: Optional[SQLTags] = None,
   ):
-    ''' Log to `logpath` and/or `sqltags`.
+    ''' Log to `pipepath`, falling back to `logpath` and/or `sqltags`.
+
+        Parameters:
+        * `pipepath`: optional filesystem path of a named pipe
+           to which to write the log line
+        * `logpath`: optional filesystem path of a regular file to
+          which to append the log line
+        * `sqltags`: optional `SQLTags` instance or filesystem path
+          of an SQLite file to use with `SQLTags`; also log the `DLog`
+          entry here
+
+        One of `logpath` or `sqltags` must be provided.
+
+        If `pipepath` exists and is logged to, `logpath` and `sqltags`
+        are ignored - the daemon listening to the pipe will do the
+        logging.
+
+        If `pipepath` is not supplied or we fail to log to it, fall
+        back to logging to `logpath` and/or `sqltags`.
     '''
+    if pipepath:
+      try:
+        S = pfx_call(os.stat, pipepath)
+      except FileNotFoundError:
+        # no server pipe
+        pass
+      except Exception as e:  # pylint: disable=broad-exception-caught
+        warning(
+            "cannot stat pipepath:%r: %s, falling back to direct log",
+            pipepath, e
+        )
+      else:
+        if S_ISFIFO(S.st_mode):
+          try:
+            with pfx_call(open, pipepath, 'a') as pipef:
+              builtin_print(self, file=pipef)
+            return
+          except Exception as e:  # pylint: disable=broad-exception-caught
+            warning(
+                "failed to log to pipeath:%r: %s, falling back to direct log",
+                pipepath, e
+            )
     if logpath is None and sqltags is None:
       raise ValueError(
           f'{self.__class__.__name__}.log: logpath and sqltags cannot both be None'
