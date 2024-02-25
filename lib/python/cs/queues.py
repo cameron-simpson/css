@@ -674,11 +674,10 @@ def get_batch(q, max_batch=128, *, poll_delay=0.01):
         return batch
       raise
     batch.append(item)
-    if not q.empty():
-      continue
-    time.sleep(poll_delay)
     if q.empty():
-      break
+      time.sleep(poll_delay)
+      if q.empty():
+        break
   return batch
 
 if __name__ == '__main__':
