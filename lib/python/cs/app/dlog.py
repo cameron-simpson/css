@@ -12,10 +12,12 @@ from datetime import datetime
 from getopt import getopt, GetoptError
 import os
 from os.path import expanduser
+from queue import Queue
 import re
 from signal import SIGINT
 from stat import S_ISFIFO
 import sys
+from threading import Thread
 import time
 from typing import Optional, Iterable, List, Union
 
@@ -33,6 +35,7 @@ from cs.lex import skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
+from cs.queues import get_batch
 from cs.resources import RunState, uses_runstate
 from cs.sqltags import SQLTags, DBURL_DEFAULT
 from cs.tagset import Tag, TagSet
@@ -212,6 +215,20 @@ class DLog:
       with sqltags:
         sqltags.default_factory(None, unixtime=self.when, tags=sql_logtags)
 
+  @staticmethod
+  def _daemon_worker(pfd: int, q, *, runstate: RunState):
+    bfr = CornuCopyBuffer.from_fd(pfd)
+    lineno = 0
+    while not runstate.cancelled:
+      line = bfr.readline()
+      lineno += 1
+      if not line:
+        # this does not actually happen because we have the pipe open read/write
+        q.close()
+        break
+      line = line.decode('utf-8', errors='replace').rstrip()
+      q.put((lineno, line))
+
   @classmethod
   @uses_runstate
   @promote
@@ -236,21 +253,28 @@ class DLog:
       pfd = None
       try:
         pfd = pfx_call(os.open, pipepath, os.O_RDWR)
-        bfr = CornuCopyBuffer.from_fd(pfd)
-        lineno = 0
+        q = Queue(1024)
+        Thread(
+            target=cls._daemon_worker,
+            args=(pfd, q),
+            kwargs=dict(runstate=runstate),  # pylint: disable=use-dict-literal
+            daemon=True,
+        ).start()
         while not runstate.cancelled:
           with stack_signals(SIGINT, lambda *_: sys.exit(1)):
-            line = bfr.readline().decode('utf-8', errors='replace').rstrip()
-          lineno += 1
-          with Pfx(lineno):
-            if not line:
-              raise RuntimeError("EOF")
-            try:
-              dl = DLog.from_str(line, multi_categories=True)
-            except ValueError as e:
-              warning("bad log line: %s: %r", e, line)
-            else:
-              dl.log(logpath=logpath, sqltags=sqltags)
+            lines = get_batch(q)
+          if not lines:
+            break
+          # open the db once around the whole batch
+          with sqltags:
+            for lineno, line in lines:
+              with Pfx(lineno):
+                try:
+                  dl = DLog.from_str(line, multi_categories=True)
+                except ValueError as e:
+                  warning("bad log line: %s: %r", e, line)
+                else:
+                  dl.log(logpath=logpath, sqltags=sqltags)
       finally:
         if pfd is not None:
           os.close(pfd)
