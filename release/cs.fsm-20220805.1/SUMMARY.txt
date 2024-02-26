@@ -1,0 +1,2 @@
+FSM: subclass DOTNodeMixin and provide a hook for a colour palette for node fillcolors.
+Other minor changes.

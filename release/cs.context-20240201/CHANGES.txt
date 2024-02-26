@@ -1,0 +1,2 @@
+lib/python/cs/context.py: merge default => cdrip
+lib/python/cs/context.py: cs.context: contextif: require the flag to be a bool

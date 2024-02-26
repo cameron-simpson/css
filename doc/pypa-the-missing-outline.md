@@ -80,7 +80,7 @@ There are several choices available, including but not limited to:
 - [poetry](https://pypi.org/project/poetry/)
 - [hatch](https://github.com/ofek/hatch)
 - [pdm](https://pypi.org/project/pdm/)
-- [whey](https://pypi.org/project/pdm/)
+- [whey](https://pypi.org/project/whey/)
 - [trampolim](https://pypi.org/project/trampolim/)
 
 Here is a table for using `setuptools` (see the [Setuptools documentation](https://setuptools.pypa.io/en/latest/userguide/index.html)):
@@ -154,7 +154,7 @@ The [twine tool](https://pypi.org/project/twine/)
 can upload build artifact files to PyPI for distribution,
 for example with a command like:
 
-    twine upload dist/package-name-version.tar.gz dist/package-name-version-py3-none-any.whlpy3-none-any.whl
+    twine upload dist/package-name-version.tar.gz dist/package-name-version-py3-none-any.whl
 
 Some build tools will also include upload facilities.
 

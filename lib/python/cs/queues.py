@@ -9,19 +9,22 @@
 
 from contextlib import contextmanager
 from functools import partial
-from threading import Timer, Lock, RLock, Thread
 import sys
+from threading import Timer, Lock, RLock, Thread
 import time
 
-##from cs.debug import Lock, RLock, Thread
+from cs.lex import r
 import cs.logutils
 from cs.logutils import exception, warning, debug
+from cs.obj import Sentinel
 from cs.pfx import Pfx, PfxCallInfo
 from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
-from cs.seq import seq
+from cs.seq import seq, unrepeated
 
-__version__ = '20220605-post'
+##from cs.debug import Lock, RLock, Thread
+
+__version__ = '20240211-post'
 
 DISTINFO = {
     'description':
@@ -33,7 +36,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.lex',
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.py3',
         'cs.resources',
@@ -41,13 +46,11 @@ DISTINFO = {
     ],
 }
 
-class _QueueIterator(MultiOpenMixin):
+class QueueIterator(MultiOpenMixin):
   ''' A `QueueIterator` is a wrapper for a `Queue` (or ducktype) which
       presents an iterator interface to collect items.
       It does not offer the `.get` or `.get_nowait` methods.
   '''
-
-  sentinel = object()
 
   def __init__(self, q, name=None):
     if name is None:
@@ -55,11 +58,15 @@ class _QueueIterator(MultiOpenMixin):
     self.q = q
     self.name = name
     self.finalise_later = True
+    self.sentinel = Sentinel(
+        "%s:%s:SENTINEL" % (self.__class__.__name__, name)
+    )
     # count of non-sentinel items
     self._item_count = 0
+    self._lock = Lock()
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.name)
+    return "%s(%r:q=%s)" % (type(self).__name__, self.name, self.q)
 
   @not_closed
   def put(self, item, *args, **kw):
@@ -70,10 +77,11 @@ class _QueueIterator(MultiOpenMixin):
     if self.closed:
       with PfxCallInfo():
         warning("%r.put: all closed: item=%s", self, item)
-      raise ClosedError("_QueueIterator closed")
+      raise ClosedError("QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
-    self._item_count += 1
+    with self._lock:
+      self._item_count += 1
     return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
@@ -83,11 +91,13 @@ class _QueueIterator(MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' `MultiOpenMixin` support; putsthe sentinel onto the underlying queue
+    ''' `MultiOpenMixin` support; puts the sentinel onto the underlying queue
         on the final close.
     '''
-    yield
-    self._put(self.sentinel)
+    try:
+      yield
+    finally:
+      self._put(self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
@@ -102,12 +112,8 @@ class _QueueIterator(MultiOpenMixin):
     try:
       item = q.get()
     except Queue_Empty as e:
-      warning(
-          "%s: Queue_Empty: %s, (SHOULD THIS HAPPEN?) calling finalise...",
-          self, e
-      )
+      warning("%s: Queue_Empty: %s", self, e)
       self._put(self.sentinel)
-      self.finalise()
       # pylint: disable=raise-missing-from
       raise StopIteration("Queue_Empty: %s" % (e,))
     if item is self.sentinel:
@@ -116,7 +122,8 @@ class _QueueIterator(MultiOpenMixin):
       # put the sentinel back for other iterators
       self._put(self.sentinel)
       raise StopIteration("SENTINEL")
-    self._item_count -= 1
+    with self._lock:
+      self._item_count -= 1
     return item
 
   next = __next__
@@ -133,6 +140,7 @@ class _QueueIterator(MultiOpenMixin):
   def empty(self):
     ''' Test if the queue is empty.
     '''
+    # testing the count because the "close" sentinel makes the underlying queue not empty
     return self._item_count == 0
 
   def task_done(self):
@@ -146,18 +154,20 @@ class _QueueIterator(MultiOpenMixin):
     self.q.join()
 
 def IterableQueue(capacity=0, name=None):
-  ''' Factory to create an iterable `Queue`.
+  ''' Factory to create an iterable queue.
+      Note that the returned queue is already open
+      and needs a close.
   '''
-  return _QueueIterator(Queue(capacity), name=name).open()
+  return QueueIterator(Queue(capacity), name=name).open()
 
 def IterablePriorityQueue(capacity=0, name=None):
   ''' Factory to create an iterable `PriorityQueue`.
   '''
-  return _QueueIterator(PriorityQueue(capacity), name=name).open()
+  return QueueIterator(PriorityQueue(capacity), name=name).open()
 
 class Channel(object):
   ''' A zero-storage data passage.
-      Unlike a `Queue(1)`, `put()` blocks waiting for the matching `get()`.
+      Unlike a `Queue`, `put(item)` blocks waiting for the matching `get()`.
   '''
 
   # pylint: disable=consider-using-with
@@ -203,7 +213,7 @@ class Channel(object):
     ''' `next(Channel)` calls `Channel.get()`.
     '''
     if self.closed:
-      raise StopIteration()
+      raise StopIteration
     return self.get()
 
   # pylint: disable=consider-using-with
@@ -270,7 +280,6 @@ class PushQueue(MultiOpenMixin):
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
     self.name = name
     self._lock = RLock()
-    MultiOpenMixin.__init__(self)
     self.functor = functor
     self.outQ = outQ
 
@@ -279,6 +288,13 @@ class PushQueue(MultiOpenMixin):
 
   def __repr__(self):
     return "<%s outQ=%s>" % (self, self.outQ)
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the output queue.
+    '''
+    with self.outQ:
+      yield
 
   @not_closed
   def put(self, item):
@@ -293,16 +309,6 @@ class PushQueue(MultiOpenMixin):
     with outQ:
       for computed in functor(item):
         outQ.put(computed)
-
-  def startup(self):
-    ''' Start up.
-    '''
-
-  def shutdown(self):
-    ''' shutdown() is called by MultiOpenMixin._close() to close
-        the outQ for real.
-    '''
-    self.outQ.close()
 
 class NullQueue(MultiOpenMixin):
   ''' A queue-like object that discards its inputs.
@@ -420,6 +426,7 @@ class TimerQueue(object):
     assert self.mainThread is not None, "no main thread to join"
     self.mainThread.join()
 
+  # pylint: disable=too-many-statements
   def _main(self):
     ''' The main loop.
 
@@ -506,16 +513,57 @@ class ListQueue:
   ''' A simple iterable queue based on a `list`.
   '''
 
-  def __init__(self, queued=None):
+  def __init__(self, queued=None, *, unique=None):
     ''' Initialise the queue.
-        `queued` is an optional iterable of initial items for the queue.
+
+        Parameters:
+        * `queued` is an optional iterable of initial items for the queue
+        * `unique`: optional signature function, default `None`
+
+        The `unique` parameter provides iteration via the
+        `cs.seq.unrepeated` iterator filter which yields only items
+        not seen earlier in the iteration.
+        If `unique` is `None` or `False` iteration iterates
+        over the queue items directly.
+        If `unique` is `True`, iteration uses the default mode
+        where items are compared for equality.
+        Otherwise `unique` may be a callable which produces a
+        value to use to detect repetitions, used as the `cs.seq.unrepeated`
+        `signature` parameter.
+
+        Example:
+
+            >>> items = [1, 2, 3, 1, 2, 5]
+            >>> list(ListQueue(items))
+            [1, 2, 3, 1, 2, 5]
+            >>> list(ListQueue(items, unique=True))
+            [1, 2, 3, 5]
     '''
     self.queued = []
     if queued is not None:
       # catch a common mistake
       assert not isinstance(queued, str)
       self.queued.extend(queued)
+    if unique is None or unique is False:
+      unrepeated_signature = None
+    elif unique is True:
+      unrepeated_signature = lambda item: item
+    elif callable(unique):
+      unrepeated_signature = unique
+    else:
+      raise ValueError(
+          "unique=%s: neither None nor False nor Ture nor a callable",
+          r(unique)
+      )
+
+    self.unrepeated_signature = unrepeated_signature
     self._lock = Lock()
+
+  def __str__(self):
+    return "%s:%d[]" % (self.__class__.__name__, len(self))
+
+  def __repr__(self):
+    return "%s(%r)" % (self.__class__.__name__, self.queued)
 
   def get(self):
     ''' Get pops from the start of the list.
@@ -526,11 +574,16 @@ class ListQueue:
       except IndexError:
         raise Queue_Empty("list is empty")  # pylint: disable=raise-missing-from
 
-  def put(self, item):
-    ''' Put appends to the queue.
+  def append(self, item):
+    ''' Append an item to the queue, aka `put`.
     '''
     with self._lock:
       self.queued.append(item)
+
+  def put(self, item):
+    ''' Put appends to the queue.
+    '''
+    return self.append(item)
 
   def extend(self, items):
     ''' Convenient/performant queue-lots-of-items.
@@ -569,10 +622,25 @@ class ListQueue:
     with self._lock:
       return bool(self.queued)
 
+  def __len__(self):
+    return len(self.queued)
+
   def __iter__(self):
     ''' A `ListQueue` is iterable.
     '''
-    return self
+    if self.unrepeated_signature is None:
+      return self
+
+    # remove duplicates from the iteration
+    def unique_items():
+      while True:
+        try:
+          item = self.get()
+        except Queue_Empty:
+          break
+        yield item
+
+    return unrepeated(unique_items())
 
   def __next__(self):
     ''' Iteration gets from the queue.
@@ -581,6 +649,36 @@ class ListQueue:
       return self.get()
     except Queue_Empty:
       raise StopIteration("list is empty")  # pylint: disable=raise-missing-from
+
+def get_batch(q, max_batch=128, *, poll_delay=0.01):
+  ''' Get up to `max_batch` closely spaced items from the queue `q`.
+      Return the batch. Raise `Queue_Empty` if the first `q.get()` raises.
+
+      Block until the first item arrives. While the batch's size is
+      less that `max_batch` and there is another item available
+      within `poll_delay` seconds, append that item to the batch.
+
+      This requires `get_batch()` to be the sole consumer of `q`
+      for correct operation as it polls `q.empty()`.
+  '''
+  if max_batch < 2:
+    raise ValueError("max_batch:%r should be >= 2" % (max_batch,))
+  if poll_delay <= 0:
+    raise ValueError("poll_delay:%r should be > 0" % (poll_delay,))
+  batch = []
+  while len(batch) < max_batch:
+    try:
+      item = q.get()
+    except Queue_Empty:
+      if batch:
+        return batch
+      raise
+    batch.append(item)
+    if q.empty():
+      time.sleep(poll_delay)
+      if q.empty():
+        break
+  return batch
 
 if __name__ == '__main__':
   import cs.queues_tests

@@ -1,0 +1,2 @@
+lib/python/cs/py/func.py: cs.py.func: @trace: tighter lint exclusion
+lib/python/cs/py/func.py: cs.py.func: @trace: add indenting

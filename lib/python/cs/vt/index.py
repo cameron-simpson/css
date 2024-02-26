@@ -1,10 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Binary index classes.
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' An index is a mapping of hashcode => `FileDataIndexEntry`.
+''' An index is a mapping of hashcode_bytes => record_bytes.
     This module supports several backends and a mechanism for choosing one.
 '''
 
@@ -13,10 +13,13 @@ from contextlib import contextmanager
 from os import pread
 from os.path import exists as pathexists
 from zlib import decompress
+
 from cs.binary import BinaryMultiValue, BSUInt
+from cs.context import stackattrs
 from cs.logutils import warning, info
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
+
 from . import Lock
 
 _CLASSES = []
@@ -65,48 +68,6 @@ def choose(basepath, preferred_indexclass=None):
       "no supported index classes available: tried %r" % (indexclasses,)
   )
 
-class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
-    'filenum': BSUInt,
-    'data_offset': BSUInt,
-    'data_length': BSUInt,
-    'flags': BSUInt,
-})):
-  ''' An index entry describing a data chunk in a `DataDir`.
-
-      This has the following attributes:
-      * `filenum`: the file number of the file containing the block
-      * `data_offset`: the offset within the file of the data chunk
-      * `data_length`: the length of the chunk
-      * `flags`: information about the chunk
-
-      These enable direct access to the raw data component.
-
-      The only defined flag at present is `FLAG_COMPRESSED`,
-      indicating that the raw data should be obtained
-      by uncompressing the chunk using `zlib.uncompress`.
-  '''
-
-  FLAG_COMPRESSED = 0x01
-
-  @property
-  def is_compressed(self):
-    ''' Whether the chunk data are compressed.
-    '''
-    return self.flags & self.FLAG_COMPRESSED
-
-  def fetch_fd(self, rfd):
-    ''' Fetch the decompressed data from an open binary file.
-    '''
-    bs = pread(rfd, self.data_length, self.data_offset)
-    if len(bs) != self.data_length:
-      raise RuntimeError(
-          "%s.fetch_fd: pread(fd=%s) returned %d bytes, expected %d" %
-          (self, rfd, len(bs), self.data_length)
-      )
-    if self.is_compressed:
-      bs = decompress(bs)
-    return bs
-
 class BinaryIndex(MultiOpenMixin, ABC):
   ''' The base class for indices mapping `bytes`->`bytes`.
   '''
@@ -154,7 +115,7 @@ class BinaryIndex(MultiOpenMixin, ABC):
     return self.keys()
 
   def get(self, key, default=None):
-    ''' Get the `FileDataIndexEntry` for `key`.
+    ''' Get the record bytes for `key`.
         Return `default` for a missing `key` (default `None`).
     '''
     try:
@@ -203,19 +164,20 @@ class LMDBIndex(BinaryIndex):
       return False
     return True
 
-  def startup(self):
-    ''' Start up the index.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close up the LMDB index.
     '''
-    self.map_size = 10240  # self.MAP_SIZE
-    self._open_lmdb()
-
-  def shutdown(self):
-    ''' Shut down the index.
-    '''
-    with self._txn_idle:
-      self.flush()
-      self._lmdb.close()
-      self._lmdb = None
+    with super().startup_shutdown():
+      self.map_size = 10240  # self.MAP_SIZE
+      self._open_lmdb()
+      try:
+        yield
+      finally:
+        with self._txn_idle:
+          self.flush()
+          self._lmdb.close()
+          self._lmdb = None
 
   def _open_lmdb(self):
     # pylint: disable=import-error,import-outside-toplevel
@@ -250,15 +212,17 @@ class LMDBIndex(BinaryIndex):
   def _txn(self, write=False):
     ''' Context manager wrapper for an LMDB transaction which tracks active transactions.
     '''
+    # while no transactions are underway, check if we need to resize
     with self._txn_blocked:
       with self._txn_lock:
         resize_needed = self._resize_needed
         if resize_needed:
           self._resize_needed = False
       if resize_needed:
-        # wait for existing transactions to finish
+        # wait for existing transactions to finish, embiggen the db
         with self._txn_idle:
           self._embiggen_lmdb()
+      # on outermost transaction, take the _txn_idle lock
       with self._txn_lock:
         count = self._txn_count
         count += 1
@@ -269,7 +233,7 @@ class LMDBIndex(BinaryIndex):
     try:
       yield self._lmdb.begin(write=write)
     finally:
-      # logic mutex
+      # release _txn_idle on exit from outermost transaction
       with self._txn_lock:
         count = self._txn_count
         count -= 1
@@ -312,8 +276,8 @@ class LMDBIndex(BinaryIndex):
   def __contains__(self, key):
     return self._get(key) is not None
 
-  def __getitem__(self, key):
-    ''' Get the `FileDataIndexEntry` for `key`.
+  def __getitem__(self, key) -> bytes:
+    ''' Get the record bytes for `key`.
         Raise `KeyError` for a missing key.
     '''
     binary_entry = self._get(key)
@@ -324,6 +288,7 @@ class LMDBIndex(BinaryIndex):
   def __setitem__(self, key: bytes, binary_entry: bytes):
     # pylint: disable=import-error,import-outside-toplevel
     import lmdb
+    # loop to retry after embiggening if necessary
     while True:
       try:
         with self._txn(write=True) as txn:
@@ -359,24 +324,21 @@ class GDBMIndex(BinaryIndex):
       return False
     return True
 
-  def startup(self):
-    ''' Start the index: open dbm, allocate lock.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open dbm, allocate lock.
     '''
-    # pylint: disable=import-error,import-outside-toplevel
-    import dbm.gnu
-    with Pfx(self.path):
-      self._gdbm = dbm.gnu.open(self.path, 'cf')
-    self._gdbm_lock = Lock()
-    self._written = False
-
-  def shutdown(self):
-    ''' Shutdown the index.
-    '''
-    self.flush()
-    with self._gdbm_lock:
-      self._gdbm.close()
-      self._gdbm = None
-      self._gdbm_lock = None
+    with super().startup_shutdown():
+      # pylint: disable=import-error,import-outside-toplevel
+      import dbm.gnu
+      db = pfx_call(dbm.gnu.open, self.path, 'cf')
+      with stackattrs(self, _gdbm=db, _gdbm_lock=Lock(), _written=False):
+        try:
+          yield
+        finally:
+          self.flush()
+          with self._gdbm_lock:
+            self._gdbm.close()
 
   def flush(self):
     ''' Flush the index: sync the gdbm.
@@ -445,24 +407,21 @@ class NDBMIndex(BinaryIndex):
       return False
     return True
 
-  def startup(self):
-    ''' Start the index: open dbm, allocate lock.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open dbm, allocate lock.
     '''
-    # pylint: disable=import-error,import-outside-toplevel
-    import dbm.ndbm
-    with Pfx(self.path):
-      self._ndbm = dbm.ndbm.open(self.path, 'c')
-    self._ndbm_lock = Lock()
-    self._written = False
-
-  def shutdown(self):
-    ''' Shutdown the index.
-    '''
-    self.flush()
-    with self._ndbm_lock:
-      self._ndbm.close()
-      self._ndbm = None
-      self._ndbm_lock = None
+    with super().startup_shutdown():
+      # pylint: disable=import-error,import-outside-toplevel
+      import dbm.ndbm
+      db = pfx_call(dbm.ndbm.open, self.path, 'c')
+      with stackattrs(self, _ndbm=db, _ndbm_lock=Lock(), _written=False):
+        try:
+          yield
+        finally:
+          self.flush()
+          with self._ndbm_lock:
+            self._ndbm.close()
 
   def flush(self):
     ''' Flush the index: sync the ndbm.
@@ -524,19 +483,20 @@ class KyotoIndex(BinaryIndex):
       return False
     return True
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Open the index.
     '''
-    # pylint: disable=import-error,import-outside-toplevel
-    from kyotocabinet import DB
-    self._kyoto = DB()
-    self._kyoto.open(self.path, DB.OWRITER | DB.OCREATE)
-
-  def shutdown(self):
-    ''' Close the index.
-    '''
-    self._kyoto.close()
-    self._kyoto = None
+    with super().startup_shutdown():
+      # pylint: disable=import-error,import-outside-toplevel
+      from kyotocabinet import DB
+      db = DB()
+      with stackattrs(self, _kyoto=db):
+        db.open(self.path, DB.OWRITER | DB.OCREATE)
+        try:
+          yield
+        finally:
+          self._kyoto.close()
 
   def flush(self):
     ''' Flush pending updates to the index.

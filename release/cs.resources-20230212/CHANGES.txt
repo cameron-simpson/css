@@ -1,0 +1,3 @@
+lib/python/cs/resources.py: cs.resources: RunSTate: if already running, do not adjust state or catch signals; if not in the main thread do not adjust signals
+lib/python/cs/resources.py: cs.resources: RunState.catch_signal: construct a dict more directly for sig_hnds
+lib/python/cs/resources.py: merge fstags ==> tagger

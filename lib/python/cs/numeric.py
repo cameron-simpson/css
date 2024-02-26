@@ -7,6 +7,8 @@
 ''' A few ad hoc numeric alogrithms: `factors` and `primes`.
 '''
 
+from typing import Union
+
 __version__ = '20220606-post'
 
 DISTINFO = {
@@ -14,7 +16,6 @@ DISTINFO = {
     'classifiers': [
         "Development Status :: 6 - Mature",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [],
@@ -46,7 +47,7 @@ def factors(n):
       yield p
       n //= p
 
-def intif(f: float):
+def intif(f: float) -> Union[int, float]:
   ''' Return `int(f)` if that equals `f`, otherwise `f`.
   '''
   i = int(f)

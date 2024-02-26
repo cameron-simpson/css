@@ -1,0 +1,1 @@
+lib/python/cs/progress.py: cs.progress: Progress.iterbar: wrap the iteration in a try/finally for cleanup

@@ -94,15 +94,29 @@ cd "$wd"
 [ -n "$vcs_top" ] || {
   # locate VCS top
   case "$vcs_type" in
-    hg)   findup_test='[ -e "$FINDUP_DIR/.hg" ]' ;;
-    git)  findup_test='[ -e "$FINDUP_DIR/.git" ]' ;;
+    hg)   if [ -d .hg ]
+          then  vcs_top=$wd
+          elif [ -d ../.hg ]
+          then  vcs_top=$( dirname "$(pwd)" )
+          else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.hg" ]' )
+          fi
+          ;;
+    git)  if [ -d .git ]
+          then  vcs_top=$wd
+          elif [ -d ../.git ]
+          then  vcs_top=$( dirname "$(pwd)" )
+          else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.git" ]' )
+          fi
+          ;;
     ?*)   echo "$cmd: unsupported VCS \"$vcs_type\"" >&2; exit 1 ;;
-    *)    findup_test='[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' ;;
+    '')   if [ -d .hg -o -d .git ]
+          then  vcs_top=$wd
+          elif [ -d ../.hg -o -d ../.git ]
+          then  vcs_top=$( dirname "$(pwd)" )
+          else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' )
+          fi
+          ;;
   esac
-  vcs_top=$(
-      set -ue
-      findup -d . -c "$findup_test"
-  )
 } || {
   echo "$cmd: $wd: cannot locate VCS top" >&2
   exit 1
@@ -234,8 +248,8 @@ case "$op" in
                     incd "$clonedir" pwd >&3
                     ;;
       # current diff
-      diff,git)     git diff ${1+"$@"} ;;
-      diff,hg)      hg diff ${1+"$@"} ;;
+      diff,git)     git ${VCS_GIT_DIFF:-"diff"} ${1+"$@"} ;;
+      diff,hg)      hg ${VCS_HG_DIFF:-"diff"} ${1+"$@"} ;;
       dl,git | download,git)
                     git fetch $git_q --all ${1+"$@"} ;;
       dl,hg | download,hg)
@@ -272,12 +286,22 @@ case "$op" in
       glog,hg)      hg log -G --template "$VCS_FORMAT_GLOG_HG" \
                       ${1+"$@"}
                     ;;
+      in,hg)        hg in ${1+"$@"} ;;
+      in,git)       alt=origin
+                    [ $# = 0 ] || { alt=$1; shift; }
+                    "$0" glog "HEAD..$alt"
+                    ;;
       # report modified files
       modified,git) ( cd "$vcs_top"
                       git status --porcelain | awk '$1 == "M" { print $2 }'
                     )
                     ;;
       modified,hg)  hg status -n -am ${1+"$@"} ;;
+      out,hg)       hg out ${1+"$@"} ;;
+      out,git)      alt=origin
+                    [ $# = 0 ] || { alt=$1; shift; }
+                    "$0" glog "$alt..HEAD"
+                    ;;
       # record partial changes
       record,hg)    hg record ${1+"$@"} ;;
       record,git)   git add -p ${1+"$@"} && git diff --staged \
@@ -304,7 +328,7 @@ case "$op" in
                     ;;
       sibling,git)  clonedir=$1; shift
                     [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
-                    git clone "$vcs_top" "$clonedir"
+                    git clone --reference "$vcs_top" "$vcs_top" "$clonedir"
                     upstream=$( git remote get-url origin )
                     incd "$clonedir" git remote set-url origin "$upstream"
                     ;;

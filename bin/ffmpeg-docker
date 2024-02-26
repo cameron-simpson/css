@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# Run ffmpeg via the linuxserver/ffmpeg Docker image.
+# - Cameron Simpson <cs@cskk.id.au> 29jan2023
+#
+
+set -ue
+
+default_image=linuxserver/ffmpeg
+
+use_tmux=
+[ -n "${FFMPEG_DOCKER_TMUX:-}" ] && use_tmux=1
+doit=1
+trace=
+[ -t 2 ] && trace=set-x
+image=${FFMPEG_DOCKER_IMAGE:-$default_image}
+run_pull_mode=missing
+ff_postopts=
+
+cmd=$0
+usage="Usage: $cmd [--tm] [-U] ffmpeg-command-line-arguments...
+  Run ffmpeg via \"docker run ... $image ...\" as a method for
+  running a modern ffmpeg on a stale system.
+
+  Leading options:
+  -I image  Specify a different image name. Default from \$FFMPEG_DOCKER_IMAGE
+            otherwise $default_image.
+  -n        No action, dry run. Print the resulting docker command.
+  --tm      Run the \"docker run ...\" in a tmux(1) session via the tm(1cs) command.
+            This is handy when your transcoding machine is remote,
+            or when you want to run a few ffmpegs in named sessions.
+            I keep a shell alias \"fftm=ffmpeg-docker --tm\" for this purpose.
+  -U        Update the docker image using \"docker run --pull always\".
+            The default is \"--pull $run_pull_mode\".
+  -x        Trace execution."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -I)     image=$2; shift ;;
+    -n)     doit= trace=echo ;;
+    --tm)   use_tmux=1 ;;
+    -U)     run_pull_mode=always ;;
+    -x)     trace=set-x ;;
+    *)      break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# docker_name=$( echo "ffmpeg $inputbase $$" | tr -s "' .:+" "_____" )
+
+set -- \
+  python3 -c 'if 1:
+                from cs.ffmpegutils import main_ffmpeg_docker
+                main_ffmpeg_docker()
+             ' ${1+"$@"}
+
+if [ $use_tmux ]
+then
+  # session_name=$( echo "FFMPEG_$inputbase $outputbase $$" | tr -s ' .:+' '____' )
+  session_name=$( echo "FFMPEG_$$" | tr -s ' .:+' '____' )
+  set -- tm -x "$session_name" "$@"
+fi
+
+[ $doit ] && set -x
+exec $trace "$@"

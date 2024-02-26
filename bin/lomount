@@ -2,27 +2,56 @@
 #
 # Do a loopback mount of a file containing a filesystem.
 # Linux specific at present. See also loumount.
-#	- Cameron Simpson <cs@cskk.id.au> 12jul2000
+# - Cameron Simpson <cs@cskk.id.au> 12jul2000
 #
 
-fstype=iso9660
-mopts=ro
+set -ue
 
-cmd=`basename "$0"`
-usage="Usage: $cmd [-t fstype] [-o options] file [mountpoint]
-	-t fstype	Filesystem type. Default: $fstype
-	-o options	Mount options. Default: $mopts"
+doit=1
+fstype=iso9660
+readonly=1
+extra_mopts=
+partition=
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-o options] [-p partition] [-q] [-t fstype] [-x] file [mountpoint]
+  Mount file, or a partition within file, on mountpoint.
+  The partition mode requires the sfdisk(8) command.
+    -n            No action; recite planned actions.
+    -o options    Mount options.
+    -p partition  Treat the file as a partitioned disk image and
+                  mount the specified partition.
+    --ro          Mount the device read only. (The default).
+    --rw          Mount the device read/write.
+    -t fstype     Filesystem type. Default: $fstype
+    -q            Quiet; do not trace execution.
+    -x            Trace execution."
 
 badopts=
-while :
+while [ $# -gt 0 ]
 do  case $1 in
-      -t)	fstype=$2; shift ;;
-      -o)	mopts=$2; shift ;;
-      --)	shift; break ;;
-      -?*)	echo "$cmd: unrecognised option: $1" >&2
-		badopts=1
-		;;
-      *)	break ;;
+      -n)   doit= trace=echo ;;
+      -o)   extra_mopts=$2; shift ;;
+      -p)   partition=$2; shift
+            case "$partition" in
+              [1-9]|[1-9][0-9] ) ;;
+              *)  echo "$cmd: -p: invalid partition, expected a number from 1-99, got: $partition" >&2
+                  badopts=1
+                  ;;
+            esac
+            ;;
+      -q)   doit=1 trace= ;;
+      --ro) readonly=1 ;;
+      --rw) readonly= ;;
+      -t)   fstype=$2; shift ;;
+      -x)   doit=1 trace=set-x ;;
+      --)   shift; break ;;
+      -?*)  echo "$cmd: unrecognised option: $1" >&2
+            badopts=1
+            ;;
+      *)    break ;;
     esac
     shift
 done
@@ -36,55 +65,89 @@ dir=
 [ $# = 0 ] || { dir=$1; shift; }
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
-		badopts=1
-	      }
+        badopts=1
+          }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $readonly ]
+then  mopts=ro losetup_args=-r
+else  mopts=rw losetup_args=
+fi
+[ -n "$extra_mopts" ] && mopts="$opts,$extra_mopts"
 
 ok=1
 
 newdir=
 [ -n "$dir" ] \
-	|| if dir=`mkdirn /tmp/$cmd`
-	   then
-	       newdir=$dir
-	   else
-	       echo "$cmd: can't create mountpoint" >&2
-	       ok=
-	   fi
+    || if dir=`mkdirn /tmp/$cmd`
+       then
+           newdir=$dir
+       else
+           echo "$cmd: can't create mountpoint" >&2
+           ok=
+       fi
 
 [ -z "$dir" ] \
-	|| [ -d "$dir/." ] \
-	|| { echo "$cmd: not a directory: $dir" >&2
-	     ok=
-	   }
+    || [ -d "$dir/." ] \
+    || { echo "$cmd: not a directory: $dir" >&2
+         ok=
+       }
 
 [ -s "$file"  ] || { echo "$cmd: need nonempty file ($file)" >&2; ok=; }
 
 [ $ok ] || exit 1
 
-for n in 0 1 2 3 4 5 6 7 FAIL
-do
-  [ "x$n" = xFAIL ] && { echo "$cmd: can't grab a loop device" >&2; exit 1; }
+partition_args=
+if [ -n "$partition" ]
+then
+  sector_size=$( sfdisk --dump "$file" | sed -n 's/^sector-size: *\([1-9][0-9]*\) *$/\1/p' )
+  [ -n "$sector_size" ] || {
+    echo "$cmd: no sector-size header in the output of sfdisk --dump $file" >&2
+    exit 1
+  }
+  partition_settings=$(
+      sfdisk --dump "$file" \
+      | sed '1,/^$/d' \
+      | sed -n "
+            ${partition}{"'
+                s/^[^ ][^ ]*  *:  *start= *\([1-9][0-9]*\),  *size= *\([1-9][0-9]*\),.*/start_sector=\1 size_sectors=\2/p
+            }'
+  )
+  [ -n "$partition_settings" ] || {
+    echo "$cmd: partition $partition not found in the output of sfdisk --dump $file" >&2
+    exit 1
+  }
+  eval "$partition_settings"
+  start_byte=$(( sector_size * start_sector ))
+  size_bytes=$(( sector_size * size_sectors ))
+  partition_args="--partscan -o $start_byte --sizelimit $size_bytes --sector-size $sector_size"
+fi
 
-  loop=/dev/loop$n
-  losetup "$loop" "$file" && break
-done
 
-unloop="losetup -d $loop"
+loopdev=$( losetup --find ) && [ -n "$loopdev" ] || {
+  echo "$cmd: no free loop device found by losetup --find" >&2
+  exit 1
+}
+$trace losetup $losetup_args $partition_args --show "$loopdev" "$file" || exit 1
 
-if mount -t "$fstype" -o "$mopts" "$loop" "$dir"
-then  echo "$loop"
+unloop="losetup -d $loopdev"
+
+if $trace mount -t "$fstype" -o "$mopts" "$loopdev" "$dir"
+then  echo "$loopdev"
       echo "$dir"
-      ( exec >&2
-	echo "Mounted $file on $dir."
-	echo "To unmount:"
-	echo "	umount $dir"
-	[ -n "$newdir" ] && echo "	rmdir $newdir"
-	echo "	$unloop"
-      )
+      if [ -t 2 ]
+      then
+        ( exec >&2
+          echo "Mounted $file on $dir."
+          echo "To unmount:"
+          echo "  umount $dir"
+          [ -n "$newdir" ] && echo "  rmdir $newdir"
+          echo "  $unloop"
+        )
+      fi
 else
-      [ -n "$newdir" ] && rmdir $newdir
-      eval "$unloop"
+      [ -n "$newdir" ] && $trace rmdir "$newdir"
+      eval "$trace $unloop"
       exit 1
 fi

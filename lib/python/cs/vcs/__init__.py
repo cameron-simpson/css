@@ -77,4 +77,4 @@ class VCS(ABC):
   def resolve_revision(self, rev_spec):
     ''' Resolve a revision specification to the commit hash (a `str`).
     '''
-    raise NotImplementedError()
+    raise NotImplementedError

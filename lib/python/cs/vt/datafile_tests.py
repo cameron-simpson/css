@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Datafile tests.
 # - Cameron Simpson <cs@cskk.id.au>
@@ -9,16 +9,20 @@ import sys
 import random
 import tempfile
 import unittest
+
 try:
   import kyotocabinet
 except ImportError:
   kyotocabinet = None
-from cs.binary_tests import _TestPacketFields
+
+from cs.binary_tests import TestBinaryClasses
 from cs.buffer import CornuCopyBuffer
 ##from cs.debug import thread_dump
 from cs.randutils import rand0, make_randblock
+
 from . import datafile
 from .datafile import DataRecord, DataFilePushable
+
 # from .hash_tests import _TestHashCodeUtils
 # TODO: run _TestHashCodeUtils on DataDirs as separate test suite?
 
@@ -26,12 +30,10 @@ from .datafile import DataRecord, DataFilePushable
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
 
-class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
-  ''' Test the `PacketField`s.
+class TestDataFileBinaryClasses(TestBinaryClasses, unittest.TestCase):
+  ''' Test the `AbstractBinary` subclasses.
   '''
-
-  def setUp(self):
-    self.module = datafile
+  test_module = datafile
 
 class TestDataFile(unittest.TestCase):
   ''' Tests for `DataFile`.

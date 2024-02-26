@@ -4,7 +4,7 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
-from fnmatch import fnmatch
+from fnmatch import filter as fnfilter
 from functools import partial
 import os
 from os.path import (
@@ -12,6 +12,7 @@ from os.path import (
     dirname,
     exists as existspath,
     expanduser,
+    expandvars,
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
@@ -24,29 +25,24 @@ from threading import Lock
 from typing import Optional
 
 from icontract import require
-from typeguard import typechecked
 
 from cs.deco import decorator
-from cs.env import envsub
 from cs.obj import SingletonMixin
-from cs.pfx import pfx_call
+from cs.pfx import pfx, pfx_call
 
-__version__ = '20220530-post'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.deco',
-        'cs.env',
         'cs.obj',
         'cs.pfx',
         'icontract',
-        'typeguard',
     ],
 }
 
@@ -56,19 +52,24 @@ pfx_makedirs = partial(pfx_call, os.makedirs)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
-def needdir(dirpath, mode=0o777, *, use_makedirs=False):
+def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
   ''' Create the directory `dirpath` if missing.
 
       Parameters:
       * `dirpath`: the required directory path
       * `mode`: the permissions mode, default `0o777`
+      * `log`: log `makedirs` or `mkdir` call
       * `use_makedirs`: optional creation mode, default `False`;
         if true, use `os.makedirs`, otherwise `os.mkdir`
   '''
   if not isdirpath(dirpath):
     if use_makedirs:
+      if log is not None:
+        log("makedirs(%r,0o%3o)", dirpath, mode)
       pfx_makedirs(dirpath, mode)
     else:
+      if log is not None:
+        log("mkdir(%r,0o%3o)", dirpath, mode)
       pfx_mkdir(dirpath, mode)
 
 @decorator
@@ -115,8 +116,7 @@ def atomic_directory(infill_func, make_placeholder=False):
       if remove_placeholder and isdirpath(dirpath):
         pfx_rmdir(dirpath)
       raise
-    else:
-      return result
+    return result
 
   return atomic_directory_wrapper
 
@@ -152,10 +152,7 @@ def rpaths(
 def fnmatchdir(dirpath, fnglob):
   ''' Return a list of the names in `dirpath` matching the glob `fnglob`.
   '''
-  return [
-      filename for filename in pfx_listdir(dirpath)
-      if fnmatch(filename, fnglob)
-  ]
+  return fnfilter(pfx_listdir(dirpath), fnglob)
 
 # pylint: disable=too-few-public-methods
 class HasFSPath:
@@ -165,29 +162,48 @@ class HasFSPath:
   def __init__(self, fspath):
     self.fspath = fspath
 
+  def __str__(self):
+    return f'{self.__class__.__name__}(fspath={self.shortpath})'
+
   @property
   def shortpath(self):
     ''' The short version of `self.fspath`.
     '''
-    return shortpath(self.fspath)
+    try:
+      return shortpath(self.fspath)
+    except AttributeError:
+      return "<no-fspath>"
 
-  @require(lambda subpath: not isabspath(subpath))
-  def pathto(self, subpath):
-    ''' The full path to `subpath`, a relative path below `self.fspath`.
+  @require(lambda subpaths: len(subpaths) > 0)
+  @require(lambda subpaths: not any(map(isabspath, subpaths)))
+  def pathto(self, *subpaths):
+    ''' The full path to `subpaths`, comprising a relative path
+        below `self.fspath`.
+        This is a shim for `os.path.join` which requires that all
+        the `subpaths` be relative paths.
     '''
-    return joinpath(self.fspath, subpath)
+    return joinpath(self.fspath, *subpaths)
 
   def fnmatch(self, fnglob):
     ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
     '''
     return fnmatchdir(self.fspath, fnglob)
 
+  def listdir(self):
+    ''' Return `os.listdir(self.fspath)`. '''
+    return os.listdir(self.fspath)
+
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
   '''
 
   @classmethod
-  def _resolve_fspath(cls, fspath, envvar=None, default_attr=None):
+  def _resolve_fspath(
+      cls,
+      fspath: Optional[str] = None,
+      envvar: Optional[str] = None,
+      default_attr: str = 'FSPATH_DEFAULT'
+  ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
 
         Parameters:
@@ -196,7 +212,17 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         * `envvar`: the environment variable to consult for a default `fspath`;
           the default for this comes from `cls.FSPATH_ENVVAR` if defined
         * `default_attr`: the class attribute containing the default `fspath`
-          if defined and there is not environment variable for `envvar`
+          if defined and there is no environment variable for `envvar`
+
+        The `default_attr` value may be either a `str`, in which
+        case `os.path.expanduser` is called on it`, or a callable
+        returning a filesystem path.
+
+        The common mode is where each instance might have an arbitrary path,
+        such as a `TagFile`.
+
+        The "class default" mode is intended for things like `CalibreTree`
+        which has the notion of a default location for your Calibre library.
     '''
     if fspath is None:
       # pylint: disable=no-member
@@ -206,18 +232,21 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         fspath = os.environ.get(envvar)
         if fspath is not None:
           return realpath(fspath)
-      if default_attr is None:
-        default_attr = 'FSPATH_DEFAULT'
-      defaultpath = getattr(cls, default_attr, None)
-      if defaultpath is not None:
-        return realpath(expanduser(defaultpath))
+      default = getattr(cls, default_attr, None)
+      if default is not None:
+        if callable(default):
+          fspath = default()
+        else:
+          fspath = expanduser(default)
+        if fspath is not None:
+          return realpath(fspath)
       raise ValueError(
-          "_resolve_fspath: fspath=None and no %s no %s.%s" % (
+          "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
               (
                   cls.__name__ + '.FSPATH_ENVVAR' if envvar is None else '$' +
                   envvar
               ),
-              cls.name,
+              cls.__name__,
               default_attr,
           )
       )
@@ -229,22 +258,34 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
     '''
     return cls._resolve_fspath(fspath)
 
-  @typechecked
-  def __init__(self, fspath: Optional[str] = None):
-    if hasattr(self, '_lock'):
-      return
+  ##@typechecked
+  def __init__(self, fspath: Optional[str] = None, lock=None):
+    ''' Initialise the singleton:
+
+        On the first call:
+        - set `.fspath` to `self._resolve_fspath(fspath)`
+        - set `._lock` to `lock` (or `threading.Lock()` if not specified)
+        - return `True`
+        On subsequent calls return `False`.
+
+    '''
+    if '_lock' in self.__dict__:
+      return False
     fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
-    self._lock = Lock()
+    if lock is None:
+      lock = Lock()
+    self._lock = lock
+    return True
 
 DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
 
-def shortpath(path, environ=None, prefixes=None):
+def shortpath(path, prefixes=None):
   ''' Return `path` with the first matching leading prefix replaced.
 
       Parameters:
       * `environ`: environment mapping if not os.environ
-      * `prefixes`: iterable of `(prefix,subst)` to consider for replacement;
+      * `prefixes`: optional iterable of `(prefix,subst)` to consider for replacement;
         each `prefix` is subject to environment variable
         substitution before consideration
         The default considers "$HOME/" for replacement by "~/".
@@ -252,12 +293,12 @@ def shortpath(path, environ=None, prefixes=None):
   if prefixes is None:
     prefixes = DEFAULT_SHORTEN_PREFIXES
   for prefix, subst in prefixes:
-    prefix = envsub(prefix, environ)
+    prefix = expandvars(prefix)
     if path.startswith(prefix):
       return subst + path[len(prefix):]
   return path
 
-def longpath(path, environ=None, prefixes=None):
+def longpath(path, prefixes=None):
   ''' Return `path` with prefixes and environment variables substituted.
       The converse of `shortpath()`.
   '''
@@ -267,11 +308,15 @@ def longpath(path, environ=None, prefixes=None):
     if path.startswith(subst):
       path = prefix + path[len(subst):]
       break
-  path = envsub(path, environ)
+  path = expandvars(path)
   return path
 
-def is_clean_subpath(subpath: str):
-  ''' Test that `subpath` is clean:
+@pfx
+def validate_rpath(rpath: str):
+  ''' Test that `rpath` is a clean relative path with no funny business;
+      raise `ValueError` if the test fails.
+
+      Tests:
       - not empty or '.' or '..'
       - not an absolute path
       - normalised
@@ -279,13 +324,30 @@ def is_clean_subpath(subpath: str):
 
       Examples:
 
-          >>> is_clean_subpath('')
+          >>> validate_rpath('')
           False
-          >>> is_clean_subpath('.')
+          >>> validate_rpath('.')
   '''
-  if subpath in ('', '.', '..'):
+  if not rpath:
+    raise ValueError('empty path')
+  if rpath in ('.', '..'):
+    raise ValueError('may not be . or ..')
+  if isabspath(rpath):
+    raise ValueError('absolute path')
+  if rpath != normpath(rpath):
+    raise ValueError('!= normpath(rpath)')
+  if rpath.startswith('../'):
+    raise ValueError('goes up')
+
+def is_valid_rpath(rpath, log=None) -> bool:
+  ''' Test that `rpath` is a clean relative path with no funny business.
+
+      This is a Boolean wrapper for `validate_rpath()`.
+  '''
+  try:
+    validate_rpath(rpath)
+  except ValueError as e:
+    if log is not None:
+      log("invalid: %s", e)
     return False
-  if isabspath(subpath):
-    return False
-  normalised = normpath(subpath)
-  return subpath == normalised and not normalised.startswith('../')
+  return True

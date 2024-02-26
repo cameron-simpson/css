@@ -24,12 +24,12 @@ class MykeCommand(BaseCommand):
 
   GETOPT_SPEC = 'dD:eEf:ij:kmNnpqrRsS:tuvx'
   USAGE_FORMAT = "Usage: {cmd} [options...] [macro=value...] [targets...]"
-  OPTIONS_CLASS = Maker
+  Options = Maker
 
   # pylint: disable=too-many-branches
   def apply_opt(self, opt, val):
     ''' Modify the `Maker` according to a command line option.
-        '''
+    '''
     M = self.options
     if opt == '-d':
       # debug mode
@@ -81,17 +81,18 @@ class MykeCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
-    M = self.options
-    M.makecmd = self.cmd
-    ok = M.loadMakefiles(M.makefiles)
-    ok = ok and M.loadMakefiles(M.appendfiles)
-    # prepend the command line namespace at the front again
-    if M.cmd_ns:
-      M.insert_namespace(M.cmd_ns)
-    if not ok:
-      raise GetoptError("errors loading Mykefiles")
-    with M:
-      yield
+    with super().run_context():
+      M = self.options
+      M.makecmd = self.cmd
+      ok = M.loadMakefiles(M.makefiles)
+      ok = ok and M.loadMakefiles(M.appendfiles)
+      # prepend the command line namespace at the front again
+      if M.cmd_ns:
+        M.insert_namespace(M.cmd_ns)
+      if not ok:
+        raise GetoptError("errors loading Mykefiles")
+      with M:
+        yield
 
   def main(self, argv):
     ''' Main body.

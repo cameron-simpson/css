@@ -24,7 +24,8 @@ DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 class DataFlag(IntFlag):
   ''' Flag values for DataFile records.
 
-      `COMPRESSED`: the data are compressed using zlib.compress.
+      Defined flags:
+      * `COMPRESSED`: the data are compressed using zlib.compress.
   '''
   COMPRESSED = 0x01
 
@@ -152,16 +153,14 @@ class DataFilePushable:
     '''
     if progress:
       progress.total += len(self) - offset
-    with open(self.pathname, 'rb') as f:
-      f.seek(offset)
-      bfr = CornuCopyBuffer(datafrom(f, offset), offset=offset)
-      for DR in DataRecord.parse_buffer(bfr):
-        if runstate and runstate.cancelled:
-          return False
-        data = DR.data
-        Q.put(Block(data=data))
-        if progress:
-          progress += len(data)
+    bfr = CornuCopyBuffer.from_filename(self.pathname, offset=offset)
+    for DR in DataRecord.scan(bfr):
+      if runstate and runstate.cancelled:
+        return False
+      data = DR.data
+      Q.put(Block(data=data))
+      if progress:
+        progress += len(data)
     return True
 
 if __name__ == '__main__':

@@ -18,7 +18,7 @@ from threading import Lock, Condition, Thread
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20220530-post'
+__version__ = '20221118-post'
 
 DISTINFO = {
     'description':
@@ -66,7 +66,6 @@ __seq = Seq()
 def seq():
   ''' Return a new sequential value.
   '''
-  global __seq  # pylint: disable=global-statement
   return next(__seq)
 
 def the(iterable, context=None):
@@ -438,14 +437,18 @@ def unrepeated(it, seen=None, signature=None):
         which produces the value to compare to recognise repeated items;
         its values are stored in the `seen` set
 
-      The default `signature` function is identity - items are stored and compared.
+      The default `signature` function is equality;
+      the items are stored n `seen` and compared.
       This requires the items to be hashable and support equality tests.
       The same applies to whatever values the `signature` function produces.
 
+      Another common signature is identity: `id`, useful for
+      traversing a graph which may have cycles.
+
       Since `seen` accrues all the signature values for yielded items
       generally it will grow monotonicly as iteration proceeeds.
-      If the items are complaex or large it is well worth providing a signature
-      function even it the items themselves can be used in a set.
+      If the items are complex or large it is well worth providing a signature
+      function even if the items themselves can be used in a set.
   '''
   if seen is None:
     seen = set()

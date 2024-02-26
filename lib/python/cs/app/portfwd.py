@@ -33,6 +33,7 @@ import subprocess
 import sys
 from threading import RLock
 from time import sleep
+
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
 from cs.env import envsub
@@ -43,7 +44,7 @@ from cs.py.func import prop
 from cs.py3 import DEVNULL
 from cs.sh import quotecmd as shq
 
-__version__ = '20210316-post'
+__version__ = '20221228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -64,7 +65,9 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': ['portfwd = cs.app.portfwd:main'],
+        'console_scripts': {
+            'portfwd': 'cs.app.portfwd:main'
+        },
     },
 }
 
@@ -116,7 +119,7 @@ def main(argv=None, environ=None):
   doit = True
   sshcfg = None
   auto_mode = False
-  flags = Flags(environ=environ, lock=RLock())
+  flags = Flags(environ=environ)
   trace = sys.stderr.isatty()
   verbose = False
 
@@ -283,12 +286,12 @@ class Portfwd(FlaggedMixin):
     self.group_name = 'PORTFWD ' + target.upper()
     self.flag_connected = False
     self.svcd = SvcD(
-        self.ssh_argv(),
+        *self.ssh_argv(),
         name=self.svcd_name,
         group_name=self.group_name,
         flags=self.flags,
         trace=trace,
-        sig_func=self.ssh_options,
+        sig_func=self.get_ssh_options,
         test_func=self.test_func,
         test_flags={
             'PORTFWD_DISABLE': False,
@@ -343,13 +346,13 @@ class Portfwd(FlaggedMixin):
       argv.extend(['--', self.target])
     return argv
 
-  def ssh_options(self):
+  def get_ssh_options(self):
     ''' Return a defaultdict(list) of `{option: values}`
         representing the ssh configuration.
     '''
-    with Pfx("ssh_options(%r)", self.target):
+    with Pfx("get_ssh_options(%r)", self.target):
       argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
-      P = pipefrom(argv)
+      P = pipefrom(argv, quiet=not self.verbose)
       options = defaultdict(list)
       parsed = [line.strip().split(None, 1) for line in P.stdout]
       retcode = P.wait()
@@ -383,7 +386,7 @@ class Portfwd(FlaggedMixin):
 
         Initially remove local socket paths.
     '''
-    options = self.ssh_options()
+    options = self.get_ssh_options()
     for localforward in options['localforward']:
       local, remote = localforward.split(None, 1)
       if '/' in local:

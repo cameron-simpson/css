@@ -6,13 +6,17 @@
 
 set -ue
 
+remote_revhost=127.0.0.1
+remote_revport=12345
+
 cmd=$( basename "$0" )
 usage="Usage: $cmd localdir:remote:remotedir[:remote-ssh-name]...
   For each argument back up localdir to a histbackup at remote:remotedir.
+
   Since histbackup must run at the remote end as:
-    histbackup srchost:localdir remotedir
-  it is necessary to define srchost, which is specified by remote-ssh-name
-  above. The default comes from the first word in \$SSH_CONNECTION,
+    histbackup remote-ssh-name:localdir remotedir
+  it is necessary to infer remote-ssh-name if not specified.
+  The default comes from the first word in \$SSH_CONNECTION,
   the source address of the inbound ssh connection."
 
 [ $# -gt 0 ] || {
@@ -47,8 +51,13 @@ do
     xit=0
     for remote in $( echo "$remotes" | tr , ' ' )
     do
-      set-x envssh -o controlpath=none "$remote" \
-        "set -ue; set -- \$SSH_CONNECTION; ssh_connection_srcip=\$1; cd $qremotedir; pwd; set -x; histbackup -i -x $remotessh:$qqlocaldir . --outbuf=line" \
+      set-x envssh -o controlpath=none -R "$remote_revport:127.0.0.1:22" "$remote" \
+        "set -ue
+         set -- \$SSH_CONNECTION; ssh_connection_srcip=\$1
+         cd $qremotedir
+         pwd
+         set -x
+         histbackup -i -x $remote_revhost:$qqlocaldir . --outbuf=line -e 'ssh -o port=$remote_revport'" \
         || xit=1
     done
     exit $xit

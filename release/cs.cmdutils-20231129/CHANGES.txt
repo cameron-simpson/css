@@ -1,0 +1,5 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions: define runstate field, autoformat
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring update
+lib/python/cs/cmdutils.py: merge default => cdrip
+lib/python/cs/cmdutils.py: merge default ==> cdrip
+lib/python/cs/cmdutils.py: merge default ==> cdrip

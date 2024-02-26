@@ -1,0 +1,2 @@
+Drop Xtty(), obsolete.
+X(): special handling for unseeking output files - I've had a Linux system moan about opening /dev/tty for append.

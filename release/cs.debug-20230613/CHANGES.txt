@@ -1,0 +1,1 @@
+lib/python/cs/debug.py: cs.debug: honour $CS_DEBUG_BUILTINS envvar to monkey patch the builtins module, constraints via a white list

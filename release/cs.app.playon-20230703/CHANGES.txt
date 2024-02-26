@@ -1,0 +1,13 @@
+lib/python/cs/app/playon.py: cs.app.playon: remove debug
+lib/python/cs/app/playon.py: merge playon ==> default
+lib/python/cs/app/playon.py: cs.*: drop BaseCommand.apply_defaults in favour of the Options dataclass
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: new cmd_feature like cmd_service but for featured shows
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.suburl: infer _base_url from api_version if _base_url is None and api_version is provided
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: features, feature, featured_image_url, service_image_url
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: common method to convert service or feature entries to a set of TagSets
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.queue,recordings: also use self._entry_tagsets
+lib/python/cs/app/playon.py: cs.app.playon: Recording.is_downloaded: also check for a 'downloaded' tag, fallback for when the downloaded_path is empty
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_downloaded: add 'downloaded" tag to specified recordings
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI._entry_tagsets: drop obsolete line trashing the correct result
+lib/python/cs/app/playon.py: cs.app.playon: DISTINFO-fs.fstags
+lib/python/cs/app/playon.py: cs.app.playon: DISTINFO+icontract

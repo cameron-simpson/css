@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Scanner tests. - Cameron Simpson <cs@cskk.id.au>
 #
@@ -12,7 +12,7 @@ import sys
 import unittest
 from cs.buffer import CornuCopyBuffer
 from cs.randutils import randomish_chunks
-from .scan import py_scanbuf2, scanbuf2, scan, MIN_BLOCKSIZE, MAX_BLOCKSIZE
+from .scan import py_scanbuf2, scanbuf2, scan_offsets, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 
 QUICK = len(os.environ.get('QUICK', '')) > 0
 
@@ -141,8 +141,12 @@ class TestScanBuf(unittest.TestCase):
         if chunks is None:
           continue
         last_offset = 0
-        for offset in scan(chunks, min_block=min_block, max_block=max_block,
-                           scan_buffer=scan_chunk):
+        for offset in scan_offsets(
+            chunks,
+            min_block=min_block,
+            max_block=max_block,
+            scan_buffer=scan_chunk,
+        ):
           self.assertGreater(offset, 0)
           self.assertTrue(last_offset < offset)
           block_size = offset - last_offset
@@ -165,20 +169,20 @@ class TestScanBuf(unittest.TestCase):
         if chunks is None:
           continue
         py_offsets = list(
-            scan(
+            scan_offsets(
                 chunks,
                 scan_buffer=py_scanbuf2,
                 min_block=min_block,
-                max_block=max_block
+                max_block=max_block,
             )
         )
         chunks = self._test_chunks(data_spec)
         c_offsets = list(
-            scan(
+            scan_offsets(
                 chunks,
                 scan_buffer=scanbuf2,
                 min_block=min_block,
-                max_block=max_block
+                max_block=max_block,
             )
         )
         self.assertEqual(py_offsets, c_offsets)

@@ -1,6 +1,6 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-hg_repos        = sr.ht-css home borg
+hg_repos        = sr.ht-css ssh://home/hg/css ssh://borg/hg/css
 git_repos       = bitbucket-css github-css
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
@@ -13,7 +13,7 @@ RSYNC_TARGET_PYTHON_ENVVAR = RSYNC_TARGET_PYTHON
 target  = bin
 
 dev = env-dev -d $. -x
-base_python = python3
+base_python = "$${PYTHON_EXE:-python3}"
 venv_dir = $./venv
 venv_requirements = $./venv-requirements.txt
 venv_pip = $(venv_python) -m pip
@@ -137,11 +137,11 @@ _tarball:
         tar czf "$$tarball" "$$tardir"
 
 _test:
-        find lib/python -type f -name '*.py[co]' -exec rm {} \;
+        find lib/python -type f -name '*.py[co]' -ls -delete
         set -x; ./bin-cs/selftest -v --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
 
 _test3:
-        find lib/python -type f -name '*.py[co]' -exec rm {} \;
+        find lib/python -type f -name '*.py[co]' -ls -delete
         set -x; ./bin-cs/selftest -v --state state3 --pycmd python3 --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
 
 deploy_dir(targetdir, base, includes) = \
@@ -181,6 +181,10 @@ _optcss:
 
 _home:
         @$(deploy($(HOME)))
+
+_push:
+        set -ue; hg push "ssh://$$HG_PUSH_HOST/$$HG_PUSH_PATH"
+        set -ue; incd "$$HG_PUSH_HOST:$$HG_PUSH_PATH" hg up
 
 _remote:
         set -uex; rsync -ia --include=*/ --include=*.py --exclude=* cs/ "$$$(RSYNC_TARGET_PYTHON_ENVVAR)/"

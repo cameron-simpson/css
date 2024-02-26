@@ -1,0 +1,2 @@
+lib/python/cs/mplutils.py: cs.mplutils: FigureSize: get defaults via $FIGURE_SIZE_DX, $FIGURE_SIZE_DY and $FIGURE_SIZE_DPI envvars
+lib/python/cs/mplutils.py: cs.mplutils: update imports

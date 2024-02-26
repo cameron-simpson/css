@@ -1,0 +1,10 @@
+New TypeCode(str) representing an array type code with associated properties and methods.
+New TimeSeriesMapping.read_csv wrapper for pandas.read_csv to import a CSV file into a TimeSeriesMapping.
+TimeSeriesFile.save,save_to: open the file for overwrite, not truncate, by default.
+TimeSeriesFile: new setitems(whens,values) method for fast batch updates.
+as_datetime64s: accept optional units parameter to trade off range versus precision.
+@plotrange: accept new optional tz/utcoffset parameters and pass the resulting utcoffset to the wrapped function along with a huge disclaimer about timezones and plots.
+New tzfor(tzspec) to return a tzinfo object from dateutil.tz.gettz, accepts 'local' for the system local default timezone.
+TimeSeriesMapping.as_pd_dataframe: accept optional utcoffset to skew the index for the DataFrame, used for time presentation in plots.
+New TimeSeriesMapping.to_csv(start,stop,f) method to write CSV data between start and stop to a file via DataFrame.to_csv.
+TimeSeriesBaseCommand: new parsetime and poptime methods, cmd_plot: update to expect start-time and optional stop-time.

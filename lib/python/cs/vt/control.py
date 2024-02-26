@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python33
 #
 # Control operations given a Dirent.
 # - Cameron Simpson <cs@cskk.id.au> 31may2018

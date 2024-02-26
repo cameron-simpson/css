@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 ''' Assorted debugging assistance functions.
 '''
@@ -98,6 +98,7 @@ def dump_Store(S, indent=''):
 
 _LockContext = namedtuple("LockContext", "caller thread")
 
+# TODO: compare with cs.debugDebuggingLock and merge
 class DebuggingLock:
   ''' A wrapper for a threading Lock or RLock
       to notice contention and report contending uses.
@@ -147,7 +148,7 @@ class DebuggingLock:
     self._held = hold
     if acquired and self.trace_acquire:
       X("ACQUIRED %r", self)
-      stack_dump()
+      ##stack_dump()
     return acquired
 
   def release(self):

@@ -25,6 +25,7 @@ badopts=
 
 if [ $# -gt 1 ]
 then
+  # concatenate the hostslike files and run the single file version
   tmpf=$TMPDIR/unhostsify.$$
   cat -- "$@" >"$tmpf"
   "$0" $re_subst_opts "$tmpf"

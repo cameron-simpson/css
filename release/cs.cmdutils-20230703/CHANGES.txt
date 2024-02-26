@@ -1,0 +1,4 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: comment out assertion
+lib/python/cs/cmdutils.py: cs.cmdutils: _BaseSubCommand: new __call__ abstractmethod; _ClassSubCommand: update __call__ method
+lib/python/cs/cmdutils.py: cs.cmdutils: add missing import
+lib/python/cs/cmdutils.py: merge playon ==> default
