@@ -93,20 +93,22 @@ class PlexCommand(BaseCommand):
         yield
 
   def cmd_linktree(self, argv):
-    ''' Usage: {cmd} [-n] srctrees... dsttree
+    ''' Usage: {cmd} [-n] [-m mode,...] [--sym] srctrees... dsttree
           Link media files from the srctrees into a Plex media tree.
-          -n    No action, dry run. Print the expected actions.
-          --sym Symlink mode: link media files using symbolic links
-                instead of hard links. The default is hard links
-                because that lets you bind mount the plex media tree,
-                which would make the symlinkpaths invalid in the
-                bound mount.
+          -n        No action, dry run. Print the expected actions.
+          -m modes  Allowed modes, comma separated list of \"movie\", \"tv\".
+          --sym     Symlink mode: link media files using symbolic links
+                    instead of hard links. The default is hard links
+                    because that lets you bind mount the plex media tree,
+                    which would make the symlinkpaths invalid in the
+                    bound mount.
     '''
     options = self.options
     options.symlink_mode = False
     options.popopts(
         argv,
         n='dry_run',
+        m='modes',
         sym='symlink_mode',
     )
     doit = options.doit
@@ -134,6 +136,7 @@ class PlexCommand(BaseCommand):
               plex_linkpath(
                   srcpath,
                   dstroot,
+                  modes=modes,
                   symlink_mode=symlink_mode,
                   doit=doit,
                   quiet=False,
@@ -163,6 +166,8 @@ def plex_subpath(fspath: str, fstags: FSTags):
   dstbase = title
   if tv.series_title and season and episode:
     # TV Series
+    if "tv" not in modes:
+      raise ValueError("tv not in modes %r" % (modes,))
     dstpath = ['TV Shows', tv.series_title, f'Season {season:02d}']
     if episode:
       dstbase += f' - s{season:02d}e{episode:02d}'
@@ -170,6 +175,8 @@ def plex_subpath(fspath: str, fstags: FSTags):
       dstbase += f' - s{season:02d}x{extra:02d}'
   else:
     # Movie
+    if "movie" not in modes:
+      raise ValueError("movie not in modes %r" % (modes,))
     dstpath = ['Movies']
     if episode:
       dstbase += f' - {episode:d}'
