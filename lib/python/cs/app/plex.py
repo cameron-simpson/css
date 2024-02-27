@@ -4,7 +4,6 @@
 ''' Stuff for Plex media libraries.
 '''
 
-import builtins
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from getopt import GetoptError
@@ -18,11 +17,11 @@ from os.path import (
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
-    relpath,
-    samefile,
+    normpath,
     splitext,
 )
 import sys
+from typing import Optional, Sequence
 
 from typeguard import typechecked
 
@@ -30,6 +29,7 @@ from cs.cmdutils import BaseCommand
 from cs.fs import needdir
 from cs.fstags import FSTags, rfilepaths, uses_fstags
 from cs.hashindex import merge, DEFAULT_HASHNAME
+from cs.lex import get_prefix_n
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 
@@ -97,7 +97,7 @@ class PlexCommand(BaseCommand):
     if opt == '-d':
       self.options.plextree = val
     else:
-      return super().apply_opt(opt, val)
+      super().apply_opt(opt, val)
 
   @contextmanager
   @uses_fstags
@@ -249,12 +249,12 @@ def plex_linkpath(
     doit=True,
     quiet=False,
     hashname=DEFAULT_HASHNAME,
-    symlink_mode=True
+    symlink_mode=True,
 ):
-  ''' Symlink `filepath` into `plex_topdirpath`.
+  ''' Symlink `srcpath` into `plex_topdirpath`.
 
       Parameters:
-      * `srcpath`: filesystem pathname of file to link into Plex tree
+      * `srcpath`: filesystem path of the file to link into Plex tree
       * `plex_topdirpath`: filesystem pathname of the Plex tree
       * `symlink_mode`: if true (default) make a symbolic link,
         otherwise a hard link
