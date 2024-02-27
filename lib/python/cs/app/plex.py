@@ -208,7 +208,8 @@ def plex_subpath(
   title = tv.series_title or t.title or base
   season = tv.season and int(tv.season)
   episode = isinstance(tv.episode, (int, str)) and int(tv.episode)
-  episode_title = tv.episode_title
+  episode_title = tv.episode_title or ''
+  episode_title = scrub_title(episode_title, season=season, episode=episode)
   extra = isinstance(tv.extra, (int, str)) and int(tv.extra)
   extra_title = tv.extra_title
   part = tv.part and int(tv.part)
