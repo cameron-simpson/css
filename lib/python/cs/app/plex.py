@@ -141,30 +141,33 @@ class PlexCommand(BaseCommand):
       raise GetoptError(f'plextree does not exist: {plextree!r}')
     for srcroot in srcroots:
       runstate.raiseif()
-      with Pfx(srcroot):
-        for srcpath in srcroot if isfilepath(srcroot) else sorted(
-            rfilepaths(srcroot)):
-          runstate.raiseif()
-          with Pfx(srcpath):
-            try:
-              os.stat(srcpath)
-            except FileNotFoundError as e:
-              warning("%s", e)
-              continue
-            try:
-              plex_linkpath(
-                  srcpath,
-                  dstroot,
-                  modes=modes,
-                  symlink_mode=symlink_mode,
-                  doit=doit,
-                  quiet=False,
-              )
-            except ValueError as e:
-              warning("skipping: %s", e)
-              continue
-            except OSError as e:
-              warning("failed: %s", e)
+      for srcpath in srcroot if isfilepath(srcroot) else sorted(
+          (joinpath(srcroot, normpath(subpath))
+           for subpath in rfilepaths(srcroot))):
+        runstate.raiseif()
+        with Pfx(srcpath):
+          try:
+            os.stat(srcpath)
+          except FileNotFoundError as e:
+            warning("%s", e)
+            continue
+          try:
+            plex_linkpath(
+                srcpath,
+                plextree,
+                modes=modes,
+                symlink_mode=symlink_mode,
+                doit=doit,
+                quiet=False,
+            )
+          except UnsupportedPlexModeError as e:
+            warning("skipping, unsupported plex mode: %s", e)
+            continue
+          except ValueError as e:
+            warning("skipping: %s", e)
+            continue
+          except OSError as e:
+            warning("failed: %s", e)
 
 def scrub_title(title: str, *, season=None, episode=None):
   ''' Strip redundant text from the start of an episode title.
