@@ -52,6 +52,10 @@ DISTINFO = {
     ],
 }
 
+PLEXTREE_DEFAULT = '~/var/plextree'
+PLEXTREE_ENVVAR = 'PLEX_LINKTREE'
+PLEXMODES = "movie,tv"  # "music"?
+
 def main(argv=None):
   ''' Command line mode.
   '''
@@ -62,16 +66,23 @@ class PlexCommand(BaseCommand):
   '''
 
   GETOPT_SPEC = 'd:'
-  USAGE_FORMAT = r'''Usage: {cmd} [-d linktree] subcommand ...
-      -d linktree   Specify the Plex link tree location,
-                    default from \$PLEX_LINKTREE or ~/var/plextree'''
+  USAGE_FORMAT = r'''Usage: {cmd} [-d plextree] subcommand ...
+      -d plextree   Specify the Plex link tree location,
+                    default from \${PLEXTREE_ENVVAR} or {PLEXTREE_DEFAULT}.
+  '''
+  USAGE_KEYWORDS = {
+      'PLEXTREE_DEFAULT': PLEXTREE_DEFAULT,
+      'PLEXTREE_ENVVAR': PLEXTREE_ENVVAR,
+  }
 
   @dataclass
   class Options(BaseCommand.Options):
     ''' Options for `PlexCommand`.
     '''
-    self.options.plextree = os.environ.get(
-        'PLEX_LINKTREE', expanduser('~/var/plextree')
+    modes: str = PLEXMODES
+    plextree: str = field(
+        default_factory=lambda:
+        (os.environ.get(PLEXTREE_ENVVAR, expanduser(PLEXTREE_DEFAULT)))
     )
     symlink_mode: bool = False
 
