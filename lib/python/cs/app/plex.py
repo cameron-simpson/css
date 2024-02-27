@@ -109,33 +109,36 @@ class PlexCommand(BaseCommand):
         yield
 
   def cmd_linktree(self, argv):
-    ''' Usage: {cmd} [-n] [-m mode,...] [--sym] srctrees... dsttree
+    ''' Usage: {cmd} [-d plextree] [-n] [-m mode,...] [--sym] srctrees...
           Link media files from the srctrees into a Plex media tree.
-          -n        No action, dry run. Print the expected actions.
-          -m modes  Allowed modes, comma separated list of \"movie\", \"tv\".
-          --sym     Symlink mode: link media files using symbolic links
-                    instead of hard links. The default is hard links
-                    because that lets you bind mount the plex media tree,
-                    which would make the symlinkpaths invalid in the
-                    bound mount.
+          -d plextree Specify the Plex link tree location.
+          -n          No action, dry run. Print the expected actions.
+          -m modes    Allowed modes, comma separated list of \"movie\", \"tv\".
+          --sym       Symlink mode: link media files using symbolic links
+                      instead of hard links. The default is hard links
+                      because that lets you bind mount the plex media tree,
+                      which would make the symlinkpaths invalid in the
+                      bound mount.
     '''
     options = self.options
     options.symlink_mode = False
     options.popopts(
         argv,
+        d='plextree',
         n='dry_run',
-        m='modes',
+        m_='modes',
         sym='symlink_mode',
     )
     doit = options.doit
+    modes = options.modes.split(',')
+    plextree = options.plextree
     symlink_mode = options.symlink_mode
     runstate = options.runstate
-    if len(argv) < 2:
-      raise GetoptError("missing srctrees or dsttree")
-    dstroot = argv.pop()
+    if not argv:
+      raise GetoptError("missing srctrees")
     srcroots = argv
-    if not isdirpath(dstroot):
-      raise GetoptError("dstroot does not exist: %s" % (dstroot,))
+    if not isdirpath(plextree):
+      raise GetoptError(f'plextree does not exist: {plextree!r}')
     for srcroot in srcroots:
       runstate.raiseif()
       with Pfx(srcroot):
