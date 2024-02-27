@@ -61,6 +61,11 @@ def main(argv=None):
   '''
   return PlexCommand(argv).run()
 
+class UnsupportedPlexModeError(ValueError):
+  ''' Plex path does not match the active modes.
+  '''
+  pass
+
 class PlexCommand(BaseCommand):
   ''' `plex` main command line class.
   '''
@@ -178,7 +183,7 @@ def plex_subpath(fspath: str, fstags: FSTags):
   if tv.series_title and season and episode:
     # TV Series
     if "tv" not in modes:
-      raise ValueError("tv not in modes %r" % (modes,))
+      raise UnsupportedPlexModeError("tv not in modes %r" % (modes,))
     dstpath = ['TV Shows', tv.series_title, f'Season {season:02d}']
     if episode:
       dstbase += f' - s{season:02d}e{episode:02d}'
@@ -187,7 +192,7 @@ def plex_subpath(fspath: str, fstags: FSTags):
   else:
     # Movie
     if "movie" not in modes:
-      raise ValueError("movie not in modes %r" % (modes,))
+      raise UnsupportedPlexModeError("movie not in modes %r" % (modes,))
     dstpath = ['Movies']
     if episode:
       dstbase += f' - {episode:d}'
