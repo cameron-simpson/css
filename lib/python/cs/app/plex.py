@@ -193,9 +193,14 @@ def scrub_title(title: str, *, season=None, episode=None):
 
 @uses_fstags
 @typechecked
-def plex_subpath(fspath: str, fstags: FSTags):
-  ''' Compute a Plex filesystem subpath based on the tags of `filepath`.
+def plex_subpath(
+    fspath: str, *, modes: Optional[Sequence[str]] = None, fstags: FSTags
+):
+  ''' Compute a Plex filesystem subpath based on the tags of `fspath`.
   '''
+  if modes is None:
+    modes = "movie", "tv"
+  assert tuple(modes) == ("tv",), "expected just [tv], got %r" % (modes,)
   base, ext = splitext(basename(fspath))
   itags = fstags[fspath].infer_tags()
   t = itags.auto
@@ -239,6 +244,7 @@ def plex_linkpath(
     srcpath: str,
     plex_topdirpath,
     *,
+    modes: Optional[Sequence[str]] = None,
     doit=True,
     quiet=False,
     hashname=DEFAULT_HASHNAME,
@@ -255,7 +261,7 @@ def plex_linkpath(
       * `quiet`: default `False`; if false print the planned link
       * `hashname`: the file content hash algorithm name
   '''
-  subpath = plex_subpath(srcpath)
+  subpath = plex_subpath(srcpath, modes=modes)
   plexpath = joinpath(plex_topdirpath, subpath)
   if doit and not existspath(plexpath):
     needdir(dirname(plexpath), use_makedirs=True, log=warning)
