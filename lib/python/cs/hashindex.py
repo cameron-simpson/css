@@ -415,6 +415,7 @@ class HashIndexCommand(BaseCommand):
           rearrange(
               targetdir,
               fspaths_by_hashcode,
+              dstdir,
               hashname=hashname,
               doit=doit,
               move_mode=move_mode,
