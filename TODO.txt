@@ -1,3 +1,4 @@
+promote: correct typo annotations
 ffmpeg-docker: does not like files in other directories or something - some bug in atomic filename?
 dlog: DLog to provide a Logger interface?
 ydl/ffmeg-docker - newtrok=none seems to break ffmpeg - what is it fteching and why, should I tweak the filenames?
