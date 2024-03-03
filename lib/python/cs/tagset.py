@@ -2208,6 +2208,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
 
       Examples of this include:
+      * `cs.cdrip.MBSQLTags`: a mapping of MusicbrainsNG entities to their associated `TagSet`
       * `cs.fstags.FSTags`: a mapping of filesystem paths to their associated `TagSet`
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
