@@ -5,7 +5,7 @@
 '''
 
 from collections import defaultdict
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from getopt import GetoptError
 import os
@@ -404,7 +404,8 @@ class HashIndexCommand(BaseCommand):
         if hashcode is not None:
           fspaths_by_hashcode[hashcode].append(fspath)
     # rearrange the target directory.
-    with run_task(f'rearrange {targetspec}'):
+    with (nullcontext()
+          if refhost or targethost else run_task(f'rearrange {targetspec}')):
       if targethost is None:
         with contextif(
             not quiet,
