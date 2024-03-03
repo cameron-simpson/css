@@ -210,7 +210,7 @@ class HasThreadState(ContextManagerMixin):
     ''' Context manager to push all the current objects from `thread_states`
         by calling each as a context manager.
 
-        The default `thread_states` comes from `HasThreadState.thread_states()`.
+        The default `thread_states` comes from `HasThreadState.get_thread_states()`.
     '''
     if thread_states is None or isinstance(thread_states, bool):
       thread_states = cls.get_thread_states(all_classes=thread_states)
@@ -226,9 +226,11 @@ class HasThreadState(ContextManagerMixin):
           yield
         else:
           if htsobj is None:
-            htsobj = nullcontext()
-          with htsobj:
+            # no current object, skip to the next class
             yield from with_thread_states_pusher()
+          else:
+            with htsobj:
+              yield from with_thread_states_pusher()
 
       yield from with_thread_states_pusher()
 
@@ -239,7 +241,7 @@ class HasThreadState(ContextManagerMixin):
         The optional parameter `thread_states`
         may be used to pass an explicit mapping of `type`->`instance`
         of thread states to use;
-        the default states come from `HasThreadState.thread_states()`.
+        the default states come from `HasThreadState.get_thread_states()`.
         The values of this mapping are iterated over and used as context managers.
 
         A boolean value may also be passed meaning:
@@ -257,6 +259,8 @@ class HasThreadState(ContextManagerMixin):
         In this case, pass `thread_states=False` to this call.
     '''
     # snapshot the .current states in the source Thread
+    if thread_states is None:
+      thread_states = False
     if isinstance(thread_states, bool):
       thread_states = cls.get_thread_states(all_classes=thread_states)
     if thread_states:
