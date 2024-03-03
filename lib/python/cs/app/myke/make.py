@@ -113,9 +113,11 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
     ''' Set up the `Later` work queue.
     '''
     self._makeQ = Later(self.parallel, self.name)
-    with self._makeQ:
-      yield
-    self._makeQ.wait()
+    try:
+      with self._makeQ:
+        yield
+    finally:
+      self._makeQ.wait()
 
   def report(self, fp=None):
     ''' Report the make queue status.
