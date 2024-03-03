@@ -24,7 +24,7 @@ from typing import Any, Mapping, Optional
 from cs.context import ContextManagerMixin, stackattrs, stackset
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.gimmicks import error, warning, nullcontext
+from cs.gimmicks import error, warning
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
