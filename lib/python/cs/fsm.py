@@ -135,6 +135,8 @@ class FSM(DOTNodeMixin):
         Fall back to the superclass `__getattr__`.
     '''
     if not attr.startswith('_'):
+      if attr in ('fsm_state',):
+        return None
       if attr in self.FSM_TRANSITIONS:
         return attr
       try:
