@@ -1797,21 +1797,6 @@ class TagSetCriterion(Promotable):
 
   @classmethod
   @pfx_method
-  def promote(cls, criterion, fallback_parse=None):
-    ''' Promote an object to a criterion.
-        Instances of `cls` are returned unchanged.
-        Instances of s`str` are promoted via `cls.from_str`.
-    '''
-    if isinstance(criterion, cls):
-      return criterion
-    if isinstance(criterion, str):
-      return cls.from_str(criterion, fallback_parse=fallback_parse)
-    raise TypeError(
-        "%s.promote: cannot promote to %s" % (cls.__name__, r(criterion))
-    )
-
-  @classmethod
-  @pfx_method
   @typechecked
   def from_str(cls, s: str, fallback_parse=None):
     ''' Prepare a `TagSetCriterion` from the string `s`.
