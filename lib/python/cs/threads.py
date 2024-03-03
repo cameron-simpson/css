@@ -153,7 +153,7 @@ class HasThreadState(ContextManagerMixin):
     cls = self.__class__
     with cls._HasThreadState_lock:
       stacked = stackset(
-          cls._HasThreadState_classes, cls, cls._HasThreadState_lock
+          HasThreadState._HasThreadState_classes, cls, cls._HasThreadState_lock
       )
     with stacked:
       state = getattr(cls, cls.THREAD_STATE_ATTR)
@@ -188,7 +188,7 @@ class HasThreadState(ContextManagerMixin):
             htscls: getattr(
                 getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None
             )
-            for htscls in cls._HasThreadState_classes
+            for htscls in HasThreadState._HasThreadState_classes
         }
       elif cls is HasThreadState:
         currency = {}
