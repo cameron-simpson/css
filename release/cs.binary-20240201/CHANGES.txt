@@ -1,0 +1,1 @@
+lib/python/cs/binary.py: cs.binary: BREAKING CHANGE: drop the long deprecated PacketField related classes

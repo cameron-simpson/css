@@ -1,0 +1,1 @@
+RunState: new raiseif() method to raise CancellationError if the RunState is cancelled.

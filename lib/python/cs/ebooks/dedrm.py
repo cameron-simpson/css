@@ -53,11 +53,12 @@ class DeDRMCommand(BaseCommand):
 
   GETOPT_SPEC = 'D:'
   USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
-    -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
-        For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
-        at /path/to/DeDRM_tools--noDRM you could supply:
-        -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
-        or place that value in the $DEDRM_PACKAGE_PATH environment variable.
+    Options:
+      -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
+          For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
+          at /path/to/DeDRM_tools--noDRM you could supply:
+          -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
+          or place that value in the $DEDRM_PACKAGE_PATH environment variable.
   '''
 
   @dataclass
@@ -132,7 +133,13 @@ class DeDRMCommand(BaseCommand):
 
   def cmd_kindlekeys(self, argv):
     ''' Usage: {cmd} [import]
-          import    Read a JSON list of key dicts and update the cached keys.
+          Print or import the Kindle DRM keys.
+          Modes:
+            import    Read a JSON list of key dicts and update the cached keys.
+          Example:
+            Import the keys from one host into the local collection:
+              ssh otherhost python3 -m cs.ebooks.dedrm kindlekeys \
+              | python3 -m cs.ebooks dedrm kindlekeys import
     '''
     dedrm = self.options.dedrm
     if not argv:

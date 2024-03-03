@@ -28,7 +28,7 @@ where the components are:
 As you may imagine,
 as a rule I dislike mixed case filenames
 and filenames with embedded whitespace.
-I also like a media filename to contain enough infomation
+I also like a media filename to contain enough information
 to identify the file contents in a compact and human readable form.
 '''
 

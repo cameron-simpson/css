@@ -104,7 +104,7 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230612-post'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -141,9 +141,9 @@ DISTINFO = {
         'typeguard',
     ],
     'entry_points': {
-        'console_scripts': [
-            'csts = cs.timeseries:main',
-        ],
+        'console_scripts': {
+            'csts': 'cs.timeseries:main',
+        },
     },
     'extras_requires': {
         'pandas': ['pandas'],
@@ -701,7 +701,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
-          Report infomation about the time series stored at tspath.
+          Report information about the time series stored at tspath.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))

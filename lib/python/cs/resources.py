@@ -27,7 +27,7 @@ from cs.py.stack import caller, frames as stack_frames, stack_dump
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20231129-post'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -44,7 +44,9 @@ DISTINFO = {
         'cs.psutils',
         'cs.py.func',
         'cs.py.stack',
+        'cs.result',
         'cs.threads',
+        'typeguard',
     ],
 }
 
@@ -164,8 +166,7 @@ class _mom_state(object):
 ## debug: TrackedClassMixin
 class MultiOpenMixin(ContextManagerMixin):
   ''' A multithread safe mixin to count open and close calls,
-      and to call `.startup` on the first `.open`
-      and to call `.shutdown` on the last `.close`.
+      doing a startup on the first `.open` and shutdown on the last `.close`.
 
       If used as a context manager this mixin calls `open()`/`close()` from
       `__enter__()` and `__exit__()`.
@@ -174,11 +175,9 @@ class MultiOpenMixin(ContextManagerMixin):
       during `__init__`, and do almost all setup during startup so
       that the class may perform multiple startup/shutdown iterations.
 
-      Classes using this mixin need to:
-      * _either_ define a context manager method `.startup_shutdown`
-        which does the startup actions before yeilding
-        and then does the shutdown actions
-      * _or_ define separate `.startup` and `.shutdown` methods.
+      Classes using this mixin should define a context manager
+      method `.startup_shutdown` which does the startup actions
+      before yielding and then does the shutdown actions.
 
       Example:
 
@@ -192,9 +191,19 @@ class MultiOpenMixin(ContextManagerMixin):
           with DatabaseThing(...) as db_thing:
               ... use db_thing ...
 
-      Why not a plain context manager? Because in multithreaded
-      code one wants to keep the instance "open" while any thread
-      is still using it.
+      If course, often something like a database open will itself
+      be a context manager and the `startup_shutdown` method more
+      usually looks like this:
+
+              @contextmanager
+              def startup_shutdown(self):
+                  with open_the_database() as db:
+                      self._db = db
+                      yield
+
+      Why not just write a plain context manager class? Because in
+      multithreaded or async code one wants to keep the instance
+      "open" while any thread is still using it.
       This mixin lets threads use an instance in overlapping fashion:
 
           db_thing = DatabaseThing(...)
@@ -354,6 +363,11 @@ class MultiOpenMixin(ContextManagerMixin):
         unless the object's `finalise_later` parameter was true.
     '''
     self.__mo_getstate().join()
+
+  def is_open(self):
+    ''' Test whether this object is open.
+    '''
+    return self.__mo_getstate().opens > 0
 
   @staticmethod
   def is_opened(func):

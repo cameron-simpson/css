@@ -1,0 +1,3 @@
+SQLTagSet.to_polyvalue: treat sets like lists.
+SQLTags.default_factory: honour new skip_refresh parameter, apply any presupplied tags.
+Pull the cmd_* methods from BaseSQLTagsCommand into new SQLTagsCommandsMixin for reuse.

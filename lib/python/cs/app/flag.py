@@ -84,7 +84,9 @@ DISTINFO = {
         'cs.pfx',
     ],
     'entry_points': {
-        'console_scripts': ['flagset = cs.app.flag:main_flagset'],
+        'console_scripts': {
+            'flagset': 'cs.app.flag:main_flagset'
+        },
     },
 }
 

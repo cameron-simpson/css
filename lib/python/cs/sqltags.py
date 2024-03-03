@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230612-post'
+__version__ = '20240201.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -87,7 +87,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts': ['sqltags = cs.sqltags:main'],
+        'console_scripts': {
+            'sqltags': 'cs.sqltags:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils>=20210404',
@@ -1661,7 +1663,11 @@ class SQLTags(BaseTagSets, Promotable):
 
   @typechecked
   def default_factory(
-      self, name: Optional[str] = None, *, unixtime=None, tags=None,
+      self,
+      name: Optional[str] = None,
+      *,
+      unixtime=None,
+      tags=None,
       skip_refresh=False,
   ):
     ''' Fetch or create an `SQLTagSet` for `name`.
@@ -1768,7 +1774,7 @@ class SQLTags(BaseTagSets, Promotable):
     entities = self.orm.entities
     entities_table = entities.__table__  # pylint: disable=no-member
     name_column = entities_table.c.name
-    q = select([name_column])
+    q = select(name_column)
     if prefix is None:
       q = q.where(name_column.isnot(None))
     else:
@@ -1976,109 +1982,17 @@ class SQLTags(BaseTagSets, Promotable):
           e.add_tag(tag)
 
   @classmethod
-  def promote(cls, obj):
-    if isinstance(obj, cls):
-      return obj
-    if isinstance(obj, str):
-      if obj.startswith('~') or isabspath(obj):
-        # expect filesystem path to an SQLite file
-        if not obj.endswith('.sqlite'):
-          raise ValueError("expected path to .sqlite file")
-        obj = expanduser(obj)
-        return cls(obj)
-    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
-
-class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
-  ''' Common features for commands oriented around an `SQLTags` database.
-  '''
-
-  TAGSETS_CLASS = SQLTags
-
-  TAGSET_CRITERION_CLASS = SQTCriterion
-
-  TAG_BASED_TEST_CLASS = SQLTagBasedTest
-
-  GETOPT_SPEC = 'f:'
-
-  # TODO:
-  # export_csv [criteria...] >csv_data
-  #   Export selected items to CSV data.
-  # import_csv <csv_data
-  #   Import CSV data.
-  # init
-  #   Initialise the database.
-
-  USAGE_FORMAT = '''Usage: {cmd} [-f db_url] subcommand [...]
-  -f db_url SQLAlchemy database URL or filename.
-            Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').'''
-
-  USAGE_KEYWORDS = {
-      'DBURL_DEFAULT': DBURL_DEFAULT,
-      'DBURL_ENVVAR': DBURL_ENVVAR,
-  }
-
-  @dataclass
-  class Options(BaseCommand.Options):
-    db_url: str = field(
-        default_factory=lambda: BaseSQLTagsCommand.TAGSETS_CLASS.infer_db_url()
-    )
-    sqltags: Optional[SQLTags] = None
-
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
+  def from_str(cls, db_url: str):
+    ''' Create an `SQLTags` from `db_url`.
     '''
-    options = self.options
-    if opt == '-f':
-      options.db_url = val
-    else:
-      super().apply_opt(opt, val)
+    if db_url.startswith('~') or isabspath(db_url):
+      # expect filesystem path to an SQLite file
+      if not db_url.endswith('.sqlite'):
+        raise ValueError("expected path to .sqlite file")
+      db_url = expanduser(db_url)
+    return cls(db_url=db_url)
 
-  @contextmanager
-  def run_context(self):
-    ''' Prepare the `SQLTags` around each command invocation.
-    '''
-    with super().run_context():
-      options = self.options
-      db_url = options.db_url
-      sqltags = self.TAGSETS_CLASS(db_url)
-      with sqltags:
-        with stackattrs(options, sqltags=sqltags, verbose=True):
-          yield
-
-  @classmethod
-  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
-    ''' Parse tag criteria from `argv`.
-
-        The criteria may be either:
-        * an integer specifying a `Tag` id
-        * a sequence of tag criteria
-    '''
-    # try a single int argument
-    try:
-      index = int(arg)
-    except ValueError:
-      return super().parse_tagset_criterion(
-          arg, tag_based_test_class=tag_based_test_class
-      )
-    else:
-      return SQTEntityIdTest([index])
-
-  @staticmethod
-  def parse_categories(categories):
-    ''' Extract "category" words from the `str` `categories`,
-        return a list of category names.
-
-        Splits on commas, strips leading and trailing whitespace, downcases.
-    '''
-    return list(
-        filter(
-            None,
-            map(
-                lambda category: category.strip().lower(),
-                categories.split(',')
-            )
-        )
-    )
+class SQLTagsCommandsMixin(TagsCommandMixin):
 
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
@@ -2440,20 +2354,111 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
             index = int(name)
           except ValueError:
             index = name
-          te = sqltags.get(index)
-          if te is None:
+          tags = sqltags.get(index)
+          if tags is None:
             error("missing")
             xit = 1
             continue
-          tags = te.tags
           for tag_choice in tag_choices:
             if tag_choice.choice:
               if tag_choice.tag not in tags:
-                te.set(tag_choice.tag)
+                tags.set(tag_choice.tag)
             else:
               if tag_choice.tag in tags:
-                te.discard(tag_choice.tag)
+                tags.discard(tag_choice.tag)
     return xit
+
+class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
+  ''' Common features for commands oriented around an `SQLTags` database.
+  '''
+
+  TAGSETS_CLASS = SQLTags
+
+  TAGSET_CRITERION_CLASS = SQTCriterion
+
+  TAG_BASED_TEST_CLASS = SQLTagBasedTest
+
+  GETOPT_SPEC = 'f:'
+
+  # TODO:
+  # export_csv [criteria...] >csv_data
+  #   Export selected items to CSV data.
+  # import_csv <csv_data
+  #   Import CSV data.
+  # init
+  #   Initialise the database.
+
+  USAGE_FORMAT = '''Usage: {cmd} [-f db_url] subcommand [...]
+  -f db_url SQLAlchemy database URL or filename.
+            Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').'''
+
+  USAGE_KEYWORDS = {
+      'DBURL_DEFAULT': DBURL_DEFAULT,
+      'DBURL_ENVVAR': DBURL_ENVVAR,
+  }
+
+  @dataclass
+  class Options(BaseCommand.Options):
+    db_url: str = field(
+        default_factory=lambda: BaseSQLTagsCommand.TAGSETS_CLASS.infer_db_url()
+    )
+    sqltags: Optional[SQLTags] = None
+
+  def apply_opt(self, opt, val):
+    ''' Apply a command line option.
+    '''
+    options = self.options
+    if opt == '-f':
+      options.db_url = val
+    else:
+      super().apply_opt(opt, val)
+
+  @contextmanager
+  def run_context(self):
+    ''' Prepare the `SQLTags` around each command invocation.
+    '''
+    with super().run_context():
+      options = self.options
+      db_url = options.db_url
+      sqltags = self.TAGSETS_CLASS(db_url)
+      with sqltags:
+        with stackattrs(options, sqltags=sqltags, verbose=True):
+          yield
+
+  @classmethod
+  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
+    ''' Parse tag criteria from `argv`.
+
+        The criteria may be either:
+        * an integer specifying a `Tag` id
+        * a sequence of tag criteria
+    '''
+    # try a single int argument
+    try:
+      index = int(arg)
+    except ValueError:
+      return super().parse_tagset_criterion(
+          arg, tag_based_test_class=tag_based_test_class
+      )
+    else:
+      return SQTEntityIdTest([index])
+
+  @staticmethod
+  def parse_categories(categories):
+    ''' Extract "category" words from the `str` `categories`,
+        return a list of category names.
+
+        Splits on commas, strips leading and trailing whitespace, downcases.
+    '''
+    return list(
+        filter(
+            None,
+            map(
+                lambda category: category.strip().lower(),
+                categories.split(',')
+            )
+        )
+    )
 
 class SQLTagsCommand(BaseSQLTagsCommand):
   ''' `sqltags` main command line utility.

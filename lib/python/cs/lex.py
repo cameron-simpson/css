@@ -31,6 +31,7 @@ from string import (
 import sys
 from textwrap import dedent
 from threading import Lock
+from typing import Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
@@ -43,7 +44,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20231018-post'
+__version__ = '20240211-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -970,11 +971,9 @@ def match_tokens(s, offset, getters):
       and returns `(None,offset)`.
   '''
   try:
-    tokens, offset2 = get_tokens(s, offset, getters)
+    return get_tokens(s, offset, getters)
   except ValueError:
     return None, offset
-  else:
-    return tokens, offset2
 
 def isUC_(s):
   ''' Check that a string matches the regular expression `^[A-Z][A-Z_0-9]*$`.
@@ -1248,6 +1247,24 @@ def snakecase(camelcased):
       was_lower = True
     strs.append(c)
   return ''.join(strs)
+
+def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
+  ''' Split a path with an optional leading `[user@]rhost:` prefix
+      into the prefix and the remaining path.
+      `None` is returned for the prefix is there is none.
+      This is useful for things like `rsync` targets etc.
+  '''
+  ssh_target = None
+  # check for [user@]rhost
+  try:
+    prefix, suffix = remotepath.split(':', 1)
+  except ValueError:
+    pass
+  else:
+    if prefix and '/' not in prefix:
+      ssh_target = prefix
+      remotepath = suffix
+  return ssh_target, remotepath
 
 # pylint: disable=redefined-outer-name
 def format_escape(s):
