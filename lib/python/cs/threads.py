@@ -161,7 +161,7 @@ class HasThreadState(ContextManagerMixin):
         yield
 
   @classmethod
-  def thread_states(cls, all_classes=False):
+  def get_thread_states(cls, all_classes=None):
     ''' Return a mapping of `class`->*current_instance*`
         for use with `HasThreadState.with_thread_states`
         or `HasThreadState.Thread` or `HasThreadState.bg`.
@@ -208,8 +208,8 @@ class HasThreadState(ContextManagerMixin):
 
         The default `thread_states` comes from `HasThreadState.thread_states()`.
     '''
-    if thread_states is None:
-      thread_states = cls.thread_states()
+    if thread_states is None or isinstance(thread_states, bool):
+      thread_states = cls.get_thread_states(all_classes=thread_states)
     if not thread_states:
       yield
     else:
@@ -253,8 +253,8 @@ class HasThreadState(ContextManagerMixin):
         In this case, pass `thread_states=False` to this call.
     '''
     # snapshot the .current states in the source Thread
-    if thread_states is None or thread_states is True:
-      thread_states = cls.thread_states()
+    if isinstance(thread_states, bool):
+      thread_states = cls.get_thread_states(all_classes=thread_states)
     if thread_states:
 
       def target_wrapper(*a, **kw):
