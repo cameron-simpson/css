@@ -205,7 +205,6 @@ from os.path import (
 from pprint import pformat
 import re
 import sys
-from threading import Lock
 import time
 from typing import Mapping, Optional, Tuple, Union
 from uuid import UUID, uuid4
@@ -3950,5 +3949,4 @@ def selftest(argv):
     print("tag.format_as(%r) => %s" % (format_str, formatted))
 
 if __name__ == '__main__':
-  import sys
   sys.exit(selftest(sys.argv))
