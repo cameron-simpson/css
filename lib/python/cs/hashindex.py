@@ -634,7 +634,7 @@ def read_remote_hashindex(
       )
   )
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
-  remote = pipefrom(remote_argv)
+  remote = pipefrom(remote_argv, quiet=True)
   yield from read_hashindex(remote.stdout, hashname=hashname)
   if check:
     remote.wait()
@@ -680,7 +680,7 @@ def run_remote_hashindex(
   ))
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
   with without():
-    return run(remote_argv, check=check, doit=doit, **subp_options)
+    return run(remote_argv, check=check, doit=doit, quiet=True, **subp_options)
 
 @uses_fstags
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
