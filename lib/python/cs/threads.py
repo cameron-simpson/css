@@ -181,11 +181,14 @@ class HasThreadState(ContextManagerMixin):
           for all `HasThreadState` subclasses with an open instance,
           otherwise just a mapping from this class to its current instance
     '''
+    if all_classes is None:
+      all_classes = False
     with cls._HasThreadState_lock:
       if all_classes:
-        #
+        # the "current" instance for every HasThreadState._HasThreadState_classes
         currency = {
-            htscls: getattr(
+            htscls:
+            getattr(
                 getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None
             )
             for htscls in HasThreadState._HasThreadState_classes
@@ -193,8 +196,9 @@ class HasThreadState(ContextManagerMixin):
       elif cls is HasThreadState:
         currency = {}
       else:
+        # just the current instance of the calling class
         currency = {
-            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
+            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR, 'current'), None)
         }
     return currency
 
