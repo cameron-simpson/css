@@ -791,26 +791,25 @@ def rearrange(
           if rsrcpath == rdstpath:
             continue
           dstpath = joinpath(dstdirpath, rdstpath)
-          if not quiet:
-            print(opname, shortpath(srcpath), shortpath(dstpath))
           if doit:
             needdir(dirname(dstpath), use_makedirs=True, log=warning)
-            try:
-              merge(
-                  srcpath,
-                  dstpath,
-                  opname=opname,
-                  hashname=hashname,
-                  move_mode=False,  # we do our own remove below
-                  symlink_mode=symlink_mode,
-                  fstags=fstags,
-                  doit=doit,
-                  quiet=True,  # we do our own print above
-              )
-            except FileExistsError as e:
-              warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
-            else:
-              if move_mode and rsrcpath not in rfspaths:
+          try:
+            merge(
+                srcpath,
+                dstpath,
+                opname=opname,
+                hashname=hashname,
+                move_mode=False,  # we do our own remove below
+                symlink_mode=symlink_mode,
+                fstags=fstags,
+                doit=doit,
+                quiet=quiet,
+            )
+          except FileExistsError as e:
+            warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
+          else:
+            if move_mode and rsrcpath not in rfspaths:
+              if doit:
                 to_remove.add(srcpath)
     # purge the srcpaths last because we might want them multiple
     # times during the main loop (files with the same hashcode)
@@ -843,10 +842,6 @@ def merge(
   '''
   if opname is None:
     opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
-  if not quiet:
-    print(opname, shortpath(srcpath), shortpath(dstpath))
-  if not doit:
-    return
   if dstpath == srcpath:
     return
   if symlink_mode:
@@ -865,14 +860,28 @@ def merge(
     if (samefile(srcpath, dstpath)
         or (file_checksum(dstpath, hashname=hashname) == file_checksum(
             srcpath, hashname=hashname))):
-      fstags[dstpath].update(fstags[srcpath])
+      # same content - update tags and remove source
+      if doit:
+        fstags[dstpath].update(fstags[srcpath])
       if move_mode and realpath(srcpath) != realpath(dstpath):
-        pfx_call(os.remove, srcpath)
+        if not quiet:
+          print(
+              "remove", shortpath(srcpath), "# identical content at",
+              shortpath(dstpath)
+          )
+        if doit:
+          pfx_call(os.remove, srcpath)
       return
+    # different content, fail
     raise FileExistsError(
         f'dstpath {dstpath!r} already exists with different hashcode'
     )
-  pfx_call(fstags.mv, srcpath, dstpath, symlink=symlink_mode, remove=move_mode)
+  if not quiet:
+    print(opname, shortpath(srcpath), shortpath(dstpath))
+  if doit:
+    pfx_call(
+        fstags.mv, srcpath, dstpath, symlink=symlink_mode, remove=move_mode
+    )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
