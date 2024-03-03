@@ -24,6 +24,7 @@ class MykeCommand(BaseCommand):
 
   GETOPT_SPEC = 'dD:eEf:ij:kmNnpqrRsS:tuvx'
   USAGE_FORMAT = "Usage: {cmd} [options...] [macro=value...] [targets...]"
+
   Options = Maker
 
   # pylint: disable=too-many-branches
@@ -54,7 +55,7 @@ class MykeCommand(BaseCommand):
       try:
         val = int(val)
       except ValueError as e:
-        raise GetoptError("invalid -j val: %s" % (e,)) from e
+        raise GetoptError("invalid -j value: int(%r): %s" % (val, e)) from e
       if val < 1:
         raise GetoptError("invalid -j value: %d, must be >= 1" % (val,))
       M.parallel = int(val)
