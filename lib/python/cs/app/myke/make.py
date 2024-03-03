@@ -19,6 +19,8 @@ import time
 from types import SimpleNamespace as NS
 from typing import Any, Optional
 
+from typeguard import typechecked
+
 from cs.cmdutils import BaseCommandOptions
 from cs.excutils import logexc
 from cs.inttypes import Flags
@@ -544,7 +546,16 @@ class Target(Result):
   ''' A make target.
   '''
 
-  def __init__(self, maker, name, context, prereqs, postprereqs, actions):
+  @typechecked
+  def __init__(
+      self,
+      maker: Maker,
+      name: str,
+      context,
+      prereqs,
+      postprereqs,
+      actions,
+  ):
     ''' Initialise a new target.
           `maker`: the Maker with which this Target is associated.
           `context`: the file context, for citations.
