@@ -769,6 +769,7 @@ class Target(Result):
     ''' Apply the consequences of the completed prereq T.
     '''
     with Pfx("%s._apply_prereqs(T=%s)", self, T):
+      assert isinstance(self.maker, Maker)
       mdebug = self.maker.debug_make
       if not T.ready:
         raise RuntimeError("not ready")
