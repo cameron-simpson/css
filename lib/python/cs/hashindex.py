@@ -794,19 +794,23 @@ def rearrange(
             print(opname, shortpath(srcpath), shortpath(dstpath))
           if doit:
             needdir(dirname(dstpath), use_makedirs=True, log=warning)
-            merge(
-                srcpath,
-                dstpath,
-                opname=opname,
-                hashname=hashname,
-                move_mode=False,  # we do our own remove below
-                symlink_mode=symlink_mode,
-                fstags=fstags,
-                doit=doit,
-                quiet=True,  # we do our own print above
-            )
-            if move_mode and rsrcpath not in rfspaths:
-              to_remove.add(srcpath)
+            try:
+              merge(
+                  srcpath,
+                  dstpath,
+                  opname=opname,
+                  hashname=hashname,
+                  move_mode=False,  # we do our own remove below
+                  symlink_mode=symlink_mode,
+                  fstags=fstags,
+                  doit=doit,
+                  quiet=True,  # we do our own print above
+              )
+            except FileExistsError as e:
+              warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
+            else:
+              if move_mode and rsrcpath not in rfspaths:
+                to_remove.add(srcpath)
     # purge the srcpaths last because we might want them multiple
     # times during the main loop (files with the same hashcode)
     if doit and to_remove:
