@@ -708,37 +708,37 @@ class Target(Result):
     self.maker.debug_make("%s: CANCEL", self)
     Result.cancel(self)
 
+  @pfx_method
   def require(self):
     ''' Require this Target to be made.
     '''
-    with Pfx("%r.require()", self.name):
-      with self._lock:
-        if self.is_pending:
-          # commence make of this Target
-          self.maker.target_active(self)
-          self.notify(self.maker.target_inactive)
-          self.dispatch()
-          self.was_missing = self.mtime is None
-          self.pending_actions = list(self.actions)
-          Ts = []
-          for Pname in self.prereqs:
-            T = self.maker[Pname]
-            Ts.append(T)
-            T.require()
+    with self._lock:
+      if self.is_pending:
+        # commence make of this Target
+        self.maker.target_active(self)
+        self.notify(self.maker.target_inactive)
+        self.dispatch()
+        self.was_missing = self.mtime is None
+        self.pending_actions = list(self.actions)
+        Ts = []
+        for Pname in self.prereqs:
+          T = self.maker[Pname]
+          Ts.append(T)
+          T.require()
 
-            # fire fail action immediately
-            def f(T):
-              if T.result:
-                pass
-              else:
-                self.fail("REQUIRE(%s): FAILED by prereq %s" % (self, T))
+          # fire fail action immediately
+          def f(T):
+            if T.result:
+              pass
+            else:
+              self.fail("REQUIRE(%s): FAILED by prereq %s" % (self, T))
 
-            T.notify(f)
-          # queue the first unit of work
-          if Ts:
-            self.maker.after(Ts, self._make_after_prereqs, Ts)
-          else:
-            self._make_after_prereqs(Ts)
+          T.notify(f)
+        # queue the first unit of work
+        if Ts:
+          self.maker.after(Ts, self._make_after_prereqs, Ts)
+        else:
+          self._make_after_prereqs(Ts)
 
   @logexc
   def _make_after_prereqs(self, Ts):
