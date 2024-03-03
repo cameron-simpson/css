@@ -6,7 +6,6 @@
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 import errno
-import getopt
 from itertools import zip_longest
 import logging
 import os
@@ -28,7 +27,7 @@ from cs.later import Later
 from cs.lex import get_identifier, get_white
 from cs.logutils import debug, info, error, exception, D
 import cs.pfx
-from cs.pfx import pfx, Pfx
+from cs.pfx import pfx, Pfx, pfx_method
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.result import Result
