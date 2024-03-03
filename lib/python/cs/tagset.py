@@ -2106,6 +2106,9 @@ class TagSetPrefixView(FormatableMixin):
         filter(lambda k: k.startswith(prefix_), self._tags.keys())
     )
 
+  def __len__(self):
+    return len(list(self.keys()))
+
   def __contains__(self, k):
     return self._prefix_ + k in self._tags
 
@@ -2144,6 +2147,12 @@ class TagSetPrefixView(FormatableMixin):
     ''' Return an iterable of the values (`Tag`s).
     '''
     return map(lambda k: self[k], self.keys())
+
+  def update(self, mapping):
+    ''' Update tags from a name->value mapping.
+    '''
+    for k, v in mapping.items():
+      self[k] = v
 
   def as_dict(self):
     ''' Return a `dict` representation of this view.
