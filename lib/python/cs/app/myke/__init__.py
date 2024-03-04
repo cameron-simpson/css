@@ -30,7 +30,7 @@ DISTINFO = {
     ],
     'entry_points': {
         'console_scripts': [
-            'myke = cs.app.myke__main__:main',
+            'myke = cs.app.myke.__main__:main',
         ],
     },
 }
