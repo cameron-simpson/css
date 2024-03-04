@@ -88,7 +88,7 @@ cs.sh
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.splink ok_revision=bf801da5b1346e4a0b259df2555a574b7f752698 pypi.release="20240201"
 cs.sqlalchemy_utils ok_revision="6bffe65c02777bd9ab29edc059e111f4c02b6d74" pypi.release="20230612" features={"20230612":["orchestrated_session"]}
-cs.sqltags ok_revision="45f644535f0f3f17b933a6cc6a7da6bd8581e950" pypi.release="20240201.1"
+cs.sqltags ok_revision="45f644535f0f3f17b933a6cc6a7da6bd8581e950" pypi.release="20240305"
 cs.tagset ok_revision=f9856215aa26d80e8470ff06a3c883358692df35 features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20240305"
 cs.taskqueue ok_revision="5b2c7311b70519bea966bedf91008c797770c819" features={"20221207":["BaseTask"]} pypi.release="20230401"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
