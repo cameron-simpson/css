@@ -60,7 +60,7 @@ cs.mappings pypi.release="20231129" ok_revision="4a18c12b4d506c8532e5b60a97ca49d
 cs.mediainfo
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.mplutils ok_revision="24a1ebf5b45d44a734462ba8fd3120331bce0173" pypi.release="20230407" features={"20220918":["FigureSize"]}
-cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783" pypi.release="20211208"
+cs.ndjson ok_revision="9df558bd5a344fc076056fac0a84e1cf7f050872" pypi.release="20211208"
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release="20220606" ok_revision=b55e44581d06b3015d0203ca7fea5c063124469c features={"20220606":["intif"]}
 cs.obj pypi.release="20220918" ok_revision=dd0916cd678327c815e379bf8ed00c9ce4332874 features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"]}
