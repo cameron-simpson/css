@@ -55,7 +55,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20240305'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'keywords': ["python3"],
