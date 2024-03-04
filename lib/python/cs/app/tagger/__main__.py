@@ -184,8 +184,6 @@ class TaggerCommand(BaseCommand):
         with Pfx(path):
           proxy.text = shortpath(path)
           if not existspath(path):
-            warning("no such path, skipping")
-            xit = 1
             continue
           if isdirpath(path) and not direct:
             if recurse:
