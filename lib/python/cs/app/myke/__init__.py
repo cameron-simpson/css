@@ -29,9 +29,9 @@ DISTINFO = {
         'cs.threads',
     ],
     'entry_points': {
-        'console_scripts': [
-            'myke = cs.app.myke.__main__:main',
-        ],
+        'console_scripts': {
+            'myke': 'cs.app.myke.__main__:main',
+        },
     },
 }
 
