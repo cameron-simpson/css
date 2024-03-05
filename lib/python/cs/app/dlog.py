@@ -5,6 +5,26 @@
 
     This is an upgrade from my venerable shell script,
     whose logic was becoming unwieldy.
+
+    I more or less live in the shell, so I log activity with brief
+    1-line shell command commands eg:
+
+        dlog HOME: set up the whatchamgig
+
+    which I alias as `dl`, with additional aliases like `HOME` for `dl HOME:`
+    and so forth; as short a throwaway line as I can get away with.
+    In particular, I use this to make notes about work activity
+    (none of the several time tracking tools I've tried work for me)
+    and things like banking and purchases eg:
+
+        dl MYBANK,VENDOR: xfer \\$99 to vendor for widget from bank acct rcpt 1234567
+
+    I've got scripts to pull out the work ones for making invoices
+    and an assortment of other scripts (eg my `alert` script) also log via `dlog`.
+
+    The current incarnation logs to a flat text file (default `~/var/dlog-quick`)
+    and to `SQLTags` SQLite database.
+    It has a little daemon mode to reduce contention for the SQLite database too.
 '''
 
 from dataclasses import dataclass, field
@@ -40,6 +60,44 @@ from cs.resources import RunState, uses_runstate
 from cs.sqltags import SQLTags, DBURL_DEFAULT
 from cs.tagset import Tag, TagSet
 from cs.upd import print, builtin_print  # pylint: disable=redefined-builtin
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Development Status :: 5 - Production/Stable",
+        "Environment :: Console",
+        "Intended Audience :: Developers",
+        "Topic :: System :: Logging",
+        "Topic :: Utilities",
+    ],
+    'install_requires': [
+        'arrow',
+        'cs.buffer',
+        'cs.cmdutils',
+        'cs.context',
+        'cs.dateutils',
+        'cs.deco',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.progress',
+        'cs.queues',
+        'cs.resources',
+        'cs.sqltags',
+        'cs.tagset',
+        'cs.upd',
+        'icontract',
+        'typeguard',
+    ],
+    'entry_points': {
+        'console_scripts': {
+            'dlog': 'cs.app.dlog:main',
+        },
+    },
+}
 
 def main(argv=None):
   ''' Run the `dlog` command line implementation.
