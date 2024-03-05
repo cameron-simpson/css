@@ -200,10 +200,10 @@ do
 
     # =item --delete
     #
-    # Passed to rsync.
+    # Passed to rsync (on by default).
     #
     --delete)
-      rsdelete="$rsdelete --delete"
+      rsdelete="--delete"
       ;;
 
     # =item --delete-excluded
