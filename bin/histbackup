@@ -108,7 +108,7 @@ rsopts=
 copytimes=
 rsdelete=--delete
 thisbackup=
-sshcmd='ssh -o controlpath=none'
+sshcmd="${RSYNC_RSH:-ssh} -o controlpath=none"
 reverse=
 verbose=
 imode=
