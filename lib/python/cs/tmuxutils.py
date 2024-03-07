@@ -17,6 +17,7 @@ from subprocess import CompletedProcess, PIPE, Popen
 import sys
 from tempfile import TemporaryDirectory
 from threading import Lock
+import time
 from time import sleep
 from typing import Callable, List, Optional
 
@@ -221,8 +222,11 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
   def startup_shutdown(self):
     ''' Open/close the control socket.
     '''
-    with Popen([self.TMUX, '-S', self.fspath, '-C'], stdin=PIPE,
-               stdout=PIPE) as P:
+    with Popen(
+        [self.TMUX, '-S', self.fspath, '-C'],
+        stdin=PIPE,
+        stdout=PIPE,
+    ) as P:
       try:
         pending = []  # queue of pending Results
         with stackattrs(self, rf=P.stdout, wf=P.stdin, pending=pending):
