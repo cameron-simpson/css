@@ -75,6 +75,7 @@ from configparser import ConfigParser
 from contextlib import contextmanager
 import csv
 from dataclasses import dataclass
+from datetime import date, datetime
 import errno
 from getopt import getopt, GetoptError
 import json
@@ -1863,12 +1864,22 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
     # implied tags by suffix
     for tag_name, value in sorted(itags.items()):
       while True:
-        for conv, upconv in dict(lc=titleify_lc, n=int).items():
+        for conv, upconv in dict(
+            date=date.fromisoformat,
+            dt=datetime.fromisoformat,
+            f=float,
+            lc=titleify_lc,
+            n=int,
+        ).items():
           suffix = '_' + conv
           prefix = cutsuffix(tag_name, suffix)
           if prefix is not tag_name:
             with Pfx("%r:%r via %s", tag_name, value, upconv):
-              value = upconv(value)
+              try:
+                value = upconv(value)
+              except (TypeError, ValueError) as e:
+                ##warning("%s", e)
+                continue
             tag_name = prefix
             if tag_name not in itags:
               itags.set(tag_name, value)
