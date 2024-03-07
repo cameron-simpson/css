@@ -158,11 +158,14 @@ class TmuxCommandResponse:
   @classmethod
   def read_response(cls, rf, *, notify=None):
     ''' Read a tmux control response from `rf`.
+
+        May raise `EOFError` from the `TmuxControlItem.parse()` call.
     '''
     notifications = []
     while True:
-      bs = rf.readline()
-      if not bs:
+      try:
+        item = TmuxControlItem.parse(rf)
+      except EOFError:
         return None
       if not bs.startswith(b'%'):
         warning("no-%% line: %r", bs)
