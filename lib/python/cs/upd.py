@@ -91,7 +91,7 @@ except ImportError as curses_e:
   warning("cannot import curses: %s", curses_e)
   curses = None
 
-__version__ = '20240201-post'
+__version__ = '20240216-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1280,6 +1280,21 @@ def with_upd_proxy(func, prefix=None, insert_at=1):
         return func(*a, upd_proxy=proxy, **kw)
 
   return upd_with_proxy_wrapper
+
+@contextmanager
+@uses_upd
+def without(*, upd: Upd):
+  ''' Context manager withdraw the `Upd` while something runs.
+
+      Example:
+
+          from cs.upd import without
+          ...
+          with without():
+              os.system('ls -la')
+  '''
+  with upd.above():
+    yield upd
 
 # Always create a default Upd() in open state.
 # Keep a module level name, which avoids the singleton weakref array

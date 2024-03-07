@@ -30,7 +30,7 @@ from cs.context import stackattrs
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.psutils import run
 
-__version__ = '20240201-post'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -243,6 +243,7 @@ class DockerRun:
   INPUTDIR_DEFAULT = '/input'
   OUTPUTDIR_DEFAULT = '/output'
   image: str = None
+  network: str = 'none'
   options: List[str] = field(default_factory=list)
   input_root: str = INPUTDIR_DEFAULT
   input_map: dict = field(default_factory=dict)
@@ -386,6 +387,7 @@ class DockerRun:
         docker_exe,
         'run',
         '--rm',
+        ('--network', self.network),
         '-w',
         self.output_root,
         *self.options,

@@ -48,7 +48,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd
 
-__version__ = '20240201-post'
+__version__ = '20240211-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -58,6 +58,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
+        'cs.deco',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',

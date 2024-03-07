@@ -1,0 +1,4 @@
+lib/python/cs/ebooks/__init__.py: cs.ebooks: markdown indent fix for package docstring
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: update usage strings for new short help behaviour
+lib/python/cs/ebooks/dedrm.py lib/python/cs/ebooks/mobi.py: cs.ebooks: update usage messages for new cs.cmdutils short mode
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: default path for the Kindle content

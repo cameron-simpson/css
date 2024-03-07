@@ -16,7 +16,7 @@ from cs.gvutils import gvprint, gvsvg, quote as gvq, DOTNodeMixin
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 
-__version__ = '20231020-post'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -135,6 +135,8 @@ class FSM(DOTNodeMixin):
         Fall back to the superclass `__getattr__`.
     '''
     if not attr.startswith('_'):
+      if attr in ('fsm_state',):
+        return None
       if attr in self.FSM_TRANSITIONS:
         return attr
       try:

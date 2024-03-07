@@ -3,11 +3,15 @@
 
 r'''
 Assorted process and subprocess management functions.
+
+Not to be confused with the excellent
+(psutil)[https://pypi.org/project/psutil/] package.
 '''
 
 from contextlib import contextmanager
 import errno
 import io
+from itertools import chain
 import logging
 import os
 import shlex
@@ -16,10 +20,11 @@ from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subpro
 import sys
 import time
 
+from cs.deco import fmtdoc
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
-__version__ = '20231129-post'
+__version__ = '20240211-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,6 +33,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
         'cs.gimmicks>=devnull',
         'cs.pfx',
     ],
@@ -37,7 +43,7 @@ DISTINFO = {
 # 262144 below is from MacOS El Capitan "sysctl kern.argmax", then
 # halved because even allowing for the size of the environment this
 # can be too big. Unsure why.
-MAX_ARGV = 262144 / 2
+MAX_ARGV = 262144 // 2
 
 def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
   ''' Stop the process specified by `pid`, optionally await its demise.
@@ -193,10 +199,12 @@ def PidFileManager(path, pid=None):
 
 def run(
     argv,
+    *,
     doit=True,
     logger=None,
     quiet=True,
-    stdin=subprocess_DEVNULL,
+    input=None,
+    stdin=None,
     **subp_options,
 ):
   ''' Run a command via `subprocess.run`.
@@ -210,11 +218,18 @@ def run(
         if `True`, use `logging.getLogger()`;
         if not `None` or `False` trace using `print_argv`
       * `quiet`: default `True`; if false, print the command and its output
+      * `input`: default `None`: alternative to `stdin`;
+        passed to `subprocess.run`
       * `stdin`: standard input for the subprocess, default `subprocess.DEVNULL`;
-        passed to subprocess.run`
+        passed to `subprocess.run`
       * `subp_options`: optional mapping of keyword arguments
         to pass to `subprocess.run`
+
+      Note that `argv` is passed through `prep_argv` before use,
+      allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
   '''
+  argv = prep_argv(*argv)
   if logger is True:
     logger = logging.getLogger()
   if not doit:
@@ -229,7 +244,12 @@ def run(
       trace("+ %s", shlex.join(argv))
     else:
       print_argv(*argv, indent="+ ", file=sys.stderr)
-  cp = pfx_call(subprocess_run, argv, stdin=stdin, **subp_options)
+  if input is None:
+    if stdin is None:
+      stdin = subprocess_DEVNULL
+  elif stdin is not None:
+    raise ValueError("you may not specify both input and stdin")
+  cp = pfx_call(subprocess_run, argv, input=input, stdin=stdin, **subp_options)
   if cp.stderr:
     print(" stderr:")
     print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
@@ -252,7 +272,12 @@ def pipefrom(argv, *, quiet=False, text=True, stdin=DEVNULL, **popen_kw):
       * `text`: optional flag, default `True`; passed to `Popen`.
       * `stdin`: optional value for `Popen`'s `stdin`, default `DEVNULL`
       Other keyword arguments are passed to `Popen`.
+
+      Note that `argv` is passed through `prep_argv` before use,
+      allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
   '''
+  argv = prep_argv(*argv)
   if not quiet:
     print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
@@ -271,13 +296,19 @@ def pipeto(argv, *, quiet=False, **kw):
 
       Other keyword arguments are passed to the `io.TextIOWrapper`
       which wraps the command's input.
+
+      Note that `argv` is passed through `prep_argv` before use,
+      allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
   '''
+  argv = prep_argv(*argv)
   if not quiet:
     print_argv(*argv, indent="| ", file=sys.stderr)
   P = Popen(argv, stdin=PIPE)  # pylint: disable=consider-using-with
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
 
+@fmtdoc
 def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   ''' Distribute the array `argv` over multiple arrays
       to fit within `MAX_ARGV`.
@@ -288,8 +319,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
       * `argv`: the sequence of arguments to distribute; this may not be empty
       * `post_argv`: optional, the sequence of trailing arguments
       * `max_argv`: optional, the maximum length of each distributed
-        argument list, default: MAX_ARGV
-      * `encode`: default False.
+        argument list, default from `MAX_ARGV`: `{MAX_ARGV}`
+      * `encode`: default `False`.
         If true, encode the argv sequences into bytes for accurate tallying.
         If `encode` is a Boolean,
         encode the elements with their .encode() method.
@@ -341,6 +372,40 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   if per:
     argvs.append(pre_argv + per + post_argv)
   return argvs
+
+def prep_argv(*argv):
+  ''' A trite list comprehension to reduce an argument list `*argv`
+      to the entries which are not `None` or `False`
+      and to flatten other entries which are not strings.
+
+      This exists ease the construction of argument lists
+      with methods like this:
+
+          >>> command_exe = 'hashindex'
+          >>> hashname = 'sha1'
+          >>> quiet = False
+          >>> verbose = True
+          >>> prep_argv(
+          ...     command_exe,
+          ...     quiet and '-q',
+          ...     verbose and '-v',
+          ...     hashname and ('-h', hashname),
+          ... )
+          ['hashindex', '-v', '-h', 'sha1']
+
+      where `verbose` is a `bool` governing the `-v` option
+      and `hashname` is either `str` to be passed with `-h hashname`
+      or `None` to omit the option.
+  '''
+  return list(
+      chain(
+          *[
+              ((arg,) if isinstance(arg, str) else arg)
+              for arg in argv
+              if arg is not None and arg is not False
+          ]
+      )
+  )
 
 def print_argv(
     *argv, indent="", subindent="  ", end="\n", file=None, fold=False

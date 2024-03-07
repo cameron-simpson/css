@@ -24,7 +24,7 @@ from cs.seq import seq, unrepeated
 
 ##from cs.debug import Lock, RLock, Thread
 
-__version__ = '20231129-post'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'description':
@@ -649,6 +649,36 @@ class ListQueue:
       return self.get()
     except Queue_Empty:
       raise StopIteration("list is empty")  # pylint: disable=raise-missing-from
+
+def get_batch(q, max_batch=128, *, poll_delay=0.01):
+  ''' Get up to `max_batch` closely spaced items from the queue `q`.
+      Return the batch. Raise `Queue_Empty` if the first `q.get()` raises.
+
+      Block until the first item arrives. While the batch's size is
+      less that `max_batch` and there is another item available
+      within `poll_delay` seconds, append that item to the batch.
+
+      This requires `get_batch()` to be the sole consumer of `q`
+      for correct operation as it polls `q.empty()`.
+  '''
+  if max_batch < 2:
+    raise ValueError("max_batch:%r should be >= 2" % (max_batch,))
+  if poll_delay <= 0:
+    raise ValueError("poll_delay:%r should be > 0" % (poll_delay,))
+  batch = []
+  while len(batch) < max_batch:
+    try:
+      item = q.get()
+    except Queue_Empty:
+      if batch:
+        return batch
+      raise
+    batch.append(item)
+    if q.empty():
+      time.sleep(poll_delay)
+      if q.empty():
+        break
+  return batch
 
 if __name__ == '__main__':
   import cs.queues_tests

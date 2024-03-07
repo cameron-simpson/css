@@ -189,7 +189,7 @@ class TagAddRemove(_Token):
     elif text.startswith('+', start_offset):
       add_remove = True
     else:
-      raise ValueError(f'exported + or -, got: {text[offset:offset+1]!r}')
+      raise ValueError(f'expected + or -, got: {text[offset:offset+1]!r}')
     offset += 1
     name, offset = get_dotted_identifier(text, offset)
     if not name:

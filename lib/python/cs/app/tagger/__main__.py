@@ -71,7 +71,6 @@ class TaggerCommand(BaseCommand):
     hashname: str = DEFAULT_HASHNAME
 
   # pylint: disable=no-self-use
-  @trace
   def apply_opt(self, opt, val):
     options = self.options
     if opt == '-d':
@@ -185,8 +184,6 @@ class TaggerCommand(BaseCommand):
         with Pfx(path):
           proxy.text = shortpath(path)
           if not existspath(path):
-            warning("no such path, skipping")
-            xit = 1
             continue
           if isdirpath(path) and not direct:
             if recurse:

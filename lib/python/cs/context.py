@@ -5,7 +5,6 @@
 
 from contextlib import contextmanager
 import signal
-import threading
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
@@ -16,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20240201-post'
+__version__ = '20240212.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -30,14 +29,14 @@ DISTINFO = {
 
 @contextmanager
 def contextif(flag, cmgr_func, *cmgr_args, **cmgr_kwargs):
-  ''' A context manager to call call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
-      if `flag` is true or `nullcontext()` otherwise.
+  ''' A context manager to call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
+      if `flag` is true, otherwise to call `nullcontext()`.
 
-      The driving use case in verbosity dependent status lines or
+      The driving use case is verbosity dependent status lines or
       progress bars, eg:
 
           from cs.upd import run_task
-          with contextif(run_task(....)) as proxy:
+          with contextif(verbose, run_task, ....) as proxy:
             ... do stuff, updating proxy if not None ...
   '''
   assert isinstance(flag, bool)
@@ -585,7 +584,7 @@ class ContextManagerMixin:
     entered = next(eegen)
     try:
       yield entered
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
       exit_result = eegen.throw(type(e), e, e.__traceback__)
       if not exit_result:
         raise
@@ -594,3 +593,14 @@ class ContextManagerMixin:
         exit_result = next(eegen)
       except StopIteration:
         pass
+
+@contextmanager
+def reconfigure_file(f, **kw):
+  ''' Context manager flavour of `TextIOBase.reconfigure`.
+  '''
+  old = {k: getattr(f, k) for k in kw}
+  try:
+    f.reconfigure(**kw)
+    yield
+  finally:
+    f.reconfigure(**old)

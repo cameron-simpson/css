@@ -1,0 +1,139 @@
+#!/bin/sh
+#
+# Run a Plex media server via the lscr.io/linuxserver/plex:latest Docker image.
+# - Cameron Simpson <cs@cskk.id.au> 17feb2024
+#
+
+set -ue
+
+default_image=lscr.io/linuxserver/plex:latest
+
+use_tmux=
+[ -n "${PLEX_DOCKER_TMUX:-}" ] && use_tmux=1
+doit=1
+trace=
+[ -t 2 ] && trace=set-x
+image=${PLEX_DOCKER_IMAGE:-$default_image}
+library_path=${PLEX_DOCKER_LIBRARY:-$HOME/var/plex}
+run_pull_mode=missing
+claim=
+uid=$( id -u )
+gid=$( id -g )
+tz=${TZ:-$( cat /etc/timezone )}
+
+# ports to expose
+# see https://support.plex.tv/articles/201543147-what-network-ports-do-i-need-to-allow-through-my-firewall/
+ports=32400:32400   # core plex port
+# bonjour/avahi discovery
+ports_bonjour="5353:5353/udp"
+# G'Day Mate discovery
+ports_gdm="32410:32410/udp 3241232412/udp 3241332413/udp 32414:32414/udp"
+ports_dlna="1900:1900/udp 32469:32469"
+# controlling Plex for Roku via Plex Companion
+ports_roku="8324:8324"
+
+cmd=$0
+usage="Usage: $cmd [options...] mediadirpaths...
+
+  Run Plex media server via \"docker run ... $image ...\"
+  as a method for running a modern plex on a stale system.
+
+  Leading options:
+  --bonjour Expose ports for Bonjour/Avahi discovery.
+  -library librarydir
+            Library/configuration directory.
+            Default from \$PLEX_DOCKER_LIBRARY otherwise ~/var/plex.
+  --claim   Claim your server - for the first run.
+  --dlna    Expose ports to support DLNA.
+  --gdm     Expose ports to support GDM discovery.
+  -I image  Specify a different image name. Default from \$PLEX_DOCKER_IMAGE
+            otherwise $default_image.
+  -n        No action, dry run. Print the resulting docker command.
+  --roku    Expose ports for controlling Plex for Roku via Plex Companion.
+  --tm      Run the \"docker run ...\" in a tmux(1) session via the tm(1cs) command.
+            This is handy when dispatching on a remote machine.
+  -U        Update the docker image using \"docker run --pull always\".
+            The default is \"--pull $run_pull_mode\".
+  -x        Trace execution."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --bonjour)  ports="$ports $ports_bonjour" ;;
+    --claim)    claim=1 ;;
+    --library)  library_path=$2; shift ;;
+    --dlna)     ports="$ports $ports_dlna" ;;
+    --gdm)      ports="$ports $ports_gdm" ;;
+    -I)         image=$2; shift ;;
+    -n)         doit= trace=echo ;;
+    --tm)       use_tmux=1 ;;
+    --roku)     ports="$ports $ports_roku" ;;
+    -U)         run_pull_mode=always ;;
+    -x)         trace=set-x ;;
+    *)          break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing mediadirpaths" >&2
+  badopts=1
+else
+  mediadirs=
+  for mediadir
+  do
+    if [ -d "$mediadir/" ]
+    then
+      mediadirs="$mediadirs $mediadir"
+    else
+      echo "$cmd: mediadirpath not a directory: $mediadir" >&2
+      badopts=1
+    fi
+  done
+fi
+
+[ -d "$library_path/" ] || {
+  echo "$cmd: not a directory: --library=$library_path" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+docker_name=$( echo "plex $library_path" | tr -s "/' .:+" "______" )
+
+# --restart unless-stopped
+set -- \
+  docker run --rm \
+  --name "$docker_name" \
+  --net=host \
+  -e "PUID=$uid" \
+  -e "PGID=$gid" \
+  -e "TZ=$tz" \
+  -e VERSION=docker \
+  -e "PLEX_CLAIM=$claim"
+
+for port in $ports
+do  set -- "$@" -p "$port"
+done
+
+set -- "$@" --mount "type=bind,source=$library_path,destination=/config"
+for mediadir in $mediadirs
+do
+  base=$( echo "$mediadir" | tr / _ )
+  set -- "$@" --mount "type=bind,readonly,src=$mediadir,dst=/$base"
+done
+
+set -- "$@" "$image"
+
+if [ $use_tmux ]
+then
+  # session_name=$( echo "PLEX_$inputbase $outputbase $$" | tr -s ' .:+' '____' )
+  session_name=$( echo "PLEX_$library_path" | tr -s ' .:+' '____' )
+  set -- tm -x "$session_name" "$@"
+fi
+
+[ $doit ] && set -x
+exec $trace "$@"

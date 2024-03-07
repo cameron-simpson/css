@@ -33,7 +33,6 @@ from shutil import rmtree
 from subprocess import run, DEVNULL
 import sys
 from types import SimpleNamespace
-from typing import Any
 
 from icontract import ensure
 import tomli_w
@@ -59,12 +58,11 @@ from cs.progress import progressbar
 import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
+from cs.resources import RunState, uses_runstate
 from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import Upd, print, uses_upd
 from cs.vcs import VCS
 from cs.vcs.hg import VCS_Hg
-
-from cs.x import X
 
 def main(argv=None):
   ''' Main command line.
@@ -126,6 +124,8 @@ class CSReleaseCommand(BaseCommand):
     cmd: str = 'cs-release'
 
     def stderr_isatty():
+      ''' Test whether `sys.stderr` is a tty.
+      '''
       try:
         return sys.stderr.isatty()
       except AttributeError:
@@ -141,6 +141,8 @@ class CSReleaseCommand(BaseCommand):
 
     @property
     def vcs(self):
+      ''' The prevailing VCS.
+      '''
       return self.modules.vcs
 
   def apply_opts(self, opts):
@@ -177,8 +179,10 @@ class CSReleaseCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing package names")
     options = self.options
+    runstate = options.runstate
     xit = 0
     for pkg_name in argv:
+      runstate.raiseif()
       with Pfx(pkg_name):
         status("...")
         pkg = options.modules[pkg_name]
@@ -1201,9 +1205,9 @@ class Module:
     )
 
     # fill in default fields
-    for field in ('author', 'author_email', 'package_dir'):
-      with Pfx("%r", field):
-        if field in dinfo:
+    for di_field in ('author', 'author_email', 'package_dir'):
+      with Pfx("%r", di_field):
+        if di_field in dinfo:
           continue
         compute_field = {
             'author': lambda: os.environ['NAME'],
@@ -1212,8 +1216,8 @@ class Module:
             'package_dir': lambda: {
                 '': PYLIBTOP
             },
-        }[field]
-        dinfo[field] = compute_field()
+        }[di_field]
+        dinfo[di_field] = compute_field()
 
     # fill in default classifications
     classifiers = dinfo['classifiers']
@@ -1314,7 +1318,6 @@ class Module:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
     dinfo_entry_points = dinfo.pop('entry_points', {})
     if dinfo_entry_points:
-      entry_points = {}
       console_scripts = dinfo_entry_points.pop('console_scripts', [])
       if console_scripts:
         projspec['scripts'] = console_scripts
@@ -1617,8 +1620,9 @@ class Module:
     return self.DISTINFO.get('install_requires', [])
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  @uses_runstate
   @pfx_method(use_str=True)
-  def problems(self):
+  def problems(self, *, runstate=RunState):
     ''' Sanity check of this module.
 
         This is a list of problems,
@@ -1653,6 +1657,7 @@ class Module:
       if not post_ok_commits:
         return problems
       unreleased_logs = post_ok_commits
+    runstate.raiseif()
     subproblems = defaultdict(list)
     pkg_name = self.package_name
     if pkg_name is None:
@@ -1707,6 +1712,7 @@ class Module:
               )
           )
         for import_name in import_names:
+          runstate.raiseif()
           if not import_name.startswith(MODULE_PREFIX):
             continue
           import_problems = self.modules[import_name].problems()
