@@ -307,9 +307,9 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       R = self.submit(tmux_command)
       return R()
 
-  def subcommand(self, argv, target_pane=None) -> str:
+  def pane(self, argv, target_pane=None) -> "TmuxPane":
     ''' Dispatch the command `argv` in a new pane split from the current window.
-        Return the pane id of the new pane.
+        Return a `TmuxPane` for the new pane.
     '''
     if target_pane is None:
       target_pane = os.environ['TMUX_PANE']
@@ -319,7 +319,24 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
           f'split-window -t {quote(target_pane)} -P -F "#{{pane_id}}" {quote(shcmd)}'
       )
       pane_id = str(rsp).strip()
-    return pane_id
+    return TmuxPane(self, pane_id)
+
+class TmuxPane:
+  ''' State associated with an individual pane.
+  '''
+
+  def __init__(self, tmux: TmuxControl, pane_id: int):
+    self.tmux = tmux
+    self.pane_id = pane_id
+
+  def __str__(self):
+    return f'%{self.pane_id}'
+
+  def select_layout(self, layout: str, even=False):
+    self.tmux(f'select-layout -t {self} {"-E" if even else ""}')
+
+  def pane(self, argv) -> "TmuxPane":
+    return self.tmux.pane(argv, self.pane_id)
 
 def tmux(tmux_command, *tmux_args) -> CompletedProcess:
   ''' Execute the tmux(1) command `tmux_command`.
