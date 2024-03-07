@@ -46,19 +46,11 @@ def quote(tmux_s: str):
   return f"'{qs}'"
 
 @dataclass
-class TmuxCommandResponse:
-  ''' A tmux control command response.
 class TmuxControlItem:
   ''' A representation of an item from a tmux control flow
       eg a `b'%output'` line or `b'%begin'`...`b'%end'` sequence.
   '''
 
-  number: int
-  ok: bool
-  begin_unixtime: float
-  end_unixtime: float
-  output: List[bytes]
-  notifications: list = field(default_factory=list)
   unixtime: float  # timestamp
   arg0: bytes
   argv: List[bytes]
@@ -73,8 +65,6 @@ class TmuxControlItem:
     '''
     return self.end_arg0 == b'end'
 
-  def __str__(self):
-    return b''.join(self.output).decode('utf-8')
   @property
   def begin_unixtime(self):
     ''' The UNIX timestamp supplied with `begin`.
@@ -144,6 +134,26 @@ class TmuxControlItem:
     item.end_argv = end_argv
     return item
 
+@dataclass
+class TmuxCommandResponse:
+  ''' A tmux control command response.
+  '''
+
+  item: TmuxControlItem
+  notifications: List[TmuxControlItem] = field(default_factory=list)
+
+  def __str__(self):
+    return b''.join(self.output).decode('utf-8')
+
+  def __iter__(self):
+    for bs in self.output:
+      yield bs.decode('utf-8')
+
+  @property
+  def output(self):
+    ''' The output data.
+    '''
+    return self.item.output_data_chunks
 
   @classmethod
   def read_response(cls, rf, *, notify=None):
