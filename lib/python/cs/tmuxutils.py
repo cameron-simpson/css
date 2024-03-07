@@ -249,10 +249,19 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
     notify = self.notify
     lock = self._lock
     # read the initial empty response
-    TmuxCommandResponse.read_response(rf, notify=notify)
+    try:
+      TmuxCommandResponse.read_response(rf, notify=notify)
+    except EOFError as e:
+      # no opening empty response
+      warning("early EOF with %d outstanding requests: %s", len(pending), e)
+      return
     while True:
       # collect the next response
-      rsp = TmuxCommandResponse.read_response(rf, notify=notify)
+      try:
+        rsp = TmuxCommandResponse.read_response(rf, notify=notify)
+      except EOFError as e:
+        warning("EOF with %d outstanding requests: %s", len(pending), e)
+        return
       if rsp is None:
         return
       try:
