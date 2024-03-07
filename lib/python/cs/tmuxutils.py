@@ -48,6 +48,9 @@ def quote(tmux_s: str):
 @dataclass
 class TmuxCommandResponse:
   ''' A tmux control command response.
+class TmuxControlItem:
+  ''' A representation of an item from a tmux control flow
+      eg a `b'%output'` line or `b'%begin'`...`b'%end'` sequence.
   '''
 
   number: int
@@ -56,18 +59,91 @@ class TmuxCommandResponse:
   end_unixtime: float
   output: List[bytes]
   notifications: list = field(default_factory=list)
+  unixtime: float  # timestamp
+  arg0: bytes
+  argv: List[bytes]
+  output_data_chunks: List[bytes] = field(default_factory=list)
+  unixtime_final: Optional[float] = None
+  end_arg0: Optional[bytes] = None
+  end_argv: Optional[List[bytes]] = None
+
+  @property
+  def ok(self):
+    ''' A `begin`...`end` or `begin`...`error` is ok if it ended with `end`.
+    '''
+    return self.end_arg0 == b'end'
 
   def __str__(self):
     return b''.join(self.output).decode('utf-8')
+  @property
+  def begin_unixtime(self):
+    ''' The UNIX timestamp supplied with `begin`.
+    '''
+    return float(self.argv[0].decode('utf-8'))
+
+  @property
+  def begin_cmdnum(self):
+    ''' The command number supplied with `begin`.
+    '''
+    return float(self.argv[1].decode('utf-8'))
+
+  @property
+  def end_unixtime(self):
+    ''' The UNIX timestamp supplied with `end`.
+    '''
+    return float(self.end_argv[0].decode('utf-8'))
+
+  @property
+  def end_cmdnum(self):
+    ''' The command number supplied with `end`.
+    '''
+    return float(self.end_argv[1].decode('utf-8'))
 
   @staticmethod
-  def argv(bs):
+  def argv(bs) -> List[bytes]:
     ''' Decode a binary line commencing with `%`*word*
         into an argument list, omitting the `%`.
     '''
     if not bs.startswith(b'%'):
       raise ValueError(f'expected leading percent, got {bs!r}')
-    return bs[1:].decode('utf-8').split()
+    return bs[1:].split()
+
+  @classmethod
+  @pfx_method
+  def parse(cls, rf) -> "TmuxControlItem":
+    ''' Read a single control item from the binary stream `rf`,
+        return a `TmuxControlItem`.
+
+        Raises `EOFError` if the binary `rf.readline()` fails.
+    '''
+    while True:
+      try:
+        bs = rf.readline()
+      except ValueError as e:
+        raise EOFError(f'error reading from rf={r(rf)}: {e}') from e
+      now = time.time()
+      if not bs:
+        raise EOFError
+      if not bs.startswith(b'%'):
+        warning("no-%% line: %r", bs)
+        continue
+    arg0, *argv = cls.argv(bs)
+    item = cls(unixtime=now, arg0=arg0, argv=argv)
+    if arg0 == b'begin':
+      while True:
+        bs = rf.readline()
+        if not bs:
+          raise EOFError
+        if bs.startswith((b'%end ', b'%error ')):
+          break
+        item.output_data_chunks.append(bs)
+    end = time.time()
+    end_arg0, *end_argv = cls.argv(bs)
+    item.unixtime_final = end
+    item.end_arg0 = end_arg0
+    item.end_argv = end_argv
+    return item
+
 
   @classmethod
   def read_response(cls, rf, *, notify=None):
