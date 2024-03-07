@@ -19,7 +19,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20240211-post'
+__version__ = '20240303-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -824,9 +824,16 @@ def promote(func, params=None, types=None):
       value not of the type of the annotation, the `.promote` method
       will be called to promote the value to the expected type.
 
+      Note that the `Promotable` mixin provides a `.promote()`
+      method which promotes `obj` to the class if the class has a
+      factory class method `from_`*typename*`(obj)` where *typename*
+      is `obj.__class__.__name__`.
+      A common case for me is lexical objects which have a `from_str(str)`
+      factory to produce an instance from its textual form.
+
       Additionally, if the `.promote(value)` class method raises a `TypeError`
       and `value` has a `.as_`*typename* attribute
-      where *typename* is the name of the type annotation,
+      (where *typename* is the name of the type annotation),
       if that attribute is an instance method of `value`
       then promotion will be attempted by calling `value.as_`*typename*`()`
       otherwise the attribute will be used directly
@@ -1012,20 +1019,29 @@ class Promotable:
     ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
         This method supports the `@promote` decorator.
 
-        This base method will call the `from_str` class factory method
-        if called with a `str` and there is such a method.
+        This base method will call the `from_`*typename*`(obj)` class factory
+        method if present, where *typename* is `obj._-class__.__name__`.
 
-        Subclasses may override this method to promote other types.
+        Subclasses may override this method to promote other types,
+        typically:
+
+            @classmethod
+            def promote(cls, obj):
+                if isinstance(obj, cls):
+                    return obj
+                ... various specific type promotions
+                ... not done via a from_typename factory method
+                # fall back to Promotable.promote
+                return super().promote(obj)
     '''
     if isinstance(obj, cls):
       return obj
-    if isinstance(obj, str):
-      try:
-        from_str = cls.from_str
-      except AttributeError:
-        pass
-      else:
-        return from_str(obj)
+    try:
+      from_type = getattr(cls, f'from_{obj.__class__.__name__}')
+    except AttributeError:
+      pass
+    else:
+      return from_type(obj)
     raise TypeError(
         f'{cls.__name__}.promote: cannot promote {obj.__class__.__name__}:{obj!r}'
     )

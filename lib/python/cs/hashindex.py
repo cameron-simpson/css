@@ -5,7 +5,7 @@
 '''
 
 from collections import defaultdict
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from getopt import GetoptError
 import os
@@ -45,7 +45,7 @@ from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
 from cs.upd import print, run_task, without  # pylint: disable=redefined-builtin
 
-__version__ = '20240216-post'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -404,7 +404,8 @@ class HashIndexCommand(BaseCommand):
         if hashcode is not None:
           fspaths_by_hashcode[hashcode].append(fspath)
     # rearrange the target directory.
-    with run_task(f'rearrange {targetspec}'):
+    with (nullcontext()
+          if refhost or targethost else run_task(f'rearrange {targetspec}')):
       if targethost is None:
         with contextif(
             not quiet,
@@ -415,6 +416,7 @@ class HashIndexCommand(BaseCommand):
           rearrange(
               targetdir,
               fspaths_by_hashcode,
+              dstdir,
               hashname=hashname,
               doit=doit,
               move_mode=move_mode,
@@ -632,7 +634,7 @@ def read_remote_hashindex(
       )
   )
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
-  remote = pipefrom(remote_argv)
+  remote = pipefrom(remote_argv, quiet=True)
   yield from read_hashindex(remote.stdout, hashname=hashname)
   if check:
     remote.wait()
@@ -678,7 +680,7 @@ def run_remote_hashindex(
   ))
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
   with without():
-    return run(remote_argv, check=check, doit=doit, **subp_options)
+    return run(remote_argv, check=check, doit=doit, quiet=True, **subp_options)
 
 @uses_fstags
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
@@ -789,10 +791,9 @@ def rearrange(
           if rsrcpath == rdstpath:
             continue
           dstpath = joinpath(dstdirpath, rdstpath)
-          if not quiet:
-            print(opname, shortpath(srcpath), shortpath(dstpath))
           if doit:
             needdir(dirname(dstpath), use_makedirs=True, log=warning)
+          try:
             merge(
                 srcpath,
                 dstpath,
@@ -802,10 +803,16 @@ def rearrange(
                 symlink_mode=symlink_mode,
                 fstags=fstags,
                 doit=doit,
-                quiet=True,  # we do our own print above
+                quiet=quiet,
             )
+          except FileExistsError as e:
+            warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
+          else:
             if move_mode and rsrcpath not in rfspaths:
-              to_remove.add(srcpath)
+              if not quiet:
+                print("remove", shortpath(srcpath))
+              if doit:
+                to_remove.add(srcpath)
     # purge the srcpaths last because we might want them multiple
     # times during the main loop (files with the same hashcode)
     if doit and to_remove:
@@ -837,10 +844,6 @@ def merge(
   '''
   if opname is None:
     opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
-  if not quiet:
-    print(opname, shortpath(srcpath), shortpath(dstpath))
-  if not doit:
-    return
   if dstpath == srcpath:
     return
   if symlink_mode:
@@ -859,14 +862,28 @@ def merge(
     if (samefile(srcpath, dstpath)
         or (file_checksum(dstpath, hashname=hashname) == file_checksum(
             srcpath, hashname=hashname))):
-      fstags[dstpath].update(fstags[srcpath])
+      # same content - update tags and remove source
+      if doit:
+        fstags[dstpath].update(fstags[srcpath])
       if move_mode and realpath(srcpath) != realpath(dstpath):
-        pfx_call(os.remove, srcpath)
+        if not quiet:
+          print(
+              "remove", shortpath(srcpath), "# identical content at",
+              shortpath(dstpath)
+          )
+        if doit:
+          pfx_call(os.remove, srcpath)
       return
+    # different content, fail
     raise FileExistsError(
         f'dstpath {dstpath!r} already exists with different hashcode'
     )
-  pfx_call(fstags.mv, srcpath, dstpath, symlink=symlink_mode, remove=move_mode)
+  if not quiet:
+    print(opname, shortpath(srcpath), shortpath(dstpath))
+  if doit:
+    pfx_call(
+        fstags.mv, srcpath, dstpath, symlink=symlink_mode, remove=move_mode
+    )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

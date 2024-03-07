@@ -1,0 +1,2 @@
+lib/python/cs/queues.py: cs.queues: new get_batch(q) to fetch closely spaced batches from a Queue
+lib/python/cs/queues.py: cs.queues: get_batch: make the empty-poll logic clearer

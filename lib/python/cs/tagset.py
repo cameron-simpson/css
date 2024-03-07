@@ -205,7 +205,6 @@ from os.path import (
 from pprint import pformat
 import re
 import sys
-from threading import Lock
 import time
 from typing import Mapping, Optional, Tuple, Union
 from uuid import UUID, uuid4
@@ -235,7 +234,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20240211-post'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1797,21 +1796,6 @@ class TagSetCriterion(Promotable):
 
   @classmethod
   @pfx_method
-  def promote(cls, criterion, fallback_parse=None):
-    ''' Promote an object to a criterion.
-        Instances of `cls` are returned unchanged.
-        Instances of s`str` are promoted via `cls.from_str`.
-    '''
-    if isinstance(criterion, cls):
-      return criterion
-    if isinstance(criterion, str):
-      return cls.from_str(criterion, fallback_parse=fallback_parse)
-    raise TypeError(
-        "%s.promote: cannot promote to %s" % (cls.__name__, r(criterion))
-    )
-
-  @classmethod
-  @pfx_method
   @typechecked
   def from_str(cls, s: str, fallback_parse=None):
     ''' Prepare a `TagSetCriterion` from the string `s`.
@@ -2121,6 +2105,9 @@ class TagSetPrefixView(FormatableMixin):
         filter(lambda k: k.startswith(prefix_), self._tags.keys())
     )
 
+  def __len__(self):
+    return len(list(self.keys()))
+
   def __contains__(self, k):
     return self._prefix_ + k in self._tags
 
@@ -2159,6 +2146,12 @@ class TagSetPrefixView(FormatableMixin):
     ''' Return an iterable of the values (`Tag`s).
     '''
     return map(lambda k: self[k], self.keys())
+
+  def update(self, mapping):
+    ''' Update tags from a name->value mapping.
+    '''
+    for k, v in mapping.items():
+      self[k] = v
 
   def as_dict(self):
     ''' Return a `dict` representation of this view.
@@ -2214,6 +2207,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
 
       Examples of this include:
+      * `cs.cdrip.MBSQLTags`: a mapping of MusicbrainsNG entities to their associated `TagSet`
       * `cs.fstags.FSTags`: a mapping of filesystem paths to their associated `TagSet`
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
@@ -3955,5 +3949,4 @@ def selftest(argv):
     print("tag.format_as(%r) => %s" % (format_str, formatted))
 
 if __name__ == '__main__':
-  import sys
   sys.exit(selftest(sys.argv))

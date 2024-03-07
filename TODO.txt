@@ -1,5 +1,7 @@
-ffmpeg-docker: doesnot like files in other diectories or something - some bug in atomic filename?
-dlog --daemon, and dlog named pipe to receive messages
+@uses_blah: correct type annotations
+promote: correct typo annotations
+ffmpeg-docker: does not like files in other directories or something - some bug in atomic filename?
+dlog: DLog to provide a Logger interface?
 ydl/ffmeg-docker - newtrok=none seems to break ffmpeg - what is it fteching and why, should I tweak the filenames?
 ydl - specify preferred ffmpeg_exe + envvar?
 cs.delta: monitor() to accept an iterable of states as alternative to polling
