@@ -226,7 +226,7 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       try:
         pending = []  # queue of pending Results
         with stackattrs(self, rf=P.stdout, wf=P.stdin, pending=pending):
-          workerT = bg(self._worker)
+          workerT = bg(self._worker, args=(self.rf,))
           with stackattrs(self, workerT=workerT):
             yield
       finally:
@@ -239,12 +239,12 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       return
     info("%%%s %r", arg0, args)
 
-  def _worker(self):
+  @pfx_method
+  def _worker(self, rf):
     ''' Worker function to read the initial response
         and then all subsequent responses, using them to complete pending
         command `Result`s.
     '''
-    rf = self.rf
     pending = self.pending
     notify = self.notify
     lock = self._lock
