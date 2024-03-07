@@ -1833,6 +1833,9 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
         return a `TagSet` of inferred `Tag`s.
 
         Tag values from earlier rules override values from later rules.
+
+        The default rules come from `self.fstags.config.filename_rules`,
+        which is sourced from `~/.fstagsrc`.
     '''
     if rules is None:
       rules = self.fstags.config.filename_rules
@@ -1851,7 +1854,8 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
         In order of preference:
         * from filesystem fstags
         * from file basename matching
-        * from the cascade rules
+        * from various `_type` suffixes
+        * from the cascade rules (see `FSTags.cascade_rules`)
     '''
     itags = TagSet()
     itags.update(self.as_tags(all_tags=True))
@@ -2019,7 +2023,7 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
         yield False, entrypath
 
 def rfilepaths(path, name_selector=None):
-  ''' Generator yielding pathnames of files found under `path`.
+  ''' Generator yielding relative pathnames of files found under `path`.
   '''
   return (
       subpath for is_dir, subpath in
