@@ -10,16 +10,35 @@ set -ue
 
 exec 3>&1 1>&2
 
+ffmpeg_exe_default=ffmpeg
+
 cmd=$0
-usage="Usage: $cmd [--replace] input [output [ffmpeg-options...]]
-  Write the output filename to standard output."
+usage="Usage: $cmd [-n|--dry-run] [--replace] input [output [ffmpeg-options...]]
+  Write the output filename to standard output.
+  Environment:
+    \$FFMPEG_EXE the ffmpeg executable, default \"$ffmpeg_exe_default\""
 
 badopts=
 
+doit=1
 do_replace=
-ffmpeg_exe=${FFMPEG_EXE:-ffmpeg}
+ffmpeg_exe=${FFMPEG_EXE:-"$ffmpeg_exe_default"}
+input=
+output=
 
-[ $# -gt 0 ] && [ "x$1" = 'x--replace' ] && { do_replace=1; shift; }
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -n | --dry-run) doit= ;;
+    --replace)      do_replace=1 ;;
+    --)             shift; break ;;
+    -?*)            echo "$cmd: unrecognised option: $1" >&2
+                    badopts=1
+                    ;;
+    *)              break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -103,8 +122,15 @@ do
 done
 set -- -map 0 "$@"
 
+set -- "$ffmpeg_exe" -i "$input" "$@" -fflags genpts "$output"
+
+[ $doit ] || {
+  echo "$*"
+  exit 0
+}
+
 set -x
-"$ffmpeg_exe" -i "$input" "$@" "$output" || exit $?
+"$@" || exit $?
 fstags cptags "$input" "$output" || :
 exec >&3 3>&-
 

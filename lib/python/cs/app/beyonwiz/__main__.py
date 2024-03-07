@@ -41,8 +41,8 @@ class BWizCmd(BaseCommand):
     ''' Output the tvwiz transport stream data.
 
         Usage: {cmd} tvwizdirs...
-          Write the video content of the named tvwiz directories to
-          standard output as MPEG2 transport Stream, acceptable to
+          Write the video content of the named tvwiz directories to stdout.
+          The output is an MPEG2 transport Stream, acceptable to
           ffmpeg's "mpegts" format.
     '''
     if not argv:
@@ -59,18 +59,23 @@ class BWizCmd(BaseCommand):
   def cmd_convert(self, argv):
     ''' Convert a recording to MP4.
 
-        Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [--rm] [start..end]... recording [output.mp4]
-          Convert the video content of the named recording to
-          the named output file (typically MP4, though the ffmpeg
-          output format chosen is based on the extension).
+        Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [--rm] [-d outputdir] [start..end]... recording [output.mp4]
+          Convert the video content of the named recording, usually to an MP4.
           Most metadata are preserved.
-          start..end: Optional start and end offsets in seconds, used
-            to crop the recording output.
+          Options:
+            -n          No action, dry run.
+            -a:afmt     Specify output audio format.
+            -v:vfmt     Specify output video format.
+            -d outputdir The derived output file should be written in outputdir.
+            --rm        Remove the source file if the conversion succeeds.
+            start..end  Optional start and end offsets in seconds, used
+              to crop the recording output.
     '''
     badopts = False
     doit = True
     acodec = None
     vcodec = None
+    outputdir = '.'
     remove_source = False
     # parse options
     while argv:
@@ -89,9 +94,14 @@ class BWizCmd(BaseCommand):
           vcodec = arg0[3:]
         elif arg0 == '--rm':
           remove_source = True
+        elif arg0 == '-d':
+          outputdir = argv.pop(0)
         else:
           warning('unexpected option')
           badopts = True
+    if not isdirpath(outputdir):
+      warning("outputdir is not a directory: %r", outputdir)
+      badopts = True
     # parse optional start..end arguments
     timespans = []
     while argv:
@@ -115,7 +125,7 @@ class BWizCmd(BaseCommand):
     if argv:
       dstpath = argv.pop(0)
     else:
-      dstpath = None
+      dstpath = f'{outputdir}/'
     if argv:
       warning("extra arguments: %s", ' '.join(argv))
       badopts = True
@@ -132,17 +142,7 @@ class BWizCmd(BaseCommand):
     ):
       return 1
     if remove_source:
-      if doit:
-        with Pfx("remove %s", R.fspath):
-          if islinkpath(R.fspath) or isfilepath(R.fspath):
-            pfx_call(os.remove, R.fspath)
-          elif isdirpath(R.fspath):
-            pfx_call(shutil.rmtree, R.fspath)
-          else:
-            warning("cannot remove, not a file or directory")
-            return 1
-      else:
-        print("remove", R.fspath)
+      R.remove(doit=doit)
 
   def cmd_ffprobe(self, argv):
     ''' Run `ffprobe` against a file.
@@ -207,7 +207,7 @@ class BWizCmd(BaseCommand):
     ''' Report information about a recording.
 
         Usage: {cmd} tvwizdirs...
-          Print some summary infomation for the named tvwiz directories.
+          Print some summary information for the named tvwiz directories.
     '''
     if not argv:
       raise GetoptError("missing recordings")

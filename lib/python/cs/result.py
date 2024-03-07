@@ -68,7 +68,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20231221-post'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -143,7 +143,12 @@ class Result(FSM):
 
   # pylint: disable=too-many-arguments
   def __init__(
-      self, name=None, lock=None, result=None, state=None, extra=None
+      self,
+      name=None,
+      lock=None,
+      result=None,
+      state=None,
+      extra=None,
   ):
     ''' Base initialiser for `Result` objects and subclasses.
 
@@ -176,12 +181,16 @@ class Result(FSM):
       self.result = result
 
   def __str__(self):
-    return "%s[%r:%s]" % (type(self).__name__, self.name, self.fsm_state)
+    return "%s[%r:%s]" % (
+        type(self).__name__,
+        self.__dict__.get('name', 'NO_NAME'),
+        self.__dict__.get('fsm_state', 'NO_FSM_STATE'),
+    )
 
   __repr__ = __str__
 
   def __del__(self):
-    if not self.collected:
+    if not getattr(self, 'collected', False):
       if self.is_done:
         exc_info = self.exc_info
         if exc_info:
@@ -278,7 +287,6 @@ class Result(FSM):
       raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
     self.collected = True
     if state == self.CANCELLED:
-      self.collected = True
       raise CancellationError
     return self._exc_info
 

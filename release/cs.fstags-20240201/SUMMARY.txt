@@ -1,0 +1,1 @@
+FSTags.attach_path: do not save the tagfile if the FSTags is open - the final close will do it.

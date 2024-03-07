@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from fnmatch import fnmatch
+from functools import cached_property
 from getopt import GetoptError
 from glob import glob
 import importlib
@@ -32,7 +33,6 @@ from shutil import rmtree
 from subprocess import run, DEVNULL
 import sys
 from types import SimpleNamespace
-from typing import Any
 
 from icontract import ensure
 import tomli_w
@@ -58,12 +58,11 @@ from cs.progress import progressbar
 import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
+from cs.resources import RunState, uses_runstate
 from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import Upd, print, uses_upd
 from cs.vcs import VCS
 from cs.vcs.hg import VCS_Hg
-
-from cs.x import X
 
 def main(argv=None):
   ''' Main command line.
@@ -125,6 +124,8 @@ class CSReleaseCommand(BaseCommand):
     cmd: str = 'cs-release'
 
     def stderr_isatty():
+      ''' Test whether `sys.stderr` is a tty.
+      '''
       try:
         return sys.stderr.isatty()
       except AttributeError:
@@ -140,6 +141,8 @@ class CSReleaseCommand(BaseCommand):
 
     @property
     def vcs(self):
+      ''' The prevailing VCS.
+      '''
       return self.modules.vcs
 
   def apply_opts(self, opts):
@@ -176,8 +179,10 @@ class CSReleaseCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing package names")
     options = self.options
+    runstate = options.runstate
     xit = 0
     for pkg_name in argv:
+      runstate.raiseif()
       with Pfx(pkg_name):
         status("...")
         pkg = options.modules[pkg_name]
@@ -856,20 +861,16 @@ class Module:
     '''
     return self.modules.vcs
 
-  @property
+  @cached_property
   @pfx_method(use_str=True)
   def module(self):
-    ''' The Module for this package name.
+    ''' The module for this package name.
     '''
-    M = self._module
-    if M is None:
-      with Pfx("importlib.import_module(%r)", self.name):
-        try:
-          M = importlib.import_module(self.name)
-        except (ImportError, NameError, SyntaxError) as e:
-          error("import fails: %s", e)
-          M = None
-      self._module = M
+    try:
+      M = pfx_call(importlib.import_module, self.name)
+    except (ImportError, ModuleNotFoundError, NameError, SyntaxError) as e:
+      error("import fails: %s", e)
+      M = None
     return M
 
   @pfx_method(use_str=True)
@@ -898,8 +899,7 @@ class Module:
       return False
     return True
 
-  @property
-  @cachedmethod
+  @cached_property
   @pfx_method(use_str=True)
   def package_name(self):
     ''' The name of the package containing this module,
@@ -929,12 +929,12 @@ class Module:
   @property
   @pfx_method(use_str=True)
   def package(self):
-    ''' The python package Module for this Module
-        (which may be the package Module or some submodule).
+    ''' The python package module for this Module
+        (which may be the package module or some submodule).
     '''
     name = self.package_name
     if name is None:
-      raise ValueError("self.package_name is None")
+      raise AttributeError("self.package_name is None")
     return self.modules[name]
 
   @property
@@ -1169,7 +1169,7 @@ class Module:
     path_revs = self.vcs.file_revisions(self.paths())
     rev_latest = None
     for rev, node in sorted(path_revs.values()):
-      if rev_latest is None or rev_latest < rev:
+      if rev is not None and rev_latest is None or rev_latest < rev:
         changeset_hash = node
         rev_latest = rev
     return changeset_hash
@@ -1205,9 +1205,9 @@ class Module:
     )
 
     # fill in default fields
-    for field in ('author', 'author_email', 'package_dir'):
-      with Pfx("%r", field):
-        if field in dinfo:
+    for di_field in ('author', 'author_email', 'package_dir'):
+      with Pfx("%r", di_field):
+        if di_field in dinfo:
           continue
         compute_field = {
             'author': lambda: os.environ['NAME'],
@@ -1216,8 +1216,8 @@ class Module:
             'package_dir': lambda: {
                 '': PYLIBTOP
             },
-        }[field]
-        dinfo[field] = compute_field()
+        }[di_field]
+        dinfo[di_field] = compute_field()
 
     # fill in default classifications
     classifiers = dinfo['classifiers']
@@ -1318,7 +1318,6 @@ class Module:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
     dinfo_entry_points = dinfo.pop('entry_points', {})
     if dinfo_entry_points:
-      entry_points = {}
       console_scripts = dinfo_entry_points.pop('console_scripts', [])
       if console_scripts:
         projspec['scripts'] = console_scripts
@@ -1621,8 +1620,9 @@ class Module:
     return self.DISTINFO.get('install_requires', [])
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  @uses_runstate
   @pfx_method(use_str=True)
-  def problems(self):
+  def problems(self, *, runstate=RunState):
     ''' Sanity check of this module.
 
         This is a list of problems,
@@ -1657,6 +1657,7 @@ class Module:
       if not post_ok_commits:
         return problems
       unreleased_logs = post_ok_commits
+    runstate.raiseif()
     subproblems = defaultdict(list)
     pkg_name = self.package_name
     if pkg_name is None:
@@ -1667,21 +1668,22 @@ class Module:
     if M is None:
       problems.append("module import fails")
       return problems
-    # TODO: import_names to be a set
-    # TODO: scan all the .py files in a package
     import_names = []
-    for import_name in direct_imports(M.__file__, self.name):
-      if self.modules[import_name].isstdlib():
+    for fspath in self.paths():
+      if not fspath.endswith('.py'):
         continue
-      if import_name.endswith('_tests'):
-        continue
-      if import_name == pkg_name:
-        # tests usually import the package - this is not a dependency
-        continue
-      if pkg_prefix and import_name.startswith(pkg_prefix):
-        # package components are not a dependency
-        continue
-      import_names.append(import_name)
+      for import_name in direct_imports(fspath, self.name):
+        if self.modules[import_name].isstdlib():
+          continue
+        if import_name.endswith('_tests'):
+          continue
+        if import_name == pkg_name:
+          # tests usually import the package - this is not a dependency
+          continue
+        if pkg_prefix and import_name.startswith(pkg_prefix):
+          # package components are not a dependency
+          continue
+        import_names.append(import_name)
     import_names = sorted(set(import_names))
     # check the DISTINFO
     distinfo = getattr(M, 'DISTINFO', None)
@@ -1710,6 +1712,7 @@ class Module:
               )
           )
         for import_name in import_names:
+          runstate.raiseif()
           if not import_name.startswith(MODULE_PREFIX):
             continue
           import_problems = self.modules[import_name].problems()
@@ -1839,7 +1842,8 @@ class Module:
             warning("man path already exists: %r", manpath)
             continue
           with pfx_call(open, manpath, 'x') as manf:
-            cd_run('.', 'md2man-roff', path, stdout=manf)
+            ##cd_run('.', 'md2man-roff', path, stdout=manf)
+            cd_run('.', 'go-md2man', path, stdout=manf)
           continue
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
@@ -1849,8 +1853,6 @@ class Module:
         This writes the following files:
         * `MANIFEST.in`: list of additional files
         * `README.md`: a README containing the long_description
-        * `setup.py`: stub setup call
-        * `setup.cfg`: setuptool configuration
         * `pyproject.toml`: the TOML configuration file
     '''
     # write MANIFEST.in
@@ -1869,17 +1871,6 @@ class Module:
     docs = self.compute_doc(all_class_names=True)
     with pfx_call(open, joinpath(pkg_dir, 'README.md'), 'x') as rf:
       print(docs.long_description, file=rf)
-
-    # write setup.py
-    with pfx_call(open, joinpath(pkg_dir, 'setup.py'), 'x') as sf:
-      print("#!/usr/bin/env python", file=sf)
-      print("from setuptools import setup", file=sf)
-      print("setup()", file=sf)
-
-    # write the setup.cfg file
-    setup_cfg = self.compute_setup_cfg()
-    with pfx_call(open, joinpath(pkg_dir, 'setup.cfg'), 'x') as scf:
-      setup_cfg.write(scf)
 
     # write the pyproject.toml file
     proj = self.compute_pyproject()

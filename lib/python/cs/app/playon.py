@@ -45,7 +45,7 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230705-post'
+__version__ = '20240201.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -57,7 +57,9 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'entry_points': {
-        'console_scripts': ['playon = cs.app.playon:main'],
+        'console_scripts': {
+            'playon': 'cs.app.playon:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils',

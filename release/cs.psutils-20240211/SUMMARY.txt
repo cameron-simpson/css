@@ -1,0 +1,2 @@
+run: new optional input= parameter to presupply input data.
+New prep_argv(*argv) function to flatten and trim computes argv lists; use automatically in run(), pipeot(), pipefrom().

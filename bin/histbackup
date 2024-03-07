@@ -97,6 +97,7 @@ symlink=LATEST
 src=
 dest=
 filteroutput=
+hashindex=
 reflink=
 rrsync=rsync
 usehbinclude=1
@@ -107,7 +108,7 @@ rsopts=
 copytimes=
 rsdelete=--delete
 thisbackup=
-sshcmd='ssh -o controlpath=none'
+sshcmd="${RSYNC_RSH:-ssh} -o controlpath=none"
 reverse=
 verbose=
 imode=
@@ -140,15 +141,18 @@ usage="Usage:
   --delete      Pass --delete to rsync.
   --delete-excluded
                 Pass --delete --delete-excluded to rsync.
+  --hashindex   Use hashindex(1) to rearrange the local backup tree
+                to match the content of the remote tree between the
+                linktree and the rsync.
+  --link-fail-repair (Obsolete; this is always done.)
+                Proceed even if the linktree step fails, presumably due
+                to hard link limit reached.
   --no-hbfiles  Do not honour the .hbfiles file in the backup directory.
   --no-hbinclude Do not honour the .hbinclude file in the backup directory.
   --no-rsync    Do not do the rsync pass - just set up the new link tree and
                 report its basename.
   --no-symlink-if-unchanged
                 Make a link tree even when there are no changes.
-  --link-fail-repair (Obsolete; this is always done.)
-                Proceed even if the linktree step fails, presumably due
-                to hard link limit reached.
   --reflink     Use \"cp --reflink\" and \"rsync --inplace\".
   --symlink-if-unchanged
                 Just symlink the top level date if there are no changes.
@@ -196,10 +200,10 @@ do
 
     # =item --delete
     #
-    # Passed to rsync.
+    # Passed to rsync (on by default).
     #
     --delete)
-      rsdelete="$rsdelete --delete"
+      rsdelete="--delete"
       ;;
 
     # =item --delete-excluded
@@ -225,6 +229,19 @@ do
     #
     -f)
       symlink_unchanged=
+      ;;
+
+    # =item --hashindex
+    #
+    # Use hashindex(1) to rearrange the local backup tree to match the
+    # content of the remote tree between the linktree and the rsync.
+    # This is useful for large remote trees which may get rearranged.
+    # It does require a working hashindex(1) at the remote end, and to be efficient the
+    # remote hashindex needs to be able to cache content hashes in the B<.fstags> files
+    # in the remote tree.
+    #
+    --hashindex)
+      hashindex=1
       ;;
 
     # =item -i, --itemize-changes
@@ -257,7 +274,7 @@ do
     # =item --no-hbfiles
     #
     # Do not honour the .hbfiles file in the backup directory.
-    # 
+    #
     --no-hbfiles)
       usehbfiles=
       ;;
@@ -265,7 +282,7 @@ do
     # =item --no-hbinclude
     #
     # Do not honour the .hbinclude file in the backup directory.
-    # 
+    #
     --no-hbinclude)
       usehbinclude=
       ;;
@@ -464,27 +481,31 @@ then
       $trace cp -ra --reflink "$_mkl_src" "$_mkl_dst"
   }
 else
-  # have "cp -ral"? otherwise rely on my linktree script
-  if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
-  then
-    mklinktree(){
-      [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
-      _mkl_src=$1
-      _mkl_dst=$2
-      case "$_mkl_dst" in
-        /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
+  mklinktree(){
+    [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
+    (
+      set -ue
+      src=$1 dst=$2
+      [ -d "$src/" ] || {
+        echo "mklinktree: missing srcdir: $src" >&2
+        exit 1
+      }
+      [ ! -e "$dst" ] || {
+        echo "mklinktree: existing dstdir: $dst" >&2
+        exit 1
+      }
+      case "$src" in
+        /*) ;; *) src=$(pwd)/$src ;;
+      esac
+      case "$dst" in
+        /* | ./* ) ;; *) dst=./$dst ;;
       esac
       # make link tree, might fail if hard link limit reached for files
-      $trace cp -ral "$_mkl_src" "$_mkl_dst" || {
-        # failed to make target? fail outright
-        [ -d "$_mkl_dst/." ] || return 1
-        # if we made the target, update from source
-        dorsync "$_mkl_src/" "$_mkl_dst/"
-      }
-    }
-  else
-    mklinktree(){ $trace linktree "$1" "$2"; }
-  fi
+      $trace mkdir "$dst"
+      $trace rsync -a "--link-dest=$src" "$src/" "$dst/" \
+      || dorsync "$src/" "$dst/"
+    )
+  }
 fi
 
 if [ $imode ]
@@ -497,11 +518,11 @@ fi
 
 # =head1 CUSTOMISATION FILES
 #
-# If the file I<backupdir>/F<.hfiles> is present
-# the options B<"-r --files-from=>I<backupdir>/F<.hbinclude>
+# If the file I<backupdir>/F<.hbfiles> is present
+# the options B<"-r --files-from=>I<backupdir>/F<.hbfiles>
 # will be added to the I<rsync> command invocation.
 # In this way specific contents may be backed up.
-# See rsync(1).
+# See rsync(1) for details on B<--files-from>.
 #
 if [ $usehbfiles ]
 then
@@ -522,7 +543,7 @@ fi
 # the option B<"--include-from=>I<backupdir>/F<.hbinclude>
 # will be added to the I<rsync> command invocation.
 # In this way the content to be backed up may be tuned.
-# See rsync(1).
+# See rsync(1) for details on B<--include-from>.
 #
 if [ $usehbinclude ]
 then
@@ -555,7 +576,7 @@ else
   fi
 fi
 
-# Locate to most recent backup younger than this one, if any.
+# Locate the most recent backup younger than this one, if any.
 # If $reverse, locate oldest backup later than this one.
 lastbackup=$(
         cd "$dest" || exit 1
@@ -578,12 +599,11 @@ lastbackup=$(
 
 dorsync()
 { [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
-  ##echo "DORSYNC $* ..." >&2
   _drs_src=$1
   _drs_dst=$2
   shift; shift
   case "$_drs_dst" in
-    /* | ./* | ../* ) ;; 
+    /* | ./* | ../* ) ;;
     *) _drs_dst=./$_drs_dst ;;
   esac
   set -- $trace rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
@@ -594,6 +614,19 @@ dorsync()
   set -- $trace "$@"
   "$@"
 }
+
+dohashindex()
+{ [ $# -ge 2 ] || { echo "Usage: dohashindex src dst" >&2; exit 2; }
+  _dhi_src=$1
+  _dhi_dst=$2
+  shift; shift
+  case "$_dhi_dst" in
+    /* | ./* | ../* ) ;;
+    *) _dhi_dst=./$_dhi_dst ;;
+  esac
+  $trace hashindex rearrange -e "$sshcmd" --mv -- "$_dhi_src" "$_dhi_dst"
+}
+
 
 ok=
 
@@ -626,6 +659,7 @@ ok=1
   if [ -n "$lastbackup" ]
   then
     mklinktree "./$lastbackup" "$thisbackup" || exit 1
+    [ $hashindex ] && dohashindex "$src" "$thisbackup" || :
     dorsync "$src" "$thisbackup" -H ${1+"$@"} $obackup_options \
     || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options \
     || :

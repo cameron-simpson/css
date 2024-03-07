@@ -1810,9 +1810,10 @@ class CalibreCommand(BaseCommand):
 
   def cmd_shell(self, argv):
     ''' Usage: {cmd}
+          Run a command prompt via cmd.Cmd using calibre's subcommands.
           Run an interactive Python prompt with some predefined names:
-          calibre: the CalibreTree
-          options: self.options
+            calibre: the CalibreTree
+            options: self.options
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
@@ -1827,6 +1828,7 @@ class CalibreCommand(BaseCommand):
 
   def cmd_tag(self, argv):
     ''' Usage: {cmd} [-n] [--] [-]tag[,tag...] book_specs...
+          Modify the tags of the specified books.
     '''
     options = self.options
     if argv and argv[0] == '-n':
