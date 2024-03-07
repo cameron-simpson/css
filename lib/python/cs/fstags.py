@@ -2012,11 +2012,12 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
+    rdirpath = relpath(dirpath, path)
     try:
       with Pfx("scandir(%r)", dirpath):
         dirents = sorted(os.scandir(dirpath), key=lambda entry: entry.name)
     except NotADirectoryError:
-      yield False, dirpath
+      yield False, rdirpath
       continue
     except (FileNotFoundError, PermissionError) as e:
       warning("%s", e)
@@ -2026,12 +2027,13 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
       if not name_selector(name):
         continue
       entrypath = entry.path
+      subpath = joinpath(rdirpath, entry.name)
       if entry.is_dir(follow_symlinks=False):
         if yield_dirs:
-          yield True, entrypath
+          yield True, subpath
         pending.append(entrypath)
       else:
-        yield False, entrypath
+        yield False, subpath
 
 def rfilepaths(path, name_selector=None):
   ''' Generator yielding relative pathnames of files found under `path`.
