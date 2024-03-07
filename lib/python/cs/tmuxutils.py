@@ -167,41 +167,12 @@ class TmuxCommandResponse:
         item = TmuxControlItem.parse(rf)
       except EOFError:
         return None
-      if not bs.startswith(b'%'):
-        warning("no-%% line: %r", bs)
-        continue
-      arg0, *args = cls.argv(bs)
-      if arg0 == 'begin':
+      if item.arg0 == b'begin':
         break
-      info("notification: %r", bs)
       if notify:
-        notify(bs)
-      notifications.append(bs)
-    unixtime_s, cmdnum_s, _ = args
-    begin_unixtime = float(unixtime_s)
-    begin_cmdnum = int(cmdnum_s)
-    output = []
-    while True:
-      bs = rf.readline()
-      if not bs:
-        raise EOFError()
-      if bs.startswith((b'%end ', b'%error ')):
-        break
-      output.append(bs)
-    arg, *args = cls.argv(bs)
-    ok = arg == 'end'
-    unixtime_s, cmdnum_s, _ = args
-    end_unixtime = float(unixtime_s)
-    end_cmdnum = int(cmdnum_s)
-    assert begin_cmdnum == end_cmdnum
-    return cls(
-        number=begin_cmdnum,
-        ok=ok,
-        begin_unixtime=begin_unixtime,
-        end_unixtime=end_unixtime,
-        output=output,
-        notifications=notifications,
-    )
+        notify(item)
+      notifications.append(item)
+    return cls(item=item, notifications=notifications)
 
 class TmuxControl(HasFSPath, MultiOpenMixin):
   ''' A class to control tmux(1) via its control socket.
