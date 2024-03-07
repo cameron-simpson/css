@@ -343,7 +343,74 @@ def tmux(tmux_command, *tmux_args) -> CompletedProcess:
   '''
   return run('tmux', tmux_command, *tmux_args, quiet=False)
 
-@trace
+class TmuxCommand(BaseCommand):
+
+  @contextmanager
+  def run_context(self, **kw):
+    ''' Establish a `TmuxContol` instance as `self.options.tmux`.
+    '''
+    with super().run_context(**kw):
+      with TmuxControl() as tmux:
+        with stackattrs(self.options, tmux=tmux):
+          yield
+
+  def cmd_cli(self, argv):
+    ''' Usage: {cmd}
+          Interaction prompt for tmux(1) commands.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    tmux = self.options.tmux
+    while True:
+      try:
+        tmux_command = input('tmux> ').strip()
+      except EOFError:
+        break
+      if not tmux_command:
+        continue
+      if tmux_command == 'exit':
+        break
+      rsp = pfx_call(tmux, tmux_command)
+      print(rsp)
+      print(repr(rsp))
+
+  def cmd_pane(self, argv):
+    ''' Usage: {cmd} [command [args...]]
+          Dispatch command in a new pane.
+          With no arguments, list the current panes.
+    '''
+    tmux = self.options.tmux
+    if argv:
+      pane = tmux.pane(argv)
+      print(pane)
+    else:
+      rsp = tmux('list-panes')
+      for line in rsp:
+        sys.stdout.write(line)
+
+  def cmd_output_pipe(sel, argv):
+    ''' Usage: {cmd} pipe-path
+          Stub command to copy its input to its output.
+          This is a placeholder to assist the work_window() function
+          by supplying an executable command to invoke.
+    '''
+    if not argv:
+      raise GetoptError('missing pipe-path')
+    pipe_path = argv.pop(0)
+    if not S_ISFIFO(pfx_call(os.stat, pipe_path).st_mode):
+      raise GetoptError(f'pipe-path {pipe_path!r}: not a named pipe')
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    wf = os.fdopen(sys.stdout.fileno(), 'wb')
+    with pfx_call(open, pipe_path, 'rb') as pf:
+      buf = CornuCopyBuffer.from_file(pf)
+      while True:
+        bs = buf.read1(1024)
+        if not bs:
+          break
+        wf.write(bs)
+        wf.flush()
+
 def work_window(name: str, subpanes: List[str]):
   ''' Set up a window split into several panes.
   '''
@@ -368,6 +435,4 @@ def run_pane(*argv) -> IterableQueue:
   shcmd = shq(argv)
 
 if __name__ == '__main__':
-  with TmuxControl() as tm:
-    print(tm('list-sessions'))
-    print(tm('list-panes'))
+  sys.exit(TmuxCommand(sys.argv).run())
