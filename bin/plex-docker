@@ -138,7 +138,7 @@ set -- "$@" --mount "type=bind,source=$library_path,destination=/config"
 for mediadir in $mediadirs
 do
   base=$( echo "$mediadir" | tr / _ )
-  set -- "$@" --mount "type=bind,readonly,src=$mediadir,dst=/$base"
+  set -- "$@" --mount "type=bind,readonly,src=$mediadir,dst=/media--$base"
 done
 
 set -- "$@" "$image"
