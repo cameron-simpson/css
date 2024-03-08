@@ -44,7 +44,7 @@ usage="Usage: $cmd [options...] mediadirpaths...
 
   Leading options:
   --bonjour Expose ports for Bonjour/Avahi discovery.
-  -library librarydir
+  --library librarydir
             Library/configuration directory.
             Default from \$PLEX_DOCKER_LIBRARY otherwise ~/var/plex.
   --claim   Claim your server - for the first run.
@@ -76,11 +76,15 @@ do
     -I)         image=$2; shift ;;
     -n)         doit= trace=echo ;;
     --no-dri)   no_dri= ;;
+    --roku)     ports="$ports $ports_roku" ;;
     -S)         use_tmux=1 session_name=$2; shift ;;
     --tm)       use_tmux=1 ;;
-    --roku)     ports="$ports $ports_roku" ;;
     -U)         run_pull_mode=always ;;
     -x)         trace=set-x ;;
+    --)         shift; break ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
     *)          break ;;
   esac
   shift
