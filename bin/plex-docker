@@ -9,6 +9,7 @@ set -ue
 default_image=lscr.io/linuxserver/plex:latest
 
 use_tmux=
+session_name=
 [ -n "${PLEX_DOCKER_TMUX:-}" ] && use_tmux=1
 doit=1
 trace=
@@ -54,6 +55,8 @@ usage="Usage: $cmd [options...] mediadirpaths...
   -n        No action, dry run. Print the resulting docker command.
   --no-dri  Do not mount $dri_path inside the container.
   --roku    Expose ports for controlling Plex for Roku via Plex Companion.
+  -S session_name
+            Session name for tmux; implies --tm.
   --tm      Run the \"docker run ...\" in a tmux(1) session via the tm(1cs) command.
             This is handy when dispatching on a remote machine.
   -U        Update the docker image using \"docker run --pull always\".
@@ -73,6 +76,7 @@ do
     -I)         image=$2; shift ;;
     -n)         doit= trace=echo ;;
     --no-dri)   no_dri= ;;
+    -S)         use_tmux=1 session_name=$2; shift ;;
     --tm)       use_tmux=1 ;;
     --roku)     ports="$ports $ports_roku" ;;
     -U)         run_pull_mode=always ;;
@@ -137,8 +141,7 @@ set -- "$@" "$image"
 
 if [ $use_tmux ]
 then
-  # session_name=$( echo "PLEX_$inputbase $outputbase $$" | tr -s ' .:+' '____' )
-  session_name=$( echo "PLEX_$library_path" | tr -s ' .:+' '____' )
+  session_name=$( echo "${session_name:-PLEX_$library_path}" | tr -s '/ .:+' '_____' )
   set -- tm -x "$session_name" "$@"
 fi
 
