@@ -26,12 +26,13 @@ from typing import Optional, Sequence
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.fs import needdir
+from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, rfilepaths, uses_fstags
 from cs.hashindex import merge, DEFAULT_HASHNAME
 from cs.lex import get_prefix_n
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
+from cs.upd import run_task
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -119,55 +120,68 @@ class PlexCommand(BaseCommand):
                       because that lets you bind mount the plex media tree,
                       which would make the symlinkpaths invalid in the
                       bound mount.
+          -v          Verbose.
     '''
     options = self.options
     options.symlink_mode = False
     options.popopts(
         argv,
-        d='plextree',
+        d_='plextree',
         n='dry_run',
         m_='modes',
         sym='symlink_mode',
+        v='verbose',
     )
     doit = options.doit
     modes = options.modes.split(',')
     plextree = options.plextree
     symlink_mode = options.symlink_mode
     runstate = options.runstate
+    verbose = options.verbose
     if not argv:
       raise GetoptError("missing srctrees")
     srcroots = argv
     if not isdirpath(plextree):
       raise GetoptError(f'plextree does not exist: {plextree!r}')
-    for srcroot in srcroots:
-      runstate.raiseif()
-      for srcpath in srcroot if isfilepath(srcroot) else sorted(
-          (joinpath(srcroot, normpath(subpath))
-           for subpath in rfilepaths(srcroot))):
+    with run_task('linktree') as proxy:
+      for srcroot in srcroots:
         runstate.raiseif()
-        with Pfx(srcpath):
-          try:
-            os.stat(srcpath)
-          except FileNotFoundError as e:
-            warning("%s", e)
-            continue
-          try:
-            plex_linkpath(
-                srcpath,
-                plextree,
-                modes=modes,
-                symlink_mode=symlink_mode,
-                doit=doit,
-                quiet=False,
-            )
-          except UnsupportedPlexModeError as e:
-            warning("skipping, unsupported plex mode: %s", e)
-            continue
-          except ValueError as e:
-            warning("skipping: %s", e)
-            continue
-          except OSError as e:
-            warning("failed: %s", e)
+        osrcdir = None
+        for srcpath in srcroot if isfilepath(srcroot) else sorted(
+            (joinpath(srcroot, normpath(subpath))
+             for subpath in rfilepaths(srcroot))):
+          runstate.raiseif()
+          with Pfx(srcpath):
+            srcdir = dirname(srcpath)
+            if srcdir != osrcdir:
+              proxy.text = shortpath(srcdir)
+              osrcdir = srcdir
+            _, ext = splitext(basename(srcpath))
+            if ext.lower() not in ('mp4', 'mkv', 'avi'):
+              verbose and warning("unsupported extension: %s", ext)
+              continue
+            try:
+              os.stat(srcpath)
+            except FileNotFoundError as e:
+              warning("%s", e)
+              continue
+            try:
+              plex_linkpath(
+                  srcpath,
+                  plextree,
+                  modes=modes,
+                  symlink_mode=symlink_mode,
+                  doit=doit,
+                  quiet=False,
+              )
+            except UnsupportedPlexModeError as e:
+              verbose and warning("skipping, unsupported plex mode: %s", e)
+              continue
+            except ValueError as e:
+              warning("skipping: %s", e)
+              continue
+            except OSError as e:
+              warning("failed: %s", e)
 
 def scrub_title(title: str, *, season=None, episode=None):
   ''' Strip redundant text from the start of an episode title.
