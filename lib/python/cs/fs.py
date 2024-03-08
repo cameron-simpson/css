@@ -23,7 +23,7 @@ from os.path import (
 )
 from tempfile import TemporaryDirectory
 from threading import Lock
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from icontract import require
 
@@ -354,7 +354,7 @@ def is_valid_rpath(rpath, log=None) -> bool:
     return False
   return True
 
-def findup(dirpath: str, criterion: Union[str, Callable[str]]) -> str:
+def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
   ''' Walk up the filesystem tree looking for a directory where
       `criterion(fspath)` is not `None`, where `fspath` starts at `dirpath`.
       Return the result of `criterion(fspath)`.
@@ -381,7 +381,7 @@ def findup(dirpath: str, criterion: Union[str, Callable[str]]) -> str:
 
     def test_subpath(dirpath):
       testpath = joinpath(dirpath, find_name)
-      if pfx_call(existspath(testpath)):
+      if pfx_call(existspath, testpath):
         return testpath
       return None
 
@@ -389,7 +389,7 @@ def findup(dirpath: str, criterion: Union[str, Callable[str]]) -> str:
   if not isabspath(dirpath):
     dirpath = abspath(dirpath)
   while True:
-    found = pfx_call(criterion(dirpath))
+    found = pfx_call(criterion, dirpath)
     if found is not None:
       return found
     new_dirpath = dirname(dirpath)
