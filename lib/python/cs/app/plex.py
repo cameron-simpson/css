@@ -194,13 +194,13 @@ def scrub_title(title: str, *, season=None, episode=None):
       title = title[offset:]
   if episode:
     epfx, n, offset = get_prefix_n(title, 'e', n=episode)
-    if spfx:
+    if epfx:
       assert title.startswith(f'e{episode:02d}')
       title = title[offset:]
   title = title.lstrip(' -')
   if episode:
     epfx, n, offset = get_prefix_n(title.lower(), 'episode ', n=episode)
-    if spfx:
+    if epfx:
       title = title[offset:]
     title = title.lstrip(' -')
   return title
