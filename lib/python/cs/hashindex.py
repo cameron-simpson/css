@@ -561,6 +561,9 @@ def hashindex(
     case str() as fspath:
       # a local filesystem path
       pass
+    case [None, "-"]:
+      yield from read_hashindex(sys.stdin, hashname=hashname, **kw)
+      return
     case [None, str() as fspath]:
       # a local filesystem path because the remote host is None
       pass
