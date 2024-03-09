@@ -86,8 +86,9 @@ def main(argv=None):
   return HashIndexCommand(argv).run()
 
 class HashIndexCommand(BaseCommand):
-  ''' Tool to generate indices of file content hashcodes
-      and to link files to destinations based on their hashcode.
+  ''' A tool to generate indices of file content hashcodes
+      and to link or otherwise rearrange files to destinations based
+      on their hashcode.
   '''
 
   USAGE_FORMAT = r'''Usage: {cmd} subcommand...
@@ -255,8 +256,9 @@ class HashIndexCommand(BaseCommand):
           print(hashcode, fspath)
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-h hashname] [-r] [host:]path...
+    ''' Usage: {cmd} [options...] [host:]path...
           Walk filesystem paths and emit a listing.
+          Options:
           -e ssh_exe    Specify the ssh executable.
           -h hashname   Specify the file content hash algorithm name.
           -H hashindex_exe
@@ -309,7 +311,7 @@ class HashIndexCommand(BaseCommand):
   @typechecked
   def cmd_rearrange(self, argv):
     ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir [dstdir]
-          Rearrange files in targetdir based on their positions in refdir.
+          Rearrange files from targetdir into dstdir based on their positions in refdir.
           Options:
             -e ssh_exe  Specify the ssh executable.
             -h hashname Specify the file content hash algorithm name.
