@@ -75,6 +75,7 @@ from configparser import ConfigParser
 from contextlib import contextmanager
 import csv
 from dataclasses import dataclass
+from datetime import date, datetime
 import errno
 from getopt import getopt, GetoptError
 import json
@@ -1833,6 +1834,9 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
         return a `TagSet` of inferred `Tag`s.
 
         Tag values from earlier rules override values from later rules.
+
+        The default rules come from `self.fstags.config.filename_rules`,
+        which is sourced from `~/.fstagsrc`.
     '''
     if rules is None:
       rules = self.fstags.config.filename_rules
@@ -1851,20 +1855,33 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
         In order of preference:
         * from filesystem fstags
         * from file basename matching
-        * from the cascade rules
+        * from various `_type` suffixes
+        * from the cascade rules (see `FSTags.cascade_rules`)
     '''
     itags = TagSet()
     itags.update(self.as_tags(all_tags=True))
     itags.update(self.infer_from_basename())
     # implied tags by suffix
     for tag_name, value in sorted(itags.items()):
+      if value is None:
+        continue
       while True:
-        for conv, upconv in dict(lc=titleify_lc, n=int).items():
+        for conv, upconv in dict(
+            date=date.fromisoformat,
+            dt=datetime.fromisoformat,
+            f=float,
+            lc=titleify_lc,
+            n=int,
+        ).items():
           suffix = '_' + conv
           prefix = cutsuffix(tag_name, suffix)
           if prefix is not tag_name:
             with Pfx("%r:%r via %s", tag_name, value, upconv):
-              value = upconv(value)
+              try:
+                value = pfx_call(upconv, value)
+              except (TypeError, ValueError) as e:
+                ##warning("%s", e)
+                continue
             tag_name = prefix
             if tag_name not in itags:
               itags.set(tag_name, value)
@@ -1997,11 +2014,12 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
+    rdirpath = relpath(dirpath, path)
     try:
       with Pfx("scandir(%r)", dirpath):
         dirents = sorted(os.scandir(dirpath), key=lambda entry: entry.name)
     except NotADirectoryError:
-      yield False, dirpath
+      yield False, rdirpath
       continue
     except (FileNotFoundError, PermissionError) as e:
       warning("%s", e)
@@ -2011,15 +2029,16 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
       if not name_selector(name):
         continue
       entrypath = entry.path
+      subpath = joinpath(rdirpath, entry.name)
       if entry.is_dir(follow_symlinks=False):
         if yield_dirs:
-          yield True, entrypath
+          yield True, subpath
         pending.append(entrypath)
       else:
-        yield False, entrypath
+        yield False, subpath
 
 def rfilepaths(path, name_selector=None):
-  ''' Generator yielding pathnames of files found under `path`.
+  ''' Generator yielding relative pathnames of files found under `path`.
   '''
   return (
       subpath for is_dir, subpath in
