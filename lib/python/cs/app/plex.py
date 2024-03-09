@@ -154,6 +154,7 @@ class PlexCommand(BaseCommand):
           with Pfx(srcpath):
             srcdir = dirname(srcpath)
             if srcdir != osrcdir:
+              ##print(srcdir)
               proxy.text = shortpath(srcdir)
               osrcdir = srcdir
             _, ext = splitext(basename(srcpath))
