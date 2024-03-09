@@ -113,6 +113,147 @@ class HashIndexCommand(BaseCommand):
       with super().run_context(**kw):
         yield
 
+  def cmd_comm(self, argv):
+    ''' Usage: {cmd} {{-1|-2|-3}} {{path1|-}} {{path2|-}}
+          Compare the filepaths in path1 and path2 by content.
+          -1            List hashes and paths only present in path1.
+          -2            List hashes and paths only present in pathr.
+          -3            List hashes and paths present in path1 and path2.
+          -e ssh_exe    Specify the ssh executable.
+          -h hashname   Specify the file content hash algorithm name.
+          -H hashindex_exe
+                        Specify the remote hashindex executable.
+    '''
+    badopts = False
+    options = self.options
+    options.path1_only = False
+    options.path2_only = False
+    options.path12 = False
+    options.popopts(
+        argv,
+        _1='path1_only',
+        _2='path2_only',
+        _3='path12',
+        e='ssh_exe',
+        h='hashname',
+        H='hashindex_exe',
+    )
+    hashindex_exe = options.hashindex_exe
+    hashname = options.hashname
+    runstate = options.runstate
+    ssh_exe = options.ssh_exe
+    path1_only = options.path1_only
+    path2_only = options.path2_only
+    path12 = options.path12
+    mode_count = len(list(filter(None, (path1_only, path2_only, path12))))
+    if not mode_count:
+      warning("one of -1, -2 or -3 must be provided")
+      badopts = True
+    elif mode_count > 1:
+      warning("only one of -1, -2 or -3 may be provided")
+      badopts = True
+    if not argv:
+      warning("missing path1")
+      badopts = True
+    else:
+      path1spec = argv.pop(0)
+      with Pfx("path1 %r", path1spec):
+        path1host, path1dir = split_remote_path(path1spec)
+        if path1host is None:
+          if path1dir != '-':
+            if not isdirpath(path1dir):
+              warning("not a directory")
+              badopts = True
+        elif path1dir == '-':
+          warning("remote \"-\" not supported")
+          badopts = True
+    if not argv:
+      warning("missing path2")
+      badopts = True
+    else:
+      path2spec = argv.pop(0)
+      with Pfx("path2 %r", path2spec):
+        path2host, path2dir = split_remote_path(path2spec)
+        if path2host is None:
+          if path2dir != '-':
+            if not isdirpath(path2dir):
+              warning("not a directory")
+              badopts = True
+        elif path2dir == '-':
+          warning("remote \"-\" not supported")
+          badopts = True
+    if argv:
+      warning("extra arguments after path2: %r", argv)
+      badopts = True
+    if path1spec == '-' and path2spec == '-':
+      warning("path1 and path2 may not both be \"-\"")
+      badopts = True
+    if badopts:
+      raise GetoptError('bad arguments')
+    with Pfx("path1 %r", path1spec):
+      if path1host is None:
+        if path1dir == '-':
+          hindex1 = read_hashindex(sys.stdin, hashname=hashname)
+        else:
+          hindex1 = (
+              (hashcode, relpath(fspath, path1dir))
+              for hashcode, fspath in hashindex(path1dir, hashname=hashname)
+          )
+      else:
+        hindex1 = read_remote_hashindex(
+            path1host,
+            path1dir,
+            hashname=hashname,
+            ssh_exe=ssh_exe,
+            hashindex_exe=hashindex_exe,
+        )
+      fspaths1_by_hashcode = defaultdict(list)
+      for hashcode, fspath in hindex1:
+        runstate.raiseif()
+        if hashcode is not None:
+          fspaths1_by_hashcode[hashcode].append(fspath)
+    with Pfx("path2 %r", path2spec):
+      if path2host is None:
+        if path2dir == '-':
+          hindex2 = read_hashindex(sys.stdin, hashname=hashname)
+        else:
+          hindex2 = (
+              (hashcode, relpath(fspath, path2dir))
+              for hashcode, fspath in hashindex(path2dir, hashname=hashname)
+          )
+      else:
+        hindex2 = read_remote_hashindex(
+            path2host,
+            path2dir,
+            hashname=hashname,
+            ssh_exe=ssh_exe,
+            hashindex_exe=hashindex_exe,
+        )
+      fspaths2_by_hashcode = defaultdict(list)
+      for hashcode, fspath in hindex2:
+        runstate.raiseif()
+        if hashcode is not None:
+          fspaths2_by_hashcode[hashcode].append(fspath)
+    if path1_only:
+      for hashcode in fspaths1_by_hashcode.keys() - fspaths2_by_hashcode.keys(
+      ):
+        runstate.raiseif()
+        for fspath in fspaths1_by_hashcode[hashcode]:
+          print(hashcode, fspath)
+    elif path2_only:
+      for hashcode in fspaths2_by_hashcode.keys() - fspaths1_by_hashcode.keys(
+      ):
+        runstate.raiseif()
+        for fspath in fspaths2_by_hashcode[hashcode]:
+          print(hashcode, fspath)
+    else:
+      assert path12
+      for hashcode in fspaths2_by_hashcode.keys() & fspaths1_by_hashcode.keys(
+      ):
+        runstate.raiseif()
+        for fspath in fspaths1_by_hashcode[hashcode]:
+          print(hashcode, fspath)
+
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-h hashname] [-r] [host:]path...
           Walk filesystem paths and emit a listing.
