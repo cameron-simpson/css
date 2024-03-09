@@ -8,6 +8,7 @@ from collections import defaultdict
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from getopt import GetoptError
+from io import TextIOBase
 import os
 from os.path import (
     abspath,
@@ -543,14 +544,32 @@ def set_fstags_hashcode(
   csum.st_mtime = S.st_mtime
 
 def hashindex(
-    fspath,
+    fspath: Union[str, TextIOBase, Tuple[Union[None, str], str]],
     *,
     hashname: str,
+    **kw,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
       for the files in `fspath`, which may be a file or directory path.
       Note that it yields `(None,filepath)` for files which cannot be accessed.
   '''
+  match fspath:
+    case TextIOBase():
+      f = fspath
+      yield from read_hashindex(f, hashname=hashname, **kw)
+      return
+    case str() as fspath:
+      # a local filesystem path
+      pass
+    case [None, str() as fspath]:
+      # a local filesystem path because the remote host is None
+      pass
+    case [rhost, rfspath]:
+      yield from read_remote_hashindex(rhost, rfspath, hashname=hashname, **kw)
+      return
+    case _:
+      raise TypeError(f'hashindex: unhandled fspath={r(fspath)}')
+  # local ahshindex
   if isfilepath(fspath):
     h = file_checksum(fspath)
     yield h, fspath
@@ -559,7 +578,9 @@ def hashindex(
       h = file_checksum(filepath, hashname=hashname)
       yield h, filepath
   else:
-    warning("hashindex(%r): neither file nor directory", fspath)
+    raise ValueError(
+        f'hashindex: neither file nor directory: fspath={fspath!r}'
+    )
 
 def read_hashindex(
     f,
