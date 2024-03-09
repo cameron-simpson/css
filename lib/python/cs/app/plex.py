@@ -212,11 +212,15 @@ def plex_subpath(
     fspath: str, *, modes: Optional[Sequence[str]] = None, fstags: FSTags
 ):
   ''' Compute a Plex filesystem subpath based on the tags of `fspath`.
+
+      See: https://support.plex.tv/articles/naming-and-organizing-your-tv-show-files/
   '''
   if modes is None:
     modes = "movie", "tv"
   assert tuple(modes) == ("tv",), "expected just [tv], got %r" % (modes,)
-  base, ext = splitext(basename(fspath))
+  filename = basename(fspath)
+  # infer from filename?
+  base, ext = splitext(filename)
   itags = fstags[fspath].infer_tags()
   t = itags.auto
   tv = t.tv
@@ -228,32 +232,40 @@ def plex_subpath(
   extra = isinstance(tv.extra, (int, str)) and int(tv.extra)
   extra_title = tv.extra_title
   part = tv.part and int(tv.part)
-  dstbase = title
+  # compose the filesystem path
+  dstpath = []
   if tv.series_title and season and episode:
     # TV Series
     if "tv" not in modes:
       raise UnsupportedPlexModeError("tv not in modes %r" % (modes,))
-    dstpath = ['TV Shows', tv.series_title, f'Season {season:02d}']
+    dstpath.append('TV Shows')
+    series_part = tv.series_title
+    if tv.series_year:
+      series_part = f'{series_part} ({tv.series_year})'
+    dstpath.append(series_part)
+    dstpath.append(f'Season {season:02d}')
+    dstfilename = series_part
     if episode:
-      dstbase += f' - s{season:02d}e{episode:02d}'
+      dstfilename += f' - s{season:02d}e{episode:02d}'
     else:
-      dstbase += f' - s{season:02d}x{extra:02d}'
+      dstfilename += f' - s{season:02d}x{extra:02d}'
   else:
     # Movie
     if "movie" not in modes:
       raise UnsupportedPlexModeError("movie not in modes %r" % (modes,))
-    dstpath = ['Movies']
+    dstpath.append('Movies')
+    dstfilename = title
     if episode:
-      dstbase += f' - {episode:d}'
+      dstfilename += f' - {episode:d}'
   if episode_title and episode_title != title:
-    dstbase += f' - {episode_title}'
+    dstfilename += f' - {episode_title}'
   elif extra_title and extra_title != title:
-    dstbase += f' - {extra_title}'
+    dstfilename += f' - {extra_title}'
   if part:
-    dstbase += f' - pt{part:d}'
-  dstbase = dstbase.replace('/', '::')
-  dstpath.append(dstbase)
-  return joinpath(*dstpath) + ext
+    dstfilename += f' - pt{part:d}'
+  dstpath.append(dstfilename + ext)
+  subpath = joinpath(*(part.replace('/', '::') for part in dstpath))
+  return subpath
 
 # pylint: disable=redefined-builtin
 def plex_linkpath(
