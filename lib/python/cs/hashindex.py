@@ -568,7 +568,7 @@ def read_hashindex(
     hashname: str,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' A generator which reads line from the file `f`
-      and yields `(hashcode,fspath)` 2-tuples.
+      and yields `(hashcode,fspath)` 2-tuples for each line.
       If there are parse errors the `hashcode` or `fspath` may be `None`.
   '''
   for lineno, line in enumerate(f, start):
@@ -584,19 +584,20 @@ def read_hashindex(
         )
         hashcode = None
         fspath = None
-      with Pfx(hashhex):
-        try:
-          hashcode = BaseHashCode.promote(hashhex)
-        except ValueError as e:
-          warning("cannot convert to hashcode: %s", e)
-          hashcode = None
-        else:
-          if hashcode.hashname != hashname:
-            warning(
-                "bad hashname %r, expected %r", hashcode.hashname, hashname
-            )
+      else:
+        with Pfx(hashhex):
+          try:
+            hashcode = BaseHashCode.promote(hashhex)
+          except ValueError as e:
+            warning("cannot convert to hashcode: %s", e)
             hashcode = None
-      yield hashcode, fspath
+          else:
+            if hashcode.hashname != hashname:
+              warning(
+                  "bad hashname %r, expected %r", hashcode.hashname, hashname
+              )
+              hashcode = None
+    yield hashcode, fspath
 
 def localpath(fspath: str) -> str:
   ''' Return a filesystem path modified so that it connot be
