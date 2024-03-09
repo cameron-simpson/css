@@ -144,6 +144,7 @@ class PlexCommand(BaseCommand):
     if not isdirpath(plextree):
       raise GetoptError(f'plextree does not exist: {plextree!r}')
     with run_task('linktree') as proxy:
+      seen = set()
       for srcroot in srcroots:
         runstate.raiseif()
         osrcdir = None
@@ -174,6 +175,7 @@ class PlexCommand(BaseCommand):
                   symlink_mode=symlink_mode,
                   doit=doit,
                   quiet=False,
+                  seen=seen,
               )
             except UnsupportedPlexModeError as e:
               verbose and warning("skipping, unsupported plex mode: %s", e)
@@ -277,6 +279,7 @@ def plex_linkpath(
     quiet=False,
     hashname=DEFAULT_HASHNAME,
     symlink_mode=True,
+    seen=None,
 ):
   ''' Symlink `srcpath` into `plex_topdirpath`.
 
@@ -289,7 +292,14 @@ def plex_linkpath(
       * `quiet`: default `False`; if false print the planned link
       * `hashname`: the file content hash algorithm name
   '''
+  if seen is None:
+    seet = set()
   subpath = plex_subpath(srcpath, modes=modes)
+  if subpath in seen:
+    quiet or warning(
+        "skipping %r -> %r, we already set it up", srcpath, subpath
+    )
+  seen.add(subpath)
   plexpath = joinpath(plex_topdirpath, subpath)
   with Pfx(plexpath):
     if doit and not existspath(plexpath):
