@@ -853,11 +853,19 @@ def merge(
       dstsympath = os.readlink(dstpath)
     except FileNotFoundError:
       pass
+    except OSError as e:
+      if e.errno == os.EINVAL:
+        # not a symlink
+        raise FileExistsError(f'dstpath {dstpath!r} not a symlink: {e}') from e
+      raise
     else:
       if dstsympath == sympath:
         # identical symlinks, just update the tags
         fstags[dstpath].update(fstags[srcpath])
         return
+      raise FileExistsError(
+          f'dstpath {dstpath!r} already exists as a symlink to {dstsympath!r}'
+      )
   elif existspath(dstpath):
     if (samefile(srcpath, dstpath)
         or (file_checksum(dstpath, hashname=hashname) == file_checksum(
