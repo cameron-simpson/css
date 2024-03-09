@@ -1863,6 +1863,8 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
     itags.update(self.infer_from_basename())
     # implied tags by suffix
     for tag_name, value in sorted(itags.items()):
+      if value is None:
+        continue
       while True:
         for conv, upconv in dict(
             date=date.fromisoformat,
@@ -1876,7 +1878,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
           if prefix is not tag_name:
             with Pfx("%r:%r via %s", tag_name, value, upconv):
               try:
-                value = upconv(value)
+                value = pfx_call(upconv, value)
               except (TypeError, ValueError) as e:
                 ##warning("%s", e)
                 continue
