@@ -279,19 +279,20 @@ def plex_linkpath(
   '''
   subpath = plex_subpath(srcpath, modes=modes)
   plexpath = joinpath(plex_topdirpath, subpath)
-  if doit and not existspath(plexpath):
-    needdir(dirname(plexpath), use_makedirs=True, log=warning)
-  try:
-    merge(
-        abspath(srcpath),
-        plexpath,
-        hashname=hashname,
-        symlink_mode=symlink_mode,
-        quiet=False,
-        doit=doit
-    )
-  except FileExistsError:
-    warning("already exists")
+  with Pfx(plexpath):
+    if doit and not existspath(plexpath):
+      needdir(dirname(plexpath), use_makedirs=True, log=warning)
+    try:
+      merge(
+          abspath(srcpath),
+          plexpath,
+          hashname=hashname,
+          symlink_mode=symlink_mode,
+          quiet=False,
+          doit=doit
+      )
+    except FileExistsError:
+      warning("already exists")
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
