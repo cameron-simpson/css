@@ -32,7 +32,7 @@ from cs.hashindex import merge, DEFAULT_HASHNAME
 from cs.lex import get_prefix_n
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
-from cs.upd import run_task
+from cs.upd import run_task, print
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -157,7 +157,7 @@ class PlexCommand(BaseCommand):
               proxy.text = shortpath(srcdir)
               osrcdir = srcdir
             _, ext = splitext(basename(srcpath))
-            if ext.lower() not in ('mp4', 'mkv', 'avi'):
+            if ext.lower() not in ('.mp4', '.mkv', '.avi'):
               verbose and warning("unsupported extension: %s", ext)
               continue
             try:
