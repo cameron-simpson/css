@@ -193,46 +193,15 @@ class HashIndexCommand(BaseCommand):
     if badopts:
       raise GetoptError('bad arguments')
     with Pfx("path1 %r", path1spec):
-      if path1host is None:
-        if path1dir == '-':
-          hindex1 = read_hashindex(sys.stdin, hashname=hashname)
-        else:
-          hindex1 = (
-              (hashcode, relpath(fspath, path1dir))
-              for hashcode, fspath in hashindex(path1dir, hashname=hashname)
-          )
-      else:
-        hindex1 = read_remote_hashindex(
-            path1host,
-            path1dir,
-            hashname=hashname,
-            ssh_exe=ssh_exe,
-            hashindex_exe=hashindex_exe,
-        )
       fspaths1_by_hashcode = defaultdict(list)
-      for hashcode, fspath in hindex1:
+      for hashcode, fspath in hashindex((path1host, path1dir),
+                                        hashname=hashname):
         runstate.raiseif()
         if hashcode is not None:
           fspaths1_by_hashcode[hashcode].append(fspath)
     with Pfx("path2 %r", path2spec):
-      if path2host is None:
-        if path2dir == '-':
-          hindex2 = read_hashindex(sys.stdin, hashname=hashname)
-        else:
-          hindex2 = (
-              (hashcode, relpath(fspath, path2dir))
-              for hashcode, fspath in hashindex(path2dir, hashname=hashname)
-          )
-      else:
-        hindex2 = read_remote_hashindex(
-            path2host,
-            path2dir,
-            hashname=hashname,
-            ssh_exe=ssh_exe,
-            hashindex_exe=hashindex_exe,
-        )
-      fspaths2_by_hashcode = defaultdict(list)
-      for hashcode, fspath in hindex2:
+      for hashcode, fspath in hashindex((path2host, path2dir),
+                                        hashname=hashname):
         runstate.raiseif()
         if hashcode is not None:
           fspaths2_by_hashcode[hashcode].append(fspath)
@@ -293,20 +262,15 @@ class HashIndexCommand(BaseCommand):
             warning("not a directory and -r (relative) specified")
             xit = 1
             continue
-          for h, fspath in hashindex(path, hashname=hashname):
-            runstate.raiseif()
-            if h is not None:
-              print(h, relpath(fspath, path) if relative else fspath)
-        else:
-          for h, fspath in read_remote_hashindex(
-              rhost,
-              lpath,
-              hashname=hashname,
-              ssh_exe=ssh_exe,
-              hashindex_exe=hashindex_exe,
-          ):
-            runstate.raiseif()
-            print(h, fspath if relative else joinpath(lpath, fspath))
+        for h, fspath in hashindex(
+            (rhost, lpath),
+            hashname=hashname,
+            ssh_exe=ssh_exe,
+            hashindex_exe=hashindex_exe,
+        ):
+          runstate.raiseif()
+          if h is not None:
+            print(h, relpath(fspath, lpath) if relative else fspath)
     return xit
 
   @typechecked
@@ -392,23 +356,12 @@ class HashIndexCommand(BaseCommand):
     fspaths_by_hashcode = defaultdict(list)
     xit = 0
     with run_task(f'hashindex {refspec}'):
-      if refhost is None:
-        if refdir == '-':
-          hindex = read_hashindex(sys.stdin, hashname=hashname)
-        else:
-          hindex = (
-              (hashcode, relpath(fspath, refdir))
-              for hashcode, fspath in hashindex(refdir, hashname=hashname)
-          )
-      else:
-        hindex = read_remote_hashindex(
-            refhost,
-            refdir,
-            hashname=hashname,
-            ssh_exe=ssh_exe,
-            hashindex_exe=hashindex_exe,
-        )
-      for hashcode, fspath in hindex:
+      for hashcode, fspath in hashindex(
+          (refhost, refdir),
+          hashname=hashname,
+          ssh_exe=ssh_exe,
+          hashindex_exe=hashindex_exe,
+      ):
         if hashcode is not None:
           fspaths_by_hashcode[hashcode].append(fspath)
     # rearrange the target directory.
