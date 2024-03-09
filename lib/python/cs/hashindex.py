@@ -542,8 +542,11 @@ def set_fstags_hashcode(
   csum.st_size = S.st_size
   csum.st_mtime = S.st_mtime
 
-@uses_fstags
-def hashindex(fspath, *, hashname: str, fstags: FSTags):
+def hashindex(
+    fspath,
+    *,
+    hashname: str,
+) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
       for the files in `fspath`, which may be a file or directory path.
       Note that it yields `(None,filepath)` for files which cannot be accessed.
@@ -558,7 +561,12 @@ def hashindex(fspath, *, hashname: str, fstags: FSTags):
   else:
     warning("hashindex(%r): neither file nor directory", fspath)
 
-def read_hashindex(f, start=1, *, hashname: str):
+def read_hashindex(
+    f,
+    start=1,
+    *,
+    hashname: str,
+) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' A generator which reads line from the file `f`
       and yields `(hashcode,fspath)` 2-tuples.
       If there are parse errors the `hashcode` or `fspath` may be `None`.
@@ -611,7 +619,7 @@ def read_remote_hashindex(
     ssh_exe=None,
     hashindex_exe=None,
     check=True,
-):
+) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' A generator which reads a hashindex of a remote directory,
       This runs: `hashindex ls -h hashname -r rdirpath` on the remote host.
       It yields `(hashcode,fspath)` 2-tuples.
