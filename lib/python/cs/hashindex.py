@@ -77,9 +77,10 @@ DISTINFO = {
     ],
 }
 
-DEFAULT_HASHNAME = 'sha256'
-DEFAULT_HASHINDEX_EXE = 'hashindex'
-DEFAULT_SSH_EXE = 'ssh'
+HASHNAME_DEFAULT = 'sha256'
+HASHINDEX_EXE_DEFAULT = 'hashindex'
+SSH_EXE_DEFAULT = 'ssh'
+SSH_EXE_ENVVAR = 'HASHINDEX_SSH'
 
 def main(argv=None):
   ''' Commandline implementation.
@@ -94,16 +95,21 @@ class HashIndexCommand(BaseCommand):
 
   USAGE_FORMAT = r'''Usage: {cmd} subcommand...
     Generate or process file content hash listings.'''
-  USAGE_KEYWORDS = dict(DEFAULT_HASHNAME=DEFAULT_HASHNAME,)
+  USAGE_KEYWORDS = dict(HASHNAME_DEFAULT=HASHNAME_DEFAULT,)
 
   @dataclass
   class Options(BaseCommand.Options):
     ''' Options for `HashIndexCommand`.
     '''
-    hashname: str = DEFAULT_HASHNAME
+    hashname: str = HASHNAME_DEFAULT
     move_mode: bool = False
-    ssh_exe: str = DEFAULT_SSH_EXE
-    hashindex_exe: str = DEFAULT_HASHINDEX_EXE
+    ssh_exe: str = field(
+        default_factory=lambda: (
+            os.environ.get(SSH_EXE_ENVVAR, os.environ.get('RSYNC_RSH', '')) or
+            SSH_EXE_DEFAULT
+        )
+    )
+    hashindex_exe: str = HASHINDEX_EXE_DEFAULT
     symlink_mode: bool = False
     relative: Optional[bool] = None
 
@@ -415,7 +421,7 @@ class HashIndexCommand(BaseCommand):
 @pfx
 def file_checksum(
     fspath: str,
-    hashname: str = DEFAULT_HASHNAME,
+    hashname: str = HASHNAME_DEFAULT,
     *,
     fstags: FSTags,
 ) -> Union[BaseHashCode, None]:
@@ -607,16 +613,16 @@ def read_remote_hashindex(
       * `rdirpath`: the remote directory path
       * `hashname`: the file content hash algorithm name
       * `ssh_exe`: the `ssh` executable,
-        default `DEFAULT_SSH_EXE`: `{DEFAULT_SSH_EXE!r}`
+        default `SSH_EXE_DEFAULT`: `{SSH_EXE_DEFAULT!r}`
       * `hashindex_exe`: the remote `hashindex` executable,
-        default `DEFAULT_HASHINDEX_EXE`: `{DEFAULT_HASHINDEX_EXE!r}`
+        default `HASHINDEX_EXE_DEFAULT`: `{HASHINDEX_EXE_DEFAULT!r}`
       * `check`: whether to check that the remote command has a `0` return code,
         default `True`
   '''
   if ssh_exe is None:
-    ssh_exe = DEFAULT_SSH_EXE
+    ssh_exe = SSH_EXE_DEFAULT
   if hashindex_exe is None:
-    hashindex_exe = DEFAULT_HASHINDEX_EXE
+    hashindex_exe = HASHINDEX_EXE_DEFAULT
   hashindex_cmd = shlex.join(
       prep_argv(
           hashindex_exe,
@@ -655,9 +661,9 @@ def run_remote_hashindex(
       * `argv`: the command line arguments to be passed to the
         remote `hashindex` command
       * `ssh_exe`: the `ssh` executable,
-        default `DEFAULT_SSH_EXE`: `{DEFAULT_SSH_EXE!r}`
+        default `SSH_EXE_DEFAULT`: `{SSH_EXE_DEFAULT!r}`
       * `hashindex_exe`: the remote `hashindex` executable,
-        default `DEFAULT_HASHINDEX_EXE`: `{DEFAULT_HASHINDEX_EXE!r}`
+        default `HASHINDEX_EXE_DEFAULT`: `{HASHINDEX_EXE_DEFAULT!r}`
       * `check`: whether to check that the remote command has a `0` return code,
         default `True`
       * `doit`: whether to actually run the command, default `True`
