@@ -200,14 +200,23 @@ class HashIndexCommand(BaseCommand):
       raise GetoptError('bad arguments')
     with Pfx("path1 %r", path1spec):
       fspaths1_by_hashcode = defaultdict(list)
-      for hashcode, fspath in hashindex((path1host, path1dir),
-                                        hashname=hashname):
+      for hashcode, fspath in hashindex(
+          (path1host, path1dir),
+          hashname=hashname,
+          hashindex_exe=hashindex_exe,
+          ssh_exe=ssh_exe,
+      ):
         runstate.raiseif()
         if hashcode is not None:
           fspaths1_by_hashcode[hashcode].append(fspath)
     with Pfx("path2 %r", path2spec):
-      for hashcode, fspath in hashindex((path2host, path2dir),
-                                        hashname=hashname):
+      fspaths2_by_hashcode = defaultdict(list)
+      for hashcode, fspath in hashindex(
+          (path2host, path2dir),
+          hashname=hashname,
+          hashindex_exe=hashindex_exe,
+          ssh_exe=ssh_exe,
+      ):
         runstate.raiseif()
         if hashcode is not None:
           fspaths2_by_hashcode[hashcode].append(fspath)
