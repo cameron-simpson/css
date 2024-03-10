@@ -6,7 +6,7 @@
 
 from collections import defaultdict
 from contextlib import contextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from getopt import GetoptError
 from io import TextIOBase
 import os
@@ -39,7 +39,7 @@ from cs.deco import fmtdoc
 from cs.fs import is_valid_rpath, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
-from cs.lex import split_remote_path
+from cs.lex import r, split_remote_path
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import prep_argv, pipefrom, run
