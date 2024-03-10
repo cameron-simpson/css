@@ -387,11 +387,21 @@ def uses_cmd_options(
         provided its `cls.Options` class is used.
       * `options_param_name`: the parameter name to provide, default `options`
 
-      Example:
+      Examples:
 
           @uses_cmd_options
           def f(x,*,options):
+              """ Run directly from the prevailing options. """
               if options.verbose:
+                  print("doing f with x =", x)
+              ....
+
+          @uses_cmd_options
+          def f(x,*,verbose=None,options):
+              """ Get defaults from the prevailing options. """
+              if verbose is None:
+                  verbose = options.verbose
+              if verbose:
                   print("doing f with x =", x)
               ....
   '''
