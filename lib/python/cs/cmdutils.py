@@ -370,7 +370,9 @@ class BaseCommandOptions(HasThreadState):
     '''
     BaseCommand.popopts(argv, self, **opt_specs)
 
-def uses_cmd_options(cls=BaseCommandOptions, options_param_name='options'):
+def uses_cmd_options(
+    func, cls=BaseCommandOptions, options_param_name='options'
+):
   ''' A decorator to provide a default parameter containing the
       prevailing `BaseCommandOptions` instance as the `options` keyword
       argument, using the `cs.deco.default_params` decorator factory.
@@ -395,7 +397,9 @@ def uses_cmd_options(cls=BaseCommandOptions, options_param_name='options'):
   '''
   if issubclass(cls, BaseCommand):
     cls = cls.Options
-  return default_params(**{options_param_name: lambda: cls.default() or cls()})
+  return default_params(
+      func, **{options_param_name: lambda: cls.default() or cls()}
+  )
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
