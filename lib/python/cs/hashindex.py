@@ -113,6 +113,13 @@ class HashIndexCommand(BaseCommand):
     symlink_mode: bool = False
     relative: Optional[bool] = None
 
+    COMMON_OPT_SPECS = dict(
+        e='ssh_exe',
+        h_='hashname',
+        H_='hashindex_exe',
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+    )
+
   # pylint: disable=arguments-differ
   @contextmanager
   @uses_fstags
@@ -142,9 +149,6 @@ class HashIndexCommand(BaseCommand):
         _1='path1_only',
         _2='path2_only',
         _3='path12',
-        e='ssh_exe',
-        h='hashname',
-        H='hashindex_exe',
     )
     hashindex_exe = options.hashindex_exe
     hashname = options.hashname
@@ -255,9 +259,6 @@ class HashIndexCommand(BaseCommand):
     options.relative = False
     options.popopts(
         argv,
-        e_='ssh_exe',
-        h_='hashname',
-        H_='hashindex_exe',
         r='relative',
     )
     hashindex_exe = options.hashindex_exe
@@ -314,11 +315,7 @@ class HashIndexCommand(BaseCommand):
     badopts = False
     options.popopts(
         argv,
-        e_='ssh_exe',
-        h_='hashname',
-        H_='hashindex_exe',
         mv='move_mode',
-        n='dry_run',
         s='symlink_mode',
     )
     doit = options.doit
