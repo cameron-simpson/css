@@ -30,7 +30,7 @@ from typing import Callable, List, Mapping, Optional, Tuple
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import default_params, Promotable
+from cs.deco import default_params, fmtdoc, Promotable
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -262,6 +262,13 @@ class _ClassSubCommand(_BaseSubCommand):
     subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
     return subusage_format
 
+# gimmkicked name to support @fmtdoc on BaseCommandOptions.popopts
+_COMMON_OPT_SPECS = dict(
+    n='dry_run',
+    q='quiet',
+    v='verbose',
+)
+
 @dataclass
 class BaseCommandOptions(HasThreadState):
   ''' A base class for the `BaseCommand` `options` object.
@@ -290,6 +297,7 @@ class BaseCommandOptions(HasThreadState):
   '''
 
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGTERM
+  COMMON_OPT_SPECS = _COMMON_OPT_SPECS
 
   cmd: Optional[str] = None
   dry_run: bool = False
@@ -355,6 +363,7 @@ class BaseCommandOptions(HasThreadState):
     '''
     self.dry_run = not new_doit
 
+  @fmtdoc
   def popopts(self, argv, **opt_specs):
     ''' Convenience method to appply `BaseCommand.popopts` to the options (`self`).
 
@@ -362,12 +371,30 @@ class BaseCommandOptions(HasThreadState):
 
             def cmd_foo(self, argv):
                 self.options.popopts(
-                    n='dry_run',
+                    c_='config',
+                    l='long',
                     x='trace',
                 )
                 if self.options.dry_run:
                     print("dry run!")
+
+        The class attribute `COMMON_OPT_SPECS` is a mapping of
+        options which are always supported. `BaseCommandOptions`
+        has: `COMMON_OPT_SPECS={_COMMON_OPT_SPECS!r}`.
+
+        A subclass with more common options might extend this like so,
+        from `cs.hashindex`:
+
+            COMMON_OPT_SPECS = dict(
+                e='ssh_exe',
+                h_='hashname',
+                H_='hashindex_exe',
+                **BaseCommand.Options.COMMON_OPT_SPECS,
+            )
+
     '''
+    for k, v in self.COMMON_OPT_SPECS.items():
+      opt_specs.setdefault(k, v)
     BaseCommand.popopts(argv, self, **opt_specs)
 
 def uses_cmd_options(
