@@ -132,7 +132,7 @@ class HashIndexCommand(BaseCommand):
     ''' Usage: {cmd} {{-1|-2|-3}} {{path1|-}} {{path2|-}}
           Compare the filepaths in path1 and path2 by content.
           -1            List hashes and paths only present in path1.
-          -2            List hashes and paths only present in pathr.
+          -2            List hashes and paths only present in path2.
           -3            List hashes and paths present in path1 and path2.
           -e ssh_exe    Specify the ssh executable.
           -h hashname   Specify the file content hash algorithm name.
