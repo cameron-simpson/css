@@ -1316,6 +1316,7 @@ class Module:
       projspec['version'] = version
     if 'extra_requires' in dinfo:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
+    package_dir = dinfo.pop('package_dir')
     dinfo_entry_points = dinfo.pop('entry_points', {})
     if dinfo_entry_points:
       console_scripts = dinfo_entry_points.pop('console_scripts', [])
@@ -1330,10 +1331,13 @@ class Module:
             "build-backend": "setuptools.build_meta",
             "requires": [
                 "setuptools >= 61.2",
-                'trove-classifiers',
+                "trove-classifiers",
                 "wheel",
             ],
-        }
+        },
+        "tool.setuptools": {
+            "package-dir": package_dir,
+        },
     }
     docs = self.compute_doc()
     projspec["readme"] = {
