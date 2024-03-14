@@ -1020,7 +1020,7 @@ class Promotable:
         This method supports the `@promote` decorator.
 
         This base method will call the `from_`*typename*`(obj)` class factory
-        method if present, where *typename* is `obj._-class__.__name__`.
+        method if present, where *typename* is `obj.__class__.__name__`.
 
         Subclasses may override this method to promote other types,
         typically:
