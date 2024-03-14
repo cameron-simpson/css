@@ -19,7 +19,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20240303-post'
+__version__ = '20240314'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
