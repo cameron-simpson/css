@@ -5,7 +5,7 @@
 #
 
 r'''
-Assorted decorator functions.
+Assorted function decorators.
 '''
 
 from abc import ABC, abstractmethod
