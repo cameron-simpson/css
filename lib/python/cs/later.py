@@ -55,7 +55,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20230212.1-post'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -313,7 +313,14 @@ class Later(MultiOpenMixin, HasThreadState):
 
   later_perthread_state = ThreadState()
 
-  def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
+  def __init__(
+      self,
+      capacity,
+      name=None,
+      inboundCapacity=0,
+      retry_delay=None,
+      thread_states=True,
+  ):
     ''' Initialise the Later instance.
 
         Parameters:
@@ -328,6 +335,10 @@ class Later(MultiOpenMixin, HasThreadState):
           block until some functions are dispatched.
         * `retry_delay`: time delay for requeued functions.
           Default: `DEFAULT_RETRY_DELAY`.
+        * `thread_states`: the default `thread_states` parameter
+          for `LateFunctions`, which is in turn passed to
+          `HasThreadState.Thread`
+          Default: `True`
     '''
     if name is None:
       name = "Later-%d" % (seq(),)
@@ -344,6 +355,7 @@ class Later(MultiOpenMixin, HasThreadState):
     self.capacity = capacity
     self.inboundCapacity = inboundCapacity
     self.retry_delay = retry_delay
+    self.thread_states = thread_states
     self.name = name
     self._lock = Lock()
     self.outstanding = set()  # dispatched but uncompleted LateFunctions
@@ -590,7 +602,7 @@ class Later(MultiOpenMixin, HasThreadState):
       func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = LateFunction(func, name=name)
+    LF = LateFunction(func, name=name, thread_states=self.thread_states)
     LF._dispatch()  # pylint: disable=protected-access
     return LF
 
@@ -645,12 +657,14 @@ class Later(MultiOpenMixin, HasThreadState):
       priority = (priority,)
     if pfx is not None:
       func = pfx.partial(func)
+    if thread_states is None:
+      thread_states = self.thread_states
     if LF is None:
       LF = LateFunction(
           func,
           name=name,
           retry_delay=retry_delay,
-          thread_states=thread_states
+          thread_states=thread_states,
       )
     pri_entry = list(priority)
     pri_entry.append(seq())  # ensure FIFO servicing of equal priorities

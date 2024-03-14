@@ -1,0 +1,5 @@
+lib/python/cs/psutils.py: cs.psutils: docstring tweaks
+lib/python/cs/psutils.py: cs.psutils: use int division when computing MAX_ARGV
+lib/python/cs/psutils.py: cs.psutils: run: new optional input= parameter to presupply input data
+lib/python/cs/psutils.py: cs.psutils: new prep_argv(*argv) function to flatten and trim computes argv lists; use automatically in run(), pipeot(), pipefrom()
+lib/python/cs/psutils.py: cs.psutils: update DISTINFO

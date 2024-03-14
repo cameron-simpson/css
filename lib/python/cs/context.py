@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+import signal
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
@@ -14,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20230331-post'
+__version__ = '20240212.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,16 +29,17 @@ DISTINFO = {
 
 @contextmanager
 def contextif(flag, cmgr_func, *cmgr_args, **cmgr_kwargs):
-  ''' A context manager to call call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
-      if `flag` is true or `nullcontext()` otherwise.
+  ''' A context manager to call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
+      if `flag` is true, otherwise to call `nullcontext()`.
 
-      The driving use case in verbosity dependent status lines or
+      The driving use case is verbosity dependent status lines or
       progress bars, eg:
 
           from cs.upd import run_task
-          with contextif(run_task(....)) as proxy:
+          with contextif(verbose, run_task, ....) as proxy:
             ... do stuff, updating proxy if not None ...
   '''
+  assert isinstance(flag, bool)
   cmgr = cmgr_func(*cmgr_args, **cmgr_kwargs) if flag else nullcontext()
   with cmgr as ctxt:
     yield ctxt
@@ -435,6 +437,35 @@ def pop_cmgr(o, attr):
   pop_func = getattr(o, '_push_cmgr__popfunc__' + attr)
   return pop_func()
 
+@contextmanager
+def stack_signals(signums, handler, additional=False):
+  ''' Context manager to apply a handler function to `signums`
+      using `signal.signal`.
+      The old handlers are restored on exit from the context manager.
+
+      If the optional `additional` argument is true,
+      apply a handler which calls both the new handler and the old handler.
+  '''
+  stacked_signals = {}
+  if additional:
+    new_handler = handler
+
+    def handler(sig, frame):
+      old_handler = stacked_signals[sig]
+      new_handler(sig, frame)
+      if old_handler:
+        old_handler(sig, frame)
+
+  if isinstance(signums, int):
+    signums = [signums]
+  try:
+    for signum in signums:
+      stacked_signals[signum] = signal.signal(signum, handler)
+    yield
+  finally:
+    for signum, old_handler in stacked_signals.items():
+      signal.signal(signum, old_handler)
+
 class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods
       running the first and second steps of a single `__enter_exit__` generator method.
@@ -553,7 +584,7 @@ class ContextManagerMixin:
     entered = next(eegen)
     try:
       yield entered
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
       exit_result = eegen.throw(type(e), e, e.__traceback__)
       if not exit_result:
         raise
@@ -562,3 +593,14 @@ class ContextManagerMixin:
         exit_result = next(eegen)
       except StopIteration:
         pass
+
+@contextmanager
+def reconfigure_file(f, **kw):
+  ''' Context manager flavour of `TextIOBase.reconfigure`.
+  '''
+  old = {k: getattr(f, k) for k in kw}
+  try:
+    f.reconfigure(**kw)
+    yield
+  finally:
+    f.reconfigure(**old)

@@ -24,7 +24,6 @@ import sys
 from cs.binary import (
     UInt8,
     Int16BE,
-    UTF16NULField,
     Int32BE,
     UInt16BE,
     UInt32BE,
@@ -36,7 +35,6 @@ from cs.binary import (
     BinaryMultiStruct,
     BinaryMultiValue,
     BinarySingleValue,
-    deferred_field,
     pt_spec,
 )
 from cs.buffer import CornuCopyBuffer
@@ -51,7 +49,7 @@ from cs.threads import locked_property, ThreadState
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
-__version__ = '20230212-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -93,7 +91,7 @@ class MP4Command(BaseCommand):
 
   @uses_fstags
   def cmd_autotag(self, argv, fstags):
-    ''' Usage: {cmd} autotag [-n] [-p prefix] [--prefix=prefix] paths...
+    ''' Usage: {cmd} [-n] [-p prefix] [--prefix=prefix] paths...
           Tag paths based on embedded MP4 metadata.
           -n  No action.
           -p prefix, --prefix=prefix
@@ -138,7 +136,8 @@ class MP4Command(BaseCommand):
     return xit
 
   def cmd_deref(self, argv):
-    ''' Dereference a Box specification against ISO14496 files.
+    ''' Usage: {cmd} boxspec paths...
+          Dereference a Box specification against ISO14496 files.
     '''
     spec = argv.pop(0)
     with Pfx(spec):
@@ -154,7 +153,7 @@ class MP4Command(BaseCommand):
           print(path, "offset=%d" % B.offset, B)
 
   def cmd_extract(self, argv):
-    ''' Usage: {cmd} extract [-H] filename boxref output
+    ''' Usage: {cmd} [-H] filename boxref output
           Extract the referenced Box from the specified filename into output.
           -H  Skip the Box header.
     '''
@@ -207,7 +206,7 @@ class MP4Command(BaseCommand):
       os.close(fd)
 
   def cmd_info(self, argv):
-    ''' Usage: {cmd} info [{{-|filename}}]...]
+    ''' Usage: {cmd} [{{-|filename}}]...]
           Print informative report about each source.
     '''
     if not argv:
@@ -232,7 +231,7 @@ class MP4Command(BaseCommand):
                   print('   ', tag, repr(tag.value))
 
   def cmd_parse(self, argv):
-    ''' Usage: {cmd} [parse [{{-|filename}}]...]
+    ''' Usage: {cmd} [{{-|filename}}...]
           Parse the named files (or stdin for "-").
     '''
     if not argv:
@@ -248,7 +247,7 @@ class MP4Command(BaseCommand):
         over_box.dump(crop_length=None)
 
   def cmd_tags(self, argv):
-    ''' Usage: {cmd} path
+    ''' Usage: {cmd} [{{-p,--prefix}} prefix] path
           Report the tags of `path` based on embedded MP4 metadata.
     '''
     xit = 0
@@ -411,7 +410,7 @@ class UTF8or16Field(SimpleBinary):
     '''
     if self.bom:
       yield self.bom
-      yield UTF16NULField.transcribe_value(
+      yield BinaryUTF16NUL.transcribe_value(
           self.text, encoding=self.BOM_ENCODING[self.bom]
       )
     else:
@@ -2182,14 +2181,14 @@ class CO64BoxBody(FullBoxBody):
     else:
       yield from map(UInt64BE.transcribe_value, chunk_offsets)
 
-  @deferred_field
-  def chunk_offsets(self, bfr):
-    ''' Computed on demand list of chunk offsets.
-    '''
-    offsets = []
-    for _ in range(self.entry_count):
-      offsets.append(UInt64BE.from_buffer(bfr))
-    return offsets
+  ##@deferred_field
+  ##def chunk_offsets(self, bfr):
+  ##  ''' Computed on demand list of chunk offsets.
+  ##  '''
+  ##  offsets = []
+  ##  for _ in range(self.entry_count):
+  ##    offsets.append(UInt64BE.from_buffer(bfr))
+  ##  return offsets
 
 add_body_class(CO64BoxBody)
 

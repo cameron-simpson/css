@@ -49,7 +49,7 @@ from cs.binary import (
     BinarySingleValue, BSUInt, BSData, flatten as flatten_transcription
 )
 from cs.buffer import CornuCopyBuffer
-from cs.lex import untexthexify, get_decimal_value
+from cs.lex import untexthexify, get_decimal_value, r
 from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
@@ -173,8 +173,8 @@ class _Block(Transcriber, ABC):
         # we can defer fetching the data until now
         data1 = leaf1.data
         data2 = leaf2.data
-        if (data1[offset - offset1:offset - offset1 + cmplen] !=
-            data2[offset - offset2:offset - offset2 + cmplen]):
+        if (data1[offset - offset1:offset - offset1 + cmplen]
+            != data2[offset - offset2:offset - offset2 + cmplen]):
           return False
         end2 = offset2 + len(data2)
         offset += cmplen
@@ -580,22 +580,21 @@ class BlockRecord(BinarySingleValue):
     block_bs = b''.join(flatten_transcription(transcription))
     return BSData(block_bs).transcribe()
 
-@lru_cache(maxsize=1024 * 1024, typed=True)
-def get_HashCodeBlock(hashcode):
-  ''' Caching constructor for HashCodeBlocks of known code.
-  '''
-  if hashcode is None:
-    raise ValueError("invalid hashcode, may not be None")
-  return HashCodeBlock(hashcode=hashcode)
-
 class HashCodeBlock(_Block):
   ''' A Block reference based on a Store hashcode.
   '''
 
   transcribe_prefix = 'B'
 
+  @typechecked
   def __init__(
-      self, *, hashcode=None, data=None, added=False, span=None, **kw
+      self,
+      hashcode: Optional[HashCode] = None,
+      *,
+      data=None,
+      added=False,
+      span=None,
+      **kw,
   ):
     ''' Initialise a `BT_HASHCODE` Block.
 
@@ -629,7 +628,7 @@ class HashCodeBlock(_Block):
               (hashcode, h, data)
           )
     self._data = data
-    self._span = None
+    self._span = span
     _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
 
@@ -700,13 +699,12 @@ class HashCodeBlock(_Block):
     if self._span is None:
       self._span = newspan
     else:
-      warning("setting .span a second time")
+      ##warning("setting .span a second time")
       if newspan != self._span:
         raise RuntimeError(
             "%s: tried to change .span from %s to %s" %
             (self, self._span, newspan)
         )
-      raise RuntimeError("SECOND UNEXPECTED")
 
   def datafrom(self, start=0, end=None):
     ''' Generator yielding data from `start:end`.
@@ -773,7 +771,7 @@ def Block(*, hashcode=None, data=None, span=None, added=False):
   if data is None:
     if span is None:
       raise ValueError('data and span may not both be None')
-    B = get_HashCodeBlock(hashcode)
+    B = HashCodeBlock(hashcode=hashcode, span=span)
   else:
     if span is None:
       span = len(data)
@@ -797,7 +795,7 @@ class IndirectBlock(_Block):
   def __init__(self, superblock, span=None):
     if superblock.indirect:
       raise ValueError(
-          "superblock may not be indirect: superblock=%s" % (superblock,)
+          "superblock may not be indirect: superblock=%s" % (r(superblock),)
       )
     super().__init__(BlockType.BT_INDIRECT, 0)
     self.indirect = True
@@ -825,7 +823,7 @@ class IndirectBlock(_Block):
         for its direct data and the `span` of bytes
         covers.
     '''
-    return cls(get_HashCodeBlock(hashcode), span=span)
+    return cls(HashCodeBlock(hashcode, span=span))
 
   @classmethod
   def from_subblocks(cls, subblocks, force=False):
@@ -852,6 +850,19 @@ class IndirectBlock(_Block):
     superblock = HashCodeBlock(data=superBdata)
     return cls(superblock, span=span)
 
+  @classmethod
+  def from_subblocks_data(cls, subblocks_data, force=False):
+    ''' Constructs an `IndirectBlock` from bytes encoding the
+        blockrefs of the subblocks.
+    '''
+    subblocks = cls.decode_subblocks(subblocks_data)
+    return cls.from_subblocks(subblocks, force=force)
+
+  @classmethod
+  def decode_subblocks(cls, subblocks_data: bytes):
+    ''' Return a tuple of Blocks decoded from the raw indirect block data. '''
+    return tuple(map(lambda BR: BR.block, BlockRecord.scan(subblocks_data)))
+
   @prop
   @locked
   def subblocks(self):
@@ -859,12 +870,7 @@ class IndirectBlock(_Block):
     '''
     blocks = self._subblocks
     if blocks is None:
-      blocks = self._subblocks = tuple(
-          map(
-              lambda BR: BR.block,
-              BlockRecord.scan(self.superblock.bufferfrom())
-          )
-      )
+      blocks = self._subblocks = self.decode_subblocks(self.superblock.data)
     return blocks
 
   def transcribe_inner(self, T, fp):
@@ -937,6 +943,13 @@ class IndirectBlock(_Block):
             if not subB.fsck(recurse=True):
               ok = False
     return ok
+
+  @uses_Store
+  def is_complete(self, S: Store):
+    ''' Check that the superblock and all the dependent blocks are
+        complete in the Store.
+    '''
+    return S.is_complete_indirect(self.hashcode)
 
 class RLEBlock(_Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes

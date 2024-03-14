@@ -697,7 +697,7 @@ class IndirectDirent(_Dirent):
     try:
       return self.deref()
     except KeyError as e:
-      raise AttributeError('ref') from e
+      raise AttributeError(f'ref: {e}') from e
 
   @property
   def meta(self):

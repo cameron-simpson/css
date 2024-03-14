@@ -12,7 +12,7 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock, current_thread, main_thread
 import time
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple, Union
 
 from typeguard import typechecked
 
@@ -24,9 +24,10 @@ from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
+from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20230503-post'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -43,7 +44,9 @@ DISTINFO = {
         'cs.psutils',
         'cs.py.func',
         'cs.py.stack',
+        'cs.result',
         'cs.threads',
+        'typeguard',
     ],
 }
 
@@ -163,8 +166,7 @@ class _mom_state(object):
 ## debug: TrackedClassMixin
 class MultiOpenMixin(ContextManagerMixin):
   ''' A multithread safe mixin to count open and close calls,
-      and to call `.startup` on the first `.open`
-      and to call `.shutdown` on the last `.close`.
+      doing a startup on the first `.open` and shutdown on the last `.close`.
 
       If used as a context manager this mixin calls `open()`/`close()` from
       `__enter__()` and `__exit__()`.
@@ -173,11 +175,9 @@ class MultiOpenMixin(ContextManagerMixin):
       during `__init__`, and do almost all setup during startup so
       that the class may perform multiple startup/shutdown iterations.
 
-      Classes using this mixin need to:
-      * _either_ define a context manager method `.startup_shutdown`
-        which does the startup actions before yeilding
-        and then does the shutdown actions
-      * _or_ define separate `.startup` and `.shutdown` methods.
+      Classes using this mixin should define a context manager
+      method `.startup_shutdown` which does the startup actions
+      before yielding and then does the shutdown actions.
 
       Example:
 
@@ -191,9 +191,19 @@ class MultiOpenMixin(ContextManagerMixin):
           with DatabaseThing(...) as db_thing:
               ... use db_thing ...
 
-      Why not a plain context manager? Because in multithreaded
-      code one wants to keep the instance "open" while any thread
-      is still using it.
+      If course, often something like a database open will itself
+      be a context manager and the `startup_shutdown` method more
+      usually looks like this:
+
+              @contextmanager
+              def startup_shutdown(self):
+                  with open_the_database() as db:
+                      self._db = db
+                      yield
+
+      Why not just write a plain context manager class? Because in
+      multithreaded or async code one wants to keep the instance
+      "open" while any thread is still using it.
       This mixin lets threads use an instance in overlapping fashion:
 
           db_thing = DatabaseThing(...)
@@ -237,7 +247,7 @@ class MultiOpenMixin(ContextManagerMixin):
     try:
       yield
     finally:
-      self.close(caller_frame=caller())
+      self.close()  ##caller_frame=caller())
 
   @contextmanager
   def startup_shutdown(self):
@@ -353,6 +363,11 @@ class MultiOpenMixin(ContextManagerMixin):
         unless the object's `finalise_later` parameter was true.
     '''
     self.__mo_getstate().join()
+
+  def is_open(self):
+    ''' Test whether this object is open.
+    '''
+    return self.__mo_getstate().opens > 0
 
   @staticmethod
   def is_opened(func):
@@ -687,6 +702,23 @@ class RunState(HasThreadState):
     '''
     self._cancelled = cancel_status
 
+  def raiseif(self, msg=None, *a):
+    ''' Raise `CancellationError` is cancelled.
+
+        Example:
+
+            for item in items:
+                runstate.raiseif()
+                ... process item ...
+    '''
+    if self.cancelled:
+      if msg is None:
+        msg = "%s.cancelled" % (self,)
+      else:
+        if a:
+          msg = msg % a
+      raise CancellationError(msg)
+
   @property
   def running(self):
     ''' Property expressing whether the task is running.
@@ -795,7 +827,7 @@ class RunStateMixin(object):
   '''
 
   @typechecked
-  def __init__(self, runstate: RunState):
+  def __init__(self, runstate: Optional[Union[RunState, str]]):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
         Parameters:
@@ -803,7 +835,9 @@ class RunStateMixin(object):
           If a `str`, a new `RunState` with that name is allocated.
           If omitted, the default `RunState` is used.
     '''
-    if isinstance(runstate, str):
+    if runstate is None:
+      runstate = RunState(runstate)
+    elif isinstance(runstate, str):
       runstate = RunState(runstate)
     self.runstate = runstate
 

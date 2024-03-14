@@ -46,12 +46,12 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
-from cs.resources import uses_runstate
+from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20230421-post'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -72,6 +72,7 @@ DISTINFO = {
         'cs.progress',
         'cs.py3',
         'cs.range',
+        'cs.resources',
         'cs.result',
         'cs.threads',
         'cs.units',
@@ -618,7 +619,13 @@ def make_files_property(
 @uses_runstate
 @pfx
 def makelockfile(
-    path, ext=None, poll_interval=None, timeout=None, runstate=None
+    path,
+    *,
+    ext=None,
+    poll_interval=None,
+    timeout=None,
+    runstate: RunState,
+    keepopen=False,
 ):
   ''' Create a lockfile and return its path.
 
@@ -639,6 +646,9 @@ def makelockfile(
       * `runstate`: optional `RunState` duck instance supporting cancellation.
         Note that if a cancelled `RunState` is provided
         no attempt will be made to make the lockfile.
+      * `keepopen`: optional flag, default `False`:
+        if true, do not close the lockfile and return `(lockpath,lockfd)`
+        being the lock file path and the open file descriptor
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
@@ -690,13 +700,19 @@ def makelockfile(
         continue
       else:
         break
+    if keepopen:
+      return lockpath, lockfd
     os.close(lockfd)
     return lockpath
 
 @contextmanager
 @uses_runstate
-def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
+def lockfile(
+    path, *, ext=None, poll_interval=None, timeout=None, runstate: RunState
+):
   ''' A context manager which takes and holds a lock file.
+      An open file descriptor is kept for the lock file as well
+      to aid locating the process holding the lock file using eg `lsof`.
 
       Parameters:
       * `path`: the base associated with the lock file.
@@ -707,17 +723,19 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
       * `poll_interval`: polling frequency when timeout is not `0`.
       * `runstate`: optional `RunState` duck instance supporting cancellation.
   '''
-  lockpath = makelockfile(
+  lockpath, lockfd = makelockfile(
       path,
       ext=ext,
       poll_interval=poll_interval,
       timeout=timeout,
-      runstate=runstate
+      runstate=runstate,
+      keepopen=True,
   )
   try:
     yield lockpath
   finally:
     pfx_call(os.remove, lockpath)
+    pfx_call(os.close, lockfd)
 
 def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.
@@ -747,19 +765,19 @@ def crop_name(name, ext=None, name_max=255):
     return name
   return base[:max_base_len] + ext
 
-def max_suffix(dirpath, pfx):
+def max_suffix(dirpath, prefix):
   ''' Compute the highest existing numeric suffix
-      for names starting with the prefix `pfx`.
+      for names starting with `prefix`.
 
       This is generally used as a starting point for picking
       a new numeric suffix.
   '''
-  pfx = ustr(pfx)
+  prefix = ustr(prefix)
   maxn = None
-  pfxlen = len(pfx)
+  pfxlen = len(prefix)
   for e in os.listdir(dirpath):
     e = ustr(e)
-    if len(e) <= pfxlen or not e.startswith(pfx):
+    if len(e) <= pfxlen or not e.startswith(prefix):
       continue
     tail = e[pfxlen:]
     if tail.isdigit():
@@ -1644,6 +1662,7 @@ def atomic_filename(
     dir=None,
     prefix=None,
     suffix=None,
+    rename_func=rename,
     **kw
 ):
   ''' A context manager to create `filename` atomicly on completion.
@@ -1665,6 +1684,10 @@ def atomic_filename(
       * `suffix`: passed to `NamedTemporaryFile`, specifies a suffix
         for the temporary file; the default is the extension obtained
         from `splitext(basename(filename))`
+      * `rename_func`: a callable accepting `(tempname,filename)`
+        used to rename the temporary file to the final name; the
+        default is `os.rename` and this parametr exists to accept
+        something such as `FSTags.move`
       Other keyword arguments are passed to the `NamedTemporaryFile` constructor.
 
       Example:
@@ -1690,8 +1713,7 @@ def atomic_filename(
     suffix = fsuffix
   if not exists_ok and existspath(filename):
     raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), filename)
-  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, delete=False,
-                          **kw) as T:
+  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, **kw) as T:
     if placeholder:
       # create a placeholder file
       with open(filename, 'ab' if exists_ok else 'xb'):
@@ -1713,7 +1735,10 @@ def atomic_filename(
       except FileNotFoundError:
         atime = mtime
       pfx_call(os.utime, T.name, (atime, mtime))
-    pfx_call(rename, T.name, filename)
+    pfx_call(rename_func, T.name, filename)
+    # recreate the temp file so that it can be cleaned up
+    with pfx_call(open, T.name, 'xb'):
+      pass
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.

@@ -8,32 +8,36 @@ structures and to access Beyonwiz devices via the net.
 '''
 
 from abc import ABC, abstractmethod
-import datetime
-import errno
+from contextlib import nullcontext
+from datetime import datetime
 import json
-import os.path
-from os.path import join as joinpath, isdir as isdirpath
-import re
-import shlex
+import os
+from os.path import (
+    dirname,
+    exists as existspath,
+    isabs as isabspath,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+    splitext,
+)
 from threading import Lock
 from types import SimpleNamespace as NS
 
-from cs.app.ffmpeg import (
-    multiconvert as ffmconvert,
-    MetaData as FFmpegMetaData,
-    ConversionSource as FFSource,
-)
+from cs.context import contextif
 from cs.deco import strable
-from cs.fileutils import crop_name
+from cs.ffmpegutils import (
+    MetaData as FFmpegMetaData,
+    convert as ffconvert,
+)
+from cs.fileutils import atomic_filename, crop_name
+from cs.fs import HasFSPath
 from cs.fstags import HasFSTagsMixin
-from cs.logutils import info, warning, error
+from cs.logutils import error
 from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx, pfx, pfx_method
-from cs.psutils import print_argv
 from cs.py.func import prop
 from cs.tagset import Tag
-
-import ffmpeg
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -42,9 +46,10 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.app.ffmpeg',
+        'cs.ffmpegutils',
         'cs.binary',
         'cs.deco',
+        'cs.fs',
         'cs.fstags',
         'cs.logutils',
         'cs.mediainfo',
@@ -61,33 +66,9 @@ DISTINFO = {
 
 DEFAULT_MEDIAFILE_FORMAT = 'mp4'
 
-FFMPEG_METADATA_MAPPINGS = {
-
-    # available metadata for MP4 files
-    'mp4': {
-        'album': None,
-        'album_artist': None,
-        'author': None,
-        'comment': None,
-        'composer': None,
-        'copyright': None,
-        'description': None,
-        'episode_id': None,
-        'genre': None,
-        'grouping': None,
-        'lyrics': None,
-        'network': lambda M: M['file.channel'],
-        'show': lambda M: M['meta.title'],
-        'synopsis': lambda M: M['meta.description'],
-        'title': lambda M: M['meta.title'],
-        'track': None,
-        'year': None,
-    }
-}
-
 # UNUSED
 def trailing_nul(bs):
-  ''' Strip trailing `NUL`s
+  ''' Strip trailing `NUL`s.
   '''
   bs = bs.rstrip(b'\x00')
   # locate preceeding NUL padded area
@@ -101,6 +82,7 @@ def trailing_nul(bs):
 # TODO: moved to cs.sqltags, can we obviate its use entirely in this package?
 @pfx
 def jsonable(value):
+  ''' Return a JSON encodable version of `value`. '''
   if isinstance(value, (int, str, float)):
     return value
   # mapping?
@@ -109,7 +91,7 @@ def jsonable(value):
     return {field: jsonable(subvalue) for field, subvalue in value.items()}
   if isinstance(value, (set, tuple, list)):
     return [jsonable(subvalue) for subvalue in value]
-  if isinstance(value, datetime.datetime):
+  if isinstance(value, datetime):
     return value.isoformat(' ')
   try:
     d = value._asdict()
@@ -126,9 +108,9 @@ class MetaJSONEncoder(json.JSONEncoder):
   def default(self, o):
     if isinstance(o, set):
       return sorted(o)
-    if isinstance(o, datetime.datetime):
+    if isinstance(o, datetime):
       return o.isoformat(' ')
-    return json.JSONEncoder.default(self, o)
+    return super().default(o)
 
 class RecordingMetaData(NS):
   ''' Base class for recording metadata.
@@ -144,7 +126,7 @@ class RecordingMetaData(NS):
     try:
       return self.raw[attr]
     except KeyError:
-      raise AttributeError(attr)
+      raise AttributeError(attr)  # pylint: disable=raise-missing-from
 
   def as_dict(self):
     ''' Return the metadata as a `dict`.
@@ -171,7 +153,7 @@ class RecordingMetaData(NS):
   def start_dt(self):
     ''' Start of recording as a datetime.datetime.
     '''
-    return datetime.datetime.fromtimestamp(self.start_unixtime)
+    return datetime.fromtimestamp(self.start_unixtime)
 
   @property
   def start_dt_iso(self):
@@ -180,23 +162,32 @@ class RecordingMetaData(NS):
     return self.start_dt.isoformat(' ')
 
 def Recording(path):
-  ''' Factory function returning a TVWiz or Enigma2 _Recording object.
+  ''' Factory function returning a TVWiz or Enigma2 `_Recording` object.
   '''
-  if path.endswith('.tvwiz'):
-    from .tvwiz import TVWiz
+  if isdirpath(path) and path.endswith('.tvwiz'):
+    from .tvwiz import TVWiz  # pylint: disable=import-outside-toplevel
     return TVWiz(path)
-  if path.endswith('.ts'):
-    from .enigma2 import Enigma2
+  if isfilepath(path) and path.endswith('.ts'):
+    from .enigma2 import Enigma2  # pylint: disable=import-outside-toplevel
     return Enigma2(path)
+  if not existspath(path):
+    # see if we were given a prefix from command line filename completion
+    if path.endswith('.'):
+      tspath = path + 'ts'
+      if existspath(tspath):
+        return Recording(tspath)
+    else:
+      tspath = path + '.ts'
+      return Recording(tspath)
   raise ValueError("don't know how to open recording %r" % (path,))
 
-class _Recording(ABC, HasFSTagsMixin):
+class _Recording(ABC, HasFSPath, HasFSTagsMixin):
   ''' Base class for video recordings.
   '''
 
-  def __init__(self, path, fstags=None):
+  def __init__(self, fspath, fstags=None):
+    HasFSPath.__init__(self, fspath)
     self._fstags = fstags
-    self.path = path
     self._lock = Lock()
 
   def __getattr__(self, attr):
@@ -214,6 +205,7 @@ class _Recording(ABC, HasFSTagsMixin):
       return getattr(self.metadata, attr)
     raise AttributeError(attr)
 
+  # pylint: disable=redefined-builtin
   def filename(self, format=None, *, ext):
     ''' Compute a filename from `format` with extension `ext`.
 
@@ -224,10 +216,10 @@ class _Recording(ABC, HasFSTagsMixin):
     if not ext.startswith('.'):
       ext = '.' + ext
     md = self.metadata
-    full_filename = self.metadata.format_as(format
-                                            ).replace('\r',
-                                                      '_').replace('\n', '_')
-    return crop_name(full_filename + ext, ext=ext)
+    full_filename = md.format_as(format).replace('_', '-').replace(
+        '\r', '_'
+    ).replace('\n', '_')
+    return crop_name(full_filename + ext, ext=ext, name_max=191)
 
   @abstractmethod
   def data(self):
@@ -235,7 +227,7 @@ class _Recording(ABC, HasFSTagsMixin):
     '''
     raise NotImplementedError('data')
 
-  @strable(open_func=lambda filename: open(filename, 'wb'))
+  @strable(open_func=lambda filename: open(filename, 'wb'))  # pylint: disable=consider-using-with
   def copyto(self, output):
     ''' Transcribe the uncropped content to a file named by output.
         Requires the .data() generator method to yield video data chunks.
@@ -261,15 +253,16 @@ class _Recording(ABC, HasFSTagsMixin):
     ''' Find an available unused pathname based on `path`.
         Raises ValueError in none is available.
     '''
-    basis, ext = os.path.splitext(path)
+    basis, ext = splitext(path)
     for i in range(max_n):
       path2 = "%s--%d%s" % (basis, i + 1, ext)
-      if not os.path.exists(path2):
+      if not existspath(path2):
         return path2
     raise ValueError(
         "no available --0..--%d variations: %r" % (max_n - 1, path)
     )
 
+  # pylint: disable=too-many-branches,too-many-locals
   def convert(
       self,
       dstpath,
@@ -280,7 +273,10 @@ class _Recording(ABC, HasFSTagsMixin):
       timespans=(),
       extra_opts=None,
       overwrite=False,
+      srcpath=None,
       use_data=False,
+      acodec=None,
+      vcodec=None,
   ):
     ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
     '''
@@ -288,28 +284,30 @@ class _Recording(ABC, HasFSTagsMixin):
     if dstfmt is None:
       dstfmt = DEFAULT_MEDIAFILE_FORMAT
     if use_data:
-      srcpath = None
+      assert srcpath is None
       if timespans:
         raise ValueError(
             "%d timespans but do_copyto is true" % (len(timespans,))
         )
     else:
-      srcpath = self.path
-      # stop path looking like a URL
-      if not os.path.isabs(srcpath):
-        srcpath = os.path.join('.', srcpath)
+      if srcpath is None:
+        srcpath = self.fspath
+      # stop srcpath looking like a URL
+      if not isabspath(srcpath):
+        srcpath = joinpath('.', srcpath)
     if dstpath is None:
       dstpath = self.filename(ext=dstfmt)
     elif dstpath.endswith('/'):
       dstpath += self.filename(ext=dstfmt)
     elif isdirpath(dstpath):
       dstpath = joinpath(dstpath, self.filename(ext=dstfmt))
-    # stop path looking like a URL
-    if not os.path.isabs(dstpath):
-      dstpath = os.path.join('.', dstpath)
+    # stop dstpath looking like a URL
+    if not isabspath(dstpath):
+      dstpath = joinpath('.', dstpath)
     ok = True
     with Pfx(dstpath):
-      if os.path.exists(dstpath):
+      if existspath(dstpath):
+        # locate a nonconflicting output path
         ok = False
         if max_n is not None:
           try:
@@ -322,10 +320,10 @@ class _Recording(ABC, HasFSTagsMixin):
           error("file exists")
       if not ok:
         return ok
-      if os.path.exists(dstpath):
+      if existspath(dstpath):
         raise ValueError("dstpath exists")
       if dstfmt is None:
-        _, ext = os.path.splitext(dstpath)
+        _, ext = splitext(dstpath)
         if not ext:
           raise ValueError(
               "can't infer output format from dstpath, no extension"
@@ -339,60 +337,30 @@ class _Recording(ABC, HasFSTagsMixin):
     if not doit:
       print(srcpath)
       print("  =>", dstpath)
-    # compute the metadata for the output format
-    # which may be passed with the input arguments
-    M = self.metadata
-    with Pfx("metadata for dstformat %r", dstfmt):
-      ffmeta_kw = dict(comment=f'Transcoded from {self.path!r} using ffmpeg.')
-      for ffmeta, beymeta in FFMPEG_METADATA_MAPPINGS[dstfmt].items():
-        with Pfx("%r->%r", beymeta, ffmeta):
-          if beymeta is None:
-            continue
-          elif isinstance(beymeta, str):
-            ffmetavalue = M.get(beymeta, '')
-          elif callable(beymeta):
-            ffmetavalue = beymeta(M)
-          else:
-            raise RuntimeError(
-                "unsupported beymeta %s:%r" %
-                (type(beymeta).__name__, beymeta)
-            )
-          assert isinstance(ffmetavalue, str), (
-              "ffmetavalue should be a str, got %s:%r" %
-              (type(ffmetavalue).__name__, ffmetavalue)
-          )
-          ffmeta_kw[ffmeta] = beymeta(M)
-    # set up the initial source path, options and metadata
-    ffinopts = {
-        'loglevel': 'repeat+error',
-        ##'strict': None,
-        ##'2': None,
-    }
-    ff = ffmpeg.input(srcpath, **ffinopts)
-    if timespans:
-      ffin = ff
-      ff = ffmpeg.concat(
-          *map(
-              lambda timespan: ffin.trim(start=timespan[0], end=timespan[1]),
-              timespans
-          )
-      )
-    ff = ff.output(
+    with contextif(
+        doit,
+        atomic_filename,
         dstpath,
-        format=dstfmt,
-        metadata=list(map('='.join, ffmeta_kw.items()))
-    )
-    if overwrite:
-      ff = ff.overwrite_output()
-    ff_args = ff.get_args()
-    if doit:
-      print_argv('ffmpeg', *ff_args)
-      fstags[dstpath]['ffmpeg.argv'] = ['ffmpeg', *ff_args]
-      fstags.sync()
-      ff.run()
-    else:
-      print_argv('ffmpeg', *ff_args, fold=True)
-    return ok
+        exists_ok=overwrite,
+        dir=dirname(dstpath),
+        suffix=f'.{dstfmt}',
+        rename_func=fstags.move,
+    ) as T:
+      if doit:
+        os.remove(T.name)
+      ffconvert(
+          srcpath,
+          dstpath=dstpath if T is None else T.name,
+          doit=doit,
+          conversions=None,
+          metadata=self.ffmetadata(dstfmt),
+          timespans=timespans,
+          overwrite=False,
+          acodec=acodec,
+          vcodec=vcodec,
+          extra_opts=extra_opts,
+      )
+    return True
 
   def ffmpeg_metadata(self, dstfmt=None):
     ''' Return a new `FFmpegMetaData` containing our metadata.
@@ -400,7 +368,7 @@ class _Recording(ABC, HasFSTagsMixin):
     if dstfmt is None:
       dstfmt = DEFAULT_MEDIAFILE_FORMAT
     M = self.metadata
-    comment = f'Transcoded from {self.path!r} using ffmpeg.'
+    comment = f'Transcoded from {self.fspath!r} using ffmpeg.'
     recording_dt = M.get('file.datetime')
     if recording_dt:
       comment += f' Recording date {recording_dt.isoformat()}.'
@@ -415,3 +383,41 @@ class _Recording(ABC, HasFSTagsMixin):
         network=M['file.channel'],
         comment=comment,
     )
+
+  def ffmetadata(self, dstfmt: str) -> dict:
+    ''' Compute the metadata for the output format
+        which may be passed with the input arguments.
+    '''
+    md_tags = self.metadata
+    with Pfx("metadata for dstformat %r", dstfmt):
+      ffmeta_kw = dict(
+          comment=f'Transcoded from {self.fspath!r} using ffmpeg.'
+      )
+      for ffmeta, beymeta in self.FFMPEG_METADATA_MAPPINGS[dstfmt].items():
+        with Pfx("%r->%r", beymeta, ffmeta):
+          if beymeta is None:
+            continue
+          if isinstance(beymeta, str):
+            # metadata name
+            beymeta = md_tags.get(beymeta, '')
+          elif callable(beymeta):
+            # function
+            beymeta = beymeta(md_tags)
+          # compute ffmetavalue
+          if isinstance(beymeta, str):
+            ffmetavalue = beymeta
+          elif isinstance(beymeta, (int, float)):
+            ffmetavalue = str(beymeta)
+          elif isinstance(beymeta, datetime):
+            ffmetavalue = beymeta.isoformat()
+          else:
+            raise RuntimeError(
+                "unsupported beymeta %s:%r" %
+                (type(beymeta).__name__, beymeta)
+            )
+          assert isinstance(ffmetavalue, str), (
+              "ffmetavalue should be a str, got %s:%r" %
+              (type(ffmetavalue).__name__, ffmetavalue)
+          )
+          ffmeta_kw[ffmeta] = ffmetavalue
+    return ffmeta_kw

@@ -13,7 +13,7 @@ import sys
 from random import choice
 import unittest
 
-from cs.binary_tests import _TestPacketFields
+from cs.binary_tests import TestBinaryClasses
 from cs.randutils import rand0, randomish_chunks
 from cs.testutils import SetupTeardownMixin
 
@@ -25,14 +25,10 @@ from .block import (
 from .store import MappingStore
 from .transcribe import hexify
 
-class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
-  ''' Hook to test the hash PacketFields.
+class TestDataFileBinaryClasses(TestBinaryClasses, unittest.TestCase):
+  ''' Hook to test the `AbstractBinary` subclasses..
   '''
-
-  def setUp(self):
-    ''' Test the block module PacketField classes.
-    '''
-    self.module = block_module
+  test_module = block_module
 
 class TestAll(SetupTeardownMixin, unittest.TestCase):
   ''' All Block tests.

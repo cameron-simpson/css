@@ -1,3 +1,4 @@
+arrow
 b2sdk
 bs4
 build
@@ -14,7 +15,6 @@ mobi
 mypy
 musicbrainzngs
 numpy
-objc
 pandas
 pillow
 pycodestyle
@@ -23,6 +23,7 @@ pycryptodome
 pyflakes
 pyicontract-lint
 pylint
+##pyobjc[allbindings]  ## macos only
 pytest
 python-dateutil
 railroad-diagrams

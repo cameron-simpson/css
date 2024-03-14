@@ -14,6 +14,9 @@ mount_point=
 trace=
 use_tmux=1
 [ -t 2 ] && trace=set-x
+sshfs_opts=
+sshfs_idmap_mode=user
+sshfs_nomap_mode=ignore
 
 cmd=$(basename "$0")
 usage="Usage:
@@ -21,6 +24,7 @@ usage="Usage:
   $cmd [-f rcfile] mount-path [/mount/point]
   $cmd [-u] {mount-path|/mount/point}...
     -f rcfile   Specify config file. Default: $rcfile
+    -o sshfs-opt Add an option for use with sshfs.
     -u          Unmount the mount-path.
     -X          Run the mount directly, not in tmux.
     -x          Trace the executed command.
@@ -41,6 +45,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -f) rcfile=$1; shift ;;
+    -o) sshfs_opts="$sshfs_opts -o $2"; shift ;;
     -u) umount=1 ;;
     -X) use_tmux= ;;
     -x) trace=set-x ;;
@@ -152,9 +157,17 @@ do_mount(){
     set -ue
     case "$type" in
       ssh | sshfs )
+        set -x
         set -- \
-          set-x sshfs -f -o reconnect -o ssh_command='datethen 2 set-x ssh' \
-            -- "$host:$path/" "$mount_point"
+          set-x sshfs -f \
+            -o reconnect \
+            -o ssh_command='datethen set-x ssh'
+        for idfile in gidfile uidfile
+        do  idfilepath=$HOME/rc/sshfs/$host-$idfile
+            [ -f "$idfilepath" ] && set -- "$@" -o "$idfile=$HOME/rc/sshfs/$host-$idfile"
+            sshfs_idmap_mode=file
+        done
+        set -- "$@" -o "idmap=$sshfs_idmap_mode" -o "nomap=$sshfs_nomap_mode" $sshfs_opts -- "$host:$path/" "$mount_point"
         [ $use_tmux ] && set -- tm use-session -d "MNT_${host}_${pathbase}" "$@"
         set -- $trace "$@"
         ;;

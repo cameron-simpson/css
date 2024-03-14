@@ -42,8 +42,10 @@ from collections import namedtuple
 from collections.abc import Mapping
 from contextlib import contextmanager
 import errno
+from functools import partial
 import os
 from os import (
+    pread,
     SEEK_SET,
     SEEK_CUR,
     SEEK_END,
@@ -58,11 +60,13 @@ import sys
 from time import time, sleep
 from types import SimpleNamespace
 from uuid import uuid4
+from zlib import decompress
 
 from icontract import require
 from typeguard import typechecked
 
-from cs.app.flag import DummyFlags, FlaggedMixin
+from cs.app.flag import FlaggedMixin
+from cs.binary import BinaryMultiValue, BSUInt
 from cs.buffer import CornuCopyBuffer
 from cs.cache import LRU_Cache
 from cs.context import nullcontext, stackattrs
@@ -82,7 +86,7 @@ from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.seq import imerge
-from cs.threads import locked, bg as bg_thread
+from cs.threads import locked, bg as bg_thread, joinif
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
 from cs.upd import with_upd_proxy, UpdProxy, uses_upd
 
@@ -95,9 +99,11 @@ from .blockify import (
 from .datafile import DataRecord, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
 from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
-from .index import choose as choose_indexclass, FileDataIndexEntry
+from .index import choose as choose_indexclass
 from .parsers import scanner_from_filename
 from .util import createpath, openfd_read
+
+pfx_listdir = partial(pfx_call, os.listdir)
 
 ##_sleep = sleep
 ##
@@ -114,6 +120,51 @@ DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
 # flush the index after this many updates in the index updater worker thread
 INDEX_FLUSH_RATE = 16384
+
+class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
+    'filenum': BSUInt,
+    'data_offset': BSUInt,
+    'data_length': BSUInt,
+    'flags': BSUInt,
+})):
+  ''' An index entry describing a data chunk in a `DataDir`.
+
+      This has the following attributes:
+      * `filenum`: the file number of the file containing the block
+      * `data_offset`: the offset within the file of the data chunk
+      * `data_length`: the length of the chunk
+      * `flags`: information about the chunk
+
+      These enable direct access to the raw data component.
+
+      The following flags are defined:
+      * `FLAG_COMPRESSED`: the raw data should be obtained
+        by uncompressing the chunk using `zlib.uncompress`.
+      * `INDIRECT_COMPLETE`: the `IndirectBlock` with this hashcode
+        is known to have all its data blocks in the Store
+  '''
+
+  FLAG_COMPRESSED = 0x01
+  INDIRECT_COMPLETE = 0x02
+
+  @property
+  def is_compressed(self):
+    ''' Whether the chunk data are compressed.
+    '''
+    return self.flags & self.FLAG_COMPRESSED
+
+  def fetch_fd(self, rfd):
+    ''' Fetch the decompressed data from an open binary file.
+    '''
+    bs = pread(rfd, self.data_length, self.data_offset)
+    if len(bs) != self.data_length:
+      raise RuntimeError(
+          "%s.fetch_fd: pread(fd=%s) returned %d bytes, expected %d" %
+          (self, rfd, len(bs), self.data_length)
+      )
+    if self.is_compressed:
+      bs = decompress(bs)
+    return bs
 
 class DataFileState(SimpleNamespace):
   ''' General state information about a data file
@@ -212,7 +263,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       )
     if flags is None:
       if flags_prefix is None:
-        flags = DummyFlags()
+        flags = defaultdict(bool)
         flags_prefix = 'DUMMY'
     else:
       if flags_prefix is None:
@@ -263,6 +314,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       rollover=None,
       flags=None,
       flags_prefix=None,
+      runstate=None,
   ):
     ''' Initialise the `DataDir` at `topdirpath`.
 
@@ -297,7 +349,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
         flags_prefix=flags_prefix
     )
     HasFSPath.__init__(self, topdirpath)
-    RunStateMixin.__init__(self)
+    RunStateMixin.__init__(self, runstate=runstate)
     MultiOpenMixin.__init__(self)
     FlaggedMixin.__init__(
         self, flags=resolved.flags, prefix=resolved.flags_prefix
@@ -319,6 +371,9 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     self._monitor_Thread = None
     self._WDFstate = None
     self._lock = RLock()
+    # a lock to surround record modifications
+    # used by the modify_entry(hashcode) method
+    self._modify_lock = Lock()
 
   def __repr__(self):
     return (
@@ -328,6 +383,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
 
   @property
   def datapath(self):
+    ''' The pathname of the data subdirectory. '''
     return self.pathto('data')
 
   def datapathto(self, rpath):
@@ -375,8 +431,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                 total=0,
                 units_scale=BINARY_BYTES_SCALE,
             )
-            with (upd.insert(1)
-                  if defaults.show_progress else nullcontext()) as data_proxy:
+            with upd.insert(1) as data_proxy:
               with upd.run_task(str(self) + " monitor ") as monitor_proxy:
                 with stackattrs(self, _monitor_proxy=monitor_proxy):
                   dataQ = IterableQueue(65536)
@@ -390,10 +445,12 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                         self._process_data_queue,
                         name="%s._process_data_queue" % (self,),
                         args=(dataQ,),
+                        thread_states=False,
                     )
                     _monitor_Thread = bg_thread(
                         self._monitor_datafiles,
-                        name="%s-datafile-monitor" % (self,),
+                        name="%s._monitor_datafiles" % (self,),
+                        thread_states=False,
                     )
                     with stackattrs(
                         self,
@@ -404,18 +461,18 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                         yield
                       finally:
                         self.runstate.cancel()
-                        self._monitor_Thread.join()
+                        joinif(_monitor_Thread)
                         self.flush()
                         # drain the data queue
                         self._dataQ.close()
+                        joinif(_data_Thread)
                         self._dataQ = None
-                        self._data_Thread.join()
-                      # update state to substrate
-                      self._filemap.close()
-                      # close the read file descriptors
-                      for rfd in self._rfds.values():
-                        with Pfx("os.close(rfd:%d)", rfd):
-                          os.close(rfd)
+                        # update state to substrate
+                        self._filemap.close()
+                        # close the read file descriptors
+                        for rfd in self._rfds.values():
+                          with Pfx("os.close(rfd:%d)", rfd):
+                            os.close(rfd)
 
   @typechecked
   def new_datafile(self) -> DataFileState:
@@ -449,6 +506,38 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       self._dataQ.put(data)
     return hashcode
 
+  def get_index_entry(self, hashcode):
+    ''' Return the index entry for `hashcode`, or `None` if there
+        is no index or the index has no entry for `hashcode`.
+    '''
+    entry_bs = self.index.get(hashcode)
+    if entry_bs is None:
+      return None
+    entry = FileDataIndexEntry.from_bytes(entry_bs)
+    return entry
+
+  @contextmanager
+  def modify_index_entry(self, hashcode):
+    ''' Context manager to obtain and yield the `FileDataIndexEntry` for `hashcode`
+        and resave it on return.
+
+        Example:
+
+            with index.modify_entry(hashcode) as entry:
+                entry.flags |= entry.INDIRECT_COMPLETE
+    '''
+    with self._modify_lock:
+      try:
+        entry_bs = self.index[hashcode]
+      except KeyError:
+        yield None
+      else:
+        entry = FileDataIndexEntry.from_bytes(entry_bs)
+        yield entry
+        new_entry_bs = bytes(entry)
+        if new_entry_bs != entry_bs:
+          self.index[hashcode] = new_entry_bs
+
   def _process_data_queue(self, dataQ):
     wf = None
     DFstate = None
@@ -464,7 +553,15 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
         # assemble up to 64 chunks at a time
         data_batch = [data]
         while not dataQ.empty() and len(data_batch) < batch_size:
-          data_batch.append(next(dataQ))
+          try:
+            data = next(dataQ)
+          except StopIteration as e:
+            warning(
+                "unexpected StopIteration:%s from next(dataQ=%r)", e, dataQ
+            )
+            break
+          else:
+            data_batch.append(data)
         yield data_batch
         data_batch = None
 
@@ -489,7 +586,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
           if wf is None:
             DFstate = self.new_datafile()
             filenum = DFstate.filenum
-            wf = open(DFstate.pathname, 'ab')
+            wf = open(DFstate.pathname, 'ab')  # pylint: disable=consider-using-with
             self._WDFstate = DFstate
           bs, data_offset, data_length, flags = self.data_save_information(
               data
@@ -857,22 +954,22 @@ class DataDir(FilesDir):
     '''
     index = self.index
     filemap = self._filemap
+    if filemap is None:
+      return
     datadirpath = self.datapath
-    while not self.cancelled:
+    while not self.cancelled and not self.closed:
       if self.flag_scan_disable:
         sleep(0.1)
         continue
       # scan for new datafiles
       with upd_proxy.extend_prefix(" check datafiles"):
-        with Pfx("listdir(%r)", datadirpath):
-          try:
-            listing = list(os.listdir(datadirpath))
-          except OSError as e:
-            if e.errno == errno.ENOENT:
-              error("listing failed: %s", e)
-              sleep(2)
-              continue
-            raise
+        try:
+          listing = pfx_listdir(datadirpath)
+        except OSError as e:
+          if e.errno == errno.ENOENT:
+            error("listing failed, exiting _monitor_datafiles loop: %s", e)
+            break
+          raise
         for filename in listing:
           if (not filename.startswith('.')
               and filename.endswith(DATAFILE_DOT_EXT)
@@ -881,7 +978,7 @@ class DataDir(FilesDir):
               info("MONITOR: add new filename %r", filename)
               filemap.add_path(filename)
       # now scan known datafiles for new data
-      for filenum in self._filemap.filenums():
+      for filenum in filemap.filenums():
         if self.cancelled or self.flag_scan_disable:
           break
         # don't monitor the current datafile: our own actions will update it

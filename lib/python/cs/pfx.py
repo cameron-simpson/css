@@ -57,7 +57,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20230331-post'
+__version__ = '20230604-post'
 
 DISTINFO = {
     'description':
@@ -354,24 +354,14 @@ class Pfx(object):
         continue
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
-        try:
-          value0, value1 = value
-        except ValueError as args_e:
-          X(
-              "prefixify_exception OSError.args: %s(%s) %s: args=%r: %s",
-              type(e).__name__,
-              ','.join(
-                  cls.__name__
-                  for cls in type(e).__mro__
-                  if cls is not type(e) and cls is not object
-              ),
-              e,
-              value,
-              args_e,
-          )
-          continue
-        else:
-          value = (value0, cls.prefixify(value1))
+        # prefixify the first string
+        value = list(value)
+        for i, v in enumerate(value):
+          if isinstance(v, str):
+            value = cls.prefixify(value)
+            did_prefix = True
+            break
+        value = tuple(value)
       elif attr == 'args' and isinstance(e, LookupError):
         if (isinstance(value, tuple) and value):
           value0 = value[0]
@@ -712,7 +702,7 @@ def XP(msg, *args, **kwargs):
       which prefixes the message with the current Pfx prefix.
   '''
   if args:
-    return X("%s: " + msg, prefix(), *args, **kwargs)
+    return X("%s%s" + msg, prefix(), DEFAULT_SEPARATOR, *args, **kwargs)
   return X(prefix() + DEFAULT_SEPARATOR + msg, **kwargs)
 
 def XX(prepfx, msg, *args, **kwargs):

@@ -2,7 +2,7 @@
 #
 # Rsync my account from one place to others.
 # Usually I use putacc to call this, but occasionally getacc.
-#	- Cameron Simpson <cs@cskk.id.au> 29jun2004
+# - Cameron Simpson <cs@cskk.id.au> 29jun2004
 #
 
 set -ue
@@ -48,8 +48,9 @@ dosync()
   _ds_to=$2
   shift; shift
 
+  # omitting -lJ
   $trace \
-    mrsync -rptOHCli --delete \
+    mrsync -rlptOHCi --delete \
         '--no-implied-dirs' \
         '--exclude=.DS_Store' \
         '--exclude=.zsh_history' \

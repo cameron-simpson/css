@@ -202,9 +202,11 @@ import os
 from os.path import (
     dirname, isdir as isdirpath, isfile as isfilepath, join as joinpath
 )
+from pprint import pformat
 import re
+import sys
 import time
-from typing import Mapping, Optional, Union
+from typing import Mapping, Optional, Tuple, Union
 from uuid import UUID, uuid4
 
 from icontract import require
@@ -232,7 +234,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20230407-post'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -422,21 +424,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       you can also access tag values as attributes
       *provided* that they do not conflict with instance attributes
       or class methods or properties.
-      The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
-      as `None` which causes attribute access to return `None`
-      for missing tag names.
-      This supports code like:
-
-          if tags.title:
-              # use the title in something
-          else:
-              # handle a missing title tag
   '''
-
-  # Arrange to return None for missing mapping attributes
-  # supporting tags.foo being None if there is no 'foo' tag.
-  # Note: sometimes this has confusing effects.
-  ATTRABLE_MAPPING_DEFAULT = None
 
   @pfx_method
   @require(
@@ -473,6 +461,47 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
+
+  def dump(self, keys=None, *, preindent=None, file=None, **pf_kwargs):
+    ''' Dump a `TagSet` in multiline format.
+
+        Parameters:
+        * `keys`: optional iterable of `Tag` names to print
+        * `file`: optional keyword parameter specifying the output filelike 
+          object; the default is `sys.stdout`.
+        * `preindent`: optional leading indentation for the entire dump,
+          either a `str` or an `int` indicating a number of spaces
+        Other keyword arguments are passed to `pprint.pformat`.
+    '''
+    if keys is None:
+      keys = sorted(self.keys())
+    else:
+      keys = list(keys)
+    if preindent is None:
+      preindent = ''
+    elif isinstance(preindent, int):
+      preindent = ' ' * preindent
+    else:
+      assert isinstance(
+          preindent, str
+      ), ("preindent: expected int or str, got: %s" % (r(preindent),))
+    if file is None:
+      file = sys.stdout
+    print(preindent, self.name, file=file, sep='')
+    if keys:
+      kwidth = max(map(len, keys)) + 1
+      kindent = '  '
+      ksubindent = kindent + ' ' * kwidth
+      pf_nl_replacement = '\n' + preindent + ksubindent
+      for k in keys:
+        print(
+            preindent,
+            kindent,
+            f"{k:{kwidth}}",
+            pformat(self[k], **pf_kwargs).replace('\n', '\n' + ksubindent),
+            file=file,
+            sep=''
+        )
 
   @classmethod
   def from_tags(cls, tags, _id=None, _ontology=None):
@@ -534,11 +563,12 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     ''' Support access to dotted name attributes.
 
         The following attribute accesses are supported:
-
-        If `attr` is a key, return `self[attr]`.
-
-        If `self.auto_infer(attr)` does not raise `ValueError`,
-        return that value.
+        - an attrbute from a superclass
+        - a `Tag` whose name is `attr`; return its value
+        - the value of `self.auto_infer(attr)` if that does not raise `ValueError`
+        - if `self.ontology`, try {type}_{field} and {type}_{field}s
+        - otherwise return `self.subtags(attr)` to allow access to dotted tags,
+          provided any existing tags start with "attr."
 
         If this `TagSet` has an ontology
         and `attr looks like *typename*`_`*fieldname*
@@ -566,6 +596,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             >>> tags.a
             1
             >>> tags.c
+            Traceback (most recent call last):
+                ...
+            AttributeError: TagSet.c
             >>> tags['c.z']=9
             >>> tags['c.x']=8
             >>> tags
@@ -590,62 +623,76 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             AttributeError: 'int' object has no attribute 'z'
 
     '''
+    sup = super()
+    try:
+      sgattr = sup.__getattr__
+    except AttributeError:
+      # no superclass __getattr__
+      pass
+    else:
+      try:
+        return sgattr(attr)
+      except AttributeError:
+        # superclass does not resolve attr
+        pass
+    # an exact key match is returned directly
     try:
       return self[attr]
     except KeyError:
+      pass
+    if attr.startswith('_'):
+      # we do not dereference _*
+      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+    # see if this is known via auto_infer()
+    try:
+      return self.auto_infer(attr)
+    except ValueError:  # as e:
+      # no match
+      ##warning("auto_infer(%r): %s", attr, e)
+      pass
+    # support for {type}_{field} and {type}_{field}s attributes
+    # these dereference through the ontology if there is one
+    ont = self.ontology
+    if ont is not None:
       try:
-        return self.auto_infer(attr)
-      except ValueError:  # as e:
-        # no match
-        ##warning("auto_infer(%r): %s", attr, e)
+        type_name, field_part = attr.split('_', 1)
+      except ValueError:
         pass
-      # support for {type}_{field} and {type}_{field}s attributes
-      # these dereference through the ontology if there is one
-      ont = self.ontology
-      if ont is not None:
-        try:
-          type_name, field_part = attr.split('_', 1)
-        except ValueError:
-          pass
-        else:
-          if type_name in self:
-            value = self[type_name]
-            md = ont.metadata(type_name, value)
-            return md.get(field_part)
-          type_name_s = type_name + 's'
-          if type_name_s in self:
-            # plural field
-            values = self[type_name_s]
-            if isinstance(values, (tuple, list)):
-              # dereference lists and tuples
-              field_name = cutsuffix(field_part, 's')
-              md_field = type_name + '_' + field_name
-              mds = [ont.metadata(type_name, value) for value in values]
-              if field_name is field_part:
-                # singular - take the first element
-                if not mds:
-                  return None
-                md = mds[0]
-                dereffed = md.get(md_field)
-                return dereffed
-              dereffed = [md.get(md_field) for md in mds]
+      else:
+        if type_name in self:
+          value = self[type_name]
+          md = ont.metadata(type_name, value)
+          return md.get(field_part)
+        type_name_s = type_name + 's'
+        if type_name_s in self:
+          # plural field
+          values = self[type_name_s]
+          if isinstance(values, (tuple, list)):
+            # dereference lists and tuples
+            field_name = cutsuffix(field_part, 's')
+            md_field = type_name + '_' + field_name
+            mds = [ont.metadata(type_name, value) for value in values]
+            if field_name is field_part:
+              # singular - take the first element
+              if not mds:
+                return None
+              md = mds[0]
+              dereffed = md.get(md_field)
               return dereffed
-            # misfilled field - seems to be a scalar
-            value = values
-            md = ont.metadata(type_name, value)
-            dereffed = md.get(field_part)
+            dereffed = [md.get(md_field) for md in mds]
             return dereffed
-      # magic dotted name access to attr.bar if there are keys
-      # starting with "attr."
-      if attr and attr[0].isalpha():
-        attr_ = attr + '.'
-        if any(map(lambda k: k.startswith(attr_) and k > attr_, self.keys())):
-          return self.subtags(attr)
-      try:
-        super_getattr = super().__getattr__
-      except AttributeError:
-        raise AttributeError(type(self).__name__ + '.' + attr)  # pylint: disable=raise-missing-from
-      return super_getattr(attr)
+          # misfilled field - seems to be a scalar
+          value = values
+          md = ont.metadata(type_name, value)
+          dereffed = md.get(field_part)
+          return dereffed
+    # magic dotted name access to attr.bar etc
+    # provided there are any attr.* keys
+    if attr and attr[0].isalpha():
+      attr_ = attr + '.'
+      if any(k.startswith(attr_) for k in self.keys()):
+        return self.subtags(attr)
+    raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
@@ -779,7 +826,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     return self.set(tag_name, value, **kw)
 
-  def __delitem__(self, tag_name):
+  @typechecked
+  def __delitem__(self, tag_name: str):
     if tag_name not in self:
       raise KeyError(tag_name)
     self.discard(tag_name)
@@ -970,7 +1018,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         if present.
     '''
     if attr in self:
-      debug("returning direct tag value for %r", attr)
+      ##debug("returning direct tag value for %r", attr)
       return self[attr]
     raise ValueError("cannot infer value for %r" % (attr,))
 
@@ -1423,7 +1471,13 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   @classmethod
   def from_str2(
-      cls, s, offset=0, *, ontology, extra_types=None, fallback_parse=None
+      cls,
+      s,
+      offset=0,
+      *,
+      ontology=None,
+      extra_types=None,
+      fallback_parse=None
   ):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
@@ -1453,7 +1507,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   # pylint: disable=too-many-branches
   @classmethod
-  def parse_value(cls, s, offset=0, extra_types=None, fallback_parse=None):
+  def parse_value(cls, s, offset=0, *, extra_types=None, fallback_parse=None):
     ''' Parse a value from `s` at `offset` (default `0`).
         Return the value, or `None` on no data.
 
@@ -1471,7 +1525,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         and `new_offset` is where the parse stopped.
         The default is `cs.lex.get_nonwhite`
         to gather nonwhitespace characters,
-        intended support *tag_name*`=`*bare_word*
+        intended to support *tag_name*`=`*bare_word*
         in human edited tag files.
 
         The core syntax for values is JSON;
@@ -1499,8 +1553,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       fallback_parse = get_nonwhite
     if offset >= len(s) or s[offset].isspace():
       warning("offset %d: missing value part", offset)
-      value = None
-    elif s[offset] in '"[{':
+      return None, offset
+    if s[offset] in '"[{':
       # must be a JSON value - collect it
       value_part = s[offset:]
       try:
@@ -1510,38 +1564,33 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
             "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
         ) from e
       offset += suboffset
+      return value, offset
+    # collect nonwhitespace (or whatever fallback_parse gathers),
+    nonwhite, offset = fallback_parse(s, offset)
+    # check for the basic types - these are never overridden
+    # check for round trip int or float
+    try:
+      i = int(nonwhite)
+    except ValueError:
+      try:
+        f = float(nonwhite)
+      except ValueError:
+        pass
+      else:
+        return f, offset
     else:
-      # collect nonwhitespace (or whatever fallback_parse gathers),
-      # check for special forms
-      nonwhite, offset = fallback_parse(s, offset)
-      value = None
-      for _, from_str, _ in extra_types:
-        try:
-          value = from_str(nonwhite)
-        except ValueError:
-          pass
-        else:
-          break
-      if value is None:
-        # not one of the special formats
-        # check for round trip int or float
-        try:
-          i = int(nonwhite)
-        except ValueError:
-          try:
-            f = float(nonwhite)
-          except ValueError:
-            pass
-          else:
-            if str(f) == nonwhite:
-              value = f
-        else:
-          if str(i) == nonwhite:
-            value = i
-      if value is None:
-        # not a special value, preserve as a string
-        value = nonwhite
-    return value, offset
+      return i, offset
+    # not a basic type
+    # check for special forms
+    for _, from_str, _ in extra_types:
+      try:
+        value = from_str(nonwhite)
+      except ValueError:
+        pass
+      else:
+        return value, offset
+    # not a special value, preserve as a string
+    return nonwhite, offset
 
   @property
   @pfx_method(use_str=True)
@@ -1744,21 +1793,6 @@ class TagSetCriterion(Promotable):
     ''' Apply this `TagSetCriterion` to a `TagSet`.
     '''
     raise NotImplementedError("match")
-
-  @classmethod
-  @pfx_method
-  def promote(cls, criterion, fallback_parse=None):
-    ''' Promote an object to a criterion.
-        Instances of `cls` are returned unchanged.
-        Instances of s`str` are promoted via `cls.from_str`.
-    '''
-    if isinstance(criterion, cls):
-      return criterion
-    if isinstance(criterion, str):
-      return cls.from_str(criterion, fallback_parse=fallback_parse)
-    raise TypeError(
-        "%s.promote: cannot promote to %s" % (cls.__name__, r(criterion))
-    )
 
   @classmethod
   @pfx_method
@@ -2071,6 +2105,9 @@ class TagSetPrefixView(FormatableMixin):
         filter(lambda k: k.startswith(prefix_), self._tags.keys())
     )
 
+  def __len__(self):
+    return len(list(self.keys()))
+
   def __contains__(self, k):
     return self._prefix_ + k in self._tags
 
@@ -2110,6 +2147,12 @@ class TagSetPrefixView(FormatableMixin):
     '''
     return map(lambda k: self[k], self.keys())
 
+  def update(self, mapping):
+    ''' Update tags from a name->value mapping.
+    '''
+    for k, v in mapping.items():
+      self[k] = v
+
   def as_dict(self):
     ''' Return a `dict` representation of this view.
     '''
@@ -2118,11 +2161,10 @@ class TagSetPrefixView(FormatableMixin):
   def __getattr__(self, attr):
     ''' Proxy other attributes through to the `TagSet`.
     '''
-    with Pfx("%s.__getattr__(%r)", type(self).__name__, attr):
-      try:
-        return self[attr]
-      except (KeyError, TypeError):
-        return getattr(self.__proxied, attr)
+    try:
+      return self[attr]
+    except (KeyError, TypeError):
+      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
@@ -2165,6 +2207,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
 
       Examples of this include:
+      * `cs.cdrip.MBSQLTags`: a mapping of MusicbrainsNG entities to their associated `TagSet`
       * `cs.fstags.FSTags`: a mapping of filesystem paths to their associated `TagSet`
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
@@ -3126,7 +3169,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
                 self.metadata(key_type_name, k, convert=convert),
                 self.metadata(member_type_name, v, convert=convert),
             )
-            for k, v in items
+            for k, v in items()
         }
     if md is None:
       # neither mapping nor iterable
@@ -3207,7 +3250,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       tes.append(te)
       te_old_names[id(te)] = name
     # modify tagsets
-    changed_tes = TagSet.edit_entities(tes)
+    changed_tes = TagSet.edit_tagsets(tes)
     # rename entries
     for te in changed_tes:
       old_name = te_old_names[id(te)]
@@ -3337,14 +3380,24 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
   @classmethod
   @pfx_method
   def parse_tags_line(
-      cls, line, ontology=None, verbose=None, extra_types=None
-  ):
+      cls,
+      line,
+      ontology=None,
+      verbose=None,
+      extra_types=None,
+  ) -> Tuple[str, TagSet]:
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
     if extra_types is None:
       extra_types = getattr(cls, 'EXTRA_TYPES', None)
-    name, offset = Tag.parse_value(line)
+    id_name, offset = get_dotted_identifier(line)
+    if id_name:
+      name = id_name
+    else:
+      name, offset = Tag.parse_value(line)
+    if not isinstance(name, str):
+      raise TypeError(f'line does not start with a string: {r(name)}')
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
@@ -3896,5 +3949,4 @@ def selftest(argv):
     print("tag.format_as(%r) => %s" % (format_str, formatted))
 
 if __name__ == '__main__':
-  import sys
   sys.exit(selftest(sys.argv))

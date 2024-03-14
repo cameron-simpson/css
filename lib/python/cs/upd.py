@@ -91,7 +91,7 @@ except ImportError as curses_e:
   warning("cannot import curses: %s", curses_e)
   curses = None
 
-__version__ = '20230401-post'
+__version__ = '20240216-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -925,6 +925,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
   def run_task(
       self,
       label: str,
+      *,
       report_print=False,
       tick_delay: int = 0.3,
       tick_chars='|/-\\',
@@ -969,6 +970,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
       )
 
+@decorator
 def uses_upd(func):
   ''' Decorator for functions accepting an optional `upd:Upd` parameter,
       default from `Upd.default() or Upd()`.
@@ -1130,20 +1132,21 @@ class UpdProxy(object):
     upd = self.upd
     if upd is None:
       return
+    index = self.index
+    if index is None:
+      return
     update_period = self.update_period
     if update_period:
       now = time.time()
       if (self.last_update is not None
           and now - self.last_update < update_period):
         return
+    txt = upd.normalise(self._prefix + self._text + self._suffix)
     with upd._lock:  # pylint: disable=protected-access
-      index = self.index
-      if index is not None:
-        txt = upd.normalise(self._prefix + self._text + self._suffix)
-        overflow = len(txt) - upd.columns + 1
-        if overflow > 0:
-          txt = '<' + txt[overflow + 1:]
-        self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+      overflow = len(txt) - upd.columns + 1
+      if overflow > 0:
+        txt = '<' + txt[overflow + 1:]
+      self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
     if update_period:
       self.last_update = now
 
@@ -1277,6 +1280,21 @@ def with_upd_proxy(func, prefix=None, insert_at=1):
         return func(*a, upd_proxy=proxy, **kw)
 
   return upd_with_proxy_wrapper
+
+@contextmanager
+@uses_upd
+def without(*, upd: Upd):
+  ''' Context manager withdraw the `Upd` while something runs.
+
+      Example:
+
+          from cs.upd import without
+          ...
+          with without():
+              os.system('ls -la')
+  '''
+  with upd.above():
+    yield upd
 
 # Always create a default Upd() in open state.
 # Keep a module level name, which avoids the singleton weakref array

@@ -67,7 +67,7 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20240201-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -93,13 +93,14 @@ DISTINFO = {
         'cs.tagset',
         'cs.timeseries',
         'cs.upd',
+        'matplotlib',
         'python-dateutil',
         'typeguard',
     ],
     'entry_points': {
-        'console_scripts': [
-            'splink = cs.splink:main',
-        ],
+        'console_scripts': {
+            'splink': 'cs.splink:main',
+        },
     },
 }
 
@@ -127,8 +128,7 @@ def main(argv=None):
   return SPLinkCommand(argv).run()
 
 def ts2001_unixtime(tzname=None):
-  ''' Convert an SP-Link seconds-since-2001-01-01-local-time offset
-      into a UNIX time.
+  ''' Return the SP-Link 2001-01-01-local-time epoch as a UNIX time.
   '''
   if tzname is None:
     tzname = 'local'
@@ -918,7 +918,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
               dataset = dsinfo.dataset
               with Pfx(rdspath):
                 dstags = fstags[dspath]
-                if not force and dstags.imported:
+                if not force and dstags.get('imported'):
                   ##print('already imported {short_dspath}')
                   continue
                 if dataset in spd.TIMESERIES_DATASETS:
@@ -990,7 +990,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
-          Report infomation about the time series stored at tspath.
+          Report information about the time series stored at tspath.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
@@ -1009,15 +1009,16 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             --bare          Strip axes and padding from the plot.
             -e events,...   Display the specified events.
             -f              Force. Overwirte the image path even if it exists.
-            --stacked       Stack graphed values on top of each other.
             -o imagepath    Write the plot to imagepath.
                             If not specified, the image will be written
                             to the standard output in sixel format if
                             it is a terminal, and in PNG format otherwise.
+            --stacked       Stack graphed values on top of each other.
             --show          Open the image path with "open".
             --tz tzspec     Skew the UTC times presented on the graph
                             to emulate the timezone specified by tzspec.
                             The default skew is the system local timezone.
+            -U, --update    Run a "pull" before plotting.
             start-time      An integer number of days before the current time
                             or any datetime specification recognised by
                             dateutil.parser.parse.
@@ -1031,6 +1032,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     '''
     options = self.options
     options.bare = False
+    options.do_update = False
     options.show_image = False
     options.imgpath = None
     options.stacked = False
@@ -1045,6 +1047,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         show='show_image',
         stacked=None,
         tz_=('tz', tzfor),
+        U='do_update',
+        update='do_update',
     )
     tz = options.tz
     if len(argv) == 1 and argv[0] in ('?', 'help'):
@@ -1064,6 +1068,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       stop = time.time()
     if stop < start:
       start, stop = stop, start
+    if options.do_update:
+      if self.cmd_pull([]):
+        warning("pull/update failed, not plotting")
+        return 1
     if len(argv) == 1 and argv[0] in ('?', 'help'):
       self.print_known_datasets()
       return 0

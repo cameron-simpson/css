@@ -1,0 +1,30 @@
+lib/python/cs/hashindex.py: hashindex: move to new cs.hashindex module
+lib/python/cs/hashindex.py: cs.hashindex: new merge(srcpath,dstpath) function which understands hashcodes, uses fstags.mv for the real move
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: use merge() for the main per-file operation
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.run_context: plumb optional keyword parameters
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_linkto: move the main hash index listing parse into separate read_hashindex function
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_ls: new -r (relative) option to make generating relative path listings easy (for ingest by cmd_rearrange, for example)
+lib/python/cs/hashindex.py: cs.hashindex: merge: honour the hashname parameter
+lib/python/cs/hashindex.py: cs.hashindex: read_hashindex: require a hashname parameter
+lib/python/cs/hashindex.py: cs.hashindex: update imports, clean some lint
+lib/python/cs/hashindex.py: cs.hashindex: plumb hashname parameter
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: subprocess command line options for move_mode and symlink_mode
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: fix option name typo
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: support both refdir and targetdir being remote
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: local and remote scans of the reference directory
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: local and remote rearrange phase
+lib/python/cs/hashindex.py: cs.hashindex: update imports, tweak docstring
+lib/python/cs/hashindex.py: cs.hashindex: merge: new optional opname parameter preempting the "ln -s"/"ln"/"mv" default
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: lie to merge() about the opname because we do our own remove for move_mode, and run merge in "ln" mode
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: use opname in the print(), and call merge(quiet=True) because we do our own print()
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: in move_mode, collect all the srcpaths which should be removed and do them at the end avoiding problems when multiple srcpaths have the same hashcode; also avoid null moves (rsrcpath==rdstpath)
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: create missing subdirectories required for mv/ln of a file
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: put ssh_exe and hashindex_exe into the options
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: bugfix the remote "hashindex rearrange" invocation - argv and text mode
+lib/python/cs/hashindex.py: cs.hashindex: usage message updates to improve help
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: reorder cmd_* lexically
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: tweak usage message
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_linkto: simplification using the hashindex() generator
+lib/python/cs/hashindex.py: cs.hashindex: hashindex: do not use runstate, let the generator consumer do that
+lib/python/cs/hashindex.py: cs.hashindex: DISTINFO
+lib/python/cs/hashindex.py: cs.hashindex: add hashindex script to DISTINFO

@@ -1,0 +1,1 @@
+lib/python/cs/result.py: cs.result: Result: simple examples for the docstring

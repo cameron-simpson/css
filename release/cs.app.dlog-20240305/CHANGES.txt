@@ -1,0 +1,37 @@
+lib/python/cs/app/dlog.py: dlog: reimplement using new cs.app.dlog module
+lib/python/cs/app/dlog.py: cs.app.dlog: improve text log formatting
+lib/python/cs/app/dlog.py: cs.app.dlog: DLogCommand.cmd_log: when tag=value does not parse, use raw value as str
+lib/python/cs/app/dlog.py: cs.app.dlog: remove debug import, shuffle argv.pop(0)
+lib/python/cs/app/dlog.py: cs.app.dlog: extract core logging function as dlog() for easy reuse
+lib/python/cs/app/dlog.py: cs.app.dlog: dlog log: get the default cs.dlog categories from the all_tags instead of the direct tags
+lib/python/cs/app/dlog.py: cs.app.dlog: dlog(): bugfix tags supplied to sqltags
+lib/python/cs/app/dlog.py: cs.*: update implementations of BaseCommand.run_context to use super().run_context()
+lib/python/cs/app/dlog.py: cs.app.dlog: get DEFAULT_DBPATH from cs.sqltags.DBURL_DEFAULT
+lib/python/cs/app/dlog.py: cs.*: drop BaseCommand.apply_defaults in favour of the Options dataclass
+lib/python/cs/app/dlog.py: cs.app.dlog: new DLog dataclass embodying a log entry, initially with a from_str factory to make one from a log line and quick to write it to a file
+lib/python/cs/app/dlog.py: cs.app.dlog: DLogCommand: new cmd_scan to read a text log file
+lib/python/cs/app/dlog.py: cs.app.dlog: update imports, adjust some strings
+lib/python/cs/app/dlog.py: cs.app.dlog: DLOG.from_str: new multi_categories=False parameter to match multiple leading CATS: preambles; use multi_categories=True in DLogCommand.cmd_scan
+lib/python/cs/app/dlog.py: cs.app.dlog: DLog.__str__: uppercase the category recital; DLogCommand.cmd_scan: just print(dl)
+lib/python/cs/app/dlog.py: cs.app.dlog: new DEFAULT_PIPEPATH and associated DLogCommand.Options.pipepath
+lib/python/cs/app/dlog.py: cs.app.dlog: DLOG: rename .line to .headline
+lib/python/cs/app/dlog.py: cs.app.dlog: DLog.from_str: make the leading datetime optional, default to time.time()
+lib/python/cs/app/dlog.py: cs.app.dlog: use the builtin print to append to the log file
+lib/python/cs/app/dlog.py: cs.app.dlog: DLog: new .log to log to log file and/or sqltags
+lib/python/cs/app/dlog.py: cs.app.dlog: DLOG: new .daemon() method to run a daemon reading log lines from a pipe and logging to log file and/or sqltags
+lib/python/cs/app/dlog.py: cs.app.dlog: DLogCommand.Options: docstring, improve defaults
+lib/python/cs/app/dlog.py: cs.app.dlog: DLogCommand: drop run_context, it will all happen in DLog.log
+lib/python/cs/app/dlog.py: cs.app.dlog: DLogCommand.cats_from_str: rename variable
+lib/python/cs/app/dlog.py: cs.app.dlog: DLogCommand: new cmd_daemon to run a daemon reading from the log pipe
+lib/python/cs/app/dlog.py: cs.app.dlog: DLogCommand.cmd_log: the post-option command line parse is now done by DLog.from_str and the logging via the pipe or DLog.log()
+lib/python/cs/app/dlog.py: cs.app.dlog: dlog(): now mostly a thin wrapper around DLog.log
+lib/python/cs/app/dlog.py: cs.app.dlog: update imports, @promote(dlog)
+lib/python/cs/app/dlog.py: cs.app.dlog: DLog.__str__: enumerate each tag individually to match updated parse code
+lib/python/cs/app/dlog.py: cs.app.dlog: DLog.log: accept an optional `pipepath` parameter and log to it preferentially if supplied; add sanity checks and expand the docstring
+lib/python/cs/app/dlog.py: cs.app.dlog: DLog.daemon: create/remove the pipe around the main body - the pipe must not already exist
+lib/python/cs/app/dlog.py: cs.app.dlog: DLogCommand.cmd_log: let DLog.log() for the pipe checking
+lib/python/cs/app/dlog.py: cs.app.dlog: remove debug
+lib/python/cs/app/dlog.py: cs.app.dlog: DLog.from_str: new optional catgeories parameter, make multi_categories keyword only
+lib/python/cs/app/dlog.py: cs.app.dlog: DLogCommand.cmd_log: pass the categories from -c through to DLog.from_str
+lib/python/cs/app/dlog.py: cs.app.dlog: DLog.daemon: use a worker thread to consume the pipe and queue what arrives, use cs.queues.get_batch to collect dlogs in batches for more efficient use of the SQLTags
+lib/python/cs/app/dlog.py: cs.app.dlog: fill out the module docstring, provide DISTINFO
