@@ -9,13 +9,13 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from contextlib import contextmanager
-from subprocess import check_call
 import sys
 from os.path import exists as existspath, join as joinpath, realpath
+
 from cs.fileutils import findup
 from cs.logutils import debug, trace, warning
 from cs.pfx import pfx_method
-from cs.psutils import pipefrom
+from cs.psutils import pipefrom, run
 
 ReleaseLogEntry = namedtuple('ReleaseLogEntry', 'tag entry')
 
@@ -49,9 +49,8 @@ class VCS(ABC):
     return pipef(self.COMMAND_NAME, *vcscmd_args, quiet=True)
 
   def _cmd(self, *vcscmd_args):
-    argv = [self.COMMAND_NAME] + list(vcscmd_args)
-    trace("+ %r", argv)
-    check_call(argv)
+    argv = [self.COMMAND_NAME, *vcscmd_args]
+    run(argv, doit=True, quiet=False)
 
   @pfx_method
   def get_topdir(self, path=None):
