@@ -61,7 +61,7 @@ from cs.sqltags import SQLTags, DBURL_DEFAULT
 from cs.tagset import Tag, TagSet
 from cs.upd import print, builtin_print  # pylint: disable=redefined-builtin
 
-__version__ = '20240316'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
