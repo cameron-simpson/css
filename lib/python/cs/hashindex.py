@@ -7,6 +7,7 @@
 from collections import defaultdict
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
+import errno
 from getopt import GetoptError
 from io import TextIOBase
 import os
@@ -883,7 +884,7 @@ def merge(
     except FileNotFoundError:
       pass
     except OSError as e:
-      if e.errno == os.EINVAL:
+      if e.errno == errno.EINVAL:
         # not a symlink
         raise FileExistsError(f'dstpath {dstpath!r} not a symlink: {e}') from e
       raise
