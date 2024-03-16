@@ -2,7 +2,7 @@ arrow
 beautifulsoup4
 cs.ansi_colour pypi.release="20220227" ok_revision="6790b9b6946cc7d66b03cfec771154d463f2cc18" features={"20220227":["COLOUR_CODES","TerminalColors","colour_escape"]}
 cs.app.beyonwiz pypi.release=20160828
-cs.app.dlog ok_revision=db2845d294ad577ef78cbc2e4578da111b52a67d pypi.release="20240305"
+cs.app.dlog ok_revision="8066478bc1a04af4b83d42e74c1b6ee2c38b793a" pypi.release="20240305"
 cs.app.flag pypi.release="20201228" ok_revision="8d880199ddcb60a456ee67bc162cb453ce85f491"
 cs.app.maildb pypi.release=20160828
 cs.app.mailfiler pypi.release="20200719"
