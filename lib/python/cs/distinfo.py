@@ -248,8 +248,11 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
-    with pkg.release_dir(vcs, vcstag, persist=True) as checkout_dirpath:
+    with pkg.release_dir(vcs, vcstag,
+                         persist=True) as (checkout_dirpath, rpaths):
       print(checkout_dirpath)
+      for artifact, rpath in sorted(rpaths.items()):
+        print(" ", artifact, rpath)
 
   def cmd_distinfo(self, argv):
     ''' Usage: {cmd} pkg_name
@@ -367,8 +370,11 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
-    with pkg.release_dir(vcs, vcstag, bare=bare, persist=True) as pkgpath:
+    with pkg.release_dir(vcs, vcstag, bare=bare,
+                         persist=True) as (pkgpath, rpaths):
       print(pkgpath)
+      for artifact, rpath in sorted(rpaths.items()):
+        print(" ", artifact, rpath)
 
   def cmd_pypi(self, argv):
     ''' Usage: {cmd} [-r repository] pkg_names...
@@ -388,7 +394,7 @@ class CSReleaseCommand(BaseCommand):
         vcs = options.vcs
         release = pkg.latest
         vcstag = release.vcstag
-        with pkg.release_dir(vcs, vcstag) as pkgpath:
+        with pkg.release_dir(vcs, vcstag) as (pkgpath, rpaths):
           pkg.upload_dist(pkgpath, repo)
         pkg.latest_pypi_version = release.version
 
@@ -1785,7 +1791,10 @@ class Module:
       self, vcs, vcs_revision, *, persist: bool = False, bare: bool = False
   ):
     ''' Context manager to prepare a package release directory.
-        It yields the release directory path.
+        It yields the a 2-tuple of `(release_dirpath,dist_rpaths)`
+        being the release directory path and a `dict` mapping
+        `'sdist'` and `'wheel'` to the built artifacts' paths
+        relative to `release_dirpath`.
 
         Parameters:
         * `vcs`: the version control system
@@ -1802,10 +1811,10 @@ class Module:
     '''
     release_dirpath = vcs_revision + '--' + datetime.now().isoformat()
     try:
-      self.prepare_release_dir(
+      dist_rpaths = self.prepare_release_dir(
           release_dirpath, self, vcs, vcs_revision, bare=bare
       )
-      yield release_dirpath
+      yield release_dirpath, dist_rpaths
     except:
       persist = False
       raise
@@ -1825,6 +1834,8 @@ class Module:
       bare: bool = False
   ):
     ''' Create and fill in a release directory at `release_dirpath`.
+        Return a `dict` mapping `'sdist'` and `'wheel'` to the built
+        artifacts' paths relative to `release_dirpath`.
     '''
     # mkdir omitted, done by @atomic_directory
     # unpack the source
@@ -1840,7 +1851,8 @@ class Module:
     else:
       self.prepare_autofiles(release_dirpath)
       self.prepare_metadata(release_dirpath)
-      self.prepare_dist(release_dirpath)
+      dist_rpaths = self.prepare_dist(release_dirpath)
+    return dist_rpaths
 
   def prepare_autofiles(self, pkg_dir):
     ''' Create automatic files in `pkg_dir`.
@@ -1892,8 +1904,7 @@ class Module:
     with pfx_call(open, joinpath(pkg_dir, 'pyproject.toml'), 'xb') as tf:
       tomli_w.dump(proj, tf, multiline_strings=True)
 
-  @staticmethod
-  def prepare_dist(pkg_dir):
+  def prepare_dist(self, pkg_dir):
     ''' Run "python3 -m build ." inside `pkg_dir`, making files in `dist/`.
     '''
     distdir = joinpath(pkg_dir, 'dist')
