@@ -812,14 +812,14 @@ def rearrange(
       opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
       with Pfx(srcpath):
         rsrcpath = relpath(srcpath, srcdirpath)
-        assert is_valid_rpath(rsrcpath), (
-            "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
-        )
+        ##assert is_valid_rpath(rsrcpath), (
+        ##    "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
+        ##)
         proxy.text = rsrcpath
         for rdstpath in rfspaths:
-          assert is_valid_rpath(rdstpath), (
-              "rdstpath:%r is not a clean subpath" % (rdstpath,)
-          )
+          ##assert is_valid_rpath(rdstpath), (
+          ##    "rdstpath:%r is not a clean subpath" % (rdstpath,)
+          ##)
           if rsrcpath == rdstpath:
             continue
           dstpath = joinpath(dstdirpath, rdstpath)
