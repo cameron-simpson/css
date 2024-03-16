@@ -31,7 +31,7 @@ from cs.deco import decorator
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20240316'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
