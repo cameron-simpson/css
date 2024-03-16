@@ -8,7 +8,7 @@ cs.app.maildb pypi.release=20160828
 cs.app.mailfiler pypi.release="20200719"
 cs.app.megacli pypi.release="20211031" ok_revision="03033cc34d810f17745cceee447af3df5566ae33"
 cs.app.mklinks pypi.release="20221228" ok_revision="25db918d3d95925205dd361638d2ddb9f279f52c"
-cs.app.myke ok_revision="4691630248f490ef65fa9909e26bd7627cb38bd4" pypi.release="20240305.2"
+cs.app.myke ok_revision="1027faacf36b6c49eaa58dae48345ddf7db6558a" pypi.release="20240305.2"
 cs.app.osx.defaults ok_revision=b2e2ad76512c91393644b0d85b3bfbef050d3d7c pypi.release="20240201"
 cs.app.osx.defaults.plist
 cs.app.osx.plist ok_revision="599e3e37c0af4e7ba92c2134c0a90d17effcfc39" pypi.release="20221228"
