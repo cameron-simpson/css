@@ -9,7 +9,7 @@ cs.app.mailfiler pypi.release="20200719"
 cs.app.megacli pypi.release="20211031" ok_revision="03033cc34d810f17745cceee447af3df5566ae33"
 cs.app.mklinks pypi.release="20221228" ok_revision="25db918d3d95925205dd361638d2ddb9f279f52c"
 cs.app.myke ok_revision="1027faacf36b6c49eaa58dae48345ddf7db6558a" pypi.release="20240316.1"
-cs.app.osx.defaults ok_revision=e3fe3ab7e2f06202c3e8ea8760ae3207b89ab05b pypi.release="20240201"
+cs.app.osx.defaults ok_revision=e3fe3ab7e2f06202c3e8ea8760ae3207b89ab05b pypi.release="20240316"
 cs.app.osx.defaults.plist
 cs.app.osx.plist ok_revision="599e3e37c0af4e7ba92c2134c0a90d17effcfc39" pypi.release="20221228"
 cs.app.playon ok_revision="524d6741afc725e0f32b62859bda8572cd116ec9" pypi.release="20240316" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
