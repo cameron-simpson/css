@@ -122,6 +122,8 @@ class CSReleaseCommand(BaseCommand):
   @dataclass
   class Options(BaseCommand.Options):
     cmd: str = 'cs-release'
+    force: bool = False
+    release_message: str = None
 
     def stderr_isatty():
       ''' Test whether `sys.stderr` is a tty.
@@ -435,15 +437,18 @@ class CSReleaseCommand(BaseCommand):
   # pylint: disable=too-many-branches,too-many-statements
   @uses_upd
   def cmd_release(self, argv, *, upd):
-    ''' Usage: {cmd} pkg_name
+    ''' Usage: {cmd} [-f] [-m release-message] pkg_name
           Issue a new release for the named package.
     '''
+    options = self.options
+    options.popopts(argv, f='force', m_='release_message')
+    force = options.force
+    release_message = options.release_message
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    options = self.options
     pkg = options.modules[pkg_name]
     vcs = options.vcs
     # issue new release tag
@@ -457,18 +462,22 @@ class CSReleaseCommand(BaseCommand):
       return 1
     changes = list(pkg.log_since())
     if not changes:
-      if options.force:
+      if force:
         warning("no commits since last release, making release anyway")
       else:
         error("no changes since last release, not making new release")
         return 1
-    print("Changes since the last release:")
-    for files, firstline in changes:
-      print(" ", ' '.join(files) + ': ' + firstline)
-    print()
-    with upd.above():
-      with pipefrom('readdottext', stdin=sys.stdin) as dotfp:
-        release_message = dotfp.read().rstrip()
+    if release_message is None:
+      print("Changes since the last release:")
+      for files, firstline in changes:
+        print(" ", ' '.join(files) + ': ' + firstline)
+      print()
+      with upd.above():
+        with pipefrom('readdottext', stdin=sys.stdin) as dotfp:
+          release_message = dotfp.read().rstrip()
+    else:
+      print("Release message:")
+      print(release_message)
     if not release_message:
       error("empty release message, not making new release")
       return 1
@@ -1346,8 +1355,7 @@ class Module:
     pyproject = {
         "project": projspec,
         "build-system": {
-            "build-backend":
-            "setuptools.build_meta",
+            "build-backend": "setuptools.build_meta",
             "requires": [
                 "setuptools >= 61.2",
                 "trove-classifiers",
