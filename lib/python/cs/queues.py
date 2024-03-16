@@ -24,7 +24,7 @@ from cs.seq import seq, unrepeated
 
 ##from cs.debug import Lock, RLock, Thread
 
-__version__ = '20240305-post'
+__version__ = '20240316'
 
 DISTINFO = {
     'description':
