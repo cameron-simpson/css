@@ -30,7 +30,7 @@ from os.path import (
 from pprint import pprint
 import re
 from shutil import rmtree
-from subprocess import run, DEVNULL
+from subprocess import DEVNULL
 import sys
 from types import SimpleNamespace
 
@@ -55,7 +55,7 @@ from cs.logutils import error, warning, info, status, trace
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
-import cs.psutils
+from cs.psutils import pipefrom, run
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
 from cs.resources import RunState, uses_runstate
@@ -746,13 +746,20 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
     return ''.join((self.module_name, self.op, release_version))
 
 @typechecked
-def cd_run(cwd: str, *argv, check: bool = True, stdin=DEVNULL, **kw):
+def cd_run(
+    cwd: str,
+    *argv,
+    check: bool = True,
+    stdin=DEVNULL,
+    quiet=False,
+    **kw,
+):
   ''' Run the command `argv` in the directory `cwd`.
       Return its exit status.
   '''
   if not isdirpath(cwd):
     raise ValueError("not a directory: %r" % (cwd,))
-  kw.update(cwd=cwd, check=check, stdin=stdin)
+  kw.update(cwd=cwd, check=check, stdin=stdin, quiet=quiet)
   trace(f"+ {argv!r}  " + " ".join((f"{k}={v!r}" for k, v in kw.items())))
   return run(argv, **kw).returncode  # pylint: disable=subprocess-run-check
 
@@ -806,7 +813,7 @@ def ask(message, fin=None, fout=None):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output file object of a command.
   '''
-  with cs.psutils.pipefrom(argv, **kw) as P:
+  with pipefrom(argv, **kw) as P:
     yield P.stdout
 
 class Modules(defaultdict):
@@ -1821,12 +1828,16 @@ class Module:
     '''
     # mkdir omitted, done by @atomic_directory
     # unpack the source
-    hg_argv = ['archive', '-r', vcs_revision]
-    hg_argv.extend(vcs.hg_include(self.paths()))
-    hg_argv.extend(['--', release_dirpath])
-    vcs.hg_cmd(*hg_argv)
-    os.system("find %r -type f -print" % (release_dirpath,))
-    if not bare:
+    vcs.hg_cmd(
+        'archive',
+        ('-r', vcs_revision),
+        *vcs.hg_include(self.paths()),
+        '--',
+        release_dirpath,
+    )
+    if bare:
+      dist_rpaths = {}
+    else:
       self.prepare_autofiles(release_dirpath)
       self.prepare_metadata(release_dirpath)
       self.prepare_dist(release_dirpath)
@@ -1885,7 +1896,21 @@ class Module:
   def prepare_dist(pkg_dir):
     ''' Run "python3 -m build ." inside `pkg_dir`, making files in `dist/`.
     '''
-    cd_run(pkg_dir, 'python3', '-m', 'build', '.')
+    distdir = joinpath(pkg_dir, 'dist')
+    sdist_rpath = f'dist/{self.name}-{self.latest_pypi_version}.tar.gz'
+    wheel_rpath = f'dist/{self.name}-{self.latest_pypi_version}-py3-none-any.whl'
+    cd_run(
+        pkg_dir,
+        ('python3', '-m', 'build'),
+        ('--outdir', 'dist'),
+        ('--sdist', '--wheel'),
+        (
+            '--skip-dependency-check',
+            ##'--no-isolation',
+        ),
+        '.',
+    )
+    return dict(sdist=sdist_rpath, wheel=wheel_rpath)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
