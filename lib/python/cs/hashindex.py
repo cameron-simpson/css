@@ -535,6 +535,8 @@ def hashindex(
     fspath: Union[str, TextIOBase, Tuple[Union[None, str], str]],
     *,
     hashname: str,
+    hashindex_exe: str,
+    ssh_exe: str,
     **kw,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
@@ -543,6 +545,7 @@ def hashindex(
   '''
   match fspath:
     case TextIOBase():
+      # read hashindex from file
       f = fspath
       yield from read_hashindex(f, hashname=hashname, **kw)
       return
@@ -556,11 +559,19 @@ def hashindex(
       # a local filesystem path because the remote host is None
       pass
     case [rhost, rfspath]:
-      yield from read_remote_hashindex(rhost, rfspath, hashname=hashname, **kw)
+      # a remote fspath
+      yield from read_remote_hashindex(
+          rhost,
+          rfspath,
+          hashname=hashname,
+          hashindex_exe=hashindex_exe,
+          ssh_exe=ssh_exe,
+          **kw,
+      )
       return
     case _:
       raise TypeError(f'hashindex: unhandled fspath={r(fspath)}')
-  # local ahshindex
+  # local hashindex
   if isfilepath(fspath):
     h = file_checksum(fspath)
     yield h, fspath
