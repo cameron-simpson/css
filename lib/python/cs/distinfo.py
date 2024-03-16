@@ -1483,7 +1483,7 @@ class Module:
         of some revision because "hg archive" complains if globs
         match no paths, and aborts.
     '''
-    skip_suffixes = '.pyc', '.o', '.so'
+    skip_suffixes = '.pyc', '.o', '.orig', '.so'
     basepath = self.basepath
     if top_dirpath:
       basepath = normpath(joinpath(top_dirpath, basepath))
