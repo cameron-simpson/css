@@ -350,7 +350,7 @@ class CSReleaseCommand(BaseCommand):
 
   def cmd_package(self, argv):
     ''' Usage: package [--bare] pkg_name [version]
-          Export the package contents as a prepared package.
+          Export the package contents as a prepared package directory.
           --bare  Do not prepare any of the metadata or distribution files.
     '''
     bare = False
