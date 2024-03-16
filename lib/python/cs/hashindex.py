@@ -247,8 +247,9 @@ class HashIndexCommand(BaseCommand):
           print(hashcode, fspath)
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [options...] [host:]path...
+    ''' Usage: {cmd} [options...] [[host:]path...]
           Walk filesystem paths and emit a listing.
+          The default path is the current directory.
           Options:
           -e ssh_exe    Specify the ssh executable.
           -h hashname   Specify the file content hash algorithm name.
@@ -269,7 +270,7 @@ class HashIndexCommand(BaseCommand):
     runstate = options.runstate
     ssh_exe = options.ssh_exe
     if not argv:
-      raise GetoptError("missing paths")
+      argv = ['.']
     xit = 0
     for path in argv:
       runstate.raiseif()
