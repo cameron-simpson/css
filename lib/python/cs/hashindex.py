@@ -120,6 +120,7 @@ class HashIndexCommand(BaseCommand):
     relative: Optional[bool] = None
     output_format: str = OUTPUT_FORMAT_DEFAULT
 
+    # pylint: disable=use-dict-literal
     COMMON_OPT_SPECS = dict(
         e='ssh_exe',
         h_='hashname',
@@ -136,6 +137,7 @@ class HashIndexCommand(BaseCommand):
       with super().run_context(**kw):
         yield
 
+  #pylint: disable=too-many-locals
   def cmd_comm(self, argv):
     ''' Usage: {cmd} {{-1|-2|-3}} {{path1|-}} {{path2|-}}
           Compare the filepaths in path1 and path2 by content.
