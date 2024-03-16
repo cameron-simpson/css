@@ -167,6 +167,7 @@ class HashIndexCommand(BaseCommand):
     if not argv:
       warning("missing path1")
       badopts = True
+      path1spec = None
     else:
       path1spec = argv.pop(0)
       with Pfx("path1 %r", path1spec):
@@ -182,6 +183,7 @@ class HashIndexCommand(BaseCommand):
     if not argv:
       warning("missing path2")
       badopts = True
+      path2spec = None
     else:
       path2spec = argv.pop(0)
       with Pfx("path2 %r", path2spec):
