@@ -766,8 +766,7 @@ def cd_run(
   if not isdirpath(cwd):
     raise ValueError("not a directory: %r" % (cwd,))
   kw.update(cwd=cwd, check=check, stdin=stdin, quiet=quiet)
-  trace(f"+ {argv!r}  " + " ".join((f"{k}={v!r}" for k, v in kw.items())))
-  return run(argv, **kw).returncode  # pylint: disable=subprocess-run-check
+  return run(argv, **kw).returncode
 
 def release_tags(vcs):
   ''' Generator yielding the current release tags.
