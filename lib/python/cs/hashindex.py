@@ -149,21 +149,25 @@ class HashIndexCommand(BaseCommand):
           -H hashindex_exe
                         Specify the remote hashindex executable.
           -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
+          -r            Emit relative paths in the listing.
     '''
     badopts = False
     options = self.options
     options.path1_only = False  # pylint: disable=attribute-defined-outside-init
     options.path2_only = False  # pylint: disable=attribute-defined-outside-init
     options.path12 = False  # pylint: disable=attribute-defined-outside-init
+    options.relative = False
     options.popopts(
         argv,
         _1='path1_only',
         _2='path2_only',
         _3='path12',
+        r='relative',
     )
     hashindex_exe = options.hashindex_exe
     hashname = options.hashname
     output_format = options.output_format
+    relative = options.relative
     runstate = options.runstate
     ssh_exe = options.ssh_exe
     path1_only = options.path1_only
@@ -223,6 +227,7 @@ class HashIndexCommand(BaseCommand):
           hashname=hashname,
           hashindex_exe=hashindex_exe,
           ssh_exe=ssh_exe,
+          relative=relative,
       ):
         runstate.raiseif()
         if hashcode is not None:
@@ -234,6 +239,7 @@ class HashIndexCommand(BaseCommand):
           hashname=hashname,
           hashindex_exe=hashindex_exe,
           ssh_exe=ssh_exe,
+          relative=relative,
       ):
         runstate.raiseif()
         if hashcode is not None:
@@ -300,15 +306,11 @@ class HashIndexCommand(BaseCommand):
             hashname=hashname,
             ssh_exe=ssh_exe,
             hashindex_exe=hashindex_exe,
+            relative=relative,
         ):
           runstate.raiseif()
           if h is not None:
-            print(
-                output_format.format(
-                    hashcode=h,
-                    fspath=(relpath(fspath, lpath) if relative else fspath)
-                )
-            )
+            print(output_format.format(hashcode=h, fspath=fspath))
     return xit
 
   @typechecked
@@ -537,6 +539,7 @@ def hashindex(
     hashname: str,
     hashindex_exe: str,
     ssh_exe: str,
+    relative: bool = False,
     **kw,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
@@ -566,6 +569,7 @@ def hashindex(
           hashname=hashname,
           hashindex_exe=hashindex_exe,
           ssh_exe=ssh_exe,
+          relative=relative,
           **kw,
       )
       return
@@ -578,7 +582,7 @@ def hashindex(
   elif isdirpath(fspath):
     for filepath in dir_filepaths(fspath):
       h = file_checksum(filepath, hashname=hashname)
-      yield h, filepath
+      yield h, relpath(filepath, fspath) if relative else filepath
   else:
     raise ValueError(
         f'hashindex: neither file nor directory: fspath={fspath!r}'
@@ -642,6 +646,7 @@ def read_remote_hashindex(
     hashname: str,
     ssh_exe=None,
     hashindex_exe=None,
+    relative: bool = False,
     check=True,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' A generator which reads a hashindex of a remote directory,
@@ -656,6 +661,8 @@ def read_remote_hashindex(
         default `SSH_EXE_DEFAULT`: `{SSH_EXE_DEFAULT!r}`
       * `hashindex_exe`: the remote `hashindex` executable,
         default `HASHINDEX_EXE_DEFAULT`: `{HASHINDEX_EXE_DEFAULT!r}`
+      * `relative`: optional flag, default `False`;
+        if true pass `'-r'` to the remote `hashindex ls` command
       * `check`: whether to check that the remote command has a `0` return code,
         default `True`
   '''
@@ -668,7 +675,8 @@ def read_remote_hashindex(
           hashindex_exe,
           'ls',
           ('-h', hashname),
-          '-r',
+          relative and '-r',
+          '--',
           localpath(rdirpath),
       )
   )
