@@ -485,7 +485,7 @@ class CSReleaseCommand(BaseCommand):
     existing_features = pkg.named_features()
     if existing_features:
       print("Existing features:", ' '.join(sorted(existing_features)))
-    features = list(
+    features = [] if force else list(
         filter(None,
                prompt('Any named features with this release').split())
     )
@@ -496,7 +496,7 @@ class CSReleaseCommand(BaseCommand):
     )):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
-    bugfixes = list(
+    bugfixes = [] if force else list(
         filter(None,
                prompt('Any named bugs fixed with this release').split())
     )
@@ -511,7 +511,8 @@ class CSReleaseCommand(BaseCommand):
     latest = pkg.latest
     next_release = pkg.latest.next() if latest else ReleaseTag.today(pkg.name)
     next_vcstag = next_release.vcstag
-    if not ask("Confirm new release for %r as %r" % (pkg.name, next_vcstag)):
+    if (not force and not ask("Confirm new release for %r as %r" %
+                              (pkg.name, next_vcstag))):
       error("aborting release at user request")
       return 1
     rel_dir = joinpath('release', next_vcstag)
