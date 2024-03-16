@@ -3,7 +3,7 @@
 ''' My make programme, a parallel make tool with superior expression syntax.
 '''
 
-__version__ = '20240305.2-post'
+__version__ = '20240316'
 
 DISTINFO = {
     'description':
