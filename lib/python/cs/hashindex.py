@@ -81,6 +81,7 @@ HASHNAME_DEFAULT = 'sha256'
 HASHINDEX_EXE_DEFAULT = 'hashindex'
 SSH_EXE_DEFAULT = 'ssh'
 SSH_EXE_ENVVAR = 'HASHINDEX_SSH'
+OUTPUT_FORMAT_DEFAULT = '{hashcode} {fspath}'
 
 def main(argv=None):
   ''' Commandline implementation.
@@ -95,7 +96,11 @@ class HashIndexCommand(BaseCommand):
 
   USAGE_FORMAT = r'''Usage: {cmd} subcommand...
     Generate or process file content hash listings.'''
-  USAGE_KEYWORDS = dict(HASHNAME_DEFAULT=HASHNAME_DEFAULT,)
+  # pylint: disable=use-dict-literal
+  USAGE_KEYWORDS = dict(
+      HASHNAME_DEFAULT=HASHNAME_DEFAULT,
+      OUTPUT_FORMAT_DEFAULT=OUTPUT_FORMAT_DEFAULT,
+  )
 
   @dataclass
   class Options(BaseCommand.Options):
@@ -112,11 +117,13 @@ class HashIndexCommand(BaseCommand):
     hashindex_exe: str = HASHINDEX_EXE_DEFAULT
     symlink_mode: bool = False
     relative: Optional[bool] = None
+    output_format: str = OUTPUT_FORMAT_DEFAULT
 
     COMMON_OPT_SPECS = dict(
         e='ssh_exe',
         h_='hashname',
         H_='hashindex_exe',
+        o_='output_format',
         **BaseCommand.Options.COMMON_OPT_SPECS,
     )
 
@@ -138,6 +145,7 @@ class HashIndexCommand(BaseCommand):
           -h hashname   Specify the file content hash algorithm name.
           -H hashindex_exe
                         Specify the remote hashindex executable.
+          -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
     '''
     badopts = False
     options = self.options
@@ -152,6 +160,7 @@ class HashIndexCommand(BaseCommand):
     )
     hashindex_exe = options.hashindex_exe
     hashname = options.hashname
+    output_format = options.output_format
     runstate = options.runstate
     ssh_exe = options.ssh_exe
     path1_only = options.path1_only
@@ -231,20 +240,20 @@ class HashIndexCommand(BaseCommand):
       ):
         runstate.raiseif()
         for fspath in fspaths1_by_hashcode[hashcode]:
-          print(hashcode, fspath)
+          print(output_format.format(hashcode=hashcode, fspath=fspath))
     elif path2_only:
       for hashcode in fspaths2_by_hashcode.keys() - fspaths1_by_hashcode.keys(
       ):
         runstate.raiseif()
         for fspath in fspaths2_by_hashcode[hashcode]:
-          print(hashcode, fspath)
+          print(output_format.format(hashcode=hashcode, fspath=fspath))
     else:
       assert path12
       for hashcode in fspaths2_by_hashcode.keys() & fspaths1_by_hashcode.keys(
       ):
         runstate.raiseif()
         for fspath in fspaths1_by_hashcode[hashcode]:
-          print(hashcode, fspath)
+          print(output_format.format(hashcode=hashcode, fspath=fspath))
 
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [options...] [[host:]path...]
@@ -255,6 +264,7 @@ class HashIndexCommand(BaseCommand):
           -h hashname   Specify the file content hash algorithm name.
           -H hashindex_exe
                         Specify the remote hashindex executable.
+          -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
           -r            Emit relative paths in the listing.
                         This requires each path to be a directory.
     '''
@@ -266,6 +276,7 @@ class HashIndexCommand(BaseCommand):
     )
     hashindex_exe = options.hashindex_exe
     hashname = options.hashname
+    output_format = options.output_format
     relative = options.relative
     runstate = options.runstate
     ssh_exe = options.ssh_exe
@@ -289,7 +300,12 @@ class HashIndexCommand(BaseCommand):
         ):
           runstate.raiseif()
           if h is not None:
-            print(h, relpath(fspath, lpath) if relative else fspath)
+            print(
+                output_format.format(
+                    hashcode=h,
+                    fspath=(relpath(fspath, lpath) if relative else fspath)
+                )
+            )
     return xit
 
   @typechecked
@@ -303,6 +319,7 @@ class HashIndexCommand(BaseCommand):
                         Specify the remote hashindex executable.
             --mv        Move mode.
             -n          No action, dry run.
+            -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
             -s          Symlink mode.
           Other arguments:
             refdir      The reference directory, which may be local or remote
