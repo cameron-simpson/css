@@ -47,7 +47,7 @@ from cs.result import Result, ResultSet
 from cs.threads import bg as bg_thread
 from cs.upd import print
 
-__version__ = '20240201.1-post'
+__version__ = '20240316'
 
 DISTINFO = {
     'keywords': ["python3"],
