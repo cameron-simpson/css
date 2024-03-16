@@ -18,7 +18,7 @@ cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9
 cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
 cs.app.ydl pypi.release="20220318" ok_revision="6c4e9e800dde94ed935a1b31a532f68cbe63adb8"
 cs.asynchron pypi.release=20160828
-cs.binary pypi.release="20240201" ok_revision="971283ffb5fac84c3b809e279a9e05350f80fa4c" features={"20230212":["BinaryMixin_load","BinaryMixin_save"]}
+cs.binary pypi.release="20240316" ok_revision="971283ffb5fac84c3b809e279a9e05350f80fa4c" features={"20230212":["BinaryMixin_load","BinaryMixin_save"]}
 cs.buffer pypi.release="20240316" ok_revision="703ab49de6b12607b7e5d1fd3a18b8b133dffebd" features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"]}
 cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.clockutils pypi.release=20190101
