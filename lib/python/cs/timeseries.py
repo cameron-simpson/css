@@ -104,7 +104,7 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.result import CancellationError
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-__version__ = '20240201-post'
+__version__ = '20240316'
 
 DISTINFO = {
     'keywords': ["python3"],
