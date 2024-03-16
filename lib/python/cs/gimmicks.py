@@ -87,7 +87,7 @@ except ImportError:
   r = repr
   s = lambda obj: "%s:%s" % (obj.__class__.__name__, str(obj))
 
-__version__ = '20240316'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
