@@ -1,0 +1,90 @@
+#!/bin/sh
+#
+# Prepare data in a transfer directory such a removable hard drive
+# with files from a source not present at a destination.
+# - Cameron Simpson <cs@cskk.id.au> 17mar2024
+#
+#
+#set -ue
+
+cmd=$0
+usage="Usage: $0 [-n] srcdir dstdir [{-|xferdir}]
+  Copy files from srcdir to xferdir if they are not present (by content) in dstdir.
+  This is useful for preparing a transfer disc to hold files to be
+  taken to the remote location holding dstdir.
+  Options:
+  -n  No action: recite planned actions.
+  If xferdir is omitted or is \"-\" just emit the filenames to stdout.
+  Example:
+      $0 local-media-dir remotehost:remote-media-dir /mnt/xfer_drive/media"
+
+rsopts=
+[ -t 2 ] && rsopts="$rsopts -P"
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -n) rsopts="$rsopts -n" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$0: missing srcdir" >&2
+  badopts=1
+else
+  srcdir=$1
+  shift
+  [ -d "$srcdir/" ] || {
+    echo "$cmd: srcdir not a directory: $srcdir" >&2
+    badopts=1
+  }
+fi
+
+if [ $# = 0 ]
+then
+  echo "$0: missing dstdir" >&2
+  badopts=1
+else
+  dstdir=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  xferdir=-
+else
+  xferdir=$1
+  shift
+  case "$xferdir" in
+    -)  ;;
+    *)  [ -d "$xferdir/" ] || {
+          echo "$cmd: xferdir not a directory: $xferdir" >&2
+          badopts=1
+        }
+        ;;
+  esac
+fi
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments after xferdir: $*" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+$trace hashindex comm -1 -o '{fspath}' -r -- "$srcdir" "$dstdir" \
+| case "$xferdir" in
+    -)  cat ;;
+    *)  $trace rsync -ia $rsopts --files-from=- -- "$srcdir/" "$xferdir/" ::
+  esac
