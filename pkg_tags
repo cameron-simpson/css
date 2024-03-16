@@ -12,7 +12,7 @@ cs.app.myke ok_revision="1027faacf36b6c49eaa58dae48345ddf7db6558a" pypi.release=
 cs.app.osx.defaults ok_revision=b2e2ad76512c91393644b0d85b3bfbef050d3d7c pypi.release="20240201"
 cs.app.osx.defaults.plist
 cs.app.osx.plist ok_revision="599e3e37c0af4e7ba92c2134c0a90d17effcfc39" pypi.release="20221228"
-cs.app.playon ok_revision="524d6741afc725e0f32b62859bda8572cd116ec9" pypi.release="20240201.1" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
+cs.app.playon ok_revision="524d6741afc725e0f32b62859bda8572cd116ec9" pypi.release="20240316" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
 cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
 cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9082bc3"
 cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
