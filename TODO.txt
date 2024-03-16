@@ -1,3 +1,4 @@
+hashindex ls: default exclusions eg .hg,.git b d
 fstags: drop rpaths func, merge into cs.fs.rpaths maybe?
 @uses_blah: correct type annotations
 promote: correct typo annotations
