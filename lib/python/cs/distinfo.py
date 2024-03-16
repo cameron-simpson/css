@@ -55,7 +55,7 @@ from cs.logutils import error, warning, info, status, trace
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
-from cs.psutils import pipefrom, run
+from cs.psutils import pipefrom as ps_pipefrom, run
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
 from cs.resources import RunState, uses_runstate
@@ -827,7 +827,7 @@ def ask(message, fin=None, fout=None):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output file object of a command.
   '''
-  with pipefrom(argv, **kw) as P:
+  with ps_pipefrom(argv, **kw) as P:
     yield P.stdout
 
 class Modules(defaultdict):
