@@ -37,7 +37,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_cmd_options
 from cs.context import contextif, reconfigure_file
 from cs.deco import fmtdoc
-from cs.fs import is_valid_rpath, needdir, shortpath
+from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
 from cs.lex import r, split_remote_path
@@ -152,9 +152,9 @@ class HashIndexCommand(BaseCommand):
     '''
     badopts = False
     options = self.options
-    options.path1_only = False
-    options.path2_only = False
-    options.path12 = False
+    options.path1_only = False  # pylint: disable=attribute-defined-outside-init
+    options.path2_only = False  # pylint: disable=attribute-defined-outside-init
+    options.path12 = False  # pylint: disable=attribute-defined-outside-init
     options.popopts(
         argv,
         _1='path1_only',
