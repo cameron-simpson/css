@@ -1218,19 +1218,16 @@ class Module:
     )
 
     # fill in default fields
+    di_defaults = {
+        'author': os.environ['NAME'],
+        'author_email': os.environ['EMAIL'],
+        'include_package_data': True,
+        'package_dir': PYLIBTOP,
+    }
     for di_field in ('author', 'author_email', 'package_dir'):
       with Pfx("%r", di_field):
-        if di_field in dinfo:
-          continue
-        compute_field = {
-            'author': lambda: os.environ['NAME'],
-            'author_email': lambda: os.environ['EMAIL'],
-            'include_package_data': lambda: True,
-            'package_dir': lambda: {
-                '': PYLIBTOP
-            },
-        }[di_field]
-        dinfo[di_field] = compute_field()
+        if di_field not in dinfo:
+          dinfo[di_field] = di_defaults[di_field]
 
     # fill in default classifications
     classifiers = dinfo['classifiers']
