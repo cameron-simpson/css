@@ -23,7 +23,7 @@ from cs.deco import Promotable
 from cs.gimmicks import r
 from cs.py3 import pread
 
-__version__ = '20240201-post'
+__version__ = '20240316'
 
 DISTINFO = {
     'keywords': ["python3"],
