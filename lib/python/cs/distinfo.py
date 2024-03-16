@@ -1334,18 +1334,28 @@ class Module:
       gui_scripts = dinfo_entry_points.pop('gui_scripts', [])
       if gui_scripts:
         projspec['gui-scripts'] = gui_scripts
+    setuptools_cfg = {
+        "package-dir": {
+            "": package_dir,
+        },
+    }
+    if self.is_package:
+      setuptools_cfg["packages"] = [self.name]
+    else:
+      setuptools_cfg["py-modules"] = [self.name]
     pyproject = {
         "project": projspec,
         "build-system": {
-            "build-backend": "setuptools.build_meta",
+            "build-backend":
+            "setuptools.build_meta",
             "requires": [
                 "setuptools >= 61.2",
                 "trove-classifiers",
                 "wheel",
             ],
         },
-        "tool.setuptools": {
-            "package-dir": package_dir,
+        "tool": {
+            "setuptools": setuptools_cfg,
         },
     }
     docs = self.compute_doc()
