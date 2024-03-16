@@ -1923,10 +1923,14 @@ class Module:
         ('--sdist', '--wheel'),
         (
             '--skip-dependency-check',
-            ##'--no-isolation',
+            '--no-isolation',
         ),
         '.',
     )
+    os.system(f'ls -ld {pkg_dir}/{sdist_rpath!r}')
+    os.system(f'tar tvzf {pkg_dir}/{sdist_rpath!r}')
+    os.system(f'ls -ld {pkg_dir}/{wheel_rpath!r}')
+    os.system(f'unzip -l {pkg_dir}/{wheel_rpath!r}')
     return dict(sdist=sdist_rpath, wheel=wheel_rpath)
 
 if __name__ == '__main__':
