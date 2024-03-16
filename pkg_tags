@@ -68,7 +68,7 @@ cs.obj pypi.release="20220918" ok_revision=dd0916cd678327c815e379bf8ed00c9ce4332
 cs.packetstream pypi.release="20211208" ok_revision="906f6148d57dfa082d18e6f4b27b8081ee317ba8"
 cs.pfx pypi.release="20230604" ok_revision=b8d9f30f06d3bb021df86d0cd9fe56b9c9f72327 features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
 cs.pipeline pypi.release="20191007.1" ok_revision="2a26b6f06610394b6c7e6fb6f9a5228e50367db9"
-cs.pop3 ok_revision=bc18d2915ed0d18dfc0178a64b9e3606d71a167c pypi.release="20240201.1"
+cs.pop3 ok_revision="64592a92c8db0e90cf818f6ccf415f6cfb53c90d" pypi.release="20240201.1"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
 cs.progress pypi.release="20230401" ok_revision="577f00d941e3a4e386c5244bbdf6ecc57dc98fa9" features={"20210803":["progress_runstate"],"20230212":["update_period"]}
 cs.psutils pypi.release="20240211" ok_revision="3a07644fffc321e1aba125957f33ea3184a464fb" features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"]}
