@@ -16,7 +16,7 @@ from cs.gvutils import gvprint, gvsvg, quote as gvq, DOTNodeMixin
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 
-__version__ = '20240316'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
