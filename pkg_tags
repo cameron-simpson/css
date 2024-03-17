@@ -47,7 +47,7 @@ cs.fuleutils
 cs.gimmicks ok_revision=c717764b2bdf5ff0ba8c0e9acb5c983ba7aa5679 pypi.release="20240316" features={"20211208":["TimeoutError"],"20220429":["devnull"],"20230212":["gimmick_r","gimmick_s"],"20230331":["open_append"]}
 cs.gvutils ok_revision="774f3a27029c48285a64daa52000d4132fa8a716" pypi.release="20230816" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"],"20221207":["gvsvg"]}
 cs.hahindex
-cs.hashindex ok_revision="77617f77494a50204f88604551f94101587937ae" pypi.release="20240316" features={"20240216":["read_remote_hashindex","run_remote_hashindex"]}
+cs.hashindex ok_revision="36b36d642f99faee48eecf3181c0e7693b69f573" pypi.release="20240316" features={"20240216":["read_remote_hashindex","run_remote_hashindex"]}
 cs.hashutils ok_revision=c61cf7fa6071dff6719796c586e63b373f6d4653 pypi.release="20240316"
 cs.html pypi.release=20160828 ok_revision="23989d64974a81c6521174d3fe496bcfdd280d3f"
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
