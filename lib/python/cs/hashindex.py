@@ -919,8 +919,6 @@ def rearrange(
             warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
           else:
             if move_mode and rsrcpath not in rfspaths:
-              if not quiet:
-                print("remove", shortpath(srcpath))
               if doit:
                 to_remove.add(srcpath)
     # purge the srcpaths last because we might want them multiple
