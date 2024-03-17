@@ -181,8 +181,17 @@ def traced_untar(
           total = S.st_size
   # pylint: disable=consider-using-with
   P = Popen(
-      [tar_exe, '-x', '-v', '-C', chdirpath, '-b',
-       str(bcount), '-f', '-'],
+      [
+          tar_exe,
+          '-x',
+          '-v',
+          '-C',
+          chdirpath,
+          '-b',
+          str(bcount),
+          '-f',
+          '-',
+      ],
       stdin=tarfd,
       stdout=PIPE,
       stderr=PIPE,
@@ -224,6 +233,7 @@ def tar(
     bcount=DEFAULT_BCOUNT
 ):
   ''' Tar up the contents of `srcpaths` to `output`.
+      Return the `Popen` object for the `tar` command.
 
       Parameters:
       * `srcpaths`: source filesystem paths
@@ -239,9 +249,16 @@ def tar(
       raise ValueError(f'path already exists: {output!r}')
   return Popen(
       [
-          tar_exe, '-c', '-C', chdirpath, '-b',
-          str(bcount), '-f',
-          (output if isinstance(output, str) else '-'), '--', *srcpaths
+          tar_exe,
+          '-c',
+          '-C',
+          chdirpath,
+          '-b',
+          str(bcount),
+          '-f',
+          (output if isinstance(output, str) else '-'),
+          '--',
+          *srcpaths,
       ],
       stdin=DEVNULL,
       stdout=(None if isinstance(output, str) else output),
@@ -259,7 +276,7 @@ def traced_cpdir(
     upd
 ):
   ''' Copy a directory to a new place using piped tars with progress reporting.
-      Return `0` if both tars success, nonzero otherwise.
+      Return `0` if both tars succeed, nonzero otherwise.
 
       Parameters:
       * `srcdirpath`: the source directory filesystem path
