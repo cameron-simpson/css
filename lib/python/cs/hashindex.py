@@ -497,6 +497,7 @@ class HashIndexCommand(BaseCommand):
             hashindex_exe=hashindex_exe,
             input=input_s,
             text=True,
+            doit=True,  # we pass -n to the remote hashindex
             quiet=False,
         ).returncode
     return xit
