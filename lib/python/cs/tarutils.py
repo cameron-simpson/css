@@ -79,7 +79,10 @@ def _watch_filenames(
         break
       sleep(poll_interval)
       continue
-    new_filename = next(filenames)
+    try:
+      new_filename = next(filenames)
+    except StopIteration:
+      break
     if not isabspath(new_filename) and chdirpath != '.':
       new_filename = joinpath(chdirpath, new_filename)
     if current_filename != new_filename:
