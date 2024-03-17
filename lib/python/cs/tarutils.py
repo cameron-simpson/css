@@ -53,9 +53,9 @@ def _stat_diff(fspath: str, old_size: int):
 
 # pylint: disable=too-many-branches
 def _watch_filenames(
-    filenames: QueueIterator, chdirpath: str, *, poll_interval=0.3
+    filenames_qit: QueueIterator, chdirpath: str, *, poll_interval=0.3
 ):
-  ''' Consumer of `filenames`, a `QueueIterator` as obtained from `IterableQueue`,
+  ''' Consumer of `filenames_qit`, a `QueueIterator` as obtained from `IterableQueue`,
       yielding `(filename,diff)` being a 2-tuple of
       filename and incremental bytes consumed at this point.
 
@@ -69,18 +69,18 @@ def _watch_filenames(
   current_filename = None
   current_size = None
   while True:
-    if filenames.empty():
+    if filenames_qit.empty():
       # poll the current file and wait for another name
       if current_filename is not None:
         diff = _stat_diff(current_filename, current_size)
         yield current_filename, diff
         current_size += diff
-      if filenames.closed:
+      if filenames_qit.closed:
         break
       sleep(poll_interval)
       continue
     try:
-      new_filename = next(filenames)
+      new_filename = next(filenames_qit)
     except StopIteration:
       break
     if not isabspath(new_filename) and chdirpath != '.':
