@@ -3,7 +3,16 @@
 # Tar utilities. - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Assorted tar related things.
+''' Assorted tar related things, including a fast tar-based copy.
+
+    My most heavily used use for this is my `cpdir` script which
+    does a high performance directory copy by piping 2 `tar`s
+    together.
+    It runs this:
+
+        from cs.tarutils import traced_cpdir
+        sys.exit(traced_cpdir(*sys.argv[1:]))
+
 '''
 
 import os
