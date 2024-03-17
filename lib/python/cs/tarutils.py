@@ -27,10 +27,15 @@ from cs.pfx import pfx_call
 from cs.progress import progressbar
 from cs.queues import IterableQueue, QueueIterator
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import uses_upd  # pylint: disable=redefined-builtin
+from cs.upd import Upd, uses_upd  # pylint: disable=redefined-builtin
 
 TAR_EXE = 'tar'
 DEFAULT_BCOUNT = 2048
+
+@uses_upd
+def _warning(msg, *a, upd: Upd):
+  with upd.above():
+    warning(msg, *a)
 
 def _stat_diff(fspath: str, old_size: int):
   ''' `lstat(fspath)` and return the difference between its size and `old_size`.
@@ -39,13 +44,13 @@ def _stat_diff(fspath: str, old_size: int):
   try:
     S = lstat(fspath)
   except OSError as e:
-    warning("lstat(%r): %s", fspath, e)
+    _warning("lstat(%r): %s", fspath, e)
     diff = 0
   else:
     if S_ISREG(S.st_mode):
       diff = S.st_size - old_size
       if diff < 0:
-        warning("%r: file shrank! %d => %d", fspath, old_size, S.st_size)
+        _warning("%r: file shrank! %d => %d", fspath, old_size, S.st_size)
     else:
       # not a regular file - ignore the size
       diff = 0
@@ -112,7 +117,7 @@ def _read_tar_stderr(f, filenames_q):
     if errline.startswith("x "):
       filenames_q.put(errline[2:])
     else:
-      warning("%s: err: " + errline)
+      _warning("%s: err: " + errline)
   filenames_q.close()
 
 # pylint: disable=too-many-locals
@@ -168,7 +173,7 @@ def traced_untar(
       try:
         S = os.fstat(fd)
       except OSError as e:
-        warning("os.fstat(%r): %s", tarfd, e)
+        _warning("os.fstat(%r): %s", tarfd, e)
       else:
         if S_ISREG(S.st_mode):
           total = S.st_size
