@@ -17,6 +17,7 @@ from os.path import (
 from stat import S_ISREG
 from subprocess import Popen, DEVNULL, PIPE
 from threading import Thread
+from time import sleep
 from typing import Iterable, List
 
 from cs.deco import fmtdoc
@@ -24,78 +25,77 @@ from cs.fs import shortpath
 from cs.gimmicks import warning
 from cs.pfx import pfx_call
 from cs.progress import progressbar
-from cs.queues import IterableQueue
+from cs.queues import IterableQueue, QueueIterator
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import uses_upd  # pylint: disable=redefined-builtin
 
 TAR_EXE = 'tar'
 DEFAULT_BCOUNT = 2048
 
+def _stat_diff(fspath: str, old_size: int):
+  ''' `lstat(fspath)` and return the difference between its size and `old_size`.
+      `lstat` failure warns and reports a difference of `0`.
+  '''
+  try:
+    S = lstat(fspath)
+  except OSError as e:
+    warning("lstat(%r): %s", fspath, e)
+    diff = 0
+  else:
+    if S_ISREG(S.st_mode):
+      diff = S.st_size - old_size
+      if diff < 0:
+        warning("%r: file shrank! %d => %d", fspath, old_size, S.st_size)
+    else:
+      # not a regular file - ignore the size
+      diff = 0
+  return diff
+
 # pylint: disable=too-many-branches
-def _watch_filenames(filenames: Iterable[str], chdirpath: str):
-  ''' Consumer of `filenames`, an iterable of filenames,
+def _watch_filenames(
+    filenames: QueueIterator, chdirpath: str, *, poll_interval=0.3
+):
+  ''' Consumer of `filenames`, a `QueueIterator` as obtained from `IterableQueue`,
       yielding `(filename,diff)` being a 2-tuple of
       filename and incremental bytes consumed at this point.
 
-      This code assumes that we one see a filename once but that
+      This code assumes that we see a filename once but that
       it may be before the file is written or after the file is
       written, and as such stats the filename twice: on sight and
       on sight of the next filename.
 
       The yielded results therefore mention each filename twice.
   '''
-  # consume filenames_q
-  ofilename = None
-  osize = None
-  for filename in filenames:
-    if not isabspath(filename) and chdirpath != '.':
-      filename = joinpath(chdirpath, filename)
-    if ofilename is not None:
-      # check final size of previous file
-      try:
-        S = lstat(ofilename)
-      except OSError as e:
-        # the previous went away!
-        warning("lstat(%r): %s", ofilename, e)
-        diff = 0
-      else:
-        diff = S.st_size - osize
-        if diff < 0:
-          warning("%r: file shrank! %d => %d", ofilename, osize, S.st_size)
-      yield ofilename, diff
-      ofilename = None
-    try:
-      S = lstat(filename)
-    except FileNotFoundError:
+  current_filename = None
+  current_size = None
+  while True:
+    if filenames.empty():
+      # poll the current file and wait for another name
+      if current_filename is not None:
+        diff = _stat_diff(current_filename, current_size)
+        yield current_filename, diff
+        current_size += diff
+      if filenames.closed:
+        break
+      sleep(poll_interval)
       continue
-    except OSError as e:
-      # pretend the size is 0
-      warning("%r: stat: %s", filename, e)
-      continue
-    if not S_ISREG(S.st_mode):
-      continue
-    size = S.st_size
-    yield filename, size
-    ofilename = filename
-    osize = size
-  if ofilename is not None:
-    # check final size of final file
-    try:
-      S = lstat(ofilename)
-    except FileNotFoundError:
-      diff = 0
-    except OSError as e:
-      # the previous went away!
-      warning("lstat(%r): %s", ofilename, e)
-      diff = 0
-    else:
-      if not S_ISREG(S.st_mode):
-        warning("%r: no longer a file? S=%s", ofilename, S)
-      else:
-        diff = S.st_size - osize
-        if diff < 0:
-          warning("%r: file shrank! %d => %d", ofilename, osize, S.st_size)
-        yield ofilename, diff
+    new_filename = next(filenames)
+    if not isabspath(new_filename) and chdirpath != '.':
+      new_filename = joinpath(chdirpath, new_filename)
+    if current_filename != new_filename:
+      # new file: poll the old file and reset the size to 0 for the new file
+      if current_filename is not None:
+        diff = _stat_diff(current_filename, current_size)
+        yield current_filename, diff
+      current_filename = new_filename
+      current_size = 0
+    diff = _stat_diff(current_filename, current_size)
+    current_size += diff
+    yield current_filename, diff
+  # final poll
+  if current_filename is not None:
+    diff = _stat_diff(current_filename, current_size)
+    yield current_filename, diff
 
 def _read_tar_stdout_filenames(f, filenames_q):
   for line in f:
@@ -190,12 +190,10 @@ def traced_untar(
     # issues warnings for other messages
     Thread(target=_read_tar_stderr, args=(P.stderr, filenames_q)).start()
     # consume filenames->(filename,diff) generator
-    filename = None
-    diff = 0
-    for filename, diff in progressbar(
+    for filename, _ in progressbar(
         _watch_filenames(filenames_q, chdirpath),
         label=label,
-        itemlenfunc=lambda f_d: diff,
+        itemlenfunc=lambda f_d: f_d[1],
         total=total,
         upd=upd,
         report_print=True,
