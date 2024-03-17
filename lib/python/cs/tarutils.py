@@ -18,7 +18,7 @@ from stat import S_ISREG
 from subprocess import Popen, DEVNULL, PIPE
 from threading import Thread
 from time import sleep
-from typing import Iterable, List
+from typing import List
 
 from cs.deco import fmtdoc
 from cs.fs import shortpath
@@ -115,7 +115,9 @@ def _read_tar_stderr(f, filenames_q):
       warning("%s: err: " + errline)
   filenames_q.close()
 
+# pylint: disable=too-many-locals
 @uses_upd
+@fmtdoc
 def traced_untar(
     tarfd,
     *,
@@ -159,7 +161,8 @@ def traced_untar(
     else:
       try:
         fd = tarfd.fileno()
-      except AttributeError as e:
+      except AttributeError:
+        # no .fileno()
         fd = -1
     if fd >= 0:
       try:
@@ -238,6 +241,7 @@ def tar(
   )
 
 @uses_upd
+@fmtdoc
 def traced_cpdir(
     srcdirpath,
     dstdirpath,
