@@ -43,6 +43,8 @@ def _stat_diff(fspath: str, old_size: int):
   '''
   try:
     S = lstat(fspath)
+  except FileNotFoundError:
+    diff = 0
   except OSError as e:
     _warning("lstat(%r): %s", fspath, e)
     diff = 0
