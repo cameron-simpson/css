@@ -38,7 +38,7 @@ from cs.queues import IterableQueue, QueueIterator
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, uses_upd  # pylint: disable=redefined-builtin
 
-__version__ = '20240318'
+__version__ = '20240318-post'
 
 DISTINFO = {
     'keywords': ["python3"],
