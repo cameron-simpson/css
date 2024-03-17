@@ -2,6 +2,59 @@
 
 ''' A command and utility functions for making listings of file content hashcodes
     and manipulating directory trees based on such a hash index.
+
+    This largely exists to solve my "what has changed remotely?" or
+    "what has been filed where?" problems by comparing file trees
+    using the files' content hashcodes.
+
+    This does require reading every file once to compute its hashcode,
+    but the hashcodes (and file sizes and mtimes when read) are
+    stored beside the file in `.fstags` files (see the `cs.fstags`
+    module), so that a file does not need to be reread on subsequent
+    comparisons.
+
+    `hashindex` knows how to invoke itself remotely using `ssh`
+    (this does require `hashindex` to be installed on the remote host)
+    and can thus be used to compare a local and remote tree, for example:
+
+        hashindex comm -1 localtree remotehost:remotetree
+
+    When you point `hashindex` at a remote tree, it uses `ssh` to
+    run `hashindex` on the remote host, so all the content hashing
+    is done locally to the remote host instead of copying files
+    over the network.
+
+    You can also use it to rearrange a tree based on the locations
+    of corresponding files in another tree. Consider a media tree
+    replicated between 2 hosts. If the source tree gets rearranged,
+    the destination can be equivalently rearranged without copying
+    the files, for example:
+
+        hashindex rearrange sourcehost:sourcetree localtree
+
+    If `fstags mv` was used to do the original rearrangement then
+    the hashcodes will be copied to the new locations, saving a
+    rescan of the source file. I keep a shell alias `mv="fstags mv"`
+    so this is routine for me.
+
+    I have a backup script [`histbackup`](https://hg.sr.ht/~cameron-simpson/css/browse/bin/histbackup)
+    which works by making a hard link tree of the previous backup
+    and `rsync`ing into it.  It has long been subject to huge
+    transfers if the source tree gets rearranged. Now it has a
+    `--hashindex` option to get it to run a `hashindex rearrange`
+    between the hard linking to the new backup tree and the `rsync`
+    from the source to the new tree.
+
+    If network bandwith is limited or quotaed, you can use the
+    comparison function to prepare a list of files missing from the
+    remote location and copy them to a transfer drive for carrying
+    to the remote site when opportune. Example:
+
+        hashindex comm -1 -o '{fspath}' src rhost:dst \
+        | rsync -a --files-from=- src/ xferdir/
+
+    I've got a script [`pref-xfer`](https://hg.sr.ht/~cameron-simpson/css/browse/bin-cs/prep-xfer)
+    which does this with some conveniences and sanity checks.
 '''
 
 from collections import defaultdict
