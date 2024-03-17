@@ -751,6 +751,7 @@ def run_remote_hashindex(
     hashindex_exe=None,
     check: bool = True,
     doit: bool = None,
+    quiet: Optional[bool] = None,
     options: BaseCommandOptions,
     **subp_options,
 ):
@@ -778,13 +779,17 @@ def run_remote_hashindex(
     hashindex_exe = options.hashindex_exe
   if doit is None:
     doit = options.doit
+  if quiet is None:
+    quiet = True
   hashindex_cmd = shlex.join(prep_argv(
       hashindex_exe,
       *argv,
   ))
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
   with without():
-    return run(remote_argv, check=check, doit=doit, quiet=True, **subp_options)
+    return run(
+        remote_argv, check=check, doit=doit, quiet=quiet, **subp_options
+    )
 
 @uses_fstags
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
