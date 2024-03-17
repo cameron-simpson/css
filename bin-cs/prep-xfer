@@ -86,5 +86,5 @@ fi
 $trace hashindex comm -1 -o '{fspath}' -r -- "$srcdir" "$dstdir" \
 | case "$xferdir" in
     -)  cat ;;
-    *)  $trace rsync -ia $rsopts --files-from=- -- "$srcdir/" "$xferdir/" ::
+    *)  $trace rsync -ia $rsopts --files-from=- -- "$srcdir/" "$xferdir/" ;;
   esac
