@@ -50,7 +50,7 @@
     remote location and copy them to a transfer drive for carrying
     to the remote site when opportune. Example:
 
-        hashindex comm -1 -o '{fspath}' src rhost:dst \
+        hashindex comm -1 -o '{fspath}' src rhost:dst \\
         | rsync -a --files-from=- src/ xferdir/
 
     I've got a script [`pref-xfer`](https://hg.sr.ht/~cameron-simpson/css/browse/bin-cs/prep-xfer)
