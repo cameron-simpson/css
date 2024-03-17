@@ -72,7 +72,7 @@ class QueueIterator(MultiOpenMixin):
   def put(self, item, *args, **kw):
     ''' Put `item` onto the queue.
         Warn if the queue is closed.
-        Reject if `item` is the sentinel.
+        Raises `ValueError` if `item` is the sentinel.
     '''
     if self.closed:
       with PfxCallInfo():
@@ -81,8 +81,8 @@ class QueueIterator(MultiOpenMixin):
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
     with self._lock:
+      self._put(item, *args, **kw)
       self._item_count += 1
-    return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
     ''' Direct call to `self.q.put()` with no checks.
