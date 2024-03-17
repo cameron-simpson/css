@@ -38,6 +38,24 @@ from cs.queues import IterableQueue, QueueIterator
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, uses_upd  # pylint: disable=redefined-builtin
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.deco',
+        'cs.fs',
+        'cs.gimmicks',
+        'cs.pfx',
+        'cs.progress',
+        'cs.queues',
+        'cs.units',
+        'cs.upd',
+    ],
+}
+
 TAR_EXE = 'tar'
 DEFAULT_BCOUNT = 2048
 
