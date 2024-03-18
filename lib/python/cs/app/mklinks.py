@@ -52,6 +52,7 @@ DISTINFO = {
     'install_requires': [
         'cs.cmdutils>=20210404',
         'cs.fileutils>=20200914',
+        'cs.hashindex',
         'cs.logutils',
         'cs.pfx',
         'cs.progress>=20200718.3',
