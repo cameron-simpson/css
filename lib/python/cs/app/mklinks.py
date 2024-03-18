@@ -32,7 +32,6 @@ from cs.fileutils import read_from, common_path_prefix, shortpath
 from cs.logutils import status, warning, error
 from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop
 from cs.resources import RunState, uses_runstate
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import UpdProxy, Upd, print, run_task  # pylint: disable=redefined-builtin
@@ -53,7 +52,6 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.progress>=20200718.3',
-        'cs.py.func',
         'cs.units',
         'cs.upd>=20200914',
     ],
@@ -100,13 +98,12 @@ class MKLinksCmd(BaseCommand):
     with options.upd.insert(1) as step:
       # scan the supplied paths
       for path in argv:
+        runstate.raiseif()
         if runstate.cancelled:
           return 1
         step("scan " + path + ' ...')
         with Pfx(path):
           linker.scan(path)
-      if runstate.cancelled:
-        return 1
       step("merge ...")
       linker.merge(dry_run=options.dry_run)
     return 0
@@ -139,13 +136,13 @@ class FileInfo(object):
     '''
     return S.st_dev, S.st_ino
 
-  @prop
+  @property
   def key(self):
     ''' The key for this file: `(dev,ino)`.
     '''
     return self.dev, self.ino
 
-  @prop
+  @property
   def path(self):
     ''' The primary path for this file, or `None` if we have no paths.
     '''
@@ -270,14 +267,14 @@ class Linker:
     with run_task(f'scan {path}: ') as proxy:
       if isdir(path):
         for dirpath, dirnames, filenames in os.walk(path):
-          if runstate.cancelled:
-            break
+          runstate.raiseif()
           proxy("sweep " + relpath(dirpath, path))
           for filename in progressbar(
               sorted(filenames),
               label=relpath(dirpath, path),
               update_frequency=32,
           ):
+            runstate.raiseif()
             filepath = joinpath(dirpath, filename)
             self.addpath(filepath)
           dirnames[:] = sorted(dirnames)
@@ -314,23 +311,20 @@ class Linker:
     # process FileInfo groups by size, largest to smallest
     with run_task('merge ... ') as proxy:
       for _, FImap in sorted(self.sizemap.items(), reverse=True):
-        if runstate.cancelled:
-          break
+        runstate.raiseif()
         # order FileInfos by mtime (newest first) and then path
         FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
         size = FIs[0].size
         with proxy.extend_prefix(f'size {size} '):
           for i, FI in enumerate(progressbar(FIs, f'size {size}')):
-            if runstate.cancelled:
-              break
+            runstate.raiseif()
             # skip FileInfos with no paths
             # this happens when a FileInfo has been assimilated
             if not FI.paths:
               ##warning("SKIP, no paths")
               continue
             for FI2 in FIs[i + 1:]:
-              if runstate.cancelled:
-                break
+              runstate.raiseif()
               status(FI2.path)
               assert FI.size == FI2.size
               assert FI.mtime >= FI2.mtime
