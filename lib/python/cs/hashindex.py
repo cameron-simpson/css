@@ -514,12 +514,16 @@ def file_checksum(
       Warn and return `None` on `OSError`.
   '''
   hashcode, S = get_fstags_hashcode(fspath, hashname)
-  if S_ISLNK(S.st_mode):
-    # ignore symlinks
+  if not S_ISREG(S.st_mode):
+    # ignore nonregular files
     return None
   if hashcode is None:
     hashclass = BaseHashCode.hashclass(hashname)
-    with run_task(f'checksum {shortpath(fspath)}'):
+    with contextif(
+        S.st_size > 1024 * 1024,
+        run_task,
+        f'checksum {shortpath(fspath)}',
+    ):
       try:
         hashcode = hashclass.from_fspath(fspath)
       except OSError as e:
