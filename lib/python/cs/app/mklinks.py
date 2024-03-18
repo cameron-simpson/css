@@ -20,6 +20,7 @@ partially hardlinked tree is processed efficiently and correctly.
 '''
 
 from collections import defaultdict
+from functools import cached_property
 from getopt import GetoptError
 from hashlib import sha1 as hashfunc
 import os
@@ -27,8 +28,10 @@ from os.path import dirname, isdir, join as joinpath, relpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
+
 from cs.cmdutils import BaseCommand
 from cs.fileutils import read_from, common_path_prefix, shortpath
+from cs.hashindex import file_checksum
 from cs.logutils import status, warning, error
 from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
@@ -148,41 +151,11 @@ class FileInfo(object):
     '''
     return sorted(self.paths)[0] if self.paths else None
 
-  @prop
+  @cached_property
   def checksum(self):
     ''' Checksum the file contents, used as a proxy for comparing the actual content.
     '''
-    csum = self._checksum
-    if csum is None:
-      path = self.path
-      U = Upd()
-      pathspace = U.columns - 64
-      label = "scan " + (
-          path if len(path) < pathspace else '...' + path[-(pathspace - 3):]  # pylint: disable=unsubscriptable-object
-      )
-      with Pfx("checksum %r", path):
-        csum = hashfunc()
-        with open(path, 'rb') as fp:
-          length = os.fstat(fp.fileno()).st_size
-          read_len = 0
-          data_src = read_from(fp, rsize=1024 * 1024)
-          if length > 128 * 1024 * 1024:
-            data_src = progressbar(
-                read_from(fp, rsize=1024 * 1024),
-                label=label,
-                total=length,
-                units_scale=BINARY_BYTES_SCALE,
-                itemlenfunc=len,
-                update_frequency=128,
-                upd=U,
-            )
-          for data in data_src:
-            csum.update(data)
-            read_len += len(data)
-          assert read_len == self.size
-      csum = csum.digest()
-      self._checksum = csum
-    return csum
+    return file_checksum(self.path)
 
   def same_dev(self, other):
     ''' Test whether two FileInfos are on the same filesystem.
