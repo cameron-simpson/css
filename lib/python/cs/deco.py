@@ -9,7 +9,7 @@ Assorted function decorators.
 '''
 
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from contextlib import contextmanager
 from inspect import isgeneratorfunction, ismethod, signature, Parameter
 import sys
@@ -802,6 +802,20 @@ def default_params(func, _strict=False, **param_defaults):
           ],
       ]
   )
+  sig0 = signature(func)
+  new_params = []
+  for param in sig0.parameters.values():
+    try:
+      param_default = param_defaults[param.name]
+    except KeyError:
+      new_params.append(param)
+    else:
+      new_param = param.replace(
+          annotation=typing.Optional[param.annotation],
+          default=None if param.default is param.empty else param.default,
+      )
+      new_params.append(new_param)
+  defaulted_func.__signature__ = sig0.replace(parameters=new_params)
   return defaulted_func
 
 # pylint: disable=too-many-statements
