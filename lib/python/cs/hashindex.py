@@ -502,8 +502,8 @@ class HashIndexCommand(BaseCommand):
         ).returncode
     return xit
 
-@uses_fstags
 @pfx
+@uses_fstags
 def file_checksum(
     fspath: str,
     hashname: str = HASHNAME_DEFAULT,
