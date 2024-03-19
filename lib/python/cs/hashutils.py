@@ -47,11 +47,18 @@ class BaseHashCode(bytes):
     except KeyError:
 
       if hashfunc is None:
-        hashfunc = getattr(hashlib, hashname)
+        try:
+          hashfunc = getattr(hashlib, hashname)
+        except AttributeError:
+          if hashname == 'blake3':
+            # see if the blake3 module is around
+            from blake3 import blake3 as hashfunc
+          else:
+            raise
 
       class hashcls(
           cls,
-          hashfunc=getattr(hashlib, hashname),
+          hashfunc=hashfunc,
           hashname=hashname,
           **kw,
       ):
