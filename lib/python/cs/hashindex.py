@@ -406,6 +406,7 @@ class HashIndexCommand(BaseCommand):
     if not argv:
       warning("missing refdir")
       badopts = True
+      refdir = None
     else:
       refspec = argv.pop(0)
       with Pfx("refdir %r", refspec):
@@ -421,6 +422,7 @@ class HashIndexCommand(BaseCommand):
     if not argv:
       warning("missing targetdir")
       badopts = True
+      targetdir = None
     else:
       targetspec = argv.pop(0)
       with Pfx("targetdir %r", targetspec):
