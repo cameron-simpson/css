@@ -360,7 +360,6 @@ class PlayOnCommand(BaseCommand):
         recording_ids = sqltags.recording_ids_from_str(arg)
         if not recording_ids:
           warning("no recording ids")
-          xit = 1
           continue
         for dl_id in sorted(recording_ids):
           recording = sqltags[dl_id]
