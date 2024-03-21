@@ -453,6 +453,7 @@ class HashIndexCommand(BaseCommand):
           hashname=hashname,
           ssh_exe=ssh_exe,
           hashindex_exe=hashindex_exe,
+          relative=True,
       ):
         if hashcode is not None:
           fspaths_by_hashcode[hashcode].append(fspath)
