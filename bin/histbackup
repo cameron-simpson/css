@@ -482,27 +482,6 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# Locate the most recent backup younger than this one, if any.
-# If $reverse, locate oldest backup later than this one.
-lastbackup=$(
-        cd "$dest" || exit 1
-        (
-          if [ $symlink_unchanged ]
-          then
-            # actual directory trees only
-            ls -ld [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
-            | sed -n 's/^d.* //p'
-          else
-            # directory or symlink
-            ls -d [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null
-          fi
-          echo "$thisbackup"
-        ) \
-        | if [ $reverse ]; then sort -ur; else sort -u; fi \
-        | sed "/^$thisbackup/,\$d" \
-        | sed -n '$p'
-)
-
 dorsync()
 { [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
   _drs_src=$1
@@ -623,7 +602,7 @@ then
   # check specified backup does not yet exist
   if [ -d "$dest/$thisbackup/." ]
   then
-    echo "$cmd: $dest/$thisbackup already exist, aborting" >&2
+    echo "$cmd: $dest/$thisbackup already exists, aborting" >&2
     exit 1
   fi
 else
@@ -641,6 +620,27 @@ else
     fi
   fi
 fi
+
+# Locate the most recent backup younger than this one, if any.
+# If $reverse, locate oldest backup later than this one.
+lastbackup=$(
+        cd "$dest" || exit 1
+        (
+          if [ $symlink_unchanged ]
+          then
+            # actual directory trees only
+            ls -ld [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
+            | sed -n 's/^d.* //p'
+          else
+            # directory or symlink
+            ls -d [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null
+          fi
+          echo "$thisbackup"
+        ) \
+        | if [ $reverse ]; then sort -ur; else sort -u; fi \
+        | sed "/^$thisbackup/,\$d" \
+        | sed -n '$p'
+)
 
 ok=
 
