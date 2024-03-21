@@ -468,6 +468,57 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# Locate the most recent backup younger than this one, if any.
+# If $reverse, locate oldest backup later than this one.
+lastbackup=$(
+        cd "$dest" || exit 1
+        (
+          if [ $symlink_unchanged ]
+          then
+            # actual directory trees only
+            ls -ld [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
+            | sed -n 's/^d.* //p'
+          else
+            # directory or symlink
+            ls -d [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null
+          fi
+          echo "$thisbackup"
+        ) \
+        | if [ $reverse ]; then sort -ur; else sort -u; fi \
+        | sed "/^$thisbackup/,\$d" \
+        | sed -n '$p'
+)
+
+dorsync()
+{ [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
+  _drs_src=$1
+  _drs_dst=$2
+  shift; shift
+  case "$_drs_dst" in
+    /* | ./* | ../* ) ;;
+    *) _drs_dst=./$_drs_dst ;;
+  esac
+  set -- $trace rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
+  then
+    set -- filter_fd 1 "$filteroutput" "$@"
+  fi
+  set -- $trace "$@"
+  "$@"
+}
+
+dohashindex()
+{ [ $# -ge 2 ] || { echo "Usage: dohashindex src dst" >&2; exit 2; }
+  _dhi_src=$1
+  _dhi_dst=$2
+  shift; shift
+  case "$_dhi_dst" in
+    /* | ./* | ../* ) ;;
+    *) _dhi_dst=./$_dhi_dst ;;
+  esac
+  $trace hashindex rearrange -e "$sshcmd" --mv -- "$_dhi_src" "$_dhi_dst"
+}
+
 if [ $reflink ]
 then
   mklinktree(){
@@ -575,58 +626,6 @@ else
     fi
   fi
 fi
-
-# Locate the most recent backup younger than this one, if any.
-# If $reverse, locate oldest backup later than this one.
-lastbackup=$(
-        cd "$dest" || exit 1
-        (
-          if [ $symlink_unchanged ]
-          then
-            # actual directory trees only
-            ls -ld [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
-            | sed -n 's/^d.* //p'
-          else
-            # directory or symlink
-            ls -d [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null
-          fi
-          echo "$thisbackup"
-        ) \
-        | if [ $reverse ]; then sort -ur; else sort -u; fi \
-        | sed "/^$thisbackup/,\$d" \
-        | sed -n '$p'
-)
-
-dorsync()
-{ [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
-  _drs_src=$1
-  _drs_dst=$2
-  shift; shift
-  case "$_drs_dst" in
-    /* | ./* | ../* ) ;;
-    *) _drs_dst=./$_drs_dst ;;
-  esac
-  set -- $trace rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
-  if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
-  then
-    set -- filter_fd 1 "$filteroutput" "$@"
-  fi
-  set -- $trace "$@"
-  "$@"
-}
-
-dohashindex()
-{ [ $# -ge 2 ] || { echo "Usage: dohashindex src dst" >&2; exit 2; }
-  _dhi_src=$1
-  _dhi_dst=$2
-  shift; shift
-  case "$_dhi_dst" in
-    /* | ./* | ../* ) ;;
-    *) _dhi_dst=./$_dhi_dst ;;
-  esac
-  $trace hashindex rearrange -e "$sshcmd" --mv -- "$_dhi_src" "$_dhi_dst"
-}
-
 
 ok=
 
