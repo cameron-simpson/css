@@ -8,8 +8,8 @@ Facilities for ISO14496 files - the ISO Base Media File Format,
 the basis for several things including MP4 and MOV.
 
 ISO make the standard available here:
-* [link](http://standards.iso.org/ittf/PubliclyAvailableStandards/index.html)
-* [link](http://standards.iso.org/ittf/PubliclyAvailableStandards/c068960_ISO_IEC_14496-12_2015.zip)
+* [available standards main page](http://standards.iso.org/ittf/PubliclyAvailableStandards/index.html)
+* [zip file download](http://standards.iso.org/ittf/PubliclyAvailableStandards/c068960_ISO_IEC_14496-12_2015.zip)
 '''
 
 from abc import ABC
@@ -2312,12 +2312,12 @@ def ILSTTextSchema(attribute_name):
   return attribute_name, _ILSTTextSchema
 
 def ILSTUInt32BESchema(attribute_name):
-  ''' Attribute name and type for ILST UInt32BE schema.
+  ''' Attribute name and type for ILST `UInt32BE` schema.
   '''
   return attribute_name, UInt32BE
 
 def ILSTUInt8Schema(attribute_name):
-  ''' Attribute name and type for ILST UInt8BE schema.
+  ''' Attribute name and type for ILST `UInt8BE` schema.
   '''
   return attribute_name, UInt8
 
@@ -2347,7 +2347,7 @@ def ILSTISOFormatSchema(attribute_name):
 
 itunes_media_type = namedtuple('itunes_media_type', 'type stik')
 
-def decode_itunes_date_field(data):
+def decode_itunes_date_field(data) -> datetime:
   ''' The iTunes 'Date' meta field: a year or an ISO timestamp.
   '''
   try:
