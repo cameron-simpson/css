@@ -110,6 +110,7 @@ rsdelete=--delete
 thisbackup=
 sshcmd="${RSYNC_RSH:-ssh} -o controlpath=none"
 reverse=
+timeout=
 verbose=
 imode=
 ##[ -t 1 ] && verbose=1
@@ -128,6 +129,8 @@ usage="Usage:
                 of the oldest younger date as the reference tree.
                 Clears any --symlink setting; --symlink must come
                 later than this if that option is required.
+  -t, --timeout timeout
+                Run the rsync with the specified timeout in seconds.
   -v, --verbose Verbose. Note: _not_ passed to rsync.
   -x            Trace execution. Recite linktree and rsync invocations.
   --copy-times  Copy file timestamps from the source tree to the
@@ -328,10 +331,20 @@ do
     --symlink)
       symlink=$2; shift ;;
 
-    # -item -r, --reverse
+    # =item -v, --verbose
     #
-    # Reverse dates, causing the oldest date to be chosen.
+    -r|--reverse)
+      reverse=1
+      symlink=
+      ;;
+
+    # -item -t, --timeout
     #
+    # Run rsync with the specified timeout in seconds.
+    #
+    -t|--timeout)
+      timeout=$2; shift ;;
+
     # =item -v, --verbose
     #
     -r|--reverse)
@@ -498,12 +511,13 @@ dorsync()
     /* | ./* | ../* ) ;;
     *) _drs_dst=./$_drs_dst ;;
   esac
-  set -- $trace rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  set -- rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  [ -n "$timeout" ] && set -- timeout -s "$timeout" "$@"
+  set -- $trace "$@"
   if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
   then
     set -- filter_fd 1 "$filteroutput" "$@"
   fi
-  set -- $trace "$@"
   "$@"
 }
 
