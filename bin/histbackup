@@ -131,6 +131,7 @@ usage="Usage:
                 later than this if that option is required.
   -t, --timeout timeout
                 Run the rsync with the specified timeout in seconds.
+                Also passes --partial to rsync.
   -v, --verbose Verbose. Note: _not_ passed to rsync.
   -x            Trace execution. Recite linktree and rsync invocations.
   --copy-times  Copy file timestamps from the source tree to the
@@ -343,7 +344,7 @@ do
     # Run rsync with the specified timeout in seconds.
     #
     -t|--timeout)
-      timeout=$2; shift ;;
+      timeout=$2; rsopts="$rsopts --partial"; shift ;;
 
     # =item -v, --verbose
     #
@@ -512,7 +513,7 @@ dorsync()
     *) _drs_dst=./$_drs_dst ;;
   esac
   set -- rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
-  [ -n "$timeout" ] && set -- timeout -s "$timeout" "$@"
+  [ -n "$timeout" ] && set -- timeout "$timeout" "$@"
   set -- $trace "$@"
   if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
   then
