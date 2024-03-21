@@ -510,7 +510,7 @@ dohashindex()
     /* | ./* | ../* ) ;;
     *) _dhi_dst=./$_dhi_dst ;;
   esac
-  $trace hashindex rearrange -e "$sshcmd" --mv -- "$_dhi_src" "$_dhi_dst"
+  $trace hashindex rearrange -e "${HASHINDEX_SSH:-$sshcmd}" --mv -- "$_dhi_src" "$_dhi_dst"
 }
 
 if [ $reflink ]
@@ -673,7 +673,7 @@ ok=1
   if [ -n "$lastbackup" ]
   then
     mklinktree "./$lastbackup" "$thisbackup" || exit 1
-    [ $hashindex ] && dohashindex "$src" "$thisbackup" || :
+    [ $hashindex ] && dohashindex "$src" "$thisbackup"
     dorsync "$src" "$thisbackup" -H ${1+"$@"} $obackup_options \
     || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options \
     || :
