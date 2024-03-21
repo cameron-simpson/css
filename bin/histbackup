@@ -103,7 +103,7 @@ rrsync=rsync
 usehbinclude=1
 usehbfiles=1
 obackup_options=
-symlink_unchanged=1
+symlink_unchanged=
 rsopts=
 copytimes=
 rsdelete=--delete
@@ -153,12 +153,12 @@ usage="Usage:
                 report its basename.
   --no-symlink-if-unchanged
                 Make a link tree even when there are no changes.
+                This is the default.
   --reflink     Use \"cp --reflink\" and \"rsync --inplace\".
   --symlink-if-unchanged
                 Just symlink the top level date if there are no changes.
                 Requires a prepass \"rsync -n\" but saves a lot of hardlinks
                 and time if the tree is often unchanged.
-                This is the default.
   --rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
                 Passed to rsync.
   --symlink name Make a symlink named \"name\" pointing at the latest backup.
