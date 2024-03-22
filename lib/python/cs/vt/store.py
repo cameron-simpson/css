@@ -478,7 +478,7 @@ class DataDirStore(MappingStore):
         self.topdirpath,
         hashclass=hashclass,
         indexclass=indexclass,
-        rollover=rollover
+        rollover=rollover,
     )
     super().__init__(
         name,
