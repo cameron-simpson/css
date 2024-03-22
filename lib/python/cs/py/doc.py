@@ -76,7 +76,10 @@ def module_doc(
       elif isclass(obj):
         classname_etc = Mname
         mro_names = []
+        mro_set = set(obj.__mro__)
         for superclass in obj.__mro__:
+          if superclass not in mro_set:
+            continue
           if (superclass is not object and superclass is not obj
               and superclass is not abc.ABC):
             supername = superclass.__name__
@@ -84,6 +87,7 @@ def module_doc(
             if supermod is not module:
               supername = supermod.__name__ + '.' + supername
             mro_names.append(supername)
+            mro_set.difference_update(superclass.__mro__)
         if mro_names:
           classname_etc += '(' + ', '.join(mro_names) + ')'
           ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
