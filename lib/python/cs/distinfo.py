@@ -419,7 +419,7 @@ class CSReleaseCommand(BaseCommand):
           -a  Document all public class members (default is just
               __new__ and __init__ for the PyPI README.md file).
     '''
-    all_class_names = False
+    all_class_names = True  ## False
     if argv and argv[0] == '-a':
       all_class_names = True
       argv.pop(0)
@@ -1134,7 +1134,7 @@ class Module:
     '''
     self.set_tag(TAG_PYPI_RELEASE, new_version, msg='update PyPI release')
 
-  def compute_doc(self, all_class_names=False):
+  def compute_doc(self, all_class_names=True):
     ''' Compute the components of the documentation.
 
         Parameters:
