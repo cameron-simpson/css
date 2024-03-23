@@ -91,7 +91,6 @@ class BaseHashCode(bytes):
     return hashcls
 
   @classmethod
-  @trace
   def __init_subclass__(
       cls, *, hashname: Optional[str] = None, hashfunc=None, **kw
   ):
