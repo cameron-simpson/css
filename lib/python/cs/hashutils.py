@@ -7,6 +7,7 @@ from binascii import hexlify, unhexlify
 import hashlib
 import mmap
 import os
+from typing import Optional
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
@@ -39,6 +40,21 @@ class BaseHashCode(bytes):
   # registry of classes
   by_hashname = {}
 
+  @staticmethod
+  def get_hashfunc(hashname: str):
+    ''' Fetch the hash function implied by `hashname`.
+    '''
+    try:
+      hashfunc = getattr(hashlib, hashname)
+    except AttributeError:
+      if hashname == 'blake3':
+        # see if the blake3 module is around
+        # pylint:disable=import-outside-toplevel
+        from blake3 import blake3 as hashfunc
+      else:
+        raise
+    return hashfunc
+
   @classmethod
   def hashclass(cls, hashname: str, hashfunc=None, **kw):
     ''' Return the class for the hash function named `hashname`.
@@ -50,17 +66,8 @@ class BaseHashCode(bytes):
     try:
       hashcls = cls.by_hashname[hashname]
     except KeyError:
-
       if hashfunc is None:
-        try:
-          hashfunc = getattr(hashlib, hashname)
-        except AttributeError:
-          if hashname == 'blake3':
-            # see if the blake3 module is around
-            # pylint:disable=import-outside-toplevel
-            from blake3 import blake3 as hashfunc
-          else:
-            raise
+        hashfunc = cls.get_hashfunc(hashname)
 
       class hashcls(
           cls,
@@ -84,7 +91,16 @@ class BaseHashCode(bytes):
     return hashcls
 
   @classmethod
-  def __init_subclass__(cls, *, hashname: str, hashfunc, **kw):
+  @trace
+  def __init_subclass__(
+      cls, *, hashname: Optional[str] = None, hashfunc=None, **kw
+  ):
+    super().__init_subclass__(**kw)
+    if hashname is None and hashfunc is None:
+      # we're a superclass of another base class
+      return
+    if hashfunc is None:
+      hashfunc = cls.get_hashfunc(hashname)
     by_hashname = cls.by_hashname
     try:
       hashcls = by_hashname[hashname]
@@ -100,7 +116,6 @@ class BaseHashCode(bytes):
     cls.hashlen = len(hashfunc(b'').digest())
     if not cls.__doc__:
       cls.__doc__ = f'{hashfunc.__name__} hashcode class, subclass of `bytes`.'
-    super().__init_subclass__(**kw)
 
   hashfunc = lambda bs=None: None  # pylint: disable=unnecessary-lambda-assignment
 
