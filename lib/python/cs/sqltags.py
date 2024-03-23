@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230612-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -87,7 +87,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts': ['sqltags = cs.sqltags:main'],
+        'console_scripts': {
+            'sqltags': 'cs.sqltags:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils>=20210404',
@@ -1980,17 +1982,15 @@ class SQLTags(BaseTagSets, Promotable):
           e.add_tag(tag)
 
   @classmethod
-  def promote(cls, obj):
-    if isinstance(obj, cls):
-      return obj
-    if isinstance(obj, str):
-      if obj.startswith('~') or isabspath(obj):
-        # expect filesystem path to an SQLite file
-        if not obj.endswith('.sqlite'):
-          raise ValueError("expected path to .sqlite file")
-        obj = expanduser(obj)
-        return cls(obj)
-    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
+  def from_str(cls, db_url: str):
+    ''' Create an `SQLTags` from `db_url`.
+    '''
+    if db_url.startswith('~') or isabspath(db_url):
+      # expect filesystem path to an SQLite file
+      if not db_url.endswith('.sqlite'):
+        raise ValueError("expected path to .sqlite file")
+      db_url = expanduser(db_url)
+    return cls(db_url=db_url)
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 

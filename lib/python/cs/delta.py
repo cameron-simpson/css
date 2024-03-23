@@ -9,6 +9,17 @@ from icontract import require
 
 from cs.obj import Sentinel
 
+__version__ = '20240316-post'
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.obj', 'icontract'],
+}
+
 MISSING = Sentinel("MISSING")
 
 def delta(old, new, keys=None):
@@ -51,7 +62,7 @@ def delta(old, new, keys=None):
     d[k] = newv
   return d
 
-@require(lambda get_state: callable(get_state))
+@require(lambda get_state: callable(get_state))  # pylint: disable=unnecessary-lambda
 @require(lambda interval: interval > 0.0)
 def monitor(
     get_state,

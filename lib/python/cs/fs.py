@@ -8,6 +8,7 @@ from fnmatch import filter as fnfilter
 from functools import partial
 import os
 from os.path import (
+    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -22,7 +23,7 @@ from os.path import (
 )
 from tempfile import TemporaryDirectory
 from threading import Lock
-from typing import Optional
+from typing import Any, Callable, Optional, Union
 
 from icontract import require
 
@@ -30,7 +31,7 @@ from cs.deco import decorator
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20231129-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -261,6 +262,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
     '''
     return cls._resolve_fspath(fspath)
 
+  # pylint: disable=return-in-init
   ##@typechecked
   def __init__(self, fspath: Optional[str] = None, lock=None):
     ''' Initialise the singleton:
@@ -354,3 +356,47 @@ def is_valid_rpath(rpath, log=None) -> bool:
       log("invalid: %s", e)
     return False
   return True
+
+def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
+  ''' Walk up the filesystem tree looking for a directory where
+      `criterion(fspath)` is not `None`, where `fspath` starts at `dirpath`.
+      Return the result of `criterion(fspath)`.
+      Return `None` if no such path is found.
+
+      Parameters:
+      * `dirpath`: the starting directory
+      * `criterion`: a `str` or a callable accepting a `str`
+
+      If `criterion` is a `str`, use look for the existence of `os.path.join(fspath,criterion)`
+
+      Example:
+
+          # find a directory containing a `.envrc` file
+          envrc_path = findup('.', '.envrc')
+
+          # find a Tagger rules file for the Downloads directory
+          rules_path = findup(expanduser('~/Downloads', '.taggerrc')
+  '''
+  if isinstance(criterion, str):
+    # passing a name looks for that name (usually a basename) with
+    # respect to each directory path
+    find_name = criterion
+
+    def test_subpath(dirpath):
+      testpath = joinpath(dirpath, find_name)
+      if pfx_call(existspath, testpath):
+        return testpath
+      return None
+
+    criterion = test_subpath
+  if not isabspath(dirpath):
+    dirpath = abspath(dirpath)
+  while True:
+    found = pfx_call(criterion, dirpath)
+    if found is not None:
+      return found
+    new_dirpath = dirname(dirpath)
+    if new_dirpath == dirpath:
+      break
+    dirpath = new_dirpath
+  return None

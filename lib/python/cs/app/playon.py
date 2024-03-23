@@ -45,7 +45,7 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230705-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -57,7 +57,9 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'entry_points': {
-        'console_scripts': ['playon = cs.app.playon:main'],
+        'console_scripts': {
+            'playon': 'cs.app.playon:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils',
@@ -358,7 +360,6 @@ class PlayOnCommand(BaseCommand):
         recording_ids = sqltags.recording_ids_from_str(arg)
         if not recording_ids:
           warning("no recording ids")
-          xit = 1
           continue
         for dl_id in sorted(recording_ids):
           recording = sqltags[dl_id]

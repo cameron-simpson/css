@@ -24,12 +24,12 @@ from typing import Any, Mapping, Optional
 from cs.context import ContextManagerMixin, stackattrs, stackset
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.gimmicks import error, warning, nullcontext
+from cs.gimmicks import error, warning
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.seq import Seq
 
-__version__ = '20231129-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'description':
@@ -153,7 +153,7 @@ class HasThreadState(ContextManagerMixin):
     cls = self.__class__
     with cls._HasThreadState_lock:
       stacked = stackset(
-          cls._HasThreadState_classes, cls, cls._HasThreadState_lock
+          HasThreadState._HasThreadState_classes, cls, cls._HasThreadState_lock
       )
     with stacked:
       state = getattr(cls, cls.THREAD_STATE_ATTR)
@@ -161,7 +161,7 @@ class HasThreadState(ContextManagerMixin):
         yield
 
   @classmethod
-  def thread_states(cls, all_classes=False):
+  def get_thread_states(cls, all_classes=None):
     ''' Return a mapping of `class`->*current_instance*`
         for use with `HasThreadState.with_thread_states`
         or `HasThreadState.Thread` or `HasThreadState.bg`.
@@ -181,20 +181,24 @@ class HasThreadState(ContextManagerMixin):
           for all `HasThreadState` subclasses with an open instance,
           otherwise just a mapping from this class to its current instance
     '''
+    if all_classes is None:
+      all_classes = False
     with cls._HasThreadState_lock:
       if all_classes:
-        #
+        # the "current" instance for every HasThreadState._HasThreadState_classes
         currency = {
-            htscls: getattr(
+            htscls:
+            getattr(
                 getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None
             )
-            for htscls in cls._HasThreadState_classes
+            for htscls in HasThreadState._HasThreadState_classes
         }
       elif cls is HasThreadState:
         currency = {}
       else:
+        # just the current instance of the calling class
         currency = {
-            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
+            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR, 'current'), None)
         }
     return currency
 
@@ -206,10 +210,10 @@ class HasThreadState(ContextManagerMixin):
     ''' Context manager to push all the current objects from `thread_states`
         by calling each as a context manager.
 
-        The default `thread_states` comes from `HasThreadState.thread_states()`.
+        The default `thread_states` comes from `HasThreadState.get_thread_states()`.
     '''
-    if thread_states is None:
-      thread_states = cls.thread_states()
+    if thread_states is None or isinstance(thread_states, bool):
+      thread_states = cls.get_thread_states(all_classes=thread_states)
     if not thread_states:
       yield
     else:
@@ -222,9 +226,11 @@ class HasThreadState(ContextManagerMixin):
           yield
         else:
           if htsobj is None:
-            htsobj = nullcontext()
-          with htsobj:
+            # no current object, skip to the next class
             yield from with_thread_states_pusher()
+          else:
+            with htsobj:
+              yield from with_thread_states_pusher()
 
       yield from with_thread_states_pusher()
 
@@ -235,7 +241,7 @@ class HasThreadState(ContextManagerMixin):
         The optional parameter `thread_states`
         may be used to pass an explicit mapping of `type`->`instance`
         of thread states to use;
-        the default states come from `HasThreadState.thread_states()`.
+        the default states come from `HasThreadState.get_thread_states()`.
         The values of this mapping are iterated over and used as context managers.
 
         A boolean value may also be passed meaning:
@@ -253,8 +259,10 @@ class HasThreadState(ContextManagerMixin):
         In this case, pass `thread_states=False` to this call.
     '''
     # snapshot the .current states in the source Thread
-    if thread_states is None or thread_states is True:
-      thread_states = cls.thread_states()
+    if thread_states is None:
+      thread_states = False
+    if isinstance(thread_states, bool):
+      thread_states = cls.get_thread_states(all_classes=thread_states)
     if thread_states:
 
       def target_wrapper(*a, **kw):

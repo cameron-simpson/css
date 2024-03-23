@@ -20,6 +20,7 @@ partially hardlinked tree is processed efficiently and correctly.
 '''
 
 from collections import defaultdict
+from functools import cached_property
 from getopt import GetoptError
 from hashlib import sha1 as hashfunc
 import os
@@ -27,12 +28,13 @@ from os.path import dirname, isdir, join as joinpath, relpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
+
 from cs.cmdutils import BaseCommand
 from cs.fileutils import read_from, common_path_prefix, shortpath
+from cs.hashindex import file_checksum
 from cs.logutils import status, warning, error
 from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop
 from cs.resources import RunState, uses_runstate
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import UpdProxy, Upd, print, run_task  # pylint: disable=redefined-builtin
@@ -50,15 +52,17 @@ DISTINFO = {
     'install_requires': [
         'cs.cmdutils>=20210404',
         'cs.fileutils>=20200914',
+        'cs.hashindex',
         'cs.logutils',
         'cs.pfx',
         'cs.progress>=20200718.3',
-        'cs.py.func',
         'cs.units',
         'cs.upd>=20200914',
     ],
     'entry_points': {
-        'console_scripts': ['mklinks = cs.app.mklinks:main'],
+        'console_scripts': {
+            'mklinks': 'cs.app.mklinks:main'
+        },
     },
 }
 
@@ -98,13 +102,12 @@ class MKLinksCmd(BaseCommand):
     with options.upd.insert(1) as step:
       # scan the supplied paths
       for path in argv:
+        runstate.raiseif()
         if runstate.cancelled:
           return 1
         step("scan " + path + ' ...')
         with Pfx(path):
           linker.scan(path)
-      if runstate.cancelled:
-        return 1
       step("merge ...")
       linker.merge(dry_run=options.dry_run)
     return 0
@@ -137,53 +140,23 @@ class FileInfo(object):
     '''
     return S.st_dev, S.st_ino
 
-  @prop
+  @property
   def key(self):
     ''' The key for this file: `(dev,ino)`.
     '''
     return self.dev, self.ino
 
-  @prop
+  @property
   def path(self):
     ''' The primary path for this file, or `None` if we have no paths.
     '''
     return sorted(self.paths)[0] if self.paths else None
 
-  @prop
+  @cached_property
   def checksum(self):
     ''' Checksum the file contents, used as a proxy for comparing the actual content.
     '''
-    csum = self._checksum
-    if csum is None:
-      path = self.path
-      U = Upd()
-      pathspace = U.columns - 64
-      label = "scan " + (
-          path if len(path) < pathspace else '...' + path[-(pathspace - 3):]  # pylint: disable=unsubscriptable-object
-      )
-      with Pfx("checksum %r", path):
-        csum = hashfunc()
-        with open(path, 'rb') as fp:
-          length = os.fstat(fp.fileno()).st_size
-          read_len = 0
-          data_src = read_from(fp, rsize=1024 * 1024)
-          if length > 128 * 1024 * 1024:
-            data_src = progressbar(
-                read_from(fp, rsize=1024 * 1024),
-                label=label,
-                total=length,
-                units_scale=BINARY_BYTES_SCALE,
-                itemlenfunc=len,
-                update_frequency=128,
-                upd=U,
-            )
-          for data in data_src:
-            csum.update(data)
-            read_len += len(data)
-          assert read_len == self.size
-      csum = csum.digest()
-      self._checksum = csum
-    return csum
+    return file_checksum(self.path)
 
   def same_dev(self, other):
     ''' Test whether two FileInfos are on the same filesystem.
@@ -268,14 +241,14 @@ class Linker:
     with run_task(f'scan {path}: ') as proxy:
       if isdir(path):
         for dirpath, dirnames, filenames in os.walk(path):
-          if runstate.cancelled:
-            break
+          runstate.raiseif()
           proxy("sweep " + relpath(dirpath, path))
           for filename in progressbar(
               sorted(filenames),
               label=relpath(dirpath, path),
               update_frequency=32,
           ):
+            runstate.raiseif()
             filepath = joinpath(dirpath, filename)
             self.addpath(filepath)
           dirnames[:] = sorted(dirnames)
@@ -312,23 +285,20 @@ class Linker:
     # process FileInfo groups by size, largest to smallest
     with run_task('merge ... ') as proxy:
       for _, FImap in sorted(self.sizemap.items(), reverse=True):
-        if runstate.cancelled:
-          break
+        runstate.raiseif()
         # order FileInfos by mtime (newest first) and then path
         FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
         size = FIs[0].size
         with proxy.extend_prefix(f'size {size} '):
           for i, FI in enumerate(progressbar(FIs, f'size {size}')):
-            if runstate.cancelled:
-              break
+            runstate.raiseif()
             # skip FileInfos with no paths
             # this happens when a FileInfo has been assimilated
             if not FI.paths:
               ##warning("SKIP, no paths")
               continue
             for FI2 in FIs[i + 1:]:
-              if runstate.cancelled:
-                break
+              runstate.raiseif()
               status(FI2.path)
               assert FI.size == FI2.size
               assert FI.mtime >= FI2.mtime

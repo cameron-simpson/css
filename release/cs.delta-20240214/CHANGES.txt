@@ -1,0 +1,7 @@
+lib/python/cs/delta.py: cs.delta: new module containing utility functions around state changes
+lib/python/cs/delta.py: cs.delta: small bugfixes
+lib/python/cs/delta.py: cs.delta: delta: add a doctest
+lib/python/cs/delta.py: cs.delta: MISSING is now a cs.obj.Sentinel
+lib/python/cs/delta.py: cs.delta: monitor: yield 3-tuple (old,new,delta); new ifunchanged parameter to yield even when there is no change (default False)
+lib/python/cs/delta.py: cs.delta: monitor: drop sanity check for interval, covered by precondition
+lib/python/cs/delta.py: cs.delta: add DISTINFO, clean lint

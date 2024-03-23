@@ -1162,6 +1162,12 @@ class CalibreCommand(BaseCommand):
     # used by "calibre add [--cbz]"
     make_cbz: bool = False
 
+    COMMON_OPT_SPECS = dict(
+        C_='calibre_path',
+        K_='kindle_path',
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+    )
+
     @property
     def calibre(self):
       ''' The `CalibreTree` from `self.calibre_path`.
@@ -1299,8 +1305,9 @@ class CalibreCommand(BaseCommand):
         DeDRMWrapper(options.dedrm_package_path)
         if options.dedrm_package_path else None
     )
-    self.popopts(
-        argv, options, cbz='make_cbz', n='doit', q='quiet', v='verbose'
+    options.popopts(
+        argv,
+        cbz='make_cbz',
     )
     if not argv:
       raise GetoptError("missing bookpaths")
@@ -1327,7 +1334,10 @@ class CalibreCommand(BaseCommand):
           -v    Verbose: report all actions and decisions.
     '''
     options = self.options
-    self.popopts(argv, options, f='force', n='doit', q='quiet', v='verbose')
+    options.popopts(
+        argv,
+        f='force',
+    )
     dstfmtk = self.poparg(argv).upper()
     srcfmtks, conv_opts = self.CONVERT_MAP.get(dstfmtk, ([], ()))
     if not srcfmtks:
@@ -1416,17 +1426,13 @@ class CalibreCommand(BaseCommand):
     options.formats = ['CBZ', 'EPUB']
     options.first_format = False
     options.link_format = None
-    self.popopts(
+    options.popopts(
         argv,
-        options,
         _1='first_format',
         d_='linkto_dirpath',
         F_='formats',
         f='force',
-        n='-doit',
         o_='link_format',
-        q='quiet',
-        v='verbose',
     )
     doit = options.doit
     first_format = options.first_format
@@ -1682,7 +1688,10 @@ class CalibreCommand(BaseCommand):
     options = self.options
     calibre = options.calibre
     runstate = options.runstate
-    self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
+    options.popopts(
+        argv,
+        f='force',
+    )
     if argv and argv[0].startswith('/') and isdirpath(argv[0]):
       options.calibre_path_other = argv.pop(0)
     doit = options.doit
@@ -1810,9 +1819,10 @@ class CalibreCommand(BaseCommand):
 
   def cmd_shell(self, argv):
     ''' Usage: {cmd}
+          Run a command prompt via cmd.Cmd using calibre's subcommands.
           Run an interactive Python prompt with some predefined names:
-          calibre: the CalibreTree
-          options: self.options
+            calibre: the CalibreTree
+            options: self.options
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
@@ -1827,6 +1837,7 @@ class CalibreCommand(BaseCommand):
 
   def cmd_tag(self, argv):
     ''' Usage: {cmd} [-n] [--] [-]tag[,tag...] book_specs...
+          Modify the tags of the specified books.
     '''
     options = self.options
     if argv and argv[0] == '-n':

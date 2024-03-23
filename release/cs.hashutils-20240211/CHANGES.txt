@@ -1,0 +1,17 @@
+lib/python/cs/hashutils.py: sha1index: swap hash and pathname, use new cshashutils module
+lib/python/cs/hashutils.py: cs.hashutils: drop old code, add _HashCode and SHA256 subclass
+lib/python/cs/hashutils.py: cs.hashutils: _HashCode: rename from_pathname to from_fspath, try mmap to hash afile in one go
+lib/python/cs/hashutils.py: cs.hashutils: fix comment typo
+lib/python/cs/hashutils.py: cs.hashutils: rename _HashCode to BaseHashCode, use __init_subclass__ to apply standard class attributes
+lib/python/cs/hashutils.py: cs.hashutils: BaseHashCode.__init_subclass__: tweak signature
+lib/python/cs/hashutils.py: cs.hashtuils: BaseHashCode: keep a registry of hashclasses by hash function name, new hashclass() to obtain/create one
+lib/python/cs/hashutils.py: cs.hashutils: BaseHashCode.from_fspath: handle empty files
+lib/python/cs/hashutils.py: cs.hashutils: BaseHashCode.from_buffer: autopromote the buffer
+lib/python/cs/hashutils.py: cs.hashutils: BaseHashCode: rename classes_by_hashname to by_hashname to match cs.vt.hash.HashCode
+lib/python/cs/hashutils.py: cs.hashtuils: move the hashclass() class factory function to BaseHashCode.hashclass
+lib/python/cs/hashutils.py: cs.hashutils: BaseHashCode.__init_subclass__: this is a class method, early return if hashname is None to support abstract subclasses
+lib/python/cs/hashutils.py: cs.hashutils: clean lint
+lib/python/cs/hashutils.py: cs.hashutils: BaseHashCode.hashclass: accept optional hashfunc; add MD5, SHA224, SHA384, SHA512 to the convenience predefined hashclasses
+lib/python/cs/hashutils.py: cs.hashutils,cs.vt.hash: move various factory methods from cs.vt.hash.HashCode to cs.hashutils.BaseHashCode and embellish
+lib/python/cs/hashutils.py: cs.hashutils: BaseHoshCode.promote: spelling fix
+lib/python/cs/hashutils.py: cs.hashutils: DISTINFO

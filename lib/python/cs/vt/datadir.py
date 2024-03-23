@@ -62,7 +62,7 @@ from zlib import decompress
 from icontract import require
 from typeguard import typechecked
 
-from cs.app.flag import DummyFlags, FlaggedMixin
+from cs.app.flag import FlaggedMixin
 from cs.binary import BinaryMultiValue, BSUInt
 from cs.cache import LRU_Cache
 from cs.cmdutils import BaseCommand
@@ -277,7 +277,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       )
     if flags is None:
       if flags_prefix is None:
-        flags = DummyFlags()
+        flags = defaultdict(bool)
         flags_prefix = 'DUMMY'
     else:
       if flags_prefix is None:

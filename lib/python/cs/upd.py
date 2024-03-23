@@ -91,7 +91,7 @@ except ImportError as curses_e:
   warning("cannot import curses: %s", curses_e)
   curses = None
 
-__version__ = '20231129-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -929,6 +929,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
   def run_task(
       self,
       label: str,
+      *,
       report_print=False,
       tick_delay: int = 0.3,
       tick_chars='|/-\\',
@@ -973,6 +974,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
       )
 
+@decorator
 def uses_upd(func):
   ''' Decorator for functions accepting an optional `upd:Upd` parameter,
       default from `Upd.default() or Upd()`.
@@ -1282,6 +1284,21 @@ def with_upd_proxy(func, prefix=None, insert_at=1):
         return func(*a, upd_proxy=proxy, **kw)
 
   return upd_with_proxy_wrapper
+
+@contextmanager
+@uses_upd
+def without(*, upd: Upd):
+  ''' Context manager withdraw the `Upd` while something runs.
+
+      Example:
+
+          from cs.upd import without
+          ...
+          with without():
+              os.system('ls -la')
+  '''
+  with upd.above():
+    yield upd
 
 # Always create a default Upd() in open state.
 # Keep a module level name, which avoids the singleton weakref array

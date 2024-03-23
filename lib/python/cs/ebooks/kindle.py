@@ -116,6 +116,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   CONTENT_DIRNAME = 'My Kindle Content'
 
   FSPATH_FACTORY = default_kindle_library
+  FSPATH_DEFAULT = KINDLE_CONTENT_DEFAULT_PATH
   FSPATH_ENVVAR = KINDLE_LIBRARY_ENVVAR
 
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
@@ -671,6 +672,12 @@ class KindleCommand(BaseCommand):
         default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
     )
 
+    COMMON_OPT_SPECS = dict(
+        C_='calibre_path',
+        K_='kindle_path',
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+    )
+
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
     '''
@@ -761,10 +768,10 @@ class KindleCommand(BaseCommand):
                 The default is to export all books with no "calibre.dbid" fstag.
     '''
     options = self.options
+    options.popopts(argv, f='force')
     kindle = options.kindle
     calibre = options.calibre
     runstate = options.runstate
-    self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
     dedrm = options.dedrm
     doit = options.doit
     force = options.force

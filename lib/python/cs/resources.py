@@ -27,7 +27,7 @@ from cs.py.stack import caller, frames as stack_frames, stack_dump
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20231221-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -363,6 +363,11 @@ class MultiOpenMixin(ContextManagerMixin):
         unless the object's `finalise_later` parameter was true.
     '''
     self.__mo_getstate().join()
+
+  def is_open(self):
+    ''' Test whether this object is open.
+    '''
+    return self.__mo_getstate().opens > 0
 
   @staticmethod
   def is_opened(func):

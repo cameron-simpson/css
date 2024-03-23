@@ -1,0 +1,5 @@
+lib/python/cs/lex.py: merge default ==> cdrip
+lib/python/cs/lex.py: merge default => cdrip
+lib/python/cs/lex.py: merge default ==> cdrip
+lib/python/cs/lex.py: cs.lex: new split_remote_path() function to recognise [[user@]host]:path
+lib/python/cs/lex.py: cs.lex: match_tokens: clean lint
