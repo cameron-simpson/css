@@ -34,10 +34,7 @@ from .file import RWBlockFile
 from .hash import io_fail
 from .meta import Meta, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
 from .paths import path_split, DirLike, FileLike
-from .transcribe import (
-    Transcriber, parse as parse_transcription, register as
-    register_transcriber, hexify
-)
+from .transcribe import Transcriber, hexify
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -173,11 +170,9 @@ class DirentRecord(BinarySingleValue):
     if flags & DirentFlags.EXTENDED:
       yield extended_data
 
-class _Dirent(Transcriber):
-  ''' Incomplete base class for Dirent objects.
+class _Dirent:
+  ''' Incomplete base class for *`Dirent` objects.
   '''
-
-  transcribe_prefix = 'DIRENT'
 
   def __init__(
       self,
@@ -318,14 +313,15 @@ class _Dirent(Transcriber):
     '''
     return id(self)
 
-  def transcribe_inner(self, T, fp, attrs=None):
-    ''' Transcribe the inner components of the Dirent as text.
+  def transcribe_inner(self, attrs=None) -> str:
+    ''' Transcribe the inner components of the `Dirent` as text.
     '''
     if attrs is None:
       attrs = {}
+    tokens = []
     if self.name and self.name != '.':
-      T.transcribe(self.name, fp=fp)
-      fp.write(':')
+      tokens.append(self.transcribe_obj(self.name))
+      tokens.append(':')
     if type(self) is _Dirent:
       attrs['type'] = self.type
     if self.uuid:
@@ -339,21 +335,22 @@ class _Dirent(Transcriber):
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is not None:
       attrs['prevblock'] = prev_blockref
-    T.transcribe_mapping(attrs, fp)
+    tokens.append(self.transcribe_mapping_inner(attrs))
+    return ''.join(tokens)
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar, prefix):
+  def parse_inner(cls, s, offset, stopchar, prefix):
     ''' Parse [name:]attrs from `s` at offset `offset`.
         Return _Dirent instance and new offset.
     '''
-    name, offset2 = T.parse_qs(s, offset, optional=True)
+    name, offset2 = cls.parse_qs(s, offset, optional=True)
     if name is None:
       name = ''
     else:
       if s[offset2] != ':':
         raise ValueError("offset %d: missing colon after name" % (offset2,))
       offset = offset2 + 1
-    attrs, offset = T.parse_mapping(s, offset, stopchar)
+    attrs, offset = cls.parse_mapping(s, offset, stopchar)
     type_ = {
         'F': DirentType.FILE,
         'D': DirentType.DIR,
@@ -589,21 +586,9 @@ class _Dirent(Transcriber):
       typemode = stat.S_IFREG
     return typemode
 
-register_transcriber(
-    _Dirent, (
-        'INVALIDDirent',
-        'SymLink',
-        'Indirect',
-        'D',
-        'F',
-    )
-)
-
-class InvalidDirent(_Dirent):
+class InvalidDirent(_Dirent, Transcriber, prefix='INVALIDDirent'):
   ''' Encapsulation for an invalid Dirent data chunk.
   '''
-
-  transcribe_prefix = 'INVALIDDirent'
 
   def __init__(self, name, *, chunk=None, **kw):
     ''' An invalid Dirent.
@@ -620,16 +605,14 @@ class InvalidDirent(_Dirent):
     '''
     return self.chunk
 
-  def transcribe_inner(self, T, fp):
+  def transcribe_inner(self) -> str:
     ''' Transcribe the inner components of this InvalidDirent's transcription.
     '''
-    return super().transcribe_inner(T, fp, {'chunks': self.chunk})
+    return super().transcribe_inner({'chunks': self.chunk})
 
-class SymlinkDirent(_Dirent):
+class SymlinkDirent(_Dirent, Transcriber, prefix='SymLink'):
   ''' A symbolic link.
   '''
-
-  transcribe_prefix = 'SymLink'
 
   def __init__(self, name, *, target=None, **kw):
     super().__init__(DirentType.SYMBOLIC, name, **kw)
@@ -646,12 +629,7 @@ class SymlinkDirent(_Dirent):
     '''
     return self.meta.pathref
 
-  def transcribe_inner(self, T, fp):
-    ''' Transcribe the inner components for a SymlinkDirent.
-    '''
-    return super().transcribe_inner(T, fp, {})
-
-class IndirectDirent(_Dirent):
+class IndirectDirent(_Dirent, Transcriber, prefix='Indirect'):
   ''' An indirect `Dirent`, referring to another `Dirent` by UUID.
 
       This is how a feature like a hard link is implented in a vt filesystem.
@@ -718,12 +696,7 @@ class IndirectDirent(_Dirent):
     '''
     return self.ref.block
 
-  def transcribe_inner(self, T, fp):
-    ''' Transcribe the inner components of an IndirectDirent.
-    '''
-    return super().transcribe_inner(T, fp, {})
-
-class FileDirent(_Dirent, MultiOpenMixin, FileLike):
+class FileDirent(_Dirent, Transcriber, MultiOpenMixin, FileLike, prefix='F'):
   ''' A _Dirent subclass referring to a file.
 
       If closed, ._block refers to the file content.
@@ -733,8 +706,6 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
       read/write offset. File systems must share this, and maintain their own
       offsets in their file handle objects.
   '''
-
-  transcribe_prefix = 'F'
 
   def __init__(self, name, block=None, **kw):
     _Dirent.__init__(self, DirentType.FILE, name, **kw)
@@ -895,11 +866,6 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
       if self.meta.mtime is not None:
         os.utime(path, (st.st_atime, self.meta.mtime))
 
-  def transcribe_inner(self, T, fp):
-    ''' Transcribe the inner components of this FileDirent's transcription.
-    '''
-    return _Dirent.transcribe_inner(self, T, fp, {})
-
   def pushto_queue(self, Q, progress=None):
     ''' Push the Block with the file contents to a queue.
 
@@ -921,7 +887,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     B = self.block
     return B.fsck(recurse=recurse)
 
-class Dir(_Dirent, DirLike):
+class Dir(_Dirent, Transcriber, DirLike, prefix='D'):
   ''' A directory.
 
       Special attributes:
@@ -931,8 +897,6 @@ class Dir(_Dirent, DirLike):
         This accepts an ongoing compute cost for .block to avoid
         setting the flag on every file.write etc.
   '''
-
-  transcribe_prefix = 'D'
 
   def __init__(self, name, block=None, **kw):
     ''' Initialise this directory.
@@ -1276,9 +1240,6 @@ class Dir(_Dirent, DirLike):
     with Pfx("update_notification(%s,when=%s,source=%s)", newE, when, source):
       if newE is not self:
         self.update(newE)
-
-  def transcribe_inner(self, T, fp):
-    return _Dirent.transcribe_inner(self, T, fp, {})
 
   @pfx_method
   @uses_runstate

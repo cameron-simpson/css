@@ -19,8 +19,7 @@ from cs.logutils import error, warning
 from cs.threads import locked
 from cs.x import X
 from . import RLock
-from .transcribe import Transcriber, register as register_transcriber, \
-                        transcribe_mapping, parse_mapping
+from .transcribe import Transcriber
 
 DEFAULT_DIR_ACL = 'o:rwx-'
 DEFAULT_FILE_ACL = 'o:rw-x'
@@ -209,7 +208,7 @@ def xattrs_from_bytes(bs, offset=0):
 
 # This is a direct dict subclass for memory efficiency.
 # pylnt: disable=too-many-public-methods,too-many-instance-attributes
-class Meta(dict, Transcriber):
+class Meta(dict, Transcriber, prefix='M'):
   ''' Inode metadata: times, permissions, ownership etc.
 
       This is a dictionary with the following keys:
@@ -223,8 +222,6 @@ class Meta(dict, Transcriber):
       * `'pathref'`: pathname component for symlinks
       * `'x'`: xattrs
   '''
-
-  transcribe_prefix = 'M'
 
   def __init__(self, mapping=None):
     dict.__init__(self)
@@ -277,20 +274,20 @@ class Meta(dict, Transcriber):
     )
     return d
 
-  def transcribe_inner(self, T, fp):
+  def transcribe_inner(self) -> str:
     ''' Transcribe the Meta.
     '''
     d = self._as_dict()
-    return transcribe_mapping(d, fp, T=T)
+    return self.transcribe_mapping_inner(d)
 
   # pylint: disable=too-many-arguments
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar, prefix):
+  def parse_inner(cls, s, offset, stopchar, prefix):
     ''' Parse a Meta transcription.
     '''
     if prefix != 'M':
       raise ValueError("expected prefix='M', got: %r" % (prefix,))
-    m, offset = parse_mapping(s, offset, stopchar=stopchar, T=T)
+    m, offset = cls.parse_mapping(s, offset, stopchar=stopchar)
     return cls(m), offset
 
   def __getitem__(self, k):
@@ -696,5 +693,3 @@ class Meta(dict, Transcriber):
     ''' Delete the file's `user.mime_type` xattr.
     '''
     self.delxattr('user.mime_type')
-
-register_transcriber(Meta)

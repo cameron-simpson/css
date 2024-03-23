@@ -209,16 +209,16 @@ class Inode(Transcriber, NS):
         )
     )
 
-  def transcribe_inner(self, T, fp):
-    return T.transcribe_mapping(
+  def transcribe_inner(self) -> str:
+    return self.transcribe_mapping_inner(
         {
             'refcount': self.refcount,
             'E': self.E,
-        }, fp, T=T
+        }
     )
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar, prefix):
+  def parse_inner(cls, s, offset, stopchar, prefix):
     if prefix != cls.transcribe_prefix:
       raise ValueError(
           "expected prefix=%r, got: %r" % (
@@ -226,7 +226,7 @@ class Inode(Transcriber, NS):
               prefix,
           )
       )
-    m, offset = T.parse_mapping(s, offset, stopchar=stopchar, T=T)
+    m, offset = cls.parse_mapping(s, offset, stopchar=stopchar)
     return cls(None, m['E'], m['refcount']), offset
 
 class Inodes:

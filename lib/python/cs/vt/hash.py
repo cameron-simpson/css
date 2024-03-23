@@ -21,7 +21,7 @@ from cs.lex import get_identifier, hexify
 from cs.resources import MultiOpenMixin
 
 from .pushpull import missing_hashcodes
-from .transcribe import Transcriber, transcribe_s, register as register_transcriber
+from .transcribe import Transcriber
 
 class MissingHashcodeError(KeyError):
   ''' Subclass of KeyError
@@ -91,13 +91,12 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
 decode_buffer = HashCodeField.parse_value
 decode = HashCodeField.parse_value_from_bytes
 
-class HashCode(BaseHashCode, Transcriber, ABC, hashfunc=None):
+class HashCode(BaseHashCode, Transcriber, hashname=None, hashfunc=None,
+               prefix='H'):
   ''' All hashes are `bytes` subclassed via `cs.hashutils.BaseHashCode`.
   '''
 
   __slots__ = ()
-
-  hashlen = None
 
   # local registries
   by_hashname = {}
@@ -116,6 +115,7 @@ class HashCode(BaseHashCode, Transcriber, ABC, hashfunc=None):
     # precompute serialisation of the enum
     cls.hashenum_bs = bytes(BSUInt(hashenum))
     # precompute the length of the serialisation of a hashcode
+    cls.hashlen = len(cls.hashfunc().digest())
     cls.hashlen_encoded = len(cls.hashenum_bs) + cls.hashlen
 
   @classmethod
@@ -131,10 +131,8 @@ class HashCode(BaseHashCode, Transcriber, ABC, hashfunc=None):
         (cls.__name__, type(index).__name__, index)
     )
 
-  transcribe_prefix = 'H'
-
   def __str__(self):
-    return transcribe_s(self)
+    return type(self).transcribe_obj(self)
 
   def __repr__(self):
     return ':'.join((self.hashname, hexify(self)))
@@ -215,13 +213,11 @@ class HashCode(BaseHashCode, Transcriber, ABC, hashfunc=None):
     hashbytes = bytes.fromhex(hexpart)
     return hashclass.from_hashbytes(hashbytes)
 
-  def transcribe_inner(self, T, fp):
-    fp.write(self.hashname)
-    fp.write(':')
-    fp.write(hexify(self))
+  def transcribe_inner(self) -> str:
+    return f'{self.hashname}:{hexify(self)}'
 
   @staticmethod
-  def parse_inner(T, s, offset, stopchar, prefix):
+  def parse_inner(s, offset, stopchar, prefix):
     ''' Parse hashname:hashhextext from `s` at offset `offset`.
         Return HashCode instance and new offset.
     '''
@@ -242,8 +238,6 @@ class HashCode(BaseHashCode, Transcriber, ABC, hashfunc=None):
     H = hashclass.from_hashbytes_hex(hashtext)
     return H, offset
 
-register_transcriber(HashCode)
-
 # legacy names, to be removed (TODO)
 HASHCLASS_BY_NAME = HashCode.by_hashname
 HASHCLASS_BY_ENUM = HashCode.by_hashenum
@@ -253,13 +247,21 @@ HASH_SHA1_T = 0
 HASH_SHA256_T = 1
 
 # pylint: disable=missing-class-docstring
-class Hash_SHA1(HashCode, BaseHashCode, hashfunc=sha1, hashname='sha1',
-                hashenum=HASH_SHA1_T):
+class Hash_SHA1(
+    HashCode,
+    hashname='sha1',
+    hashenum=HASH_SHA1_T,
+    prefix='H',
+):
   __slots__ = ()
 
 # pylint: disable=missing-class-docstring
-class Hash_SHA256(HashCode, BaseHashCode, hashfunc=sha256, hashname='sha256',
-                  hashenum=HASH_SHA256_T):
+class Hash_SHA256(
+    HashCode,
+    hashname='sha256',
+    hashenum=HASH_SHA256_T,
+    prefix='H',
+):
   __slots__ = ()
 
 DEFAULT_HASHCLASS = Hash_SHA1
