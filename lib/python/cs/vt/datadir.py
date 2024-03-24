@@ -1343,6 +1343,7 @@ class DataDirCommand(BaseCommand):
   GETOPT_SPEC = 'd:'
 
   USAGE_FORMAT = '''Usage: {cmd} [-d datadir] subcommand [...]
+  Perform various tasks with DataDirs.
   -d datadir    Specify the filesystem path of the DataDir.
                 Default from the default Store, which must be a DataDirStore.
   '''
