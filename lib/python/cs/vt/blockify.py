@@ -20,7 +20,7 @@ from cs.seq import tee
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 
-from .block import Block, IndirectBlock
+from .block import Block, IndirectBlock, LiteralBlock
 from .scan import (
     scan_offsets,
     scan_reblock,
