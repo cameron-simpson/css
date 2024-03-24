@@ -124,7 +124,7 @@ class TestDataDir(unittest.TestCase):
     '''
     D = self.datadir
     with D:
-      hashfunc = D.hashclass.from_chunk
+      hashfunc = D.hashclass.from_data
       by_hash = {}
       by_data = {}
       # store RUN_SIZE random blocks
@@ -147,7 +147,8 @@ class TestDataDir(unittest.TestCase):
           self.assertTrue(hashcode in by_hash)
           self.assertTrue(data in by_data)
           self.assertTrue(hashcode in D)
-          self.assertEqual(D[hashcode], data)
+          data2 = D[hashcode]
+          self.assertEqual(data2, data)
       # now retrieve in random order
       hashcodes = list(by_hash.keys())
       random.shuffle(hashcodes)
