@@ -34,7 +34,15 @@ import json
 import re
 from string import ascii_letters, digits
 import sys
-from typing import Any, Iterable, Mapping, Optional, Tuple, Union
+from typing import (
+    Any,
+    Iterable,
+    Mapping,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 from uuid import UUID
 
 from cs.deco import decorator, Promotable
@@ -206,54 +214,83 @@ class Transcriber(Promotable):  ##, ABC):
 
   @classmethod
   @pfx_method
-  def parse(cls, s: str, offset: int = 0) -> Tuple[Any, int]:
+  def parse(
+      cls,
+      s: str,
+      offset: int = 0,
+      *,
+      expected_cls: Optional[Type] = None,
+  ) -> Tuple[Any, int]:
     ''' Parse an object from the string `s` starting at `offset`.
         Return the object and the new offset.
 
         Parameters:
         * `s`: the source string
         * `offset`: optional string offset, default 0
+        * `expected_cls`: optional; if provided, require an instance of `expected_cls`
+
+        If `parse` is called via a subclass of `Transcriber` and
+        `expected_cls` omitted then it defaults to the subclass,
+        so that:
+
+            _Dirent.parse(s)
+
+        will ensure that some instance of `_Dirent` is found.
     '''
+    if expected_cls is Any:
+      expected_cls = None
+    elif expected_cls is None and cls is not Transcriber:
+      expected_cls = cls
     # strings
-    value, offset2 = cls.parse_qs(s, offset, optional=True)
-    if value is not None:
-      return value, offset2
+    obj, offset2 = cls.parse_qs(s, offset, optional=True)
+    if obj is not None:
+      offset = offset2
     # decimal values
-    if s[offset:offset + 1].isdigit():
-      return get_decimal_or_float_value(s, offset)
-    # {json}
-    if s.startswith('{', offset):
+    elif s[offset:offset + 1].isdigit():
+      obj, offset = get_decimal_or_float_value(s, offset)
+    # bare {json}
+    elif s.startswith('{', offset):
       sub = s[offset:]
-      m, suboffset = pfx_call(json.JSONDecoder().raw_decode, sub)
+      obj, suboffset = pfx_call(json.JSONDecoder().raw_decode, sub)
       offset += suboffset
-      return m, offset
-    # prefix{....}
-    prefix, offset = get_identifier(s, offset)
-    if not prefix:
-      raise ValueError("no type prefix at offset %d" % (offset,))
-    with Pfx("prefix %r", prefix):
-      if not s.startswith('{', offset):
-        raise ValueError("missing opening '{' at offset %d" % (offset,))
-      offset += 1
-      if prefix == 'U':
-        # UUID
-        m = UUID_re.match(s, offset)
-        if not m:
-          raise ValueError("expected a UUID")
-        o = UUID(m.group())
-        offset = m.end()
-      else:
-        baseclass = cls.class_by_prefix.get(prefix)
-        if baseclass is None:
-          raise ValueError("prefix not registered")
-        with Pfx("baseclass=%s", baseclass.__name__):
-          o, offset = baseclass.parse_inner(s, offset, '}', prefix)
-        if offset > len(s):
-          raise ValueError("parse_inner returns offset beyond text")
-      if not s.startswith('}', offset):
-        raise ValueError("missing closing '}' at offset %d" % (offset,))
-      offset += 1
-      return o, offset
+    elif offset < len(s) and s[offset].isalpha():
+      # prefix{....}
+      prefix, offset = get_identifier(s, offset)
+      assert prefix
+      with Pfx("prefix %r", prefix):
+        if not s.startswith('{', offset):
+          raise ValueError("missing opening '{' at offset %d" % (offset,))
+        offset += 1
+        if prefix == 'U':
+          # UUID
+          m = UUID_re.match(s, offset)
+          if not m:
+            raise ValueError("expected a UUID")
+          obj = UUID(m.group())
+          offset = m.end()
+        else:
+          prefix_cls = cls.class_by_prefix.get(prefix)
+          if prefix_cls is None:
+            raise ValueError("prefix not registered")
+          with Pfx("prefix_cls=%s", prefix_cls.__name__):
+            obj, offset = prefix_cls.parse_inner(s, offset, '}', prefix)
+            assert isinstance(
+                obj, prefix_cls
+            ), f'{prefix_cls}.parse_inner did not return the expected object type, got {type(obj)}'
+          if offset > len(s):
+            raise ValueError("parse_inner returns offset beyond text")
+        if not s.startswith('}', offset):
+          raise ValueError("missing closing '}' at offset %d" % (offset,))
+        offset += 1
+    else:
+      raise ValueError(
+          f'parse error at offset {offset}: {s[offset:offset+16]!r}'
+      )
+    if expected_cls is not None and not isinstance(obj, expected_cls):
+      raise ValueError(
+          f'unexpected object type at offset {offset}: expected {expected_cls} but got {r(obj)}'
+      )
+    return obj, offset
 
   @staticmethod
   def parse_qs(
