@@ -422,10 +422,11 @@ class _Dirent(Transcriber, prefix=None):
       if self._prev_dirent_blockref is not None:
         self.changed = True
     elif E == self:
-      warning(
-          "%r.prev_dirent=%s: ignore setting previous to our own state", self,
-          E
-      )
+      pass
+      ##warning(
+      ##  "%r.prev_dirent=%s: ignore setting previous to our own state", self,
+      ##  E
+      ##)
     else:
       Ebs = E.encode()
       self._prev_dirent_blockref = HashCodeBlock.promote(Ebs)
