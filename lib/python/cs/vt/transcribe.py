@@ -110,6 +110,7 @@ class Transcriber(Promotable):  ##, ABC):
     '''
     super().__init_subclass__(**kw)
     if prefix is None:
+      # explicitly no prefix: a superclass of some other transcriber subclasses
       return
     if isinstance(prefix, str):
       prefixes = (prefix,)
