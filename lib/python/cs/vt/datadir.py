@@ -858,7 +858,7 @@ class DataDir(FilesDir):
     datadirpath = self.datapath
     while not self.cancelled and not self.closed:
       if self.flag_scan_disable:
-        sleep(0.1)
+        sleep(0.25)
         continue
       # scan for new datafiles
       for filename in self.datafilenames():
