@@ -362,6 +362,7 @@ class BlockMapping:
         self.tempf.fileno(), self.offset + offset, maxlength=maxlength
     )
 
+# TODO: why isn't this just a DataFile?
 class BlockTempfile:
   ''' Manage a temporary file which contains the contents of various Blocks.
   '''
