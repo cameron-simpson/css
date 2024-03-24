@@ -594,10 +594,8 @@ class StreamStoreArchive(BaseArchive):
     while not bfr.at_eof():
       when = BSString.parse_value(bfr)
       when = float(when)
-      E = BSString.parse_value(bfr)
-      E = parse(E)
-      if not isinstance(E, _Dirent):
-        raise ValueError("not a _Dirent: %r" % (E,))
+      Es = BSString.parse_value(bfr)
+      E = _Dirent.parse(Es, expected_cls=_Dirent)
       yield when, E
 
   def update(self, E, *, when=None, previous=None, force=False, source=None):
