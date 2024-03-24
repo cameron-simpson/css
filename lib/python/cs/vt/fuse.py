@@ -26,6 +26,7 @@ from cs.deco import decorator
 from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
+from cs.resources import RunState, uses_runstate
 from cs.x import X
 
 from typeguard import typechecked
@@ -110,7 +111,7 @@ def mount(
       subpath=subpath,
       readonly=readonly,
       append_only=append_only,
-      show_prev_dirent=True
+      show_prev_dirent=True,
   )
   return FS._vt_runfuse(mnt, fsname=fsname)
 
@@ -310,7 +311,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def __str__(self):
     return "<%s %s>" % (self.__class__.__name__, self._vtfs)
 
-  def _vt_runfuse(self, mnt, fsname=None):
+  @uses_runstate
+  def _vt_runfuse(
+      self, mnt, fsname: Optional[str] = None, *, runstate: RunState
+  ):
     ''' Run the filesystem once.
         Return a Thread managing the mount.
     '''
