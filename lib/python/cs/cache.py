@@ -7,7 +7,7 @@ from collections import deque
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from itertools import chain
-from threading import Lock, Thread
+from threading import Lock, RLock, Thread
 import time
 from typing import Any, Callable, Mapping, Optional
 
@@ -46,7 +46,7 @@ class LRU_Cache(object):
     self.max_size = max_size
     self.on_add = on_add
     self.on_remove = on_remove
-    self._lock = Lock()
+    self._lock = RLock()
     self._reset()
 
   def _reset(self):
