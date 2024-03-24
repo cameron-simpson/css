@@ -133,7 +133,7 @@ class FileHandle:
           self.E.close()
         S.close()
 
-    R.notify(withR)
+      R.notify(withR)
 
   def write(self, data, offset):
     ''' Write data to the file.
