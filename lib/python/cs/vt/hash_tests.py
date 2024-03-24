@@ -38,7 +38,7 @@ class TestHashing(unittest.TestCase):
       with self.subTest(hash_name=hash_name):
         for _ in range(10):
           rs = bytes(random.randint(0, 255) for _ in range(100))
-          H = cls.from_chunk(rs)
+          H = cls.from_data(rs)
           self.assertEqual(cls.hashfunc(rs).digest(), bytes(H))
           self.assertTrue(isinstance(H, Transcriber))
           Hs = str(H)

@@ -241,7 +241,7 @@ class Block(Transcriber, ABC, prefix=None):
       h = self.hashcode
     except AttributeError:
       return self.data == odata
-    return h == h.from_chunk(odata)
+    return h == h.from_data(odata)
 
   @prop
   def leaves(self):

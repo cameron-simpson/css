@@ -175,17 +175,19 @@ class HashCode(BaseHashCode, Transcriber, hashname=None, hashfunc=None,
     return bytes(HashCodeField(self))
 
   @classmethod
+  @OBSOLETE(suggestion='use BaseHashCode.from_data)')
   def from_chunk(cls, chunk):
-    ''' Factory function returning a HashCode object from a data block.
+    ''' Factory function returning a `HashCode` object from a data block.
     '''
-    hashbytes = cls.hashfunc(chunk).digest()  # pylint: disable=not-callable
-    return cls.from_hashbytes(hashbytes)
+    ##hashbytes = cls.hashfunc(chunk).digest()  # pylint: disable=not-callable
+    ##return cls.from_hashbytes(hashbytes)
+    return cls.from_data(chunk)
 
   @property
   def hashfunc(self):
-    ''' Convenient hook to this Hash's class' .from_chunk method.
+    ''' Convenient hook to this `HashCode`'s class' `.from_data` method.
     '''
-    return self.__class__.from_chunk
+    return self.__class__.from_data
 
   @property
   def filename(self):
@@ -299,7 +301,7 @@ class HashCodeUtilsMixin:
     hashstate = hashclass.hashfunc()
     for bs in bss:
       hashstate.update(bs)
-    return hashclass.from_chunk(hashstate.digest())
+    return hashclass.from_data(hashstate.digest())
 
   @require(
       lambda self, start_hashcode: start_hashcode is None or
@@ -448,7 +450,7 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   def add(self, data):
     ''' Add `data` to the dict.
     '''
-    hashcode = self.hashclass.from_chunk(data)
+    hashcode = self.hashclass.from_data(data)
     self[hashcode] = data
     return hashcode
 

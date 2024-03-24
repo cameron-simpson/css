@@ -528,7 +528,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
   def add(self, data):
     ''' Add `data` to the cache, queue data for indexing, return hashcode.
     '''
-    hashcode = self.hashclass.from_chunk(data)
+    hashcode = self.hashclass.from_data(data)
     self[hashcode] = data
     return hashcode
 
@@ -910,7 +910,7 @@ class DataDir(FilesDir):
                   update_frequency=64,
               )
             for pre_offset, DR, post_offset in scanner:
-              hashcode = hashclass.from_chunk(DR.data)
+              hashcode = hashclass.from_data(DR.data)
               entry = FileDataIndexEntry(
                   filenum=filenum,
                   data_offset=pre_offset + DR.data_offset,
@@ -1275,7 +1275,7 @@ class PlatonicDir(FilesDir):
             report_print=True,
         )
       for pre_offset, data, post_offset in scanner:
-        hashcode = self.hashclass.from_chunk(data)
+        hashcode = self.hashclass.from_data(data)
         entry = FileDataIndexEntry(
             filenum=DFstate.filenum,
             data_offset=pre_offset,

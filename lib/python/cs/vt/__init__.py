@@ -308,10 +308,10 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     return id(self)
 
   def hash(self, data):
-    ''' Return a HashCode instance from data bytes.
+    ''' Return a `HashCode` instance from data bytes.
         NB: this does _not_ store the data.
     '''
-    return self.hashclass.from_chunk(data)
+    return self.hashclass.from_data(data)
 
   # Stores are equal only to themselves.
   def __eq__(self, other):

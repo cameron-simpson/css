@@ -39,8 +39,7 @@ class TestTranscribe(unittest.TestCase):
         '"de\\f"',
         '"gh\\\"i"',
         uuid4(),
-        Hash_SHA1.from_chunk(bytes(random.randint(0, 255)
-                                   for _ in range(100))),
+        Hash_SHA1.from_data(bytes(random.randint(0, 255) for _ in range(100))),
         Dir("some_dir", meta=Meta(dict(x=dict(a=1, b=2)))),
     ):
       s = Transcriber.transcribe_obj(o, None)
