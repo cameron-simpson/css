@@ -46,7 +46,6 @@ from .hash import (
 )
 from .pushpull import missing_hashcodes_by_checksum
 from .store import StoreError, StoreSyncBase
-from .transcribe import parse
 
 class RqType(IntEnum):
   ''' Packet opcode values.
@@ -63,6 +62,7 @@ class RqType(IntEnum):
   LENGTH = 9  # () -> remote-store-length
   CONTAINS_INDIRECT = 10  # hashcode->Boolean
 
+# pylint: disable=too-many-ancestors
 class StreamStore(StoreSyncBase):
   ''' A `Store` connected to a remote `Store` via a `PacketConnection`.
       Optionally accept a local store to facilitate bidirectional activities
@@ -549,7 +549,7 @@ class StreamStore(StoreSyncBase):
       for hashcode in hashcodes:
         yield hashcode
       # set the resume point: after the last yielded hashcode
-      start_hashcode = hashcode
+      start_hashcode = hashcode  # pylint: disable=undefined-loop-variable
       after = True
 
   def raw_get_Archive(self, archive_name, missing_ok=False):
@@ -648,9 +648,10 @@ class UnFlaggedPayloadMixin:
     assert parse_flags == 0
     return super().parse_bytes(payload)
 
-class AddRequest(UnFlaggedPayloadMixin, BinaryMultiValue('AddRequest',
-                                                         dict(hashenum=BSUInt,
-                                                              data=BSData))):
+class AddRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue('AddRequest', dict(hashenum=BSUInt, data=BSData)),
+):
   ''' An add(bytes) request, returning the hashcode for the stored data.
   '''
 
@@ -882,9 +883,10 @@ class HashOfHashCodesRequest(HashCodesRequest):
       payload += final_hashcode.encode()
     return payload
 
-class ArchiveLastRequest(UnFlaggedPayloadMixin,
-                         BinaryMultiValue('ArchiveLastRequest',
-                                          dict(s=BSString))):
+class ArchiveLastRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue('ArchiveLastRequest', dict(s=BSString,)),
+):
   ''' Return the last entry in a remote Archive.
   '''
 
@@ -902,9 +904,10 @@ class ArchiveLastRequest(UnFlaggedPayloadMixin,
       return 0
     return (1, bytes(entry))
 
-class ArchiveListRequest(UnFlaggedPayloadMixin,
-                         BinaryMultiValue('ArchiveListRequest',
-                                          dict(s=BSString))):
+class ArchiveListRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue('ArchiveListRequest', dict(s=BSString)),
+):
   ''' List the entries in a remote Archive.
   '''
 
@@ -919,10 +922,13 @@ class ArchiveListRequest(UnFlaggedPayloadMixin,
     archive = local_store.get_Archive(self.s)
     return b''.join(bytes(entry) for entry in archive)
 
-class ArchiveUpdateRequest(UnFlaggedPayloadMixin,
-                           BinaryMultiValue('ArchiveUpdateRequest',
-                                            dict(archive_name=BSString,
-                                                 entry=ArchiveEntry))):
+class ArchiveUpdateRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue(
+        'ArchiveUpdateRequest',
+        dict(archive_name=BSString, entry=ArchiveEntry),
+    ),
+):
   ''' Add an entry to a remote Archive.
   '''
 
@@ -954,5 +960,6 @@ def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to a command.
   '''
   name = "StreamStore(%r)" % ("|" + shcmd,)
+  # TODO: a PopenStore to close the Popen?
   P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
   return StreamStore(name, P.stdin, P.stdout, local_store=None, addif=addif)
