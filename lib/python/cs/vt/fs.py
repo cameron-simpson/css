@@ -124,13 +124,14 @@ class FileHandle:
     '''
     R = self.E.flush()
     self.E.parent.changed = True
-    S.open()
-    # NB: additional S.open/close around self.E.close
-    @logexc
-    def withR(R):
-      with S:
-        self.E.close()
-      S.close()
+    if R is not None:
+      S.open()
+      # NB: additional S.open/close around self.E.close
+      @logexc
+      def withR(R):
+        with S:
+          self.E.close()
+        S.close()
 
     R.notify(withR)
 
