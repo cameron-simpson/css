@@ -66,7 +66,6 @@ from .store import (
     VTDStore,
 )
 from .socket import TCPClientStore, UNIXSocketClientStore
-from .transcribe import parse
 
 # pylint: disable=too-many-public-methods
 class Config(SingletonMixin, HasThreadState):
@@ -245,6 +244,7 @@ class Config(SingletonMixin, HasThreadState):
     return Archive(arpath)
 
   # pylint: disable=too-many-branches
+  @pfx_method
   def parse_special(self, special, readonly):
     ''' Parse the mount command's special device from `special`.
         Return `(fsname,readonly,Store,Dir,basename,archive)`.
@@ -262,7 +262,7 @@ class Config(SingletonMixin, HasThreadState):
     archive = None
     if special.startswith('D{') and special.endswith('}'):
       # D{dir}
-      specialD, offset = parse(special)
+      specialD, offset = Dir.parse(special)
       if offset != len(special):
         raise ValueError("unparsed text: %r" % (special[offset:],))
       if not isinstance(specialD, Dir):
