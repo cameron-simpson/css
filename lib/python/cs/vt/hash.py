@@ -15,6 +15,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.binary import BSUInt, BinarySingleValue
+from cs.deco import OBSOLETE
 from cs.excutils import exc_fold
 from cs.hashutils import BaseHashCode
 from cs.lex import get_identifier, hexify
@@ -91,8 +92,13 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
 decode_buffer = HashCodeField.parse_value
 decode = HashCodeField.parse_value_from_bytes
 
-class HashCode(BaseHashCode, Transcriber, hashname=None, hashfunc=None,
-               prefix='H'):
+class HashCode(
+    BaseHashCode,
+    Transcriber,
+    hashname=None,
+    hashfunc=None,
+    prefix='H',
+):
   ''' All hashes are `bytes` subclassed via `cs.hashutils.BaseHashCode`.
   '''
 
