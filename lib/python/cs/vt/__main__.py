@@ -316,7 +316,10 @@ class VTCmd(BaseCommand):
     ''' Pop and return a Store specified on the command line.
     '''
     return self.poparg(
-        argv, lambda store_spec: Store(store_spec, self.options.config), *a
+        argv,
+        lambda store_spec: Store.
+        promote(store_spec, config=self.options.config),
+        *a,
     )
 
   def cmd_benchmark(self, argv):
