@@ -787,6 +787,15 @@ class HashCodeBlock(Block, prefix='B'):
             ok = False
     return ok
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `bytes` or transcription to a `HashCodeBlock`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, bytes):
+      return cls(data=obj)
+    return super().promote(obj)
 
 class IndirectBlock(Block, prefix='I'):
   ''' An indirect block,
