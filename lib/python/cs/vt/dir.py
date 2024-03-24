@@ -347,8 +347,8 @@ class _Dirent(Transcriber, prefix=None):
     if name is None:
       name = ''
     else:
-      if s[offset2] != ':':
-        raise ValueError("offset %d: missing colon after name" % (offset2,))
+      if not s.startswith(':',offset2):
+        raise ValueError(f'offset {offset2}: missing colon after name {name!r}')
       offset = offset2 + 1
     attrs, offset = cls.parse_mapping(s, offset, stopchar)
     type_ = {
@@ -781,7 +781,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike, prefix='F'):
     with self._lock:
       if self.open_file is None:
         return self._block
-    return self.open_file.sync()
+      return self.open_file.sync()
 
   @block.setter
   @locked
@@ -818,7 +818,10 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike, prefix='F'):
     ''' Flush the contents of the file.
         Presumes the Dirent is open.
     '''
-    return self.open_file.flush(scanner, dispatch=dispatch)
+    f = self.open_file
+    if f is None:
+      return None
+    return f.flush(scanner, dispatch=dispatch)
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
