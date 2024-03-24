@@ -335,8 +335,10 @@ class _Dirent(Transcriber, prefix=None):
     if name is None:
       name = ''
     else:
-      if not s.startswith(':',offset2):
-        raise ValueError(f'offset {offset2}: missing colon after name {name!r}')
+      if not s.startswith(':', offset2):
+        raise ValueError(
+            f'offset {offset2}: missing colon after name {name!r}'
+        )
       offset = offset2 + 1
     attrs, offset = cls.parse_mapping(s, offset, stopchar)
     type_ = {
