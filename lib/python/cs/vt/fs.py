@@ -446,12 +446,7 @@ class FileSystem(HasThreadState):
         fs_inode_dirents = E.meta.get("fs_inode_dirents")
         X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
         if fs_inode_dirents:
-          inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
-          if offset < len(fs_inode_dirents):
-            warning(
-                "unparsed text after Dirent: %r", fs_inode_dirents[offset:]
-            )
-          X("IMPORT INODES:")
+          inode_dir = _Dirent.from_str(fs_inode_dirents)
           dump_Dirent(inode_dir)
           inodes.load_fs_inode_dirents(inode_dir)
         else:
