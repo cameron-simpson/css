@@ -316,6 +316,7 @@ class VTCmd(BaseCommand):
 
   def cmd_benchmark(self, argv):
     ''' Usage: {cmd} mode [args...] [<data]
+          Benchmark various things.
           Modes:
             blocked_chunks  Scan the data into edge aligned chunks without a parser.
             blocked_chunks2 Scan the data into edge aligned chunks without a parser.
@@ -900,8 +901,7 @@ class VTCmd(BaseCommand):
 
   def cmd_pack(self, argv):
     ''' Usage: {cmd} ospath
-          Replace the ospath with an archive file ospath.vt
-          referring to the stored content of path.
+          Store and replace ospath with an archive file ospath.vt.
     '''
     if not argv:
       raise GetoptError("missing path")
@@ -1078,8 +1078,8 @@ class VTCmd(BaseCommand):
 
   def cmd_pushto(self, argv):
     ''' Usage: {cmd} other_store [objects...]
-          Push objects to another store such that the other store has all the
-          required Blocks. The default is to push all of the current Store.
+          Push objects to another store.
+          The default is to push all of the current Store.
     '''
     options = self.options
     if not argv:
@@ -1107,8 +1107,7 @@ class VTCmd(BaseCommand):
 
   def cmd_save(self, argv):
     ''' Usage: {cmd} [-F] [{{ospath|-}}...]
-          Save the contents of each ospath to the Store and print a fileref
-          or dirref for each.
+          Save the contents of each ospath to the Store.
           The argument "-" reads data from standard input and prints a fileref.
           The default argument list is "-".
           -F  Print a FileDirent instead of a block ref for file contents.
@@ -1174,8 +1173,7 @@ class VTCmd(BaseCommand):
 
   def cmd_serve(self, argv):
     ''' Usage: {cmd} [{{DEFAULT|-|/path/to/socket|[host]:port}} [name:storespec]...]
-          Start a service daemon listening on a TCP port
-          or on a UNIX domain socket or on stdin/stdout.
+          Start a service daemon listening on a TCP port or a UNIX domain socket.
           With no `name:storespec` arguments the default Store is served,
           otherwise the named Stores are exported with the first being
           served initially.
@@ -1312,8 +1310,7 @@ class VTCmd(BaseCommand):
 
   def cmd_unpack(self, argv):
     ''' Usage: {cmd} archive.vt [unpacked]
-          Unpack arpath to unpacked. If unpacked is omitted, unpack
-          from the archive file _archive_`.vt` as _archive_.
+          Unpack archive.vt to unpacked.
     '''
     if not argv:
       raise GetoptError("missing archive name")
