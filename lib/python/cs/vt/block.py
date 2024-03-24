@@ -886,7 +886,7 @@ class IndirectBlock(Block, prefix='I'):
   def transcribe_inner(self) -> str:
     ''' Transcribe "span:Block".
     '''
-    return self.transcribe(self.superblock)
+    return self.transcribe_obj(self.superblock)
 
   @classmethod
   # pylint: disable=too-many-arguments
