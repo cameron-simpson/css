@@ -281,43 +281,26 @@ class VTCmd(BaseCommand):
                       f"unusable Store specification: {e}"
                   ) from e
                 except Exception as e:
-                  exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
+                  exception(
+                      f"UNEXPECTED EXCEPTION: can't open cache store: {e}"
+                  )
                   raise GetoptError(
                       f"unusable Store specification: {e}"
                   ) from e
-                if options.cache_store_spec == 'NONE':
-                  cacheS = None
-                else:
-                  try:
-                    cacheS = pfx_call(
-                        Store, options.cache_store_spec, options.config
-                    )
-                  except (KeyError, ValueError) as e:
-                    ##warning("foo")
-                    raise GetoptError(
-                        f"unusable Store specification: {e}"
-                    ) from e
-                  except Exception as e:
-                    exception(
-                        f"UNEXPECTED EXCEPTION: can't open cache store: {e}"
-                    )
-                    raise GetoptError(
-                        f"unusable Store specification: {e}"
-                    ) from e
-                  S = ProxyStore(
-                      "%s:%s" % (cacheS.name, S.name),
-                      read=(cacheS,),
-                      read2=(S,),
-                      copy2=(cacheS,),
-                      save=(cacheS, S),
-                      archives=((S, '*'),),
-                  )
-                  S.config = options.config
-                with S:
-                  with stackattrs(options, S=S):
-                    yield
-                if cacheS:
-                  cacheS.backend = None
+                S = ProxyStore(
+                    "%s:%s" % (cacheS.name, S.name),
+                    read=(cacheS,),
+                    read2=(S,),
+                    copy2=(cacheS,),
+                    save=(cacheS, S),
+                    archives=((S, '*'),),
+                )
+                S.config = options.config
+              with S:
+                with stackattrs(options, S=S):
+                  yield
+              if cacheS:
+                cacheS.backend = None
       if ifdebug():
         dump_debug_threads()
 
