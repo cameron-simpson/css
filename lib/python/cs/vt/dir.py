@@ -238,18 +238,6 @@ class _Dirent(Transcriber, prefix=None):
         ':' + self.uuid if self.uuid else '', self.meta
     )
 
-  @classmethod
-  def from_str(cls, s, offset=0):
-    ''' Parse a Dirent transcription from the str `s`.
-    '''
-    E, offset2 = parse_transcription(s, offset)
-    if not isinstance(E, cls):
-      raise ValueError(
-          "expected instance of %s (got %s) at offset %d of %r" %
-          (cls, type(E), offset, s)
-      )
-    return E, offset2
-
   @staticmethod
   def from_components(type_, name, **kw):
     ''' Factory returning a _Dirent instance.
