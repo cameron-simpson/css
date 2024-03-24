@@ -320,6 +320,9 @@ class Transcriber(Promotable):  ##, ABC):
     ''' Parse a mapping from the string `s`.
         Return the mapping and the new offset.
 
+        A mapping is expressed as comma separated set of
+        *name*`:`*transcribed_value* pairs, ended by `stopchar`.
+
         Parameters:
         * `s`: the source string
         * `offset`: optional string offset, default 0
@@ -341,23 +344,25 @@ class Transcriber(Promotable):  ##, ABC):
       )
     d = OrderedDict()
     while offset < len(s) and (stopchar is None or s[offset] != stopchar):
-      k, offset = get_identifier(s, offset)
-      if not k:
-        raise ValueError("offset %d: not an identifier" % (offset,))
-      if offset >= len(s) or s[offset] != ':':
-        raise ValueError("offset %d: expected ':'" % (offset,))
+      with Pfx("offset %d", offset):
+        k, offset = get_identifier(s, offset)
+        if not k:
+          raise ValueError('expected identifier')
+      with Pfx("offset %d", offset):
+        if not s.startswith(':', offset):
+          raise ValueError("expected ':'")
       offset += 1
-      v, offset = cls.parse(s, offset)
+      with Pfx("offset %d", offset):
+        v, offset = cls.parse(s, offset, expected_cls=Any)
       d[k] = v
-      if offset >= len(s):
-        break
-      c = s[offset]
-      if c == stopchar:
-        break
-      if c != ',':
-        raise ValueError(
-            "offset %d: expected ',' but found: %r" % (offset, s[offset:])
-        )
+      with Pfx("offset %d", offset):
+        if offset >= len(s):
+          break
+        c = s[offset]
+        if c == stopchar:
+          break
+        if c != ',':
+          raise ValueError(f"expected ',' or {stopchar!r} but found: {c!r}")
       offset += 1
     if required is None and optional is None:
       return d, offset
