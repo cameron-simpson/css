@@ -32,7 +32,7 @@
     to their block data location within the backing files.
 '''
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -234,9 +234,7 @@ class DataFileState(SimpleNamespace, HasFSPath):
         We use the `DataDir`'s `.scanfrom` method because it knows the
         format of the file.
     '''
-    yield from self.datafile.scanfrom(
-        self.fspath, offset=offset, with_offsets=True
-    )
+    yield from self.datafile.scanfrom(offset=offset, with_offsets=True)
 
 class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
                RunStateMixin, FlaggedMixin, MutableMapping):
@@ -318,6 +316,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
         flags_id=id(resolved.flags)
     )
 
+  @uses_runstate
   @require(lambda hashclass: issubclass(hashclass, HashCode))
   def __init__(
       self,
@@ -328,7 +327,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       rollover=None,
       flags=None,
       flags_prefix=None,
-      runstate=None,
+      runstate: RunState,
   ):
     ''' Initialise the `DataDir` at `topdirpath`.
 
@@ -520,7 +519,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
           # TODO: shove this sideways to self.open_datafile
           # which releases an existing datafile if too many are open
           DFstate = self._filemap[filenum]
-          rfd = self._rfds[filenum] = openfd_read(DFstate.pathname)
+          rfd = self._rfds[filenum] = openfd_read(DFstate.fspath)
         return entry.fetch_fd(rfd)
       except Exception as e:
         exception(f'{self}[{hashcode}]:{entry} not available: {e}')
@@ -537,7 +536,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
     ''' Store the bytes `data` against key hashcode `h`.
     '''
     assert isinstance(h, self.hashclass)
-    assert h == self.hashclass.from_chunk(data)
+    assert h == self.hashclass.from_data(data)
     with self._lock:
       index_entry = self.append(data)
       self.index[h] = bytes(index_entry)
