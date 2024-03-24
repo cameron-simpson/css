@@ -80,7 +80,7 @@ from .scan import (
 )
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore, ProgressStore
-from .transcribe import parse
+from .transcribe import Transcriber
 
 RANDOM_DEV = '/dev/urandom'
 
@@ -182,6 +182,23 @@ class VTCmd(BaseCommand):
         default_factory=lambda: run_modes.show_progress
     )
 
+    @property
+    def hashclass(self):
+      ''' The `HashCode` subclass for `self.hashname`.
+      '''
+      try:
+        return HASHCLASS_BY_NAME[self.hashname]
+      except KeyError as e:
+        raise AttributeError(
+            f'{self.__class__.__name__}.hashclass: unknown hashclass name {self.hashname!r} (I know {sorted(HASHCLASS_BY_NAME.keys())})'
+        ) from e
+
+    @property
+    def config(self):
+      ''' A `Config` derived from `self.config_map`.
+      '''
+      return Config(self.config_map)
+
   def apply_opts(self, opts):
     ''' Apply the command line options mapping `opts` to `options`.
     '''
@@ -206,20 +223,10 @@ class VTCmd(BaseCommand):
         options.verbose = True
       else:
         raise RuntimeError("unhandled option: %s" % (opt,))
-    options.hashclass = None
-    if options.hashname is not None:
-      try:
-        options.hashclass = HASHCLASS_BY_NAME[options.hashname]
-      except KeyError:
-        raise GetoptError(
-            "unrecognised hashname %r: I know %r" %
-            (options.hashname, sorted(HASHCLASS_BY_NAME.keys()))
-        )
     if options.verbose:
       self.loginfo.level = logging.INFO
     if options.dflt_log is not None:
       logTo(options.dflt_log, delay=True)
-    options.config = Config(options.config_map)
 
   def handle_signal(self, sig, frame):
     ''' Override `BaseCommand.handle_signal`:
@@ -243,29 +250,31 @@ class VTCmd(BaseCommand):
       options = self.options
       config = options.config
       show_progress = options.show_progress
-      try:
-        hashclass = HASHCLASS_BY_NAME[options.hashname]
-      except KeyError:
-        raise GetoptError(
-            "unrecognised hashname %r: I know %r" %
-            (options.hashname, sorted(HASHCLASS_BY_NAME.keys()))
-        )
-      with stackattrs(options, hashclass=hashclass):
-        with config:
-          with stackattrs(run_modes, config=config):
-            # redo these because defaults is already initialised
-            with stackattrs(run_modes, show_progress=show_progress):
-              if cmd in ("config", "datadir", "dump", "help", "init",
-                         "profile", "scan"):
-                yield
+      with config:
+        with stackattrs(run_modes, config=config):
+          # redo these because defaults is already initialised
+          with stackattrs(run_modes, show_progress=show_progress):
+            if cmd in ("config", "datadir", "dump", "help", "init", "profile",
+                       "scan"):
+              yield
+            else:
+              # open the default Store
+              if options.store_spec is None:
+                if cmd == "serve":
+                  options.store_spec = store_spec
+              try:
+                S = pfx_call(Store.promote, options.store_spec, options.config)
+              except (KeyError, ValueError) as e:
+                raise GetoptError(f"unusable Store specification: {e}") from e
+              except Exception as e:
+                exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
+                raise GetoptError(f"unusable Store specification: {e}") from e
+              if options.cache_store_spec == 'NONE':
+                cacheS = None
               else:
-                # open the default Store
-                if options.store_spec is None:
-                  if cmd == "serve":
-                    options.store_spec = store_spec
                 try:
-                  S = pfx_call(
-                      Store.promote, options.store_spec, options.config
+                  cacheS = pfx_call(
+                      Store, options.cache_store_spec, options.config
                   )
                 except (KeyError, ValueError) as e:
                   raise GetoptError(
@@ -504,7 +513,8 @@ class VTCmd(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing objects")
-    hashclass = DEFAULT_HASHCLASS
+    options = self.options
+    hashclass = options.hashclass
     one_line = True
     _, columns = ttysize(1)
     if columns is None:
@@ -550,7 +560,7 @@ class VTCmd(BaseCommand):
     for arg in argv:
       with Pfx(arg):
         try:
-          o, offset = parse(arg)
+          o, offset = Transcriber.parse(arg)
         except ValueError as e:
           error("does not seem to be a transcription: %s", e)
           xit = 1
