@@ -170,7 +170,7 @@ class DirentRecord(BinarySingleValue):
     if flags & DirentFlags.EXTENDED:
       yield extended_data
 
-class _Dirent:
+class _Dirent(Transcriber, prefix=None):
   ''' Incomplete base class for *`Dirent` objects.
   '''
 
@@ -586,7 +586,7 @@ class _Dirent:
       typemode = stat.S_IFREG
     return typemode
 
-class InvalidDirent(_Dirent, Transcriber, prefix='INVALIDDirent'):
+class InvalidDirent(_Dirent, prefix='INVALIDDirent'):
   ''' Encapsulation for an invalid Dirent data chunk.
   '''
 
@@ -610,7 +610,7 @@ class InvalidDirent(_Dirent, Transcriber, prefix='INVALIDDirent'):
     '''
     return super().transcribe_inner({'chunks': self.chunk})
 
-class SymlinkDirent(_Dirent, Transcriber, prefix='SymLink'):
+class SymlinkDirent(_Dirent, prefix='SymLink'):
   ''' A symbolic link.
   '''
 
@@ -629,7 +629,7 @@ class SymlinkDirent(_Dirent, Transcriber, prefix='SymLink'):
     '''
     return self.meta.pathref
 
-class IndirectDirent(_Dirent, Transcriber, prefix='Indirect'):
+class IndirectDirent(_Dirent, prefix='Indirect'):
   ''' An indirect `Dirent`, referring to another `Dirent` by UUID.
 
       This is how a feature like a hard link is implented in a vt filesystem.
@@ -696,7 +696,7 @@ class IndirectDirent(_Dirent, Transcriber, prefix='Indirect'):
     '''
     return self.ref.block
 
-class FileDirent(_Dirent, Transcriber, MultiOpenMixin, FileLike, prefix='F'):
+class FileDirent(_Dirent, MultiOpenMixin, FileLike, prefix='F'):
   ''' A _Dirent subclass referring to a file.
 
       If closed, ._block refers to the file content.
@@ -887,7 +887,7 @@ class FileDirent(_Dirent, Transcriber, MultiOpenMixin, FileLike, prefix='F'):
     B = self.block
     return B.fsck(recurse=recurse)
 
-class Dir(_Dirent, Transcriber, DirLike, prefix='D'):
+class Dir(_Dirent, DirLike, prefix='D'):
   ''' A directory.
 
       Special attributes:
