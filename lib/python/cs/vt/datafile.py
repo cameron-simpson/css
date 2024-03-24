@@ -215,7 +215,7 @@ class DataFile(SingletonMixin, HasFSPath, MultiOpenMixin):
       DR = DataRecord.parse(bfr)
     return DR
 
-  def scan(self, *, offset=0, **scan_kw):
+  def scanfrom(self, *, offset=0, **scan_kw):
     ''' Scan the file from `offset` (default `0`)
         and yield `DataRecord` instances.
         This honours the `BinaryMixin.scan` parameters
