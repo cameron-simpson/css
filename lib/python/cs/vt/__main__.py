@@ -61,7 +61,6 @@ from .blockify import (
 from .compose import get_store_spec
 from .config import Config
 from .convert import expand_path
-from .datadir import DataDirCommand
 from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
 from .dir import Dir, FileDirent
@@ -111,6 +110,151 @@ def print_hist(samples, bins=128):
     ax.hist(samples, 128)
     mplutils.print_figure(ax)
 
+@dataclass
+class VTCmdOptions(BaseCommand.Options):
+  config_map: Optional[Union[str, Mapping]] = None
+  store_spec: str = field(
+      default_factory=lambda: os.environ.
+      get(VTCmd.VT_STORE_ENVVAR, '[default]')
+  )
+  cache_store_spec: str = field(
+      default_factory=lambda: os.environ.
+      get(VTCmd.VT_CACHE_STORE_ENVVAR, '[cache]')
+  )
+  # TODO: discard dflt_log
+  dflt_log: Optional[str] = field(
+      default_factory=lambda: os.environ.get(VTCmd.VT_LOGFILE_ENVVAR)
+  )
+  hashname: str = field(
+      default_factory=lambda: os.environ.
+      get(VTCmd.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname)
+  )
+  show_progress: bool = field(default_factory=lambda: run_modes.show_progress)
+
+  @property
+  def hashclass(self):
+    ''' The `HashCode` subclass for `self.hashname`.
+      '''
+    try:
+      return HASHCLASS_BY_NAME[self.hashname]
+    except KeyError as e:
+      raise AttributeError(
+          f'{self.__class__.__name__}.hashclass: unknown hashclass name {self.hashname!r} (I know {sorted(HASHCLASS_BY_NAME.keys())})'
+      ) from e
+
+  @property
+  def config(self):
+    ''' A `Config` derived from `self.config_map`.
+      '''
+    return Config(self.config_map)
+
+class DataDirCommand(BaseCommand):
+  ''' Command line implementation for `DataDir`s.
+  '''
+
+  GETOPT_SPEC = 'd:'
+
+  USAGE_FORMAT = '''Usage: {cmd} [-d datadir] subcommand [...]
+      Perform various tasks with DataDirs.
+      -d datadir    Specify the filesystem path of the DataDir.
+                    Default from the default Store, which must be a DataDirStore.
+  '''
+
+  SUBCOMMAND_ARGV_DEFAULT = ['info']
+
+  @dataclass
+  class Options(VTCmdOptions):
+    ''' Special class for `self.options` with various properties.
+    '''
+    datadirpath: Optional[str] = None
+    datadir: Optional["DataDir"] = None
+
+    @property
+    def config(self):
+      ''' The configuration.
+      '''
+      from .config import Config
+      return Config(self.config_map)
+
+  def apply_opt(self, opt, val):
+    ''' Apply the command line option `opt` with value `val`.
+    '''
+    options = self.options
+    if opt == '-d':
+      options.datadirpath = val
+    else:
+      raise GetoptError(f'unhandled option: {opt!r}={val!r}')
+
+  @contextmanager
+  def run_context(self):
+    options = self.options
+    datadirpath = options.datadirpath
+    if datadirpath is None:
+      from .store import DataDirStore  # pylint: disable=import-outside-toplevel
+      S = pfx_call(Store.promote, options.store_spec, options.config)
+      if not isinstance(S, DataDirStore):
+        raise GetoptError("default Store is not a DataDirStore: %s" % (s(S),))
+      datadir = S._datadir
+      datadirpath = datadir.fspath
+    else:
+      datadir = DataDir(datadirpath)
+    with super().run_context():
+      with stackattrs(
+          options,
+          datadir=datadir,
+          datadirpath=datadirpath,
+      ):
+        yield
+
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Print information about the DataDir.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    datadir = options.datadir
+    verbose = options.verbose
+    print(datadir)
+    print("  hashclass: ", datadir.hashclass.__name__)
+    print("  indexclass:", datadir.indexclass.__name__)
+    if verbose:
+      print("  datafiles:")
+    total_data = 0
+    datafilenames = datadir.datafilenames()
+    for filename in sorted(datafilenames):
+      with Pfx(filename):
+        datapath = datadir.datapathto(filename)
+        S = os.stat(datapath)
+        if verbose:
+          print("   ", filename, transcribe_bytes_geek(S.st_size))
+        total_data += S.st_size
+    if verbose:
+      print("   ", transcribe_bytes_geek(total_data))
+    else:
+      print(
+          "  datafiles:",
+          len(datafilenames),
+          "files, ",
+          transcribe_bytes_geek(total_data),
+          "total bytes",
+      )
+
+  def cmd_init(self, argv):
+    ''' Usage: {cmd}
+          Initialise the DataDir.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    self.options.datadir.initdir()
+
+  def cmd_test(self, argv):
+    ''' Usage: {cmd} [selftest-args...]
+          Run the DataDir unit tests.
+    '''
+    from .datadir_tests import selftest  # pylint: disable=import-outside-toplevel
+    selftest([self.options.cmd] + argv)
+
 class VTCmd(BaseCommand):
   ''' A main programme instance.
   '''
@@ -159,45 +303,7 @@ class VTCmd(BaseCommand):
     -v        Verbose; not quiet. Default if stderr is a tty.
 '''
 
-  @dataclass
-  class Options(BaseCommand.Options):
-    config_map: Optional[Union[str, Mapping]] = None
-    store_spec: str = field(
-        default_factory=lambda: os.environ.
-        get(VTCmd.VT_STORE_ENVVAR, '[default]')
-    )
-    cache_store_spec: str = field(
-        default_factory=lambda: os.environ.
-        get(VTCmd.VT_CACHE_STORE_ENVVAR, '[cache]')
-    )
-    # TODO: discard dflt_log
-    dflt_log: Optional[str] = field(
-        default_factory=lambda: os.environ.get(VTCmd.VT_LOGFILE_ENVVAR)
-    )
-    hashname: str = field(
-        default_factory=lambda: os.environ.
-        get(VTCmd.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname)
-    )
-    show_progress: bool = field(
-        default_factory=lambda: run_modes.show_progress
-    )
-
-    @property
-    def hashclass(self):
-      ''' The `HashCode` subclass for `self.hashname`.
-      '''
-      try:
-        return HASHCLASS_BY_NAME[self.hashname]
-      except KeyError as e:
-        raise AttributeError(
-            f'{self.__class__.__name__}.hashclass: unknown hashclass name {self.hashname!r} (I know {sorted(HASHCLASS_BY_NAME.keys())})'
-        ) from e
-
-    @property
-    def config(self):
-      ''' A `Config` derived from `self.config_map`.
-      '''
-      return Config(self.config_map)
+  Options = VTCmdOptions
 
   def apply_opts(self, opts):
     ''' Apply the command line options mapping `opts` to `options`.
