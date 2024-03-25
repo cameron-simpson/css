@@ -56,6 +56,9 @@ DISTINFO = {
 # default to 5s of position buffer for computing recent thoroughput
 DEFAULT_THROUGHPUT_WINDOW = 5
 
+# default update period
+DEFAULT_UPDATE_PERIOD = 0.3
+
 @functools.total_ordering
 class BaseProgress(object):
   ''' The base class for `Progress` and `OverProcess`
