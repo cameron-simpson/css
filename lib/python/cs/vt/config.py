@@ -57,14 +57,6 @@ from .convert import (
     truthy_word,
 )
 from .dir import Dir
-from .store import (
-    DataDirStore,
-    FileCacheStore,
-    MemoryCacheStore,
-    PlatonicStore,
-    ProxyStore,
-    VTDStore,
-)
 from .socket import TCPClientStore, UNIXSocketClientStore
 
 # pylint: disable=too-many-public-methods
@@ -330,6 +322,7 @@ class Config(SingletonMixin, HasThreadState):
         See also the `.Stores_from_spec` method, which returns the
         separate `Store`s unassembled.
     '''
+    from .store import ProxyStore
     stores = self.Stores_from_spec(store_spec, hashclass=hashclass)
     if not stores:
       raise ValueError("empty Store specification: %r" % (store_spec,))
@@ -415,6 +408,7 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
+    from .store import DataDirStore
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -441,6 +435,7 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a VTDStore from a "datafile" clause.
     '''
+    from .store import VTDStore
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -470,6 +465,7 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a FileCacheStore from a "filecache" clause.
     '''
+    from .store import FileCacheStore
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -515,6 +511,7 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
+    from .store import MemoryCacheStore
     if isinstance(max_data, str):
       max_data = scaled_value(max_data)
     return MemoryCacheStore(store_name, max_data, hashclass=hashclass)
@@ -532,8 +529,9 @@ class Config(SingletonMixin, HasThreadState):
       archive=None,
       hashclass=None,
   ):
-    ''' Construct a PlatonicStore from a "datadir" clause.
+    ''' Construct a `PlatonicStore` from a "datadir" clause.
     '''
+    from .store import PlatonicStore
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -581,6 +579,7 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a ProxyStore.
     '''
+    from .store import ProxyStore
     if save is None:
       save_stores = []
       readonly = True
