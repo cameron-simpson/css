@@ -253,7 +253,7 @@ class _ClassSubCommand(_BaseSubCommand):
     subcmd_class = self.method
     updates = dict(command.options.__dict__)
     updates.update(cmd=subcmd)
-    command = subcmd_class(argv, **updates)
+    command = pfx_call(subcmd_class, argv, **updates)
     return command.run()
 
   def usage_format(self) -> str:
@@ -315,8 +315,8 @@ class BaseCommandOptions(HasThreadState):
 
         Any keyword arguments are applied as attribute updates to the copy.
     '''
-    copied = type(self)(
-        **{
+    copied = pfx_call(
+        type(self), **{
             k: v
             for k, v in self.__dict__.items()
             if not k.startswith('_')
