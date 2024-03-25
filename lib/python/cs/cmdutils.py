@@ -326,6 +326,7 @@ class BaseCommandOptions(HasThreadState):
       setattr(copied, k, v)
     return copied
 
+  # TODO: remove this - the overt make-a-copy-and-with-the-copy is clearer
   @contextmanager
   def __call__(self, **updates):
     ''' Calling the options object returns a context manager whose
@@ -638,7 +639,7 @@ class BaseCommand:
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
     options = self.options = self.Options(cmd=self.cmd)
-    options.runstate_signals = self.DEFAULT_SIGNALS
+    options.runstate_signals = options.DEFAULT_SIGNALS
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
@@ -1308,22 +1309,19 @@ class BaseCommand:
     '''
     # redundant try/finally to remind subclassers of correct structure
     try:
-      options = self.options
-      kw_options.setdefault('runstate', runstate)
-      kw_options.setdefault('upd', upd)
-      with options(**kw_options) as run_options:
-        with run_options:  # make the default ThreadState
-          with stackattrs(self, options=run_options):
-            handle_signal = getattr(
-                self, 'handle_signal', lambda *_: runstate.cancel()
-            )
-            with stackattrs(self, cmd=self._subcmd or self.cmd):
-              with upd:
-                with runstate:
-                  with runstate.catch_signal(options.runstate_signals,
-                                             call_previous=False,
-                                             handle_signal=handle_signal):
-                    yield
+      run_options = self.options.copy(**kw_options)
+      with run_options:  # make the default ThreadState
+        with stackattrs(self, options=run_options):
+          handle_signal = getattr(
+              self, 'handle_signal', lambda *_: runstate.cancel()
+          )
+          with stackattrs(self, cmd=self._subcmd or self.cmd):
+            with upd:
+              with runstate:
+                with runstate.catch_signal(run_options.runstate_signals,
+                                           call_previous=False,
+                                           handle_signal=handle_signal):
+                  yield
 
     finally:
       pass
