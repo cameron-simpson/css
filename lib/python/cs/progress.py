@@ -460,30 +460,23 @@ class BaseProgress(object):
       )
 
   # pylint: disable=too-many-arguments,too-many-branches,too-many-locals
-  @uses_upd
   def iterbar(
       self,
       it,
       label=None,
       *,
-      upd=None,
-      proxy=None,
       itemlenfunc=None,
-      statusfunc=None,
       incfirst=False,
-      width=None,
-      window=None,
-      update_frequency=1,
-      update_period=0.2,
-      update_min_size=None,
-      report_print=None,
-      runstate=None,
+      update_period=0,
+      **bar_kw,
   ):
     ''' An iterable progress bar: a generator yielding values
         from the iterable `it` while updating a progress bar.
 
         Parameters:
         * `it`: the iterable to consume and yield.
+        * `label`: a label for the progress bar,
+          default from `self.name`.
         * `itemlenfunc`: an optional function returning the "size" of each item
           from `it`, used to advance `self.position`.
           The default is to assume a size of `1`.
@@ -494,38 +487,10 @@ class BaseProgress(object):
           made as items are obtained or only after items are processed
           by whatever is consuming this generator.
           The default is `False`, advancing after processing.
-        * `label`: a label for the progress bar,
-          default from `self.name`.
-        * `width`: an optional width expressing how wide the progress bar
-          text may be.
-          The default comes from the `proxy.width` property.
-        * `window`: optional timeframe to define "recent" in seconds;
-          if the default `statusfunc` (`Progress.status`) is used
-          this is passed to it
-        * `statusfunc`: an optional function to compute the progress bar text
-          accepting `(self,label,width)`.
-        * `proxy`: an optional proxy for displaying the progress bar,
-          a callable accepting the result of `statusfunc`.
-          The default is a `cs.upd.UpdProxy` created from `upd`,
-          which inserts a progress bar above the main status line.
-        * `upd`: an optional `cs.upd.Upd` instance,
-          used only to produce the default `proxy` if that is not supplied.
-          The default `upd` is `cs.upd.Upd()`
-          which uses `sys.stderr` for display.
-        * `update_frequency`: optional update frequency, default `1`;
-          only update the progress bar after this many iterations,
-          useful if the iteration rate is quite high
-        * `update_min_size`: optional update step size;
-          only update the progress bar after an advance of this many units,
-          useful if the iteration size increment is quite small
-        * `update_period`: optional update time period, default `0.2`;
-          only update the progress bar after this much time has
-          elapsed since the last update
-        * `report_print`: optional `print` compatible function
-          with which to write a report on completion;
-          this may also be a `bool`, which if true will use `Upd.print`
-          in order to interoperate with `Upd`.
-        * `runstate`: optional `RunState` whose `.cancelled` property can be consulted
+        * `update_period`: default `0`; if > 0 then update the
+          progress bar every `update_period` seconds, otherwise on
+          each iteration
+        Other parameters are passed to `Progress.bar`.
 
         Example use:
 
@@ -547,71 +512,19 @@ class BaseProgress(object):
             for bs in P.iterbar(readfrom(f), itemlenfunc=len):
                 ... process the file data in bs ...
     '''
-    if label is None:
-      label = self.name
-    delete_proxy = False
-    if proxy is None:
-      proxy = upd.insert(1, update_period=update_period)
-      delete_proxy = True
-    else:
-      old_update_period = proxy.update_period
-      proxy.update_period = update_period
-    if statusfunc is None:
-      # pylint: disable=unnecessary-lambda-assignment
-      statusfunc = lambda P, label, width: P.status(
-          label, width, window=window
-      )
-    iteration = 0
-    last_update_iteration = 0
-    last_update_pos = start_pos = self.position
-    last_update_time = None
-
-    def update_status(force=False):
-      nonlocal self, proxy, statusfunc, label, width
-      nonlocal iteration, last_update_iteration, last_update_pos, last_update_time
-      now = time.time()
-      # pylint: disable=too-many-boolean-expressions
-      if (force or iteration - last_update_iteration >= update_frequency
-          or (update_min_size is not None
-              and self.position - last_update_pos >= update_min_size)
-          or (update_period and now >= last_update_time + update_period)):
-        last_update_iteration = iteration
-        last_update_pos = self.position
-        proxy(statusfunc(self, label, width or proxy.width))
-        last_update_time = now
-
-    update_status(True)
-    try:
+    with self.bar(label, update_period=update_period, **bar_kw) as proxy:
       for iteration, item in enumerate(it):
         length = itemlenfunc(item) if itemlenfunc else 1
         if incfirst:
           self += length
-          update_status()
-        yield item
-        if not incfirst:
+          if update_period == 0:
+            proxy.text = None
+          yield item
+        else:
+          yield item
           self += length
-          update_status()
-        if runstate is not None and runstate.cancelled:
-          break
-    finally:
-      if delete_proxy:
-        proxy.delete()
-      else:
-        # restore previous update frequency
-        proxy.update_period = old_update_period
-        update_status(True)
-      if report_print:
-        if isinstance(report_print, bool):
-          report_print = print
-        report_print(
-            label + (
-                ': (cancelled)'
-                if runstate is not None and runstate.cancelled else ':'
-            ), self.format_counter(self.position - start_pos), 'in',
-            transcribe(
-                self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
-            )
-        )
+          if update_period == 0:
+            proxy.text = None
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
@@ -1064,7 +977,7 @@ def progressbar(
     position=None,
     total=None,
     units_scale=UNSCALED_SCALE,
-    **kw
+    **iterbar_kw
 ):
   ''' Convenience function to construct and run a `Progress.iterbar`
       wrapping the iterable `it`,
@@ -1096,10 +1009,7 @@ def progressbar(
       total = None
   yield from Progress(
       name=label, position=position, total=total, units_scale=units_scale
-  ).iterbar(
-      it, label=label, **kw
-  )
-  ##pass  # former workaround for some bug, IIRC
+  ).iterbar(it, **iterbar_kw)
 
 @decorator
 def auto_progressbar(func, label=None, report_print=False):
