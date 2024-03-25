@@ -27,7 +27,7 @@ from typing import Mapping, Optional, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.deco import fmtdoc, Promotable
+from cs.deco import fmtdoc, promote, Promotable
 from cs.fs import shortpath, longpath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning
