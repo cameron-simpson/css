@@ -1194,9 +1194,17 @@ class UpdProxy(object):
   def text(self, txt):
     ''' Set the text of the status line.
 
+        If `txt` is `None`: if a `text_auto` function was supplied,
+        use it to compute `txt` otherwise do not change the text.
+
         If the length of `self.prefix+txt` exceeds the available display
         width then the leftmost text is cropped to fit.
     '''
+    if txt is None:
+      if self._text_auto:
+        txt = self._text_auto()
+      else:
+        return
     self._text = txt
     self._update()
 
