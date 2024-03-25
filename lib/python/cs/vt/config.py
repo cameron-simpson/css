@@ -27,7 +27,7 @@ from typing import Mapping, Optional, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.deco import fmtdoc, promote
+from cs.deco import fmtdoc, promote, Promotable
 from cs.fs import shortpath, longpath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning
@@ -60,7 +60,7 @@ from .dir import Dir
 from .socket import TCPClientStore, UNIXSocketClientStore
 
 # pylint: disable=too-many-public-methods
-class Config(SingletonMixin, HasThreadState):
+class Config(SingletonMixin, HasThreadState, Promotable):
   ''' A configuration specification.
 
       This can be driven by any mapping of mappings: {clause_name => {param => value}}.
@@ -675,3 +675,11 @@ class Config(SingletonMixin, HasThreadState):
       socket_path = clause_name
     socket_path = expand_path(socket_path)
     return UNIXSocketClientStore(store_name, socket_path, hashclass=hashclass)
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to a `Config`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    return cls(config_spec=obj)
