@@ -788,7 +788,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
         )
       if proxy is None:
         # create the proxy, which inserts it
-        return UpdProxy(index=index, upd=self, prefix=txt, **proxy_kw)
+        return UpdProxy(txt, index=index, upd=self, **proxy_kw)
 
       # associate the proxy with self
       assert proxy.upd is None
