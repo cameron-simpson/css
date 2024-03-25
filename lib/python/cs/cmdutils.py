@@ -158,17 +158,18 @@ class _BaseSubCommand(ABC):
       if attr.startswith(prefix):
         subcmd = cutprefix(attr, prefix)
         method = getattr(command_cls, attr)
-        subcommands_map[subcmd] = (
-            _ClassSubCommand(
-                subcmd,
-                method,
-                usage_mapping=dict(getattr(method, 'USAGE_KEYWORDS', ()))
-            ) if isclass(method) else _MethodSubCommand(
-                subcmd,
-                method,
-                usage_mapping=dict(getattr(command_cls, 'USAGE_KEYWORDS', ()))
-            )
-        )
+        if isclass(method):
+          subcommands_map[subcmd] = _ClassSubCommand(
+              subcmd,
+              method,
+              usage_mapping=dict(getattr(method, 'USAGE_KEYWORDS', ())),
+          )
+        else:
+          subcommands_map[subcmd] = _MethodSubCommand(
+              subcmd,
+              method,
+              usage_mapping=dict(getattr(command_cls, 'USAGE_KEYWORDS', ())),
+          )
     return subcommands_map
 
   def usage_text(
