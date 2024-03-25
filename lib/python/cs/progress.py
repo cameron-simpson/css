@@ -18,12 +18,15 @@ from threading import RLock
 import time
 from typing import Optional
 
+from icontract import ensure
 from typeguard import typechecked
 
 from cs.deco import decorator
 from cs.logutils import debug, exception
 from cs.py.func import funcname
+from cs.resources import RunState
 from cs.seq import seq
+from cs.threads import bg
 from cs.units import (
     transcribe_time,
     transcribe,
@@ -227,6 +230,7 @@ class BaseProgress(object):
       return None
     return time.time() + remaining
 
+  @ensure(lambda width, result: len(result) <= width)
   def arrow(self, width, no_padding=False):
     ''' Construct a progress arrow representing completion
         to fit in the specified `width`.
@@ -324,7 +328,9 @@ class BaseProgress(object):
       leftv.append(self.text_pos_of_total())
     else:
       leftv.append(self.format_counter(self.position))
+    # the n/m display
     left = ' '.join(leftv)
+    # the throughput display
     right = ' '.join(rightv)
     if self.total is None:
       arrow_field = ' '
@@ -418,6 +424,7 @@ class BaseProgress(object):
       '''
       return statusfunc(self, "", min((width or proxy.width), proxy.width))
 
+    # pylint: disable=unused-argument
     def update(P: Progress, _):
       ''' Update the status bar `UpdProxy` with the current state.
       '''
@@ -513,7 +520,7 @@ class BaseProgress(object):
                 ... process the file data in bs ...
     '''
     with self.bar(label, update_period=update_period, **bar_kw) as proxy:
-      for iteration, item in enumerate(it):
+      for item in it:
         length = itemlenfunc(item) if itemlenfunc else 1
         if incfirst:
           self += length
@@ -1048,22 +1055,35 @@ def selftest(argv):
   with open(__file__, encoding='utf8') as f:
     lines = f.readlines()
   lines += lines
-  for _ in progressbar(lines, "lines"):
-    time.sleep(0.005)
-  for _ in progressbar(lines, "blines", units_scale=BINARY_BYTES_SCALE,
-                       itemlenfunc=len):
-    time.sleep(0.005)
-  for _ in progressbar(lines, "lines step 100", update_frequency=100,
-                       report_print=True):
-    time.sleep(0.005)
-  P = Progress(
-      name=__file__,
-      ##total=len(lines),
-      units_scale=DECIMAL_SCALE,
-  )
-  with open(__file__, encoding='utf8') as f:
-    for _ in P.iterbar(f):
-      time.sleep(0.005)
+  if True:  # pylint: disable=using-constant-test
+    for _ in progressbar(lines, "lines"):
+      pass
+  if True:  # pylint: disable=using-constant-test
+    for _ in progressbar(
+        lines,
+        "blines",
+        units_scale=BINARY_BYTES_SCALE,
+        itemlenfunc=len,
+        total=sum(len(line) for line in lines),
+    ):
+      pass
+  if True:  # pylint: disable=using-constant-test
+    for _ in progressbar(
+        lines,
+        "lines update 2s",
+        update_period=2,
+        report_print=True,
+    ):
+      pass
+  if True:  # pylint: disable=using-constant-test
+    P = Progress(
+        name=__file__,
+        ##total=len(lines),
+        units_scale=DECIMAL_SCALE,
+    )
+    with open(__file__, encoding='utf8') as f:
+      for _ in P.iterbar(f):
+        time.sleep(0.005)
   from cs.debug import selftest as runtests  # pylint: disable=import-outside-toplevel
   runtests('cs.progress_tests')
 
