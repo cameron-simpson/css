@@ -35,10 +35,8 @@
 from collections import defaultdict, namedtuple
 from collections.abc import MutableMapping
 from contextlib import contextmanager
-from dataclasses import dataclass
 import errno
 from functools import cached_property, partial
-from getopt import GetoptError
 import os
 from os import (
     pread,
@@ -55,7 +53,6 @@ import stat
 import sys
 from time import time, sleep
 from types import SimpleNamespace
-from typing import Optional
 from uuid import uuid4
 from zlib import decompress
 
@@ -65,7 +62,6 @@ from typeguard import typechecked
 from cs.app.flag import FlaggedMixin
 from cs.binary import BinaryMultiValue, BSUInt
 from cs.cache import LRU_Cache
-from cs.cmdutils import BaseCommand
 from cs.context import nullcontext, stackattrs
 from cs.fileutils import (
     DEFAULT_READSIZE,
@@ -75,7 +71,6 @@ from cs.fileutils import (
     shortpath,
 )
 from cs.fs import HasFSPath, needdir
-from cs.lex import s
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -85,7 +80,7 @@ from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.threads import locked, bg as bg_thread, joinif
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
-from cs.upd import with_upd_proxy, UpdProxy, uses_upd
+from cs.upd import Upd, with_upd_proxy, UpdProxy, uses_upd
 
 from . import MAX_FILE_SIZE, Lock, RLock, Store, run_modes
 from .archive import Archive
@@ -120,6 +115,7 @@ INDEX_FLUSH_RATE = 16384
 
 def main(argv=None):
   ''' DataDir command line mode. '''
+  from .__main__ import DataDirCommand  # pylint: disable=import-outside-toplevel
   return DataDirCommand(argv=argv).run()
 
 class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
@@ -460,6 +456,8 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
 
   @property
   def WDFstate(self) -> DataFileState:
+    ''' The `DataFileState` for the writable save `DataFile`.
+    '''
     with self._lock:
       WDFstate = self._WDFstate
       if WDFstate is None:
@@ -1192,10 +1190,8 @@ class PlatonicDir(FilesDir):
                     continue
                   upd_proxy.text = f'scan {filename!r}'
                   try:
-                    updated |= self._scan_datafile(
-                        D, filename, rfilepath, upd_proxy=upd_proxy
-                    )
-                  except Exception as e:
+                    updated |= self._scan_datafile(D, filename, rfilepath)
+                  except Exception as e:  # pylint: disable=broad-exception-caught
                     warning(
                         "exception scanning %s: %s",
                         shortpath(joinpath(dirpath, filename)), e
@@ -1206,7 +1202,9 @@ class PlatonicDir(FilesDir):
           updated = False
     self.flush()
 
-  def _scan_datafile(self, D, filename, rfilepath, *, upd_proxy: UpdProxy):
+  # pylint: disable=too-many-branches,too-many-statements
+  @uses_upd
+  def _scan_datafile(self, D, filename, rfilepath, *, upd: Upd):
     ''' Scan the data file at `data/{rfilepath}`, record as `D[filename]`.
         Return a Boolean indicating whether `D` was updated.
     '''
@@ -1230,7 +1228,7 @@ class PlatonicDir(FilesDir):
         self._del_datafilestate(DFstate)
       else:
         warning("stat: %s", e)
-      return
+      return updated
     if new_size is None:
       # skip non files
       debug("SKIP non-file")
@@ -1262,16 +1260,15 @@ class PlatonicDir(FilesDir):
       scan_from = DFstate.scanned_to
       scan_start = time()
       scanner = DFstate.scanfrom(offset=DFstate.scanned_to)
-      if 1:
+      if not upd.disabled:
         scanner = progressbar(
             scanner,
-            "scan " + rfilepath[:max(16, upd_proxy.width - 60)],
+            "scan " + rfilepath,
             position=DFstate.scanned_to,
             total=new_size,
             itemlenfunc=lambda t3: t3[2] - t3[0],
-            update_frequency=256,
-            proxy=upd_proxy,
             units_scale=BINARY_BYTES_SCALE,
+            update_period=0.3,
             report_print=True,
         )
       for pre_offset, data, post_offset in scanner:
