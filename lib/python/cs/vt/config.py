@@ -27,7 +27,7 @@ from typing import Mapping, Optional, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.deco import fmtdoc, promote, Promotable
+from cs.deco import fmtdoc, Promotable
 from cs.fs import shortpath, longpath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning
@@ -54,10 +54,8 @@ from .convert import (
     expand_path,
     get_integer,
     scaled_value,
-    truthy_word,
 )
 from .dir import Dir
-from .socket import TCPClientStore, UNIXSocketClientStore
 
 # pylint: disable=too-many-public-methods
 class Config(SingletonMixin, HasThreadState, Promotable):
@@ -322,7 +320,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
         See also the `.Stores_from_spec` method, which returns the
         separate `Store`s unassembled.
     '''
-    from .store import ProxyStore
+    from .store import ProxyStore  # pylint: disable=import-outside-toplevel
     stores = self.Stores_from_spec(store_spec, hashclass=hashclass)
     if not stores:
       raise ValueError("empty Store specification: %r" % (store_spec,))
@@ -408,7 +406,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
-    from .store import DataDirStore
+    from .store import DataDirStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -435,7 +433,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
   ):
     ''' Construct a VTDStore from a "datafile" clause.
     '''
-    from .store import VTDStore
+    from .store import VTDStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -465,7 +463,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
   ):
     ''' Construct a FileCacheStore from a "filecache" clause.
     '''
-    from .store import FileCacheStore
+    from .store import FileCacheStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -511,7 +509,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
-    from .store import MemoryCacheStore
+    from .store import MemoryCacheStore  # pylint: disable=import-outside-toplevel
     if isinstance(max_data, str):
       max_data = scaled_value(max_data)
     return MemoryCacheStore(store_name, max_data, hashclass=hashclass)
@@ -531,7 +529,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
   ):
     ''' Construct a `PlatonicStore` from a "datadir" clause.
     '''
-    from .store import PlatonicStore
+    from .store import PlatonicStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -579,7 +577,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
   ):
     ''' Construct a ProxyStore.
     '''
-    from .store import ProxyStore
+    from .store import ProxyStore  # pylint: disable=import-outside-toplevel
     if save is None:
       save_stores = []
       readonly = True
@@ -648,6 +646,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
   ):
     ''' Construct a TCPClientStore from a "tcp" clause.
     '''
+    from .socket import TCPClientStore  # pylint: disable=import-outside-toplevel
     if host is None:
       host = clause_name
     if port is None:
@@ -671,6 +670,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
   ):
     ''' Construct a `UNIXSocketClientStore` from a "socket" clause.
     '''
+    from .socket import UNIXSocketClientStore  # pylint: disable=import-outside-toplevel
     if socket_path is None:
       socket_path = clause_name
     socket_path = expand_path(socket_path)
