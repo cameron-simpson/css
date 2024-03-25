@@ -362,18 +362,18 @@ class BaseProgress(object):
 
   # pylint: disable=blacklisted-name,too-many-arguments
   @contextmanager
+  @uses_upd
   def bar(
       self,
       label=None,
       *,
-      upd=None,
-      proxy=None,
       statusfunc=None,
       width=None,
       recent_window=None,
       report_print=None,
       insert_pos=1,
-      deferred=False,
+      update_period=0,
+      upd: Upd,
   ):
     ''' A context manager to create and withdraw a progress bar.
         It returns the `UpdProxy` which displays the progress bar.
@@ -381,11 +381,6 @@ class BaseProgress(object):
         Parameters:
         * `label`: a label for the progress bar,
           default from `self.name`.
-        * `proxy`: an optional `UpdProxy` to display the progress bar
-        * `upd`: an optional `cs.upd.Upd` instance,
-          used to produce the progress bar status line if not supplied.
-          The default `upd` is `cs.upd.Upd()`
-          which uses `sys.stderr` for display.
         * `statusfunc`: an optional function to compute the progress bar text
           accepting `(self,label,width)`.
         * `width`: an optional width expressing how wide the progress bar
@@ -399,8 +394,6 @@ class BaseProgress(object):
           this may also be a `bool`, which if true will use `Upd.print`
           in order to interoperate with `Upd`.
         * `insert_pos`: where to insert the progress bar, default `1`
-        * `deferred`: optional flag; if true do not create the
-          progress bar until the first update occurs.
 
         Example use:
 
@@ -414,35 +407,48 @@ class BaseProgress(object):
     '''
     if label is None:
       label = self.name
-    if upd is None:
-      upd = Upd()
     if statusfunc is None:
       # pylint: disable=unnecessary-lambda-assignment
       statusfunc = lambda P, label, width: P.status(
           label, width, recent_window=recent_window
       )
-    pproxy = [proxy]
-    proxy_delete = proxy is None
 
-    def update(P, _):
-      proxy = pproxy[0]
-      if proxy is None:
-        proxy = pproxy[0] = upd.insert(insert_pos, 'LABEL=' + label)
-      proxy(statusfunc(P, label, width or proxy.width))
+    def text_auto():
+      ''' The current state of the `Progress`, to fit `width` and `proxy.width`.
+      '''
+      return statusfunc(self, "", min((width or proxy.width), proxy.width))
 
-    try:
-      if not deferred:
-        if proxy is None:
-          proxy = pproxy[0] = upd.insert(insert_pos)
-        status = statusfunc(self, label, width or proxy.width)
-        proxy(status)
+    def update(P: Progress, _):
+      ''' Update the status bar `UpdProxy` with the current state.
+      '''
+      proxy.text = None
+
+    def ticker(runstate: RunState):
+      ''' Worker to update the progress bar every `update_period` seconds.
+      '''
+      time.sleep(update_period)
+      while not runstate.cancelled:
+        update(self, None)
+        time.sleep(update_period)
+
+    if update_period == 0:
       self.notify_update.add(update)
-      start_pos = self.position
-      yield pproxy[0]
-    finally:
-      self.notify_update.remove(update)
-      if proxy and proxy_delete:
-        proxy.delete()
+    with RunState(label) as runstate:
+      try:
+        start_pos = self.position
+        with upd.insert(
+            insert_pos,
+            prefix=label + ' ',
+            text_auto=text_auto,
+        ) as proxy:
+          update(self, None)
+          if update_period > 0:
+            bg(ticker, args=(runstate,), daemon=True)
+          yield proxy
+      finally:
+        runstate.cancel()
+        if update_period == 0:
+          self.notify_update.remove(update)
     if report_print:
       if isinstance(report_print, bool):
         report_print = print
