@@ -285,7 +285,7 @@ class BaseProgress(object):
     return fmt.format(pos_text=pos_text, total_text=total_text)
 
   # pylint: disable=too-many-branches,too-many-statements
-  def status(self, label, width, window=None):
+  def status(self, label, width, recent_window=None):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
 
@@ -294,18 +294,18 @@ class BaseProgress(object):
           if `None` use `self.name`
         * `width`: the available width for the status line;
           if not an `int` use `width.width`
-        * `window`: optional timeframe to define "recent" in seconds,
+        * `recent_window`: optional timeframe to define "recent" in seconds,
           default : `5`
     '''
     if label is None:
       label = self.name
     if not isinstance(width, int):
       width = width.width
-    if window is None:
-      window = 5
+    if recent_window is None:
+      recent_window = 5
     leftv = []
     rightv = []
-    throughput = self.throughput_recent(window)
+    throughput = self.throughput_recent(recent_window)
     if throughput is not None:
       if throughput == 0:
         if self.total is not None and self.position >= self.total:
@@ -370,7 +370,7 @@ class BaseProgress(object):
       proxy=None,
       statusfunc=None,
       width=None,
-      window=None,
+      recent_window=None,
       report_print=None,
       insert_pos=1,
       deferred=False,
@@ -391,7 +391,7 @@ class BaseProgress(object):
         * `width`: an optional width expressing how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
-        * `window`: optional timeframe to define "recent" in seconds;
+        * `recent_window`: optional timeframe to define "recent" in seconds;
           if the default `statusfunc` (`Progress.status`) is used
           this is passed to it
         * `report_print`: optional `print` compatible function
@@ -419,7 +419,7 @@ class BaseProgress(object):
     if statusfunc is None:
       # pylint: disable=unnecessary-lambda-assignment
       statusfunc = lambda P, label, width: P.status(
-          label, width, window=window
+          label, width, recent_window=recent_window
       )
     pproxy = [proxy]
     proxy_delete = proxy is None
