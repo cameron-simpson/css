@@ -8,8 +8,7 @@ r'''
 Assorted function decorators.
 '''
 
-from abc import ABC, abstractmethod
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from contextlib import contextmanager
 from inspect import isgeneratorfunction, ismethod, signature, Parameter
 import sys
@@ -812,7 +811,7 @@ def default_params(func, _strict=False, **param_defaults):
     else:
       new_param = param.replace(
           annotation=typing.Optional[param.annotation],
-          default=None if param.default is param.empty else param.default,
+          default=None if param_default is param.empty else param_default,
       )
       new_params.append(new_param)
   defaulted_func.__signature__ = sig0.replace(parameters=new_params)
