@@ -349,8 +349,8 @@ class Pfx(object):
         continue
       if value is None:
         continue
-      # special case various known exception type attributes
       ovalue = value
+      # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
         # prefixify the first string
         value = list(value)
@@ -370,6 +370,10 @@ class Pfx(object):
           value = (cls.prefixify(value0), *value[1:])
         else:
           continue
+      elif attr == 'message' and not isinstance(value, StringTypes):
+        # saw django.core.exceptions.ValidationError.message
+        # is not a string but some kind of proxy object
+        continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
@@ -401,8 +405,9 @@ class Pfx(object):
           value = t0(value)
         else:
           X(
-              "prefixify_exception: %s.%s:%s:%r is a different type from the new value:%s:%r",
-              e.__class__.__name__, attr, ovalue.__class__.__name__, ovalue,
+              "prefixify_exception: %s.%s.%s:%s.%s:%r is a different type from the new value:%s:%r",
+              e.__class__.__module__, e.__class__.__name__, attr,
+              ovalue.__class__.__module__, ovalue.__class__.__name__, ovalue,
               value.__class__.__name__, value
           )
       try:
