@@ -334,7 +334,8 @@ class VTCmd(BaseCommand):
     if options.dflt_log is not None:
       logTo(options.dflt_log, delay=True)
 
-  def handle_signal(self, sig, frame):
+  @uses_runstate
+  def handle_signal(self, sig, frame, *, runstate: RunState):
     ''' Override `BaseCommand.handle_signal`:
         - do a threaddump for `SIGQUIT`
         - run the default `handle_signal` method
@@ -343,7 +344,7 @@ class VTCmd(BaseCommand):
     if sig == SIGQUIT:
       thread_dump()
     # call the standard RunState signal handler
-    self.options.runstate.handle_signal(sig, frame)
+    runstate.handle_signal(sig, frame)
     if sig == SIGQUIT:
       sys.exit(1)
 
@@ -420,7 +421,8 @@ class VTCmd(BaseCommand):
         *a,
     )
 
-  def cmd_benchmark(self, argv):
+  @uses_runstate
+  def cmd_benchmark(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} mode [args...] [<data]
           Benchmark various things.
           Modes:
@@ -433,7 +435,6 @@ class VTCmd(BaseCommand):
             scan_reblock    Run the new scan_reblock function against the data.
             scanbuf2        Run the new C scanbuf2 against the data.
     '''
-    runstate = self.options.runstate
     if not argv:
       raise GetoptError("missing mode")
     mode = argv.pop(0)
@@ -679,7 +680,8 @@ class VTCmd(BaseCommand):
     from .httpd import main as httpd_main
     httpd_main([self.cmd + ': ' + 'httpd'] + argv)
 
-  def cmd_import(self, argv):
+  @uses_runstate
+  def cmd_import(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-oW] srcpath {{-|archivepath}}
           Import paths into the Store, print top Dirent for each.
 
@@ -704,7 +706,6 @@ class VTCmd(BaseCommand):
     delete = options.delete
     overlay = options.overlay
     whole_read = options.whole_read
-    runstate = options.runstate
     if archivepath is None:
       D = Dir('.')
     else:
@@ -826,7 +827,8 @@ class VTCmd(BaseCommand):
         ls(path, D, recurse, sys.stdout)
     return xit
 
-  def cmd_mount(self, argv):
+  @uses_runstate
+  def cmd_mount(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-ar] [-o options] special [mountpoint]
           Mount the specified special on the specified mountpoint directory.
           Requires FUSE support.
@@ -835,7 +837,6 @@ class VTCmd(BaseCommand):
           -r            Read only, synonym for "-o readonly".
     '''
     options = self.options
-    runstate = options.runstate
     try:
       from .fuse import mount, umount
     except ImportError as e:
@@ -1211,7 +1212,8 @@ class VTCmd(BaseCommand):
         raise GetoptError("unrecognised pushables")
     return self._push(srcS, dstS, *pushables)
 
-  def cmd_save(self, argv):
+  @uses_runstate
+  def cmd_save(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-F] [{{ospath|-}}...]
           Save the contents of each ospath to the Store.
           The argument "-" reads data from standard input and prints a fileref.
@@ -1219,7 +1221,6 @@ class VTCmd(BaseCommand):
           -F  Print a FileDirent instead of a block ref for file contents.
     '''
     options = self.options
-    runstate = options.runstate
     use_filedirent = False
     if argv and argv[0] == '-F':
       use_filedirent = True
@@ -1277,7 +1278,8 @@ class VTCmd(BaseCommand):
         )
     return xit
 
-  def cmd_serve(self, argv):
+  @uses_runstate
+  def cmd_serve(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [{{DEFAULT|-|/path/to/socket|[host]:port}} [name:storespec]...]
           Start a service daemon listening on a TCP port or a UNIX domain socket.
           With no `name:storespec` arguments the default Store is served,
@@ -1333,7 +1335,6 @@ class VTCmd(BaseCommand):
             exports[name] = namedS
             if '' not in exports:
               exports[''] = namedS
-    runstate = self.options.runstate
     if address == '-':
       track("dispatch StreamStore(%r,stdin,stdout,..)", address)
       from .stream import StreamStore
@@ -1368,7 +1369,8 @@ class VTCmd(BaseCommand):
         )
     return 0
 
-  def cmd_test(self, argv):
+  @uses_runstate
+  def cmd_test(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} subtest [subtestargs...]
           Test various facilites.
           blockify filenames... Blockify the contents of the filenames.
@@ -1376,7 +1378,6 @@ class VTCmd(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing test subcommand")
-    runstate = self.options.runstate
     subcmd = argv.pop(0)
     with Pfx(subcmd):
       if subcmd == 'blockify':
@@ -1448,7 +1449,7 @@ class VTCmd(BaseCommand):
       else:
         target = OSFile(targetpath)
     with Pfx(targetpath):
-      if not merge(target, source, runstate=self.options.runstate):
+      if not merge(target, source):
         return 1
     return 0
 
