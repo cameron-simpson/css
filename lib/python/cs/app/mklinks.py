@@ -22,7 +22,6 @@ partially hardlinked tree is processed efficiently and correctly.
 from collections import defaultdict
 from functools import cached_property
 from getopt import GetoptError
-from hashlib import sha1 as hashfunc
 import os
 from os.path import dirname, isdir, join as joinpath, relpath
 from stat import S_ISREG
@@ -30,14 +29,13 @@ import sys
 from tempfile import NamedTemporaryFile
 
 from cs.cmdutils import BaseCommand
-from cs.fileutils import read_from, common_path_prefix, shortpath
+from cs.fileutils import common_path_prefix, shortpath
 from cs.hashindex import file_checksum
 from cs.logutils import status, warning, error
 from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
 from cs.resources import RunState, uses_runstate
-from cs.units import BINARY_BYTES_SCALE
-from cs.upd import UpdProxy, Upd, print, run_task  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, print, run_task  # pylint: disable=redefined-builtin
 
 __version__ = '20221228-post'
 
@@ -99,7 +97,7 @@ class MKLinksCmd(BaseCommand):
       raise GetoptError("missing paths")
     options = self.options
     linker = Linker()
-    with options.upd.insert(1) as step:
+    with run_task("scan") as step:
       # scan the supplied paths
       for path in argv:
         runstate.raiseif()
@@ -108,7 +106,7 @@ class MKLinksCmd(BaseCommand):
         step("scan " + path + ' ...')
         with Pfx(path):
           linker.scan(path)
-      step("merge ...")
+    with run_task("merge"):
       linker.merge(dry_run=options.dry_run)
     return 0
 

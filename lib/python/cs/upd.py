@@ -1027,7 +1027,7 @@ def pfxprint(*a, upd, **kw):
 
 @contextmanager
 @uses_upd
-def run_task(*a, upd, **kw):
+def run_task(*a, upd: Upd, **kw):
   ''' Top level `run_task` function to call `Upd.run_task`.
   '''
   with upd.run_task(*a, **kw) as proxy:

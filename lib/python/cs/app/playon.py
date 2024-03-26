@@ -22,7 +22,7 @@ import re
 import sys
 from threading import Semaphore
 import time
-from typing import Optional, Set
+from typing import Optional
 from urllib.parse import unquote as unpercent
 
 from icontract import require
@@ -43,7 +43,7 @@ from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import print  # pylint: disable=redefined-builtin
+from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
 __version__ = '20240316-post'
 
@@ -316,8 +316,6 @@ class PlayOnCommand(BaseCommand):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
-    options = self.options
-    upd = options.upd
     recordings = set(sqltags.recordings())
     need_refresh = (
         # any current recordings whose state is stale
@@ -326,7 +324,7 @@ class PlayOnCommand(BaseCommand):
         all(recording.is_expired() for recording in recordings)
     )
     if need_refresh:
-      with upd.run_task("refresh queue and recordings"):
+      with run_task("refresh queue and recordings"):
         Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
         for T in Ts:
           T.join()
@@ -386,6 +384,7 @@ class PlayOnCommand(BaseCommand):
             recording = sqltags[dl_id]
             print(dl_id, '+ downloaded')
             recording.add("downloaded")
+    return xit
 
   def cmd_feature(self, argv, locale='en_US'):
     ''' Usage: {cmd} [feature_id]
