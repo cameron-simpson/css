@@ -304,9 +304,9 @@ class BaseCommandOptions(HasThreadState):
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
-  runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
   verbose: bool = False
+
   perthread_state = ThreadState()
 
   def copy(self, **updates):
