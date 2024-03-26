@@ -1325,7 +1325,8 @@ class CalibreCommand(BaseCommand):
           pfx_call(cbook.make_cbz)
 
   # pylint: disable=too-many-branches,too-many-locals
-  def cmd_convert(self, argv):
+  @uses_runstate
+  def cmd_convert(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-fnqv] formatkey dbids...
           Convert books to the format `formatkey`.
           -f    Force: convert even if the format is already present.
@@ -1355,10 +1356,8 @@ class CalibreCommand(BaseCommand):
     force = options.force
     quiet = options.quiet
     verbose = options.verbose
-    runstate = options.runstate
     for cbook in cbooks:
-      if runstate.cancelled:
-        break
+      runstate.raiseif()
       with Pfx(cbook):
         if dstfmtk in cbook.formats:
           if force:
@@ -1407,7 +1406,8 @@ class CalibreCommand(BaseCommand):
     if self.options.kindle_path:
       print("kindle", shortpath(self.options.kindle_path))
 
-  def cmd_linkto(self, argv):
+  @uses_runstate
+  def cmd_linkto(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-1fnqv] [-d linkto-dir] [-F fmt,...] [-o link-format] [dbids...]
           Export books to linkto-dir by hard linking.
           -1              Link only the first format found.
@@ -1445,7 +1445,6 @@ class CalibreCommand(BaseCommand):
     link_format = options.link_format
     linkto_dirpath = options.linkto_dirpath
     quiet = options.quiet
-    runstate = options.runstate
     verbose = options.verbose
     upd = options.upd
     quiet or print(
@@ -1457,8 +1456,7 @@ class CalibreCommand(BaseCommand):
     )
     for cbook in progressbar(cbooks, "linkto"):
       with upd.run_task('linkto: ') as proxy:
-        if runstate.cancelled:
-          break
+        runstate.raiseif()
         proxy.text = str(cbook)
         with Pfx(cbook):
           fmttags = cbook.format_tagset()
@@ -1477,8 +1475,7 @@ class CalibreCommand(BaseCommand):
               if series_name and not link_format else ''
           )
           for fmt in formats:
-            if runstate.cancelled:
-              break
+            runstate.raiseif()
             proxy.text = f'{cbook}: {fmt}'
             srcpath = cbook.formatpath(fmt)
             if srcpath is None:
@@ -1504,12 +1501,11 @@ class CalibreCommand(BaseCommand):
             if first_format:
               break
           proxy.text = f'{cbook}'
-    if runstate.cancelled:
-      return 1
     return 0
 
   # pylint: disable=too-many-locals
-  def cmd_ls(self, argv):
+  @uses_runstate
+  def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-l] [-o ls-format] [book_specs...]
           List the contents of the Calibre library.
           -l            Long mode, listing book details over several lines.
@@ -1554,7 +1550,6 @@ class CalibreCommand(BaseCommand):
           cbooks = sorted(
               calibre, key=cbook_sort_key, reverse=options.sort_reverse
           )
-      runstate = options.runstate
       for cbook in cbooks:
         runstate.raiseif()
         with Pfx(cbook):
@@ -1601,14 +1596,14 @@ class CalibreCommand(BaseCommand):
                   print(f"    {fmt:4s}", transcribe_bytes_geek(size), subpath)
     return xit
 
-  def cmd_make_cbz(self, argv):
+  @uses_runstate
+  def cmd_make_cbz(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} book_specs...
           Add the CBZ format to the designated Calibre books.
     '''
     if not argv:
       raise GetoptError("missing book_specs")
     options = self.options
-    runstate = options.runstate
     xit = 0
     while argv and not runstate.cancelled:
       with Pfx(argv[0]):
@@ -1619,16 +1614,13 @@ class CalibreCommand(BaseCommand):
           xit = 2
           continue
         for cbook in cbooks:
-          if runstate.cancelled:
-            break
+          runstate.raiseif()
           with Pfx(cbook):
             try:
               pfx_call(cbook.make_cbz)
             except ValueError as e:
               warning("cannot make CBZ from %s: %s" % (cbook, e))
               xit = 1
-    if runstate.cancelled:
-      xit = 1
     return xit
 
   # pylint: disable=too-many-branches
@@ -1669,7 +1661,8 @@ class CalibreCommand(BaseCommand):
     return xit
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
-  def cmd_pull(self, argv):
+  @uses_runstate
+  def cmd_pull(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-fnqv] [/path/to/other-library] [identifiers...]
           Import formats from another Calibre library.
           -f    Force. Overwrite existing formats with formats from other-library.
@@ -1687,7 +1680,6 @@ class CalibreCommand(BaseCommand):
     '''
     options = self.options
     calibre = options.calibre
-    runstate = options.runstate
     options.popopts(
         argv,
         f='force',
@@ -1752,8 +1744,7 @@ class CalibreCommand(BaseCommand):
                       ) as proxy:
           for identifier_value in progressbar(identifier_values, "pull " +
                                               other_library.shortpath):
-            if runstate.cancelled:
-              break
+            runstate.raiseif()
             with Pfx.scope("%s=%s", identifier_name, identifier_value):
               try:
                 obook = obooks_map[identifier_value]
@@ -1813,8 +1804,6 @@ class CalibreCommand(BaseCommand):
                     quiet=quiet,
                     verbose=verbose
                 )
-        if runstate.cancelled:
-          xit = 1
         return xit
 
   def cmd_shell(self, argv):

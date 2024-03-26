@@ -191,7 +191,8 @@ class HashIndexCommand(BaseCommand):
         yield
 
   #pylint: disable=too-many-locals
-  def cmd_comm(self, argv):
+  @uses_runstate
+  def cmd_comm(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} {{-1|-2|-3}} {{path1|-}} {{path2|-}}
           Compare the filepaths in path1 and path2 by content.
           -1            List hashes and paths only present in path1.
@@ -221,7 +222,6 @@ class HashIndexCommand(BaseCommand):
     hashname = options.hashname
     output_format = options.output_format
     relative = options.relative
-    runstate = options.runstate
     ssh_exe = options.ssh_exe
     path1_only = options.path1_only
     path2_only = options.path2_only
@@ -317,7 +317,8 @@ class HashIndexCommand(BaseCommand):
         for fspath in fspaths1_by_hashcode[hashcode]:
           print(output_format.format(hashcode=hashcode, fspath=fspath))
 
-  def cmd_ls(self, argv):
+  @uses_runstate
+  def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [options...] [[host:]path...]
           Walk filesystem paths and emit a listing.
           The default path is the current directory.
@@ -340,7 +341,6 @@ class HashIndexCommand(BaseCommand):
     hashname = options.hashname
     output_format = options.output_format
     relative = options.relative
-    runstate = options.runstate
     ssh_exe = options.ssh_exe
     if not argv:
       argv = ['.']

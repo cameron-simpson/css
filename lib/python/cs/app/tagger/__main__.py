@@ -35,6 +35,7 @@ from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint, pfx_call, pfx_method
 from cs.queues import ListQueue
+from cs.resources import RunState, uses_runstate
 from cs.seq import unrepeated
 from cs.tagset import Tag
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
@@ -105,7 +106,8 @@ class TaggerCommand(BaseCommand):
     return self.options.tagger.tagger_for(fspath)
 
   # pylint: disable=too-many-branches,too-many-locals
-  def cmd_autofile(self, argv):
+  @uses_runstate
+  def cmd_autofile(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-dnrx] paths...
           Link paths to destinations based on their tags.
           -d    Treat directory paths like files - file the
@@ -147,7 +149,6 @@ class TaggerCommand(BaseCommand):
       raise GetoptError(f'invalid modes not in {RULE_MODES!r}: {modes!r}')
     once = options.once
     recurse = options.recurse
-    runstate = options.runstate
     verbose = options.verbose
     taggers = set()
     ok = True

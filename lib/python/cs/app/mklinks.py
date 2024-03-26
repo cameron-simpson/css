@@ -89,7 +89,8 @@ class MKLinksCmd(BaseCommand):
     else:
       raise RuntimeError("unhandled option")
 
-  def main(self, argv):
+  @uses_runstate
+  def main(self, argv, *, runstate: RunState):
     ''' Usage: mklinks [-n] paths...
           Hard link files with identical contents.
           -n    No action. Report proposed actions.
@@ -97,7 +98,6 @@ class MKLinksCmd(BaseCommand):
     if not argv:
       raise GetoptError("missing paths")
     options = self.options
-    runstate = options.runstate
     linker = Linker()
     with options.upd.insert(1) as step:
       # scan the supplied paths

@@ -227,7 +227,6 @@ class PlayOnCommand(BaseCommand):
           -n        No download. List the specified recordings.
     '''
     options = self.options
-    runstate = options.runstate
     sqltags = options.sqltags
     dl_jobs = DEFAULT_DL_PARALLELISM
     no_download = False
@@ -259,7 +258,7 @@ class PlayOnCommand(BaseCommand):
           )
           filename = re.sub('---+', '--', filename)
           try:
-            api.download(dl_id, filename=filename, runstate=runstate)
+            api.download(dl_id, filename=filename)
           except ValueError as e:
             warning("download fails: %s", e)
             return None

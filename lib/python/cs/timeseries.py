@@ -371,7 +371,8 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     raise NotImplementedError
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-  def cmd_plot(self, argv):
+  @uses_runstate
+  def cmd_plot(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] [--tz tzspec] start-time [stop-time] [{{glob|fields}}...]
           Plot the data from specified fields for the specified time range.
           Options:
@@ -394,7 +395,6 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
                             a TimeSeriesDataDir by the glob.
     '''
     options = self.options
-    runstate = options.runstate
     options.bare = False
     options.show_image = False
     options.imgpath = None
@@ -574,7 +574,8 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       raise GetoptError("unhandled time series: %s" % ts)
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-  def cmd_import(self, argv):
+  @uses_runstate
+  def cmd_import(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} csvpath datecol[:conv] [import_columns...]
           Import data into the time series.
           csvpath   The CSV file to import.
@@ -594,7 +595,6 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
                     numeric column except for the datecol.
     '''
     options = self.options
-    runstate = options.runstate
     upd = options.upd
     ts = options.ts
     badopts = False
