@@ -28,7 +28,7 @@ cs.context pypi.release="20240316" ok_revision=cc54cc6e0a076a882b93939057836b895
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20230613.1" ok_revision="927d70161547e2044cba9503c87faa734a244bd6" features={"20230613":["patch_builtins"]}
-cs.deco pypi.release="20240316" ok_revision="472b71a95e63bcd5db6546796b5f7c7a1be824fd" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"]}
+cs.deco pypi.release="20240326" ok_revision="472b71a95e63bcd5db6546796b5f7c7a1be824fd" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"]}
 cs.delta ok_revision=d0283003212321f65a8540df3d807cb41782e797 pypi.release="20240316"
 cs.distinfo
 cs.dockerutils ok_revision=dd0fac7b67a5c3caacea7189456a7784d3e718e6 pypi.release="20240305" features={"20240305":["DockerRun__network"]}
