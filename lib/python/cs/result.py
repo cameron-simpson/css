@@ -55,6 +55,7 @@ You can also collect multiple `Result`s in completion order using the `report()`
 
 import sys
 from threading import Lock, RLock
+from typing import Callable
 
 from icontract import require
 
@@ -74,7 +75,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -435,7 +435,7 @@ class Result(FSM):
       raise3(*exc_info)
     return result
 
-  def notify(self, notifier):
+  def notify(self, notifier: Callable[["Result"], None]):
     ''' After the `Result` completes, call `notifier(self)`.
 
         If the `Result` has already completed this will happen immediately.

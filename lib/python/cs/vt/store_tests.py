@@ -26,6 +26,7 @@ from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
 from cs.testutils import SetupTeardownMixin
 
+from .block import HashCodeBlock, IndirectBlock
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashCode, HASHCLASS_BY_NAME
 from .socket import (
@@ -78,7 +79,6 @@ STORECLASS_NAMES = tuple(
         'StreamStore', 'TCPClientStore', 'UNIXSocketClientStore', 'ProxyStore'
     )
 )
-X("STORECLASS_NAMES = %r", STORECLASS_NAMES)
 
 all_store_type_names = set(
     store_type.__name__ for store_type in ALL_STORE_TYPES
@@ -106,7 +106,6 @@ def get_test_stores(prefix):
     ):
       for store_type in ALL_STORE_TYPES:
         if store_type.__name__ not in STORECLASS_NAMES:
-          ##X("SKIP %s:%s", hashclass_name, store_type.__name__)
           continue
         if store_type is MappingStore:
           with stackkeys(subtest, storetype=MappingStore):
@@ -148,7 +147,7 @@ def get_test_stores(prefix):
         elif store_type is StreamStore:
           with stackkeys(subtest, storetype=StreamStore):
             for addif in False, True:
-              with stackkeys(subtest, addif=addif):
+              with stackkeys(subtest, addif=addif, sync=True):
                 local_store = MappingStore(
                     "MappingStore", {}, hashclass=hashclass
                 )
@@ -167,7 +166,8 @@ def get_test_stores(prefix):
                     downstream_rd,
                     upstream_wr,
                     addif=addif,
-                    hashclass=hashclass
+                    hashclass=hashclass,
+                    sync=subtest['sync'],
                 )
                 with local_store:
                   with remote_S:
@@ -175,7 +175,7 @@ def get_test_stores(prefix):
         elif store_type is TCPClientStore:
           with stackkeys(subtest, storetype=TCPClientStore):
             for addif in False, True:
-              with stackkeys(subtest, addif=addif):
+              with stackkeys(subtest, addif=addif, sync=True):
                 local_store = MappingStore(
                     "MappingStore", {}, hashclass=hashclass
                 )
@@ -194,7 +194,11 @@ def get_test_stores(prefix):
                   else:
                     break
                 S = TCPClientStore(
-                    None, bind_addr, addif=addif, hashclass=hashclass
+                    None,
+                    bind_addr,
+                    addif=addif,
+                    hashclass=hashclass,
+                    sync=subtest['sync'],
                 )
                 with local_store:
                   with remote_S:
@@ -202,7 +206,7 @@ def get_test_stores(prefix):
         elif store_type is UNIXSocketClientStore:
           with stackkeys(subtest, storetype=UNIXSocketClientStore):
             for addif in False, True:
-              with stackkeys(subtest, addif=addif):
+              with stackkeys(subtest, addif=addif, sync=True):
                 local_store = MappingStore(
                     "MappingStore", {}, hashclass=hashclass
                 )
@@ -213,7 +217,11 @@ def get_test_stores(prefix):
                       socket_path, local_store=local_store
                   )
                   S = UNIXSocketClientStore(
-                      None, socket_path, addif=addif, hashclass=hashclass
+                      None,
+                      socket_path,
+                      addif=addif,
+                      sync=subtest['sync'],
+                      hashclass=hashclass,
                   )
                   with local_store:
                     with remote_S:
@@ -253,8 +261,7 @@ def multitest(method):
           with S:
             method(self)
             S.flush()
-          self.S = None
-      S = None
+          self.assertTrue(S.closed)
 
   return testMethod
 
@@ -270,7 +277,6 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
   @contextmanager
   def setupTeardown(self):
     S = self.S
-    self.supports_index_entry = type(self.S) in (DataDirStore,)
     if S is not None:
       with S:
         yield
@@ -331,36 +337,31 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     ''' Trivial test adding 2 blocks.
     '''
     M1 = self.S
-    KS1 = set()
+    added_hashes = set()
     # test emptiness
     self.assertLen(M1, 0)
     # add one block
     data = make_randblock(rand0(8193))
     h = M1.add(data)
     self.assertIn(h, M1)
+    self.assertIn(h, M1.keys())
     self.assertEqual(M1[h], data)
-    KS1.add(h)
+    added_hashes.add(h)
     self.assertIn(h, M1)
-    mks = set(M1.keys())
-    self.assertIn(h, mks)
-    mks = set(M1.hashcodes())
-    ##self.assertEqual(set(M1.hashcodes()), KS1)
-    if mks != KS1:
-      warning(
-          "M1.hashcodes != KS1: M1 missing %r, KS1 missing %r", KS1 - mks,
-          mks - KS1
-      )
+    M1.flush()
+    M1_keys = set(M1.keys())
+    self.assertIn(h, M1_keys)
+    M1_hashcodes = set(M1.hashcodes())
+    self.assertIn(h, M1_hashcodes)
+    self.assertEqual(M1_hashcodes, added_hashes)
     # add another block
     data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
-    KS1.add(h2)
-    mks2 = set(M1.hashcodes())
-    ##self.assertEqual(mks2, KS1)
-    if mks2 != KS1:
-      warning(
-          "M1.hashcodes != KS1: M1 missing %r, KS1 missing %r", KS1 - mks2,
-          mks2 - KS1
-      )
+    added_hashes.add(h2)
+    self.assertIn(h2, M1)
+    self.assertIn(h2, M1.keys())
+    M1_hashcodes_2 = set(M1.hashcodes())
+    self.assertEqual(M1_hashcodes_2, added_hashes)
 
   @multitest
   def testhcu01test_hashcodes_from(self):
@@ -525,12 +526,15 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     ''' Test `get_index_entry`
     '''
     S = self.S
-    for _ in range(16):
-      data = make_randblock(rand0(8193))
+    datas = [make_randblock(rand0(8193)) for _ in range(16)]
+    for data in datas:
       h = S.hash(data)
       self.assertIsNone(S.get_index_entry(h))
       h2 = S.add(data)
       self.assertEqual(h, h2)
+    sleep(0.5)  # wait for the indexing queue to flush
+    for data in datas:
+      h = S.hash(data)
       entry = S.get_index_entry(h)
       if self.supports_index_entry:
         self.assertIsNotNone(entry)
@@ -543,10 +547,10 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     data1 = make_randblock(rand0(8193))
     data2 = make_randblock(rand0(8193))
     h1 = S.add(data1)
-    B1 = Block(hashcode=h1, span=len(data1))
+    B1 = HashCodeBlock(hashcode=h1, span=len(data1), added=True)
     self.assertEqual(len(B1), len(data1))
     h2 = S.hash(data2)
-    B2 = Block(hashcode=h2, span=len(data2))
+    B2 = HashCodeBlock(hashcode=h2, span=len(data2), added=True)
     self.assertEqual(len(B2), len(data2))
     IB = IndirectBlock.from_subblocks((B1, B2))
     self.assertIn(h1, S)

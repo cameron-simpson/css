@@ -87,7 +87,6 @@ from cs.binary import BinarySingleStruct, SimpleBinary
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
-from cs.context import stackattrs
 from cs.csvutils import csv_import
 from cs.deco import cachedmethod, decorator, promote, Promotable
 from cs.fileutils import atomic_filename
@@ -102,7 +101,7 @@ from cs.progress import progressbar
 from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.result import CancellationError
-from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
 __version__ = '20240316-post'
 
@@ -371,7 +370,8 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
     raise NotImplementedError
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-  def cmd_plot(self, argv):
+  @uses_runstate
+  def cmd_plot(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-f] [-o imgpath.png] [--show] [--tz tzspec] start-time [stop-time] [{{glob|fields}}...]
           Plot the data from specified fields for the specified time range.
           Options:
@@ -394,7 +394,6 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
                             a TimeSeriesDataDir by the glob.
     '''
     options = self.options
-    runstate = options.runstate
     options.bare = False
     options.show_image = False
     options.imgpath = None
@@ -548,13 +547,11 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
   @contextmanager
   def run_context(self):
     with super().run_context():
-      with Upd() as upd:
-        with stackattrs(self.options, upd=upd):
-          if self.options.ts is None:
-            yield
-          else:
-            with self.options.ts:
-              yield
+      if self.options.ts is None:
+        yield
+      else:
+        with self.options.ts:
+          yield
 
   def cmd_dump(self, argv):
     ''' Usage: {cmd}
@@ -574,7 +571,8 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       raise GetoptError("unhandled time series: %s" % ts)
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-  def cmd_import(self, argv):
+  @uses_runstate
+  def cmd_import(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} csvpath datecol[:conv] [import_columns...]
           Import data into the time series.
           csvpath   The CSV file to import.
@@ -594,8 +592,6 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
                     numeric column except for the datecol.
     '''
     options = self.options
-    runstate = options.runstate
-    upd = options.upd
     ts = options.ts
     badopts = False
     csvpath = self.poparg(
@@ -692,9 +688,9 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
           report_print=True,
           runstate=runstate,
       ):
-        upd.out("%s: %d values..." % (attr, len(values)))
         with Pfx("%s: store %d values", attr, len(values)):
-          ts[attr].setitems(unixtimes, values, skipNone=True)
+          with run_task("%s: %d values..." % (attr, len(values))):
+            ts[attr].setitems(unixtimes, values, skipNone=True)
       if runstate.cancelled:
         return 1
       return 0
@@ -2724,25 +2720,24 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
     # the entire time range
     indices = as_datetime64s(self.range(start, stop), utcoffset=utcoffset)
     data_dict = {}
-    with UpdProxy(prefix="gather fields: ") as proxy:
-      for data in progressbar(df_data, "gather fields"):
-        if runstate.cancelled:
-          raise CancellationError
-        pfx_context = (
-            data
-            if isinstance(data, str) else f'{data[0]}:{type(data[1]).__name__}'
-        )
-        proxy.text = pfx_context
-        with Pfx(pfx_context):
-          if isinstance(data, str):
-            ##key, *args = key.split('__')
-            key = data
-            ts = self[key]
-            series = ts.as_pd_series(start, stop, utcoffset=utcoffset)
-          else:
-            key, series = data
-          data_key = key_map.get(key, key)
-          data_dict[data_key] = series
+    for data in progressbar(df_data, "gather fields"):
+      if runstate.cancelled:
+        raise CancellationError
+      pfx_context = (
+          data
+          if isinstance(data, str) else f'{data[0]}:{type(data[1]).__name__}'
+      )
+      proxy.text = pfx_context
+      with Pfx(pfx_context):
+        if isinstance(data, str):
+          ##key, *args = key.split('__')
+          key = data
+          ts = self[key]
+          series = ts.as_pd_series(start, stop, utcoffset=utcoffset)
+        else:
+          key, series = data
+        data_key = key_map.get(key, key)
+        data_dict[data_key] = series
     if runstate.cancelled:
       raise CancellationError
     return pfx_call(
@@ -2891,8 +2886,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, HasEpochMixin, ABC):
         new_name: former_name
         for former_name, new_name in renamed.items()
     }
-    with Upd().insert(1) as proxy:
-      proxy.prefix = f'update {self.shortname()}: '
+    with run_task(f'update {self.shortname()}: ') as proxy:
       for column_name in df.columns:
         with Pfx(column_name):
           proxy.text = column_name

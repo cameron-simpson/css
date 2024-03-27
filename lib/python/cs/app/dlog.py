@@ -435,13 +435,13 @@ class DLogCommand(BaseCommand):
       dl.categories.update(auto_categories)
     dl.log(logpath=logpath, pipepath=pipepath, sqltags=dbpath)
 
-  def cmd_scan(self, argv):
+  @uses_runstate
+  def cmd_scan(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [{{-|filename}}]...
           Scan log files and report.
     '''
     if not argv:
       argv = ['-']
-    runstate = self.options.runstate
     for arg in argv:
       runstate.raiseif()
       if arg == '-':

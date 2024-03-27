@@ -703,7 +703,7 @@ class RunState(HasThreadState):
     self._cancelled = cancel_status
 
   def raiseif(self, msg=None, *a):
-    ''' Raise `CancellationError` is cancelled.
+    ''' Raise `CancellationError` if cancelled.
 
         Example:
 
@@ -826,8 +826,9 @@ class RunStateMixin(object):
       Provides: `.runstate`, `.cancelled`, `.running`, `.stopping`, `.stopped`.
   '''
 
+  @uses_runstate
   @typechecked
-  def __init__(self, runstate: Optional[Union[RunState, str]]):
+  def __init__(self, runstate: Union[RunState, str]):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
         Parameters:
@@ -835,9 +836,7 @@ class RunStateMixin(object):
           If a `str`, a new `RunState` with that name is allocated.
           If omitted, the default `RunState` is used.
     '''
-    if runstate is None:
-      runstate = RunState(runstate)
-    elif isinstance(runstate, str):
+    if isinstance(runstate, str):
       runstate = RunState(runstate)
     self.runstate = runstate
 

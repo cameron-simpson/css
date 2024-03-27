@@ -594,6 +594,20 @@ class ContextManagerMixin:
       except StopIteration:
         pass
 
+def withif(obj):
+  ''' Return a context manager for `obj`.
+      If `obj` has an `__enter__` attribute, return `obj`
+      otherwise return `nullcontext()`.
+
+      Example:
+
+          with withif(inner_mapping):
+            ... work with inner_mapping ...
+  '''
+  if hasattr(obj, '__enter__'):
+    return obj
+  return nullcontext()
+
 @contextmanager
 def reconfigure_file(f, **kw):
   ''' Context manager flavour of `TextIOBase.reconfigure`.

@@ -15,7 +15,7 @@ from functools import lru_cache
 from subprocess import Popen, PIPE
 from threading import Lock
 import time
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from icontract import require
 from typeguard import typechecked
@@ -35,6 +35,7 @@ from cs.py.func import prop
 from cs.resources import ClosedError
 from cs.result import CancellationError, Result
 from cs.threads import locked
+
 from .archive import BaseArchive, ArchiveEntry
 from .dir import _Dirent
 from .hash import (
@@ -45,7 +46,6 @@ from .hash import (
 )
 from .pushpull import missing_hashcodes_by_checksum
 from .store import StoreError, StoreSyncBase
-from .transcribe import parse
 
 class RqType(IntEnum):
   ''' Packet opcode values.
@@ -60,25 +60,28 @@ class RqType(IntEnum):
   ARCHIVE_UPDATE = 7  # (archive_name,when,E)
   ARCHIVE_LIST = 8  # (count,archive_name) -> (when,E)...
   LENGTH = 9  # () -> remote-store-length
+  CONTAINS_INDIRECT = 10  # hashcode->Boolean
 
+# pylint: disable=too-many-ancestors
 class StreamStore(StoreSyncBase):
-  ''' A Store connected to a remote Store via a `PacketConnection`.
+  ''' A `Store` connected to a remote `Store` via a `PacketConnection`.
       Optionally accept a local store to facilitate bidirectional activities
       or simply to implement the server side.
   '''
 
+  @typechecked
   def __init__(
       self,
-      name,
+      name: str,
       recv,
       send,
       *,
-      addif=False,
-      connect=None,
+      addif: bool = False,
+      connect: Optional[Callable] = None,
       local_store=None,
       exports=None,
       capacity=None,
-      sync=False,
+      sync: bool = False,
       **kw
   ):
     ''' Initialise the `StreamStore`.
@@ -110,12 +113,23 @@ class StreamStore(StoreSyncBase):
           the hashcode immediately
 
         Other keyword arguments are passed to `StoreSyncBase.__init__`.
+
+        Note: because a `sync` mode of `False` (the default) breaks this assertion:
+
+            h = S.add(data)
+            assert h in S
+
+        due to the possibility of the contains test completing
+        before the `data` have been added the `StreamStore.add`
+        method has an additional optional `sync=None` parameter to
+        override the default `sync` mode.
     '''
     if capacity is None:
       capacity = 1024
     super().__init__('StreamStore:%s' % (name,), capacity=capacity, **kw)
     self._lock = Lock()
     self.mode_addif = addif
+    self._contains_cache = set()
     self.mode_sync = sync
     self._local_store = local_store
     self.exports = exports
@@ -139,6 +153,11 @@ class StreamStore(StoreSyncBase):
       self._conn = None
     # caching method
     self.get_Archive = lru_cache(maxsize=64)(self.raw_get_Archive)
+
+  def __str__(self):
+    return "%s(addif=%r,sync=%r)" % (
+        self.__class__.__name__, self.mode_addif, self.mode_sync
+    )
 
   def init(self):
     ''' Initialise store prior to any use.
@@ -307,7 +326,8 @@ class StreamStore(StoreSyncBase):
     if local_store is None:
       raise ValueError("no local_store, request rejected")
     rq = self.decode_request(rq_type, flags, payload)
-    return rq.do(self)
+    with local_store:
+      return rq.do(self)
 
   @pfx_method
   def __len__(self):
@@ -322,13 +342,25 @@ class StreamStore(StoreSyncBase):
       warning("unparsed bytes after BSUInt(length): %r", payload[offset:])
     return length
 
-  def add(self, data: bytes):
+  def add(self, data: bytes, *, sync=None):
+    ''' Add `data` to the Store, return its hashcode.
+
+        The optinal `sync` parameter may be used to control whether
+        this add is synchronous (return after the remote Store
+        has completed the add) or asynchronous (return as soon as
+        the add requests has been queued for the remote Store).
+        If not specified, use the `sync` mode supplied when the
+        `StreamStore` was initialised.
+    '''
     h = self.hash(data)
     if self.mode_addif:
+      # lower bandwidth, higher latency
       if self.contains(h):
         return h
     rq = AddRequest(data=data, hashenum=self.hashclass.hashenum)
-    if self.mode_sync:
+    if sync is None:
+      sync = self.mode_sync
+    if sync:
       flags, payload = self.do(rq)
       h2, offset = hash_decode(payload)
       if offset != len(payload):
@@ -365,7 +397,26 @@ class StreamStore(StoreSyncBase):
   def contains(self, h):
     ''' Dispatch a contains request, return a `Result` for collection.
     '''
+    if h in self._contains_cache:
+      return True
     rq = ContainsRequest(h)
+    flags, payload = self.do(rq)
+    found = flags & 0x01
+    if found:
+      flags &= ~0x01
+    if flags:
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
+    if payload:
+      raise StoreError("unexpected payload: %r" % (payload,))
+    if found:
+      self._contains_cache.add(h)
+    return found
+
+  def is_complete_indirect(self, ih):
+    ''' Check whether `ih`, the hashcode of an indirect Block,
+        has its data and all its implied data present in this Store.
+    '''
+    rq = ContainsIndirectRequest(ih)
     flags, payload = self.do(rq)
     found = flags & 0x01
     if found:
@@ -392,13 +443,13 @@ class StreamStore(StoreSyncBase):
     '''
     return missing_hashcodes_by_checksum(self, other, **kw)
 
-  @typechecked
   @require(
       lambda self, start_hashcode: (
           start_hashcode is None or self.hashclass is None or
           isinstance(start_hashcode, self.hashclass)
       )
   )
+  @typechecked
   def hashcodes(
       self,
       start_hashcode=None,
@@ -498,7 +549,7 @@ class StreamStore(StoreSyncBase):
       for hashcode in hashcodes:
         yield hashcode
       # set the resume point: after the last yielded hashcode
-      start_hashcode = hashcode
+      start_hashcode = hashcode  # pylint: disable=undefined-loop-variable
       after = True
 
   def raw_get_Archive(self, archive_name, missing_ok=False):
@@ -543,10 +594,8 @@ class StreamStoreArchive(BaseArchive):
     while not bfr.at_eof():
       when = BSString.parse_value(bfr)
       when = float(when)
-      E = BSString.parse_value(bfr)
-      E = parse(E)
-      if not isinstance(E, _Dirent):
-        raise ValueError("not a _Dirent: %r" % (E,))
+      Es = BSString.parse_value(bfr)
+      E = _Dirent.parse(Es, expected_cls=_Dirent)
       yield when, E
 
   def update(self, E, *, when=None, previous=None, force=False, source=None):
@@ -597,9 +646,10 @@ class UnFlaggedPayloadMixin:
     assert parse_flags == 0
     return super().parse_bytes(payload)
 
-class AddRequest(UnFlaggedPayloadMixin, BinaryMultiValue('AddRequest',
-                                                         dict(hashenum=BSUInt,
-                                                              data=BSData))):
+class AddRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue('AddRequest', dict(hashenum=BSUInt, data=BSData)),
+):
   ''' An add(bytes) request, returning the hashcode for the stored data.
   '''
 
@@ -666,6 +716,26 @@ class ContainsRequest(UnFlaggedPayloadMixin, HashCodeField):
     hashcode = self.hashcode
     return 1 if hashcode in local_store else 0
 
+class ContainsIndirectRequest(UnFlaggedPayloadMixin, HashCodeField):
+  ''' A request to test for the presence all of the blocks
+      of an indirect block hashcode.
+  '''
+
+  RQTYPE = RqType.CONTAINS_INDIRECT
+
+  @property
+  def hashcode(self):
+    return self.value
+
+  def do(self, stream):
+    ''' Test for hashcode, return `1` for present, `0` otherwise.
+    '''
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    hashcode = self.hashcode
+    return 1 if local_store.is_complete_indirect(hashcode) else 0
+
 class FlushRequest(UnFlaggedPayloadMixin, BinaryMultiValue('FlushRequest',
                                                            {})):
   ''' A flush request.
@@ -704,11 +774,11 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
 
   RQTYPE = RqType.HASHCODES
 
-  @typechecked
   @require(lambda hashclass: issubclass(hashclass, HashCode))
   @require(
       lambda after, start_hashcode: not after or start_hashcode is not None
   )
+  @typechecked
   def __init__(
       self,
       *,
@@ -811,9 +881,10 @@ class HashOfHashCodesRequest(HashCodesRequest):
       payload += final_hashcode.encode()
     return payload
 
-class ArchiveLastRequest(UnFlaggedPayloadMixin,
-                         BinaryMultiValue('ArchiveLastRequest',
-                                          dict(s=BSString))):
+class ArchiveLastRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue('ArchiveLastRequest', dict(s=BSString,)),
+):
   ''' Return the last entry in a remote Archive.
   '''
 
@@ -831,9 +902,10 @@ class ArchiveLastRequest(UnFlaggedPayloadMixin,
       return 0
     return (1, bytes(entry))
 
-class ArchiveListRequest(UnFlaggedPayloadMixin,
-                         BinaryMultiValue('ArchiveListRequest',
-                                          dict(s=BSString))):
+class ArchiveListRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue('ArchiveListRequest', dict(s=BSString)),
+):
   ''' List the entries in a remote Archive.
   '''
 
@@ -848,10 +920,13 @@ class ArchiveListRequest(UnFlaggedPayloadMixin,
     archive = local_store.get_Archive(self.s)
     return b''.join(bytes(entry) for entry in archive)
 
-class ArchiveUpdateRequest(UnFlaggedPayloadMixin,
-                           BinaryMultiValue('ArchiveUpdateRequest',
-                                            dict(archive_name=BSString,
-                                                 entry=ArchiveEntry))):
+class ArchiveUpdateRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue(
+        'ArchiveUpdateRequest',
+        dict(archive_name=BSString, entry=ArchiveEntry),
+    ),
+):
   ''' Add an entry to a remote Archive.
   '''
 
@@ -877,10 +952,12 @@ RqType.ARCHIVE_LAST.request_class = ArchiveLastRequest
 RqType.ARCHIVE_LIST.request_class = ArchiveListRequest
 RqType.ARCHIVE_UPDATE.request_class = ArchiveUpdateRequest
 RqType.LENGTH.request_class = LengthRequest
+RqType.CONTAINS_INDIRECT.request_class = ContainsIndirectRequest
 
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to a command.
   '''
   name = "StreamStore(%r)" % ("|" + shcmd,)
+  # TODO: a PopenStore to close the Popen?
   P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
   return StreamStore(name, P.stdin, P.stdout, local_store=None, addif=addif)

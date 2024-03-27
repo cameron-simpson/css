@@ -32,6 +32,7 @@ from cs.hashindex import merge, DEFAULT_HASHNAME
 from cs.lex import get_prefix_n
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
+from cs.resources import RunState, uses_runstate
 from cs.upd import run_task, print
 
 DISTINFO = {
@@ -109,7 +110,8 @@ class PlexCommand(BaseCommand):
       with fstags:
         yield
 
-  def cmd_linktree(self, argv):
+  @uses_runstate
+  def cmd_linktree(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-d plextree] [-n] [-m mode,...] [--sym] srctrees...
           Link media files from the srctrees into a Plex media tree.
           -d plextree Specify the Plex link tree location.
@@ -136,7 +138,6 @@ class PlexCommand(BaseCommand):
     modes = options.modes.split(',')
     plextree = options.plextree
     symlink_mode = options.symlink_mode
-    runstate = options.runstate
     verbose = options.verbose
     if not argv:
       raise GetoptError("missing srctrees")

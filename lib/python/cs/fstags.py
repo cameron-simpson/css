@@ -115,7 +115,7 @@ from cs.lex import (
 )
 from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.tagset import (
     Tag,
     TagSet,
@@ -239,13 +239,13 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           yield
 
   @uses_upd
-  def cmd_autotag(self, argv, *, upd: Upd):
+  @uses_runstate
+  def cmd_autotag(self, argv, *, upd: Upd, runstate: RunState):
     ''' Usage: {cmd} paths...
           Tag paths based on rules from the rc file.
     '''
     options = self.options
     fstags = options.fstags
-    runstate = options.runstate
     if not argv:
       argv = ['.']
     filename_rules = fstags.config.filename_rules
@@ -336,7 +336,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           xit = 1
     return xit
 
-  def cmd_export(self, argv):
+  @uses_runstate
+  def cmd_export(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-a] [--direct] path {{tag[=value]|-tag}}...
           Export tags for files from paths matching all the constraints.
           -a        Export all paths, not just those with tags.
@@ -350,7 +351,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
-    runstate = options.runstate
     badopts = False
     all_paths = False
     use_direct_tags = False
@@ -378,8 +378,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     csvw = csv.writer(sys.stdout)
     for fspath in fstags.find(realpath(path), tag_choices,
                               use_direct_tags=use_direct_tags):
-      if runstate.cancelled:
-        return 1
+      runstate.raiseif()
       tagged_path = fstags[fspath]
       # pylint: disable=superfluous-parens
       if (not all_paths
@@ -390,7 +389,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return xit
 
   # pylint: disable=too-many-branches
-  def cmd_find(self, argv):
+  @uses_runstate
+  def cmd_find(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
           List files from path matching all the constraints.
           --direct    Use direct tags instead of all tags.
@@ -405,7 +405,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
-    runstate = options.runstate
     badopts = False
     use_direct_tags = False
     as_rsync_includes = False
@@ -445,8 +444,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         print(include)
     else:
       for fspath in filepaths:
-        if runstate.cancelled:
-          return 1
+        runstate.raiseif()
         with Pfx(fspath):
           try:
             output = fstags[fspath].format_as(
@@ -585,7 +583,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             )
     return 0
 
-  def cmd_ls(self, argv):
+  @uses_runstate
+  def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-d] [--direct] [-o output_format] [paths...]
           List files from paths and their tags.
           -d          Treat directories like files, do not recurse.
@@ -598,7 +597,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
-    runstate = options.runstate
     directories_like_files = False
     use_direct_tags = False
     long_format = False
@@ -622,8 +620,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       fullpath = realpath(path)
       for fspath in ((fullpath,)
                      if directories_like_files else rfilepaths(fullpath)):
-        if runstate.cancelled:
-          return 1
+        runstate.raiseif()
         with Pfx(fspath):
           tags = fstags[fspath]
           if long_format:

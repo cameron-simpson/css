@@ -832,7 +832,17 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     return run(rsargv).returncode
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
-  def cmd_import(self, argv, datasets=None, doit=None, force=None):
+  @uses_upd
+  @uses_runstate
+  def cmd_import(
+      self,
+      argv,
+      runstate: RunState,
+      upd: Upd,
+      datasets=None,
+      doit=None,
+      force=None
+  ):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
           -d datasets       Comma separated list of datasets to import.
@@ -860,9 +870,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         dry_run='dry_run',
     )
     spd = options.spd
-    upd = options.upd
     fstags = options.fstags
-    runstate = options.runstate
     datasets = options.datasets
     doit = options.doit
     force = options.force

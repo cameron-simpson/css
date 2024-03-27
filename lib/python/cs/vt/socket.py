@@ -288,10 +288,15 @@ class UNIXSocketClientStore(StreamStore):
         **kw
     )
 
-  def shutdown(self):
-    StreamStore.shutdown(self)
-    if self.sock:
-      self.sock.close()
+  @contextmanager
+  def startup_shutdown(self):
+    try:
+      with super().startup_shutdown():
+        yield
+    finally:
+      if self.sock is not None:
+        self.sock.close()
+        self.sock = None
 
   @pfx_method
   @require(lambda self: not self.sock)

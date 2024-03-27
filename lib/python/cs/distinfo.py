@@ -174,14 +174,14 @@ class CSReleaseCommand(BaseCommand):
   ##  export      Export release to temporary directory, report directory.
   ##  freshmeat-submit Announce last release to freshmeat.
 
-  def cmd_check(self, argv):
+  @uses_runstate
+  def cmd_check(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} pkg_name...
           Perform sanity checks on the names packages.
     '''
     if not argv:
       raise GetoptError("missing package names")
     options = self.options
-    runstate = options.runstate
     xit = 0
     for pkg_name in argv:
       runstate.raiseif()

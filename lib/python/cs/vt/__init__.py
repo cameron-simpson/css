@@ -4,42 +4,43 @@
     variable sized blocks, arbitrarily sized data and utilising some
     domain knowledge to aid efficient block boundary selection.
 
-    *Note*: the "mount" filesystem facility uses FUSE,
-    which may need manual OS installation.
-    On MacOS this means installing `osxfuse`
-    for example from MacPorts.
-    You will also need the `llfuse` Python module,
-    which is not automatically required by this package.
-
     The package provides the `vt` command to access
     these facilities from the command line.
 
     This system has two main components:
-    * Stores: storage areas of variable sized data blocks
+    * `Store`s: storage areas of variable sized data blocks
       indexed by the cryptographic hashcode of their content
-    * Dirents: references to filesystem entities
+    * `Dirent`s: references to filesystem entities
       containing hashcode based references to the content
 
     These are logically disconnected.
-    Dirents are not associated with particular Stores;
-    it is sufficient to have access to any Store
+    Dirents are not associated with particular `Store`s;
+    it is sufficient to have access to any `Store`
     containing the required blocks.
 
-    The other common entity is the Archive,
+    The other common entity is the `Archive`,
     which is just a text file containing
-    a timestamped log of revisions of a Dirent.
+    a timestamped log of revisions of a `Dirent`.
     These can be mounted as a FUSE filesystem,
     and the `vt pack` command simply stores
-    a directory tree into the current Store,
-    and records the stored reference in an Archive file.
+    a directory tree into the current `Store`,
+    and records the stored reference in an `Archive` file.
 
     See also the Plan 9 Venti system:
     (http://library.pantek.com/general/plan9.documents/venti/venti.html,
     http://en.wikipedia.org/wiki/Venti)
     which is also a system based on variable sized blocks.
+
+    *Note*: the "mount" filesystem facility uses FUSE,
+    which may need manual OS installation.
+    On MacOS this means installing `osxfuse`,
+    for example from MacPorts.
+    You will also need the `llfuse` Python module,
+    which is not automatically required by this package.
 '''
 
 from abc import ABC, abstractmethod
+from collections.abc import MutableMapping
 from contextlib import closing, contextmanager
 import os
 from threading import Thread
@@ -185,55 +186,9 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
-_progress = Progress(name="cs.vt.common.progress"),
-_over_progress = OverProgress(name="cs.vt.common.over_progress")
+run_modes = NS(show_progress=True,)
 
-# some shared default state, Thread independent
-common = NS(
-    progress=_progress,
-    over_progress=_over_progress,
-    S=None,
-)
-
-del _progress
-del _over_progress
-
-class _Defaults(ThreadState):
-  ''' Per-thread default context stack.
-
-      A Store's __enter__/__exit__ methods push/pop that store
-      from the `.S` attribute.
-  '''
-
-  # Global stack of fallback Store values.
-  # These are pushed by things like main or the fuse setup
-  # to provide a shared default across Threads.
-  _Ss = []
-
-  def __init__(self):
-    super().__init__()
-    self.progress = common.progress
-    self.fs = None
-    self.show_progress = False
-
-  def __getattr__(self, attr):
-    if attr == 'S':
-      S = common.S
-      if S is None:
-        S = self.config['default']
-      return S
-    raise AttributeError(attr)
-
-  @contextmanager
-  def common_S(self, S):
-    ''' Context manager to push a Store onto `common.S`.
-    '''
-    with stackattrs(common, S=S):
-      yield
-
-NOdefaults = _Defaults()
-
-class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
+class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
@@ -332,15 +287,16 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
     params = []
-    for attr, val in sorted(self._str_attrs.items()):
+    for attr, val in sorted(getattr(self, '_str_attrs', {}).items()):
       if isinstance(val, type):
         val_s = '<%s.%s>' % (val.__module__, val.__name__)
       else:
         val_s = str(val)
       params.append(attr + '=' + val_s)
     return "%s:%s(%s)" % (
-        self.__class__.__name__, self.hashclass.hashname,
-        ','.join([repr(self.name)] + params)
+        self.__class__.__name__,
+        getattr(getattr(self, 'hashclass', None), 'hashname', "no-hashclass"),
+        ','.join([repr(getattr(self, 'name', 'no-name'))] + params),
     )
 
   __repr__ = __str__
@@ -352,10 +308,10 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     return id(self)
 
   def hash(self, data):
-    ''' Return a HashCode instance from data bytes.
+    ''' Return a `HashCode` instance from data bytes.
         NB: this does _not_ store the data.
     '''
-    return self.hashclass.from_chunk(data)
+    return self.hashclass.from_data(data)
 
   # Stores are equal only to themselves.
   def __eq__(self, other):
@@ -378,7 +334,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def __iter__(self):
     ''' Return an iterator over the Store's hashcodes.
     '''
-    return self.keys()
+    return iter(self.keys())
 
   def __getitem__(self, h):
     ''' Return the data bytes associated with the supplied hashcode.
@@ -401,12 +357,15 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     if h != h2:
       raise ValueError("h:%s != hash(data):%s" % (h, h2))
 
+  def __delitem__(self, h):
+    raise NotImplementedError(f'{self.__class__.__name__}.__delitem__')
+
   ###################################################
   ## Context manager methods via ContextManagerMixin.
   ##
   def __enter_exit__(self):
-    with HasThreadState.as_contextmanager(self):
-      with MultiOpenMixin.as_contextmanager(self):
+    with MultiOpenMixin.as_contextmanager(self):
+      with HasThreadState.as_contextmanager(self):
         yield
 
   ##########################
@@ -461,6 +420,14 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     raise NotImplementedError
 
+  def __setitem__(self, h, data):
+    if not isinstance(h, self.hashclass):
+      raise TypeError(f'h should be a {self.hashclass}, got {r(h)}')
+    if h != self.hashclass.from_bytes(data):
+      raise ValueError(f'{h=} != {self.hashclass.hashname}({data=})')
+    h2 = self.add(data)
+    assert h == h2
+
   @abstractmethod
   # pylint: disable=unused-argument
   def get(self, h, default=None):
@@ -474,6 +441,9 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     raise NotImplementedError
 
+  def __getitem__(self, h):
+    return self.get(h)
+
   @abstractmethod
   def contains(self, h):
     ''' Test whether the hashcode `h` is present in the Store.
@@ -485,6 +455,9 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     ''' Dispatch the contains request in the background, return a `Result`.
     '''
     raise NotImplementedError
+
+  def __contains__(self, h):
+    return self.contains(h)
 
   @abstractmethod
   def flush(self):
@@ -509,8 +482,8 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
 
   @property
   def config(self):
-    ''' The configuration for use with this Store.
-        Falls back to `defaults.config`.
+    ''' The configuration for use with this `Store`.
+        Falls back to `Config.default`.
     '''
     from .config import Config
     return self._config or Config.default(factory=True)
@@ -536,8 +509,8 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     self._blockmapdir = dirpath
 
-  @typechecked
   @require(lambda capacity: capacity >= 1)
+  @typechecked
   def pushto(self,
              dstS,
              *,
@@ -654,7 +627,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         on Stores with no persistent index-with-flags
         this yields `None` for the entry and updates nothing on return;
         callers must recognise this.
-        This is the behaviour of this default implementation.
+        That is the behaviour of this default implementation.
 
         Stores with a persistent index such as `DataDirStore` have
         functioning versions of this method which yield a non`None`
@@ -670,7 +643,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
 
   @classmethod
   @fmtdoc
-  def promote(cls, obj):
+  def promote(cls, obj, config=None):
     ''' Promote `obj` to a `Store` instance.
         Existing instances are returned unchanged.
         A `str` is promoted via `Config.Store_from_spec`
@@ -684,8 +657,9 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     if obj is None:
       obj = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
     if isinstance(obj, str):
-      from .config import Config
-      config = Config.default(factory=True)
+      if config is None:
+        from .config import Config
+        config = Config.default(factory=True)
       return config.Store_from_spec(obj)
     raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))
 

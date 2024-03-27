@@ -228,7 +228,7 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
 
   @classmethod
   def of(cls, w):
-    ''' The geometry of this widget in root coordinates.
+    ''' The geometry of the widget `w` in root coordinates.
     '''
     x, y = w.winfo_rootx(), w.winfo_rooty()
     dx, dy = w.winfo_width(), w.winfo_height()

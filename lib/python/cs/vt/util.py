@@ -15,15 +15,16 @@ from os import (
     O_CLOEXEC,
 )
 from cs.buffer import CornuCopyBuffer
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.logutils import warning
 
 def createpath(pathname):
   ''' Create the file `pathname`.
       The file must not already exist.
   '''
-  with Pfx("createpath(%r)", pathname):
-    os.close(os.open(pathname, O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC))
+  os.close(
+      pfx_call(os.open, pathname, O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC)
+  )
 
 def openfd_append(pathname, create=False):
   ''' Low level OS open of `pathname` for append.
