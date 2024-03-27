@@ -1,3 +1,4 @@
+mklinks: update the hashindex while scanning
 rewrite mrg using hashindex?
 hashindex ls: default exclusions eg .hg,.git b d
 fstags: drop rpaths func, merge into cs.fs.rpaths maybe?
