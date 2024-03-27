@@ -942,7 +942,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           "run_task(%r,...,tick_delay=%s): tick_delay should be >=0" %
           (label, tick_delay)
       )
-    with self.insert(1, label + ' ') as proxy:
+    with self.insert(1, prefix=label + ' ') as proxy:
       ticker_runstate = None
       if tick_delay > 0:
         from cs.resources import RunState  # pylint: disable=import-outside-toplevel
