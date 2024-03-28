@@ -1,3 +1,4 @@
+playon refresh: accept q ids to ping the API, mainly to expire zombie entries
 mklinks: update the hashindex while scanning
 rewrite mrg using hashindex?
 hashindex ls: default exclusions eg .hg,.git b d
