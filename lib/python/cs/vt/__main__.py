@@ -1247,7 +1247,6 @@ class VTCmd(BaseCommand):
                 itemlenfunc=len,
                 units_scale=BINARY_BYTES_SCALE,
                 runstate=runstate,
-                update_frequency=64,
                 total=(
                     st.st_size
                     if st is not None and S_ISREG(st.st_mode) else None
@@ -1381,7 +1380,6 @@ class VTCmd(BaseCommand):
                     blocked_chunks_of(file_data(f, None), scanner=scanner),
                     f"blocked_chunks_of({shortpath(filename)})",
                     units_scale=BINARY_BYTES_SCALE,
-                    update_frequency=64,
                     itemlenfunc=len,
                     total=total_size,
                     runstate=runstate,
