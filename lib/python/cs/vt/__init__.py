@@ -390,8 +390,6 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
               yield
             finally:
               self.runstate.cancel()
-        # obtain this before the Later forgets it
-        finished = L.finished_event
       L.wait()
 
   #############################
@@ -475,7 +473,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     ''' The configuration for use with this `Store`.
         Falls back to `Config.default`.
     '''
-    from .config import Config
+    from .config import Config  # pylint:disable=import-outside-toplevel
     return self._config or Config.default(factory=True)
 
   @config.setter
@@ -578,7 +576,6 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         def add_bg(data):
           ''' Add the data and advance the progress on completion.
           '''
-          dlen = len(data)
           R = dstS.add_bg(data)
           R.notify(lambda _: progress.advance(len(data)))
           return R
@@ -628,7 +625,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     if subblocks_data is None:
       # missing hash, incomplete
       return False
-    from .block import IndirectBlock
+    from .block import IndirectBlock  # pylint:disable=import-outside-toplevel
     IB = IndirectBlock.from_subblocks_data(subblocks_data)
     for subblock in IB.subblocks:
       h = subblock.hashcode
@@ -694,7 +691,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       obj = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
     if isinstance(obj, str):
       if config is None:
-        from .config import Config
+        from .config import Config  # pylint:disable=import-outside-toplevel
         config = Config.default(factory=True)
       return config.Store_from_spec(obj)
     raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))
