@@ -37,11 +37,11 @@ def openfd_append(pathname, create=False):
   with Pfx("os.open(%r,0o%o)", pathname, mode):
     return os.open(pathname, mode)
 
-def openfd_read(pathname):
-  ''' Low level OS open of `pathname` for read.
+def openfd_read(fspath: str) -> int:
+  ''' Low level OS open of `fspath` for read.
   '''
-  with Pfx("os.open(%r,O_RDONLY|O_CLOEXEC)", pathname):
-    return os.open(pathname, O_RDONLY | O_CLOEXEC)
+  with Pfx("os.open(%r,O_RDONLY|O_CLOEXEC)", fspath):
+    return os.open(fspath, O_RDONLY | O_CLOEXEC)
 
 def append_data(wfd, bs):
   ''' Append the bytes `bs` to the writable file descriptor `wfd`.
