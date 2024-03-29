@@ -24,7 +24,6 @@ from typeguard import typechecked
 from cs.deco import decorator
 from cs.logutils import debug, exception
 from cs.py.func import funcname
-from cs.resources import RunState
 from cs.seq import seq
 from cs.threads import bg
 from cs.units import (
