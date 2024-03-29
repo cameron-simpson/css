@@ -558,17 +558,13 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         * `blocks`: an iterable of `HashCode`s or `Block`s or `bytes`-like objects
         * `dstS`: the destination `Store` to which to push `Block`s
     '''
+    if progress is None and not upd.disabled:
+      P = Progress(name, total=0)
+      with P.bar(report_print=True):
+        return self._push_worker(
+            name, blocks, dstS, progress=P, runstate=runstate, upd=upd
+        )
     try:
-      rsd = RunState.default()
-      assert runstate is rsd, \
-          "_PUSH_WORKER: runstate:%d:%s is not RunState.default:%d:%s" %(
-          id(runstate),runstate,id(rsd),rsd)
-      if False and progress is None and not upd.disabled:
-        P = Progress(name, total=0)
-        with P.bar(report_print=True):
-          return self._push_worker(
-              name, blocks, dstS, progress=P, runstate=runstate, upd=upd
-          )
       if progress is None:
         add_bg = dstS.add_bg
       else:
