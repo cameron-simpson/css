@@ -457,8 +457,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             blocked_chunks_of(inbfr),
             label=mode,
-            ##update_min_size=65536,
-            update_frequency=1024,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -473,8 +471,6 @@ class VTCmd(BaseCommand):
         for offset in progressbar(
             blockify(inbfr),
             label=mode,
-            update_frequency=256,
-            ##update_min_size=65536,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -489,7 +485,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             inbfr,
             label=mode,
-            update_min_size=65536,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -505,7 +500,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             inbfr,
             label=mode,
-            update_min_size=65536,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -520,8 +514,6 @@ class VTCmd(BaseCommand):
         for offset in progressbar(
             scan_offsets(inbfr),
             label=mode,
-            update_frequency=256,
-            ##update_min_size=65536,
             itemlenfunc=lambda offset: offset - last_offset,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -536,8 +528,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             scan_reblock(inbfr),
             label=mode,
-            update_frequency=256,
-            ##update_min_size=65536,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -552,8 +542,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             inbfr,
             label=mode,
-            ##update_min_size=65536,
-            update_frequency=128,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
