@@ -594,36 +594,35 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
           R.notify(lambda _: progress.advance(len(data)))
           return R
 
-      if True:  ##with self:
-        for item in blocks:
-          if isinstance(item, HashCode):
-            h = item
-            if h in dstS:
-              # known, skip
-              continue
-            data = self[h]
+      for item in blocks:
+        if isinstance(item, HashCode):
+          h = item
+          if h in dstS:
+            # known, skip
+            continue
+          data = self[h]
+          dlen = len(data)
+          if progress is not None:
+            progress.total += dlen
+        else:
+          # a Block?
+          try:
+            h = item.hashcode
+          except AttributeError:
+            # just data
+            data = item
             dlen = len(data)
             if progress is not None:
               progress.total += dlen
           else:
-            # a Block?
-            try:
-              h = item.hashcode
-            except AttributeError:
-              # just data
-              data = item
-              dlen = len(data)
-              if progress is not None:
-                progress.total += dlen
-            else:
-              dlen = len(item)
-              if progress is not None:
-                progress.total += dlen
-              h = item.hashcode
-              if h in dstS:
-                progress += dlen
-                continue
-          add_bg(data)
+            dlen = len(item)
+            if progress is not None:
+              progress.total += dlen
+            h = item.hashcode
+            if h in dstS:
+              progress += dlen
+              continue
+        add_bg(data)
     finally:
       self.close()
       dstS.close()
