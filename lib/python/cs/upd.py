@@ -945,12 +945,11 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     with self.insert(1, prefix=label + ' ') as proxy:
       ticker_runstate = None
       if tick_delay > 0:
-        from cs.resources import RunState  # pylint: disable=import-outside-toplevel
-        ticker_runstate = RunState()
+        cancel_ticker = False
 
         def _ticker():
           i = 0
-          while not ticker_runstate.cancelled:
+          while not cancel_ticker:
             proxy.suffix = ' ' + tick_chars[i % len(tick_chars)]
             i += 1
             time.sleep(tick_delay)
@@ -962,9 +961,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
         yield proxy
       finally:
         end_time = time.time()
-        if ticker_runstate:
-          # shut down the ticker
-          ticker_runstate.cancel()
+        cancel_ticker = True
     elapsed_time = end_time - start_time
     if report_print:
       if isinstance(report_print, bool):
