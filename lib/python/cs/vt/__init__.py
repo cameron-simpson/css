@@ -509,21 +509,27 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     self._blockmapdir = dirpath
 
+  @uses_upd
+  @uses_runstate
   @require(lambda capacity: capacity >= 1)
   @typechecked
-  def pushto(self,
-             dstS,
-             *,
-             capacity: int = 64,
-             progress=None) -> Tuple[QueueIterator, Thread]:
+  def pushto(
+      self,
+      dstS,
+      *,
+      capacity: int = 64,
+      runstate: RunState,
+      upd: Upd,
+      progress=None,
+  ) -> Tuple[QueueIterator, Thread]:
     ''' Allocate a `QueueIterator` for Blocks to push from this
         Store to another Store `dstS`.
-        Return `(Q,T)` where `Q` is the new `QueueIterator` and `T` is the
+        Return `(Q,T)` where `Q` is a queue to receive blocks `T` is the
         `Thread` processing the queue.
 
         Parameters:
-        * `dstS`: the secondary Store to receive Blocks.
-        * `capacity`: the Queue capacity, arbitrary default `64`.
+        * `dstS`: the secondary Store to receive `Block`s.
+        * `capacity`: the queue capacity, arbitrary default `64`.
         * `progress`: an optional `Progress` counting submitted and completed data bytes.
 
         Once called, the caller can then `.put` Blocks onto the queue.
@@ -533,52 +539,93 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     name = "%s.pushto(%s)" % (self.name, dstS.name)
     with Pfx(name):
       Q = IterableQueue(capacity=capacity, name=name)
-      srcS = self
-      srcS.open()
+      self.open()
       dstS.open()
       T = bg_thread(
-          lambda: (
-              self._push_blocks(name, Q, srcS, dstS, progress),
-              srcS.close(),
-              dstS.close(),
-          )
+          self._push_worker,
+          args=(name, Q, dstS),
+          kwargs=dict(progress=progress, runstate=runstate, upd=upd),
       )
       return Q, T
 
   @pfx_method
-  def _push_blocks(self, name, blocks, srcS, dstS, progress):
-    ''' This is a worker function which pushes Blocks or bytes from
-        the supplied iterable `blocks` to the second Store.
+  def _push_worker(
+      self,
+      name: str,
+      blocks: Iterable,
+      dstS: "Store",
+      *,
+      progress: Union[Progress, None],
+      runstate: RunState,
+      upd: Upd,
+  ):
+    ''' This is a worker function which receives `HashCode`s or `Block`s
+        or `bytes` from the supplied iterable `blocks` and pushes
+        them to `dstS` (the second `Store`).
+        This closes `self` and `dstS` on return
+        and thus expects them to be opened in `self.pushto()`.
 
         Parameters:
         * `name`: name for this worker instance
-        * `blocks`: an iterable of `HashCode`s or Blocks or bytes-like objects
-        * `srcS`: the source Store from which to obtain block data
-        * `dstS`: the target Store to which to push Blocks
+        * `blocks`: an iterable of `HashCode`s or `Block`s or `bytes`-like objects
+        * `dstS`: the destination `Store` to which to push `Block`s
     '''
-    with srcS:
-      for item in progressbar(blocks, f'{self.name}.pushto',
-                              update_frequency=64):
-        if isinstance(item, HashCode):
-          h = item
-          if h in dstS:
-            continue
-          data = srcS[h]
-          dstS.add_bg(data)
-        else:
-          # a Block?
-          try:
-            h = item.hashcode
-          except AttributeError:
-            # just data
-            data = item
-            dstS.add(data)
-          else:
-            # Block
+    try:
+      rsd = RunState.default()
+      assert runstate is rsd, \
+          "_PUSH_WORKER: runstate:%d:%s is not RunState.default:%d:%s" %(
+          id(runstate),runstate,id(rsd),rsd)
+      if False and progress is None and not upd.disabled:
+        P = Progress(name, total=0)
+        with P.bar(report_print=True):
+          return self._push_worker(
+              name, blocks, dstS, progress=P, runstate=runstate, upd=upd
+          )
+      if progress is None:
+        add_bg = dstS.add_bg
+      else:
+
+        def add_bg(data):
+          ''' Add the data and advance the progress on completion.
+          '''
+          dlen = len(data)
+          R = dstS.add_bg(data)
+          R.notify(lambda _: progress.advance(len(data)))
+          return R
+
+      if True:  ##with self:
+        for item in blocks:
+          if isinstance(item, HashCode):
+            h = item
             if h in dstS:
+              # known, skip
               continue
-            data = item.data
-            dstS.add_bg(data)
+            data = self[h]
+            dlen = len(data)
+            if progress is not None:
+              progress.total += dlen
+          else:
+            # a Block?
+            try:
+              h = item.hashcode
+            except AttributeError:
+              # just data
+              data = item
+              dlen = len(data)
+              if progress is not None:
+                progress.total += dlen
+            else:
+              dlen = len(item)
+              if progress is not None:
+                progress.total += dlen
+              h = item.hashcode
+              if h in dstS:
+                progress += dlen
+                continue
+          add_bg(data)
+    finally:
+      self.close()
+      dstS.close()
 
   def is_complete_indirect(self, ih):
     ''' Check whether `ih`, the hashcode of an indirect Block,
