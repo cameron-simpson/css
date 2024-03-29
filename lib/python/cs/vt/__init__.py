@@ -45,7 +45,10 @@ from contextlib import closing, contextmanager
 import os
 from threading import Thread
 from types import SimpleNamespace as NS
-from typing import Iterable, Mapping, Tuple, Union
+from typing import Iterable, Tuple, Union
+
+from icontract import require
+from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.deco import default_params, fmtdoc
@@ -59,9 +62,6 @@ from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.seq import Seq
 from cs.threads import bg as bg_thread, ThreadState, HasThreadState
 from cs.upd import Upd, uses_upd
-
-from icontract import require
-from typeguard import typechecked
 
 from .hash import (
     DEFAULT_HASHCLASS,
@@ -171,7 +171,7 @@ if False:
 
   # monkey patch MultiOpenMixin
   import cs.resources
-  cs.resources._mom_lockclass = RLock
+  cs.resources.MultiOpenMixin._mom_state_lock = Lock()
 else:
   from threading import (
       Lock as threading_Lock,
