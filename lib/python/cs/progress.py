@@ -430,7 +430,7 @@ class BaseProgress(object):
       '''
       proxy.text = None
 
-    cancel_ticker = True
+    cancel_ticker = False
 
     def ticker():
       ''' Worker to update the progress bar every `update_period` seconds.
