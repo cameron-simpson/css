@@ -5,6 +5,7 @@
     These functions provide convenient facilities.
 '''
 
+from __future__ import print_function
 from collections import namedtuple
 import sys
 from traceback import extract_stack
@@ -54,11 +55,11 @@ def caller(frame_index=-3):
   except IndexError:
     return None
 
-def stack_dump(fp=None, indent=0, Fs=None, skip=None):
-  ''' Recite current or supplied stack to `fp`, default `sys.stderr`.
+def stack_dump(f=None, indent=0, Fs=None, skip=None, select=None):
+  ''' Recite current or supplied stack to `f`, default `sys.stderr`.
 
       Parameters:
-      * `fp`: the output file object, default `sys.stderr`
+      * `f`: the output file object, default `sys.stderr`
       * `indent`: how many spaces to indent the stack lines, default `0`
       * `Fs`: the stack `Frame`s to write,
         default obtained from the current stack
@@ -66,9 +67,12 @@ def stack_dump(fp=None, indent=0, Fs=None, skip=None):
         if `Fs` is `None` this defaults to `2` to trim the `Frame`s
         for the `stack_dump` function and its call to `frames()`,
         otherwise the default is `0` to use the supplied `Frame`s as is
+      * `select`: if not `None`, select particular frames;
+        if `select` is a `str` it must be present in the frame filename;
+        otherwise `select(frame)` must be true
   '''
-  if fp is None:
-    fp = sys.stderr
+  if f is None:
+    f = sys.stderr
   if Fs is None:
     Fs = frames()
     if skip is None:
@@ -78,10 +82,14 @@ def stack_dump(fp=None, indent=0, Fs=None, skip=None):
   if skip > 0:
     Fs = Fs[:-skip]
   for F in Fs:
-    if indent > 0:
-      fp.write(' ' * indent)
-    fp.write(str(F))
-    fp.write('\n')
+    if select is not None:
+      if isinstance(select, str):
+        if select not in F.filename:
+          continue
+      else:
+        if not select(F):
+          continue
+    print(' ' * indent, F, file=f, sep='')
 
 if __name__ == '__main__':
   import cs.py.stack_tests
