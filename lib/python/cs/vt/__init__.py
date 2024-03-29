@@ -388,7 +388,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
               self.runstate.cancel()
         # obtain this before the Later forgets it
         finished = L.finished_event
-      finished.wait()
+      L.wait()
 
   #############################
   ## Function dispatch methods.
@@ -396,7 +396,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
 
   def _defer(self, func, *args, **kwargs):
     ''' Defer a function via the internal `Later` queue.
-        Hold an `open()` on `self` to avoid easy shutdown.
+        Hold an `open()` on `self` to avoid premature shutdown.
     '''
     self.open()
 
