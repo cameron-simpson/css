@@ -430,32 +430,33 @@ class BaseProgress(object):
       '''
       proxy.text = None
 
-    def ticker(runstate: RunState):
+    cancel_ticker = True
+
+    def ticker():
       ''' Worker to update the progress bar every `update_period` seconds.
       '''
       time.sleep(update_period)
-      while not runstate.cancelled:
+      while not cancel_ticker:
         update(self, None)
         time.sleep(update_period)
 
     if update_period == 0:
       self.notify_update.add(update)
-    with RunState(label) as runstate:
-      try:
-        start_pos = self.position
-        with upd.insert(
-            insert_pos,
-            prefix=label + ' ',
-            text_auto=text_auto,
-        ) as proxy:
-          update(self, None)
-          if update_period > 0:
-            bg(ticker, args=(runstate,), daemon=True)
-          yield proxy
-      finally:
-        runstate.cancel()
-        if update_period == 0:
-          self.notify_update.remove(update)
+    try:
+      start_pos = self.position
+      with upd.insert(
+          insert_pos,
+          prefix=label + ' ',
+          text_auto=text_auto,
+      ) as proxy:
+        update(self, None)
+        if update_period > 0:
+          bg(ticker, daemon=True)
+        yield proxy
+    finally:
+      cancel_ticker = True
+      if update_period == 0:
+        self.notify_update.remove(update)
     if report_print:
       if isinstance(report_print, bool):
         report_print = print
