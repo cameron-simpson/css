@@ -268,7 +268,6 @@ class VTCmd(BaseCommand):
   )
 
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
-  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
 
   GETOPT_SPEC = 'C:S:f:h:Pqv'
 
@@ -334,8 +333,7 @@ class VTCmd(BaseCommand):
     if options.dflt_log is not None:
       logTo(options.dflt_log, delay=True)
 
-  @uses_runstate
-  def handle_signal(self, sig, frame, *, runstate: RunState):
+  def handle_signal(self, sig, frame):
     ''' Override `BaseCommand.handle_signal`:
         - do a threaddump for `SIGQUIT`
         - run the default `handle_signal` method
@@ -344,7 +342,7 @@ class VTCmd(BaseCommand):
     if sig == SIGQUIT:
       thread_dump()
     # call the standard RunState signal handler
-    runstate.handle_signal(sig, frame)
+    super().handle_signal(sig, frame)
     if sig == SIGQUIT:
       sys.exit(1)
 
