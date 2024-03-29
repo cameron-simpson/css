@@ -38,7 +38,7 @@ import time
 import traceback
 from types import SimpleNamespace as NS
 
-from cs.deco import decorator
+from cs.deco import ALL, decorator
 from cs.fs import shortpath
 from cs.lex import s, r, is_identifier  # pylint: disable=unused-import
 import cs.logutils
@@ -75,6 +75,8 @@ DISTINFO = {
     ],
 }
 
+__all__ = ['X', 'r', 's']
+
 # environment variable specifying names to become built in
 CS_DEBUG_BUILTINS_ENVVAR = 'CS_DEBUG_BUILTINS'
 
@@ -85,6 +87,7 @@ CS_DEBUG_BUILTINS_NAMES = ('X', 'pformat', 'pprint', 's', 'r', 'trace')
 # This is how often it polls for function completion.
 DEBUG_POLL_RATE = 0.25
 
+@ALL
 class TimingOutLock(object):
   ''' A `Lock` replacement which times out, used for locating deadlock points.
   '''
@@ -143,6 +146,7 @@ def Thread(*a, **kw):
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingThread({'filename': filename, 'lineno': lineno}, *a, **kw)
 
+@ALL
 def thread_dump(Ts=None, fp=None):
   ''' Write thread identifiers and stack traces to the file `fp`.
 
@@ -166,6 +170,7 @@ def thread_dump(Ts=None, fp=None):
       traceback.print_stack(frame, None, fp)
       print(file=fp)
 
+@ALL
 def stack_dump(stack=None, limit=None, logger=None, log_level=None):
   ''' Dump a stack trace to a logger.
 
@@ -587,6 +592,7 @@ def debug_object_shell(o, prompt=None):
 
 _trace_indent = ""
 
+@ALL
 @decorator
 # pylint: disable=too-many-arguments
 def trace(
