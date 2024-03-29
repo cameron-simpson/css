@@ -72,7 +72,7 @@ def not_closed(func):
   return not_closed_wrapper
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
-class _mom_state(object):
+class _MultiOpenMixinOpenCloseState(object):
 
   def __init__(self, mom: "MultiOpenMixin"):
     self.mom = mom
@@ -136,7 +136,7 @@ class _mom_state(object):
               "  opened from %s %d times", frame_key,
               self.opens_from[frame_key]
           )
-        return retval
+        return opens, retval
       opens -= 1
       self.opens = opens
       if opens == 0:
@@ -224,17 +224,20 @@ class MultiOpenMixin(ContextManagerMixin):
         proxy's `.close`.
   '''
 
+  _mom_state_lock = Lock()
+
   def __mo_getstate(self):
     ''' Fetch the state object for the mixin,
-        something of a hack to avoid providing an __init__.
+        something of a hack to avoid providing an `__init__`.
     '''
     # used to be self.__mo_state and catch AttributeError, but
     # something up the MRO weirds this - suspect the ABC base class
-    try:
-      state = self.__dict__['_MultiOpenMixin_state']
-    except KeyError:
-      state = self.__dict__['_MultiOpenMixin_state'] = _mom_state(self)
-      assert state.opens == 0
+    with self.__class__._mom_state_lock:
+      try:
+        state = self.__dict__['_MultiOpenMixin_state']
+      except KeyError:
+        state = self.__dict__['_MultiOpenMixin_state'
+                              ] = _MultiOpenMixinOpenCloseState(self)
     return state
 
   def tcm_get_state(self):
