@@ -378,7 +378,7 @@ class BaseProgress(object):
       recent_window=None,
       report_print=None,
       insert_pos=1,
-      update_period=0,
+      update_period=DEFAULT_UPDATE_PERIOD,
       upd: Upd,
   ):
     ''' A context manager to create and withdraw a progress bar.
