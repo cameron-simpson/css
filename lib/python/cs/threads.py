@@ -305,8 +305,8 @@ def bg(
     name=None,
     no_start=False,
     no_logexc=False,
-    thread_states=None,
     thread_factory=None,
+    thread_states=True,
     args=None,
     kwargs=None,
 ):
@@ -324,6 +324,8 @@ def bg(
       * `thread_factory`: the `Thread` factory, default `HasThreadState.Thread`,
         which prepares a new `threading.Thread` with the default
         `HasThreadState` contexts
+      * `thread_states`: passed to the  `thread_factory` factory;
+        default `True`
       * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
