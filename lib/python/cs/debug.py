@@ -11,13 +11,17 @@ If the environment variable $CS_DEBUG_BUILTINS is set to a comma
 separated list of names then the `builtins` module will be monkey
 patched with those names, enabling trite debug use of those names
 anywhere in the code provided this module has been imported somewhere.
-The allowed names are the following:
+The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
 * `r`: `cs.lex.r`
 * `s`: `cs.lex.s`
-* `trace`: `cs.debug.trace` (the `@trace` decorator)
+* `stack_dump`: dump current `Thread`'s call stack
+* `thread_dump` dump the active `Thread`s with their call stacks
+* `trace`: the `@trace` decorator
+`$CS_DEBUG_BUILTINS` can also be set to `"1"` to install all of
+`__all__` in the builtins.
 '''
 
 from __future__ import print_function
@@ -75,7 +79,7 @@ DISTINFO = {
     ],
 }
 
-__all__ = ['X', 'r', 's']
+__all__ = ['X', 'pformat', 'pprint', 'r', 's']
 
 # environment variable specifying names to become built in
 CS_DEBUG_BUILTINS_ENVVAR = 'CS_DEBUG_BUILTINS'
@@ -679,13 +683,14 @@ if builtin_names_s:
         CS_DEBUG_BUILTINS_ENVVAR, builtin_names_s
     )
   else:
-    for builtin_name in builtin_names_s.split(','):
+    for builtin_name in (__all__ if builtin_names_s == "1" else
+                         builtin_names_s.split(',')):
       if not builtin_name:
         continue
-      if builtin_name not in CS_DEBUG_BUILTINS_NAMES:
+      if builtin_name not in __all__:
         warning(
-            "$%s: ignoring %r, not in CS_DEBUG_BUILTINS_NAMES:%r",
-            CS_DEBUG_BUILTINS_ENVVAR, builtin_name, CS_DEBUG_BUILTINS_NAMES
+            "$%s: ignoring %r, not in cs.debug.__all__:%r",
+            CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
         )
         continue
       if not is_identifier(builtin_name):
