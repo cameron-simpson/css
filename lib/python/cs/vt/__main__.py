@@ -1120,15 +1120,13 @@ class VTCmd(BaseCommand):
       Q, T = srcS.pushto(dstS, capacity=64)
       try:
         for pushable in pushables:
+          runstate.raiseif()
           with Pfx("push %s", pushable):
-            if runstate.cancelled:
-              xit = 1
-              break
             with Pfx(pushable):
               progress = Progress(str(pushable))
-              pushq = pushable.pushto_queue
+              push_to_q = pushable.pushto_queue
               try:
-                pushed_ok = pfx_call(pushq, Q, progress=progress)
+                pushed_ok = pfx_call(push_to_q, Q, progress=progress)
                 assert isinstance(pushed_ok, bool)
               except Exception as e:
                 error("push fails: %s", e)
