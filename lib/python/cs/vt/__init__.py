@@ -45,7 +45,7 @@ from contextlib import closing, contextmanager
 import os
 from threading import Thread
 from types import SimpleNamespace as NS
-from typing import Mapping, Tuple
+from typing import Iterable, Mapping, Tuple, Union
 
 from cs.context import stackattrs
 from cs.deco import default_params, fmtdoc
@@ -58,6 +58,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.seq import Seq
 from cs.threads import bg as bg_thread, ThreadState, HasThreadState
+from cs.upd import Upd, uses_upd
 
 from icontract import require
 from typeguard import typechecked
