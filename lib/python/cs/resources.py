@@ -91,7 +91,7 @@ class _mom_state(object):
     ''' The open process:
         Bump the opens counter.
         If it goes to 1, run the startup phase of `self.mom.startup_shutdown`.
-        Return the bumped opens counter.
+        Return the incremented opens counter.
     '''
     with self._lock:
       opens = self.opens
@@ -117,8 +117,9 @@ class _mom_state(object):
     ''' The close process:
         Decrement the opens counter.
         If it goes to 0, run the shutdown phase of `self.mom.startup_shutdown`.
-        Return the bumped opens counter and the return value of the shutdown phase
-        (or `None` if the shutdown was not run).
+        Return a 2-tuple `(opens,retval)` being:
+        - the decremented opens counter
+        - the return value of the shutdown phase or `None` if the shutdown was not run
     '''
     if not self.opened:
       if unopened_ok:
@@ -243,7 +244,7 @@ class MultiOpenMixin(ContextManagerMixin):
     return {'opened': state.opened, 'opens': state.opens}
 
   def __enter_exit__(self):
-    self.open(caller_frame=caller())
+    self.open()  ##caller_frame=caller())
     try:
       yield
     finally:
@@ -816,9 +817,10 @@ class RunState(HasThreadState):
     self.cancel()
 
 # use the prevailing RunState or make a fresh one
-uses_runstate = default_params(
-    runstate=lambda: RunState.default() or RunState()
-)
+from cs.upd import print
+
+# default to the current RunState or make one
+uses_runstate = default_params(runstate=lambda: RunState.default(factory=True))
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
