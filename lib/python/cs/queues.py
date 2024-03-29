@@ -119,7 +119,7 @@ class QueueIterator(MultiOpenMixin):
     if item is self.sentinel:
       # sentinel consumed (clients won't see it, so we must)
       self.q.task_done()
-      # put the sentinel back for other iterators
+      # put the sentinel back for other consumers
       self._put(self.sentinel)
       raise StopIteration("SENTINEL")
     with self._lock:
@@ -157,8 +157,11 @@ class QueueIterator(MultiOpenMixin):
     ''' Obtain a batch of immediately available items from the queue.
         Up to `batch_size` items will be obtained, default 1024.
         Return a list of the items.
-        If the queue is empty and empty list is returned.
-        If the 
+        If the queue is empty an empty list is returned.
+        If the queue is not empty, continue collecting items until
+        the queue is empty or the batch size is reached.
+        If `block_once` is true, wait for the first item;
+        this mode never returns an empty list except at the end of the iterator.
     '''
     batch = []
     try:
@@ -171,7 +174,7 @@ class QueueIterator(MultiOpenMixin):
     return batch
 
   def iter_batch(self, batch_size=1024):
-    ''' Generator to yield batches of items from the queue.
+    ''' A generator which yields batches of items from the queue.
     '''
     while True:
       batch = self.next_batch(batch_size=batch_size, block_once=True)
