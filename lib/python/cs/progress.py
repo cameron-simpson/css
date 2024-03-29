@@ -475,7 +475,7 @@ class BaseProgress(object):
       *,
       itemlenfunc=None,
       incfirst=False,
-      update_period=0,
+      update_period=DEFAULT_UPDATE_PERIOD,
       **bar_kw,
   ):
     ''' An iterable progress bar: a generator yielding values
@@ -495,9 +495,9 @@ class BaseProgress(object):
           made as items are obtained or only after items are processed
           by whatever is consuming this generator.
           The default is `False`, advancing after processing.
-        * `update_period`: default `0`; if > 0 then update the
-          progress bar every `update_period` seconds, otherwise on
-          each iteration
+        * `update_period`: default `DEFAULT_UPDATE_PERIOD`; if `0`
+          then update on every iteration, otherwise every `update_period`
+          seconds
         Other parameters are passed to `Progress.bar`.
 
         Example use:
