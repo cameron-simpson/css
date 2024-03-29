@@ -432,27 +432,26 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
             # data onto the data queue, and returns.
             # The data queue worker saves the data to backing files and
             # updates the indices.
-            with upd.run_task(str(self) + " monitor ") as monitor_proxy:
-              with stackattrs(self, _monitor_proxy=monitor_proxy):
-                _monitor_Thread = bg_thread(
-                    self._monitor_datafiles,
-                    name=f'{self}._monitor_datafiles',
-                    thread_states=False,
-                )
-                with stackattrs(self, _monitor_Thread=_monitor_Thread):
-                  try:
-                    yield
-                  finally:
-                    self.runstate.cancel()
-                    joinif(_monitor_Thread)
-                    with self._lock:
-                      self.flush()
-                      self.WDFclose()
-                      # update state to substrate
-                      self._filemap.close()
-                      # close the read file descriptors
-                      for rfd in self._rfds.values():
-                        pfx_call(os.close, rfd)
+            with upd.run_task(f'{self} monitor ') as monitor_proxy:
+              _monitor_Thread = bg_thread(
+                  self._monitor_datafiles,
+                  name=f'{self}._monitor_datafiles',
+                  thread_states=False,
+                  args=(monitor_proxy,),
+              )
+              try:
+                yield
+              finally:
+                self.runstate.cancel()
+                joinif(_monitor_Thread)
+                with self._lock:
+                  self.flush()
+                  self.WDFclose()
+                  # update state to substrate
+                  self._filemap.close()
+                  # close the read file descriptors
+                  for rfd in self._rfds.values():
+                    pfx_call(os.close, rfd)
 
   @property
   def WDFstate(self) -> DataFileState:
