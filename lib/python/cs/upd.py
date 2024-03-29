@@ -982,7 +982,7 @@ def uses_upd(func):
     with upd:
       return func(*a, upd=upd, **kw)
 
-  return default_params(with_func, upd=lambda: Upd.default() or Upd())
+  return default_params(with_func, upd=lambda: Upd.default(factory=True))
 
 @uses_upd
 def out(msg, *a, upd, **outkw):
