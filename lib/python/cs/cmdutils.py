@@ -23,7 +23,7 @@ try:
 except ImportError:
   pass
 import shlex
-from signal import SIGHUP, SIGINT, SIGTERM
+from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 import sys
 from typing import Callable, List, Mapping, Optional, Tuple
 
@@ -297,7 +297,7 @@ class BaseCommandOptions(HasThreadState):
               ... optional extra fields etc ...
   '''
 
-  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGTERM
+  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
   COMMON_OPT_SPECS = _COMMON_OPT_SPECS
 
   cmd: Optional[str] = None
@@ -640,7 +640,6 @@ class BaseCommand:
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
     options = self.options = self.Options(cmd=self.cmd)
-    options.runstate_signals = options.DEFAULT_SIGNALS
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
@@ -1290,6 +1289,12 @@ class BaseCommand:
       print(usage.rstrip(), file=sys.stderr)
     return True
 
+  @uses_runstate
+  def handle_signal(self, sig, frame, *, runstate: RunState):
+    ''' The default signal handler, which cancels the default `RunState`.
+    '''
+    runstate.cancel()
+
   @contextmanager
   @uses_runstate
   @uses_upd
@@ -1313,15 +1318,14 @@ class BaseCommand:
       run_options = self.options.copy(**kw_options)
       with run_options:  # make the default ThreadState
         with stackattrs(self, options=run_options):
-          handle_signal = getattr(
-              self, 'handle_signal', lambda *_: runstate.cancel()
-          )
           with stackattrs(self, cmd=self._subcmd or self.cmd):
             with upd:
               with runstate:
-                with runstate.catch_signal(run_options.runstate_signals,
-                                           call_previous=False,
-                                           handle_signal=handle_signal):
+                with runstate.catch_signal(
+                    run_options.runstate_signals,
+                    call_previous=False,
+                    handle_signal=self.handle_signal,
+                ):
                   yield
 
     finally:

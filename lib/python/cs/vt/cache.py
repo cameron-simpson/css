@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # A cache store, connected to a fast cache and a slower backend.
-#       - Cameron Simpson <cs@cskk.id.au> 07dec2007
+# - Cameron Simpson <cs@cskk.id.au> 07dec2007
 #
 
 ''' Caching Stores and associated data structures.

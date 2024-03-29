@@ -97,12 +97,6 @@ from .util import createpath, openfd_read
 
 pfx_listdir = partial(pfx_call, os.listdir)
 
-##_sleep = sleep
-##
-##def sleep(t):
-##  print("sleep", t, "...")
-##  return _sleep(t)
-
 DEFAULT_DATADIR_STATE_NAME = 'default'
 
 ##RAWFILE_DOT_EXT = '.data'
@@ -432,27 +426,26 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
             # data onto the data queue, and returns.
             # The data queue worker saves the data to backing files and
             # updates the indices.
-            with upd.run_task(str(self) + " monitor ") as monitor_proxy:
-              with stackattrs(self, _monitor_proxy=monitor_proxy):
-                _monitor_Thread = bg_thread(
-                    self._monitor_datafiles,
-                    name=f'{self}._monitor_datafiles',
-                    thread_states=False,
-                )
-                with stackattrs(self, _monitor_Thread=_monitor_Thread):
-                  try:
-                    yield
-                  finally:
-                    self.runstate.cancel()
-                    joinif(_monitor_Thread)
-                    with self._lock:
-                      self.flush()
-                      self.WDFclose()
-                      # update state to substrate
-                      self._filemap.close()
-                      # close the read file descriptors
-                      for rfd in self._rfds.values():
-                        pfx_call(os.close, rfd)
+            with upd.run_task(f'{self} monitor ') as monitor_proxy:
+              _monitor_Thread = bg_thread(
+                  self._monitor_datafiles,
+                  name=f'{self}._monitor_datafiles',
+                  thread_states=False,
+                  args=(monitor_proxy,),
+              )
+              try:
+                yield
+              finally:
+                self.runstate.cancel()
+                joinif(_monitor_Thread)
+                with self._lock:
+                  self.flush()
+                  self.WDFclose()
+                  # update state to substrate
+                  self._filemap.close()
+                  # close the read file descriptors
+                  for rfd in self._rfds.values():
+                    pfx_call(os.close, rfd)
 
   @property
   def WDFstate(self) -> DataFileState:
@@ -841,7 +834,7 @@ class DataDir(FilesDir):
         (not filename.startswith(',') and filename.endswith(DATAFILE_DOT_EXT))
     ]
 
-  def _monitor_datafiles(self):
+  def _monitor_datafiles(self, proxy: UpdProxy):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
 
         This is what supports shared use of the data area. Other clients
@@ -905,7 +898,6 @@ class DataDir(FilesDir):
                       lambda pre_dr_post: pre_dr_post[2] - pre_dr_post[0]
                   ),
                   units_scale=BINARY_BYTES_SCALE,
-                  update_frequency=64,
               )
             for pre_offset, DR, post_offset in scanner:
               hashcode = hashclass.from_data(DR.data)
@@ -1268,7 +1260,6 @@ class PlatonicDir(FilesDir):
             total=new_size,
             itemlenfunc=lambda t3: t3[2] - t3[0],
             units_scale=BINARY_BYTES_SCALE,
-            update_period=0.3,
             report_print=True,
         )
       for pre_offset, data, post_offset in scanner:

@@ -72,7 +72,7 @@ def not_closed(func):
   return not_closed_wrapper
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
-class _mom_state(object):
+class _MultiOpenMixinOpenCloseState(object):
 
   def __init__(self, mom: "MultiOpenMixin"):
     self.mom = mom
@@ -91,7 +91,7 @@ class _mom_state(object):
     ''' The open process:
         Bump the opens counter.
         If it goes to 1, run the startup phase of `self.mom.startup_shutdown`.
-        Return the bumped opens counter.
+        Return the incremented opens counter.
     '''
     with self._lock:
       opens = self.opens
@@ -117,8 +117,9 @@ class _mom_state(object):
     ''' The close process:
         Decrement the opens counter.
         If it goes to 0, run the shutdown phase of `self.mom.startup_shutdown`.
-        Return the bumped opens counter and the return value of the shutdown phase
-        (or `None` if the shutdown was not run).
+        Return a 2-tuple `(opens,retval)` being:
+        - the decremented opens counter
+        - the return value of the shutdown phase or `None` if the shutdown was not run
     '''
     if not self.opened:
       if unopened_ok:
@@ -135,7 +136,7 @@ class _mom_state(object):
               "  opened from %s %d times", frame_key,
               self.opens_from[frame_key]
           )
-        return retval
+        return opens, retval
       opens -= 1
       self.opens = opens
       if opens == 0:
@@ -223,17 +224,20 @@ class MultiOpenMixin(ContextManagerMixin):
         proxy's `.close`.
   '''
 
+  _mom_state_lock = Lock()
+
   def __mo_getstate(self):
     ''' Fetch the state object for the mixin,
-        something of a hack to avoid providing an __init__.
+        something of a hack to avoid providing an `__init__`.
     '''
     # used to be self.__mo_state and catch AttributeError, but
     # something up the MRO weirds this - suspect the ABC base class
-    try:
-      state = self.__dict__['_MultiOpenMixin_state']
-    except KeyError:
-      state = self.__dict__['_MultiOpenMixin_state'] = _mom_state(self)
-      assert state.opens == 0
+    with self.__class__._mom_state_lock:
+      try:
+        state = self.__dict__['_MultiOpenMixin_state']
+      except KeyError:
+        state = self.__dict__['_MultiOpenMixin_state'
+                              ] = _MultiOpenMixinOpenCloseState(self)
     return state
 
   def tcm_get_state(self):
@@ -243,7 +247,7 @@ class MultiOpenMixin(ContextManagerMixin):
     return {'opened': state.opened, 'opens': state.opens}
 
   def __enter_exit__(self):
-    self.open(caller_frame=caller())
+    self.open()  ##caller_frame=caller())
     try:
       yield
     finally:
@@ -816,9 +820,10 @@ class RunState(HasThreadState):
     self.cancel()
 
 # use the prevailing RunState or make a fresh one
-uses_runstate = default_params(
-    runstate=lambda: RunState.default() or RunState()
-)
+from cs.upd import print
+
+# default to the current RunState or make one
+uses_runstate = default_params(runstate=lambda: RunState.default(factory=True))
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.

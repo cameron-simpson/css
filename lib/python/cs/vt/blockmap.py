@@ -331,7 +331,6 @@ class BlockMap(RunStateMixin):
           itemlenfunc=(lambda leaf_start_length: leaf_start_length[2] -
                        leaf_start_length[1]),
           proxy=upd_proxy,
-          update_frequency=16,
           units_scale=BINARY_BYTES_SCALE,
       ):
         if runstate.cancelled:

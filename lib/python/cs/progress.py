@@ -378,7 +378,7 @@ class BaseProgress(object):
       recent_window=None,
       report_print=None,
       insert_pos=1,
-      update_period=0,
+      update_period=DEFAULT_UPDATE_PERIOD,
       upd: Upd,
   ):
     ''' A context manager to create and withdraw a progress bar.
@@ -430,32 +430,33 @@ class BaseProgress(object):
       '''
       proxy.text = None
 
-    def ticker(runstate: RunState):
+    cancel_ticker = True
+
+    def ticker():
       ''' Worker to update the progress bar every `update_period` seconds.
       '''
       time.sleep(update_period)
-      while not runstate.cancelled:
+      while not cancel_ticker:
         update(self, None)
         time.sleep(update_period)
 
     if update_period == 0:
       self.notify_update.add(update)
-    with RunState(label) as runstate:
-      try:
-        start_pos = self.position
-        with upd.insert(
-            insert_pos,
-            prefix=label + ' ',
-            text_auto=text_auto,
-        ) as proxy:
-          update(self, None)
-          if update_period > 0:
-            bg(ticker, args=(runstate,), daemon=True)
-          yield proxy
-      finally:
-        runstate.cancel()
-        if update_period == 0:
-          self.notify_update.remove(update)
+    try:
+      start_pos = self.position
+      with upd.insert(
+          insert_pos,
+          prefix=label + ' ',
+          text_auto=text_auto,
+      ) as proxy:
+        update(self, None)
+        if update_period > 0:
+          bg(ticker, daemon=True)
+        yield proxy
+    finally:
+      cancel_ticker = True
+      if update_period == 0:
+        self.notify_update.remove(update)
     if report_print:
       if isinstance(report_print, bool):
         report_print = print
@@ -474,7 +475,7 @@ class BaseProgress(object):
       *,
       itemlenfunc=None,
       incfirst=False,
-      update_period=0,
+      update_period=DEFAULT_UPDATE_PERIOD,
       **bar_kw,
   ):
     ''' An iterable progress bar: a generator yielding values
@@ -494,9 +495,9 @@ class BaseProgress(object):
           made as items are obtained or only after items are processed
           by whatever is consuming this generator.
           The default is `False`, advancing after processing.
-        * `update_period`: default `0`; if > 0 then update the
-          progress bar every `update_period` seconds, otherwise on
-          each iteration
+        * `update_period`: default `DEFAULT_UPDATE_PERIOD`; if `0`
+          then update on every iteration, otherwise every `update_period`
+          seconds
         Other parameters are passed to `Progress.bar`.
 
         Example use:
@@ -667,6 +668,11 @@ class Progress(BaseProgress):
     '''
     self._total = new_total
     self._updated()
+
+  def advance_total(self, delta):
+    ''' Function form of addition to the total.
+    '''
+    self.total += delta
 
   def update(self, new_position, update_time=None):
     ''' Record more progress.

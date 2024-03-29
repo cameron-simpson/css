@@ -320,6 +320,7 @@ class Later(MultiOpenMixin, HasThreadState):
       inboundCapacity=0,
       retry_delay=None,
       thread_states=True,
+      default=False,
   ):
     ''' Initialise the Later instance.
 
@@ -352,6 +353,7 @@ class Later(MultiOpenMixin, HasThreadState):
     )
     if retry_delay is None:
       retry_delay = DEFAULT_RETRY_DELAY
+    self.default = default
     self.capacity = capacity
     self.inboundCapacity = inboundCapacity
     self.retry_delay = retry_delay
@@ -375,7 +377,7 @@ class Later(MultiOpenMixin, HasThreadState):
     '''
     for _ in zip_longest(
         MultiOpenMixin.__enter_exit__(self),
-        HasThreadState.__enter_exit__(self),
+        HasThreadState.__enter_exit__(self) if self.default else (),
     ):
       yield
 

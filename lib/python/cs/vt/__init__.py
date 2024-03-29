@@ -45,7 +45,10 @@ from contextlib import closing, contextmanager
 import os
 from threading import Thread
 from types import SimpleNamespace as NS
-from typing import Mapping, Tuple
+from typing import Iterable, Tuple, Union
+
+from icontract import require
+from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.deco import default_params, fmtdoc
@@ -58,9 +61,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.seq import Seq
 from cs.threads import bg as bg_thread, ThreadState, HasThreadState
-
-from icontract import require
-from typeguard import typechecked
+from cs.upd import Upd, uses_upd
 
 from .hash import (
     DEFAULT_HASHCLASS,
@@ -170,7 +171,7 @@ if False:
 
   # monkey patch MultiOpenMixin
   import cs.resources
-  cs.resources._mom_lockclass = RLock
+  cs.resources.MultiOpenMixin._mom_state_lock = Lock()
 else:
   from threading import (
       Lock as threading_Lock,
@@ -353,9 +354,12 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         and raises `ValueError` if that does not match the supplied
         `h`.
     '''
-    h2 = self.add(data, type(h))
-    if h != h2:
-      raise ValueError("h:%s != hash(data):%s" % (h, h2))
+    if not isinstance(h, self.hashclass):
+      raise TypeError(f'h should be a {self.hashclass}, got {r(h)}')
+    if h != self.hashclass.from_bytes(data):
+      raise ValueError(f'{h=} != {self.hashclass.hashname}({data=})')
+    h2 = self.add(data)
+    assert h == h2
 
   def __delitem__(self, h):
     raise NotImplementedError(f'{self.__class__.__name__}.__delitem__')
@@ -386,9 +390,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
               yield
             finally:
               self.runstate.cancel()
-        # obtain this before the Later forgets it
-        finished = L.finished_event
-      finished.wait()
+      L.wait()
 
   #############################
   ## Function dispatch methods.
@@ -396,7 +398,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
 
   def _defer(self, func, *args, **kwargs):
     ''' Defer a function via the internal `Later` queue.
-        Hold an `open()` on `self` to avoid easy shutdown.
+        Hold an `open()` on `self` to avoid premature shutdown.
     '''
     self.open()
 
@@ -420,14 +422,6 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     raise NotImplementedError
 
-  def __setitem__(self, h, data):
-    if not isinstance(h, self.hashclass):
-      raise TypeError(f'h should be a {self.hashclass}, got {r(h)}')
-    if h != self.hashclass.from_bytes(data):
-      raise ValueError(f'{h=} != {self.hashclass.hashname}({data=})')
-    h2 = self.add(data)
-    assert h == h2
-
   @abstractmethod
   # pylint: disable=unused-argument
   def get(self, h, default=None):
@@ -441,9 +435,6 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     raise NotImplementedError
 
-  def __getitem__(self, h):
-    return self.get(h)
-
   @abstractmethod
   def contains(self, h):
     ''' Test whether the hashcode `h` is present in the Store.
@@ -455,9 +446,6 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     ''' Dispatch the contains request in the background, return a `Result`.
     '''
     raise NotImplementedError
-
-  def __contains__(self, h):
-    return self.contains(h)
 
   @abstractmethod
   def flush(self):
@@ -485,7 +473,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     ''' The configuration for use with this `Store`.
         Falls back to `Config.default`.
     '''
-    from .config import Config
+    from .config import Config  # pylint:disable=import-outside-toplevel
     return self._config or Config.default(factory=True)
 
   @config.setter
@@ -509,21 +497,27 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     self._blockmapdir = dirpath
 
+  @uses_upd
+  @uses_runstate
   @require(lambda capacity: capacity >= 1)
   @typechecked
-  def pushto(self,
-             dstS,
-             *,
-             capacity: int = 64,
-             progress=None) -> Tuple[QueueIterator, Thread]:
+  def pushto(
+      self,
+      dstS,
+      *,
+      capacity: int = 64,
+      runstate: RunState,
+      upd: Upd,
+      progress=None,
+  ) -> Tuple[QueueIterator, Thread]:
     ''' Allocate a `QueueIterator` for Blocks to push from this
         Store to another Store `dstS`.
-        Return `(Q,T)` where `Q` is the new `QueueIterator` and `T` is the
+        Return `(Q,T)` where `Q` is a queue to receive blocks `T` is the
         `Thread` processing the queue.
 
         Parameters:
-        * `dstS`: the secondary Store to receive Blocks.
-        * `capacity`: the Queue capacity, arbitrary default `64`.
+        * `dstS`: the secondary Store to receive `Block`s.
+        * `capacity`: the queue capacity, arbitrary default `64`.
         * `progress`: an optional `Progress` counting submitted and completed data bytes.
 
         Once called, the caller can then `.put` Blocks onto the queue.
@@ -533,38 +527,65 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     name = "%s.pushto(%s)" % (self.name, dstS.name)
     with Pfx(name):
       Q = IterableQueue(capacity=capacity, name=name)
-      srcS = self
-      srcS.open()
+      self.open()
       dstS.open()
       T = bg_thread(
-          lambda: (
-              self._push_blocks(name, Q, srcS, dstS, progress),
-              srcS.close(),
-              dstS.close(),
-          )
+          self._push_worker,
+          args=(name, Q, dstS),
+          kwargs=dict(progress=progress, runstate=runstate, upd=upd),
       )
       return Q, T
 
   @pfx_method
-  def _push_blocks(self, name, blocks, srcS, dstS, progress):
-    ''' This is a worker function which pushes Blocks or bytes from
-        the supplied iterable `blocks` to the second Store.
+  def _push_worker(
+      self,
+      name: str,
+      blocks: Iterable,
+      dstS: "Store",
+      *,
+      progress: Union[Progress, None],
+      runstate: RunState,
+      upd: Upd,
+  ):
+    ''' This is a worker function which receives `HashCode`s or `Block`s
+        or `bytes` from the supplied iterable `blocks` and pushes
+        them to `dstS` (the second `Store`).
+        This closes `self` and `dstS` on return
+        and thus expects them to be opened in `self.pushto()`.
 
         Parameters:
         * `name`: name for this worker instance
-        * `blocks`: an iterable of `HashCode`s or Blocks or bytes-like objects
-        * `srcS`: the source Store from which to obtain block data
-        * `dstS`: the target Store to which to push Blocks
+        * `blocks`: an iterable of `HashCode`s or `Block`s or `bytes`-like objects
+        * `dstS`: the destination `Store` to which to push `Block`s
     '''
-    with srcS:
-      for item in progressbar(blocks, f'{self.name}.pushto',
-                              update_frequency=64):
+    if progress is None and not upd.disabled:
+      P = Progress(name, total=0)
+      with P.bar(report_print=True):
+        return self._push_worker(
+            name, blocks, dstS, progress=P, runstate=runstate, upd=upd
+        )
+    try:
+      if progress is None:
+        add_bg = dstS.add_bg
+      else:
+
+        def add_bg(data):
+          ''' Add the data and advance the progress on completion.
+          '''
+          R = dstS.add_bg(data)
+          R.notify(lambda _: progress.advance(len(data)))
+          return R
+
+      for item in blocks:
         if isinstance(item, HashCode):
           h = item
           if h in dstS:
+            # known, skip
             continue
-          data = srcS[h]
-          dstS.add_bg(data)
+          data = self[h]
+          dlen = len(data)
+          if progress is not None:
+            progress.total += dlen
         else:
           # a Block?
           try:
@@ -572,13 +593,21 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
           except AttributeError:
             # just data
             data = item
-            dstS.add(data)
+            dlen = len(data)
+            if progress is not None:
+              progress.total += dlen
           else:
-            # Block
+            dlen = len(item)
+            if progress is not None:
+              progress.total += dlen
+            h = item.hashcode
             if h in dstS:
+              progress += dlen
               continue
-            data = item.data
-            dstS.add_bg(data)
+        add_bg(data)
+    finally:
+      self.close()
+      dstS.close()
 
   def is_complete_indirect(self, ih):
     ''' Check whether `ih`, the hashcode of an indirect Block,
@@ -592,7 +621,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     if subblocks_data is None:
       # missing hash, incomplete
       return False
-    from .block import IndirectBlock
+    from .block import IndirectBlock  # pylint:disable=import-outside-toplevel
     IB = IndirectBlock.from_subblocks_data(subblocks_data)
     for subblock in IB.subblocks:
       h = subblock.hashcode
@@ -658,7 +687,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       obj = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
     if isinstance(obj, str):
       if config is None:
-        from .config import Config
+        from .config import Config  # pylint:disable=import-outside-toplevel
         config = Config.default(factory=True)
       return config.Store_from_spec(obj)
     raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))

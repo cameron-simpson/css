@@ -268,7 +268,6 @@ class VTCmd(BaseCommand):
   )
 
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
-  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
 
   GETOPT_SPEC = 'C:S:f:h:Pqv'
 
@@ -334,8 +333,7 @@ class VTCmd(BaseCommand):
     if options.dflt_log is not None:
       logTo(options.dflt_log, delay=True)
 
-  @uses_runstate
-  def handle_signal(self, sig, frame, *, runstate: RunState):
+  def handle_signal(self, sig, frame):
     ''' Override `BaseCommand.handle_signal`:
         - do a threaddump for `SIGQUIT`
         - run the default `handle_signal` method
@@ -344,7 +342,7 @@ class VTCmd(BaseCommand):
     if sig == SIGQUIT:
       thread_dump()
     # call the standard RunState signal handler
-    runstate.handle_signal(sig, frame)
+    super().handle_signal(sig, frame)
     if sig == SIGQUIT:
       sys.exit(1)
 
@@ -459,8 +457,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             blocked_chunks_of(inbfr),
             label=mode,
-            ##update_min_size=65536,
-            update_frequency=1024,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -475,8 +471,6 @@ class VTCmd(BaseCommand):
         for offset in progressbar(
             blockify(inbfr),
             label=mode,
-            update_frequency=256,
-            ##update_min_size=65536,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -491,7 +485,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             inbfr,
             label=mode,
-            update_min_size=65536,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -507,7 +500,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             inbfr,
             label=mode,
-            update_min_size=65536,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -522,8 +514,6 @@ class VTCmd(BaseCommand):
         for offset in progressbar(
             scan_offsets(inbfr),
             label=mode,
-            update_frequency=256,
-            ##update_min_size=65536,
             itemlenfunc=lambda offset: offset - last_offset,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -538,8 +528,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             scan_reblock(inbfr),
             label=mode,
-            update_frequency=256,
-            ##update_min_size=65536,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -554,8 +542,6 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             inbfr,
             label=mode,
-            ##update_min_size=65536,
-            update_frequency=128,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -1131,18 +1117,16 @@ class VTCmd(BaseCommand):
     '''
     xit = 0
     with Pfx("%s => %s", srcS.name, dstS.name):
-      Q, T = srcS.pushto(dstS, progress=None)
+      Q, T = srcS.pushto(dstS, capacity=64)
       try:
         for pushable in pushables:
+          runstate.raiseif()
           with Pfx("push %s", pushable):
-            if runstate.cancelled:
-              xit = 1
-              break
             with Pfx(pushable):
               progress = Progress(str(pushable))
-              pushq = pushable.pushto_queue
+              push_to_q = pushable.pushto_queue
               try:
-                pushed_ok = pfx_call(pushq, Q, progress=progress)
+                pushed_ok = pfx_call(push_to_q, Q, progress=progress)
                 assert isinstance(pushed_ok, bool)
               except Exception as e:
                 error("push fails: %s", e)
@@ -1261,7 +1245,6 @@ class VTCmd(BaseCommand):
                 itemlenfunc=len,
                 units_scale=BINARY_BYTES_SCALE,
                 runstate=runstate,
-                update_frequency=64,
                 total=(
                     st.st_size
                     if st is not None and S_ISREG(st.st_mode) else None
@@ -1395,7 +1378,6 @@ class VTCmd(BaseCommand):
                     blocked_chunks_of(file_data(f, None), scanner=scanner),
                     f"blocked_chunks_of({shortpath(filename)})",
                     units_scale=BINARY_BYTES_SCALE,
-                    update_frequency=64,
                     itemlenfunc=len,
                     total=total_size,
                     runstate=runstate,

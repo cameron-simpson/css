@@ -305,8 +305,8 @@ def bg(
     name=None,
     no_start=False,
     no_logexc=False,
-    thread_class=None,
-    thread_states=None,
+    thread_factory=None,
+    thread_states=True,
     args=None,
     kwargs=None,
 ):
@@ -321,8 +321,11 @@ def bg(
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
-      * `thread_class`: the `Thread` factory, default `HasThreadState.Thread`
-      * `thread_states`: passed tothe  `thread_class` factory
+      * `thread_factory`: the `Thread` factory, default `HasThreadState.Thread`,
+        which prepares a new `threading.Thread` with the default
+        `HasThreadState` contexts
+      * `thread_states`: passed to the  `thread_factory` factory;
+        default `True`
       * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
@@ -331,8 +334,8 @@ def bg(
     args = ()
   if kwargs is None:
     kwargs = {}
-  if thread_class is None:
-    thread_class = HasThreadState.Thread
+  if thread_factory is None:
+    thread_factory = HasThreadState.Thread
 
   ##thread_prefix = prefix() + ': ' + name
   thread_prefix = name
@@ -341,7 +344,7 @@ def bg(
     with Pfx(thread_prefix):
       return func(*args, **kwargs)
 
-  T = thread_class(
+  T = thread_factory(
       name=thread_prefix,
       target=thread_body,
       thread_states=thread_states,
