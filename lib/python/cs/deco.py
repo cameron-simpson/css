@@ -153,6 +153,7 @@ def decorator(deco):
     # `deco(func, *da, **kw)`.
     return lambda func: decorate(func, *da, **dkw)
 
+  metadeco.__name__ = getattr(deco, '__name__', repr(deco))
   metadeco.__doc__ = getattr(deco, '__doc__', '')
   metadeco.__module__ = getattr(deco, '__module__', None)
   return metadeco
