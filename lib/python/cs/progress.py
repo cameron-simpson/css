@@ -669,6 +669,11 @@ class Progress(BaseProgress):
     self._total = new_total
     self._updated()
 
+  def advance_total(self, delta):
+    ''' Function form of addition to the total.
+    '''
+    self.total += delta
+
   def update(self, new_position, update_time=None):
     ''' Record more progress.
 
