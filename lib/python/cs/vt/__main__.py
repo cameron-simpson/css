@@ -1117,7 +1117,7 @@ class VTCmd(BaseCommand):
     '''
     xit = 0
     with Pfx("%s => %s", srcS.name, dstS.name):
-      Q, T = srcS.pushto(dstS, progress=None)
+      Q, T = srcS.pushto(dstS, capacity=64)
       try:
         for pushable in pushables:
           with Pfx("push %s", pushable):
