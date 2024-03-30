@@ -66,7 +66,7 @@ this default behaviour.
 '''
 
 import atexit
-from builtins import print as builtin_print
+from builtins import breakpoint as builtin_breakpoint, print as builtin_print
 from contextlib import contextmanager
 from functools import partial
 import os
@@ -671,7 +671,8 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
 
   @contextmanager
   def above(self, need_newline=False):
-    ''' Context manager to move to the top line of the display, clear it, yield, redraw below.
+    ''' Context manager to move to the top line of the `Upd` display,
+        clear it, `yield`, redraw below.
 
         This context manager is for use when interleaving _another_
         stream with the `Upd` display;
@@ -991,26 +992,23 @@ def out(msg, *a, upd, **outkw):
   '''
   return upd.out(msg, *a, **outkw)
 
-# pylint: disable=redefined-builtin
-@uses_upd
-def print(*a, upd: Upd, end='\n', **kw):
-  ''' Wrapper for the builtin print function
-      to call it inside `Upd.above()` and enforce a flush.
-
-      The function supports an addition parameter beyond the builtin print:
-      * `upd`: the `Upd` instance to use, default `Upd()`
-
-      Programmes integrating `cs.upd` with use of the builtin `print`
-      function should use this at import time:
-
-          from cs.upd import print
+@decorator
+def without(func):
+  ''' A decorator to withdraw the current `Upd` (if any) while running `func`.
   '''
-  if upd.disabled:
-    builtin_print(*a, end=end, **kw)
-  else:
-    kw['flush'] = True
-    with upd.above(need_newline=not end.endswith('\n')):
-      builtin_print(*a, end=end, **kw)
+
+  def _without_upd_wrapper(*a, **kw):
+    upd = Upd.default()
+    if upd is None or upd.disabled:
+      return func(*a, **kw)
+    with upd.above():
+      return func(*a, **kw)
+
+  return _without_upd_wrapper
+
+# pylint: disable=redefined-builtin
+breakpoint = without(builtin_breakpoint)
+print = without(partial(builtin_print, flush=True))
 
 @uses_upd
 def pfxprint(*a, upd, **kw):
