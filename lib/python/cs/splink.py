@@ -972,7 +972,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                           for when, tags in progressbar(
                               when_tags,
                               short_dspath,
-                              update_frequency=16,
                               report_print=True,
                           ):
                             key = when
