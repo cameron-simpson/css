@@ -235,7 +235,6 @@ class DataFile(SingletonMixin, HasFSPath, MultiOpenMixin):
     '''
     with self._lock:
       if self._af is None:
-        X("DataFile.wf: open %r ...", self.fspath)
         self._af = pfx_call(open, self.fspath, 'ab', buffering=0)
       return self._af
 
