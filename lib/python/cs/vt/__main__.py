@@ -41,7 +41,7 @@ from cs.logutils import (exception, error, warning, track, info, debug, logTo)
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar, Progress
 from cs.py.modules import import_extra
-from cs.resources import RunState, uses_runstate
+from cs.resources import RunState, uses_runstate, CancellationError
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
@@ -1128,8 +1128,13 @@ class VTCmd(BaseCommand):
               try:
                 pushed_ok = pfx_call(push_to_q, Q, progress=progress)
                 assert isinstance(pushed_ok, bool)
+              except CancellationError:
+                # consider the push kinda ok, just cancelled
+                warning("cancelled")
+                pushed_ok = True
+                xit = 1
               except Exception as e:
-                error("push fails: %s", e)
+                warning("push fails: %s", e)
                 pushed_ok = False
               if not pushed_ok:
                 error("push failed")

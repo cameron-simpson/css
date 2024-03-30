@@ -16,7 +16,7 @@ import functools
 import sys
 from threading import RLock
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 from icontract import ensure
 from typeguard import typechecked
@@ -24,7 +24,6 @@ from typeguard import typechecked
 from cs.deco import decorator
 from cs.logutils import debug, exception
 from cs.py.func import funcname
-from cs.resources import RunState
 from cs.seq import seq
 from cs.threads import bg
 from cs.units import (
@@ -378,6 +377,7 @@ class BaseProgress(object):
       recent_window=None,
       report_print=None,
       insert_pos=1,
+      poll: Optional[Callable[["BaseProgress"], None]] = None,
       update_period=DEFAULT_UPDATE_PERIOD,
       upd: Upd,
   ):
@@ -400,6 +400,9 @@ class BaseProgress(object):
           this may also be a `bool`, which if true will use `Upd.print`
           in order to interoperate with `Upd`.
         * `insert_pos`: where to insert the progress bar, default `1`
+        * `poll`: an optional callable accepting a `BaseProgress`
+          which can be used to update the progress state before
+          updating the progress bar display
 
         Example use:
 
@@ -422,6 +425,8 @@ class BaseProgress(object):
     def text_auto():
       ''' The current state of the `Progress`, to fit `width` and `proxy.width`.
       '''
+      if poll is not None:
+        poll(self)
       return statusfunc(self, "", min((width or proxy.width), proxy.width))
 
     # pylint: disable=unused-argument
@@ -430,7 +435,7 @@ class BaseProgress(object):
       '''
       proxy.text = None
 
-    cancel_ticker = True
+    cancel_ticker = False
 
     def ticker():
       ''' Worker to update the progress bar every `update_period` seconds.

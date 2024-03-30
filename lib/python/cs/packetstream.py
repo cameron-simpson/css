@@ -530,7 +530,6 @@ class PacketConnection(object):
         label=f'<= {self.name}',
         units_scale=BINARY_BYTES_SCALE,
         itemlenfunc=self._recv_len_func,
-        update_frequency=32,
     ):
       if packet == self.EOF_Packet:
         break
@@ -629,7 +628,6 @@ class PacketConnection(object):
             label=f'=> {self.name}',
             units_scale=BINARY_BYTES_SCALE,
             itemlenfunc=len,
-            update_frequency=32,
         ):
           sig = (P.channel, P.tag, P.is_request)
           if sig in self.__sent:

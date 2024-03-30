@@ -663,7 +663,6 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
       for row in progressbar(
           rows,
           "parse " + shortpath(csvpath),
-          update_frequency=1024,
           report_print=True,
           runstate=runstate,
       ):

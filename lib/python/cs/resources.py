@@ -819,9 +819,6 @@ class RunState(HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
-# use the prevailing RunState or make a fresh one
-from cs.upd import print
-
 # default to the current RunState or make one
 uses_runstate = default_params(runstate=lambda: RunState.default(factory=True))
 

@@ -21,7 +21,7 @@ from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.queues import Channel, IterableQueue
-from cs.resources import openif
+from cs.resources import openif, RunState, uses_runstate
 from cs.result import Result, report
 from cs.threads import bg as bg_thread
 
@@ -120,10 +120,12 @@ class MappingStore(StoreSyncBase):
     '''
     return self.mapping.get(h, default)
 
-  def pushto_queue(self, Q, runstate=None, progress=None):
-    ''' Push all the keys to the queue.
+  @uses_runstate
+  def pushto_queue(self, Q, runstate: RunState, progress=None):
+    ''' Push all the `Store` keys to the queue `Q`.
     '''
-    for h in progressbar(self.keys(), f'{self.name}', update_frequency=64):
+    for h in progressbar(self.keys(), f'push {self.name}', total=len(self)):
+      runstate.raiseif()
       Q.put(h)
     return True
 

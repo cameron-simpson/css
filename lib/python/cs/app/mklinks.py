@@ -244,7 +244,6 @@ class Linker:
           for filename in progressbar(
               sorted(filenames),
               label=relpath(dirpath, path),
-              update_frequency=32,
           ):
             runstate.raiseif()
             filepath = joinpath(dirpath, filename)

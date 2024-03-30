@@ -22,8 +22,6 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq, unrepeated
 
-##from cs.debug import Lock, RLock, Thread
-
 __version__ = '20240318-post'
 
 DISTINFO = {
@@ -63,7 +61,7 @@ class QueueIterator(MultiOpenMixin):
     )
     # count of non-sentinel items
     self._item_count = 0
-    self._lock = Lock()
+    self.__lock = Lock()
 
   def __str__(self):
     return "%s(%r:q=%s)" % (type(self).__name__, self.name, self.q)
@@ -80,8 +78,8 @@ class QueueIterator(MultiOpenMixin):
       raise ClosedError("QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
-    with self._lock:
-      self._put(item, *args, **kw)
+    self._put(item, *args, **kw)
+    with self.__lock:
       self._item_count += 1
 
   def _put(self, item, *args, **kw):
@@ -122,7 +120,7 @@ class QueueIterator(MultiOpenMixin):
       # put the sentinel back for other consumers
       self._put(self.sentinel)
       raise StopIteration("SENTINEL")
-    with self._lock:
+    with self.__lock:
       self._item_count -= 1
     return item
 
