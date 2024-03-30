@@ -13,8 +13,10 @@ patched with those names, enabling trite debug use of those names
 anywhere in the code provided this module has been imported somewhere.
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
+* `breakpoint`: `cs.upd.breakpoint`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
+* `print`: `cs.upd.print`
 * `r`: `cs.lex.r`
 * `s`: `cs.lex.s`
 * `stack_dump`: dump current `Thread`'s call stack
@@ -53,6 +55,7 @@ from cs.py.func import funccite, func_a_kw_fmt
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
+from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
 from cs.x import X
 
 __version__ = '20230613.1-post'
@@ -79,7 +82,7 @@ DISTINFO = {
     ],
 }
 
-__all__ = ['X', 'pformat', 'pprint', 'r', 's']
+__all__ = ['X', 'breakpoint', 'pformat', 'pprint', 'print', 'r', 's']
 
 # environment variable specifying names to become built in
 CS_DEBUG_BUILTINS_ENVVAR = 'CS_DEBUG_BUILTINS'
