@@ -1005,9 +1005,12 @@ def print(*a, upd: Upd, end='\n', **kw):
 
           from cs.upd import print
   '''
-  kw['flush'] = True
-  with upd.above(need_newline=not end.endswith('\n')):
+  if upd.disabled:
     builtin_print(*a, end=end, **kw)
+  else:
+    kw['flush'] = True
+    with upd.above(need_newline=not end.endswith('\n')):
+      builtin_print(*a, end=end, **kw)
 
 @uses_upd
 def pfxprint(*a, upd, **kw):
