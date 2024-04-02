@@ -28,21 +28,79 @@ DISTINFO = {
 }
 
 @contextmanager
-def contextif(flag, cmgr_func, *cmgr_args, **cmgr_kwargs):
-  ''' A context manager to call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
-      if `flag` is true, otherwise to call `nullcontext()`.
+def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
+  ''' A context manager to use `cmgr` conditionally,
+      with a flexible call signature.
+      This yields the context manager if `cmgr` is used or `None`
+      if it is not used, allowing the enclosed code to test whether
+      the context is active.
 
-      The driving use case is verbosity dependent status lines or
-      progress bars, eg:
+      This is to ease uses where the context object is optional
+      i.e. `None` if not present. Example from `cs.vt.stream`:
+
+          @contextmanager
+          def startup_shutdown(self):
+            """ Open/close `self.local_store` if not `None`.
+            """
+            with super().startup_shutdown():
+              with contextif(self.local_store):
+                with self._packet_connection(self.recv, self.send) as conn:
+                  with stackattrs(self, _conn=conn):
+                    yield
+
+      Here `self.local_store` might be `None` if there's no local
+      store to present. We still want a nice nested `with` statement
+      during the setup. By using `contextif` we run a context manager
+      which behaves correctly when `self.local_store=None`.
+
+      The signature is flexible, offering 2 basic modes of use.
+
+      Flagged use: `contextif(flag,cmgr,*a,**kw)`: if `flag` is a
+      Boolean then it governs whether the context manager `cmgr`
+      is used. Historically the driving use case was verbosity
+      dependent status lines or progress bars. Example:
 
           from cs.upd import run_task
           with contextif(verbose, run_task, ....) as proxy:
-            ... do stuff, updating proxy if not None ...
+              ... do stuff, updating proxy if not None ...
+
+      Unflagged use: `contextif(cmgr,*a,**kw)`: use `cmgr` as the
+      flag: if false (eg `None`) then `cmgr` is not used.
+
+      Additionally, `cmgr` may be a callable, in which case the
+      context manager itself is obtained by calling
+      `cmgr,*cmgr_args,**cmgr_kwargs)`. Otherwise `cmgr` is assumed
+      to be a context manager already, and it is an error to provide
+      `cmgr_args` or `cmgr_kwargs`.
+
+      In the `cs.upd` example above, `run_task` is a context manager
+      function which pops up an updatable status line, normally
+      used as:
+
+          with run_task("doing thing") as proxy:
+              ... do the thing, setting proxy.text as needed ...
   '''
-  assert isinstance(flag, bool)
-  cmgr = cmgr_func(*cmgr_args, **cmgr_kwargs) if flag else nullcontext()
-  with cmgr as ctxt:
-    yield ctxt
+  if callable(cmgr):
+    flag = True
+  else:
+    if isinstance(cmgr, bool):
+      flag = cmgr
+      cmgr = cmgr_args[0]
+      cmgr_args = cmgr_args[1:]
+    else:
+      flag = bool(cmgr)
+  if flag:
+    if callable(cmgr):
+      cmgr = cmgr(*cmgr_args, **cmgr_kwargs)
+    elif cmgr_args or cmgr_kwargs:
+      raise ValueError(
+          "cmgr %s:%r is not callable but arguments were provided: cmgr_args=%r, cmgr_kwargs=%r"
+          % (cmgr.__class__.__name__, cmgr, cmgr_args, cmgr_kwargs)
+      )
+    with cmgr as ctxt:
+      yield ctxt
+  else:
+    yield
 
 def pushattrs(o, **attr_values):
   ''' The "push" part of `stackattrs`.
