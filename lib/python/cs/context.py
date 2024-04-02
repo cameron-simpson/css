@@ -15,6 +15,8 @@ except ImportError:
     '''
     yield None
 
+from cs.gimmicks import error
+
 __version__ = '20240316-post'
 
 DISTINFO = {
@@ -24,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.gimmicks'],
 }
 
 @contextmanager
@@ -105,7 +107,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
 def pushattrs(o, **attr_values):
   ''' The "push" part of `stackattrs`.
       Push `attr_values` onto `o` as attributes,
-      return the previous attribute values in a dict.
+      return the previous attribute values in a `dict`.
 
       This can be useful in hooks/signals/callbacks,
       where you cannot inline a context manager.
@@ -145,7 +147,7 @@ def stackattrs(o, **attr_values):
   ''' Context manager to push new values for the attributes of `o`
       and to restore them afterward.
       Returns a `dict` containing a mapping of the previous attribute values.
-      Attributes not present are not present in returned mapping.
+      Attributes not present are not present in the returned mapping.
 
       Restoration includes deleting attributes which were not present
       initially.
@@ -155,7 +157,7 @@ def stackattrs(o, **attr_values):
 
       See `stackkeys` for a flavour of this for mappings.
 
-      See `cs.threads.State` for a convenient wrapper class.
+      See `cs.threads.ThreadState` for a convenient wrapper class.
 
       Example of fiddling a programme's "verbose" mode:
 
@@ -514,6 +516,7 @@ def stack_signals(signums, handler, additional=False):
   if additional:
     new_handler = handler
 
+    # pylint: disable=function-redefined
     def handler(sig, frame):
       old_handler = stacked_signals[sig]
       new_handler(sig, frame)
@@ -645,7 +648,11 @@ class ContextManagerMixin:
         around the main `RunState` context manager.
     '''
     eegen = cls.__enter_exit__(self)
-    entered = next(eegen)
+    try:
+      entered = next(eegen)
+    except StopIteration as e:
+      error("expected enter value from next(eegen): %s", e)
+      return
     try:
       yield entered
     except Exception as e:  # pylint: disable=broad-exception-caught
