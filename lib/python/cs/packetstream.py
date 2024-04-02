@@ -13,7 +13,7 @@ import errno
 import os
 import sys
 from time import sleep
-from threading import Lock, current_thread
+from threading import Lock
 
 from icontract import ensure
 
@@ -144,7 +144,7 @@ class Packet(SimpleBinary):
         ),
         BSUInt.transcribe_value(channel) if channel != 0 else b'',
         BSUInt.transcribe_value(self.rq_type) if is_request else b'',
-        self.payload
+        self.payload,
     ]
     length = sum(len(bs) for bs in bss)
     # spit out a BSData manually to avoid pointless bytes.join
@@ -529,6 +529,7 @@ class PacketConnection(MultiOpenMixin):
       self._channel_request_tags[channel].remove(tag)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  @logexc
   @pfx_method
   @ensure(lambda self: self._recv is None)
   def _receive_loop(self, *, notify_recv_eof: set, runstate: RunState):
@@ -623,6 +624,7 @@ class PacketConnection(MultiOpenMixin):
     self._recv = None
 
   # pylint: disable=too-many-branches
+  @logexc
   def _send_loop(self):
     ''' Send packets upstream.
         Write every packet directly to self._send.
