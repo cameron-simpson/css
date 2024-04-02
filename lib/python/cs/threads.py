@@ -738,6 +738,63 @@ def monitor(cls, attrs=None, initial_timeout=10.0, lockattr='_lock'):
       )
   return cls
 
+class DeadlockError(RuntimeError):
+  ''' Raised by `NRLock` when a lock is attempted from the `Thread` currently holding the lock.
+  '''
+
+class NRLock:
+  ''' A nonrecursive lock.
+      Attempting to take this lock when it is already held by the current `Thread`
+      will raise `DeadlockError`.
+      Otherwise this behaves likc `threading.Lock`.
+  '''
+
+  __slots__ = ('_lock', '_lock_thread', '_locked_by')
+
+  def __init__(self):
+    self._lock = Lock()
+    self._lock_thread = None
+    self._locked_by = None
+
+  def __repr__(self):
+    return (
+        f'{self.__class__.__name__}:{self._lock}:{self._lock_thread}:{self._locked_by}'
+        if self.locked() else f'{self.__class__.__name__}:{self._lock}'
+    )
+
+  def locked(self):
+    ''' Return the lock status.
+    '''
+    return self._lock.locked()
+
+  def acquire(self, *a, caller_frame=None, **kw):
+    ''' Acquire the lock as for `threading.Lock`.
+        Raises `DeadlockError` is the lock is already held by the current `Thread`.
+    '''
+    lock = self._lock
+    if lock.locked() and current_thread() is self._lock_thread:
+      raise DeadlockError('lock already held by current Thread')
+    acquired = lock.acquire(*a, **kw)
+    if acquired:
+      if caller_frame is None:
+        caller_frame = caller()
+      self._lock_thread = current_thread()
+      self._locked_by = caller_frame
+    return acquired
+
+  def release(self):
+    self._lock.release()
+    self._lock_thread = None
+    self._locked_by = None
+
+  def __enter__(self):
+    acquired = self.acquire(caller_frame=caller())
+    assert acquired
+    return acquired
+
+  def __exit__(self, *_):
+    self.release()
+
 if __name__ == '__main__':
   import cs.threads_tests
   cs.threads_tests.selftest(sys.argv)
