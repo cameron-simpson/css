@@ -107,7 +107,7 @@ class Packet(SimpleBinary):
 
   @classmethod
   def parse(cls, bfr):
-    ''' Parse a packet from a buffer.
+    ''' Parse a `Packet` from a buffer.
     '''
     raw_payload = BSData.parse_value(bfr)
     payload_bfr = CornuCopyBuffer([raw_payload])
@@ -185,11 +185,10 @@ class PacketConnection(object):
           on the receive stream
         * `send`: outbound binary stream.
           If this is an `int` it is taken to be an OS file descriptor,
-          otherwise it should be a file like object with `.write(bytes)`
+          otherwise it should be a binary file like object with `.write(bytes)`
           and `.flush()` methods.
-          For a file descriptor sending is done via an os.dup() of
-          the supplied descriptor, so the caller remains responsible
-          for closing the original descriptor.
+          This objects _is not closed_ by the `PacketConnection`;
+          the caller has responsibility for that.
         * `send_len_func`: optional function to compute the data
           length of a sent packet; the default watches the offset
           on the send stream
@@ -345,7 +344,7 @@ class PacketConnection(object):
 
   @locked
   def _pending_add(self, channel, tag, state):
-    ''' Record some state against a (channel, tag).
+    ''' Record some state against `(channel,tag)`.
     '''
     pending = self._pending
     if channel not in pending:
@@ -357,7 +356,7 @@ class PacketConnection(object):
 
   @locked
   def _pending_pop(self, channel, tag):
-    ''' Retrieve and remove the state associated with (channel, tag).
+    ''' Retrieve and remove the state associated with `(channel,tag)`.
     '''
     pending = self._pending
     if channel not in pending:
@@ -493,14 +492,17 @@ class PacketConnection(object):
     ''' Run a request and queue a response packet.
     '''
     with Pfx(
-        "_run_request[channel=%d,tag=%d,rq_type=%d,flags=0x%02x,payload=%s",
+        "_run_request[channel=%d,tag=%d,rq_type=%d,flags=0x%02x,payload=%s]",
         channel, tag, rq_type, flags,
         repr(payload) if len(payload) <= 32 else repr(payload[:32]) + '...'):
       result_flags = 0
       result_payload = b''
       try:
         result = handler(rq_type, flags, payload)
-        if result is not None:
+        if result is None:
+          # no meaningful result - return the default (0,b'')
+          pass
+        else:
           if isinstance(result, int):
             result_flags = result
           elif isinstance(result, bytes):
@@ -573,6 +575,7 @@ class PacketConnection(object):
               self._running.add(LF)
               LF.notify(self._running.remove)
       else:
+        # response to a previous request from us
         with Pfx("response[%d:%d]", channel, tag):
           # response: get state of matching pending request, remove state
           try:
@@ -655,6 +658,7 @@ class PacketConnection(object):
               warning("remote end closed")
               break
             raise
+        # send EOF packet to remote receiver and close self._send
         try:
           ##XX(b'>EOF')
           for bs in self.EOF_Packet.transcribe_flat():
