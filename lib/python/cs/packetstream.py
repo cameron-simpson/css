@@ -8,6 +8,7 @@
 '''
 
 from collections import namedtuple
+from contextlib import contextmanager
 import errno
 import os
 import sys
@@ -18,6 +19,7 @@ from icontract import ensure
 
 from cs.binary import SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
+from cs.context import stackattrs
 from cs.deco import promote
 from cs.excutils import logexc
 from cs.later import Later
@@ -26,7 +28,7 @@ from cs.pfx import Pfx, PrePfx, pfx_method
 from cs.predicate import post_condition
 from cs.progress import progressbar
 from cs.queues import IterableQueue
-from cs.resources import not_closed, ClosedError
+from cs.resources import not_closed, ClosedError, MultiOpenMixin, RunState
 from cs.result import Result
 from cs.seq import seq, Seq
 from cs.threads import locked, bg as bg_thread
@@ -152,7 +154,7 @@ class Packet(SimpleBinary):
 Request_State = namedtuple('RequestState', 'decode_response result')
 
 # pylint: disable=too-many-instance-attributes
-class PacketConnection(object):
+class PacketConnection(MultiOpenMixin):
   ''' A bidirectional binary connection for exchanging requests and responses.
   '''
 
@@ -219,7 +221,7 @@ class PacketConnection(object):
     self.name = name
     self._recv = recv
     if isinstance(send, int):
-      self._send = os.fdopen(os.dup(send), 'wb')
+      self._send = os.fdopen(send, 'wb')
     else:
       self._send = send
     if packet_grace is None:
@@ -258,71 +260,74 @@ class PacketConnection(object):
     self.packet_grace = packet_grace
     self.request_handler = request_handler
     self.tick = tick
-    # tags of requests in play against the local system
-    self._channel_request_tags = {0: set()}
-    self.notify_recv_eof = set()
-    self.notify_send_eof = set()
-    # LateFunctions for the requests we are performing for the remote system
-    self._running = set()
-    # requests we have outstanding against the remote system
-    self._pending = {0: {}}
-    # sequence of tag numbers
-    # TODO: later, reuse old tags to prevent monotonic growth of tag field
-    self._tag_seq = Seq(1)
-    # work queue for local requests
-    self._later = Later(4, name="%s:Later" % (self,))
-    self._later.open()
-    # dispatch queue of Packets to send
-    self._sendQ = IterableQueue(16)
+    self._pending = None
+    self._runstate = RunState(str(self))
     self._lock = Lock()
-    self.closed = False
-    # debugging: check for reuse of (channel,tag) etc
-    self.__sent = set()
-    self.__send_queued = set()
-    # dispatch Thread to process received packets
-    self._recv_thread = bg_thread(
-        self._receive_loop, name="%s[_receive_loop]" % (self.name,)
-    )
-    # dispatch Thread to send data
-    # primary purpose is to bundle output by deferring flushes
-    self._send_thread = bg_thread(
-        self._send_loop, name="%s[_send]" % (self.name,)
-    )
 
   def __str__(self):
     return "PacketConnection[%s]" % (self.name,)
 
-  @pfx_method
-  def shutdown(self, immediately=False):
-    ''' Shut down the `PacketConnection`.
-
-        Parameters:
-        * `immediately`: optional flag, default `False`;
-          if true, do not wait for outstanding requests
-    '''
-    with self._lock:
-      if self.closed:
-        # shutdown already called from another thread
-        return
-      # prevent further request submission either local or remote
-      self.closed = True
-    # wait for completion of requests we're performing
-    for LF in list(self._running):
-      LF.join()
-    # shut down sender, should trigger shutdown of remote receiver
-    self._sendQ.close(enforce_final_close=True)
-    self._send_thread.join()
-    # we do not wait for the receiver - anyone hanging on outstaning
-    # requests will get them as they come in, and in theory a network
-    # disconnect might leave the receiver hanging anyway
-    self._later.close()
-    if not immediately:
-      self._later.wait()
-      if self._recv_thread is not current_thread():
-        self.join()
-    ps = self._pending_states()
-    if ps:
-      warning("PENDING STATES AT SHUTDOWN: %r", ps)
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      later = Later(4, name="%s:Later" % (self,))
+      with stackattrs(
+          self,
+          notify_recv_eof=set(),
+          notify_send_eof=set(),
+          # tags of remote requests in play against the local system,
+          # per channel
+          _channel_request_tags={0: set()},
+          # LateFunctions for the requests we are performing for the remote system
+          _running=set(),
+          # requests we have outstanding against the remote system, per channel
+          _pending={0: {}},
+          # sequence of tag numbers
+          # TODO: later, reuse old tags to prevent monotonic growth of tag field?
+          _tag_seq=Seq(1),
+          # work queue for local requests
+          _later=later,
+          # dispatch queue of Packets to send
+          _sendQ=IterableQueue(16),
+          _lock=Lock(),
+          # debugging: check for reuse of (channel,tag) etc
+          _sent=set(),
+          _send_queued=set(),
+      ):
+        with self._later:
+          runstate = self._runstate
+          with runstate:
+            # dispatch Thread to process received packets
+            self._recv_thread = bg_thread(
+                self._receive_loop,
+                name="%s[_receive_loop]" % (self.name,),
+                kwargs=dict(
+                    notify_recv_eof=self.notify_recv_eof, runstate=runstate
+                ),
+            )
+            # dispatch Thread to send data
+            # primary purpose is to bundle output by deferring flushes
+            self._send_thread = bg_thread(
+                self._send_loop,
+                name="%s[_send]" % (self.name,),
+            )
+            yield
+          # block new requests
+          runstate.cancel()
+          # complete accepted but incomplete requests
+          for LF in list(self._running):
+            LF.join()
+        # there should not be any outstanding work
+        later.wait()
+        # close the stream to the remote and wait
+        self._sendQ.close(enforce_final_close=True)
+        self._send_thread.join()
+        # we do not wait for the receiver - anyone hanging on outstanding
+        # requests will get them as they come in, and in theory a network
+        # disconnect might leave the receiver hanging anyway
+        ps = self._pending_states()
+        if ps:
+          warning("PENDING STATES AT SHUTDOWN: %r", ps)
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
@@ -337,9 +342,10 @@ class PacketConnection(object):
     '''
     states = []
     pending = self._pending
-    for channel, channel_states in sorted(pending.items()):
-      for tag, channel_state in sorted(channel_states.items()):
-        states.append(((channel, tag), channel_state))
+    if pending is not None:
+      for channel, channel_states in sorted(pending.items()):
+        for tag, channel_state in sorted(channel_states.items()):
+          states.append(((channel, tag), channel_state))
     return states
 
   @locked
@@ -379,9 +385,9 @@ class PacketConnection(object):
 
   def _queue_packet(self, P):
     sig = (P.channel, P.tag, P.is_request)
-    if sig in self.__send_queued:
+    if sig in self._send_queued:
       raise RuntimeError("requeue of %s: %s" % (sig, P))
-    self.__send_queued.add(sig)
+    self._send_queued.add(sig)
     try:
       self._sendQ.put(P)
     except ClosedError as e:
@@ -454,6 +460,8 @@ class PacketConnection(object):
         * `payload`: the response payload, decoded by decode_response
           if specified
     '''
+    if self._runstate.cancelled:
+      raise ClosedError("shutting down: self.cancelled")
     if rq_type < 0:
       raise ValueError("rq_type may not be negative (%s)" % (rq_type,))
     # reserve type 0 for end-of-requests
@@ -523,7 +531,7 @@ class PacketConnection(object):
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @pfx_method
   @ensure(lambda self: self._recv is None)
-  def _receive_loop(self):
+  def _receive_loop(self, *, notify_recv_eof: set, runstate: RunState):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
     ##XX = self.tick
@@ -542,11 +550,12 @@ class PacketConnection(object):
       if packet.is_request:
         # request from upstream client
         with Pfx("request[%d:%d]", channel, tag):
-          if self.closed:
-            debug("rejecting request: closed")
-            # NB: no rejection packet sent since sender also closed
-          elif self.request_handler is None:
+          if self.request_handler is None:
+            # we are only a client, not a server
             self._reject(channel, tag, "no request handler")
+          elif runstate.cancelled:
+            # we are shutting down, no new work accepted
+            self._reject(channel, tag, "rejecting request: runstate.cancelled")
           else:
             requests = self._channel_request_tags
             if channel not in requests:
@@ -609,10 +618,9 @@ class PacketConnection(object):
     # end of received packets: cancel any outstanding requests
     self._pending_cancel()
     # alert any listeners of receive EOF
-    for notify in self.notify_recv_eof:
+    for notify in notify_recv_eof:
       notify(self)
     self._recv = None
-    self.shutdown()
 
   # pylint: disable=too-many-branches
   def _send_loop(self):
@@ -633,9 +641,9 @@ class PacketConnection(object):
             itemlenfunc=len,
         ):
           sig = (P.channel, P.tag, P.is_request)
-          if sig in self.__sent:
+          if sig in self._sent:
             raise RuntimeError("second send of %s" % (P,))
-          self.__sent.add(sig)
+          self._sent.add(sig)
           try:
             ##XX(b'>')
             for bs in P.transcribe_flat():
@@ -663,7 +671,7 @@ class PacketConnection(object):
           ##XX(b'>EOF')
           for bs in self.EOF_Packet.transcribe_flat():
             fp.write(bs)
-          fp.close()
+          fp.flush()
         except (OSError, IOError) as e:
           if e.errno == errno.EPIPE:
             debug("remote end closed: %s", e)
