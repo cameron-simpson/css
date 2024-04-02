@@ -212,16 +212,20 @@ def stackattrs(o, **attr_values):
   finally:
     popattrs(o, attr_values.keys(), old_values)
 
-def pushkeys(d, **key_values):
+def pushkeys(d, kv=None, **kw):
   ''' The "push" part of `stackkeys`.
-      Push `key_values` onto `d` as key values.
-      return the previous key values in a dict.
+      Use the mapping provided as `kv` or `kw` to update `d`.
+      Return the previous key values in a `dict`.
 
       This can be useful in hooks/signals/callbacks,
-      where you cannot inline a context manager.
+      where you cannot inline a context manager using `stackkeys`.
   '''
+  if kv is None:
+    kv = kw
+  elif kw:
+    raise ValueError("pushkeys: only one of kv or kw may be provided")
   old_values = {}
-  for key, value in key_values.items():
+  for key, value in kv.items():
     try:
       old_value = d[key]
     except KeyError:
@@ -251,9 +255,10 @@ def popkeys(d, key_names, old_values):
       d[key] = old_value
 
 @contextmanager
-def stackkeys(d, **key_values):
-  ''' Context manager to push new values for the key values of `d`
+def stackkeys(d, kv=None, **kw):
+  ''' A context manager to push new values for the key values of `d`
       and to restore them afterward.
+      The new values are provided as `kv` or `kw` as convenient.
       Returns a `dict` containing a mapping of the previous key values.
       Keys not present are not present in the mapping.
 
@@ -295,11 +300,12 @@ def stackkeys(d, **key_values):
           log_entry: global_context = {'parent': None}
           {'parent': None, 'desc': 'another standalone entry', 'when': ...}
   '''
-  old_values = pushkeys(d, **key_values)
+  old_values = pushkeys(d, kv, **kw)
+  kv = kv or kw
   try:
     yield old_values
   finally:
-    popkeys(d, key_values.keys(), old_values)
+    popkeys(d, kv.keys(), old_values)
 
 @contextmanager
 def stackset(s, element, lock=None):
