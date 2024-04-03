@@ -691,6 +691,7 @@ if builtin_names_s:
         CS_DEBUG_BUILTINS_ENVVAR, builtin_names_s
     )
   else:
+    vs = vars()
     for builtin_name in (__all__ if builtin_names_s == "1" else
                          builtin_names_s.split(',')):
       if not builtin_name:
@@ -707,5 +708,4 @@ if builtin_names_s:
             builtin_name
         )
         continue
-      # pylint: disable=eval-used
-      eval('setattr(builtins,builtin_name,%s)' % (builtin_name,))
+      setattr(builtins, builtin_name, vs[builtin_name])
