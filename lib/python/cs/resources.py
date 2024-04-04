@@ -566,6 +566,7 @@ class RunState(HasThreadState):
   def __init__(
       self,
       name=None,
+      *,
       signals=None,
       handle_signal=None,
       poll_cancel: Optional[Callable] = None,
@@ -712,6 +713,8 @@ class RunState(HasThreadState):
 
   def raiseif(self, msg=None, *a):
     ''' Raise `CancellationError` if cancelled.
+        This is the concise way to terminate an operation which honour
+        `.cancelled` if you're prepared to handle the exception.
 
         Example:
 
