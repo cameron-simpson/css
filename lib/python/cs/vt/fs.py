@@ -31,7 +31,7 @@ from .debug import dump_Dirent
 from .meta import Meta
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
-from .transcribe import Transcriber, mapping_transcriber, parse
+from .transcribe import Transcriber
 
 XATTR_VT_PREFIX = 'x-vt-'
 
@@ -178,16 +178,7 @@ class FileHandle:
     self.E.flush(scanner, dispatch=self.bg)
     ## no touch, already done by any writes
 
-@mapping_transcriber(
-    prefix="Ino",
-    transcription_mapping=lambda self: {
-        'refcount': self.refcount,
-        'E': self.E,
-    },
-    required=('refcount', 'E'),
-    optional=(),
-)
-class Inode(Transcriber, NS):
+class Inode(Transcriber, NS, prefix='Ino'):
   ''' An Inode associates an inode number and a Dirent.
 
       Attributes:
