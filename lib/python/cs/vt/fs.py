@@ -19,7 +19,7 @@ from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import exception, error, warning, info, debug
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.range import Range
 from cs.threads import locked, HasThreadState, State as ThreadState
 from cs.x import X
@@ -31,7 +31,7 @@ from .debug import dump_Dirent
 from .meta import Meta
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
-from .transcribe import Transcriber, mapping_transcriber, parse
+from .transcribe import Transcriber
 
 XATTR_VT_PREFIX = 'x-vt-'
 
@@ -178,16 +178,7 @@ class FileHandle:
     self.E.flush(scanner, dispatch=self.bg)
     ## no touch, already done by any writes
 
-@mapping_transcriber(
-    prefix="Ino",
-    transcription_mapping=lambda self: {
-        'refcount': self.refcount,
-        'E': self.E,
-    },
-    required=('refcount', 'E'),
-    optional=(),
-)
-class Inode(Transcriber, NS):
+class Inode(Transcriber, NS, prefix='Ino'):
   ''' An Inode associates an inode number and a Dirent.
 
       Attributes:
@@ -295,47 +286,47 @@ class Inodes:
     allocated.add(inum)
     return inum
 
+  @pfx_method
   def add(self, E, inum=None):
     ''' Add the Dirent `E` to the Inodes, return the new Inode.
         It is not an error to add the same Dirent more than once.
     '''
-    with Pfx("Inodes.add(E=%s)", E):
-      if E.isindirect:
-        raise ValueError("indirect Dirents may not become Inodes")
-      if inum is not None and inum < 1:
-        raise ValueError("inum must be >= 1, got: %d" % (inum,))
-      uu = E.uuid
-      I = self._by_dirent.get(E)
-      if I:
-        assert I.E is E
-        if inum is not None and I.inum != inum:
-          raise ValueError(
-              "inum=%d: Dirent already has an Inode with a different inum: %s"
-              % (inum, I)
-          )
-        if uu:
-          # opportunisticly update UUID mapping
-          # in case the Dirent has acquired a UUID
-          I2 = self._by_uuid.get(uu)
-          if I2:
-            assert I2.E is E
-          else:
-            self._by_uuid[uu] = I
-        return I
-      # unknown Dirent, create new Inode
-      if inum is None:
-        inum = self._new_inum()
-      else:
-        I = self._by_inum.get(inum)
-        if I:
-          raise ValueError("inum %d already allocated: %s" % (inum, I))
-        self._allocated.add(inum)
-      I = Inode(inum, E)
-      self._by_dirent[E] = I
-      self._by_inum[inum] = I
+    if E.isindirect:
+      raise ValueError("indirect Dirents may not become Inodes")
+    if inum is not None and inum < 1:
+      raise ValueError("inum must be >= 1, got: %d" % (inum,))
+    uu = E.uuid
+    I = self._by_dirent.get(E)
+    if I:
+      assert I.E is E
+      if inum is not None and I.inum != inum:
+        raise ValueError(
+            "inum=%d: Dirent already has an Inode with a different inum: %s" %
+            (inum, I)
+        )
       if uu:
-        self._by_uuid[uu] = I
+        # opportunisticly update UUID mapping
+        # in case the Dirent has acquired a UUID
+        I2 = self._by_uuid.get(uu)
+        if I2:
+          assert I2.E is E
+        else:
+          self._by_uuid[uu] = I
       return I
+    # unknown Dirent, create new Inode
+    if inum is None:
+      inum = self._new_inum()
+    else:
+      I = self._by_inum.get(inum)
+      if I:
+        raise ValueError("inum %d already allocated: %s" % (inum, I))
+      self._allocated.add(inum)
+    I = Inode(inum, E)
+    self._by_dirent[E] = I
+    self._by_inum[inum] = I
+    if uu:
+      self._by_uuid[uu] = I
+    return I
 
   def __getitem__(self, ndx):
     if isinstance(ndx, int):

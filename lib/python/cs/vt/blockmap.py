@@ -21,16 +21,12 @@ from tempfile import TemporaryFile, NamedTemporaryFile
 from cs.logutils import warning, info as log_info
 from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
-from cs.py.func import prop
-from cs.resources import RunStateMixin
+from cs.resources import RunState
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import with_upd_proxy, UpdProxy
 
-from . import uses_Store
+from . import Store, uses_Store
 from .block import HashCodeBlock, IndirectBlock
-
-from cs.x import X
 
 # The record format uses 4 byte integer offsets
 # so this is the maximum (and default) scale for the memory maps.
@@ -44,13 +40,13 @@ class MapEntry(_MapEntry):
   ''' A blockmap entry (index, offset, span, hashcode) and related properties.
   '''
 
-  @prop
+  @property
   def leaf(self):
     ''' Return the leaf block for this entry.
     '''
     return HashCodeBlock(hashcode=self.hashcode, span=self.span)
 
-  @prop
+  @property
   def data(self):
     ''' Return the data from this leaf block.
     '''
@@ -131,7 +127,7 @@ class MappedFD:
     i -= 1
     entry = self.entry(i)
     if offset < entry.offset or offset >= entry.offset + entry.span:
-      X("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset, entry)
+      warning("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset, entry)
       entry = MapEntry(-1, None, None, None)
     return entry
 
@@ -140,8 +136,8 @@ class MappedFD:
     '''
     try:
       offset = self.offset(i)
-    except ValueError:
-      raise IndexError(i)
+    except ValueError as e:
+      raise IndexError(i) from e
     return offset
 
   def entries(self, i):
@@ -199,20 +195,18 @@ class MappedFD:
     offset, = OFF_STRUCT.unpack(mapped[rec_offset:hash_offset])
     return offset
 
-  @prop
+  @property
   def start(self):
     ''' The offset of the first leaf in the mapping.
     '''
     return self.offset(0)
 
-class BlockMap(RunStateMixin):
+class BlockMap:
   ''' A fast mapping of offsets to leaf block hashcodes.
   '''
 
   @uses_Store
-  def __init__(
-      self, block, *, mapsize=None, blockmapdir=None, runstate=None, S
-  ):
+  def __init__(self, block, *, mapsize=None, blockmapdir=None, S):
     ''' Initialise the `BlockMap`, dispatch the index generator.
 
         Parameters:
@@ -220,7 +214,6 @@ class BlockMap(RunStateMixin):
         * `mapsize`: the size of each index map, default `OFFSET_SCALE`
         * `blockmapdir`: the pathname for persistent storage of `BlockMaps`
     '''
-    super().__init__(runstate=runstate)
     if mapsize is None:
       mapsize = OFFSET_SCALE
     elif mapsize <= 0 or mapsize > OFFSET_SCALE:
@@ -264,17 +257,16 @@ class BlockMap(RunStateMixin):
         if not pathexists(submappath):
           break
         # existing map, attach and install, advance and restart loop
-        X("Blockmap.__init__: preattach existing map %r", submappath)
         submaps[submap_index] = MappedFD(submappath, hashclass)
         mapped_to += mapsize
     self.mapped_to = mapped_to
     if mapped_to < len(block):
-      self.runstate.start()
+      self._scan_runstate = RunState(f'BlockMap[{block}] scan leaves')
       self._worker = bg_thread(
           self._load_maps,
-          args=(S,),
+          args=(S, self._scan_runstate),
           daemon=True,
-          name="%s._load_maps" % (self,)
+          name="%s._load_maps" % (self,),
       )
     else:
       self._worker = None
@@ -297,7 +289,7 @@ class BlockMap(RunStateMixin):
   def close(self):
     ''' Release the resources associated with the `BlockMap`.
     '''
-    self.cancel()
+    self._scan_runstate.cancel()
     self.join()
     maps = self.maps
     for i in range(len(maps) - 1):
@@ -306,16 +298,14 @@ class BlockMap(RunStateMixin):
         submap.close()
         maps[i] = None
 
-  @with_upd_proxy
   @pfx_method(use_str=True)
-  def _load_maps(self, S, upd_proxy: UpdProxy):
+  def _load_maps(self, S: Store, scan_runstate: RunState):
     ''' Load leaf offsets and hashcodes into the unfilled portion of the blockmap.
     '''
     offset = self.mapped_to
     mapsize = self.mapsize
     submap_index = offset // mapsize - 1
     with S:
-      runstate = self.runstate
       block = self.block
       blocklen = len(block)
       hashclass = self.hashclass
@@ -323,88 +313,85 @@ class BlockMap(RunStateMixin):
       submap_fp = None
       submap_path = None
       nleaves = 0
-      upd_proxy.prefix = "%s(%s) leaves " % (type(self).__name__, block)
-      for leaf, start, length in progressbar(
-          block.slices(offset, blocklen),
-          position=offset,
-          total=blocklen,
-          itemlenfunc=(lambda leaf_start_length: leaf_start_length[2] -
-                       leaf_start_length[1]),
-          proxy=upd_proxy,
-          units_scale=BINARY_BYTES_SCALE,
-      ):
-        if runstate.cancelled:
-          break
-        if start > 0:
-          # partial block, skip to next
-          offset += length
-          continue
-        leaf_submap_index = offset // mapsize
-        leaf_submap_offset = offset % mapsize
-        if submap_index < leaf_submap_index:
-          # this leaf belongs in a new submap
-          if submap_fp is not None:
-            # consume the submap in progress
-            submap = MappedFD(submap_fp, hashclass)
-            if submap_path is not None:
-              log_info("new submap: %r", submap_path)
-              os.link(submap_fp.name, submap_path)
-            submaps[submap_index] = submap
-            last_entry = submap.entry(-1)
-            self.mapped_to = last_entry.offset + last_entry.span
-            submap_fp.close()
-            submap_fp = None
-          # advance to the correct submap index
-          submap_index = leaf_submap_index
-          if self.mappath:
-            # if we're doing persistent submaps...
-            submap_path = joinpath(
-                self.mappath, '%d.blockmap' % (submap_index,)
-            )
-            if pathexists(submap_path):
-              # existing map, attach and install, advance and restart loop
-              log_info("attach existing map %r", submap_path)
-              submaps[submap_index] = MappedFD(submap_path, hashclass)
-              offset = (submap_index + 1) * mapsize
-              log_info("skip to offset=0x%x", offset)
-              break
-            # start a new persistent file to attach later
-            submap_fp = NamedTemporaryFile('wb')
-          else:
-            # not persistent - start a new temp file to attach later
-            submap_fp = TemporaryFile('wb')
-            submap_path = None
-        # post condition: correct submap_index and correct submap_fp state
-        assert (
-            submap_index == leaf_submap_index and submap_index < len(submaps)
-            and (
-                submap_fp is None if self.mappath and pathexists(submap_path)
-                else submap_fp is not None
-            )
-        )
-        try:
-          h = leaf.hashcode
-        except AttributeError:
-          # make a conventional HashCodeBlock and index that
-          data = leaf.data
-          if len(data) >= 65536:
-            warning(
-                "promoting %d bytes from %s to a new HashCodeBlock", len(data),
-                leaf
-            )
-          leaf = HashCodeBlock(data=data)
-          h = leaf.hashcode
-        submap_fp.write(OFF_STRUCT.pack(leaf_submap_offset))
-        submap_fp.write(h)
-        offset += leaf.span
-        nleaves += 1
-        if nleaves % 4096 == 0:
-          log_info(
-              "processed %d leaves in %gs (%d leaves/s)", nleaves,
-              runstate.run_time, nleaves // runstate.run_time
+      with scan_runstate:
+        for leaf, start, length in progressbar(
+            block.slices(offset, blocklen),
+            f'{self.__class__.__name__}){block} leaves',
+            position=offset,
+            total=blocklen,
+            itemlenfunc=(lambda leaf_start_length: leaf_start_length[2] -
+                         leaf_start_length[1]),
+            units_scale=BINARY_BYTES_SCALE,
+        ):
+          if S.cancelled:
+            break
+          if start > 0:
+            # partial block, skip to next
+            offset += length
+            continue
+          leaf_submap_index = offset // mapsize
+          leaf_submap_offset = offset % mapsize
+          if submap_index < leaf_submap_index:
+            # this leaf belongs in a new submap
+            if submap_fp is not None:
+              # consume the submap in progress
+              submap = MappedFD(submap_fp, hashclass)
+              if submap_path is not None:
+                log_info("new submap: %r", submap_path)
+                os.link(submap_fp.name, submap_path)
+              submaps[submap_index] = submap
+              last_entry = submap.entry(-1)
+              self.mapped_to = last_entry.offset + last_entry.span
+              submap_fp.close()
+              submap_fp = None
+            # advance to the correct submap index
+            submap_index = leaf_submap_index
+            if self.mappath:
+              # if we're doing persistent submaps...
+              submap_path = joinpath(
+                  self.mappath, '%d.blockmap' % (submap_index,)
+              )
+              if pathexists(submap_path):
+                # existing map, attach and install, advance and restart loop
+                log_info("attach existing map %r", submap_path)
+                submaps[submap_index] = MappedFD(submap_path, hashclass)
+                offset = (submap_index + 1) * mapsize
+                log_info("skip to offset=0x%x", offset)
+                break
+              # start a new persistent file to attach later
+              submap_fp = NamedTemporaryFile('wb')
+            else:
+              # not persistent - start a new temp file to attach later
+              submap_fp = TemporaryFile('wb')
+              submap_path = None
+          # post condition: correct submap_index and correct submap_fp state
+          assert (
+              submap_index == leaf_submap_index
+              and submap_index < len(submaps) and (
+                  submap_fp is None if self.mappath
+                  and pathexists(submap_path) else submap_fp is not None
+              )
           )
-      upd_proxy("")
-      log_info("leaf scan finished")
+          try:
+            h = leaf.hashcode
+          except AttributeError:
+            # make a conventional HashCodeBlock and index that
+            data = leaf.data
+            if len(data) >= 65536:
+              warning(
+                  "promoting %d bytes from %s to a new HashCodeBlock",
+                  len(data), leaf
+              )
+            leaf = HashCodeBlock(data=data)
+            h = leaf.hashcode
+          submap_fp.write(OFF_STRUCT.pack(leaf_submap_offset))
+          submap_fp.write(h)
+          offset += leaf.span
+          nleaves += 1
+      log_info(
+          "processed %d leaves in %gs (%d leaves/s)", nleaves,
+          scan_runstate.run_time, nleaves // scan_runstate.run_time
+      )
       # attach final submap after the loop if one is in progress
       if submap_fp is not None:
         # consume the submap in progress

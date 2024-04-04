@@ -18,6 +18,7 @@ The allowed names are the list `cs.debug.__all__` and include:
 * `pprint`: `pprint.pprint`
 * `print`: `cs.upd.print`
 * `r`: `cs.lex.r`
+* `redirect_stdout`: `contextlib.redirect_stdout`
 * `s`: `cs.lex.s`
 * `stack_dump`: dump current `Thread`'s call stack
 * `thread_dump` dump the active `Thread`s with their call stacks
@@ -28,6 +29,7 @@ The allowed names are the list `cs.debug.__all__` and include:
 
 from __future__ import print_function
 from cmd import Cmd
+from contextlib import redirect_stdout
 import inspect
 import logging
 import os
@@ -82,7 +84,10 @@ DISTINFO = {
     ],
 }
 
-__all__ = ['X', 'breakpoint', 'pformat', 'pprint', 'print', 'r', 's']
+__all__ = [
+    'X', 'breakpoint', 'pformat', 'pprint', 'print', 'r', 'redirect_stdout',
+    's'
+]
 
 # environment variable specifying names to become built in
 CS_DEBUG_BUILTINS_ENVVAR = 'CS_DEBUG_BUILTINS'
@@ -686,6 +691,7 @@ if builtin_names_s:
         CS_DEBUG_BUILTINS_ENVVAR, builtin_names_s
     )
   else:
+    vs = vars()
     for builtin_name in (__all__ if builtin_names_s == "1" else
                          builtin_names_s.split(',')):
       if not builtin_name:
@@ -702,5 +708,4 @@ if builtin_names_s:
             builtin_name
         )
         continue
-      # pylint: disable=eval-used
-      eval('setattr(builtins,builtin_name,%s)' % (builtin_name,))
+      setattr(builtins, builtin_name, vs[builtin_name])

@@ -430,7 +430,6 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
               _monitor_Thread = bg_thread(
                   self._monitor_datafiles,
                   name=f'{self}._monitor_datafiles',
-                  thread_states=False,
                   args=(monitor_proxy,),
               )
               try:
