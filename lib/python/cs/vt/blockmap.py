@@ -21,16 +21,12 @@ from tempfile import TemporaryFile, NamedTemporaryFile
 from cs.logutils import warning, info as log_info
 from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
-from cs.py.func import prop
-from cs.resources import RunStateMixin
+from cs.resources import RunState
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import with_upd_proxy, UpdProxy
 
-from . import uses_Store
+from . import Store, uses_Store
 from .block import HashCodeBlock, IndirectBlock
-
-from cs.x import X
 
 # The record format uses 4 byte integer offsets
 # so this is the maximum (and default) scale for the memory maps.
@@ -44,13 +40,13 @@ class MapEntry(_MapEntry):
   ''' A blockmap entry (index, offset, span, hashcode) and related properties.
   '''
 
-  @prop
+  @property
   def leaf(self):
     ''' Return the leaf block for this entry.
     '''
     return HashCodeBlock(hashcode=self.hashcode, span=self.span)
 
-  @prop
+  @property
   def data(self):
     ''' Return the data from this leaf block.
     '''
@@ -131,7 +127,7 @@ class MappedFD:
     i -= 1
     entry = self.entry(i)
     if offset < entry.offset or offset >= entry.offset + entry.span:
-      X("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset, entry)
+      warning("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset, entry)
       entry = MapEntry(-1, None, None, None)
     return entry
 
@@ -140,8 +136,8 @@ class MappedFD:
     '''
     try:
       offset = self.offset(i)
-    except ValueError:
-      raise IndexError(i)
+    except ValueError as e:
+      raise IndexError(i) from e
     return offset
 
   def entries(self, i):
@@ -199,7 +195,7 @@ class MappedFD:
     offset, = OFF_STRUCT.unpack(mapped[rec_offset:hash_offset])
     return offset
 
-  @prop
+  @property
   def start(self):
     ''' The offset of the first leaf in the mapping.
     '''
@@ -264,7 +260,6 @@ class BlockMap(RunStateMixin):
         if not pathexists(submappath):
           break
         # existing map, attach and install, advance and restart loop
-        X("Blockmap.__init__: preattach existing map %r", submappath)
         submaps[submap_index] = MappedFD(submappath, hashclass)
         mapped_to += mapsize
     self.mapped_to = mapped_to
@@ -274,7 +269,7 @@ class BlockMap(RunStateMixin):
           self._load_maps,
           args=(S,),
           daemon=True,
-          name="%s._load_maps" % (self,)
+          name="%s._load_maps" % (self,),
       )
     else:
       self._worker = None
