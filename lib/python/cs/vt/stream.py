@@ -28,6 +28,8 @@ from cs.binary import (
     SimpleBinary,
 )
 from cs.buffer import CornuCopyBuffer
+from cs.context import contextif, stackattrs
+from cs.lex import r
 from cs.logutils import debug, warning, error
 from cs.packetstream import PacketConnection
 from cs.pfx import Pfx, pfx_method
@@ -73,8 +75,7 @@ class StreamStore(StoreSyncBase):
   def __init__(
       self,
       name: str,
-      recv,
-      send,
+      recv_send,
       *,
       addif: bool = False,
       connect: Optional[Callable] = None,
@@ -126,37 +127,52 @@ class StreamStore(StoreSyncBase):
     '''
     if capacity is None:
       capacity = 1024
-    super().__init__('StreamStore:%s' % (name,), capacity=capacity, **kw)
+    super().__init__(name, capacity=capacity, **kw)
     self._lock = Lock()
     self.mode_addif = addif
     self._contains_cache = set()
     self.mode_sync = sync
     self._local_store = local_store
     self.exports = exports
+    # caching method
+    self.get_Archive = lru_cache(maxsize=64)(self.raw_get_Archive)
     # parameters controlling connection hysteresis
     self._conn_attempt_last = 0.0
     self._conn_attempt_delay = 10.0
-    if connect is None:
-      # set up protocol on existing stream
-      # no reconnect facility
-      self._conn = conn = self._packet_connection(recv, send)
-      # arrange to disassociate if the channel goes away
-      conn.notify_recv_eof.add(self._packet_disconnect)
-      conn.notify_send_eof.add(self._packet_disconnect)
-    else:
-      # defer protocol setup until needed
-      if recv is not None or send is not None:
+    self._conn = None
+    match recv_send:
+      case cmgr_func if callable(cmgr_func):
+        # A callable returns a context manager yielding the receive and send objects.
+        get_recv_send = cmgr_func
+
+      case [recv, send]:
+        # Use the supplied receive and send objects.
+
+        @contextmanager
+        def get_recv_send():
+          ''' Use the supplied receive and send objects.
+          '''
+          yield recv, send
+
+      case int(fd):
+        # Use a file descriptor for receive and send.
+
+        def get_recv_send():
+          ''' Use a file descriptor for receive and send.
+          '''
+          yield fd, fd
+
+      case _:
         raise ValueError(
-            "connect is not None and one of recv or send is not None"
+            f'invalid recv_send:{r(recv_send)}, expected a callable, (recv,send) 2-tuple or an int OS file descriptor'
         )
-      self.connect = connect
-      self._conn = None
-    # caching method
-    self.get_Archive = lru_cache(maxsize=64)(self.raw_get_Archive)
+    self._get_recv_send = get_recv_send
+    assert not self.closed
+    assert not self.is_open()
 
   def __str__(self):
-    return "%s(addif=%r,sync=%r)" % (
-        self.__class__.__name__, self.mode_addif, self.mode_sync
+    return "%s:%s(addif=%r,sync=%r)" % (
+        self.__class__.__name__, self.name, self.mode_addif, self.mode_sync
     )
 
   def init(self):
@@ -165,7 +181,7 @@ class StreamStore(StoreSyncBase):
 
   @property
   def local_store(self):
-    ''' The current local Store.
+    ''' The local `Store`. Read only.
     '''
     return self._local_store
 
@@ -174,19 +190,11 @@ class StreamStore(StoreSyncBase):
     ''' Open/close `self.local_store` if not `None`.
     '''
     with super().startup_shutdown():
-      local_store = self.local_store
-      if local_store is not None:
-        local_store.open()
-      try:
-        yield
-      finally:
-        conn = self._conn
-        if conn:
-          conn.shutdown()
-          self._conn = None
-        local_store = self.local_store
-        if local_store is not None:
-          local_store.close()
+      with contextif(self.local_store):
+        with self._get_recv_send() as (recv, send):
+          with self._packet_connection(recv, send) as conn:
+            with stackattrs(self, _conn=conn):
+              yield
 
   @pfx_method
   def connection(self):
@@ -212,7 +220,7 @@ class StreamStore(StoreSyncBase):
             conn.notify_send_eof.add(self._packet_disconnect)
     return conn
 
-  def _packet_connection(self, recv, send):
+  def _packet_connection(self, recv, send) -> PacketConnection:
     ''' Wrap a pair of binary streams in a `PacketConnection`.
     '''
     conn = PacketConnection(
@@ -943,4 +951,4 @@ def CommandStore(shcmd, addif=False):
   name = "StreamStore(%r)" % ("|" + shcmd,)
   # TODO: a PopenStore to close the Popen?
   P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
-  return StreamStore(name, P.stdin, P.stdout, local_store=None, addif=addif)
+  return StreamStore(name, (P.stdin, P.stdout), local_store=None, addif=addif)
