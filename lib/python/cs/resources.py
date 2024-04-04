@@ -793,6 +793,18 @@ class RunState(HasThreadState):
       stop_time = self.stop_time
     return max(0, stop_time - start_time)
 
+  def iter(self, it):
+    ''' Iterate over `it` while not `self.cancelled`.
+    '''
+    it = iter(it)
+    while True:
+      if self.cancelled:
+        return
+      try:
+        yield next(it)
+      except StopIteration:
+        return
+
   @contextmanager
   def catch_signal(
       self,
