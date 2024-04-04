@@ -9,23 +9,24 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
-import sys
-from threading import Condition, Lock, RLock, current_thread, main_thread
+from dataclasses import dataclass, field
+from functools import partial
+from threading import Lock, current_thread, main_thread
 import time
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Mapping, Optional, Tuple, Union
 
 from typeguard import typechecked
 
-from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
+from cs.context import contextif, stackattrs, setup_cmgr, ContextManagerMixin
 from cs.deco import default_params
 from cs.gimmicks import error, warning, nullcontext
 from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import prop
-from cs.py.stack import caller, frames as stack_frames, stack_dump
+from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
 from cs.result import CancellationError
-from cs.threads import ThreadState, HasThreadState
+from cs.threads import ThreadState, HasThreadState, NRLock
 
 __version__ = '20240316-post'
 
@@ -251,11 +252,11 @@ class MultiOpenMixin(ContextManagerMixin):
     return {'opened': state.opened, 'opens': state.opens}
 
   def __enter_exit__(self):
-    self.open()  ##caller_frame=caller())
+    self.open()
     try:
       yield
     finally:
-      self.close()  ##caller_frame=caller())
+      self.close()
 
   @contextmanager
   def startup_shutdown(self):
@@ -303,8 +304,8 @@ class MultiOpenMixin(ContextManagerMixin):
     ''' Increment the open count.
         On the first `.open` call `self.startup()`.
     '''
-    if False:
     state = self.MultiOpenMixin_state
+    if False:  # pylint: disable=using-constant-test
       if caller_frame is None:
         caller_frame = caller()
       frame_key = caller_frame.filename, caller_frame.lineno
@@ -335,13 +336,13 @@ class MultiOpenMixin(ContextManagerMixin):
           even if the original open never happened.
           (I'm looking at you, `cs.resources.RunState`.)
     '''
-    if False:
     state = self.MultiOpenMixin_state
+    if False:  # pylint: disable=using-constant-test
       if caller_frame is None:
         caller_frame = caller()
       frame_key = caller_frame.filename, caller_frame.lineno
       state.opens_from[frame_key] = state.opens_from.get(frame_key, 0) + 1
-    opens, retval = state.close(
+    _, retval = state.close(
         caller_frame=caller_frame,
         enforce_final_close=enforce_final_close,
         unopened_ok=unopened_ok,
