@@ -28,7 +28,7 @@ from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
 from cs.threads import bg as bg_thread
 
-from . import Store
+from . import Store, uses_Store
 from .stream import StreamStore
 
 class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
@@ -36,11 +36,14 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   '''
 
   # if exports supplied, may not contain '' if local_store supplied
+  @uses_Store
   @require(
       lambda exports, local_store:
       (local_store is None or not exports or '' not in exports)
   )
-  def __init__(self, *, exports=None, runstate=None, local_store=None):
+  def __init__(
+      self, *, S: Store, exports=None, runstate=None, local_store=None
+  ):
     ''' Initialise the server.
 
         Parameters:
@@ -61,8 +64,8 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     if local_store is not None:
       exports[''] = local_store
     if '' not in exports:
-      exports[''] = Store.defaults()
     MultiOpenMixin.__init__(self)
+      exports[''] = S
     RunStateMixin.__init__(self, runstate=runstate)
     self.exports = exports
     self.S = exports['']
