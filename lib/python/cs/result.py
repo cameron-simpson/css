@@ -136,9 +136,11 @@ class Result(FSM):
       'RUNNING': {
           'cancel': 'CANCELLED',
           'complete': 'DONE',
+          'except': 'FAILED',
       },
       'CANCELLED': {},
       'DONE': {},
+      'FAILED': {},
   }
 
   # pylint: disable=too-many-arguments
@@ -365,8 +367,11 @@ class Result(FSM):
         self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
         self._get_lock.release()
         if state != self.CANCELLED:
-          self.fsm_event('complete')
-      elif state == self.DONE:
+          if exc_info is None:
+            self.fsm_event('complete')
+          else:
+            self.fsm_event('except')
+      elif state in (self.DONE, self.FAILED):
         warning(
             "<%s>: state is %s, ignoring result=%r, exc_info=%r",
             self,
@@ -376,7 +381,7 @@ class Result(FSM):
         )
       else:
         raise RuntimeError(
-            "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE)"
+            "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE, FAILED)"
             % (self, self.fsm_state)
         )
 
