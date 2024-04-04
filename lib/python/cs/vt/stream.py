@@ -169,23 +169,6 @@ class StreamStore(StoreSyncBase):
     '''
     return self._local_store
 
-  @local_store.setter
-  def local_store(self, newS):
-    ''' Switch out the local Store for a new one.
-    '''
-    oldS = self._local_store
-    if newS is not oldS:
-      if newS:
-        newS.open()
-      self._local_store = newS
-      if oldS:
-        oldS.close()
-
-  def switch_to(self, export_name):
-    ''' Switch the local backend Store to one of the exports.
-    '''
-    self.local_store = self.exports[export_name]
-
   @contextmanager
   def startup_shutdown(self):
     ''' Open/close `self.local_store` if not `None`.
