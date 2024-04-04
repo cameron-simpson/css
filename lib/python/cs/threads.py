@@ -211,32 +211,22 @@ class HasThreadState(ContextManagerMixin):
       enter_objects=None,
       **Thread_kw,
   ):
-    ''' Class factory for a `Thread` to push the `.current` state for this class.
+    ''' Factory for a `Thread` to push the `.current` state for the
+        currently active classes.
 
-        The optional parameter `thread_states`
-        may be used to pass an explicit mapping of `type`->`instance`
-        of thread states to use;
-        the default states come from `HasThreadState.get_thread_states()`.
-        The values of this mapping are iterated over and used as context managers.
-
-        A boolean value may also be passed meaning:
-        * `False`: do not apply any thread states
-        * `True`: apply the default thread states
-
-        Note: the default `thread_states` does a `with current:`
-        for this class' `current` instance (if any) so that the
-        `Thread` holds it open until completed.
-        For some worker threads such as `MultiOpenMixin`s consuming
-        a queue of tasks this may be undesirable if the instance
-        shutdown phase includes a close-and-drain for the queue -
-        because the `Thread` holds the instance open, the shutdown
-        phase never arrives.
-        In this case, pass `thread_states=False` to this call.
+        The optional parameter `enter_objects` may be used to pass
+        an iterable of objects whose contexts should be entered
+        using `with obj:`.
+        If this is set to `True` that indicates that every "current"
+        `HasThreadStates` instance should be entered.
+        The default does not enter any object contexts.
+        The `HasThreadStates.bg` method defaults to passing
+        `enter_objects=(self,)` to enter the context for `self`.
     '''
     if name is None:
       name = funcname(target)
     if enter_objects is True:
-      # the bool True means enter all the state objects, marker as for-with
+      # the bool True means enter all the state objects, marked as for-with
       enter_tuples = (
           (
               getattr(
