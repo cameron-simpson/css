@@ -43,6 +43,7 @@ from typing import Callable, Iterable, Optional
 
 from typeguard import typechecked
 
+from cs.context import ContextManagerMixin
 from cs.deco import OBSOLETE, decorator, default_params
 from cs.excutils import logexc
 import cs.logutils
@@ -1023,7 +1024,7 @@ class SubLater(object):
     T.start()
     return T
 
-class LatePool(object):
+class LatePool(ContextManagerMixin):
   ''' A context manager after the style of subprocess.Pool
       but with deferred completion.
 
@@ -1061,7 +1062,7 @@ class LatePool(object):
         * `priority`, `delay`, `when`, `name`, `pfx`:
           default values passed to Later.submit.
         * `block`: if true, wait for `LateFunction` completion
-          before leaving __exit__.
+          before leaving `__exit__`.
     '''
     self.later = later
     self.parameters = {
@@ -1073,20 +1074,14 @@ class LatePool(object):
     self.block = block
     self.LFs = []
 
-  def __enter__(self):
-    ''' Entry handler: submit a placeholder function to the queue,
-        acquire the "commence" lock, which will be made available
-        when the placeholder gets to run.
+  def __enter_exit__(self):
+    ''' Generator supporting `__enter__` and `__exit__`.
     '''
-    return self
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    ''' Exit handler.
-        If .block is true, wait for `LateFunction` completion before return.
-    '''
-    if self.block:
-      self.join()
-    return False
+    try:
+      yield
+    finally:
+      if self.block:
+        self.join()
 
   def add(self, LF):
     ''' Add a `LateFunction` to those to be tracked by this LatePool.
