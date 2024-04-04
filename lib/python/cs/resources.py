@@ -169,9 +169,10 @@ class MultiOpenMixin(ContextManagerMixin):
       If used as a context manager this mixin calls `open()`/`close()` from
       `__enter__()` and `__exit__()`.
 
-      It is recommended subclass implementations do as little as possible
-      during `__init__`, and do almost all setup during startup so
-      that the class may perform multiple startup/shutdown iterations.
+      It is recommended that subclass implementations do as little
+      as possible during `__init__`, and do almost all setup during
+      startup so that the class may perform multiple startup/shutdown
+      iterations.
 
       Classes using this mixin should define a context manager
       method `.startup_shutdown` which does the startup actions
@@ -183,8 +184,10 @@ class MultiOpenMixin(ContextManagerMixin):
               @contextmanager
               def startup_shutdown(self):
                   self._db = open_the_database()
-                  yield
-                  self._db.close()
+                  try:
+                      yield
+                  finally:
+                      self._db.close()
           ...
           with DatabaseThing(...) as db_thing:
               ... use db_thing ...
@@ -223,24 +226,28 @@ class MultiOpenMixin(ContextManagerMixin):
 
   _mom_state_lock = Lock()
 
-  def __mo_getstate(self):
-    ''' Fetch the state object for the mixin,
+  @property
+  def MultiOpenMixin_state(self):
+    ''' The state object for the mixin,
         something of a hack to avoid providing an `__init__`.
     '''
-    # used to be self.__mo_state and catch AttributeError, but
-    # something up the MRO weirds this - suspect the ABC base class
-    with self.__class__._mom_state_lock:
-      try:
-        state = self.__dict__['_MultiOpenMixin_state']
-      except KeyError:
-        state = self.__dict__['_MultiOpenMixin_state'
-                              ] = _MultiOpenMixinOpenCloseState(self)
-    return state
+    try:
+      # the fast path
+      return self.__dict__['_MultiOpenMixin_state']
+    except KeyError:
+      # pylint: disable=protected-access
+      with self.__class__._mom_state_lock:
+        try:
+          state = self.__dict__['_MultiOpenMixin_state']
+        except KeyError:
+          state = self.__dict__['_MultiOpenMixin_state'
+                                ] = _MultiOpenMixinOpenCloseState(self)
+      return state
 
   def tcm_get_state(self):
     ''' Support method for `TrackedClassMixin`.
     '''
-    state = self.__mo_getstate()
+    state = self.MultiOpenMixin_state
     return {'opened': state.opened, 'opens': state.opens}
 
   def __enter_exit__(self):
@@ -296,8 +303,8 @@ class MultiOpenMixin(ContextManagerMixin):
     ''' Increment the open count.
         On the first `.open` call `self.startup()`.
     '''
-    state = self.__mo_getstate()
     if False:
+    state = self.MultiOpenMixin_state
       if caller_frame is None:
         caller_frame = caller()
       frame_key = caller_frame.filename, caller_frame.lineno
@@ -328,8 +335,8 @@ class MultiOpenMixin(ContextManagerMixin):
           even if the original open never happened.
           (I'm looking at you, `cs.resources.RunState`.)
     '''
-    state = self.__mo_getstate()
     if False:
+    state = self.MultiOpenMixin_state
       if caller_frame is None:
         caller_frame = caller()
       frame_key = caller_frame.filename, caller_frame.lineno
@@ -346,7 +353,7 @@ class MultiOpenMixin(ContextManagerMixin):
     ''' Whether this object has been closed.
         Note: False if never opened.
     '''
-    state = self.__mo_getstate()
+    state = self.MultiOpenMixin_state
     if state.opens > 0:
       return False
     ##if state.opens < 0:
@@ -363,12 +370,12 @@ class MultiOpenMixin(ContextManagerMixin):
         Normally this is notified at the end of the shutdown procedure
         unless the object's `finalise_later` parameter was true.
     '''
-    self.__mo_getstate().join()
+    self.MultiOpenMixin_state.join()
 
   def is_open(self):
     ''' Test whether this object is open.
     '''
-    return self.__mo_getstate().opens > 0
+    return self.MultiOpenMixin_state.opens > 0
 
   @staticmethod
   def is_opened(func):
