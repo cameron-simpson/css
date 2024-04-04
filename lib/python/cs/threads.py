@@ -14,12 +14,11 @@ from inspect import ismethod
 import sys
 from threading import (
     current_thread,
+    Lock,
     Semaphore,
     Thread as builtin_Thread,
-    Lock,
     local as thread_local,
 )
-from typing import Any, Mapping, Optional
 
 from cs.context import ContextManagerMixin, stackattrs, stackset
 from cs.deco import decorator
@@ -27,6 +26,7 @@ from cs.excutils import logexc, transmute
 from cs.gimmicks import error, warning
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
+from cs.py.stack import caller
 from cs.seq import Seq
 
 __version__ = '20240316-post'
@@ -203,39 +203,14 @@ class HasThreadState(ContextManagerMixin):
     return currency
 
   @classmethod
-  @contextmanager
-  def with_thread_states(
-      cls, thread_states: Optional[Mapping[type, Any]] = None
+  def Thread(
+      cls,
+      *,
+      name=None,
+      target,
+      enter_objects=None,
+      **Thread_kw,
   ):
-    ''' Context manager to push all the current objects from `thread_states`
-        by calling each as a context manager.
-
-        The default `thread_states` comes from `HasThreadState.get_thread_states()`.
-    '''
-    if thread_states is None or isinstance(thread_states, bool):
-      thread_states = cls.get_thread_states(all_classes=thread_states)
-    if not thread_states:
-      yield
-    else:
-      state_iter = iter(list(thread_states.values()))
-
-      def with_thread_states_pusher():
-        try:
-          htsobj = next(state_iter)
-        except StopIteration:
-          yield
-        else:
-          if htsobj is None:
-            # no current object, skip to the next class
-            yield from with_thread_states_pusher()
-          else:
-            with htsobj:
-              yield from with_thread_states_pusher()
-
-      yield from with_thread_states_pusher()
-
-  @classmethod
-  def Thread(cls, *Thread_a, target, thread_states=None, **Thread_kw):
     ''' Class factory for a `Thread` to push the `.current` state for this class.
 
         The optional parameter `thread_states`
@@ -258,57 +233,102 @@ class HasThreadState(ContextManagerMixin):
         phase never arrives.
         In this case, pass `thread_states=False` to this call.
     '''
-    # snapshot the .current states in the source Thread
-    if thread_states is None:
-      thread_states = False
-    if isinstance(thread_states, bool):
-      thread_states = cls.get_thread_states(all_classes=thread_states)
-    if thread_states:
-
-      def target_wrapper(*a, **kw):
-        ''' Wrapper for the `Thread.target` to push the source `.current`
-            states in the new Thread before running the target.
-        '''
-        with cls.with_thread_states(thread_states):
-          return target(*a, **kw)
+    if name is None:
+      name = funcname(target)
+    if enter_objects is True:
+      # the bool True means enter all the state objects, marker as for-with
+      enter_tuples = (
+          (
+              getattr(
+                  getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None
+              ), True
+          ) for htscls in HasThreadState._HasThreadState_classes
+      )
     else:
-      # no state to prepare, eschew the wrapper
-      target_wrapper = target
+      enter_tuples = (
+          # all the current objects, marked as not-for-with
+          [
+              (
+                  getattr(
+                      getattr(htscls, htscls.THREAD_STATE_ATTR), 'current',
+                      None
+                  ), False
+              ) for htscls in HasThreadState._HasThreadState_classes
+          ] +
+          # the enter_objects, marked as for-with
+          [(obj, True) for obj in enter_objects or ()]
+      )
+    enter_it = iter(enter_tuples)
 
-    return builtin_Thread(*Thread_a, target=target_wrapper, **Thread_kw)
+    def with_enter_objects():
+      ''' A recursive context manager to enter all the contexts implied by `enter_it`.
+      '''
+      try:
+        enter_obj, for_with = next(enter_it)
+      except StopIteration:
+        yield
+      else:
+        if enter_obj is None:
+          # no current object, skip to the next one
+          yield from with_enter_objects()
+        else:
+          if for_with:
+            print("WITH enter_obj", enter_obj)
+            with enter_obj:
+              yield from with_enter_objects()
+          else:
+            thread_state = getattr(enter_obj, enter_obj.THREAD_STATE_ATTR)
+            with thread_state(curret=enter_obj):
+              yield from with_enter_objects()
 
-  def bg(self, func, *bg_a, thread_states=None, **bg_kw):
-    ''' Get a `Thread` using `self.Thread` and start it.
+    def target_wrapper(*a, **kw):
+      ''' Wrapper for the `Thread.target` to push the current states
+          from `enter_it` in the new Thread before running the `target`.
+      '''
+      with contextmanager(with_enter_objects)():
+        return target(*a, **kw)
+
+    return builtin_Thread(name=name, target=target_wrapper, **Thread_kw)
+
+  def bg(self, func, *, enter_objects=None, **bg_kw):
+    ''' Get a `Thread` using `type(elf).Thread` and start it.
         Return the `Thread`.
 
-        Note: the default `thread_states` is `{type(self): self}`
-        in order to arranges a `with self:` so that the `Thread`
-        holds it open until completed.
-        For some worker threads such as `MultiOpenMixin`s consuming
-        a queue of tasks this may be undesirable if the instance
-        shutdown phase includes a close-and-drain for the queue -
-        because the `Thread` holds the instance open, the shutdown
-        phase never arrives.
-        In this case, pass `thread_states=False` to this call.
+        The `HasThreadState.Thread` factory duplicates the current `Thread`'s
+        `HasThreadState` current objects as current in the new `Thread`.
+        Additionally it enters the contexts of various objects using
+        `with obj` accorind to the `enter_objects` parameter.
+
+        The value of the optional parameter `enter_objects` governs
+        which objects have their context entered using `with obj`
+        in the child `Thread` while running `func` as follows:
+        - `None`: the default, meaning `(self,)`
+        - `False`: no object contexts are entered
+        - `True`: all current `HasThreadState` object contexts will be entered
+        - an iterable of objects whose contexts will be entered
     '''
     cls = type(self)
-    if thread_states is None:
-      thread_states = {cls: self}
+    if enter_objects is None:
+      enter_objects = (self,)
     return bg(
-        func, *bg_a, thread_states=thread_states, thread_class=cls, **bg_kw
+        func,
+        thread_factory=cls.Thread,
+        enter_objects=enter_objects,
+        **bg_kw,
     )
 
 # pylint: disable=too-many-arguments
 def bg(
     func,
+    *,
     daemon=None,
     name=None,
     no_start=False,
     no_logexc=False,
-    thread_factory=None,
-    thread_states=True,
     args=None,
     kwargs=None,
+    thread_factory=None,
+    **tfkw,
 ):
   ''' Dispatch the callable `func` in its own `Thread`;
       return the `Thread`.
@@ -341,13 +361,15 @@ def bg(
   thread_prefix = name
 
   def thread_body():
-    with Pfx(thread_prefix):
+    ''' Establish a basic `Pfx` context for the target `func`.
+    '''
+    with Pfx("Thread:%d:%s", current_thread().ident, thread_prefix):
       return func(*args, **kwargs)
 
   T = thread_factory(
       name=thread_prefix,
       target=thread_body,
-      thread_states=thread_states,
+      **tfkw,
   )
   if not no_logexc:
     func = logexc(func)
