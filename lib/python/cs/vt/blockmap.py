@@ -298,7 +298,6 @@ class BlockMap:
         submap.close()
         maps[i] = None
 
-  @with_upd_proxy
   @pfx_method(use_str=True)
   def _load_maps(self, S: Store, scan_runstate: RunState):
     ''' Load leaf offsets and hashcodes into the unfilled portion of the blockmap.
