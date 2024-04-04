@@ -72,20 +72,17 @@ def not_closed(func):
   return not_closed_wrapper
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
-class _MultiOpenMixinOpenCloseState(object):
+@dataclass(slots=True)
+class _MultiOpenMixinOpenCloseState:
 
-  def __init__(self, mom: "MultiOpenMixin"):
-    self.mom = mom
-    self.opened = False
-    self.opens = 0
-    self.opens_from = defaultdict(int)
-    ##self.closed = False # final _close() not yet called
-    self.final_close_from = None
-    self._lock = RLock()
-    self.join_lock = None
-
-  def __repr__(self):
-    return "%s:%r" % (self.__class__.__name__, self.__dict__)
+  mom: "MultiOpenMixin"
+  opened: bool = False
+  opens: int = 0
+  opens_from: Mapping = field(default_factory=lambda: defaultdict(int))
+  final_close_from: StackSummary = None
+  join_lock: Lock = None
+  _teardown: Callable = None
+  _lock: NRLock = field(default_factory=NRLock)
 
   def open(self, caller_frame=None) -> int:
     ''' The open process:
@@ -104,7 +101,7 @@ class _MultiOpenMixinOpenCloseState(object):
         self.join_lock = Lock()
         self.join_lock.acquire()
         self._teardown = setup_cmgr(self.mom.startup_shutdown())
-      self.opened = True
+        self.opened = True
     return opens
 
   def close(
