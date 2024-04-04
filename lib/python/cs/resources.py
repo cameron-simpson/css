@@ -572,9 +572,11 @@ class RunState(HasThreadState):
       handle_signal=None,
       poll_cancel: Optional[Callable] = None,
       verbose=False,
+      thread_wide=False,
   ):
     self.name = name
     self.verbose = verbose
+    self.thread_wide = thread_wide
     self._started_from = None
     self._signals = tuple(signals) if signals else ()
     self._sigstack = None
@@ -624,7 +626,7 @@ class RunState(HasThreadState):
         In particular, the `HasThreadState.Thread` factory calls this
         in the "running" state.
     '''
-    with HasThreadState.as_contextmanager(self):
+    with contextif(self.thread_wide, HasThreadState.as_contextmanager, self):
       if self.running:
         # we're already running - do not change states or push signal handlers
         # typical situation is HasThreadState.Thread setting up the "current" RunState
@@ -840,7 +842,10 @@ class RunState(HasThreadState):
     self.cancel()
 
 # default to the current RunState or make one
-uses_runstate = default_params(runstate=lambda: RunState.default(factory=True))
+uses_runstate = default_params(
+    runstate=lambda:
+    (RunState.default(factory=partial(RunState, thread_wide=True)))
+)
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
