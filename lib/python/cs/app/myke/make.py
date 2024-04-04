@@ -28,13 +28,13 @@ from cs.lex import get_identifier, get_white
 from cs.logutils import debug, info, error, exception, D
 import cs.pfx
 from cs.pfx import pfx, Pfx, pfx_method
-from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.result import Result
 from cs.threads import (
-    ThreadState,
     HasThreadState,
     Lock,
+    NRLck,
+    ThreadState,
     locked,
     locked_property,
 )
@@ -137,7 +137,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
       time.sleep(5)
       self.report()
 
-  @prop
+  @property
   def namespaces(self):
     ''' The namespaces for this Maker: the built namespaces plus the special macros.
     '''
@@ -150,7 +150,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
     '''
     self.basic_namespaces.insert(0, ns)
 
-  @prop
+  @property
   def makefiles(self):
     ''' The list of makefiles to consult, a tuple.
         It is not possible to add more makefiles after accessing this property.
@@ -627,7 +627,7 @@ class Target(Result):
     self.failed = True
     self.result = False
 
-  @prop
+  @property
   def namespaces(self):
     ''' The namespaces for this Target: the special per-Target macros,
         the Maker's namespaces, the Maker's macros and the special macros.
@@ -646,7 +646,7 @@ class Target(Result):
         ]
     )
 
-  @prop
+  @property
   def prereqs(self):
     ''' Return the prerequisite target names.
     '''
@@ -656,7 +656,7 @@ class Target(Result):
       self._prereqs = prereqs_mexpr(self.context, self.namespaces).split()
     return self._prereqs
 
-  @prop
+  @property
   def new_prereqs(self):
     ''' Return the new prerequisite target names.
     '''
@@ -838,16 +838,14 @@ class Action(NS):
     self.line = line
     self.mexpr = MacroExpression.from_text(context, line)
     self.silent = silent
-    self._lock = Lock()
+    self._lock = NRLock()
 
   def __str__(self):
-    return "<Action %s %s:%d>" % (
-        self.variant, self.context.filename, self.context.lineno
-    )
+    return f'{self.__class__.__name__}({self.variant}:{self.context.filename}:{self.context.lineno})'
 
   __repr__ = __str__
 
-  @prop
+  @property
   def prline(self):
     ''' Printable form of this Action.
     '''
