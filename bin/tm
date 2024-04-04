@@ -389,7 +389,7 @@ case "$op" in
     # no tmux? use scr
     have_tmux || exec $trace scr
     do_tmux start-server
-    if [ "x$1" = x-n ]
+    if [ $# -gt 0 ] && [ "x$1" = x-n ]
     then
       shift
       do_tmux list-sessions ${1+"$@"} \
@@ -458,9 +458,9 @@ case "$op" in
         )
         ;;
     esac
-    if do_tmux has-session -t "$session_name"
+    if do_tmux has-session -t "=$session_name"
     then
-      do_tmux rename-session -t "$session_name" "$session_name_new"
+      do_tmux rename-session -t "=$session_name" "$session_name_new"
     else
       echo "$cmd: $op: no such session: $session_name" >&2
       exit 1
@@ -493,7 +493,7 @@ case "$op" in
         fi
         matched=1
         [ -n "$shcmd" ] || shcmd='exec $SHELL'
-        do_tmux has-session -t "$session_name" 2>/dev/null \
+        do_tmux has-session -t "=$session_name" 2>/dev/null \
         || do_tmux new-session -d -s "$session_name" "set -x; $shcmd" \
         || xit=1
       done
@@ -516,8 +516,8 @@ case "$op" in
         )
         ;;
     esac
-    do_tmux has-session -t "$session_name" 2>/dev/null \
-    || { [ $# = 0 ] && "$0" start "$session_name" 2>/dev/null; } \
+    do_tmux has-session -t "=$session_name" 2>/dev/null \
+      || { [ $# = 0 ] && "$0" start "$session_name" 2>/dev/null; } \
     || {
       [ $# -gt 0 ] && {
         tm_shcmd=$( shqstr "$@" )
@@ -527,8 +527,8 @@ case "$op" in
     }
     [ $detached ] || {
       if [ -n "$TMUX" ]
-      then do_tmux switch-client -t "$session_name"
-      else do_tmux attach-session -t "$session_name"
+      then do_tmux switch-client -t "=$session_name"
+      else do_tmux attach-session -t "=$session_name"
       fi
     }
     ;;
@@ -539,8 +539,8 @@ case "$op" in
       if tmux -V >/dev/null 2>&1
       then
         tmux start-server
-        if tmux has-session -t '"'$session_name'"'
-        then  tmux attach-session -t '"'$session_name'"'
+        if tmux has-session -t '"'=$session_name'"'
+        then  tmux attach-session -t '"'=$session_name'"'
         else  exec env tmux new-session -s '"'$session_name'"' "${SHELL:-/bin/sh}"
         fi
       else

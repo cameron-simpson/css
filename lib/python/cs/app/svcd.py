@@ -89,7 +89,9 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': ['svcd = cs.app.svcd:main'],
+        'console_scripts': {
+            'svcd': 'cs.app.svcd:main'
+        },
     },
 }
 
@@ -426,7 +428,7 @@ class SvcD(FlaggedMixin, object):
     if pidfile is None and name is not None:
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     if flags is None:
-      flags = Flags(environ=environ, debug=trace)
+      flags = Flags(environ=environ)  ##, debug=trace)
     if group_name is None:
       group_name = "SVCD " + name
     if test_flags is None:

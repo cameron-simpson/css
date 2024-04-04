@@ -1,0 +1,2 @@
+Reimplement fnmatchdir using fnmatch.filter.
+No longer claim Python 2 compatibility.

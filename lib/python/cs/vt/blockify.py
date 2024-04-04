@@ -20,7 +20,7 @@ from cs.seq import tee
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 
-from .block import Block, IndirectBlock
+from .block import Block, IndirectBlock, LiteralBlock
 from .scan import (
     scan_offsets,
     scan_reblock,
@@ -50,7 +50,7 @@ def top_block_for(blocks):
       topblock = next(blocks)
     except StopIteration:
       # no blocks - return the empty block - no data
-      return Block(data=b'')
+      return LiteralBlock(data=b'')
 
     # we have a full IndirectBlock
     # if there are more, replace our blocks with
@@ -119,13 +119,12 @@ def blockify(
       label=f'blockify({chunks_name})',
       itemlenfunc=len,
       units_scale=BINARY_BYTES_SCALE,
-      update_frequency=32,
   ):
-    yield Block(data=chunk)
+    yield Block.promote(chunk)
 
 @promote
 def block_for(bfr: CornuCopyBuffer, **kw):
-  ''' Return a Block for the contents `bfr`, an iterable of `bytes`like objects
+  ''' Return a top Block for the contents `bfr`, an iterable of `bytes`like objects
       such as a `CornuCopyBuffer`.
 
       Keyword arguments are passed to `blockify`.

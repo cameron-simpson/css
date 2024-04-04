@@ -1,0 +1,3 @@
+lib/python/cs/fs.py: cs.fs: reimplement fnmatchdir using fnmatch.filter
+lib/python/cs/fs.py: cs.fs: no longer Python 2 compatible
+lib/python/cs/fs.py: cs.fs: update DISTINFO

@@ -32,7 +32,7 @@ usage="Usage: $cmd [--ips ip,...] [--tm]
   Run the Unifi controller software via \"docker run ... $image ...\".
 
   Leading options:
-  --ip  Expose the controler on the specified comma separated IP addresses.
+  --ip  Expose the controller on the specified comma separated IP addresses.
         Default from \$UNIFI_DOCKER_IPS: ${UNIFI_DOCKER_IPS:-}
         If this is empty, the default network is \"host\",
         exposing the controller on the local network.

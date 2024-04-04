@@ -4,10 +4,11 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
-from fnmatch import fnmatch
+from fnmatch import filter as fnfilter
 from functools import partial
 import os
 from os.path import (
+    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -22,22 +23,20 @@ from os.path import (
 )
 from tempfile import TemporaryDirectory
 from threading import Lock
-from typing import Optional
+from typing import Any, Callable, Optional, Union
 
 from icontract import require
-from typeguard import typechecked
 
 from cs.deco import decorator
 from cs.obj import SingletonMixin
-from cs.pfx import pfx_call
+from cs.pfx import pfx, pfx_call
 
-__version__ = '20221221-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -45,7 +44,6 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'icontract',
-        'typeguard',
     ],
 }
 
@@ -119,8 +117,7 @@ def atomic_directory(infill_func, make_placeholder=False):
       if remove_placeholder and isdirpath(dirpath):
         pfx_rmdir(dirpath)
       raise
-    else:
-      return result
+    return result
 
   return atomic_directory_wrapper
 
@@ -156,14 +153,14 @@ def rpaths(
 def fnmatchdir(dirpath, fnglob):
   ''' Return a list of the names in `dirpath` matching the glob `fnglob`.
   '''
-  return [
-      filename for filename in pfx_listdir(dirpath)
-      if fnmatch(filename, fnglob)
-  ]
+  return fnfilter(pfx_listdir(dirpath), fnglob)
 
 # pylint: disable=too-few-public-methods
 class HasFSPath:
-  ''' An object with a `.fspath` attribute representing a filesystem location.
+  ''' A mixin for an object with a `.fspath` attribute representing a filesystem location.
+
+      The `__init__` method just sets the `.fspath` attribute, and
+      need not be called if the main class takes care of that itself.
   '''
 
   def __init__(self, fspath):
@@ -181,16 +178,24 @@ class HasFSPath:
     except AttributeError:
       return "<no-fspath>"
 
-  @require(lambda subpath: not isabspath(subpath))
-  def pathto(self, subpath):
-    ''' The full path to `subpath`, a relative path below `self.fspath`.
+  @require(lambda subpaths: len(subpaths) > 0)
+  @require(lambda subpaths: not any(map(isabspath, subpaths)))
+  def pathto(self, *subpaths):
+    ''' The full path to `subpaths`, comprising a relative path
+        below `self.fspath`.
+        This is a shim for `os.path.join` which requires that all
+        the `subpaths` be relative paths.
     '''
-    return joinpath(self.fspath, subpath)
+    return joinpath(self.fspath, *subpaths)
 
   def fnmatch(self, fnglob):
     ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
     '''
     return fnmatchdir(self.fspath, fnglob)
+
+  def listdir(self):
+    ''' Return `os.listdir(self.fspath)`. '''
+    return os.listdir(self.fspath)
 
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
@@ -199,9 +204,9 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   @classmethod
   def _resolve_fspath(
       cls,
-      fspath: Optional[str],
+      fspath: Optional[str] = None,
       envvar: Optional[str] = None,
-      default_attr=None
+      default_attr: str = 'FSPATH_DEFAULT'
   ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
 
@@ -212,6 +217,10 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
           the default for this comes from `cls.FSPATH_ENVVAR` if defined
         * `default_attr`: the class attribute containing the default `fspath`
           if defined and there is no environment variable for `envvar`
+
+        The `default_attr` value may be either a `str`, in which
+        case `os.path.expanduser` is called on it`, or a callable
+        returning a filesystem path.
 
         The common mode is where each instance might have an arbitrary path,
         such as a `TagFile`.
@@ -227,18 +236,21 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         fspath = os.environ.get(envvar)
         if fspath is not None:
           return realpath(fspath)
-      if default_attr is None:
-        default_attr = 'FSPATH_DEFAULT'
-      defaultpath = getattr(cls, default_attr, None)
-      if defaultpath is not None:
-        return realpath(expanduser(defaultpath))
+      default = getattr(cls, default_attr, None)
+      if default is not None:
+        if callable(default):
+          fspath = default()
+        else:
+          fspath = expanduser(default)
+        if fspath is not None:
+          return realpath(fspath)
       raise ValueError(
-          "_resolve_fspath: fspath=None and no %s no %s.%s" % (
+          "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
               (
                   cls.__name__ + '.FSPATH_ENVVAR' if envvar is None else '$' +
                   envvar
               ),
-              cls.name,
+              cls.__name__,
               default_attr,
           )
       )
@@ -250,6 +262,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
     '''
     return cls._resolve_fspath(fspath)
 
+  # pylint: disable=return-in-init
   ##@typechecked
   def __init__(self, fspath: Optional[str] = None, lock=None):
     ''' Initialise the singleton:
@@ -303,8 +316,12 @@ def longpath(path, prefixes=None):
   path = expandvars(path)
   return path
 
-def is_clean_subpath(subpath: str):
-  ''' Test that `subpath` is clean:
+@pfx
+def validate_rpath(rpath: str):
+  ''' Test that `rpath` is a clean relative path with no funny business;
+      raise `ValueError` if the test fails.
+
+      Tests:
       - not empty or '.' or '..'
       - not an absolute path
       - normalised
@@ -312,13 +329,74 @@ def is_clean_subpath(subpath: str):
 
       Examples:
 
-          >>> is_clean_subpath('')
+          >>> validate_rpath('')
           False
-          >>> is_clean_subpath('.')
+          >>> validate_rpath('.')
   '''
-  if subpath in ('', '.', '..'):
+  if not rpath:
+    raise ValueError('empty path')
+  if rpath in ('.', '..'):
+    raise ValueError('may not be . or ..')
+  if isabspath(rpath):
+    raise ValueError('absolute path')
+  if rpath != normpath(rpath):
+    raise ValueError('!= normpath(rpath)')
+  if rpath.startswith('../'):
+    raise ValueError('goes up')
+
+def is_valid_rpath(rpath, log=None) -> bool:
+  ''' Test that `rpath` is a clean relative path with no funny business.
+
+      This is a Boolean wrapper for `validate_rpath()`.
+  '''
+  try:
+    validate_rpath(rpath)
+  except ValueError as e:
+    if log is not None:
+      log("invalid: %s", e)
     return False
-  if isabspath(subpath):
-    return False
-  normalised = normpath(subpath)
-  return subpath == normalised and not normalised.startswith('../')
+  return True
+
+def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
+  ''' Walk up the filesystem tree looking for a directory where
+      `criterion(fspath)` is not `None`, where `fspath` starts at `dirpath`.
+      Return the result of `criterion(fspath)`.
+      Return `None` if no such path is found.
+
+      Parameters:
+      * `dirpath`: the starting directory
+      * `criterion`: a `str` or a callable accepting a `str`
+
+      If `criterion` is a `str`, use look for the existence of `os.path.join(fspath,criterion)`
+
+      Example:
+
+          # find a directory containing a `.envrc` file
+          envrc_path = findup('.', '.envrc')
+
+          # find a Tagger rules file for the Downloads directory
+          rules_path = findup(expanduser('~/Downloads', '.taggerrc')
+  '''
+  if isinstance(criterion, str):
+    # passing a name looks for that name (usually a basename) with
+    # respect to each directory path
+    find_name = criterion
+
+    def test_subpath(dirpath):
+      testpath = joinpath(dirpath, find_name)
+      if pfx_call(existspath, testpath):
+        return testpath
+      return None
+
+    criterion = test_subpath
+  if not isabspath(dirpath):
+    dirpath = abspath(dirpath)
+  while True:
+    found = pfx_call(criterion, dirpath)
+    if found is not None:
+      return found
+    new_dirpath = dirname(dirpath)
+    if new_dirpath == dirpath:
+      break
+    dirpath = new_dirpath
+  return None

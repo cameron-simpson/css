@@ -1,0 +1,14 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: include the first sentence of the subcommand description in the short help
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions.popopts: this does not return a value
+lib/python/cs/cmdutils.py: merge default ==> tagger
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._OptSpec: replace from_specs with promote
+lib/python/cs/cmdutils.py: merge default ==> tagger
+lib/python/cs/cmdutils.py: merge default ==> tagger
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions: subclass HasThreadState so that we can use this for process wide doit/quiet/verbose stuff
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions: move the runstate_signals into this directly; BaseCommand: move the run() options stuff into run_context() and have it work on a copy of the original options
+lib/python/cs/cmdutils.py: cs.cmdutils: update imports
+lib/python/cs/cmdutils.py: cmd.cmdutils: BaseCommandCmd: implement get_names(), provide docstrings for the do_* attributes, thus help
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring updates
+lib/python/cs/cmdutils.py: cs.cmdutils: update imports, clean lint, improve a message
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: make runstate and upd keyword only parameters
+lib/python/cs/cmdutils.py: cs.cmdutils: update DISTINFO

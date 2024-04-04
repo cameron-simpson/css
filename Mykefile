@@ -137,11 +137,11 @@ _tarball:
         tar czf "$$tarball" "$$tardir"
 
 _test:
-        find lib/python -type f -name '*.py[co]' -exec rm {} \;
+        find lib/python -type f -name '*.py[co]' -ls -delete
         set -x; ./bin-cs/selftest -v --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
 
 _test3:
-        find lib/python -type f -name '*.py[co]' -exec rm {} \;
+        find lib/python -type f -name '*.py[co]' -ls -delete
         set -x; ./bin-cs/selftest -v --state state3 --pycmd python3 --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
 
 deploy_dir(targetdir, base, includes) = \

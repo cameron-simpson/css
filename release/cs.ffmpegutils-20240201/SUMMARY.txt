@@ -1,0 +1,6 @@
+New $FFMPEG_EXE envvar.
+convert: use $FFMPEG_EXE, return the ffmpeg argv.
+convert: include the media type in DEFAULT_CONVERSIONS, refactor the choice of codec conversion.
+convert: supply dummy results if doit is false - could do with some finesse.
+ffmpeg_docker: use DockerRun.{add_input,add_output}.
+New main_ffmpeg_docker to support the ffmpeg-docker command, add ffmpeg-docker to DISTINFO scripts.

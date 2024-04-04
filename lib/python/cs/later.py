@@ -55,7 +55,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20230212.1-post'
+__version__ = '20240305-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -219,7 +219,7 @@ class LateFunction(Result):
       TODO: .cancel(), timeout for wait().
   '''
 
-  def __init__(self, func, name=None, retry_delay=None, thread_states=None):
+  def __init__(self, func, name=None, retry_delay=None):
     ''' Initialise a `LateFunction`.
 
         Parameters:
@@ -227,7 +227,6 @@ class LateFunction(Result):
         * `name`, if supplied, specifies an identifying name for the `LateFunction`.
         * `retry_local`: time delay before retry of this function on RetryError.
           Default from `later.retry_delay`.
-        * `thread_states`: optional thread states passed to `HasThreadState.Thread`
     '''
     Result.__init__(self)
     self.func = func
@@ -241,7 +240,6 @@ class LateFunction(Result):
     self.thread = HasThreadState.Thread(
         name=name,
         target=partial(self.run_func, func),
-        thread_states=thread_states,
     )
 
   def __str__(self):
@@ -313,7 +311,14 @@ class Later(MultiOpenMixin, HasThreadState):
 
   later_perthread_state = ThreadState()
 
-  def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
+  def __init__(
+      self,
+      capacity,
+      name=None,
+      inboundCapacity=0,
+      retry_delay=None,
+      default=False,
+  ):
     ''' Initialise the Later instance.
 
         Parameters:
@@ -341,6 +346,7 @@ class Later(MultiOpenMixin, HasThreadState):
     )
     if retry_delay is None:
       retry_delay = DEFAULT_RETRY_DELAY
+    self.default = default
     self.capacity = capacity
     self.inboundCapacity = inboundCapacity
     self.retry_delay = retry_delay
@@ -363,7 +369,7 @@ class Later(MultiOpenMixin, HasThreadState):
     '''
     for _ in zip_longest(
         MultiOpenMixin.__enter_exit__(self),
-        HasThreadState.__enter_exit__(self),
+        HasThreadState.__enter_exit__(self) if self.default else (),
     ):
       yield
 
@@ -383,7 +389,6 @@ class Later(MultiOpenMixin, HasThreadState):
         #   finished_event Event
         # queue final action to mark activity completion
         self.defer(
-            dict(thread_states=False),
             self.finished_event.set,
             _force_submit=True,
         )
@@ -612,7 +617,6 @@ class Later(MultiOpenMixin, HasThreadState):
       pfx=None,  # pylint: disable=redefined-outer-name
       LF=None,
       retry_delay=None,
-      thread_states=None,
   ):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding `LateFunction` for result collection.
@@ -650,7 +654,6 @@ class Later(MultiOpenMixin, HasThreadState):
           func,
           name=name,
           retry_delay=retry_delay,
-          thread_states=thread_states
       )
     pri_entry = list(priority)
     pri_entry.append(seq())  # ensure FIFO servicing of equal priorities

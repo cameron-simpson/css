@@ -22,9 +22,10 @@ import re
 import sys
 from threading import Semaphore
 import time
-from typing import Optional, Set
+from typing import Optional
 from urllib.parse import unquote as unpercent
 
+from icontract import require
 import requests
 from typeguard import typechecked
 
@@ -42,9 +43,9 @@ from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import print  # pylint: disable=redefined-builtin
+from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20230217-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -56,14 +57,15 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'entry_points': {
-        'console_scripts': ['playon = cs.app.playon:main'],
+        'console_scripts': {
+            'playon': 'cs.app.playon:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils',
         'cs.context',
         'cs.deco',
         'cs.fileutils>=atomic_filename',
-        'cs.fstags',
         'cs.lex',
         'cs.logutils',
         'cs.pfx>=pfx_call',
@@ -75,6 +77,7 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'icontract',
         'requests',
         'typeguard',
     ],
@@ -85,7 +88,7 @@ DBURL_DEFAULT = '~/var/playon.sqlite'
 
 FILENAME_FORMAT_ENVVAR = 'PLAYON_FILENAME_FORMAT'
 DEFAULT_FILENAME_FORMAT = (
-    '{series_prefix}{playon.Name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
+    '{series_prefix}{series_episode_name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
 # download parallelism
@@ -250,9 +253,10 @@ class PlayOnCommand(BaseCommand):
         with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
-              filename.lower().replace(' - ', '--').replace('_', ':')
-              .replace(' ', '-').replace(os.sep, ':') + '.'
+              filename.lower().replace(' - ', '--').replace(' ', '-')
+              .replace('_', ':').replace(os.sep, ':') + '.'
           )
+          filename = re.sub('---+', '--', filename)
           try:
             api.download(dl_id, filename=filename)
           except ValueError as e:
@@ -312,8 +316,6 @@ class PlayOnCommand(BaseCommand):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
-    options = self.options
-    upd = options.upd
     recordings = set(sqltags.recordings())
     need_refresh = (
         # any current recordings whose state is stale
@@ -322,7 +324,7 @@ class PlayOnCommand(BaseCommand):
         all(recording.is_expired() for recording in recordings)
     )
     if need_refresh:
-      with upd.run_task("refresh queue and recordings"):
+      with run_task("refresh queue and recordings"):
         Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
         for T in Ts:
           T.join()
@@ -355,13 +357,63 @@ class PlayOnCommand(BaseCommand):
         recording_ids = sqltags.recording_ids_from_str(arg)
         if not recording_ids:
           warning("no recording ids")
-          xit = 1
           continue
-        for dl_id in recording_ids:
+        for dl_id in sorted(recording_ids):
           recording = sqltags[dl_id]
           with Pfx(recording.name):
             recording.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
+
+  def cmd_downloaded(self, argv, locale='en_US'):
+    ''' Usage: {cmd} recordings...
+          Mark the specified recordings as downloaded and no longer pending.
+    '''
+    if not argv:
+      raise GetoptError("missing recordings")
+    sqltags = self.options.sqltags
+    xit = 0
+    for spec in argv:
+      with Pfx(spec):
+        recording_ids = sqltags.recording_ids_from_str(spec)
+        if not recording_ids:
+          warning("no recording ids")
+          xit = 1
+          continue
+        for dl_id in recording_ids:
+          with Pfx("%s", dl_id):
+            recording = sqltags[dl_id]
+            print(dl_id, '+ downloaded')
+            recording.add("downloaded")
+    return xit
+
+  def cmd_feature(self, argv, locale='en_US'):
+    ''' Usage: {cmd} [feature_id]
+          List features.
+    '''
+    long_mode = False
+    opts, argv = getopt(argv, 'l', '')
+    for opt, val in opts:
+      if opt == '-l':
+        long_mode = True
+      else:
+        raise RuntimeError("unhandled option: %r" % (opt,))
+    if argv:
+      feature_id = argv.pop(0)
+    else:
+      feature_id = None
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    for feature in sorted(api.features(), key=lambda svc: svc['playon.ID']):
+      playon = feature.subtags('playon', as_tagset=True)
+      if feature_id is not None and playon.ID != feature_id:
+        print("skip", playon.ID)
+        continue
+      print(playon.ID)
+      if feature_id is None and not long_mode:
+        continue
+      for tag in playon:
+        print(" ", tag)
 
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
@@ -493,16 +545,38 @@ class Recording(SQLTagSet):
     parts = []
     if self.playon.Series:
       parts.append(self.playon.Series)
-    se_parts = []
-    if self.playon.Season is not None:
-      se_parts.append(f's{self.playon.Season:02d}')
-    if self.playon.Episode:
-      se_parts.append(f'e{self.playon.Episode:02d}')
-    if se_parts:
-      parts.append(''.join(se_parts))
+      se_parts = []
+      if self.playon.get('Season'):
+        se_parts.append(f's{self.playon.Season:02d}')
+      if self.playon.get('Episode'):
+        se_parts.append(f'e{self.playon.Episode:02d}')
+      if se_parts:
+        parts.append(''.join(se_parts))
     if not parts:
       return ''
     return sep.join(parts) + sep
+
+  @format_attribute
+  def series_episode_name(self):
+    name = self.playon.Name
+    name = name.strip()
+    if self.playon.get('Season'):
+      spfx, n, offset = get_prefix_n(name, 's', n=self.playon.Season)
+      if spfx is not None:
+        assert name.startswith(f's{self.playon.Season:02d}')
+        name = name[offset:]
+    if self.playon.get('Episode'):
+      epfx, n, offset = get_prefix_n(name, 'e', n=self.playon.Episode)
+      if epfx is not None:
+        assert name.startswith(f'e{self.playon.Episode:02d}')
+        name = name[offset:]
+      name = name.lstrip()
+      epfx, n, offset = get_prefix_n(
+          name.lower(), 'episode ', n=self.playon.Episode
+      )
+      if epfx is not None:
+        name = name[offset:]
+    return name.strip()
 
   @format_attribute
   def is_available(self):
@@ -519,9 +593,10 @@ class Recording(SQLTagSet):
   @format_attribute
   def is_downloaded(self):
     ''' Test whether this recording has been downloaded
-        based on the presence of a `download_path` `Tag`.
+        based on the presence of a `download_path` `Tag`
+        or a true `downloaded` `Tag`.
     '''
-    return self.download_path is not None
+    return self.get('download_path') is not None or 'downloaded' in self
 
   @format_attribute
   def is_pending(self):
@@ -781,13 +856,17 @@ class PlayOnAPI(HTTPServiceAPI):
     '''
     return self.sqltags[download_id]
 
-  def suburl(self, suburl, headers=None, **kw):
+  def suburl(
+      self, suburl, *, api_version=None, headers=None, _base_url=None, **kw
+  ):
     ''' Override `HTTPServiceAPI.suburl` with default
         `headers={'Authorization':self.jwt}`.
     '''
+    if _base_url is None:
+      _base_url = None if api_version is None else f'api/v{api_version}'
     if headers is None:
       headers = dict(Authorization=self.jwt)
-    return super().suburl(suburl, headers=headers, **kw)
+    return super().suburl(suburl, _base_url=_base_url, headers=headers, **kw)
 
   def suburl_data(self, suburl, *, raw=False, **kw):
     ''' Call `suburl` and return the `'data'` component on success.
@@ -832,65 +911,19 @@ class PlayOnAPI(HTTPServiceAPI):
     )
 
   @pfx_method
-  def _recordings_from_entries(self, entries) -> Set[SQLTagSet]:
-    ''' Return the recording `TagSet` instances from PlayOn data entries.
-    '''
-    with self.sqltags:
-      now = time.time()
-      recordings = set()
-      for entry in entries:
-        entry_id = entry['ID']
-        with Pfx(entry_id):
-          for r_field, conv in sorted(dict(
-              Episode=int,
-              ReleaseYear=int,
-              Season=int,
-              ##Created=self.from_playon_date,
-              ##Expires=self.from_playon_date,
-              ##Updated=self.from_playon_date,
-          ).items()):
-            try:
-              value = entry[r_field]
-            except KeyError:
-              pass
-            else:
-              with Pfx("%s=%r", r_field, value):
-                if value is None:
-                  del entry[r_field]
-                else:
-                  try:
-                    value2 = conv(value)
-                  except ValueError as e:
-                    warning("%r: %s", value, e)
-                  else:
-                    entry[r_field] = value2
-          recording = self[entry_id]
-          # sometimes the name is spuriously prefixed with the seaon and episode
-          playon_name = entry['Name']
-          season = entry.get('Season')
-          spfx, sn, offset = get_prefix_n(playon_name, 's', season)
-          if spfx:
-            episode = entry.get('Episode')
-            epfx, en, offset = get_prefix_n(
-                playon_name, 'e', episode, offset=offset
-            )
-            if epfx:
-              entry['Season'] = sn
-              entry['Episode'] = en
-              entry['Name'] = playon_name[offset:].lstrip(' -')
-          recording.update(entry, prefix='playon')
-          recording.update(dict(last_updated=now))
-          recordings.add(recording)
-      return recordings
-
-  @pfx_method
   def queue(self):
     ''' Return the `TagSet` instances for the queued recordings.
     '''
     with self.sqltags.db_session():
       data = self.suburl_data('queue')
       entries = data['entries']
-      return self._recordings_from_entries(entries)
+      return self._entry_tagsets(
+          entries, 'recording', dict(
+              Episode=int,
+              ReleaseYear=int,
+              Season=int,
+          )
+      )
 
   @pfx_method
   def recordings(self):
@@ -899,46 +932,58 @@ class PlayOnAPI(HTTPServiceAPI):
     with self.sqltags.db_session():
       data = self.suburl_data('library/all')
       entries = data['entries']
-      return self._recordings_from_entries(entries)
+      return self._entry_tagsets(
+          entries, 'recording', dict(
+              Episode=int,
+              ReleaseYear=int,
+              Season=int,
+          )
+      )
 
   available = recordings
+
+  @pfx_method
+  @require(lambda type: type in ('feature', 'recording', 'service'))
+  def _entry_tagsets(
+      self, entries, type: str, conversions: Optional[dict] = None
+  ) -> set:
+    ''' Return a `set` of `TagSet` instances from PlayOn data entries.
+    '''
+    with self.sqltags:
+      now = time.time()
+      tes = set()
+      for entry in entries:
+        entry_id = entry['ID']
+        with Pfx(entry_id):
+          # pylint: disable=use-dict-literal
+          if conversions:
+            for e_field, conv in sorted(conversions.items()):
+              try:
+                value = entry[e_field]
+              except KeyError:
+                pass
+              else:
+                with Pfx("%s=%r", e_field, value):
+                  if value is None:
+                    del entry[e_field]
+                  else:
+                    try:
+                      value2 = conv(value)
+                    except ValueError as e:
+                      warning("%r: %s", value, e)
+                    else:
+                      entry[e_field] = value2
+          te = self.sqltags[f'{type}.{entry_id}']
+          te.update(entry, prefix='playon')
+          te.update(dict(last_updated=now))
+          tes.add(te)
+      return tes
 
   @pfx_method
   def _services_from_entries(self, entries):
     ''' Return the service `TagSet` instances from PlayOn data entries.
     '''
-    with self.sqltags:
-      now = time.time()
-      services = set()
-      for entry in entries:
-        entry_id = entry['ID']
-        with Pfx(entry_id):
-          # pylint: disable=use-dict-literal
-          for e_field, conv in sorted(dict(
-              ##Created=self.from_playon_date,
-              ##Expires=self.from_playon_date,
-              ##Updated=self.from_playon_date,
-          ).items()):
-            try:
-              value = entry[e_field]
-            except KeyError:
-              pass
-            else:
-              with Pfx("%s=%r", e_field, value):
-                if value is None:
-                  del entry[e_field]
-                else:
-                  try:
-                    value2 = conv(value)
-                  except ValueError as e:
-                    warning("%r: %s", value, e)
-                  else:
-                    entry[e_field] = value2
-          service = self.service(entry_id)
-          service.update(entry, prefix='playon')
-          service.update(dict(last_updated=now))
-          services.add(service)
-      return services
+    return self._entry_tagsets(entries, 'service')
 
   @pfx_method
   def services(self):
@@ -947,10 +992,36 @@ class PlayOnAPI(HTTPServiceAPI):
     entries = self.cdsurl_data('content')
     return self._services_from_entries(entries)
 
-  def service(self, service_id):
+  def service(self, service_id: str):
     ''' Return the service `SQLTags` instance for `service_id`.
     '''
     return self.sqltags[f'service.{service_id}']
+
+  @pfx_method
+  def features(self):
+    ''' Fetch the list of featured shows.
+    '''
+    entries = self.cdsurl_data('content/featured')
+    return self._entry_tagsets(entries, 'feature')
+
+  def feature(self, feature_id):
+    ''' Return the feature `SQLTags` instance for `feature_id`.
+    '''
+    return self.sqltags[f'feature.{feature_id}']
+
+  def featured_image_url(self, feature_name: str):
+    ''' URL of the image for a featured show. '''
+    return self.suburl(
+        self, f'content/featured/{feature_name}/image', api_version=9
+    )
+
+  def service_image_url(self, service_id, large=True):
+    return self.suburl(
+        self,
+        f'content/{service_id}/image?size={"large" if large else "small"}',
+        _base_url=self.CDS_HOSTNAME,
+        api_version=9,
+    )
 
   # pylint: disable=too-many-locals
   @pfx_method
@@ -993,8 +1064,7 @@ class PlayOnAPI(HTTPServiceAPI):
           dl_url, auth=RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with pfx_call(atomic_filename, filename, mode='wb',
-                    placeholder=True) as f:
+      with pfx_call(atomic_filename, filename, mode='wb') as f:
         for chunk in progressbar(
             dl_rsp.iter_content(chunk_size=131072),
             label=filename,

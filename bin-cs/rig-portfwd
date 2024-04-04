@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Prepare ssh keys for port forwarding or other batch ssh key use:
+# - Generate batch keys.
+# - Emit public keys.
+# Cameron Simpson <cs@cskk.id.au> 22jul2023
+#
+
+set -ue
+
+host=$( hostname -s )
+sfx=portfwd
+today=$( date +%Y-%m-%d )
+user=$( id -un )
+
+(
+  set -ue
+  cd "$HOME/.ssh"
+  for keytype in rsa dsa ed25519
+  do
+    kf=id_${keytype}_${sfx}
+    kfpub=${kf}.pub
+    if [ -s "$kf" -o -s "$kfpub" ]
+    then
+      ls -ld "$kf" "$kfpub" >&2
+      echo "$0: skipping batch key file: $kf, $kfpub" >&2
+    else
+      set-x ssh-keygen -t "$keytype" -f "$kf" -P '' -C "$sfx $keytype batch key $user@$host $today"
+      ls -ld "$kf" "$kfpub"
+      cat "$kfpub"
+    fi
+  done
+)

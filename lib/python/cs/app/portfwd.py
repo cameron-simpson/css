@@ -65,7 +65,9 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': ['portfwd = cs.app.portfwd:main'],
+        'console_scripts': {
+            'portfwd': 'cs.app.portfwd:main'
+        },
     },
 }
 
@@ -117,7 +119,7 @@ def main(argv=None, environ=None):
   doit = True
   sshcfg = None
   auto_mode = False
-  flags = Flags(environ=environ, lock=RLock())
+  flags = Flags(environ=environ)
   trace = sys.stderr.isatty()
   verbose = False
 

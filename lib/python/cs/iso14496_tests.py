@@ -9,7 +9,7 @@ import os
 import os.path
 import unittest
 from cs.logutils import setup_logging
-from .binary_tests import _TestPacketFields
+from .binary_tests import BaseTestBinaryClasses
 from .iso14496 import parse
 from . import iso14496 as iso14496_module
 
@@ -35,16 +35,12 @@ class Test_iso14496(unittest.TestCase):
         (over_box.end_offset, mp4_size)
     )
 
-class TestISO14496PacketFields(_TestPacketFields, unittest.TestCase):
+class TestISO14496BinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Test the `PacketField`s in `cs.iso14496`.
-      Subclasses `cs.binary_tests._TestPacketFields`
+      Subclasses `cs.binary_tests.BaseTestBinaryClasses`
       which locates all `PacketFields` in the associated module.
   '''
-
-  def setUp(self):
-    ''' We're testing the cs.binary module.
-    '''
-    self.module = iso14496_module
+  test_module = iso14496_module
 
 def selftest(argv, **kw):
   ''' Run the unit tests.

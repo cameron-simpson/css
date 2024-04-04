@@ -25,6 +25,13 @@
 
     which runs the downloader in my preferred download area
     without tedious manual `cd`ing.
+
+    Note 23apr2023: this module requires `youtube_dl`
+    but the latest version on PyPI is from 2021, and has problems
+    with current YouTube metadata.
+    I've been having success with the latest git version via:
+
+        pip install -e git+https://github.com/ytdl-org/youtube-dl.git@26035bde4#egg=youtube-dl
 '''
 
 from dataclasses import dataclass, field
@@ -45,7 +52,7 @@ from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20220318-post'
+__version__ = '20230703-post'
 
 DISTINFO = {
     'keywords': ["python3"],

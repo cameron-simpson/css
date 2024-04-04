@@ -6,14 +6,34 @@
 
 r'''
 Assorted debugging facilities.
+
+If the environment variable $CS_DEBUG_BUILTINS is set to a comma
+separated list of names then the `builtins` module will be monkey
+patched with those names, enabling trite debug use of those names
+anywhere in the code provided this module has been imported somewhere.
+The allowed names are the list `cs.debug.__all__` and include:
+* `X`: `cs.x.X`
+* `breakpoint`: `cs.upd.breakpoint`
+* `pformat`: `pprint.pformat`
+* `pprint`: `pprint.pprint`
+* `print`: `cs.upd.print`
+* `r`: `cs.lex.r`
+* `redirect_stdout`: `contextlib.redirect_stdout`
+* `s`: `cs.lex.s`
+* `stack_dump`: dump current `Thread`'s call stack
+* `thread_dump` dump the active `Thread`s with their call stacks
+* `trace`: the `@trace` decorator
+`$CS_DEBUG_BUILTINS` can also be set to `"1"` to install all of
+`__all__` in the builtins.
 '''
 
 from __future__ import print_function
 from cmd import Cmd
+from contextlib import redirect_stdout
 import inspect
 import logging
 import os
-from pprint import pformat
+from pprint import pformat, pprint  # pylint: disable=unused-import
 from subprocess import Popen, PIPE
 import sys
 from threading import (
@@ -26,9 +46,9 @@ import time
 import traceback
 from types import SimpleNamespace as NS
 
-from cs.deco import decorator
+from cs.deco import ALL, decorator
 from cs.fs import shortpath
-from cs.lex import s
+from cs.lex import s, r, is_identifier  # pylint: disable=unused-import
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
@@ -37,9 +57,10 @@ from cs.py.func import funccite, func_a_kw_fmt
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
+from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20221118-post'
+__version__ = '20230613.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -50,6 +71,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.fs',
         'cs.lex',
         'cs.logutils',
         'cs.obj',
@@ -62,10 +84,22 @@ DISTINFO = {
     ],
 }
 
+__all__ = [
+    'X', 'breakpoint', 'pformat', 'pprint', 'print', 'r', 'redirect_stdout',
+    's'
+]
+
+# environment variable specifying names to become built in
+CS_DEBUG_BUILTINS_ENVVAR = 'CS_DEBUG_BUILTINS'
+
+# white list of allowed builtin names
+CS_DEBUG_BUILTINS_NAMES = ('X', 'pformat', 'pprint', 's', 'r', 'trace')
+
 # @DEBUG dispatches a thread to monitor function elapsed time.
 # This is how often it polls for function completion.
 DEBUG_POLL_RATE = 0.25
 
+@ALL
 class TimingOutLock(object):
   ''' A `Lock` replacement which times out, used for locating deadlock points.
   '''
@@ -124,6 +158,7 @@ def Thread(*a, **kw):
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingThread({'filename': filename, 'lineno': lineno}, *a, **kw)
 
+@ALL
 def thread_dump(Ts=None, fp=None):
   ''' Write thread identifiers and stack traces to the file `fp`.
 
@@ -147,6 +182,7 @@ def thread_dump(Ts=None, fp=None):
       traceback.print_stack(frame, None, fp)
       print(file=fp)
 
+@ALL
 def stack_dump(stack=None, limit=None, logger=None, log_level=None):
   ''' Dump a stack trace to a logger.
 
@@ -568,6 +604,7 @@ def debug_object_shell(o, prompt=None):
 
 _trace_indent = ""
 
+@ALL
 @decorator
 # pylint: disable=too-many-arguments
 def trace(
@@ -643,3 +680,32 @@ def selftest(module_name, defaultTest=None, argv=None):
   signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
   import unittest
   return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
+
+builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
+if builtin_names_s:
+  try:
+    import builtins  # pylint: disable=unused-import
+  except ImportError:
+    warning(
+        "$%s=%r but connot import builtins for monkey patching",
+        CS_DEBUG_BUILTINS_ENVVAR, builtin_names_s
+    )
+  else:
+    vs = vars()
+    for builtin_name in (__all__ if builtin_names_s == "1" else
+                         builtin_names_s.split(',')):
+      if not builtin_name:
+        continue
+      if builtin_name not in __all__:
+        warning(
+            "$%s: ignoring %r, not in cs.debug.__all__:%r",
+            CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
+        )
+        continue
+      if not is_identifier(builtin_name):
+        warning(
+            "$%s: ignoring %r, not an identifier", CS_DEBUG_BUILTINS_ENVVAR,
+            builtin_name
+        )
+        continue
+      setattr(builtins, builtin_name, vs[builtin_name])
