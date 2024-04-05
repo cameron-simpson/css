@@ -14,22 +14,22 @@ from inspect import ismethod
 import sys
 from threading import (
     current_thread,
+    Lock,
     Semaphore,
     Thread as builtin_Thread,
-    Lock,
     local as thread_local,
 )
-from typing import Any, Mapping, Optional
 
 from cs.context import ContextManagerMixin, stackattrs, stackset
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.gimmicks import error, warning, nullcontext
+from cs.gimmicks import error, warning
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
+from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20231129-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'description':
@@ -66,7 +66,7 @@ class ThreadState(thread_local):
   '''
 
   def __init__(self, **kw):
-    ''' Initiale the `ThreadState`, providing the per-Thread initial values.
+    ''' Initiate the `ThreadState`, providing the per-Thread initial values.
     '''
     thread_local.__init__(self)
     for k, v in kw.items():
@@ -153,7 +153,7 @@ class HasThreadState(ContextManagerMixin):
     cls = self.__class__
     with cls._HasThreadState_lock:
       stacked = stackset(
-          cls._HasThreadState_classes, cls, cls._HasThreadState_lock
+          HasThreadState._HasThreadState_classes, cls, cls._HasThreadState_lock
       )
     with stacked:
       state = getattr(cls, cls.THREAD_STATE_ATTR)
@@ -161,7 +161,7 @@ class HasThreadState(ContextManagerMixin):
         yield
 
   @classmethod
-  def thread_states(cls, all_classes=False):
+  def get_thread_states(cls, all_classes=None):
     ''' Return a mapping of `class`->*current_instance*`
         for use with `HasThreadState.with_thread_states`
         or `HasThreadState.Thread` or `HasThreadState.bg`.
@@ -181,126 +181,144 @@ class HasThreadState(ContextManagerMixin):
           for all `HasThreadState` subclasses with an open instance,
           otherwise just a mapping from this class to its current instance
     '''
+    if all_classes is None:
+      all_classes = False
     with cls._HasThreadState_lock:
       if all_classes:
-        #
+        # the "current" instance for every HasThreadState._HasThreadState_classes
         currency = {
-            htscls: getattr(
+            htscls:
+            getattr(
                 getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None
             )
-            for htscls in cls._HasThreadState_classes
+            for htscls in HasThreadState._HasThreadState_classes
         }
       elif cls is HasThreadState:
         currency = {}
       else:
+        # just the current instance of the calling class
         currency = {
-            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
+            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR, 'current'), None)
         }
     return currency
 
   @classmethod
-  @contextmanager
-  def with_thread_states(
-      cls, thread_states: Optional[Mapping[type, Any]] = None
+  def Thread(
+      cls,
+      *,
+      name=None,
+      target,
+      enter_objects=None,
+      **Thread_kw,
   ):
-    ''' Context manager to push all the current objects from `thread_states`
-        by calling each as a context manager.
+    ''' Factory for a `Thread` to push the `.current` state for the
+        currently active classes.
 
-        The default `thread_states` comes from `HasThreadState.thread_states()`.
+        The optional parameter `enter_objects` may be used to pass
+        an iterable of objects whose contexts should be entered
+        using `with obj:`.
+        If this is set to `True` that indicates that every "current"
+        `HasThreadStates` instance should be entered.
+        The default does not enter any object contexts.
+        The `HasThreadStates.bg` method defaults to passing
+        `enter_objects=(self,)` to enter the context for `self`.
     '''
-    if thread_states is None:
-      thread_states = cls.thread_states()
-    if not thread_states:
-      yield
+    if name is None:
+      name = funcname(target)
+    if enter_objects is True:
+      # the bool True means enter all the state objects, marked as for-with
+      enter_tuples = (
+          (
+              getattr(
+                  getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None
+              ), True
+          ) for htscls in HasThreadState._HasThreadState_classes
+      )
     else:
-      state_iter = iter(list(thread_states.values()))
+      enter_tuples = (
+          # all the current objects, marked as not-for-with
+          [
+              (
+                  getattr(
+                      getattr(htscls, htscls.THREAD_STATE_ATTR), 'current',
+                      None
+                  ), False
+              ) for htscls in HasThreadState._HasThreadState_classes
+          ] +
+          # the enter_objects, marked as for-with
+          [(obj, True) for obj in enter_objects or ()]
+      )
+    enter_it = iter(enter_tuples)
 
-      def with_thread_states_pusher():
-        try:
-          htsobj = next(state_iter)
-        except StopIteration:
-          yield
+    def with_enter_objects():
+      ''' A recursive context manager to enter all the contexts implied by `enter_it`.
+      '''
+      try:
+        enter_obj, for_with = next(enter_it)
+      except StopIteration:
+        yield
+      else:
+        if enter_obj is None:
+          # no current object, skip to the next one
+          yield from with_enter_objects()
         else:
-          if htsobj is None:
-            htsobj = nullcontext()
-          with htsobj:
-            yield from with_thread_states_pusher()
+          if for_with:
+            print("WITH enter_obj", enter_obj)
+            with enter_obj:
+              yield from with_enter_objects()
+          else:
+            thread_state = getattr(enter_obj, enter_obj.THREAD_STATE_ATTR)
+            with thread_state(curret=enter_obj):
+              yield from with_enter_objects()
 
-      yield from with_thread_states_pusher()
+    def target_wrapper(*a, **kw):
+      ''' Wrapper for the `Thread.target` to push the current states
+          from `enter_it` in the new Thread before running the `target`.
+      '''
+      with contextmanager(with_enter_objects)():
+        return target(*a, **kw)
 
-  @classmethod
-  def Thread(cls, *Thread_a, target, thread_states=None, **Thread_kw):
-    ''' Class factory for a `Thread` to push the `.current` state for this class.
+    return builtin_Thread(name=name, target=target_wrapper, **Thread_kw)
 
-        The optional parameter `thread_states`
-        may be used to pass an explicit mapping of `type`->`instance`
-        of thread states to use;
-        the default states come from `HasThreadState.thread_states()`.
-        The values of this mapping are iterated over and used as context managers.
-
-        A boolean value may also be passed meaning:
-        * `False`: do not apply any thread states
-        * `True`: apply the default thread states
-
-        Note: the default `thread_states` does a `with current:`
-        for this class' `current` instance (if any) so that the
-        `Thread` holds it open until completed.
-        For some worker threads such as `MultiOpenMixin`s consuming
-        a queue of tasks this may be undesirable if the instance
-        shutdown phase includes a close-and-drain for the queue -
-        because the `Thread` holds the instance open, the shutdown
-        phase never arrives.
-        In this case, pass `thread_states=False` to this call.
-    '''
-    # snapshot the .current states in the source Thread
-    if thread_states is None or thread_states is True:
-      thread_states = cls.thread_states()
-    if thread_states:
-
-      def target_wrapper(*a, **kw):
-        ''' Wrapper for the `Thread.target` to push the source `.current`
-            states in the new Thread before running the target.
-        '''
-        with cls.with_thread_states(thread_states):
-          return target(*a, **kw)
-    else:
-      # no state to prepare, eschew the wrapper
-      target_wrapper = target
-
-    return builtin_Thread(*Thread_a, target=target_wrapper, **Thread_kw)
-
-  def bg(self, func, *bg_a, thread_states=None, **bg_kw):
-    ''' Get a `Thread` using `self.Thread` and start it.
+  def bg(self, func, *, enter_objects=None, **bg_kw):
+    ''' Get a `Thread` using `type(elf).Thread` and start it.
         Return the `Thread`.
 
-        Note: the default `thread_states` is `{type(self): self}`
-        in order to arranges a `with self:` so that the `Thread`
-        holds it open until completed.
-        For some worker threads such as `MultiOpenMixin`s consuming
-        a queue of tasks this may be undesirable if the instance
-        shutdown phase includes a close-and-drain for the queue -
-        because the `Thread` holds the instance open, the shutdown
-        phase never arrives.
-        In this case, pass `thread_states=False` to this call.
+        The `HasThreadState.Thread` factory duplicates the current `Thread`'s
+        `HasThreadState` current objects as current in the new `Thread`.
+        Additionally it enters the contexts of various objects using
+        `with obj` accorind to the `enter_objects` parameter.
+
+        The value of the optional parameter `enter_objects` governs
+        which objects have their context entered using `with obj`
+        in the child `Thread` while running `func` as follows:
+        - `None`: the default, meaning `(self,)`
+        - `False`: no object contexts are entered
+        - `True`: all current `HasThreadState` object contexts will be entered
+        - an iterable of objects whose contexts will be entered
     '''
     cls = type(self)
-    if thread_states is None:
-      thread_states = {cls: self}
+    if enter_objects is None:
+      enter_objects = (self,)
     return bg(
-        func, *bg_a, thread_states=thread_states, thread_class=cls, **bg_kw
+        func,
+        thread_factory=cls.Thread,
+        enter_objects=enter_objects,
+        **bg_kw,
     )
 
 # pylint: disable=too-many-arguments
 def bg(
     func,
+    *,
     daemon=None,
     name=None,
     no_start=False,
     no_logexc=False,
-    thread_class=None,
-    thread_states=None,
     args=None,
     kwargs=None,
+    thread_factory=None,
+    **tfkw,
 ):
   ''' Dispatch the callable `func` in its own `Thread`;
       return the `Thread`.
@@ -313,8 +331,11 @@ def bg(
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
-      * `thread_class`: the `Thread` factory, default `HasThreadState.Thread`
-      * `thread_states`: passed tothe  `thread_class` factory
+      * `thread_factory`: the `Thread` factory, default `HasThreadState.Thread`,
+        which prepares a new `threading.Thread` with the default
+        `HasThreadState` contexts
+      * `thread_states`: passed to the  `thread_factory` factory;
+        default `True`
       * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
@@ -323,20 +344,22 @@ def bg(
     args = ()
   if kwargs is None:
     kwargs = {}
-  if thread_class is None:
-    thread_class = HasThreadState.Thread
+  if thread_factory is None:
+    thread_factory = HasThreadState.Thread
 
   ##thread_prefix = prefix() + ': ' + name
   thread_prefix = name
 
   def thread_body():
-    with Pfx(thread_prefix):
+    ''' Establish a basic `Pfx` context for the target `func`.
+    '''
+    with Pfx("Thread:%d:%s", current_thread().ident, thread_prefix):
       return func(*args, **kwargs)
 
-  T = thread_class(
+  T = thread_factory(
       name=thread_prefix,
       target=thread_body,
-      thread_states=thread_states,
+      **tfkw,
   )
   if not no_logexc:
     func = logexc(func)
@@ -726,6 +749,63 @@ def monitor(cls, attrs=None, initial_timeout=10.0, lockattr='_lock'):
           locked(method, initial_timeout=initial_timeout, lockattr=lockattr)
       )
   return cls
+
+class DeadlockError(RuntimeError):
+  ''' Raised by `NRLock` when a lock is attempted from the `Thread` currently holding the lock.
+  '''
+
+class NRLock:
+  ''' A nonrecursive lock.
+      Attempting to take this lock when it is already held by the current `Thread`
+      will raise `DeadlockError`.
+      Otherwise this behaves likc `threading.Lock`.
+  '''
+
+  __slots__ = ('_lock', '_lock_thread', '_locked_by')
+
+  def __init__(self):
+    self._lock = Lock()
+    self._lock_thread = None
+    self._locked_by = None
+
+  def __repr__(self):
+    return (
+        f'{self.__class__.__name__}:{self._lock}:{self._lock_thread}:{self._locked_by}'
+        if self.locked() else f'{self.__class__.__name__}:{self._lock}'
+    )
+
+  def locked(self):
+    ''' Return the lock status.
+    '''
+    return self._lock.locked()
+
+  def acquire(self, *a, caller_frame=None, **kw):
+    ''' Acquire the lock as for `threading.Lock`.
+        Raises `DeadlockError` is the lock is already held by the current `Thread`.
+    '''
+    lock = self._lock
+    if lock.locked() and current_thread() is self._lock_thread:
+      raise DeadlockError('lock already held by current Thread')
+    acquired = lock.acquire(*a, **kw)
+    if acquired:
+      if caller_frame is None:
+        caller_frame = caller()
+      self._lock_thread = current_thread()
+      self._locked_by = caller_frame
+    return acquired
+
+  def release(self):
+    self._lock.release()
+    self._lock_thread = None
+    self._locked_by = None
+
+  def __enter__(self):
+    acquired = self.acquire(caller_frame=caller())
+    assert acquired
+    return acquired
+
+  def __exit__(self, *_):
+    self.release()
 
 if __name__ == '__main__':
   import cs.threads_tests

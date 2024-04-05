@@ -1,0 +1,12 @@
+lib/python/cs/app/myke/__main__.py: cs.*: update implementations of BaseCommand.run_context to use super().run_context()
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: update for new BaseCommandOptions implementation, also subclass HasThreadState so that a TargetMap does not need a Maker reference
+lib/python/cs/app/myke/__main__.py: cs.app.myke.__main__: MykeCommand: renamed OPTIONS_CLASS to Options
+lib/python/cs/app/myke/make.py: cs.myke.make: go back to threading.RLock, cs.debug.RLock should not be on the main branch and also might have some issues
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker: provide the cmd_ns field
+lib/python/cs/app/myke/__main__.py: cs.app.myke: docstring tweak
+lib/python/cs/app/myke/__main__.py: cs.app.myke.__main__: MykeCommand.apply_opt: improve exception message
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Maker.startup_shutdown: wait for the queue reliably
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target.__init__: typecheck
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target.require: remove a level of Pfx indentation
+lib/python/cs/app/myke/make.py: cs.app.myke.make: Target._apply_prereq: sanity check self.maker
+lib/python/cs/app/myke/make.py: cs.app.myke.make: update imports

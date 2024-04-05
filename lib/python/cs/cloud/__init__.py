@@ -113,8 +113,8 @@ class Cloud(ABC):
     self._conn_sem = Semaphore(max_connections)
 
   @staticmethod
-  @typechecked
   @require(lambda prefix: is_identifier(prefix))  # pylint: disable=unnecessary-lambda
+  @typechecked
   def subclass_from_prefix(prefix: str):
     ''' Return the `Cloud` subclass.
     '''

@@ -50,7 +50,7 @@ dosync()
 
   # omitting -lJ
   $trace \
-    mrsync -rlptOHCi --delete \
+    mrsync -rptOHCi --delete \
         '--no-implied-dirs' \
         '--exclude=.DS_Store' \
         '--exclude=.zsh_history' \

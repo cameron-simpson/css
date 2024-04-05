@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # A cache store, connected to a fast cache and a slower backend.
-#       - Cameron Simpson <cs@cskk.id.au> 07dec2007
+# - Cameron Simpson <cs@cskk.id.au> 07dec2007
 #
 
 ''' Caching Stores and associated data structures.
@@ -96,7 +96,6 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
           self._work,
           args=(workQ,),
           name="%s WORKER" % (self,),
-          thread_states=False,
       )
       with stackattrs(self, _workQ=workQ):
         try:
@@ -144,10 +143,10 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
   def keys(self):
     ''' Mapping method for .keys.
     '''
-    seen = set()
-    for h in list(self.cached.keys()):
-      yield h
-      seen.add(h)
+    with self._lock:
+      ks = set(self.cached.keys())
+    yield from ks
+    seen = ks
     saved = self.saved
     with self._lock:
       saved_keys = list(saved.keys())
@@ -362,6 +361,7 @@ class BlockMapping:
         self.tempf.fileno(), self.offset + offset, maxlength=maxlength
     )
 
+# TODO: why isn't this just a DataFile?
 class BlockTempfile:
   ''' Manage a temporary file which contains the contents of various Blocks.
   '''

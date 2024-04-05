@@ -1,0 +1,1 @@
+lib/python/cs/app/myke/__init__.py: cs.app.myke.__init__: fix script definition in DISTINFO

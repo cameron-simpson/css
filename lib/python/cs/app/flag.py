@@ -84,7 +84,9 @@ DISTINFO = {
         'cs.pfx',
     ],
     'entry_points': {
-        'console_scripts': ['flagset = cs.app.flag:main_flagset'],
+        'console_scripts': {
+            ##'flagset': 'cs.app.flag:main_flagset',
+        },
     },
 }
 
@@ -318,9 +320,6 @@ class FlaggedMixin(object):
       self.flags[flagname] = value
     else:
       object.__setattr__(self, attr, value)
-
-# factory to make a dummy flagslike object without persistent storage
-DummyFlags = lambda: defaultdict(lambda: False)
 
 # pylint: disable=too-many-ancestors
 class Flags(MutableMapping, HasFSPath, FlaggedMixin):

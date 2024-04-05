@@ -1,0 +1,1 @@
+lib/python/cs/app/playon.py: cs.*: DISTINFO: update console_scripts and gui_scripts definitions

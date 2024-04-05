@@ -1,0 +1,3 @@
+lib/python/cs/result.py: cs.result: Result.exc_info: remove redundant assignment
+lib/python/cs/result.py: merge default ==> tagger
+lib/python/cs/result.py: cs.result: Result.__str__: handle early use where __dict__ lacks various entries

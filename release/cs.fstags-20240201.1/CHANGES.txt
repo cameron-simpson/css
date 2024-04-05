@@ -1,0 +1,1 @@
+lib/python/cs/fstags.py: cs.*: DISTINFO: update console_scripts and gui_scripts definitions more

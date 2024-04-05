@@ -14,21 +14,19 @@ from socket import socket, AF_INET, AF_UNIX
 from socketserver import (
     TCPServer, UnixStreamServer, ThreadingMixIn, StreamRequestHandler
 )
-import sys
 
 from icontract import require
 
 from cs.context import stackattrs
 from cs.excutils import logexc
-from cs.logutils import error
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
-from cs.threads import bg as bg_thread
+from cs.threads import bg as bg_thread, joinif
 
-from . import Store
+from . import Store, uses_Store
 from .stream import StreamStore
 
 class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
@@ -36,11 +34,14 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   '''
 
   # if exports supplied, may not contain '' if local_store supplied
+  @uses_Store
   @require(
       lambda exports, local_store:
       (local_store is None or not exports or '' not in exports)
   )
-  def __init__(self, *, exports=None, runstate=None, local_store=None):
+  def __init__(
+      self, *, S: Store, exports=None, runstate=None, local_store=None
+  ):
     ''' Initialise the server.
 
         Parameters:
@@ -61,8 +62,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     if local_store is not None:
       exports[''] = local_store
     if '' not in exports:
-      exports[''] = Store.defaults()
-    MultiOpenMixin.__init__(self)
+      exports[''] = S
     RunStateMixin.__init__(self, runstate=runstate)
     self.exports = exports
     self.S = exports['']
@@ -96,7 +96,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
         finally:
           if self.socket_server:
             self.socket_server.shutdown()
-          self.socket_server_thread.join()
+          joinif(self.socket_server_thread)
           if self.socket_server and self.socket_server.socket is not None:
             self.socket_server.socket.close()
 
@@ -138,8 +138,10 @@ class _ClientConnectionHandler(StreamRequestHandler):
     self.S = self.store_server.S
     remoteS = StreamStore(
         "server-StreamStore(local=%s)" % self.S,
-        OpenSocket(self.request, False),
-        OpenSocket(self.request, True),
+        (
+            OpenSocket(self.request, False),
+            OpenSocket(self.request, True),
+        ),
         local_store=self.S,
         exports=self.exports,
     )
@@ -246,7 +248,7 @@ class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
         % (type(self).__name__, self.store_server, self.socket_path, self.exports)
 
 class UNIXSocketStoreServer(_SocketStoreServer):
-  ''' A threading UnixStreamServer that accepts connections from UNIXSocketClientStores.
+  ''' A threading `UnixStreamServer` that accepts connections from `UNIXSocketClientStore`s.
   '''
 
   def __init__(self, socket_path, **kw):
@@ -288,10 +290,15 @@ class UNIXSocketClientStore(StreamStore):
         **kw
     )
 
-  def shutdown(self):
-    StreamStore.shutdown(self)
-    if self.sock:
-      self.sock.close()
+  @contextmanager
+  def startup_shutdown(self):
+    try:
+      with super().startup_shutdown():
+        yield
+    finally:
+      if self.sock is not None:
+        self.sock.close()
+        self.sock = None
 
   @pfx_method
   @require(lambda self: not self.sock)
@@ -306,7 +313,3 @@ class UNIXSocketClientStore(StreamStore):
         self.sock = None
         raise
     return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
-
-if __name__ == '__main__':
-  from .socket_tests import selftest
-  selftest(sys.argv)
