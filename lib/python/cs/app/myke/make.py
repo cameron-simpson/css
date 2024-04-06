@@ -16,7 +16,7 @@ import sys
 from threading import RLock
 import time
 from types import SimpleNamespace as NS
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from typeguard import typechecked
 
@@ -33,7 +33,7 @@ from cs.result import Result
 from cs.threads import (
     HasThreadState,
     Lock,
-    NRLck,
+    NRLock,
     ThreadState,
     locked,
     locked_property,
