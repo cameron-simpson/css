@@ -39,7 +39,17 @@ TARGET_MACROS = "@?/"
 #  identifier(param[,param...]) =
 #
 re_identifier = r'[A-Za-z]\w*'
-re_assignment = r'^\s*(' + re_identifier + r')\s*(\(\s*(' + re_identifier + r'(\s*,\s*' + re_identifier + r')*)\s*\)\s*)?='
+re_assignment = "".join(
+    (
+        r'^\s*(',
+        re_identifier,
+        r')\s*(\(\s*(',
+        re_identifier,
+        r'(\s*,\s*',
+        re_identifier,
+        r')*)\s*\)\s*)?=',
+    )
+)
 RE_ASSIGNMENT = re.compile(re_assignment)
 
 RE_COMMASEP = re.compile(r'\s*,\s*')
@@ -93,12 +103,12 @@ def nsget(namespaces, mname):
 def nsstr(namespaces):
   ''' Transcribe a list of namespaces.
   '''
-  return \
-    "\n  ".join( "{ %s\n  }" % ( ",\n    ".join( "%s: %s" % (k, ns[k])
-                                                 for k in sorted(ns.keys())
-                                               ), )
-                 for ns in namespaces
-               )
+  return "\n  ".join(
+      "{ %s\n  }" %
+      (",\n    ".join("%s: %s" % (k, ns[k])
+                      for k in sorted(ns.keys())),)
+      for ns in namespaces
+  )
 
 class Modifier(object):
   ''' Base class for modifiers.
