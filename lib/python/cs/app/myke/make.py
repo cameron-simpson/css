@@ -553,23 +553,23 @@ class Target(Result):
       context,
       prereqs,
       postprereqs,
-      actions,
+      actions: List["Action"],
   ):
     ''' Initialise a new target.
-          `maker`: the Maker with which this Target is associated.
-          `context`: the file context, for citations.
-          `name`: the name of the target.
-          `prereqs`: macro expression to produce prereqs.
-          `postprereqs`: macro expression to produce post-inference prereqs.
-          `actions`: a list of actions to build this Target
-          The same actions list is shared amongst all Targets defined
-          by a common clause in the Mykefile, and extends during the
-          Mykefile parse _after_ defining those Targets. So we do not
-          modify it the class; instead we extend .pending_actions
-          when .require() is called the first time, just as we do for a
-          :make directive.
-    '''
+        - `maker`: the Maker with which this Target is associated.
+        - `context`: the file context, for citations.
+        - `name`: the name of the target.
+        - `prereqs`: macro expression to produce prereqs.
+        - `postprereqs`: macro expression to produce post-inference prereqs.
+        - `actions`: a list of actions to build this `Target`
 
+        The same actions list is shared amongst all `Target`s defined
+        by a common clause in the Mykefile, and extends during the
+        Mykefile parse _after_ defining those `Target`s. So we do not
+        modify it the class; instead we extend `.pending_actions`
+        when `.require()` is called the first time, just as we do for a
+        `:make` directive.
+    '''
     Result.__init__(self, name=name, lock=RLock())
     self.maker = maker
     self.context = context
@@ -829,7 +829,9 @@ class Target(Result):
         self.succeed()
 
 class Action(NS):
-  ''' A make ation.
+  ''' A make action.
+      This corresponds to a line in the Mykefile and may be used
+      by multiple `Target`s.
   '''
 
   def __init__(self, context, variant, line, silent=False):
@@ -851,9 +853,9 @@ class Action(NS):
     '''
     return self.line.rstrip().replace('\n', '\\n')
 
-  def act_later(self, target):
-    ''' Request that this Action occur on behalf of the Target `target`.
-        Return a Result which returns the success or failure
+  def act_later(self, target: Target) -> Result:
+    ''' Request that this `Action` occur on behalf of the `target`.
+        Return a `Result` which returns the success or failure
         of the action.
     '''
     R = Result(name="%s.action(%s)" % (target, self))
@@ -863,7 +865,7 @@ class Action(NS):
     ), self._act, R, target)
     return R
 
-  def _act(self, R, target):
+  def _act(self, R: Result, target: Target):
     ''' Perform this Action on behalf of the Target `target`.
         Arrange to put the result onto `R`.
     '''
