@@ -4,6 +4,7 @@
 ''' Makefile parsing functions.
 '''
 
+from dataclasses import dataclass
 import errno
 import glob
 from collections import namedtuple
@@ -43,28 +44,19 @@ RE_ASSIGNMENT = re.compile(re_assignment)
 
 RE_COMMASEP = re.compile(r'\s*,\s*')
 
-_FileContext = namedtuple('FileContext', 'filename lineno text parent')
-
-class FileContext(_FileContext):
+@dataclass(frozen=True, slots=True)
+class FileContext:
   ''' Context information for parse objects and exceptions.
   '''
-
-  def __init__(self, filename, lineno, text, parent):
-    assert type(filename
-                ) is str, "filename should be str, got %s" % (type(filename),)
-    assert type(lineno
-                ) is int, "lineno should be int, got %s" % (type(lineno),)
-    assert type(text) is str, "text should be str, got %s" % (type(text),)
-    if parent is not None:
-      assert type(parent
-                  ) is FileContext, "parent should be FileContext, got %s" % (
-                      type(parent),
-                  )
+  filename: str
+  lineno: int
+  text: str
+  parent: "FileContext"
 
   def __str__(self):
-    tag = "%s:%d" % (self.filename, self.lineno)
+    tag = f'{self.filename}:{self.lineno}'
     if self.parent:
-      tag = str(self.parent) + "::" + tag
+      tag = f'{self.parent}::{tag}'
     return tag
 
 class ParseError(SyntaxError):
