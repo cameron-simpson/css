@@ -485,15 +485,15 @@ class Task(Result, BaseTask, HasThreadState):
 
   def run(self):
     ''' Run the function associated with this task,
-        completing the `self.result` `Result` appropriately when finished.
+        completing appropriately when finished.
 
-        *WARNING*: this _ignores_ the current state and any blocking `Task`s.
-        You should usually use `dispatch` or `make`.
+        Prior to the run the `Task`'s blockers are checked;
+        if the `Task` is blocked `BlockedError` is raised.
 
         During the run the thread local `Task.default()`
         will be `self` and the `self.runstate` will be running.
 
-        Otherwise run `func_result=self.func(*self.func_args,**self.func_kwargs)`
+        Run `func_result=self.func(*self.func_args,**self.func_kwargs)`
         with the following effects:
         * if the function raises a `CancellationError`, cancel the `Task`
         * if the function raises another exception,
@@ -506,9 +506,13 @@ class Task(Result, BaseTask, HasThreadState):
         * otherwise complete `self.result` with `func_result`
           and fire the `'done'` event
     '''
-    if not self.is_running:
-      warning(f'.run() when state is not {self.RUNNING!r}')
-    R = self.result
+    with self._lock:
+      for otask in self.blockers():
+        if otask.is_abort:
+          warning("%s requires %s which is aborted: aborting", self, otask)
+          self.fsm_event('abort')
+        raise BlockedError("%s blocked by %s" % (self, otask), self, otask)
+    self.fsm_event('dispatch')
     with self:
       try:
         with self.runstate:
