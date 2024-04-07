@@ -348,7 +348,10 @@ class Task(Result, BaseTask, HasThreadState):
     ''' Block on `self.result` awaiting completion
         by calling `self.result()`.
     '''
-    return self.result()
+    if not self.is_completed():
+      self.run()
+    # then run Result.__call__
+    return super().__call__()
 
   @typechecked
   def then(
