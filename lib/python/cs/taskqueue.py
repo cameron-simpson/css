@@ -434,11 +434,6 @@ class Task(Result, BaseTask, HasThreadState):
     '''
     otask.require(self)
 
-  def isblocked(self):
-    ''' A task is blocked if any prerequisite is not complete.
-    '''
-    return any(not prereq.iscompleted() for prereq in self.required)
-
   def blockers(self):
     ''' A generator yielding tasks from `self.required`
         which should block this task.
@@ -448,6 +443,11 @@ class Task(Result, BaseTask, HasThreadState):
     for otask in self.required:
       if not otask.is_completed():
         yield otask
+
+  def is_blocked(self):
+    ''' A task is blocked if any prerequisite is not complete.
+    '''
+    return any(True for _ in self.blockers())
 
   ##############################################################
   # Specific implementations for things which would otherwise be
