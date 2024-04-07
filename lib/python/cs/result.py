@@ -369,7 +369,9 @@ class Result(FSM):
         self._get_lock.release()
         self.fsm_event(event)
       else:
-        raise RuntimeError(f'{self}: event:%r is not allowed')
+        raise RuntimeError(
+            f'{self}: event:{event!r} is not allowed (I expect one of {self.fsm_expected_transitions_s})'
+        )
 
   def is_completed(self) -> bool:
     ''' Examine the completion lock.
@@ -412,7 +414,7 @@ class Result(FSM):
 
         You can optionally supply a callable and arguments,
         in which case `callable(*args,**kwargs)` will be called
-        via `Result.call` and the results applied to this `Result`.
+        via `Result.run_func` and the results applied to this `Result`.
 
         Basic example:
 
@@ -442,10 +444,11 @@ class Result(FSM):
 
         If the `Result` has already completed this will happen immediately.
         If you'd rather `self` got put on some queue `Q`, supply `Q.put`.
+
+        This is a wrapper for `FSM.fsm_callback` which adds `notifier`
+        to each of the states in `self.COMPLETION_STATES`.
     '''
 
-    # TODO: adjust all users of .notify() to use fsm_callback and
-    # accept a transition object?
     # pylint: disable=unused-argument
     def callback(fsm, fsm_transition):
       ''' `FSM.fsm_callback` shim for plain `notify(Result)` notifier functions.
@@ -456,7 +459,6 @@ class Result(FSM):
     with self._lock:
       for state in self.COMPLETION_STATES:
         self.fsm_callback(state, callback)
-      self.fsm_callback('DONE', callback)
       state = self.fsm_state
     # already completed? call the notifier immediately
     if self.is_completed():
