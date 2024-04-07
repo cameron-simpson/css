@@ -280,7 +280,7 @@ class HasThreadState(ContextManagerMixin):
 
     return builtin_Thread(name=name, target=target_wrapper, **Thread_kw)
 
-  def bg(self, func, *, enter_objects=None, **bg_kw):
+  def bg(self, func, *, enter_objects=None, **bg_kw) -> builtin_Thread:
     ''' Get a `Thread` using `type(elf).Thread` and start it.
         Return the `Thread`.
 
@@ -795,6 +795,8 @@ class NRLock:
     return acquired
 
   def release(self):
+    ''' Release the lock.
+    '''
     self._lock.release()
     self._lock_thread = None
     self._locked_by = None
