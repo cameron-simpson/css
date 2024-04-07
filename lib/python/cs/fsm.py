@@ -197,6 +197,17 @@ class FSM(DOTNodeMixin):
         for event_name in ((event,) if isinstance(event, str) else event)
     )
 
+  @property
+  def fsm_expected_transitions_s(self):
+    ''' The expected transitions from the current state as a string.
+    '''
+    return ", ".join(
+        sorted(
+            f"{event}->{state}"
+            for event, state in self.FSM_TRANSITIONS[self.fsm_state].items()
+        )
+    )
+
   def fsm_event(self, event, **extra):
     ''' Transition the FSM from the current state to a new state based on `event`.
         Call any callbacks associated with the new state.
@@ -222,7 +233,8 @@ class FSM(DOTNodeMixin):
         new_state = self.FSM_TRANSITIONS[old_state][event]
       except KeyError as e:
         raise FSMError(
-            f'invalid event {event!r} for state {old_state!r}', self
+            f'invalid event {event!r} for state {old_state!r} (I expect one of {self.fsm_expected_transitions_s})',
+            self
         ) from e
       self.fsm_state = new_state
       transition = FSMTransitionEvent(
