@@ -7,7 +7,7 @@
 set -ue
 
 cmd=$(basename "$0")
-usage="Usage: $cmd [-f] [-v] [--] test-subjects"
+usage="Usage: $cmd [-f] [-o opt] [-v] [--] test-subjects"
 
 python=python3
 doctest_opts=
@@ -21,6 +21,8 @@ do
   case $1 in
     -f | -v)
         doctest_opts="$doctest_opts $1" ;;
+    -o)
+        doctest_opts="$doctest_opts $1 $2"; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -41,9 +43,11 @@ for arg
 do
   case "$arg" in
     '' | *[^a-z_.]*)
+      # test a file
       $trace "$python" -m doctest $doctest_opts "$arg"
       ;;
-    *)$trace "$python" -c "import doctest; import $arg; doctest.testmod($arg)" $doctest_opts
+    *)# test a module
+      $trace "$python" -c "import doctest; import $arg; doctest.testmod($arg)" $doctest_opts
       ;;
   esac || xit=1
 done
