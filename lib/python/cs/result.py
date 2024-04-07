@@ -55,7 +55,7 @@ You can also collect multiple `Result`s in completion order using the `report()`
 
 import sys
 from threading import Lock, RLock
-from typing import Callable
+from typing import Callable, Iterable
 
 from icontract import require
 
@@ -437,7 +437,7 @@ class Result(FSM):
       raise3(*exc_info)
     return result
 
-  def notify(self, notifier: Callable[["Result"], None]):
+  def notify(self, notifier: Callable[["Result"], None], *, state=None):
     ''' After the `Result` completes, call `notifier(self)`.
 
         If the `Result` has already completed this will happen immediately.
@@ -454,13 +454,14 @@ class Result(FSM):
       return notifier(fsm)
 
     with self._lock:
-      self.fsm_callback('CANCELLED', callback)
+      for state in self.COMPLETION_STATES:
+        self.fsm_callback(state, callback)
       self.fsm_callback('DONE', callback)
       state = self.fsm_state
-    # already cancelled or done? call the notifier immediately
-    if state in (self.CANCELLED, self.DONE):
-      self.collected = True
+    # already completed? call the notifier immediately
+    if self.is_completed():
       notifier(self)
+      self.collected = True
 
   def post_notify(self, post_func) -> "Result":
     ''' Return a secondary `Result` which processes the result of `self`.
