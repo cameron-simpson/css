@@ -490,6 +490,25 @@ class Result(FSM):
     self.notify(notifier)
     return post_R
 
+  @staticmethod
+  def report(results: Iterable["Result"]) -> Iterable["Result"]:
+    ''' Generator which yields completed `Result`s.
+
+        This yields `Result`s as they complete, useful for waiting for a
+        sequence of `Result`s that may complete in an arbitrary order.
+    '''
+    Q = Queue()
+    n = 0
+    notify = Q.put
+    for R in results:
+      if R.is_completed():
+        yield R
+      else:
+        n += 1
+        R.notify(notify)
+    for _ in range(n):
+      yield Q.get()
+
 def in_thread(func):
   ''' Decorator to evaluate `func` in a separate `Thread`.
       Return or exception is as for the original function.
@@ -532,21 +551,8 @@ def bg(func, *a, **kw):
   R.bg(func, *a, **kw)
   return R
 
-def report(LFs):
-  ''' Generator which yields completed `Result`s.
-
-      This is a generator that yields `Result`s as they complete,
-      useful for waiting for a sequence of `Result`s
-      that may complete in an arbitrary order.
-  '''
-  Q = Queue()
-  n = 0
-  notify = Q.put
-  for LF in LFs:
-    n += 1
-    LF.notify(notify)
-  for _ in range(n):
-    yield Q.get()
+# support historic use as a top level name
+report = Result.report
 
 class ResultSet(set):
   ''' A `set` subclass containing `Result`s,
