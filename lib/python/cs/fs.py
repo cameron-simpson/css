@@ -82,7 +82,7 @@ def atomic_directory(infill_func, make_placeholder=False):
       Parameters:
       * `infill_func`: the function to fill in the target directory
       * `make_placeholder`: optional flag, default `False`:
-        if true an empty directory will be make at the target name
+        if true an empty directory will be made at the target name
         and after completion it will be removed and the completed
         directory renamed to the target name
   '''
