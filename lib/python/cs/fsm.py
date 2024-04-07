@@ -7,7 +7,7 @@ from collections import defaultdict, namedtuple
 from itertools import chain
 from threading import Lock
 import time
-from typing import Optional, TypeVar
+from typing import Optional, Tuple, TypeVar, Union
 
 from typeguard import typechecked
 
@@ -187,11 +187,15 @@ class FSM(DOTNodeMixin):
     '''
     return self._fsm_history
 
-  def fsm_event_is_allowed(self, event):
+  def fsm_event_is_allowed(self, event: Union[str, Tuple[str]]):
     ''' Test whether `event` is permitted in the current state.
         This can be handy as a pretest.
     '''
-    return event in self.FSM_TRANSITIONS[self.fsm_state]
+    transitions = tuple(self.FSM_TRANSITIONS[self.fsm_state])
+    return any(
+        event_name in transitions
+        for event_name in ((event,) if isinstance(event, str) else event)
+    )
 
   def fsm_event(self, event, **extra):
     ''' Transition the FSM from the current state to a new state based on `event`.
@@ -276,6 +280,7 @@ class FSM(DOTNodeMixin):
           cb for cb in self.__callbacks[state] if cb != callback
       ]
 
+  # pylint: disable=too-many-locals
   def fsm_transitions_as_dot(
       self,
       fsm_transitions=None,
