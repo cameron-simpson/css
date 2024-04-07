@@ -474,15 +474,14 @@ class Task(Result, BaseTask, HasThreadState):
         If a prerequisite is aborted, fire the 'abort' method.
         Otherwise fire the `'dispatch'` event and then run the
         task's function via the `.run()` method.
+
+        This default implementation calls `self.run()` directly.
+        Subclasses might choose to have this dispatch the run
+        via other methods. Those queuing it to a runner such as a
+        `Later` or Celery might queue it and fire the `queue` event,
+        placing the `Task` in the `QUEUED` state.
     '''
-    with self._lock:
-      for otask in self.blockers():
-        if otask.is_abort:
-          warning("%s requires %s which is aborted: aborting", self, otask)
-          self.fsm_event('abort')
-        raise BlockedError("%s blocked by %s" % (self, otask), self, otask)
-      self.fsm_event('dispatch')
-      return self.run()
+    return self.run()
 
   def run(self):
     ''' Run the function associated with this task,
