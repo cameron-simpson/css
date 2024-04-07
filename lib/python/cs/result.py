@@ -345,14 +345,9 @@ class Result(FSM):
     T.join()
     return self()
 
-  @require(
-      lambda self: self.fsm_state in
-      (self.PENDING, self.RUNNING, self.CANCELLED)
-  )
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
-        Expect to be called _inside_ `self._lock`.
     '''
     if result is not None and exc_info is not None:
       raise ValueError(
@@ -360,29 +355,21 @@ class Result(FSM):
           (result, exc_info)
       )
     with self._lock:
-      state = self.fsm_state
-      if state in (self.PENDING, self.RUNNING, self.CANCELLED):
+      if self.is_completed():
+        raise RuntimeError(f'{self}: already completed')
+      event = 'complete' if exc_info is None else 'except'
+      if self.fsm_state == self.CANCELLED:
+        # update the result
         self._result = result  # pylint: disable=attribute-defined-outside-init
         self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
         self._get_lock.release()
-        if state != self.CANCELLED:
-          if exc_info is None:
-            self.fsm_event('complete')
-          else:
-            self.fsm_event('except')
-      elif state in (self.DONE, self.FAILED):
-        warning(
-            "<%s>: state is %s, ignoring result=%r, exc_info=%r",
-            self,
-            self.fsm_state,
-            result,
-            exc_info,
-        )
+      elif self.fsm_event_is_allowed(event):
+        self._result = result  # pylint: disable=attribute-defined-outside-init
+        self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+        self._get_lock.release()
+        self.fsm_event(event)
       else:
-        raise RuntimeError(
-            "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE, FAILED)"
-            % (self, self.fsm_state)
-        )
+        raise RuntimeError(f'{self}: event:%r is not allowed')
 
   def is_completed(self) -> bool:
     ''' Examine the completion lock.
