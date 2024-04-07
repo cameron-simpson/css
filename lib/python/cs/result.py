@@ -143,6 +143,11 @@ class Result(FSM):
       'FAILED': {},
   }
 
+  COMPLETION_STATES = 'CANCELLED', 'DONE', 'FAILED'
+
+  def __init_subclass__(cls):
+    assert all(state in cls.FSM_TRANSITIONS for state in cls.COMPLETION_STATES)
+
   # pylint: disable=too-many-arguments
   def __init__(
       self,
