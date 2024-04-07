@@ -327,6 +327,7 @@ class Task(Result, BaseTask, HasThreadState):
     self.func_kwargs = func_kwargs
     if track:
       if track is True:
+        # pylint: disable=unnecessary-lambda-assignment
         track = lambda t, tr: print(
             f'{t.name} {tr.old_state}->{tr.event}->{tr.new_state}'
         )
@@ -417,9 +418,9 @@ class Task(Result, BaseTask, HasThreadState):
     post_task.require(self)
     return post_task
 
-  @typechecked
   @require(lambda self, otask: otask is not self)
   @require(lambda self: self.is_prepare or self.is_pending)
+  @typechecked
   def require(self, otask: 'TaskSubType'):
     ''' Add a requirement that `otask` be complete before we proceed.
         This is the simple `Task` only version of `.then()`.
@@ -788,7 +789,7 @@ class TaskQueue:
         changed |= self._set_discard(self._up, task)
         changed |= self._set_add(self._ready, task)
         changed |= self._set_discard(self._unready, task)
-      elif task.is_pending and not task.isblocked():
+      elif task.is_pending and not task.is_blocked():
         # pending unblocked
         changed |= self._set_add(self._up, task)
         changed |= self._set_discard(self._ready, task)
