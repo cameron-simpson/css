@@ -179,7 +179,7 @@ class BaseTask(FSM, RunStateMixin):
 BaseTaskSubType = subtype(BaseTask)
 
 # pylint: disable=too-many-instance-attributes
-class Task(BaseTask, HasThreadState):
+class Task(Result, BaseTask, HasThreadState):
   ''' A task which may require the completion of other tasks.
 
       The model here may not be quite as expected; it is aimed at
@@ -188,25 +188,6 @@ class Task(BaseTask, HasThreadState):
       `func` then this `Task` will still block dependent `Task`s.
       Dually, a `Task` which completes without an exception is
       considered complete and does not block dependent `Task`s.
-
-      Keyword parameters:
-      * `cancel_on_exception`: if true, cancel this `Task` if `.run`
-        raises an exception; the default is `False`, allowing repair
-        and retry
-      * `cancel_on_result`: optional callable to test the `Task.result`
-        after `.run`; if the callable returns `True` the `Task` is marked
-        as cancelled, allowing repair and retry
-      * `func`: the function to call to complete the `Task`;
-        it will be called as `func(*func_args,**func_kwargs)`
-      * `func_args`: optional positional arguments, default `()`
-      * `func_kwargs`: optional keyword arguments, default `{}`
-      * `lock`: optional lock, default an `RLock`
-      * `state`: initial state, default from `self._state.initial_state`,
-        which is initally '`PENDING`'
-      * `track`: default `False`;
-        if `True` then apply a callback for all states to print task transitions;
-        otherwise it should be a callback function suitable for `FSM.fsm_callback`
-      Other arguments are passed to the `Result` initialiser.
 
       Example:
 
@@ -238,32 +219,34 @@ class Task(BaseTask, HasThreadState):
           'prepared': 'PENDING',
       },
       'PENDING': {
-          'dispatch': 'RUNNING',
-          'queue': 'QUEUED',
-          'cancel': 'CANCELLED',
-          'error': 'FAILED',
           'abort': 'ABORT',
+          'cancel': 'CANCELLED',
+          'dispatch': 'RUNNING',
+          'error': 'FAILED',
+          'queue': 'QUEUED',
       },
       'QUEUED': {
           'cancel': 'CANCELLED',
           'dispatch': 'RUNNING',
       },
       'RUNNING': {
-          'done': 'DONE',
-          'except': 'FAILED',
           'cancel': 'CANCELLED',
+          'complete': 'DONE',
+          'except': 'FAILED',
       },
       'CANCELLED': {
-          'retry': 'PENDING',
           'abort': 'ABORT',
+          'retry': 'PENDING',
       },
       'DONE': {},
       'FAILED': {
-          'retry': 'PENDING',
           'abort': 'ABORT',
+          'retry': 'PENDING',
       },
       'ABORT': {},
   }
+
+  COMPLETION_STATES = 'ABORT', 'CANCELLED', 'DONE', 'FAILED'
 
   FSM_DEFAULT_STATE = 'PENDING'
 
@@ -282,7 +265,6 @@ class Task(BaseTask, HasThreadState):
 
   def __init__(
       self,
-      func,
       *a,
       func_args=(),
       func_kwargs=None,
@@ -291,13 +273,41 @@ class Task(BaseTask, HasThreadState):
       cancel_on_result=None,
       track=False,
   ):
-    if func is None or isinstance(func, str):
-      name = func
-      a = list(a)
-      func = a.pop(0)
+    ''' Initialise a `Task`.
+
+        The positional parameters are `[name,]func`
+        i.e. if the first argument is a `str` it is taken to be the `Task` name.
+        The following argument is `func`, a callable which will be invoked as
+        `func(*func_args,**func_kwargs)` to fulfil the `Task`.
+
+        Keyword parameters:
+        * `cancel_on_exception`: if true, cancel this `Task` if `.run`
+          raises an exception; the default is `False`, allowing repair
+          and retry
+        * `cancel_on_result`: optional callable to test the `Task.result`
+          after `.run`; if the callable returns `True` the `Task` is marked
+          as cancelled, allowing repair and retry
+        * `func_args`: optional positional arguments, default `()`
+        * `func_kwargs`: optional keyword arguments, default `{}`
+        * `lock`: optional lock, default an `RLock`
+        * `state`: initial state, default from `self._state.initial_state`,
+          which is initally '`PENDING`'
+        * `track`: default `False`;
+          if `True` then apply a callback for all states to print task transitions;
+          otherwise it should be a callback function suitable for `FSM.fsm_callback`
+        Other arguments are passed to the `Result` initialiser.
+    '''
+    if not a:
+      raise ValueError("missing name or func")
+    a = list(a)
+    arg0 = a.pop(0)
+    if isinstance(arg0, str):
+      name = arg0
+    else:
+      name = None
+    func = a.pop(0)
     if name is None:
       name = funcname(func)
-    self.name = name
     if a:
       raise ValueError(
           "unexpected positional parameters after func:%r: %r" % (func, a)
@@ -306,8 +316,8 @@ class Task(BaseTask, HasThreadState):
       state = type(self).perthread_state.initial_state
     if func_kwargs is None:
       func_kwargs = {}
-    self._lock = RLock()
-    super().__init__(state=state, runstate=RunState(name))
+    Result.__init__(self, name=name, lock=RLock())
+    BaseTask.__init__(self, state=state, runstate=RunState(name))
     self.required = set()
     self.blocking = set()
     self.cancel_on_exception = cancel_on_exception
@@ -315,7 +325,6 @@ class Task(BaseTask, HasThreadState):
     self.func = func
     self.func_args = func_args
     self.func_kwargs = func_kwargs
-    self.result = Result()
     if track:
       if track is True:
         track = lambda t, tr: print(
@@ -361,9 +370,9 @@ class Task(BaseTask, HasThreadState):
 
             >>> t_root = Task("t_root", lambda: 0)
             >>> t_leaf = t_root.then(lambda: 1).then(lambda: 2)
-            >>> t_root.iscompleted()   # the root task has not yet run
+            >>> t_root.is_completed()   # the root task has not yet run
             False
-            >>> t_leaf.iscompleted()   # the final task has not yet run
+            >>> t_leaf.is_completed()   # the final task has not yet run
             False
             >>> # t_leaf is blocked by t_root
             >>> t_leaf.dispatch()      # doctest: +ELLIPSIS
@@ -372,9 +381,9 @@ class Task(BaseTask, HasThreadState):
             cs.taskqueue.BlockedError: ...
             >>> t_leaf.make()          # make the leaf, but make t_root first
             True
-            >>> t_root.iscompleted()   # implicitly completed by make
+            >>> t_root.is_completed()   # implicitly completed by make
             True
-            >>> t_leaf.iscompleted()
+            >>> t_leaf.is_completed()
             True
     '''
     if isinstance(func, Task):
@@ -422,11 +431,6 @@ class Task(BaseTask, HasThreadState):
     '''
     otask.require(self)
 
-  def iscompleted(self):
-    ''' This task is completed (even if failed) and does not block contingent tasks.
-    '''
-    return self.fsm_state in (self.DONE, self.FAILED, self.ABORT)
-
   def isblocked(self):
     ''' A task is blocked if any prerequisite is not complete.
     '''
@@ -439,7 +443,7 @@ class Task(BaseTask, HasThreadState):
         but if we encounter one we do abort the current task.
     '''
     for otask in self.required:
-      if not otask.iscompleted():
+      if not otask.is_completed():
         yield otask
 
   ##############################################################
@@ -515,10 +519,8 @@ class Task(BaseTask, HasThreadState):
           # cancel the task, ready for retry
           self.fsm_event('cancel')
         else:
-          # error->FAILED
           # complete self.result with the exception
-          R.exc_info = sys.exc_info()
-          self.fsm_event('error')
+          self.exc_info = sys.exc_info()
       else:
         # if the runstate was cancelled or the result indicates
         # cancellation cancel the task otherwise complete `self.result`
@@ -527,10 +529,8 @@ class Task(BaseTask, HasThreadState):
           # cancel the task, ready for retry
           self.fsm_event('cancel')
         else:
-          # 'done'->DONE
           # complete self.result with the function return value
-          R.result = func_result
-          self.fsm_event('done')
+          self.result = func_result
 
   # pylint: disable=arguments-differ
   def bg(self):
@@ -551,12 +551,7 @@ class Task(BaseTask, HasThreadState):
     '''
     for t in make(self, fail_fast=fail_fast):
       assert t is self
-    return self.iscompleted()
-
-  def join(self):
-    ''' Wait for this task to complete.
-    '''
-    self.result.join()
+    return self.is_completed()
 
 TaskSubType = subtype(Task)
 
@@ -591,10 +586,10 @@ def make(*tasks, fail_fast=False, queue=None):
           >>> list(make(t2))    # doctest: +ELLIPSIS
           t1 PENDING->dispatch->RUNNING
           doing t1
-          t1 RUNNING->done->DONE
+          t1 RUNNING->complete->DONE
           t2 PENDING->dispatch->RUNNING
           doing t2
-          t2 RUNNING->done->DONE
+          t2 RUNNING->complete->DONE
           [Task('t2',<function <lambda> at ...>,state='DONE')]
   '''
   tasks0 = set(tasks)
@@ -606,7 +601,7 @@ def make(*tasks, fail_fast=False, queue=None):
       if qtask.is_running or qtask.is_queued:
         # task is already running, or queued and will be run
         qtask.join()
-        assert qtask.iscompleted()
+        assert qtask.is_completed()
       elif qtask.is_pending:
         failed = [
             prereq for prereq in qtask.required
@@ -658,7 +653,7 @@ def make(*tasks, fail_fast=False, queue=None):
                 queue(qtask.dispatch)
                 q.append(qtask)
                 continue
-      assert qtask.iscompleted() or qtask.is_cancelled()
+      assert qtask.is_completed() or qtask.is_cancelled()
       if qtask in tasks0:
         yield qtask
         tasks0.remove(qtask)
@@ -782,7 +777,7 @@ class TaskQueue:
     if task not in self._tasks:
       warning("%s._update_sets: ignoring untracked task %s", self, task)
     else:
-      if task.iscompleted():
+      if task.is_completed():
         # completed
         changed |= self._set_discard(self._up, task)
         changed |= self._set_add(self._ready, task)
@@ -830,7 +825,7 @@ class TaskQueue:
   # pylint: disable=redefined-outer-name
   def run(self, runstate=None, once=False):
     ''' Process tasks in the queue until the queue has no completed tasks,
-        yielding each task, immediately if `task.iscompleted()`
+        yielding each task, immediately if `task.is_completed()`
         otherwise after `taks.dispatch()`.
 
         An optional `RunState` may be provided to allow early termination
@@ -845,7 +840,7 @@ class TaskQueue:
       task = self.get()
       if task is None:
         break
-      if not task.iscompleted():
+      if not task.is_completed():
         task.dispatch()
         # update the state of tasks we are blocking
         if self.run_dependent_tasks:
