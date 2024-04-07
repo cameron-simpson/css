@@ -218,12 +218,6 @@ class Result(FSM):
     return self.fsm_state
 
   @property
-  def ready(self):
-    ''' True if the `Result` state is `DONE` or `CANCELLED`..
-    '''
-    return self.fsm_state in (self.DONE, self.CANCELLED)
-
-  @property
   @OBSOLETE("is_cancelled")
   def cancelled(self):
     ''' Test whether this `Result` has been cancelled.
@@ -389,6 +383,17 @@ class Result(FSM):
             "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE, FAILED)"
             % (self, self.fsm_state)
         )
+
+  def is_completed(self) -> bool:
+    ''' Examine the completion lock.
+    '''
+    return not self._get_lock.locked()
+
+  @property
+  def ready(self):
+    ''' Deprecated test for completion of the `Result`.
+    '''
+    return self.is_completed()
 
   @pfx_method
   def join(self):
