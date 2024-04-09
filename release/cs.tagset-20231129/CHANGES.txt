@@ -1,0 +1,9 @@
+lib/python/cs/tagset.py: merge default ==> cdrip
+lib/python/cs/tagset.py: cs.tagset: TagSet.__getattr__: super __getattr__ - get super() outside inner function
+lib/python/cs/tagset.py: merge default => cdrip
+lib/python/cs/tagset.py: cs.tagset: TagSet: drop ATTRABLE_MAPPING_DEFAULT=None, caused far more confusion that it was worth
+lib/python/cs/tagset.py: cs.tagset: TagSet: remove the docstring which described ATTRABLE_MAPPING_DEFAULT
+lib/python/cs/tagset.py: merge default ==> cdrip
+lib/python/cs/tagset.py: cs.tagset: TagSet.__getattr__: rework the attribute lookup with greater precision
+lib/python/cs/tagset.py: cs.tagset: TagSetPrefixView.__getattr__: fix sub-getattr
+lib/python/cs/tagset.py: cs.tagset: TagSetPrefixView.__getattr__: if the attribute is not there, raise Attribute error, do not try to fall back to something else

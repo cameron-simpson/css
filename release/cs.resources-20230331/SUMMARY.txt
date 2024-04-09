@@ -1,0 +1,3 @@
+@uses_runstate: use the prevailing RunState or create one.
+MultiOpenMixin: move all the open/close counting logic to the _mom_state class, make several attributes public, drop separate finalise() method and associated Condition.
+bugfix: _mom_state.open: only set self._teardown when opens==1.

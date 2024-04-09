@@ -19,6 +19,8 @@ import os
 from cs.gimmicks import warning
 from cs.lex import get_qstr
 
+__version__ = '20230407-post'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [

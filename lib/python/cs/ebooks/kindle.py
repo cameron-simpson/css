@@ -39,14 +39,14 @@ from cs.context import stackattrs
 from cs.deco import cachedmethod, fmtdoc
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton, HasFSPath
-from cs.fstags import FSTags
-from cs.lex import cutsuffix
-from cs.logutils import warning
+from cs.fstags import FSTags, uses_fstags
+from cs.lex import cutsuffix, s
+from cs.logutils import warning, error
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqlalchemy_utils import (
     ORM,
     BasicTableMixin,
@@ -64,46 +64,42 @@ def main(argv=None):
 
 KINDLE_LIBRARY_ENVVAR = 'KINDLE_LIBRARY'
 
-KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.kindle.Kindle'
+KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.amazon.Kindle'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING = 'User Settings.CONTENT_PATH'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
     '~/Library/Containers/com.amazon.Kindle/Data/Library/'
     'Application Support/Kindle/My Kindle Content'
 )
 
-def kindle_content_path_default():
-  ''' Return the default content path for the Kindle application.
-      Currently only knows about Darwin (MacOS).
-  '''
-  if sys.platform == 'darwin':
-    return expanduser(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH)
-  raise RuntimeError(
-      "I do not know the default Kindle content path on platform %r" %
-      (sys.platform,)
-  )
+# The default location of the Kindle content.
+# On MacOS ("darwin") this is KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH.
+# Otherwise use the made up path ~/media/kindle/My Kindle Content,
+# which is where I'm putting my personal Kindle stuff.
+KINDLE_CONTENT_DEFAULT_PATH = {
+    'darwin': KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH,
+}.get(sys.platform, '~/media/kindle/My Kindle Content')
 
+@fmtdoc
 def kindle_content_path():
-  ''' Return the default Kindle content path or `None`.
-      Currently only supports Darwin (MacOS).
+  ''' Return the default Kindle content path.
+      On MacOS this will look up
+      `{KINDLE_APP_OSX_DEFAULTS_DOMAIN}[{KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING}]`
+      if present.
+      Otherwise it returns `KINDLE_CONTENT_DEFAULT_PATH`
+      (`{KINDLE_CONTENT_DEFAULT_PATH!r}`).
   '''
   if sys.platform == 'darwin':
+    # use the app settings if provided
     defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
     path = defaults.get(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING)
-    if path is None:
-      path = kindle_content_path_default()
-    return path
-  raise RuntimeError(
-      "cannot look up Kindle content path on platform %r" % (sys.platform,)
-  )
+    if path is not None:
+      return path
+  return expanduser(KINDLE_CONTENT_DEFAULT_PATH)
 
 @fmtdoc
 def default_kindle_library():
-  ''' Return the default kindle library content path
-        from ${KINDLE_LIBRARY_ENVVAR}.
-        On Darwin, fall back to the Kindle app setting from the
-        defaults domain {KINDLE_APP_OSX_DEFAULTS_DOMAIN!r}
-        setting {KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING!r}.
-        Returns `None` if no default can be found.
+  ''' Return the default kindle library content path from `${KINDLE_LIBRARY_ENVVAR}`
+      otherwise fall back to `kindle_content_path()`.
     '''
   path = os.environ.get(KINDLE_LIBRARY_ENVVAR, None)
   if path is not None:
@@ -119,8 +115,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CONTENT_DIRNAME = 'My Kindle Content'
 
-  FSPATH_DEFAULT = default_kindle_library()
-
+  FSPATH_FACTORY = default_kindle_library
+  FSPATH_DEFAULT = KINDLE_CONTENT_DEFAULT_PATH
   FSPATH_ENVVAR = KINDLE_LIBRARY_ENVVAR
 
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
@@ -212,10 +208,11 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
         return self.pathto(self.subdir_name + '.' + ext)
 
       @property
-      def tags(self):
+      @uses_fstags
+      def tags(self, fstags: FSTags):
         ''' The `FSTags` for this book subdirectory.
         '''
-        return self.tree.fstags[self.fspath]
+        return fstags[self.fspath]
 
       def asset_names(self):
         ''' Return the names of files within the subdirectory
@@ -259,7 +256,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       ):
         ''' Export this Kindle book to a Calibre instance,
             return `(cbook,added)`
-            being the `CalibreBook` and whether the Kinble book was added
+            being the `CalibreBook` and whether the Kindle book was added
             (books are not added if the format is already present).
 
             Parameters:
@@ -275,15 +272,20 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
             * `verbose`: default `False`, print all actions or nonactions
         '''
         azwpath = self.extpath('azw')
-        if not isfilepath(azwpath):
-          raise ValueError("no AZW file: %r" % (azwpath,))
+        kcrpath = self.extpath('kcr')
+        if isfilepath(azwpath):
+          bookpath = azwpath
+        elif isfilepath(kcrpath):
+          bookpath = kcrpath
+        else:
+          raise ValueError("no AZW or KCR file: %r, %r" % (azwpath, kcrpath))
         added = False
         cbooks = list(calibre.by_asin(self.asin))
         if not cbooks:
           # new book
           # pylint: disable=expression-not-assigned
-          quiet or print("new book <=", shortpath(azwpath))
-          dbid = calibre.add(azwpath, dedrm=dedrm, doit=doit, quiet=quiet)
+          quiet or print("new book <=", shortpath(bookpath))
+          dbid = calibre.add(bookpath, dedrm=dedrm, doit=doit, quiet=quiet)
           if dbid is None:
             added = not doit
             cbook = None
@@ -301,18 +303,26 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
             )
           with Pfx(cbook):
             # look for exact content match
-            for fmtk in 'AZW3', 'AZW', 'MOBI':
+            for fmtk in 'AZW3', 'AZW', 'KCR', 'MOBI':
               fmtpath = cbook.formatpath(fmtk)
-              if fmtpath and filecmp.cmp(fmtpath, azwpath):
-                # pylint: disable=expression-not-assigned
-                verbose and print(
-                    cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
-                )
-                return cbook, False
-            # remaining logic is in CalibreBook.pull_format
-            cbook.pull_format(
-                azwpath, doit=doit, force=force, quiet=quiet, verbose=verbose
-            )
+              extpath = self.extpath(fmtk.lower())
+              if not existspath(extpath):
+                continue
+              if fmtpath and existspath(fmtpath):
+                if filecmp.cmp(fmtpath, azwpath):
+                  # pylint: disable=expression-not-assigned
+                  verbose and print(
+                      cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
+                  )
+                  return cbook, False
+              # remaining logic is in CalibreBook.pull_format
+              cbook.pull_format(
+                  extpath,
+                  doit=doit,
+                  force=force,
+                  quiet=quiet,
+                  verbose=verbose
+              )
         return cbook, added
 
     self.KindleBook = KindleBook
@@ -324,12 +334,12 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     return "%s(%r)" % (type(self).__name__, self.fspath)
 
   @contextmanager
-  def startup_shutdown(self):
+  @uses_fstags
+  def startup_shutdown(self, fstags: FSTags):
     ''' Context manager to obtain and release resources.
     '''
-    with FSTags() as fstags:
-      with stackattrs(self, fstags=fstags):
-        yield
+    with fstags:
+      yield
 
   @property
   @cachedmethod
@@ -387,7 +397,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     return self.book_subdir_names()
 
   def __getitem__(self, subdir_name):
-    ''' Return the `cs.fstags.TaggedPath` for the ebook subdirectory named `subdir_name`.
+    ''' Return the `KindleBook` for the ebook subdirectory named `subdir_name`.
     '''
     if not self.is_book_subdir(subdir_name):
       raise ValueError(
@@ -501,7 +511,7 @@ class KindleBookAssetDB(ORM):
           String,
           nullable=False,
           comment=
-          'Book sample state, often blank, "Sample" for a sample download'
+          'Book sample state, often blank, "Sample" for a sample download',
       )
 
     # pylint: disable=missing-class-docstring
@@ -662,6 +672,12 @@ class KindleCommand(BaseCommand):
         default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
     )
 
+    COMMON_OPT_SPECS = dict(
+        C_='calibre_path',
+        K_='kindle_path',
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+    )
+
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
     '''
@@ -686,7 +702,8 @@ class KindleCommand(BaseCommand):
       super().apply_opt(opt, val)
 
   @contextmanager
-  def run_context(self):
+  @uses_fstags
+  def run_context(self, fstags: FSTags):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
@@ -700,7 +717,8 @@ class KindleCommand(BaseCommand):
       with KindleTree(options.kindle_path) as kt:
         with CalibreTree(options.calibre_path) as cal:
           with stackattrs(options, kindle=kt, calibre=cal, dedrm=dedrm):
-            yield
+            with fstags:
+              yield
 
   def cmd_app_path(self, argv):
     ''' Usage: {cmd} [content-path]
@@ -719,9 +737,15 @@ class KindleCommand(BaseCommand):
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     if content_path == 'DEFAULT':
-      content_path = kindle_content_path_default()
-    defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
-    defaults[KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING] = content_path
+      content_path = kindle_content_path()
+    if sys.platform == 'darwin':
+      defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
+      defaults[KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING] = content_path
+    else:
+      error(
+          f'cannot set Kindle default content path on sys.platform=={sys.platform!r}'
+      )
+      return 1
     return 0
 
   def cmd_dbshell(self, argv):
@@ -733,7 +757,8 @@ class KindleCommand(BaseCommand):
     return self.options.kindle.dbshell()
 
   # pylint: disable=too-many-locals
-  def cmd_export(self, argv):
+  @uses_runstate
+  def cmd_export(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-fnqv] [ASINs...]
           Export AZW files to Calibre library.
           -f    Force: replace the AZW3 format if already present.
@@ -744,10 +769,9 @@ class KindleCommand(BaseCommand):
                 The default is to export all books with no "calibre.dbid" fstag.
     '''
     options = self.options
+    options.popopts(argv, f='force')
     kindle = options.kindle
     calibre = options.calibre
-    runstate = options.runstate
-    self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
     dedrm = options.dedrm
     doit = options.doit
     force = options.force
@@ -757,8 +781,7 @@ class KindleCommand(BaseCommand):
     xit = 0
     quiet or print("export", kindle.shortpath, "=>", calibre.shortpath)
     for asin in progressbar(asins, f"export to {calibre}"):
-      if runstate.cancelled:
-        break
+      runstate.raiseif()
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
         try:
@@ -771,14 +794,16 @@ class KindleCommand(BaseCommand):
               quiet=quiet,
               verbose=verbose,
           )
-        except ValueError as e:
+        except (dedrm.DeDRMError, ValueError) as e:
           warning("export failed: %s", e)
           xit = 1
-    if runstate.cancelled:
-      xit = 1
+        except Exception as e:
+          warning("kbook.export_to_calibre: e=%s", s(e))
+          raise
     return xit
 
-  def cmd_import_tags(self, argv):
+  @uses_runstate
+  def cmd_import_tags(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-nqv] [ASINs...]
           Import Calibre book information into the fstags for a Kindle book.
           This will support doing searches based on stuff like
@@ -788,7 +813,6 @@ class KindleCommand(BaseCommand):
     options = self.options
     kindle = options.kindle
     calibre = options.calibre
-    runstate = options.runstate
     self.popopts(argv, options, n='-doit', q='quiet', v='verbose')
     doit = options.doit
     quiet = options.quiet
@@ -796,8 +820,7 @@ class KindleCommand(BaseCommand):
     asins = argv or sorted(kindle.asins())
     xit = 0
     for asin in progressbar(asins, f"import metadata from {calibre}"):
-      if runstate.cancelled:
-        break
+      runstate.raiseif()
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
         cbooks = list(calibre.by_asin(asin))
@@ -809,7 +832,8 @@ class KindleCommand(BaseCommand):
         if len(cbooks) > 1:
           # pylint: disable=expression-not-assigned
           quiet or print(
-              f"asin {asin}: multiple Calibre books, dbids {[cb.dbid for cb in cbooks]!r}; choosing {cbook}"
+              f'asin {asin}: multiple Calibre books,',
+              f'dbids {[cb.dbid for cb in cbooks]!r}; choosing {cbook}'
           )
         ktags = kbook.tags
         ctags = ktags.subtags('calibre')
@@ -838,8 +862,6 @@ class KindleCommand(BaseCommand):
                   print(f"  calibre.{tag_name}={tag_value!r}")
               if doit:
                 ctags[tag_name] = tag_value
-    if runstate.cancelled:
-      xit = 1
     return xit
 
   def cmd_info(self, argv):

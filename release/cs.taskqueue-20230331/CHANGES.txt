@@ -1,0 +1,7 @@
+lib/python/cs/taskqueue.py: cs.*: rename default HasThreadState.THREAD_STATE_ATTR to 'perthread_state', drop associated special cases
+lib/python/cs/taskqueue.py: cs.threads: State renamed to ThreadState, update importing modules
+lib/python/cs/taskqueue.py: cs.taskqueue: update subtype definitions
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: subclass BaseTask instead of (FSM, RunStateMixin)
+lib/python/cs/taskqueue.py: cs.taskqueue: BaseTask.__init__: use @uses_runstate to ensure we've got a RunState
+lib/python/cs/taskqueue.py: merge default ==> taskqueue
+lib/python/cs/taskqueue.py: cs.taskqueue: fix import

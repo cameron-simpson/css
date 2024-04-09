@@ -31,6 +31,7 @@ from string import (
 import sys
 from textwrap import dedent
 from threading import Lock
+from typing import Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
@@ -43,7 +44,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20230217.1-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -180,7 +181,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
 # convenience alias
 s = typed_str
 
-def typed_repr(o, use_cls=False, max_length=None):
+def typed_repr(o, max_length=None, *, use_cls=False):
   ''' Like `typed_str` but using `repr` instead of `str`.
       This is available as both `typed_repr` and `r`.
   '''
@@ -593,6 +594,13 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
       s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras
   )
 
+def is_uc_identifier(s, offset=0, **kw):
+  ''' Test if the string `s` is an uppercase identifier
+      from position `offset` (default `0`) onward.
+  '''
+  s2, offset2 = get_uc_identifier(s, offset=offset, **kw)
+  return s2 and offset2 == len(s)
+
 # pylint: disable=redefined-outer-name
 def get_dotted_identifier(s, offset=0, **kw):
   ''' Scan the string `s` for a dotted identifier (by default an
@@ -963,11 +971,9 @@ def match_tokens(s, offset, getters):
       and returns `(None,offset)`.
   '''
   try:
-    tokens, offset2 = get_tokens(s, offset, getters)
+    return get_tokens(s, offset, getters)
   except ValueError:
     return None, offset
-  else:
-    return tokens, offset2
 
 def isUC_(s):
   ''' Check that a string matches the regular expression `^[A-Z][A-Z_0-9]*$`.
@@ -1241,6 +1247,24 @@ def snakecase(camelcased):
       was_lower = True
     strs.append(c)
   return ''.join(strs)
+
+def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
+  ''' Split a path with an optional leading `[user@]rhost:` prefix
+      into the prefix and the remaining path.
+      `None` is returned for the prefix is there is none.
+      This is useful for things like `rsync` targets etc.
+  '''
+  ssh_target = None
+  # check for [user@]rhost
+  try:
+    prefix, suffix = remotepath.split(':', 1)
+  except ValueError:
+    pass
+  else:
+    if prefix and '/' not in prefix:
+      ssh_target = prefix
+      remotepath = suffix
+  return ssh_target, remotepath
 
 # pylint: disable=redefined-outer-name
 def format_escape(s):

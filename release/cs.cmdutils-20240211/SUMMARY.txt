@@ -1,0 +1,5 @@
+Include the first sentence of the subcommand description in the short help.
+BaseCommandOptions: move the runstate_signals into this directly.
+BaseCommand: move the run() options stuff into run_context() and have it work on a copy of the original options.
+BaseCommandCmd: implement get_names(), provide docstrings for the do_* attributes, thus help.
+BaseCommand.run_context: make runstate and upd keyword only parameters.

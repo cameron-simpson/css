@@ -1,0 +1,4 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: catch CancellationError and return 1
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandCmd.__getattr__: recognise EOF, exit and quit to terminate the cmdloop
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popopts: more docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: update DISTINFO

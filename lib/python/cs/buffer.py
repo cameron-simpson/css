@@ -23,7 +23,7 @@ from cs.deco import Promotable
 from cs.gimmicks import r
 from cs.py3 import pread
 
-__version__ = '20230212.2-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -181,9 +181,12 @@ class CornuCopyBuffer(Promotable):
 
   @property
   def buf(self):
-    ''' The first buffer.
+    ''' The first buffer, or `b''` if nothing is buffered.
     '''
-    return self.bufs[0]
+    try:
+      return self.bufs[0]
+    except IndexError:
+      return b''
 
   def close(self):
     ''' Close the buffer.
@@ -723,6 +726,11 @@ class CornuCopyBuffer(Promotable):
     if len(taken) == 1:
       return taken[0]
     return b''.join(taken)
+
+  def read1(self, size):
+    ''' Shorthand method for `self.read(size,one_fetch=True)`.
+    '''
+    return self.read(size, one_fetch=True)
 
   def byte0(self):
     ''' Consume the leading byte and return it as an `int` (`0`..`255`).

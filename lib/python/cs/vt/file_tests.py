@@ -9,7 +9,6 @@ import sys
 import unittest
 from cs.fileutils import BackedFile_TestMethods
 from cs.testutils import SetupTeardownMixin
-from . import defaults
 from .blockify import blockify, top_block_for
 from .store import MappingStore
 from .file import RWBlockFile

@@ -1573,7 +1573,6 @@ class NamedBackup(SingletonMixin):
               entries,
               label="scan",
               proxy=proxy,
-              update_frequency=16,
           )
         else:
           proxy("scan %d entries", len(entries))
@@ -1642,8 +1641,8 @@ class NamedBackup(SingletonMixin):
                     )
                     changed = (
                         prev_backup_record is None
-                        or backup_record.content_path !=
-                        prev_backup_record.content_path
+                        or backup_record.content_path
+                        != prev_backup_record.content_path
                     )
                     if changed:
                       ##print(

@@ -66,7 +66,7 @@ this default behaviour.
 '''
 
 import atexit
-from builtins import print as builtin_print
+from builtins import breakpoint as builtin_breakpoint, print as builtin_print
 from contextlib import contextmanager
 from functools import partial
 import os
@@ -91,7 +91,7 @@ except ImportError as curses_e:
   warning("cannot import curses: %s", curses_e)
   curses = None
 
-__version__ = '20230217-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -162,8 +162,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
         backend = sys.stderr
       else:
         backend = open_append(backend_path)
-    self._backend = backend
-    assert self._backend is not None
+    assert backend is not None
     # test isatty and the associated file descriptor
     isatty = backend.isatty()
     if isatty:
@@ -174,19 +173,23 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
         isatty = False
     else:
       backend_fd = None
+    self._backend_isatty = isatty
+    self._backend_fd = backend_fd
     if columns is None:
       columns = 80
-      if backend.isatty():
+      if isatty:
         rc = ttysize(backend)
         if rc.columns is not None:
           columns = rc.columns
     if disabled is None:
-      try:
-        disabled = not backend.isatty()
-      except AttributeError:
-        disabled = True
-    self._backend_isatty = isatty
-    self._backend_fd = backend_fd
+      disabled = not isatty
+    self._disabled = disabled
+    if disabled:
+      self._backend = None
+      self._disabled_backend = backend
+    else:
+      self._backend = backend
+      self._disabled_backend = None
     # prepare the terminfo capability mapping, if any
     self._ti_strs = {}
     if isatty:
@@ -210,8 +213,6 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
             if s is not None:
               s = s.decode('ascii')
             self._ti_strs[ti_name] = s
-    self._disabled = disabled
-    self._disabled_backend = None
     self.columns = columns
     self._cursor_visible = True
     self._current_slot = None
@@ -230,7 +231,10 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     proxy0.index = 0
 
   def __str__(self):
-    backend = self._disabled_backend if self._disabled else self._backend
+    backend = (
+        self._disabled_backend if getattr(self, '_disabled', False) else
+        getattr(self, '_backend', None)
+    )
     return "%s(backend=%s)" % (self.__class__.__name__, backend)
 
   ############################################################
@@ -667,7 +671,8 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
 
   @contextmanager
   def above(self, need_newline=False):
-    ''' Context manager to move to the top line of the display, clear it, yield, redraw below.
+    ''' Context manager to move to the top line of the `Upd` display,
+        clear it, `yield`, redraw below.
 
         This context manager is for use when interleaving _another_
         stream with the `Upd` display;
@@ -788,7 +793,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
         )
       if proxy is None:
         # create the proxy, which inserts it
-        return UpdProxy(index=index, upd=self, prefix=txt, **proxy_kw)
+        return UpdProxy(txt, index=index, upd=self, **proxy_kw)
 
       # associate the proxy with self
       assert proxy.upd is None
@@ -925,6 +930,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
   def run_task(
       self,
       label: str,
+      *,
       report_print=False,
       tick_delay: int = 0.3,
       tick_chars='|/-\\',
@@ -937,15 +943,14 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           "run_task(%r,...,tick_delay=%s): tick_delay should be >=0" %
           (label, tick_delay)
       )
-    with self.insert(1, label + ' ') as proxy:
+    with self.insert(1, prefix=label + ' ') as proxy:
       ticker_runstate = None
       if tick_delay > 0:
-        from cs.resources import RunState  # pylint: disable=import-outside-toplevel
-        ticker_runstate = RunState()
+        cancel_ticker = False
 
         def _ticker():
           i = 0
-          while not ticker_runstate.cancelled:
+          while not cancel_ticker:
             proxy.suffix = ' ' + tick_chars[i % len(tick_chars)]
             i += 1
             time.sleep(tick_delay)
@@ -957,9 +962,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
         yield proxy
       finally:
         end_time = time.time()
-        if ticker_runstate:
-          # shut down the ticker
-          ticker_runstate.cancel()
+        cancel_ticker = True
     elapsed_time = end_time - start_time
     if report_print:
       if isinstance(report_print, bool):
@@ -969,6 +972,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
       )
 
+@decorator
 def uses_upd(func):
   ''' Decorator for functions accepting an optional `upd:Upd` parameter,
       default from `Upd.default() or Upd()`.
@@ -979,7 +983,7 @@ def uses_upd(func):
     with upd:
       return func(*a, upd=upd, **kw)
 
-  return default_params(with_func, upd=lambda: Upd.default() or Upd())
+  return default_params(with_func, upd=lambda: Upd.default(factory=True))
 
 @uses_upd
 def out(msg, *a, upd, **outkw):
@@ -988,23 +992,23 @@ def out(msg, *a, upd, **outkw):
   '''
   return upd.out(msg, *a, **outkw)
 
-# pylint: disable=redefined-builtin
-@uses_upd
-def print(*a, upd: Upd, end='\n', **kw):
-  ''' Wrapper for the builtin print function
-      to call it inside `Upd.above()` and enforce a flush.
-
-      The function supports an addition parameter beyond the builtin print:
-      * `upd`: the `Upd` instance to use, default `Upd()`
-
-      Programmes integrating `cs.upd` with use of the builtin `print`
-      function should use this at import time:
-
-          from cs.upd import print
+@decorator
+def without(func):
+  ''' A decorator to withdraw the current `Upd` (if any) while running `func`.
   '''
-  kw['flush'] = True
-  with upd.above(need_newline=not end.endswith('\n')):
-    builtin_print(*a, end=end, **kw)
+
+  def _without_upd_wrapper(*a, **kw):
+    upd = Upd.default()
+    if upd is None or upd.disabled:
+      return func(*a, **kw)
+    with upd.above():
+      return func(*a, **kw)
+
+  return _without_upd_wrapper
+
+# pylint: disable=redefined-builtin
+breakpoint = without(builtin_breakpoint)
+print = without(partial(builtin_print, flush=True))
 
 @uses_upd
 def pfxprint(*a, upd, **kw):
@@ -1021,7 +1025,7 @@ def pfxprint(*a, upd, **kw):
 
 @contextmanager
 @uses_upd
-def run_task(*a, upd, **kw):
+def run_task(*a, upd: Upd, **kw):
   ''' Top level `run_task` function to call `Upd.run_task`.
   '''
   with upd.run_task(*a, **kw) as proxy:
@@ -1130,20 +1134,21 @@ class UpdProxy(object):
     upd = self.upd
     if upd is None:
       return
+    index = self.index
+    if index is None:
+      return
     update_period = self.update_period
     if update_period:
       now = time.time()
       if (self.last_update is not None
           and now - self.last_update < update_period):
         return
+    txt = upd.normalise(self._prefix + self._text + self._suffix)
     with upd._lock:  # pylint: disable=protected-access
-      index = self.index
-      if index is not None:
-        txt = upd.normalise(self._prefix + self._text + self._suffix)
-        overflow = len(txt) - upd.columns + 1
-        if overflow > 0:
-          txt = '<' + txt[overflow + 1:]
-        self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
+      overflow = len(txt) - upd.columns + 1
+      if overflow > 0:
+        txt = '<' + txt[overflow + 1:]
+      self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
     if update_period:
       self.last_update = now
 
@@ -1191,9 +1196,17 @@ class UpdProxy(object):
   def text(self, txt):
     ''' Set the text of the status line.
 
+        If `txt` is `None`: if a `text_auto` function was supplied,
+        use it to compute `txt` otherwise do not change the text.
+
         If the length of `self.prefix+txt` exceeds the available display
         width then the leftmost text is cropped to fit.
     '''
+    if txt is None:
+      if self._text_auto:
+        txt = self._text_auto()
+      else:
+        return
     self._text = txt
     self._update()
 
@@ -1277,6 +1290,21 @@ def with_upd_proxy(func, prefix=None, insert_at=1):
         return func(*a, upd_proxy=proxy, **kw)
 
   return upd_with_proxy_wrapper
+
+@contextmanager
+@uses_upd
+def without(*, upd: Upd):
+  ''' Context manager withdraw the `Upd` while something runs.
+
+      Example:
+
+          from cs.upd import without
+          ...
+          with without():
+              os.system('ls -la')
+  '''
+  with upd.above():
+    yield upd
 
 # Always create a default Upd() in open state.
 # Keep a module level name, which avoids the singleton weakref array

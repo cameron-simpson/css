@@ -1,0 +1,1 @@
+DEFAULT_FILENAME_FORMAT: replace naive playon.Name with series_episode_name which is the name with leading series/episode info removed, honour in "playon dl".

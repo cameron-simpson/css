@@ -1,3 +1,4 @@
+splink plot POWER: aggregate bar graphs to the right showing total power by category
 list ts keys to aid plotting
 splink plot: help should list modes etc
 splink plot: bar chart version with window/label function showing aggregate stuff per window

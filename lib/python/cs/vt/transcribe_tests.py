@@ -11,10 +11,11 @@ import sys
 import random
 import unittest
 from uuid import uuid4
+
 from .dir import Dir
 from .hash import Hash_SHA1
 from .meta import Meta
-from .transcribe import _TRANSCRIBE
+from .transcribe import Transcriber
 
 class TestTranscribe(unittest.TestCase):
   ''' Test the text transcription facility.
@@ -28,7 +29,6 @@ class TestTranscribe(unittest.TestCase):
   def test1(self):
     ''' Basic tests.
     '''
-    T = _TRANSCRIBE
     for o in (
         '',
         0,
@@ -39,13 +39,12 @@ class TestTranscribe(unittest.TestCase):
         '"de\\f"',
         '"gh\\\"i"',
         uuid4(),
-        Hash_SHA1.from_chunk(bytes(random.randint(0, 255)
-                                   for _ in range(100))),
+        Hash_SHA1.from_data(bytes(random.randint(0, 255) for _ in range(100))),
         Dir("some_dir", meta=Meta(dict(x=dict(a=1, b=2)))),
     ):
-      s = T.transcribe_s(o, None)
+      s = Transcriber.transcribe_obj(o, None)
       self.assertIsInstance(s, str)
-      o2, offset = T.parse(s)
+      o2, offset = Transcriber.parse(s)
       self.assertEqual(
           offset, len(s), "UNPARSED: len(s)=%d, offset=%d" % (len(s), offset)
       )

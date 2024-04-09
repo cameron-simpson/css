@@ -1,0 +1,5 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: remove unimported debug calls, remove unused imports
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmdloop: fix intro parameter
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.repl: handle no options.sqltags, not really the right fix
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCOmmand.run_context: there is always a runstate parameter and there should not be an options.runstate
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: do not set options.runstate at init, set it in run_context
