@@ -11,6 +11,8 @@ trace=
 
 quick=
 pymode=3
+ruff=1
+which ruff >/dev/null 2>&1 || ruff=
 pyflakes2=pyflakes-2.7
 pyflakes3='python3 -m pyflakes'
 pylint2=pylint-2.7
@@ -113,15 +115,22 @@ do
       } || xit=1
       ;;
     py)
-      if $trace $python -We:invalid -m py_compile "$lintfile"
-      then
-        $trace $pyflakes "$lintfile" || xit=1
-        [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
-        [ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+      (
+        set -ue
+        xit=0
+        if [ $ruff ]
+        then
+          # drop grep when ruff>3.5.0
+          $trace ruff check "$lintfile" | not grep -v ' Q000 ' || exit 1
+        else
+          $trace $python -We:invalid -m py_compile "$lintfile" || exit 1
+          $trace $pyflakes "$lintfile" || xit=1
+          [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
+          [ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+        fi
         [ $quick ] || $trace $pyiclint "$lintfile" || xit=1
-      else
-        xit=1
-      fi
+        exit $xit
+      ) || xit=1
       ;;
     py2)
       if $trace python2 -m py_compile "$lintfile"
