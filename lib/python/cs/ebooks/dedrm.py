@@ -24,6 +24,7 @@ from os.path import (
     realpath,
     splitext,
 )
+from pprint import pprint
 from shutil import copyfile
 import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
@@ -132,10 +133,13 @@ class DeDRMCommand(BaseCommand):
     return xit
 
   def cmd_kindlekeys(self, argv):
-    ''' Usage: {cmd} [import]
-          Print or import the Kindle DRM keys.
+    ''' Usage: {cmd} [import|json|print]
+          Dump, print or import the Kindle DRM keys.
           Modes:
             import    Read a JSON list of key dicts and update the cached keys.
+            json      Write the cached list of keys as JSON.
+            print     Readable listing of the keys.
+          The default mode is 'json'.
           Example:
             Import the keys from one host into the local collection:
               ssh otherhost python3 -m cs.ebooks.dedrm kindlekeys \
@@ -143,19 +147,32 @@ class DeDRMCommand(BaseCommand):
     '''
     dedrm = self.options.dedrm
     if not argv:
-      with redirect_stdout(sys.stderr):
-        kks = dedrm.kindlekeys
-      print(json.dumps(kks))
-      return 0
+      argv = ['json']
     op = argv.pop(0)
-    if op != 'import':
-      raise GetoptError("expected 'import', got %r" % (op,))
     with Pfx(op):
-      if argv:
-        raise GetoptError("extra arguments: %r" % (argv,))
-      new_kks = json.loads(sys.stdin.read())
-      assert all(isinstance(kk, dict) for kk in new_kks)
-      dedrm.update_kindlekeys_from_keys(new_kks)
+      if op == 'import':
+        if argv:
+          raise GetoptError("extra arguments: %r" % (argv,))
+        if sys.stdin.isatty():
+          print("Reading JSON keys from stadnard input.")
+        new_kks = json.loads(sys.stdin.read())
+        assert all(isinstance(kk, dict) for kk in new_kks)
+        dedrm.update_kindlekeys_from_keys(new_kks)
+      elif op == 'json':
+        if argv:
+          raise GetoptError("extra arguments: %r" % (argv,))
+        with redirect_stdout(sys.stderr):
+          kks = dedrm.kindlekeys
+        print(json.dumps(kks))
+      elif op == 'print':
+        if argv:
+          raise GetoptError("extra arguments: %r" % (argv,))
+        with redirect_stdout(sys.stderr):
+          kks = dedrm.kindlekeys
+        for kk in kks:
+          pprint(kk)
+      else:
+        raise GetoptError("expected 'import' or 'print', got %r" % (op,))
 
   def cmd_remove(self, argv):
     ''' Usage: {cmd} filenames...
