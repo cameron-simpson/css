@@ -40,11 +40,11 @@ class Test_VTFuse(SetupTeardownMixin, unittest.TestCase):
       E = Dir(testdirpath)
       with S:  # TODO: try without this line? mount should do it
         mount(testdirpath, E, S=S)
-        with stackattrs(self, E=E, S=S, testdirpath=testdirpath):
-          try:
+        try:
+          with stackattrs(self, E=E, S=S, testdirpath=testdirpath):
             yield
-          finally:
-            umount(testdirpath)
+        finally:
+          umount(testdirpath)
     time.sleep(1)
     with open('/dev/tty', 'a') as tty:
       with stackattrs(sys, stderr=tty):
