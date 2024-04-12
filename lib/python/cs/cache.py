@@ -18,6 +18,8 @@ from cs.resources import MultiOpenMixin
 from cs.result import Result
 from cs.seq import unrepeated
 
+__version__ = '20240412'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
