@@ -324,12 +324,25 @@ class Result(FSM):
     ''' Submit a function to compute the result in a separate `Thread`,
         returning the `Thread`.
 
+        Keyword arguments for `cs.threads.bg` may be supplied by
+        prefixing their names with an underscore, for example:
+
+            T = R.bg(mainloop, _pre_enter_objects=(S, fs))
+
         This dispatches a `Thread` to run `self.run_func(func,*a,**kw)`
         and as such the `Result` must be in "pending" state,
         and transitions to "running".
     '''
+    bg_kw = {}
+    for k in list(kw.keys()):
+      if k.startswith('_'):
+        bg_kw[k[1:]] = kw.pop(k)
     return bg_thread(
-        self.run_func, name=self.name, args=[func] + list(a), kwargs=kw
+        self.run_func,
+        name=self.name,
+        args=[func] + list(a),
+        kwargs=kw,
+        **bg_kw,
     )
 
   def run_func_in_thread(self, func, *a, **kw):

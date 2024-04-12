@@ -360,9 +360,12 @@ def twostep(cmgr):
               yield
               ...
 
-      then the correct use of `twostep()` is:
+      then `my_cmgr_func(...)` returns a context manager instance
+      and so the correct use of `twostep()` is like this:
 
-          cmgr_iter = twostep(my_cmgr_func(...))
+          # steps broken out for clarity
+          cmgr = my_cmgr_func(...)
+          cmgr_iter = twostep(cmgr)
           next(cmgr_iter)   # set up
           next(cmgr_iter)   # tear down
 
@@ -678,6 +681,25 @@ def withif(obj):
   if hasattr(obj, '__enter__'):
     return obj
   return nullcontext()
+
+def _withall(obj_it):
+  ''' A generator to enter every object `obj` from the iterator
+      `obj_it` using `with obj:`, then yield.
+  '''
+  try:
+    obj = next(obj_it)
+  except StopIteration:
+    yield
+  else:
+    with obj:
+      yield from _withall(obj_it)
+
+@contextmanager
+def withall(objs):
+  ''' Enter every object `obj` in `obj_list` except those which are `None`
+      using `with obj:`, then yield.
+  '''
+  yield from _withall(obj for obj in objs if obj is not None)
 
 @contextmanager
 def reconfigure_file(f, **kw):

@@ -28,7 +28,7 @@ from cs.seq import seq
 from cs.threads import bg
 from cs.units import (
     transcribe_time,
-    transcribe,
+    transcribe as transcribe_units,
     BINARY_BYTES_SCALE,
     DECIMAL_SCALE,
     TIME_SCALE,
@@ -259,7 +259,7 @@ class BaseProgress(object):
       scale = self.units_scale
     if scale is None:
       return str(value)
-    return transcribe(value, scale, max_parts=max_parts, sep=sep, **kw)
+    return transcribe_units(value, scale, max_parts=max_parts, sep=sep, **kw)
 
   def text_pos_of_total(
       self, fmt=None, fmt_pos=None, fmt_total=None, pos_first=False
@@ -288,7 +288,7 @@ class BaseProgress(object):
     return fmt.format(pos_text=pos_text, total_text=total_text)
 
   # pylint: disable=too-many-branches,too-many-statements
-  def status(self, label, width, recent_window=None):
+  def status(self, label, width, recent_window=None, stalled=None):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
 
@@ -299,9 +299,13 @@ class BaseProgress(object):
           if not an `int` use `width.width`
         * `recent_window`: optional timeframe to define "recent" in seconds,
           default : `5`
+        * `stalled`: the label to indicate no throughput, default `'stalled'`;
+          for a worker this might often b better as `'idle'`
     '''
     if label is None:
       label = self.name
+    if stalled is None:
+      stalled = 'stalled'
     if not isinstance(width, int):
       width = width.width
     if recent_window is None:
@@ -313,7 +317,7 @@ class BaseProgress(object):
       if throughput == 0:
         if self.total is not None and self.position >= self.total:
           return 'idle'
-        rightv.append('stalled')
+        rightv.append(stalled)
       else:
         if throughput >= 10:
           throughput = int(throughput)
@@ -375,6 +379,7 @@ class BaseProgress(object):
       statusfunc=None,
       width=None,
       recent_window=None,
+      stalled=None,
       report_print=None,
       insert_pos=1,
       poll: Optional[Callable[["BaseProgress"], None]] = None,
@@ -399,6 +404,8 @@ class BaseProgress(object):
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
           in order to interoperate with `Upd`.
+        * `stalled`: optional string to replace the word `'stalled'`
+          in the status line; for a worked this might be betteer as `'idle'`
         * `insert_pos`: where to insert the progress bar, default `1`
         * `poll`: an optional callable accepting a `BaseProgress`
           which can be used to update the progress state before
@@ -417,10 +424,16 @@ class BaseProgress(object):
     if label is None:
       label = self.name
     if statusfunc is None:
-      # pylint: disable=unnecessary-lambda-assignment
-      statusfunc = lambda P, label, width: P.status(
-          label, width, recent_window=recent_window
-      )
+
+      def statusfunc(P, label, width):
+        ''' Use the `Progress.status` method by default.
+        '''
+        return P.status(
+            label,
+            width,
+            recent_window=recent_window,
+            stalled=stalled,
+        )
 
     def text_auto():
       ''' The current state of the `Progress`, to fit `width` and `proxy.width`.
@@ -467,7 +480,7 @@ class BaseProgress(object):
         report_print = print
       report_print(
           label + ':', self.format_counter(self.position - start_pos), 'in',
-          transcribe(
+          transcribe_units(
               self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
           )
       )
