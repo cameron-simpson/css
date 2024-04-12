@@ -766,65 +766,39 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.readdir
     '''
-    # TODO: if rootdir, generate '..' for parent of mount
-    FH = self._vtfs._fh(fhndx)
-
-    def entries():
-      ''' Generator to yield directory entries.
-      '''
-      o = off
-      D = FH.D
-      fs = FH.fs
-      S = self._vtfs.S
-      names = FH.names
-      while True:
-        try:
-          E = None
-          EA = None
-          if o == 0:
-            name = '.'
-            with S:
-              E = D[name]
-          elif o == 1:
-            name = '..'
-            if D is self._vtfs.mntE:
-              try:
-                st = os.stat(dirname(self._vtfs.mnt_path))
-              except OSError as e:
-                warning("os.stat(%r): %s", dirname(self._vtfs.mnt_path), e)
-              else:
-                EA = self._stat_EntryAttributes(st)
-            else:
+    fs = self._vtfs
+    S = fs.S
+    FH = fs._fh(fhndx)
+    D = FH.D
+    names = FH.names
+    while True:
+      try:
+        # use Pfx and S contets around the prep of EA, prior to yield
+        with Pfx("readdir(fhndx=%d,dent_offset=%d)", fhndx, dent_offset):
+          with S:
+            E = None
+            EA = None
+            if dent_offset == 0:
+              name = '.'
               with S:
                 E = D[name]
-          else:
-            o2 = o - 2
-            if o2 == len(names) and fs.show_prev_dirent:
-              name = PREV_DIRENT_NAME
-              try:
-                E = D.prev_dirent
-              except MissingHashcodeError as e:
-                warning("prev_dirent unavailable: %s", e)
-            elif o2 >= len(names):
-              break
-            else:
-              name = names[o2]
-              if name == '.' or name == '..':
-                # already special cased
-                E = None
-              elif name == PREV_DIRENT_NAME and fs.show_prev_dirent:
-                warning(
-                    "%s: readdir: suppressing entry %r because fs.show_prev_dirent is true",
-                    D, PREV_DIRENT_NAME
-                )
-                E = None
+            elif dent_offset == 1:
+              name = '..'
+              if D is self._vtfs.mntE:
+                # mount point, stat the real filesystem for ".."
+                try:
+                  st = os.stat(dirname(self._vtfs.mnt_path))
+                except OSError as e:
+                  warning("os.stat(%r): %s", dirname(self._vtfs.mnt_path), e)
+                else:
+                  EA = self._stat_EntryAttributes(st)
               else:
                 with S:
-                  E = D.get(name)
-          if EA is None:
-            if E is not None:
-              # yield name, attributes and next offset
-              with S:
+                  E = D[name]
+            else:
+              name_offset = dent_offset - 2
+              if name_offset == len(names) and fs.show_prev_dirent:
+                name = PREV_DIRENT_NAME
                 try:
                   EA = self._vt_EntryAttributes(E)
                 except Exception as e:
