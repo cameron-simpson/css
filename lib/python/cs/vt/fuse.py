@@ -800,18 +800,41 @@ class StoreFS_LLFUSE(llfuse.Operations):
               if name_offset == len(names) and fs.show_prev_dirent:
                 name = PREV_DIRENT_NAME
                 try:
-                  EA = self._vt_EntryAttributes(E)
-                except Exception as e:
-                  warning("%r: %s", name, e)
-                  EA = None
-          if EA is not None:
-            yield self._vt_bytes(name), EA, o + 1
-          o += 1
-        except Exception as e:
-          exception("READDIR: %s", e)
-          raise
-
-    return entries()
+                  E = D.prev_dirent
+                except MissingHashcodeError as e:
+                  warning("prev_dirent unavailable: %s", e)
+              elif name_offset >= len(names):
+                break
+              else:
+                name = names[name_offset]
+                if name == '.' or name == '..':
+                  # already special cased
+                  E = None
+                elif name == PREV_DIRENT_NAME and fs.show_prev_dirent:
+                  warning(
+                      "%s: readdir: suppressing entry %r because fs.show_prev_dirent is true",
+                      D, PREV_DIRENT_NAME
+                  )
+                  E = None
+                else:
+                  with S:
+                    E = D.get(name)
+            if EA is None:
+              if E is not None:
+                # yield name, attributes and next offset
+                with S:
+                  try:
+                    EA = self._vt_EntryAttributes(E)
+                  except Exception as e:
+                    warning("%r: %s", name, e)
+                    EA = None
+        # out of the Pfx and S contexts
+        if EA is not None:
+          yield self._vt_bytes(name), EA, dent_offset + 1
+        dent_offset += 1
+      except Exception as e:
+        exception("READDIR: %s", e)
+        raise
 
   @staticmethod
   def _stat_EntryAttributes(st):
