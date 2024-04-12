@@ -680,8 +680,6 @@ class RunState(HasThreadState):
     '''
     if not running_ok and self.running:
       warning("already running")
-      print("runstate.start(): originally started from:", file=sys.stderr)
-      stack_dump(Fs=self._started_from)
     else:
       self._started_from = stack_frames()
     self.cancelled = False
