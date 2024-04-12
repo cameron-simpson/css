@@ -195,9 +195,7 @@ class TCPClientStore(StreamStore):
       name = "%s(bind_addr=%r)" % (self.__class__.__name__, bind_addr)
     self.sock_bind_addr = bind_addr
     self.sock = None
-    StreamStore.__init__(
-        self, name, None, None, addif=addif, connect=self._tcp_connect, **kw
-    )
+    StreamStore.__init__(self, name, self._tcp_connect, addif=addif, **kw)
 
   @contextmanager
   def startup_shutdown(self):
@@ -209,29 +207,18 @@ class TCPClientStore(StreamStore):
         self.sock.close()
         self.sock = None
 
-  @pfx_method
+  @contextmanager
   @require(lambda self: not self.sock)
   def _tcp_connect(self):
     # TODO: IPv6 support
     self.sock = socket(AF_INET)
-    with Pfx("%s.sock.connect(%r)", self, self.sock_bind_addr):
-      try:
+    try:
+      with Pfx("%s.sock.connect(%r)", self, self.sock_bind_addr):
         self.sock.connect(self.sock_bind_addr)
-      except:
-        self.sock.close()
-        self.sock = None
-        raise
-    return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
-
-  @logexc
-  def _packet_disconnect(self, conn):
-    ''' On disconnect, close the socket as well.
-    '''
-    super()._packet_disconnect(conn)
-    sock = self.sock
-    if sock:
+      yield OpenSocket(self.sock, False), OpenSocket(self.sock, True)
+    finally:
+      self.sock.close()
       self.sock = None
-      sock.close()
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
@@ -280,15 +267,7 @@ class UNIXSocketClientStore(StreamStore):
       name = "%s(socket_path=%r)" % (self.__class__.__name__, socket_path)
     self.socket_path = socket_path
     self.sock = None
-    StreamStore.__init__(
-        self,
-        name,
-        None,
-        None,
-        addif=addif,
-        connect=self._unixsock_connect,
-        **kw
-    )
+    StreamStore.__init__(self, name, self._unixsock_connect, addif=addif, **kw)
 
   @contextmanager
   def startup_shutdown(self):
@@ -300,16 +279,15 @@ class UNIXSocketClientStore(StreamStore):
         self.sock.close()
         self.sock = None
 
-  @pfx_method
+  @contextmanager
   @require(lambda self: not self.sock)
   def _unixsock_connect(self):
     self.sock = socket(AF_UNIX)
-    with Pfx("%s.sock.connect(%r)", self, self.socket_path):
-      try:
+    try:
+      with Pfx("%s.sock.connect(%r)", self, self.socket_path):
         self.sock.connect(self.socket_path)
-      except OSError as e:
-        error("connect fails: %s", e)
+        yield OpenSocket(self.sock, False), OpenSocket(self.sock, True)
+    finally:
+      if self.sock is not None:
         self.sock.close()
         self.sock = None
-        raise
-    return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
