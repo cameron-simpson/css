@@ -10,10 +10,9 @@ import time
 import unittest
 from tempfile import TemporaryDirectory
 
-from cs.debug import thread_dump
 from cs.logutils import warning
 from cs.resources import stackattrs
-from cs.testutils import SetupTeardownMixin
+from cs.testutils import SetupTeardownMixin, assertSingleThread
 from cs.x import X
 
 from .dir import Dir
@@ -46,12 +45,11 @@ class Test_VTFuse(SetupTeardownMixin, unittest.TestCase):
         finally:
           umount(testdirpath)
     time.sleep(1)
-    with open('/dev/tty', 'a') as tty:
-      with stackattrs(sys, stderr=tty):
-        thread_dump()
+    assertSingleThread()
 
   def test_FS(self):
-    X("test_FS...")
+    ''' Dummy mount/umount test.
+    '''
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)
