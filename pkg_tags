@@ -19,7 +19,7 @@ cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f
 cs.app.ydl pypi.release="20220318" ok_revision="6c4e9e800dde94ed935a1b31a532f68cbe63adb8"
 cs.asynchron pypi.release=20160828
 cs.binary pypi.release="20240316" ok_revision="971283ffb5fac84c3b809e279a9e05350f80fa4c" features={"20230212":["BinaryMixin_load","BinaryMixin_save"]}
-cs.buffer pypi.release="20240316" ok_revision="703ab49de6b12607b7e5d1fd3a18b8b133dffebd" features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"]}
+cs.buffer pypi.release="20240316" ok_revision=ef83ded9892741e8148a0f5d77ce631fabacf9d9 features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"]}
 cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.clockutils pypi.release=20190101
 cs.cmdutils pypi.release="20240316" ok_revision="835cbfefa6bad9bb377dd8a319eb9f462b9e4cec" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"]}
