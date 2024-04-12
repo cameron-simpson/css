@@ -24,6 +24,7 @@ DISTINFO = {
     'install_requires': [
         'cs.buffer',
         'cs.deco',
+        'cs.lex',
     ],
 }
 
