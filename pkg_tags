@@ -94,7 +94,7 @@ cs.tagset ok_revision=eea89f0a1fdf037f03c51c8ce339e6700d76cbd3 features={"202212
 cs.tarutils ok_revision=b5ed41d868eba32d0098c9d651a36df8eb52c7ff pypi.release="20240318"
 cs.taskqueue ok_revision="5b2c7311b70519bea966bedf91008c797770c819" features={"20221207":["BaseTask"]} pypi.release="20230401"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
-cs.threads ok_revision="953e3a1dd90cdf9f1f13d09b925d9c9003f3a1c6" pypi.release="20240316" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"]}
+cs.threads ok_revision="2de855981c3b80c3ee71fe96d2ead74782c16d22" pypi.release="20240316" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"]}
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
 cs.timeutils
 cs.tty
