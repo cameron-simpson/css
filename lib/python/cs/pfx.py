@@ -356,7 +356,7 @@ class Pfx(object):
         value = list(value)
         for i, v in enumerate(value):
           if isinstance(v, str):
-            value = cls.prefixify(value)
+            value[i] = cls.prefixify(v)
             did_prefix = True
             break
         value = tuple(value)
