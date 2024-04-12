@@ -1,0 +1,17 @@
+lib/python/cs/packetstream.py: cs.packetstream: formatting, remove debug tracing
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.request: better name for the Result
+lib/python/cs/packetstream.py: cs.packetstream: fixup: PacketConnection.do: explicit parameter names
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.shutdown: change the control flag to `immediately`, default `False`
+lib/python/cs/packetstream.py: cs.packetstream: docstring typo fix
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: provide progressbars for the send and receive streams (TODO: a way to disable them)
+lib/python/cs/packetstream.py: cs.packetstream: fix deadlock, add some checks, drop Python 2 support from DISTINFO
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.__init__: use @promote to turn the recv parameter into a CornuCopyBuffer
+lib/python/cs/packetstream.py: cs.packetstream: Packet.__repr__ using str()
+lib/python/cs/packetstream.py: cs.packetstream: update DISTINFO
+lib/python/cs/packetstream.py: cs.packetstream: remove some debug, update a docstring
+lib/python/cs/packetstream.py: cs.packetstream: clean some lint
+lib/python/cs/packetstream.py: cs.*: drop obsolete update_frequency from more progress bars
+lib/python/cs/packetstream.py: cs.packetstream: some docstring and comment updates
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: now subclasses MultiOpenMixin, big refactor
+lib/python/cs/packetstream.py: cs.packetstream: update imports, use @logexc on the worker thread bodies, format tweak
+lib/python/cs/packetstream.py: cs.packetstream: update DISTINFO

@@ -23,10 +23,10 @@ import time
 from typing import Optional
 
 from cs.deco import decorator
-from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
-from cs.pfx import Pfx, PfxThread
+from cs.pfx import Pfx
 from cs.resources import RunState, uses_runstate
+from cs.result import Result
 from cs.x import X
 
 from typeguard import typechecked
@@ -101,9 +101,6 @@ def mount(
   log_formatter = LogFormatter(DEFAULT_BASE_FORMAT)
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
-  X("mount: S=%s", S)
-  X("mount: E=%s", E)
-  ##dump_Dirent(E, recurse=True)
   FS = StoreFS(
       E,
       S=S,
@@ -121,7 +118,7 @@ def umount(mnt):
   return subprocess.call(['umount', mnt])
 
 @decorator
-def handler(method, trace=False):
+def handler(method, trace=False):  # noqa: C901
   ''' Decorator for FUSE handlers.
 
       Prefixes exceptions with the method name, associates with the
@@ -154,7 +151,7 @@ def handler(method, trace=False):
     desc = ','.join(desc_v)
     return desc
 
-  def handle(self, *a, **kw):
+  def handle(self, *a, **kw):  # noqa: C901
     ''' Wrapper for FUSE handler methods.
     '''
     sysdesc = None
@@ -212,7 +209,7 @@ def handler(method, trace=False):
         except BaseException as e:
           error("UNCAUGHT EXCEPTION: %s", e)
           raise RuntimeError("UNCAUGHT EXCEPTION") from e
-        except:
+        except:  # noqa: E722
           error("=> EXCEPTION %r", sys.exc_info())
 
   return handle
@@ -309,14 +306,14 @@ class StoreFS_LLFUSE(llfuse.Operations):
 ##    return self.__getattr__(attr)
 
   def __str__(self):
-    return "<%s %s>" % (self.__class__.__name__, self._vtfs)
+    return f'{self.__class__.__name__}:{self._vtfs}'
 
   @uses_runstate
   def _vt_runfuse(
       self, mnt, fsname: Optional[str] = None, *, runstate: RunState
   ):
     ''' Run the filesystem once.
-        Return a Thread managing the mount.
+        Return a `Thread` managing the mount.
     '''
     fs = self._vtfs
     S = fs.S
@@ -324,36 +321,37 @@ class StoreFS_LLFUSE(llfuse.Operations):
       fsname = str(S)
     # llfuse reads additional mount options from the fsname :-(
     fsname = fsname.replace(',', ':')
-    with S:
-      opts = set(self._vt_llf_opts)
-      opts.add("fsname=" + fsname)
-      ##opts.add('noappledouble')
-      llfuse.init(self, mnt, opts)
-      # record the full path to the mount point
-      # this is used to support '..' at the top of the tree
-      fs.mnt_path = abspath(mnt)
+    opts = set(self._vt_llf_opts)
+    opts.add("fsname=" + fsname)
+    ##opts.add('noappledouble')
+    llfuse.init(self, mnt, opts)
+    # record the full path to the mount point
+    # this is used to support '..' at the top of the tree
+    fs.mnt_path = abspath(mnt)
 
-      @logexc
-      def mainloop():
-        ''' Worker main loop to run the filesystem then tidy up.
-        '''
-        with fs:
-          with S:
-            llfuse.main(workers=32)
-            llfuse.close()
-        S.close()
+    @trace
+    def _vt_runfuse__mainloop():
+      ''' Worker main loop to run the filesystem then tidy up.
+      '''
+      try:
+        signum = llfuse.main(workers=32)  ## , handle_signals=False)
+        if signum is not None:
+          warning("llfuse.main returns due to signal %d", signum)
+      finally:
+        llfuse.close()
 
-      T = PfxThread(target=mainloop)
-      S.open()
-      T.start()
-      return T
+    R = Result(f'{self}.mainloop')
+    # these is no llfuse.stop apparently
+    ##runstate.notify_cancel.add(lambda _: llfuse.stop())
+    T = R.bg(_vt_runfuse__mainloop, _pre_enter_objects=(S, fs))
+    return T
 
   def _vt_i2E(self, inode):
     try:
       E = self._vtfs.i2E(inode)
     except ValueError as e:
       warning("access(inode=%d): %s", inode, e)
-      raise FuseOSError(errno.EINVAL)
+      raise FuseOSError(errno.EINVAL) from e
     return E
 
   def _vt_EntryAttributes(self, E):
@@ -514,7 +512,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     return self._vtfs.getxattr(inode, xattr_name)
 
   @handler
-  def link(self, inode, new_parent_inode, new_name_b, ctx):
+  def link(self, inode, new_parent_inode, new_name_b, ctx):  # noqa: C901
     ''' Link `inode` to new name `new_name_b` in `new_parent_inode`.
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.link
@@ -553,7 +551,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise FuseOSError(errno.EROFS)
     # TODO: test for write access to new_parent_inode
     new_name = self._vt_str(new_name_b)
-    I = fs[inode]
+    I = fs[inode]  # noqa: E741
     E = I.E
     if E.isindirect:
       raise RuntimeError("tried to link IndirectDirent!")
@@ -621,7 +619,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     name = self._vt_str(name_b)
     fs = self._vtfs
-    I = fs[parent_inode]
+    I = fs[parent_inode]  # noqa: E741
     # TODO: test for permission to search parent_inode
     P = I.E
     EA = None
@@ -633,7 +631,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         try:
           st = os.stat(dirname(fs.mnt_path))
         except OSError as e:
-          raise FuseOSError(e.errno)
+          raise FuseOSError(e.errno) from e
         EA = self._stat_EntryAttributes(st)
       else:
         # otherwise use the parent with the FS
@@ -657,7 +655,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         EA = self._vt_EntryAttributes(E)
       except Exception as e:
         warning("%r: %s", name, e)
-        raise FuseOSError(errno.ENOENT)
+        raise FuseOSError(errno.ENOENT) from e
     return EA
 
   @handler
@@ -763,83 +761,80 @@ class StoreFS_LLFUSE(llfuse.Operations):
     return b''.join(chunks)
 
   @handler
-  def readdir(self, fhndx, off):
+  def readdir(self, fhndx, dent_offset):  # noqa: C901
     ''' Read entries in open directory file handle `fhndx` from offset `off`.
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.readdir
     '''
-    # TODO: if rootdir, generate '..' for parent of mount
-    FH = self._vtfs._fh(fhndx)
-
-    def entries():
-      ''' Generator to yield directory entries.
-      '''
-      o = off
-      D = FH.D
-      fs = FH.fs
-      S = self._vtfs.S
-      names = FH.names
-      while True:
-        try:
-          E = None
-          EA = None
-          if o == 0:
-            name = '.'
-            with S:
-              E = D[name]
-          elif o == 1:
-            name = '..'
-            if D is self._vtfs.mntE:
-              try:
-                st = os.stat(dirname(self._vtfs.mnt_path))
-              except OSError as e:
-                warning("os.stat(%r): %s", dirname(self._vtfs.mnt_path), e)
-              else:
-                EA = self._stat_EntryAttributes(st)
-            else:
+    fs = self._vtfs
+    S = fs.S
+    FH = fs._fh(fhndx)
+    D = FH.D
+    names = FH.names
+    while True:
+      try:
+        # use Pfx and S contets around the prep of EA, prior to yield
+        with Pfx("readdir(fhndx=%d,dent_offset=%d)", fhndx, dent_offset):
+          with S:
+            E = None
+            EA = None
+            if dent_offset == 0:
+              name = '.'
               with S:
                 E = D[name]
-          else:
-            o2 = o - 2
-            if o2 == len(names) and fs.show_prev_dirent:
-              name = PREV_DIRENT_NAME
-              try:
-                E = D.prev_dirent
-              except MissingHashcodeError as e:
-                warning("prev_dirent unavailable: %s", e)
-            elif o2 >= len(names):
-              break
-            else:
-              name = names[o2]
-              if name == '.' or name == '..':
-                # already special cased
-                E = None
-              elif name == PREV_DIRENT_NAME and fs.show_prev_dirent:
-                warning(
-                    "%s: readdir: suppressing entry %r because fs.show_prev_dirent is true",
-                    D, PREV_DIRENT_NAME
-                )
-                E = None
+            elif dent_offset == 1:
+              name = '..'
+              if D is self._vtfs.mntE:
+                # mount point, stat the real filesystem for ".."
+                try:
+                  st = os.stat(dirname(self._vtfs.mnt_path))
+                except OSError as e:
+                  warning("os.stat(%r): %s", dirname(self._vtfs.mnt_path), e)
+                else:
+                  EA = self._stat_EntryAttributes(st)
               else:
                 with S:
-                  E = D.get(name)
-          if EA is None:
-            if E is not None:
-              # yield name, attributes and next offset
-              with S:
+                  E = D[name]
+            else:
+              name_offset = dent_offset - 2
+              if name_offset == len(names) and fs.show_prev_dirent:
+                name = PREV_DIRENT_NAME
                 try:
-                  EA = self._vt_EntryAttributes(E)
-                except Exception as e:
-                  warning("%r: %s", name, e)
-                  EA = None
-          if EA is not None:
-            yield self._vt_bytes(name), EA, o + 1
-          o += 1
-        except Exception as e:
-          exception("READDIR: %s", e)
-          raise
-
-    return entries()
+                  E = D.prev_dirent
+                except MissingHashcodeError as e:
+                  warning("prev_dirent unavailable: %s", e)
+              elif name_offset >= len(names):
+                break
+              else:
+                name = names[name_offset]
+                if name == '.' or name == '..':
+                  # already special cased
+                  E = None
+                elif name == PREV_DIRENT_NAME and fs.show_prev_dirent:
+                  warning(
+                      "%s: readdir: suppressing entry %r because fs.show_prev_dirent is true",
+                      D, PREV_DIRENT_NAME
+                  )
+                  E = None
+                else:
+                  with S:
+                    E = D.get(name)
+            if EA is None:
+              if E is not None:
+                # yield name, attributes and next offset
+                with S:
+                  try:
+                    EA = self._vt_EntryAttributes(E)
+                  except Exception as e:
+                    warning("%r: %s", name, e)
+                    EA = None
+        # out of the Pfx and S contexts
+        if EA is not None:
+          yield self._vt_bytes(name), EA, dent_offset + 1
+        dent_offset += 1
+      except Exception as e:
+        exception("READDIR: %s", e)
+        raise
 
   @staticmethod
   def _stat_EntryAttributes(st):
@@ -936,8 +931,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise FuseOSError(errno.EPERM)
     try:
       E = P[name]
-    except KeyError:
-      raise FuseOSError(errno.ENOENT)
+    except KeyError as e:
+      raise FuseOSError(errno.ENOENT) from e
     else:
       if not E.isdir:
         raise FuseOSError(errno.ENOTDIR)
@@ -1047,10 +1042,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise FuseOSError(errno.ENOTDIR)
     try:
       E = P.pop(name)
-    except KeyError:
-      raise FuseOSError(errno.ENOENT)
+    except KeyError as e:
+      raise FuseOSError(errno.ENOENT) from e
     if E.isindirect:
-      I = fs.E2inode(E)
+      I = fs.E2inode(E)  # noqa: E741
       I.refcount -= 1
 
   @handler

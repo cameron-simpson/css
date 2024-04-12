@@ -54,7 +54,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20240326-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'description':
@@ -272,7 +272,7 @@ class Pfx(object):
     _state = self._state
     if exc_value is not None:
       try:
-        exc_value._pfx_prefix
+        exc_value._pfx_prefix  # noqa: B018
       except AttributeError:
         exc_value._pfx_prefix = self._state.prefix
         # prevent outer Pfx wrappers from hacking stuff as well
@@ -336,7 +336,7 @@ class Pfx(object):
     )
 
   @classmethod
-  def prefixify_exception(cls, e):
+  def prefixify_exception(cls, e):  # noqa: C901
     ''' Modify the supplied exception `e` with the current prefix.
         Return `True` if modified, `False` if unable to modify.
     '''
@@ -356,7 +356,7 @@ class Pfx(object):
         value = list(value)
         for i, v in enumerate(value):
           if isinstance(v, str):
-            value = cls.prefixify(value)
+            value[i] = cls.prefixify(v)
             did_prefix = True
             break
         value = tuple(value)

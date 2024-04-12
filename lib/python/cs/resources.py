@@ -28,7 +28,7 @@ from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20240316-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -680,8 +680,6 @@ class RunState(HasThreadState):
     '''
     if not running_ok and self.running:
       warning("already running")
-      print("runstate.start(): originally started from:", file=sys.stderr)
-      stack_dump(Fs=self._started_from)
     else:
       self._started_from = stack_frames()
     self.cancelled = False

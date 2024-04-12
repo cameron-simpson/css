@@ -84,7 +84,6 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     self._workQ = None
     self.cachefiles = []
     self._add_cachefile()
-    self.runstate.notify_cancel.add(lambda rs: self.close())
 
   @contextmanager
   def startup_shutdown(self):

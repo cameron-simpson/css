@@ -696,6 +696,9 @@ if builtin_names_s:
                          builtin_names_s.split(',')):
       if not builtin_name:
         continue
+      if builtin_name in ('breakpoint',):
+        # breakpoint doesn't work right if wrapped, gets the wrong frame
+        continue
       if builtin_name not in __all__:
         warning(
             "$%s: ignoring %r, not in cs.debug.__all__:%r",
