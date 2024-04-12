@@ -28,7 +28,7 @@ from cs.seq import seq
 from cs.threads import bg
 from cs.units import (
     transcribe_time,
-    transcribe,
+    transcribe as transcribe_units,
     BINARY_BYTES_SCALE,
     DECIMAL_SCALE,
     TIME_SCALE,
@@ -259,7 +259,7 @@ class BaseProgress(object):
       scale = self.units_scale
     if scale is None:
       return str(value)
-    return transcribe(value, scale, max_parts=max_parts, sep=sep, **kw)
+    return transcribe_units(value, scale, max_parts=max_parts, sep=sep, **kw)
 
   def text_pos_of_total(
       self, fmt=None, fmt_pos=None, fmt_total=None, pos_first=False
@@ -467,7 +467,7 @@ class BaseProgress(object):
         report_print = print
       report_print(
           label + ':', self.format_counter(self.position - start_pos), 'in',
-          transcribe(
+          transcribe_units(
               self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
           )
       )
