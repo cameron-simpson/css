@@ -49,8 +49,10 @@ DISTINFO = {
         'cs.logutils',
         'cs.py.func',
         'cs.seq',
+        'cs.threads',
         'cs.units',
         'cs.upd',
+        'icontract',
         'typeguard',
     ],
 }
