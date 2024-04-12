@@ -70,7 +70,7 @@ cs.pfx pypi.release="20240412" ok_revision="85f7ed24f46cfa3b4be3e1a1dc38b9598ec7
 cs.pipeline pypi.release="20191007.1" ok_revision="2a26b6f06610394b6c7e6fb6f9a5228e50367db9"
 cs.pop3 ok_revision="64592a92c8db0e90cf818f6ccf415f6cfb53c90d" pypi.release="20240316"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
-cs.progress pypi.release="20230401" ok_revision="2a92a87dad2863f09f850809941561fa82551651" features={"20210803":["progress_runstate"],"20230212":["update_period"],"20240412":["BaseProgress__update_period"]}
+cs.progress pypi.release="20240412" ok_revision="2a92a87dad2863f09f850809941561fa82551651" features={"20210803":["progress_runstate"],"20230212":["update_period"],"20240412":["BaseProgress__update_period"]}
 cs.psutils pypi.release="20240316" ok_revision="8291b0f87bdef1ec55c6c8464cdc394d52208f03" features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"]}
 cs.py.doc pypi.release="20240412" ok_revision=b875457f8b76ec04e78afb012728a50c4a14d5e0
 cs.py.func pypi.release="20230331" ok_revision="20ff01187c10d3b05188f4ee21bb3a7e9a4348b6" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
