@@ -699,7 +699,7 @@ def withall(objs):
   ''' Enter every object `obj` in `obj_list` except those which are `None`
       using `with obj:`, then yield.
   '''
-  yield from _with_all(obj for obj in objs if obj is not None)
+  yield from _withall(obj for obj in objs if obj is not None)
 
 @contextmanager
 def reconfigure_file(f, **kw):
