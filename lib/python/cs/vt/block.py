@@ -737,7 +737,11 @@ class HashCodeBlock(Block, prefix='B'):
       raise ValueError("invalid start:%d" % (start,))
     if end is not None and end < start:
       raise ValueError("invalid end:%d < start:%d" % (end, start))
-    bs = self.get_direct_data()
+    try:
+      bs = self.get_direct_data()
+    except KeyError as e:
+      error("%s.datafrom: self.get_direct_data(): %s", self, e)
+      return
     if start == 0:
       if end is None:
         yield bs
