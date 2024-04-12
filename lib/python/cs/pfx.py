@@ -272,7 +272,7 @@ class Pfx(object):
     _state = self._state
     if exc_value is not None:
       try:
-        exc_value._pfx_prefix
+        exc_value._pfx_prefix  # noqa: B018
       except AttributeError:
         exc_value._pfx_prefix = self._state.prefix
         # prevent outer Pfx wrappers from hacking stuff as well
@@ -336,7 +336,7 @@ class Pfx(object):
     )
 
   @classmethod
-  def prefixify_exception(cls, e):
+  def prefixify_exception(cls, e):  # noqa: C901
     ''' Modify the supplied exception `e` with the current prefix.
         Return `True` if modified, `False` if unable to modify.
     '''
