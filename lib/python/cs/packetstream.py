@@ -57,6 +57,7 @@ DISTINFO = {
     'install_requires': [
         'cs.binary',
         'cs.buffer',
+        'cs.context',
         'cs.deco',
         'cs.progress',
         'cs.units',
