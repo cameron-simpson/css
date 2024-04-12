@@ -22,7 +22,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq, unrepeated
 
-__version__ = '20240412'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'description':
