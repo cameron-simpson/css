@@ -1866,7 +1866,7 @@ class Module:
     else:
       self.prepare_autofiles(release_dirpath)
       self.prepare_metadata(release_dirpath)
-      dist_rpaths = self.prepare_dist(release_dirpath)
+      dist_rpaths = self.prepare_dist(release_dirpath, vcs_revision)
     return dist_rpaths
 
   def prepare_autofiles(self, pkg_dir):
@@ -1919,12 +1919,12 @@ class Module:
     with pfx_call(open, joinpath(pkg_dir, 'pyproject.toml'), 'xb') as tf:
       tomli_w.dump(proj, tf, multiline_strings=True)
 
-  def prepare_dist(self, pkg_dir):
+  def prepare_dist(self, pkg_dir, vcs_version):
     ''' Run "python3 -m build ." inside `pkg_dir`, making files in `dist/`.
     '''
     distdir = joinpath(pkg_dir, 'dist')
-    sdist_rpath = f'dist/{self.name}-{self.latest_pypi_version}.tar.gz'
-    wheel_rpath = f'dist/{self.name}-{self.latest_pypi_version}-py3-none-any.whl'
+    sdist_rpath = f'dist/{vcs_version}.tar.gz'
+    wheel_rpath = f'dist/{vcs_version}-py3-none-any.whl'
     cd_run(
         pkg_dir,
         ('python3', '-m', 'build'),
@@ -1936,10 +1936,12 @@ class Module:
         ),
         '.',
     )
+    print()
     os.system(f'ls -ld {pkg_dir}/{sdist_rpath!r}')
-    os.system(f'tar tvzf {pkg_dir}/{sdist_rpath!r}')
+    os.system(f'set -x; tar tvzf {pkg_dir}/{sdist_rpath!r}')
+    print()
     os.system(f'ls -ld {pkg_dir}/{wheel_rpath!r}')
-    os.system(f'unzip -l {pkg_dir}/{wheel_rpath!r}')
+    os.system(f'set -x; unzip -l {pkg_dir}/{wheel_rpath!r}')
     return dict(sdist=sdist_rpath, wheel=wheel_rpath)
 
 if __name__ == '__main__':
