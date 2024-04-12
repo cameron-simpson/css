@@ -424,10 +424,16 @@ class BaseProgress(object):
     if label is None:
       label = self.name
     if statusfunc is None:
-      # pylint: disable=unnecessary-lambda-assignment
-      statusfunc = lambda P, label, width: P.status(
-          label, width, recent_window=recent_window
-      )
+
+      def statusfunc(P, label, width):
+        ''' Use the `Progress.status` method by default.
+        '''
+        return P.status(
+            label,
+            width,
+            recent_window=recent_window,
+            stalled=stalled,
+        )
 
     def text_auto():
       ''' The current state of the `Progress`, to fit `width` and `proxy.width`.
