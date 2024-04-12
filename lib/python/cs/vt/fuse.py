@@ -27,6 +27,7 @@ from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
 from cs.resources import RunState, uses_runstate
+from cs.result import Result
 from cs.x import X
 
 from typeguard import typechecked
@@ -316,7 +317,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       self, mnt, fsname: Optional[str] = None, *, runstate: RunState
   ):
     ''' Run the filesystem once.
-        Return a Thread managing the mount.
+        Return a `Thread` managing the mount.
     '''
     fs = self._vtfs
     S = fs.S
@@ -324,29 +325,30 @@ class StoreFS_LLFUSE(llfuse.Operations):
       fsname = str(S)
     # llfuse reads additional mount options from the fsname :-(
     fsname = fsname.replace(',', ':')
-    with S:
-      opts = set(self._vt_llf_opts)
-      opts.add("fsname=" + fsname)
-      ##opts.add('noappledouble')
-      llfuse.init(self, mnt, opts)
-      # record the full path to the mount point
-      # this is used to support '..' at the top of the tree
-      fs.mnt_path = abspath(mnt)
+    opts = set(self._vt_llf_opts)
+    opts.add("fsname=" + fsname)
+    ##opts.add('noappledouble')
+    llfuse.init(self, mnt, opts)
+    # record the full path to the mount point
+    # this is used to support '..' at the top of the tree
+    fs.mnt_path = abspath(mnt)
 
-      @logexc
-      def mainloop():
-        ''' Worker main loop to run the filesystem then tidy up.
-        '''
-        with fs:
-          with S:
-            llfuse.main(workers=32)
-            llfuse.close()
-        S.close()
+    @trace
+    def mainloop():
+      ''' Worker main loop to run the filesystem then tidy up.
+      '''
+      try:
+        signum = llfuse.main(workers=32)  ## , handle_signals=False)
+        if signum is not None:
+          warning("llfuse.main returns due to signal %d", signum)
+      finally:
+        llfuse.close()
 
-      T = PfxThread(target=mainloop)
-      S.open()
-      T.start()
-      return T
+    R = Result(f'{self}.mainloop')
+    # these is no llfuse.stop apparently
+    ##runstate.notify_cancel.add(lambda _: llfuse.stop())
+    T = R.bg(mainloop, _pre_enter_objects=(S, fs))
+    return T
 
   def _vt_i2E(self, inode):
     try:
