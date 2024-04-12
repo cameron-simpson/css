@@ -27,7 +27,15 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': [
+        'cs.context',
+        'cs.lex',
+        'cs.logutils',
+        'cs.queues',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+    ],
 }
 
 class LRU_Cache(object):
