@@ -20,7 +20,13 @@ from threading import (
     local as thread_local,
 )
 
-from cs.context import ContextManagerMixin, stackattrs, stackset
+from cs.context import (
+    ContextManagerMixin,
+    stackattrs,
+    stackset,
+    twostep,
+    withall,
+)
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
 from cs.gimmicks import error, warning
@@ -251,7 +257,11 @@ class HasThreadState(ContextManagerMixin):
     enter_it = iter(enter_tuples)
 
     def with_enter_objects():
-      ''' A recursive context manager to enter all the contexts implied by `enter_it`.
+      ''' A recursive context manager to enter all the contexts
+          implied by `enter_it`.
+          For each `(enter_obj,for_with)` in `enter_it`, if `for_with`
+          is true, enter the object using `with enter_obj:` otherwise
+          enter using: `with enter_object.per_thread_state(current=enter_obj)`.
       '''
       try:
         enter_obj, for_with = next(enter_it)
@@ -280,14 +290,14 @@ class HasThreadState(ContextManagerMixin):
 
     return builtin_Thread(name=name, target=target_wrapper, **Thread_kw)
 
-  def bg(self, func, *, enter_objects=None, **bg_kw):
+  def bg(self, func, *, enter_objects=None, pre_enter_objects=None, **bg_kw):
     ''' Get a `Thread` using `type(elf).Thread` and start it.
         Return the `Thread`.
 
         The `HasThreadState.Thread` factory duplicates the current `Thread`'s
         `HasThreadState` current objects as current in the new `Thread`.
         Additionally it enters the contexts of various objects using
-        `with obj` accorind to the `enter_objects` parameter.
+        `with obj` according to the `enter_objects` parameter.
 
         The value of the optional parameter `enter_objects` governs
         which objects have their context entered using `with obj`
@@ -295,7 +305,8 @@ class HasThreadState(ContextManagerMixin):
         - `None`: the default, meaning `(self,)`
         - `False`: no object contexts are entered
         - `True`: all current `HasThreadState` object contexts will be entered
-        - an iterable of objects whose contexts will be entered
+        - an iterable of objects whose contexts will be entered;
+          pass `()` to enter no objects
     '''
     cls = type(self)
     if enter_objects is None:
@@ -318,6 +329,7 @@ def bg(
     args=None,
     kwargs=None,
     thread_factory=None,
+    pre_enter_objects=None,
     **tfkw,
 ):
   ''' Dispatch the callable `func` in its own `Thread`;
@@ -325,18 +337,23 @@ def bg(
 
       Parameters:
       * `func`: a callable for the `Thread` target.
+      * `args`, `kwargs`: passed to the `Thread` constructor
+      * `kwargs`, `kwargs`: passed to the `Thread` constructor
       * `daemon`: optional argument specifying the `.daemon` attribute.
       * `name`: optional argument specifying the `Thread` name,
         default: the name of `func`.
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
-      * `thread_factory`: the `Thread` factory, default `HasThreadState.Thread`,
-        which prepares a new `threading.Thread` with the default
-        `HasThreadState` contexts
-      * `thread_states`: passed to the  `thread_factory` factory;
-        default `True`
-      * `args`, `kwargs`: passed to the `Thread` constructor
+      * `pre_enter_objects`: an optional iterable of objects which
+        should be entered using `with`
+
+      If `pre_enter_objects` is supplied, these objects will be
+      entered before the `Thread` is started and exited when the
+      `Thread` target function ends.
+      If the `Thread` is _not_ started (`no_start=True`, very
+      unusual) then it will be the caller's responsibility to manage
+      to entered objects.
   '''
   if name is None:
     name = funcname(func)
@@ -346,15 +363,20 @@ def bg(
     kwargs = {}
   if thread_factory is None:
     thread_factory = HasThreadState.Thread
-
   ##thread_prefix = prefix() + ': ' + name
   thread_prefix = name
+  preopen_close_it = None
 
   def thread_body():
     ''' Establish a basic `Pfx` context for the target `func`.
     '''
-    with Pfx("Thread:%d:%s", current_thread().ident, thread_prefix):
-      return func(*args, **kwargs)
+    try:
+      with Pfx("Thread:%d:%s", current_thread().ident, thread_prefix):
+        return func(*args, **kwargs)
+    finally:
+      if preopen_close_it is not None:
+        # do the closes
+        next(preopen_close_it)
 
   T = thread_factory(
       name=thread_prefix,
@@ -365,6 +387,11 @@ def bg(
     func = logexc(func)
   if daemon is not None:
     T.daemon = daemon
+  if pre_enter_objects:
+    # prepare a context manager to open all the pre_enter_objects
+    preopen_close_it = twostep(withall(pre_enter_objects))
+    # do the opens
+    next(preopen_close_it)
   if not no_start:
     T.start()
   return T
@@ -381,7 +408,7 @@ def joinif(T: builtin_Thread):
       the same thread as the "final close" shutdown phase, it is
       possible for example for a worker `Thread` to execute the
       shutdown phase and try to join itself. Using this function
-      allows that scenario.
+      supports that scenario.
   '''
   if T is not current_thread():
     T.join()
