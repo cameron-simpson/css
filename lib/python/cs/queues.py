@@ -22,9 +22,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq, unrepeated
 
-##from cs.debug import Lock, RLock, Thread
-
-__version__ = '20240305-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'description':
@@ -63,7 +61,7 @@ class QueueIterator(MultiOpenMixin):
     )
     # count of non-sentinel items
     self._item_count = 0
-    self._lock = Lock()
+    self.__lock = Lock()
 
   def __str__(self):
     return "%s(%r:q=%s)" % (type(self).__name__, self.name, self.q)
@@ -72,7 +70,7 @@ class QueueIterator(MultiOpenMixin):
   def put(self, item, *args, **kw):
     ''' Put `item` onto the queue.
         Warn if the queue is closed.
-        Reject if `item` is the sentinel.
+        Raises `ValueError` if `item` is the sentinel.
     '''
     if self.closed:
       with PfxCallInfo():
@@ -80,9 +78,9 @@ class QueueIterator(MultiOpenMixin):
       raise ClosedError("QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
-    with self._lock:
+    self._put(item, *args, **kw)
+    with self.__lock:
       self._item_count += 1
-    return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
     ''' Direct call to `self.q.put()` with no checks.
@@ -119,10 +117,10 @@ class QueueIterator(MultiOpenMixin):
     if item is self.sentinel:
       # sentinel consumed (clients won't see it, so we must)
       self.q.task_done()
-      # put the sentinel back for other iterators
+      # put the sentinel back for other consumers
       self._put(self.sentinel)
       raise StopIteration("SENTINEL")
-    with self._lock:
+    with self.__lock:
       self._item_count -= 1
     return item
 
@@ -152,6 +150,35 @@ class QueueIterator(MultiOpenMixin):
     ''' Wait for the queue items to complete.
     '''
     self.q.join()
+
+  def next_batch(self, batch_size=1024, block_once=False):
+    ''' Obtain a batch of immediately available items from the queue.
+        Up to `batch_size` items will be obtained, default 1024.
+        Return a list of the items.
+        If the queue is empty an empty list is returned.
+        If the queue is not empty, continue collecting items until
+        the queue is empty or the batch size is reached.
+        If `block_once` is true, wait for the first item;
+        this mode never returns an empty list except at the end of the iterator.
+    '''
+    batch = []
+    try:
+      if block_once:
+        batch.append(next(self))
+      while len(batch) < batch_size and not self.empty():
+        batch.append(next(self))
+    except StopIteration:
+      pass
+    return batch
+
+  def iter_batch(self, batch_size=1024):
+    ''' A generator which yields batches of items from the queue.
+    '''
+    while True:
+      batch = self.next_batch(batch_size=batch_size, block_once=True)
+      if not batch:
+        return
+      yield batch
 
 def IterableQueue(capacity=0, name=None):
   ''' Factory to create an iterable queue.

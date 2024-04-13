@@ -30,11 +30,12 @@ from cs.fileutils import shortpath
 from cs.fs import HasFSPath
 from cs.fstags import FSTags, uses_fstags
 from cs.gui_tk import BaseTkCommand
-from cs.hashindex import DEFAULT_HASHNAME
+from cs.hashindex import HASHNAME_DEFAULT
 from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint, pfx_call, pfx_method
 from cs.queues import ListQueue
+from cs.resources import RunState, uses_runstate
 from cs.seq import unrepeated
 from cs.tagset import Tag
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
@@ -55,20 +56,20 @@ class TaggerCommand(BaseCommand):
 
   USAGE_FORMAT = '''Usage: {cmd} [-d dirpath] [-nqv] subcommand [subargs...]
     -d dirpath  Specify the reference directory, default '.'.
-    -h hashname Specify the content hash algorithm name, default: {DEFAULT_HASHNAME}.
+    -h hashname Specify the content hash algorithm name, default: {HASHNAME_DEFAULT}.
     -n          No action, dry run.
     -q          Quiet.
     -v          Verbose.'''
 
   USAGE_KEYWORDS = {
-      'DEFAULT_HASHNAME': DEFAULT_HASHNAME,
+      'HASHNAME_DEFAULT': HASHNAME_DEFAULT,
       'RULE_MODES': RULE_MODES,
   }
 
   @dataclass
   class Options(BaseCommand.Options, HasFSPath):
     fspath: str = '.'
-    hashname: str = DEFAULT_HASHNAME
+    hashname: str = HASHNAME_DEFAULT
 
   # pylint: disable=no-self-use
   def apply_opt(self, opt, val):
@@ -105,14 +106,15 @@ class TaggerCommand(BaseCommand):
     return self.options.tagger.tagger_for(fspath)
 
   # pylint: disable=too-many-branches,too-many-locals
-  def cmd_autofile(self, argv):
+  @uses_runstate
+  def cmd_autofile(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-dnrx] paths...
           Link paths to destinations based on their tags.
           -d    Treat directory paths like files - file the
                 directory, not its contents.
                 (TODO: we file by linking - this needs a rename.)
           -h hashname
-                Specify the content hash algorithm name, default: {DEFAULT_HASHNAME}.
+                Specify the content hash algorithm name, default: {HASHNAME_DEFAULT}.
           -M modes
                 Only apply actions in modes, a comma separated list of modes
                 from {RULE_MODES!r}.
@@ -122,7 +124,7 @@ class TaggerCommand(BaseCommand):
     '''
     options = self.options
     options.direct = False
-    options.hashname = DEFAULT_HASHNAME
+    options.hashname = HASHNAME_DEFAULT
     options.modes = ",".join(RULE_MODES)
     options.once = False
     options.recurse = False
@@ -147,7 +149,6 @@ class TaggerCommand(BaseCommand):
       raise GetoptError(f'invalid modes not in {RULE_MODES!r}: {modes!r}')
     once = options.once
     recurse = options.recurse
-    runstate = options.runstate
     verbose = options.verbose
     taggers = set()
     ok = True

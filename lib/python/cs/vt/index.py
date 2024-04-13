@@ -16,6 +16,7 @@ from zlib import decompress
 
 from cs.binary import BinaryMultiValue, BSUInt
 from cs.context import stackattrs
+from cs.fs import shortpath
 from cs.logutils import warning, info
 from cs.pfx import pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
@@ -84,6 +85,12 @@ class BinaryIndex(MultiOpenMixin, ABC):
     '''
     MultiOpenMixin.__init__(self)
     self.basepath = basepath
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}{shortpath(self.basepath)}'
+
+  def __str__(self):
+    return repr(self)
 
   @classmethod
   def pathof(cls, basepath):

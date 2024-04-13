@@ -31,15 +31,36 @@ from abc import ABC, abstractmethod
 from collections import namedtuple, OrderedDict
 from io import StringIO
 import json
+import re
 from string import ascii_letters, digits
 import sys
+from typing import (
+    Any,
+    Iterable,
+    Mapping,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 from uuid import UUID
 
-from cs.deco import decorator
-from cs.lex import get_identifier, is_identifier, \
-                   get_decimal_or_float_value, get_qstr, \
-                   texthexify
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.deco import decorator, Promotable
+from cs.gimmicks import warning
+from cs.lex import (
+    get_identifier,
+    get_decimal_or_float_value,
+    get_qstr,
+    is_identifier,
+    r,
+    texthexify,
+)
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+
+# a regular expression to match a UUID
+UUID_re = re.compile(
+    r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}', re.I
+)
 
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
@@ -53,8 +74,8 @@ def hexify(data):
   '''
   return texthexify(data, whitelist=_TEXTHEXIFY_WHITE_CHARS)
 
-class Transcriber(ABC):
-  ''' Abstract base class for objects which can be used with the Transcribe class.
+class Transcriber(Promotable):  ##, ABC):
+  ''' Abstract base class for objects which can be transcribed.
 
       Transcribers implement the following methods:
       * `transcribe_inner(T, fp)`: to transcribe to the file `fp`.
@@ -68,231 +89,224 @@ class Transcriber(ABC):
 
   __slots__ = ()
 
+  class_by_prefix = {}  # prefix -> class
+  prefix_by_class = {}  # class -> prefix
+  class_transcribers = {
+      int: str,
+      float: lambda f: "%f" % f,
+      str: json.dumps,
+      bool: lambda v: '1' if v else '0',
+      bytes: hexify,
+      dict: lambda m: json.dumps(m, separators=(',', ':')),
+      UUID: lambda u: 'U{' + str(u) + '}',
+  }
+
+  @classmethod
+  def __init_subclass__(cls, *, prefix: Union[None, str, Iterable[str]], **kw):
+    ''' Register a subclass and its default prefix.
+
+        `prefix` should be a string or an iterable of string prefixes to lead
+        "prefix{....}" transcriptions.  The first prefix is the default.
+    '''
+    super().__init_subclass__(**kw)
+    if prefix is None:
+      # explicitly no prefix: a superclass of some other transcriber subclasses
+      return
+    if isinstance(prefix, str):
+      prefixes = (prefix,)
+    else:
+      prefixes = list(prefix)
+      if not prefixes:
+        raise ValueError('prefixes may not be empty')
+    for prefix in prefixes:
+      try:
+        known_cls = cls.class_by_prefix[prefix]
+      except KeyError:
+        cls.class_by_prefix[prefix] = cls
+      else:
+        if not issubclass(cls, known_cls):
+          warning(
+              f'cls={cls!r}: prefix {prefix!r} already taken by a non-superclass: {known_cls!r}'
+          )
+      if cls not in cls.prefix_by_class:
+        # note the default prefix for the class
+        cls.prefix_by_class[cls] = prefix
+
   def __str__(self):
-    return transcribe_s(self)
+    ''' Return the transcription of this object.
+    '''
+    return type(self).transcribe_obj(self)
+
+  @classmethod
+  def from_str(cls, s: str):
+    ''' Parse a transcription into an instance.
+    '''
+    with Pfx("%s.from_str(%r)", cls.__name__, s):
+      obj, offset = cls.parse(s)
+      if offset < len(s):
+        raise ValueError(f'unparsed data after transcription: {s[offset:]}')
+      if not isinstance(obj, cls):
+        raise TypeError(
+            f'did not decode to instance of {cls.__name__}, got: {r(obj)}'
+        )
+      return obj
+
+  @classmethod
+  def transcribe_obj(cls, obj, prefix: Optional[str] = None) -> str:
+    ''' Class method to transcribe `obj` as a string.
+
+        If `obj` is an instance of one of the predefined compact
+        types (`int` et al) defined in `cls.class_transcribers`
+        then use the compact transcription otherwise use
+        *prefix*`{`*obj.transcribe_inner()*`}`.
+    '''
+    obj_type = type(obj)
+    to_str = cls.class_transcribers.get(obj_type)
+    if to_str is None:
+      # prefix based use of obj.transcribe_inner()
+      if prefix is None:
+        prefix = cls.prefix_by_class[obj_type]
+      return f'{prefix}{{{obj.transcribe_inner()}}}'
+    # use the predefined transcription; prefix should be None
+    if prefix is not None:
+      raise ValueError(
+          f'{cls.__name__}.class_transcribers[{obj_type!r}] exists, prefix should be None, was {prefix!r}'
+      )
+    return to_str(obj)
 
   @abstractmethod
-  def transcribe_inner(self, T, fp):
+  def transcribe_inner(self) -> str:
     ''' Write the inner textual form of this object to the file `fp`.
         The result becomes "prefix{transcribe_inner()}".
-
-        Parameters:
-        * `T`: the Transcribe context
-        * `fp`: the output file
     '''
     raise NotImplementedError
 
-  @staticmethod
+  @classmethod
   @abstractmethod
-  def parse_inner(T, s, offset, stopchar, prefix):
+  def parse_inner(cls, s, offset=0, *, stopchar='}', prefix=None):
     ''' Read the inner textual form of an object from `s` at `offset`.
-        Return the object and new offset.
+        Return the new instance of `cls` and new offset.
 
         Parameters:
-        * `T`: the Transcribe context
         * `s`: the source text
         * `offset`: the parse position within `s`
-        * `stopchar`: the end of object marker, usually '}'
-        * `prefix`: the active prefix
+        * `stopchar`: the end of object marker, default '}'
+        * `prefix`: the active prefix, if any
     '''
     raise NotImplementedError
 
-class UUIDTranscriber:
-  ''' A transcriber for uuid.UUID instances.
-  '''
-
-  @staticmethod
-  def transcribe_inner(uu, fp):
-    ''' Transcribe a UUID.
-    '''
-    fp.write(str(uu))
-
-  @staticmethod
-  def parse_inner(T, s, offset, stopchar, prefix):
-    ''' Parse a UUID from `s` at `offset`.
-        Return the UUID and the new offset.
-    '''
-    end_offset = s.find(stopchar, offset)
-    if end_offset < offset:
-      raise ValueError("offset %d: closing %r not found" % (offset, stopchar))
-    uu = UUID(s[offset:end_offset])
-    return uu, end_offset
-
-ClassTranscriber = namedtuple('ClassTranscriber', 'cls transcribe_s parse')
-
-class Transcribe:
-  ''' Class to transcribe and parse textual forms of objects.
-  '''
-
-  def __init__(self):
-    self.prefix_map = {}  # prefix -> baseclass
-    self.class_map = {}  # baseclass -> prefix
-    self.class_transcribers = {
-        int: str,
-        float: lambda f: "%f" % f,
-        str: json.dumps,
-        bool: lambda v: '1' if v else '0',
-        bytes: hexify,
-        dict: lambda m: json.dumps(m, separators=(',', ':')),
-        UUID: lambda u: 'U{' + str(u) + '}',
-    }
-    self.register(UUIDTranscriber, 'U')
-
-  def register(self, baseclass, prefixes):
-    ''' Register a class and its default prefix.
-
-        Parameters:
-        * `baseclass`: the class to register, which should be a Transcriber.
-        * `prefixes`: an iterable of string prefixes to lead
-          "prefix{....}" transcriptions;
-          the first prefix is the default.
-          This may also be a single string.
-    '''
-    if isinstance(prefixes, str):
-      prefixes = (prefixes,)
-    for prefix in prefixes:
-      if prefix in self.prefix_map:
-        raise ValueError(
-            "prefix %r already taken: %r" % (prefix, self.prefix_map[prefix])
-        )
-      if (not isinstance(baseclass, Transcriber)
-          and (not hasattr(baseclass, 'transcribe_inner')
-               or not hasattr(baseclass, 'parse_inner'))):
-        raise ValueError(
-            "baseclass %s not a subclass of Transcriber" % (baseclass,)
-        )
-      self.prefix_map[prefix] = baseclass
-      if baseclass not in self.class_map:
-        self.class_map[baseclass] = prefix
-
-  def register_class(self, cls, transcribe_s, parse):
-    ''' Register transcribers for a class `cls`.
-    '''
-    class_transcribers = self.class_transcribers
-    if cls in class_transcribers:
-      raise ValueError("class %s already registered" % (cls,))
-    class_transcribers[cls] = ClassTranscriber(cls, transcribe_s, parse)
-
-  def transcribe(self, o, prefix=None, fp=None):
-    ''' Transcribe the object `o` to file `fp`.
-        `o`: the object to transcribe.
-        `prefix`: prefix leading the 'prefix{...}' transcription.
-          If `prefix` is None, use `o.transcribe_prefix` if defined,
-          otherwise look up `type(o)` in the class_transcribers and
-          use that directly.
-        `fp`: optional file, default sys.stdout
-    '''
-    with Pfx("transcribe(%s,%r,fp)", type(o), prefix):
-      if fp is None:
-        fp = sys.stdout
-      if prefix is None:
-        # see if there is an o.transcribe_prefix
-        prefix = getattr(o, 'transcribe_prefix', None)
-        if prefix is None:
-          # see if this class is in class_transcribers
-          tr = self.class_transcribers.get(type(o))
-          if tr is None:
-            raise ValueError(
-                "prefix is None and no o.transcribe_prefix and no class transcriber"
-            )
-          fp.write(tr(o))
-          return
-      # use prefix and rely on o.transcribe_inner
-      baseclass = self.prefix_map.get(prefix)
-      if baseclass is not None:
-        if not isinstance(o, baseclass):
-          raise ValueError(
-              "type(o)=%s, not an instanceof(%r)" % (type(o), baseclass)
-          )
-      fp.write(prefix)
-      fp.write('{')
-      o.transcribe_inner(self, fp)
-      fp.write('}')
-
-  def transcribe_s(self, o, prefix=None):
-    ''' Transcribe the object `o` to a string.
-        `o`: the object to transcribe.
-        `prefix`: optional marker prefix
-    '''
-    fp = StringIO()
-    self.transcribe(o, prefix=prefix, fp=fp)
-    s = fp.getvalue()
-    fp.close()
-    return s
-
-  def transcribe_mapping(self, m, fp):
-    ''' Transcribe the mapping `m` to the file `fp`.
-        `m`: the mapping to transcribe.
-        `fp`: optional file, default sys.stdout
+  @pfx
+  def transcribe_mapping_inner(self, m: Mapping[str, Any]) -> str:
+    ''' Transcribe the mapping `m` as a `str`.
+        This returns the inner items comma separated without the
+        usual surronding `{...}` markers.
         The keys of the mapping must be identifiers.
-        Values which are None are skipped.
+        Values which are `None` are skipped.
     '''
-    with Pfx("transcribe_mapping(%r)", m):
-      first = True
-      for k, v in m.items():
+    tokens = []
+    for k, v in m.items():
+      with Pfx("%r=%r", k, v):
         if not is_identifier(k):
-          raise ValueError("not an identifier key: %r" % (k,))
+          raise ValueError("key is not an identifier")
         if v is None:
           continue
-        if not first:
-          fp.write(',')
-        fp.write(k)
-        fp.write(':')
-        self.transcribe(v, None, fp)
-        first = False
+        tokens.append(f'{k}:{self.transcribe_obj(v)}')
+    return ','.join(tokens)
 
+  @classmethod
   @pfx_method
-  def parse(self, s, offset=0):
+  def parse(
+      cls,
+      s: str,
+      offset: int = 0,
+      *,
+      expected_cls: Optional[Type] = None,
+  ) -> Tuple[Any, int]:
     ''' Parse an object from the string `s` starting at `offset`.
         Return the object and the new offset.
 
         Parameters:
         * `s`: the source string
         * `offset`: optional string offset, default 0
+        * `expected_cls`: optional; if provided, require an instance of `expected_cls`
+
+        If `parse` is called via a subclass of `Transcriber` and
+        `expected_cls` omitted then it defaults to the subclass,
+        so that:
+
+            _Dirent.parse(s)
+
+        will ensure that some instance of `_Dirent` is found.
     '''
+    if expected_cls is Any:
+      expected_cls = None
+    elif expected_cls is None and cls is not Transcriber:
+      expected_cls = cls
     # strings
-    value, offset2 = self.parse_qs(s, offset, optional=True)
-    if value is not None:
-      return value, offset2
+    obj, offset2 = cls.parse_qs(s, offset, optional=True)
+    if obj is not None:
+      offset = offset2
     # decimal values
-    if s[offset:offset + 1].isdigit():
-      return get_decimal_or_float_value(s, offset)
-    # {json}
-    if s.startswith('{', offset):
+    elif s[offset:offset + 1].isdigit():
+      obj, offset = get_decimal_or_float_value(s, offset)
+    # bare {json}
+    elif s.startswith('{', offset):
       sub = s[offset:]
-      m, suboffset = pfx_call(json.JSONDecoder().raw_decode, sub)
+      obj, suboffset = pfx_call(json.JSONDecoder().raw_decode, sub)
       offset += suboffset
-      return m, offset
-    # prefix{....}
-    prefix, offset = get_identifier(s, offset)
-    if not prefix:
-      raise ValueError("no type prefix at offset %d" % (offset,))
-    with Pfx("prefix %r", prefix):
-      if offset >= len(s) or s[offset] != '{':
-        raise ValueError("missing opening '{' at offset %d" % (offset,))
-      offset += 1
-      baseclass = self.prefix_map.get(prefix)
-      if baseclass is None:
-        raise ValueError("prefix not registered: %r" % (prefix,))
-      with Pfx("baseclass=%s", baseclass.__name__):
-        o, offset = baseclass.parse_inner(self, s, offset, '}', prefix)
-      if offset > len(s):
-        raise ValueError("parse_inner returns offset beyond text")
-      if offset >= len(s) or s[offset] != '}':
-        raise ValueError("missing closing '}' at offset %d" % (offset,))
-      offset += 1
-      return o, offset
+    elif offset < len(s) and s[offset].isalpha():
+      # prefix{....}
+      prefix, offset = get_identifier(s, offset)
+      assert prefix
+      with Pfx("prefix %r", prefix):
+        if not s.startswith('{', offset):
+          raise ValueError("missing opening '{' at offset %d" % (offset,))
+        offset += 1
+        if prefix == 'U':
+          # UUID
+          m = UUID_re.match(s, offset)
+          if not m:
+            raise ValueError("expected a UUID")
+          obj = UUID(m.group())
+          offset = m.end()
+        else:
+          prefix_cls = cls.class_by_prefix.get(prefix)
+          if prefix_cls is None:
+            raise ValueError("prefix not registered")
+          with Pfx("prefix_cls=%s", prefix_cls.__name__):
+            obj, offset = prefix_cls.parse_inner(s, offset, '}', prefix)
+            assert isinstance(
+                obj, prefix_cls
+            ), f'{prefix_cls}.parse_inner did not return the expected object type, got {type(obj)}'
+          if offset > len(s):
+            raise ValueError("parse_inner returns offset beyond text")
+        if not s.startswith('}', offset):
+          raise ValueError("missing closing '}' at offset %d" % (offset,))
+        offset += 1
+    else:
+      raise ValueError(
+          f'parse error at offset {offset}: {s[offset:offset+16]!r}'
+      )
+    if expected_cls is not None and not isinstance(obj, expected_cls):
+      raise ValueError(
+          f'unexpected object type at offset {offset}: expected {expected_cls} but got {r(obj)}'
+      )
+    return obj, offset
 
   @staticmethod
-  def parse_qs(s, offset=0, optional=False):
+  def parse_qs(
+      s: str,
+      offset: int = 0,
+      optional: Optional[bool] = False,
+  ) -> [Union[str, None], int]:
     ''' Parse a quoted string from `s` at `offset`.
         Return the string value and the new offset.
 
         Parameters:
         * `s`: the source string
         * `offset`: optional string offset, default 0
-        * `optional`: if true (default False), return None if there
-          is no quoted string at offset instead of raising a ValueError
+        * `optional`: if true (default `False`), return `None` if there
+          is no quoted string at offset instead of raising `ValueError`
     '''
     if s.startswith("'", offset) or s.startswith('"', offset):
       return get_qstr(s, offset=offset, q=s[offset])
@@ -300,11 +314,15 @@ class Transcribe:
       return None, offset
     raise ValueError("offset %d: expected quoted string" % (offset,))
 
+  @classmethod
   def parse_mapping(
-      self, s, offset=0, stopchar=None, required=None, optional=None
+      cls, s, offset=0, stopchar=None, required=None, optional=None
   ):
     ''' Parse a mapping from the string `s`.
         Return the mapping and the new offset.
+
+        A mapping is expressed as comma separated set of
+        *name*`:`*transcribed_value* pairs, ended by `stopchar`.
 
         Parameters:
         * `s`: the source string
@@ -327,23 +345,25 @@ class Transcribe:
       )
     d = OrderedDict()
     while offset < len(s) and (stopchar is None or s[offset] != stopchar):
-      k, offset = get_identifier(s, offset)
-      if not k:
-        raise ValueError("offset %d: not an identifier" % (offset,))
-      if offset >= len(s) or s[offset] != ':':
-        raise ValueError("offset %d: expected ':'" % (offset,))
+      with Pfx("offset %d", offset):
+        k, offset = get_identifier(s, offset)
+        if not k:
+          raise ValueError('expected identifier')
+      with Pfx("offset %d", offset):
+        if not s.startswith(':', offset):
+          raise ValueError("expected ':'")
       offset += 1
-      v, offset = self.parse(s, offset)
+      with Pfx("offset %d", offset):
+        v, offset = cls.parse(s, offset, expected_cls=Any)
       d[k] = v
-      if offset >= len(s):
-        break
-      c = s[offset]
-      if c == stopchar:
-        break
-      if c != ',':
-        raise ValueError(
-            "offset %d: expected ',' but found: %r" % (offset, s[offset:])
-        )
+      with Pfx("offset %d", offset):
+        if offset >= len(s):
+          break
+        c = s[offset]
+        if c == stopchar:
+          break
+        if c != ',':
+          raise ValueError(f"expected ',' or {stopchar!r} but found: {c!r}")
       offset += 1
     if required is None and optional is None:
       return d, offset
@@ -360,179 +380,6 @@ class Transcribe:
     for k in optional:
       ret.append(d.get(k))
     return ret
-
-# global default Transcribe context
-_TRANSCRIBE = Transcribe()
-
-def register(cls, prefix=None, T=None):
-  ''' Register a class and prefix with a Transcribe context.
-
-      Parameters:
-      * `cls`: the class to register
-      * `prefix`: the marker prefix. If not specified, use `cls.transcribe_prefix`.
-      * `T`: the transcribe context, default: `_TRANSCRIBE`
-  '''
-  global _TRANSCRIBE
-  if prefix is None:
-    prefix = cls.transcribe_prefix
-  if T is None:
-    T = _TRANSCRIBE
-  return T.register(cls, prefix)
-
-def transcribe(o, prefix=None, fp=None, T=None):
-  ''' Transcribe the object `o` to file `fp`.
-
-      Parameters:
-      * `o`: the object to transcribe.
-      * `prefix`: optional marker prefix
-      * `fp`: optional file, default sys.stdout
-      * `T`: the transcribe context, default: `_TRANSCRIBE`
-  '''
-  global _TRANSCRIBE
-  if fp is None:
-    fp = sys.stdout
-  if T is None:
-    T = _TRANSCRIBE
-  return T.transcribe(o, prefix, fp)
-
-def transcribe_s(o, prefix=None, T=None):
-  ''' Transcribe the object `o` to a string.
-
-      Parameters:
-      * `o`: the object to transcribe.
-      * `prefix`: optional marker prefix
-      * `T`: the transcribe context, default: `_TRANSCRIBE`
-  '''
-  global _TRANSCRIBE
-  if T is None:
-    T = _TRANSCRIBE
-  return T.transcribe_s(o, prefix)
-
-def transcribe_mapping(m, fp, T=None):
-  ''' Transcribe the mapping `m` to the file `fp`.
-
-      Parameters:
-      * `m`: the mapping to transcribe.
-      * `fp`: optional file, default sys.stdout
-      * `T`: the transcribe context, default: `_TRANSCRIBE`
-
-      The keys of the mapping must be identifiers.
-  '''
-  global _TRANSCRIBE
-  if T is None:
-    T = _TRANSCRIBE
-  return T.transcribe_mapping(m, fp)
-
-def parse(s, offset=0, T=None):
-  ''' Parse an object from the string `s`. Return the object and the new offset.
-
-      Parameters:
-      * `s`: the source string
-      * `offset`: optional string offset, default 0
-      * `T`: the transcribe context, default: `_TRANSCRIBE`
-  '''
-  global _TRANSCRIBE
-  if T is None:
-    T = _TRANSCRIBE
-  return T.parse(s, offset)
-
-def parse_mapping(
-    s, offset=0, stopchar=None, T=None, required=None, optional=None
-):
-  ''' Parse a mapping from the string `s`.
-      Return the mapping and the new offset.
-
-      Parameters:
-      * `s`: the source string
-      * `offset`: optional string offset, default 0
-      * `stopchar`: ending character, not to be consumed
-      * `T`: the transcribe context, default: `_TRANSCRIBE`
-  '''
-  global _TRANSCRIBE
-  if T is None:
-    T = _TRANSCRIBE
-  return T.parse_mapping(
-      s, offset, stopchar, required=required, optional=optional
-  )
-
-@decorator
-def mapping_transcriber(
-    cls,
-    *,
-    prefix=None,
-    T=None,
-    transcription_mapping=None,
-    required=None,
-    optional=None,
-    factory=None,
-):
-  ''' A class decorator to provide mapping style `parse_inner` and
-      `transcribe_inner` methods and to register the class against
-      a Transcribe instance.
-
-      Parameters:
-      * `prefix`: the prefix string
-      * `T`: the transcribe instance, default: `_TRANSCRIBE`
-      * `transcription_mapping`: a function of `self` to produce
-        the mapping to be transcribed
-      * `required`: optional list of keys required in the mapping
-      * `optional`: optional list of keys which may be present in
-        the mapping
-      * `factory`: a factory to construct an instance of `cls` given
-        keywords arguments supplied by the parsed mapping;
-        default: `cls`
-
-      Example:
-
-          @mapping_transcriber(
-              prefix="Ino",
-              transcription_mapping=lambda self: {
-                  'refcount': self.recount,
-                  'E': self.E,
-              },
-              required=('refcount', 'E'),
-              optional=(),
-          )
-          class Inode(Transcriber):
-  '''
-  if prefix is None:
-    raise ValueError("missing prefix")
-  if transcription_mapping is None:
-    raise ValueError(
-        "missing transcription_mapping, expected a function of self"
-    )
-  if factory is None:
-    factory = cls
-
-  @classmethod
-  def parse_inner(cls, T, s, offset, stopchar, parsed_prefix):
-    ''' Parse the inner section as a mapping.
-    '''
-    if parsed_prefix != prefix:
-      raise ValueError(
-          "expected prefix=%r, got: %r" % (
-              prefix,
-              parsed_prefix,
-          )
-      )
-    m, offset = parse_mapping(
-        s,
-        offset,
-        stopchar=stopchar,
-        T=T,
-        required=required,
-        optional=optional
-    )
-    return factory(**m), offset
-
-  cls.parse_inner = parse_inner
-
-  def transcribe_inner(self, T, fp):
-    return transcribe_mapping(transcription_mapping(self), fp, T=T)
-
-  cls.transcribe_inner = transcribe_inner
-  register(cls, prefix=prefix, T=T)
-  return cls
 
 if __name__ == '__main__':
   from .transcribe_tests import selftest
