@@ -87,6 +87,7 @@ _help:
         @echo '_test3             - do python 3 syntax checks and self tests'
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_venv              - make the Python virtual environment based off $(base_python) using $(venv_requirements)'
+        @echo '_xfstests          - run the xfstests test suite against our FUSE implementation'
 
 _setup:
     :make _tags _venv
@@ -333,3 +334,15 @@ squid_redirect: $(noads)
 
 %.class-prereqs: %.java
     javaprereqs $(@P).java >$@
+
+XFSTESTS_VENDOR = $./vendor/xfstests
+XFSTESTS_SRCREPO = https://git.kernel.org/pub/scm/fs/xfs/xfstests-dev.git/
+XFSTESTS_TESTDIR = $./xfstests_test
+
+_xfstests:
+    :make $(XFSTESTS_VENDOR)
+    :make $(XFSTESTS_TESTDIR)/.
+
+$(XFSTESTS_VENDOR):
+    :make $(@D)/.
+    git clone $(XFSTESTS_SRCREPO) $@
