@@ -21,20 +21,20 @@ venv_python = $(venv_dir)/bin/python
 
 rewrite = rewriteif -0 -v
 
-JAVADIR	= $(ETCDIR)/www/java/classes
-java	= $(localjava) $(subjava)
+JAVADIR = $(ETCDIR)/www/java/classes
+java    = $(localjava) $(subjava)
 localjava= $('*.java' G)
-subjava	= $('cs/*.java' G?)
-classes	= $((java P)).class
+subjava = $('cs/*.java' G?)
+classes = $((java P)).class
 subclasses=$((subjava P)).class
-html	= $('*.html' G)
+html    = $('*.html' G)
 
-htdocs	= $(HOME)/@/ezos/html/cs
+htdocs  = $(HOME)/@/ezos/html/cs
 htmandir = $(htdocs)/css/manuals
-pmsets	= lib/perl/cs
+pmsets  = lib/perl/cs
 pmset(set) = $('$(set)/*.pm' EG?) \
-	     $('$(set)/*/*.pm' EG?) \
-	     $('$(set)/*/*/*.pm' EG?)
+         $('$(set)/*/*.pm' EG?) \
+         $('$(set)/*/*/*.pm' EG?)
 pmsetmans(set) = $(MANDIR)/man3/$(('$(pmset($(set)))' Es[/]P :|/|::|)).3
 pmsethtml(set) = $(htmandir)/$(('$(pmset($(set)))' Es[/]P :|/|::|)).3.html
 pmmans = $('$$(pmsetmans($((pmsets))))' EE)
@@ -255,14 +255,14 @@ _pending:
 _freshmeat:
         cs-release freshmeat-submit
 
-CHANGELOG.txt:	_always
-	>>$@; $(rewrite) $@ hglog
+CHANGELOG.txt:  _always
+    >>$@; $(rewrite) $@ hglog
 
-CHANGELOG.html:	_always
-	>>$@; $(rewrite) $@ cvslog2html -O .
+CHANGELOG.html: _always
+    >>$@; $(rewrite) $@ cvslog2html -O .
 
 1INDEX.txt: $(allscripts)
-	@echo make $@ \
+    @echo make $@ \
          ( cat INSTALL; mkscriptndx `ls -d $(allscripts) | sort` ) >$@
 
 _man:
@@ -282,54 +282,54 @@ $(podmans):     $(podFromMan($@))
 
 _pmmans: $(pmmans)
 
-$(pmmans):	$(pmFromMan($@))
-	:make $(@D)/.
-	@if grep '^=head1 NAME' <$? >/dev/null \
-	then \
-	    >>$@; $(rewrite) $@ pod2man --center="$(title): $?" $? \
-	    chmod 644 $@ \
-	    htman=$(htmandir)/$(@F).html \
-	    >>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
-	    chmod 644 $$htman \
-	else \
-	    : \
-	fi
+$(pmmans):  $(pmFromMan($@))
+    :make $(@D)/.
+    @if grep '^=head1 NAME' <$? >/dev/null \
+    then \
+        >>$@; $(rewrite) $@ pod2man --center="$(title): $?" $? \
+        chmod 644 $@ \
+        htman=$(htmandir)/$(@F).html \
+        >>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
+        chmod 644 $$htman \
+    else \
+        : \
+    fi
 
 _scriptmans:
         ( cd bin; exec egrep -l '^(# *)?=head1 NAME' $(allscripts) ) \\
-	| sed 's|.*|$(scriptmandir)/&.1|' \\
-	| xxargs $(MAKE) MANDIR=$(MANDIR)
+    | sed 's|.*|$(scriptmandir)/&.1|' \\
+    | xxargs $(MAKE) MANDIR=$(MANDIR)
 
 $(scriptmandir)/%.1: bin/%
-	:make $(@D)/.
-	@htman=$(htmandir)/$(@F).html \
-	 case "`sed 1q <$?`" in \
-	    '#!/usr/bin/perl'*) \
-		grep '^=head1 NAME' <$? >/dev/null || exit 0 \
-		>>$@; $(rewrite) $@ pod2man --release=CSS --section=1cs --center="$(title)" $? \
-		>>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
-		;; \
-	    *) \
-		grep '^# *=head1 NAME' <$? >/dev/null || exit 0 \
-		tmp=$${TMPDIR:-/tmp}/$(@F).$$ \
-		unhashpod <$? >$$tmp \
-		>>$@; $(rewrite) $@ pod2man --section=1cs --center="$(title)" $$tmp \
-		>>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $$tmp \
-		rm $$tmp \
-		;; \
-	 esac \
-	 chmod 644 $@ $$htman
+    :make $(@D)/.
+    @htman=$(htmandir)/$(@F).html \
+     case "`sed 1q <$?`" in \
+      '#!/usr/bin/perl'*) \
+        grep '^=head1 NAME' <$? >/dev/null || exit 0 \
+        >>$@; $(rewrite) $@ pod2man --release=CSS --section=1cs --center="$(title)" $? \
+        >>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
+        ;; \
+      *) \
+        grep '^# *=head1 NAME' <$? >/dev/null || exit 0 \
+        tmp=$${TMPDIR:-/tmp}/$(@F).$$ \
+        unhashpod <$? >$$tmp \
+        >>$@; $(rewrite) $@ pod2man --section=1cs --center="$(title)" $$tmp \
+        >>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $$tmp \
+        rm $$tmp \
+        ;; \
+     esac \
+     chmod 644 $@ $$htman
 
-noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
+noads   = $(HOME)/@/adzapper.sf/html/rc/patterns
 
 squid_redirect: $(noads)
-	@cd $(?DD) || exit 1 \
-	pwd; \
-	exec $(MAKE) _scripts
+    @cd $(?DD) || exit 1 \
+    pwd; \
+    exec $(MAKE) _scripts
 
 %.class: %.java %.class-prereqs : $(("%.class-prereqs" G?<P)).class
-	:make $(("$@-prereqs" E<P)).class
-	$(JAVAC) $(@P).java
+    :make $(("$@-prereqs" E<P)).class
+    $(JAVAC) $(@P).java
 
 %.class-prereqs: %.java
-	javaprereqs $(@P).java >$@
+    javaprereqs $(@P).java >$@
