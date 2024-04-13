@@ -479,74 +479,47 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
 
     self.debug_parse("finish parse")
 
-class TargetMap(NS):
-  ''' A mapping interface to the known targets.
-      Makes targets as needed if inferrable.
-      Raise KeyError for missing Targets which are not inferrable.
 uses_Maker = default_params(maker=Maker.default)
 
 @uses_Maker
 def mdebug(msg: str, *a, maker: Maker):
   return maker.make_debug(msg, *a)
 
+class TargetMap(dict):
+  ''' A thread safe mapping interface to the known `Target`s.
+      Makes empty targets as needed.
   '''
 
   def __init__(self):
     ''' Initialise the `TargetMap`.
     '''
-    self._maker = None
-    self.targets = {}
-    self._lock = RLock()
+    self._lock = RLock()  # __setitem__ can call __getitem__
 
-  @property
-  def maker(self):
-    ''' The `Maker` to use to make `Target`s.
-    '''
-    return self._maker or Maker.default()
-
-  def __getitem__(self, name):
+  def __getitem__(self, name: str) -> "Target":
     ''' Return the Target for `name`.
         Raises KeyError if the Target is unknown and not inferrable.
     '''
-    targets = self.targets
-    if name not in targets:
-      with self._lock:
-        if name not in targets:
-          T = self._newTarget(self.maker, name, context=None)
-          if existspath(name):
-            self.maker.debug_make("%r: exists, no rules - consider made", name)
-            T.out_of_date = False
-            T.succeed()
-          else:
-            error("%r: does not exist, no rules (and nothing inferred)", name)
-            T.fail()
-          targets[name] = T
-    return targets[name]
+    with self._lock:
+      return super().__getitem__(name)
 
-  def _newTarget(
-      self, maker, name, context, prereqs=(), postprereqs=(), actions=()
-  ):
-    ''' Construct a new Target.
+  def __missing__(self, name) -> "Target":
+    ''' A missing `Target` gets made with no context or other stuff.
     '''
-    return Target(maker, name, context, prereqs, postprereqs, actions)
+    return Target(name, None, (), (), [])
 
-  def __setitem__(self, name, target):
+  def __setitem__(self, name: str, target: "Target"):
     ''' Record new target in map.
         Check that the name matches.
         Reject duplicate names.
     '''
     if name != target.name:
       raise ValueError(
-          "tried to record Target as %r, but target.name = %r" %
-          (name, target.name)
+          f'tried to record Target as {name!r}, but target.name = {target.name!r}'
       )
     with self._lock:
-      if name in self.targets:
-        raise ValueError(
-            "redefinition of Target %r, previous definition from %s" %
-            (name, self.targets[name].context)
-        )
-      self.targets[name] = target
+      if name in self:
+        raise KeyError('Target for {name!r} already known: {self[name]}')
+      super().__setitem__(name, target)
 
 class Target(Result):
   ''' A make target.
