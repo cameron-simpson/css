@@ -439,10 +439,9 @@ class Macro:
   def mexpr(self):
     ''' The parsed `MacroExpression`.
     '''
-    if self._mexpr is None:
-      self._mexpr, offset = MacroExpression.parse(self.context, self.text)
-      assert offset == len(self.text)
-    return self._mexpr
+    mexpr, offset = MacroExpression.parse(self.context, self.text)
+    assert offset == len(self.text)
+    return mexpr
 
   def __call__(self, context, namespaces, *param_values):
     ''' Call the macro with namespaces and parameter values as keywork arguments.
