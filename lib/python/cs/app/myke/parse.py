@@ -419,7 +419,7 @@ class Macro:
       cls,
       context: FileContext,
       assignment_text: str,
-  ) -> Union["Macro" | None]:
+  ) -> Union["Macro", None]:
     ''' Try to parse `assignment_text` as a macro definition.
         If it does not look like an assignment (does not match `RE_ASSIGNMENT`),
         return `None`.
@@ -988,7 +988,7 @@ def parseMacro(context, text=None, offset=0):
             offset += 1
             try:
               ptn, repl, etc = text[offset:].split(delim, 2)
-            except ValueError as e
+            except ValueError as e:
               raise ParseError(
                   context, offset, 'incomplete :%sptn%srep%s', delim, delim,
                   delim
