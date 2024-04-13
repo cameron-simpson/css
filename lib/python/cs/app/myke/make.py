@@ -923,7 +923,6 @@ class Action(NS):
 
   def _shcmd(self, target, shcmd):
     with Pfx("%s.act: shcmd=%r", self, shcmd):
-      mdebug = target.maker.debug_make
       argv = (target.shell, '-c', shcmd)
       mdebug("Popen(%s,..)", argv)
       P = Popen(argv, close_fds=True)
