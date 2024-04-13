@@ -484,6 +484,12 @@ class TargetMap(NS):
   ''' A mapping interface to the known targets.
       Makes targets as needed if inferrable.
       Raise KeyError for missing Targets which are not inferrable.
+uses_Maker = default_params(maker=Maker.default)
+
+@uses_Maker
+def mdebug(msg: str, *a, maker: Maker):
+  return maker.make_debug(msg, *a)
+
   '''
 
   def __init__(self):
@@ -606,7 +612,7 @@ class Target(Result):
   def succeed(self):
     ''' Mark target as successfully made.
     '''
-    self.mdebug("OK")
+    mdebug("OK")
     if self.ready:
       if not self.result:
         raise RuntimeError(
@@ -622,7 +628,7 @@ class Target(Result):
     '''
     if msg is None:
       msg = "FAILED"
-    self.mdebug(msg)
+    mdebug(msg)
     if self.ready:
       if self.result:
         raise RuntimeError("%s.fail: already completed OK" % (self.name,))
@@ -707,8 +713,8 @@ class Target(Result):
     ''' Cancel this Target.
         Actions will cease as soon as decorum allows.
     '''
-    self.maker.debug_make("%s: CANCEL", self)
     Result.cancel(self)
+    mdebug("%s: CANCEL", self)
 
   @pfx_method
   def require(self):
@@ -771,8 +777,6 @@ class Target(Result):
     ''' Apply the consequences of the completed prereq T.
     '''
     with Pfx("%s._apply_prereqs(T=%s)", self, T):
-      assert isinstance(self.maker, Maker)
-      mdebug = self.maker.debug_make
       if not T.ready:
         raise RuntimeError("not ready")
       if not T.result:
@@ -816,13 +820,13 @@ class Target(Result):
       actions = self.pending_actions
       if actions:
         A = actions.pop(0)
-        self.mdebug("queue action: %s", A)
+        mdebug("queue action: %s", A)
         Rs.append(A.act_later(self))
       else:
-        self.mdebug("no actions remaining")
+        mdebug("no actions remaining")
 
       if Rs:
-        self.mdebug(
+        mdebug(
             "tasks still to do, requeuing: Rs=%s",
             ",".join(str(_) for _ in Rs)
         )
@@ -876,7 +880,6 @@ class Action(NS):
       try:
         debug("start act...")
         M = target.maker
-        mdebug = M.debug_make
         v = self.variant
 
         if v == 'shell':
@@ -899,7 +902,6 @@ class Action(NS):
           def _act_after_make():
             # analyse success of targets, update R
             ok = True
-            mdebug = M.debug_make
             for T in subTs:
               if T.result:
                 mdebug('submake "%s" OK', T)
