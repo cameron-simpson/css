@@ -465,7 +465,6 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
           action_list = []
           for target in target_mexpr(context, self.namespaces).split():
             yield Target(
-                self,
                 target,
                 context,
                 prereqs=prereqs_mexpr,
@@ -556,7 +555,6 @@ class Target(Result):
   @typechecked
   def __init__(
       self,
-      maker: Maker,
       name: str,
       context: FileContext,
       prereqs,
@@ -581,7 +579,6 @@ class Target(Result):
         `:make` directive.
     '''
     self.name = name
-    self.maker = maker
     self.context = context
     self.shell = SHELL
     self._prereqs = prereqs
