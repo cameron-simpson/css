@@ -28,7 +28,9 @@ from typing import Any, List, Optional
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommandOptions
+from cs.deco import default_params, promote, Promotable
 from cs.excutils import logexc
+from cs.fsm import FSM
 from cs.inttypes import Flags
 from cs.later import Later
 from cs.lex import get_identifier, get_white
@@ -521,9 +523,37 @@ class TargetMap(dict):
         raise KeyError('Target for {name!r} already known: {self[name]}')
       super().__setitem__(name, target)
 
-class Target(Result):
+class Target(FSM, Promotable):
   ''' A make target.
   '''
+
+  FSM_TRANSITIONS = {
+      'UNCHECKED': {
+          'require': 'MAKE_PREREQS',
+      },
+      'MAKE_PREREQS': {
+          'failed': 'FAILED',
+          'updated': 'OUT_OF_DATE',
+          'unchanged': 'CHECK_EXISTS',
+      },
+      'CHECK_EXISTS': {
+          'exists': 'DONE',
+          'missing': 'OUT_OF_DATE',
+      },
+      'OUT_OF_DATE': {
+          'cancel': 'CANCELLED',
+          'completed': 'DONE',
+          'failed': 'FAILED',
+      },
+      # build cancelled
+      'CANCELLED': {},
+      # built anew
+      'UPDATED': {},
+      # exists and prereqs not updated
+      'OK': {},
+      # build failed
+      'FAILED': {},
+  }
 
   @typechecked
   def __init__(
@@ -573,10 +603,11 @@ class Target(Result):
   def __str__(self):
     return f'{self.name}[{self.fsm_state}]'
 
-  def mdebug(self, msg, *a):
-    ''' Emit a debug message.
+  @classmethod
+  def from_str(cls, name, *, maker: Maker):
+    ''' Return the `Target` named `name`.
     '''
-    return self.maker.debug_make(msg, *a)
+    return maker[name]
 
   @locked
   def succeed(self):
