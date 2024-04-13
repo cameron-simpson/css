@@ -637,7 +637,8 @@ class Target(Result):
     self.result = False
 
   @property
-  def namespaces(self):
+  @uses_Maker
+  def namespaces(self, *, maker: Maker):
     ''' The namespaces for this `Target`: the special per-`Target` macros,
         the `Maker`'s namespaces, the `Maker`'s macros and the special macros.
     '''
@@ -649,8 +650,8 @@ class Target(Result):
                 '?': lambda c, ns: ' '.join(self.new_prereqs),
                 # TODO: $< et al
             },
-        ] + self.maker.namespaces + [
-            self.maker.macros,
+        ] + maker.namespaces + [
+            maker.macros,
             SPECIAL_MACROS,
         ]
     )
@@ -666,7 +667,8 @@ class Target(Result):
     return self._prereqs
 
   @property
-  def new_prereqs(self):
+  @uses_Maker
+  def new_prereqs(self, *, maker: Maker):
     ''' Return the new prerequisite target names.
     '''
     if self.was_missing:
@@ -674,7 +676,7 @@ class Target(Result):
       return self.prereqs
     Ps = []
     for Pname in self.prereqs:
-      P = self.maker[Pname]
+      P = maker[Pname]
       if not P.ready:
         raise RuntimeError("%s: prereq %r not ready", self.name, Pname)
       if self.older_than(P):
@@ -717,20 +719,21 @@ class Target(Result):
     mdebug("%s: CANCEL", self)
 
   @pfx_method
-  def require(self):
+  @uses_Maker
+  def require(self, *, maker: Maker):
     ''' Require this Target to be made.
     '''
     with self._lock:
       if self.is_pending:
         # commence make of this Target
-        self.maker.target_active(self)
-        self.notify(self.maker.target_inactive)
+        maker.target_active(self)
+        self.notify(maker.target_inactive)
         self.dispatch()
         self.was_missing = self.mtime is None
         self.pending_actions = list(self.actions)
         Ts = []
         for Pname in self.prereqs:
-          T = self.maker[Pname]
+          T = maker[Pname]
           Ts.append(T)
           T.require()
 
@@ -744,7 +747,7 @@ class Target(Result):
           T.notify(f)
         # queue the first unit of work
         if Ts:
-          self.maker.after(Ts, self._make_after_prereqs, Ts)
+          maker.after(Ts, self._make_after_prereqs, Ts)
         else:
           self._make_after_prereqs(Ts)
 
@@ -792,7 +795,8 @@ class Target(Result):
           self.out_of_date = True
 
   @logexc
-  def _make_next(self):
+  @uses_Maker
+  def _make_next(self, *, maker: Maker):
     ''' The inner/recursive/deferred function from _make; only called if out of date.
         Perform the next unit of work in making this Target.
         If we complete without blocking, put True or False onto self.made.
@@ -830,7 +834,7 @@ class Target(Result):
             "tasks still to do, requeuing: Rs=%s",
             ",".join(str(_) for _ in Rs)
         )
-        self.maker.after(Rs, self._make_next)
+        maker.after(Rs, self._make_next)
       else:
         # all done, record success
         self.succeed()
@@ -860,34 +864,35 @@ class Action(NS):
     '''
     return self.line.rstrip().replace('\n', '\\n')
 
-  def act_later(self, target: Target) -> Result:
+  @uses_Maker
+  def act_later(self, target: Target, *, maker: Maker) -> Result:
     ''' Request that this `Action` occur on behalf of the `target`.
         Return a `Result` which returns the success or failure
         of the action.
     '''
     R = Result(name="%s.action(%s)" % (target, self))
-    target.maker.defer("%s:act[%s]" % (
+    maker.defer("%s:act[%s]" % (
         self,
         target,
     ), self._act, R, target)
     return R
 
-  def _act(self, R: Result, target: Target):
+  @uses_Maker
+  def _act(self, R: Result, target: Target, *, maker: Maker):
     ''' Perform this Action on behalf of the Target `target`.
         Arrange to put the result onto `R`.
     '''
     with Pfx("%s.act(target=%s)", self, target):
       try:
         debug("start act...")
-        M = target.maker
         v = self.variant
 
         if v == 'shell':
           debug("shell command")
           shcmd = self.mexpr(self.context, target.namespaces)
-          if M.no_action or not self.silent:
+          if maker.no_action or not self.silent:
             print(shcmd)
-          if M.no_action:
+          if maker.no_action:
             mdebug("OK (maker.no_action)")
             R.put(True)
             return
@@ -897,7 +902,7 @@ class Action(NS):
         if v == 'make':
           subtargets = self.mexpr(self.context, target.namespaces).split()
           mdebug("targets = %s", subtargets)
-          subTs = [M[subtarget] for subtarget in subtargets]
+          subTs = [maker[subtarget] for subtarget in subtargets]
 
           def _act_after_make():
             # analyse success of targets, update R
@@ -913,7 +918,7 @@ class Action(NS):
           for T in subTs:
             mdebug('submake "%s"', T)
             T.require()
-          M.after(subTs, _act_after_make)
+          maker.after(subTs, _act_after_make)
           return
 
         raise NotImplementedError("unsupported variant: %s" % (self.variant,))
