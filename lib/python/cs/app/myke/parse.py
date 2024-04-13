@@ -6,15 +6,22 @@
 
 from dataclasses import dataclass
 import errno
+from functools import cached_property
 import glob
 from collections import namedtuple
 from io import StringIO
 from itertools import product
 import os
-import os.path
-from os.path import dirname, isabs
+from os.path import (
+    basename,
+    dirname,
+    isabs as isabspath,
+    join as joinpath,
+    normpath,
+)
 import re
 from string import whitespace
+from typing import List, Optional, Tuple, Union
 import unittest
 
 from cs.deco import strable
@@ -61,7 +68,7 @@ class FileContext:
   filename: str
   lineno: int
   text: str
-  parent: "FileContext"
+  parent: Optional["FileContext"] = None
 
   def __str__(self):
     tag = f'{self.filename}:{self.lineno}'
@@ -95,7 +102,7 @@ def nsget(namespaces, mname):
   for ns in namespaces:
     M = ns.get(mname)
     if M:
-      if type(M) is str:
+      if isinstance(M, str):
         return lambda c, ns: M
       return M
   return None
@@ -144,7 +151,7 @@ class ModDirpart(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
-    return self.foreach(text, os.path.dirname)
+    return self.foreach(text, dirname)
 
 class ModFilepart(Modifier):
   ''' A modifier to get the file part of a filename.
@@ -152,7 +159,7 @@ class ModFilepart(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
-    return self.foreach(text, os.path.basename)
+    return self.foreach(text, basename)
 
 class ModifierSplit1(Modifier):
   ''' A modifier that splits a word on a separator and returns one half.
@@ -220,13 +227,13 @@ class ModUnique(Modifier):
     return " ".join(words)
 
 class ModNormpath(Modifier):
-  ''' A modifier which returns os.path.normpath(word) for each word in `text`.
+  ''' A modifier which returns `normpath(word)` for each `word` in `text`.
   '''
 
   def modify(self, text, namespaces):
     ''' Normalise the path `text`.
     '''
-    return self.foreach(os.path.normpath)
+    return self.foreach(normpath)
 
 class ModGlob(Modifier):
   ''' A modifier which returns each word of `text` replaced by its glob match.
@@ -242,8 +249,8 @@ class ModGlob(Modifier):
     '''
     globbed = []
     for ptn in self.words(text):
-      with Pfx("glob(\"%s\")", ptn):
-        matches = glob.glob(ptn)
+      with Pfx("%r G", ptn):
+        matches = pfx_call(glob.glob, ptn)
         if matches:
           if self.muststat:
             for match in matches:
@@ -280,8 +287,8 @@ class ModFromFiles(Modifier):
     for filename in self.words(text):
       with Pfx(filename):
         try:
-          with open(filename) as fp:
-            newwords.extend(self.words(fp.read()))
+          with open(filename) as f:
+            newwords.extend(self.words(f.read()))
         except IOError as e:
           if self.lax:
             warning("%s", e)
@@ -386,44 +393,37 @@ class ModSetOp(Modifier):
     elif self.op == '*':
       words = words.intersection(subwords)
     else:
-      raise NotImplementedError("unimplemented set op \"%s\"" % (self.op,))
+      raise NotImplementedError(f'unimplemented set op {self.op!r}')
     return " ".join(words)
 
-class Macro(object):
+@dataclass
+class Macro:
   ''' A macro definition.
   '''
-
-  def __init__(self, context, name, params, text):
-    ''' Initialise macro definition.
-
-        Parameters:
-        * `context`: source context.
-        * `name`: macro name.
-        * `params`: list of parameter names.
-        * `text`: replacement text, unparsed.
-    '''
-    self.context = context
-    self.name = name
-    self.params = params
-    self.text = text
-    self._mexpr = None
+  context: FileContext
+  name: str
+  params: List[str]
+  text: str
 
   def __str__(self):
     if self.params:
-      return "$(%s(%s))" % (
-          self.name,
-          ",".join(self.params),
-      )
-    return ("$(%s)" if len(self.name) > 1 else "$%s") % (self.name,)
+      return f'$({self.name}({",".join(self.params)})'
+    if len(self.name) == 1:
+      return f'${self.name}'
+    return f'$({self.name})'
 
   __repr__ = __str__
 
   @classmethod
-  def from_assignment(cls, context, assignment_text):
+  def from_assignment(
+      cls,
+      context: FileContext,
+      assignment_text: str,
+  ) -> Union["Macro" | None]:
     ''' Try to parse `assignment_text` as a macro definition.
-        If it does not look like an assignment (does not match RE_ASSIGNMENT),
-        return None.
-        Otherwise return a Macro.
+        If it does not look like an assignment (does not match `RE_ASSIGNMENT`),
+        return `None`.
+        Otherwise return a `Macro`.
     '''
     with Pfx("%s.from_assignment(%r)", cls.__name__, assignment_text):
       m = RE_ASSIGNMENT.match(assignment_text)
@@ -435,9 +435,9 @@ class Macro(object):
       macro_text = assignment_text[m.end():].rstrip()
       return cls(context, macro_name, param_names, macro_text)
 
-  @prop
+  @cached_property
   def mexpr(self):
-    ''' The parsed MacroExpression.
+    ''' The parsed `MacroExpression`.
     '''
     if self._mexpr is None:
       self._mexpr, offset = MacroExpression.parse(self.context, self.text)
@@ -445,48 +445,61 @@ class Macro(object):
     return self._mexpr
 
   def __call__(self, context, namespaces, *param_values):
-    with Pfx("$(%s)", self.name):
-      assert type(namespaces) is list, "namespaces = %s" % r(namespaces)
+    ''' Call the macro with namespaces and parameter values as keywork arguments.
+    '''
+    with Pfx(self):
+      assert isinstance(namespaces, list)
       if len(param_values) != len(self.params):
         raise ValueError(
             "mismatched Macro parameters: self.params = %r (%d items) but got %d param_values: %r"
             % (self.params, len(self.params), len(param_values), param_values)
         )
+      # provide any parameters as the leading namespace
       if self.params:
         namespaces = [dict(zip(self.params, param_values))] + namespaces
       return self.mexpr(context, namespaces)
 
-def readMakefileLines(
-    M, fp, parent_context=None, start_lineno=1, missing_ok=False
+def scan_makefile(
+    M,
+    f,
+    parent_context=None,
+    start_lineno=1,
+    missing_ok=False,
 ):
-  ''' Read a Mykefile and yield text lines.
+  ''' Read a Mykefile and yield `(FileContext,str)` tuples.
       This generator parses slosh extensions and
       :if/ifdef/ifndef/else/endif directives.
 
   '''
-  if isinstance(fp, str):
+  if isinstance(f, str):
+    if start_lineno != 1:
+      raise ValueError(
+          "start_lineno must be 1 (the default) if f is a filename"
+      )
     # open file, yield contents
-    filename = fp
+    filename = f
     try:
-      with pfx_call(open, filename) as fp:
-        yield from readMakefileLines(
-            M, fp, parent_context, missing_ok=missing_ok
-        )
+      with pfx_call(open, filename) as f:
+        yield from scan_makefile(M, f, parent_context, missing_ok=missing_ok)
     except OSError as e:
-      if e.errno == errno.ENOENT or e.errno == errno.EPERM:
-        yield parent_context, e
+      if e.errno == errno.ENOENT and missing_ok:
+        return
+      raise
     return
 
+  if missing_ok:
+    raise ValueError("missing_ok may not be true unless f is a filename")
+
   try:
-    filename = fp.name
+    filename = f.name
   except AttributeError:
-    filename = str(fp)
+    filename = str(f)
 
   ifStack = []  # active ifStates (state, in-first-branch)
   context = None  # FileContext(filename, lineno, line)
 
   prevline = None
-  for lineno, line in enumerate(fp, start_lineno):
+  for lineno, line in enumerate(f, start_lineno):
     if not line.endswith('\n'):
       raise ParseError(
           context, len(line), '%s:%d: unexpected EOF (missing final newline)',
@@ -550,7 +563,7 @@ def readMakefileLines(
               ifStack.append(newIfState)
               continue
             if word == "if":
-              raise ParseError(context, offset, "\":if\" not yet implemented")
+              raise ParseError(context, offset, '":if" not yet implemented')
               continue
             if word == "else":
               # extra text permitted
@@ -583,15 +596,12 @@ def readMakefileLines(
                                                   M.namespaces).split():
                   if len(include_file) == 0:
                     continue
-                  if isabs(include_file):
-                    include_file = os.path.join(
-                        dirname(filename), include_file
-                    )
-                  yield from readMakefileLines(
+                  if not isabspath(include_file):
+                    include_file = joinpath(dirname(filename), include_file)
+                  yield from scan_makefile(
                       M,
                       include_file,
                       parent_context=context,
-                      missing_ok=missing_ok
                   )
               continue
         if not all(ifState[0] for ifState in ifStack):
@@ -651,18 +661,20 @@ class MacroExpression(object):
     return mexpr
 
   @classmethod
-  def parse(cls, context, text=None, offset=0, stopchars=''):
+  def parse(cls,
+            context,
+            text=None,
+            offset=0,
+            stopchars='') -> Tuple["MacroExpression", int]:
     ''' Parse a macro expression from `text` or `context.text` if `text` is `None`.
         Return `(MacroExpression,offset)`.
 
         A macro expression is a concatenation of permutations.
     '''
-    if type(context) is str:
+    if isinstance(context, str):
       context = FileContext('<string>', 1, context, None)
-
     if text is None:
       text = context.text
-
     permutations = []
     while offset < len(text):
       ch = text[offset]
@@ -686,23 +698,21 @@ class MacroExpression(object):
         else:
           # end of parsable string
           break
-
     # drop trailing whitespace
     if permutations:
       last = permutations[-1]
-      if type(last) is str and last.isspace():
+      if isinstance(last, str) and last.isspace():
         permutations.pop()
-
     return cls(context, permutations), offset
 
   def __call__(self, context, namespaces):
-    assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
+    assert isinstance(namespaces, list)
     if self._result is not None:
       return self._result
     strs = []  # strings to collate
     wordlists = None  # accruing word permutations
     for item in self.permutations:
-      if type(item) is str:
+      if isinstance(item, str):
         if item.isspace():
           # whitespace - end of word
           # stash existing word if any
@@ -927,7 +937,7 @@ def parseMacro(context, text=None, offset=0):
               modclass = ModSuffixLong
             else:
               raise NotImplementedError(
-                  "parse error: unhandled PpSs letter \"%s\"" % (mod0,)
+                  f'parse error: unhandled PpSs letter {mod0!r}'
               )
           elif mod0 == '<':
             modclass = ModFromFiles
@@ -978,11 +988,11 @@ def parseMacro(context, text=None, offset=0):
             offset += 1
             try:
               ptn, repl, etc = text[offset:].split(delim, 2)
-            except ValueError:
+            except ValueError as e
               raise ParseError(
                   context, offset, 'incomplete :%sptn%srep%s', delim, delim,
                   delim
-              )
+              ) from e
             offset = len(text) - len(etc)
             modargs = (ptn, repl)
           else:
@@ -1025,7 +1035,7 @@ def parseMacro(context, text=None, offset=0):
         error("%s", e)
         offset += 1
 
-    assert ch == mmark2, "should be at \"%s\", but am at: %s" % (
+    assert ch == mmark2, "should be at %r, but am at: %s" % (
         mmark, text[offset:]
     )
     offset += 1
@@ -1045,11 +1055,11 @@ def parseMacro(context, text=None, offset=0):
     )
     return M, offset
 
-  except IndexError:
+  except IndexError as e:
     raise ParseError(
         context, offset, 'parse incomplete, offset=%d, remainder: %s', offset,
         text[offset:]
-    )
+    ) from e
 
   raise ParseError(
       context, offset, 'unhandled parse failure at offset %d: %s', offset,
@@ -1111,8 +1121,8 @@ class MacroTerm(object):
   def __call__(self, context, namespaces, param_mexprs):
     ''' Evaluate a macro expression.
     '''
-    assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
-    with Pfx(str(self.context)):
+    assert isinstance(namespaces, list)
+    with Pfx(self.context):
       text = self.text
       if not self.literal:
         macro = nsget(namespaces, text)
@@ -1120,11 +1130,9 @@ class MacroTerm(object):
           raise ValueError("unknown macro: $(%s)" % (text,))
         param_values = [mexpr(context, namespaces) for mexpr in param_mexprs]
         text = macro(context, namespaces, *param_values)
-
       for modifier in self.modifiers:
-        with Pfx("\"%s\" %s", text, modifier):
+        with Pfx("%r %s", text, modifier):
           text = modifier(text, namespaces)
-
       return text
 
 class TestAll(unittest.TestCase):
@@ -1159,7 +1167,7 @@ class TestAll(unittest.TestCase):
     with Maker("myke") as M:
       parsed = list(M.parse(StringIO("abc = def\n")))
       self.assertEqual(len(parsed), 1)
-      self.assertEqual([type(O) for O in parsed], [Macro])
+      self.assertEqual([type(obj) for obj in parsed], [Macro])
 
 if __name__ == '__main__':
   unittest.main()

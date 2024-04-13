@@ -9,8 +9,15 @@ import errno
 from itertools import zip_longest
 import logging
 import os
-import os.path
-from os.path import dirname, realpath
+from os.path import (
+    basename,
+    dirname,
+    exists as existspath,
+    isabs as isabspath,
+    join as joinpath,
+    realpath,
+    splitext,
+)
 from subprocess import Popen
 import sys
 from threading import RLock
@@ -41,7 +48,12 @@ from cs.threads import (
 
 from . import DEFAULT_MAKE_COMMAND
 from .parse import (
-    SPECIAL_MACROS, Macro, MacroExpression, readMakefileLines, ParseError
+    SPECIAL_MACROS,
+    FileContext,
+    Macro,
+    MacroExpression,
+    ParseError,
+    scan_makefile,
 )
 
 SHELL = '/bin/sh'
@@ -120,16 +132,16 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
     finally:
       self._makeQ.wait()
 
-  def report(self, fp=None):
+  def report(self, f=None):
     ''' Report the make queue status.
     '''
     D("REPORT...")
-    if fp is None:
-      fp = sys.stderr
-    fp.write(str(self))
-    fp.write(': ')
-    fp.write(repr(self._makeQ))
-    fp.write('\n')
+    if f is None:
+      f = sys.stderr
+    f.write(str(self))
+    f.write(': ')
+    f.write(repr(self._makeQ))
+    f.write('\n')
     D("REPORTED")
 
   def _ticker(self):
@@ -158,13 +170,11 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
     _makefiles = self._makefiles
     if not _makefiles:
       _makefiles = []
-      makerc_envvar = (
-          os.path.splitext(os.path.basename(cs.pfx.cmd))[0] + 'rc'
-      ).upper()
+      makerc_envvar = (splitext(basename(cs.pfx.cmd))[0] + 'rc').upper()
       makerc = os.environ.get(makerc_envvar)
-      if makerc and os.path.exists(makerc):
+      if makerc and existspath(makerc):
         _makefiles.append(makerc)
-      makefile = os.path.basename(cs.pfx.cmd).title() + 'file'
+      makefile = basename(cs.pfx.cmd).title() + 'file'
       _makefiles.append(makefile)
       self._makefiles = _makefiles
     if type(_makefiles) is not tuple:
@@ -192,7 +202,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   def target_active(self, target):
     ''' Add this target to the set of "in progress" targets.
     '''
-    self.debug_make("note target \"%s\" as active", target.name)
+    self.debug_make('note target "%s" as active', target.name)
     with self.activity_lock:
       self.active.add(target)
 
@@ -328,24 +338,18 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
         self.default_target = first_target
     return ok
 
-  def parse(self, fp, parent_context=None, missing_ok=False):
+  def parse(self, f, parent_context=None, missing_ok=False):
     ''' Read a Mykefile and yield Macros and Targets.
     '''
     from .make import Target, Action
     action_list = None  # not in a target
-    for context, line in readMakefileLines(self, fp,
-                                           parent_context=parent_context,
-                                           missing_ok=missing_ok):
-      with Pfx(str(context)):
-        if isinstance(line, OSError):
-          e = line
-          if e.errno == errno.ENOENT or e.errno == errno.EPERM:
-            if missing_ok:
-              continue
-            e.context = context
-            yield e
-            break
-          raise e
+    for context, line in scan_makefile(
+        self,
+        f,
+        parent_context=parent_context,
+        missing_ok=missing_ok,
+    ):
+      with Pfx(context):
         try:
           if line.startswith(':'):
             # top level directive
@@ -362,9 +366,9 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
                 assert offset == len(line)
                 for include_file in mexpr(context, self.namespaces).split():
                   if include_file:
-                    if not os.path.isabs(include_file):
-                      include_file = os.path.join(
-                          realpath(dirname(fp.name)), include_file
+                    if not isabspath(include_file):
+                      include_file = joinpath(
+                          realpath(dirname(f.name)), include_file
                       )
                     self.add_appendfile(include_file)
                 continue
@@ -506,7 +510,7 @@ class TargetMap(NS):
       with self._lock:
         if name not in targets:
           T = self._newTarget(self.maker, name, context=None)
-          if os.path.exists(name):
+          if existspath(name):
             self.maker.debug_make("%r: exists, no rules - consider made", name)
             T.out_of_date = False
             T.succeed()
@@ -550,15 +554,17 @@ class Target(Result):
       self,
       maker: Maker,
       name: str,
-      context,
+      context: FileContext,
       prereqs,
       postprereqs,
       actions: List["Action"],
   ):
     ''' Initialise a new target.
+
+        Parameters:
+        - `name`: the name of the target.
         - `maker`: the Maker with which this Target is associated.
         - `context`: the file context, for citations.
-        - `name`: the name of the target.
         - `prereqs`: macro expression to produce prereqs.
         - `postprereqs`: macro expression to produce post-inference prereqs.
         - `actions`: a list of actions to build this `Target`
@@ -570,7 +576,7 @@ class Target(Result):
         when `.require()` is called the first time, just as we do for a
         `:make` directive.
     '''
-    Result.__init__(self, name=name, lock=RLock())
+    self.name = name
     self.maker = maker
     self.context = context
     self.shell = SHELL
@@ -591,8 +597,7 @@ class Target(Result):
     #
 
   def __str__(self):
-    return "{}[{}]".format(self.name, self.fsm_state)
-    ##return "{}[{}]:{}:{}".format(self.name, self.fsm_state, self._prereqs, self._postprereqs)
+    return f'{self.name}[{self.fsm_state}]'
 
   def mdebug(self, msg, *a):
     ''' Emit a debug message.
@@ -629,8 +634,8 @@ class Target(Result):
 
   @property
   def namespaces(self):
-    ''' The namespaces for this Target: the special per-Target macros,
-        the Maker's namespaces, the Maker's macros and the special macros.
+    ''' The namespaces for this `Target`: the special per-`Target` macros,
+        the `Maker`'s namespaces, the `Maker`'s macros and the special macros.
     '''
     return (
         [
@@ -899,14 +904,14 @@ class Action(NS):
             mdebug = M.debug_make
             for T in subTs:
               if T.result:
-                mdebug("submake \"%s\" OK", T)
+                mdebug('submake "%s" OK', T)
               else:
                 ok = False
-                mdebug("submake \"%s\" FAIL", T)
+                mdebug('submake "%s" FAIL"', T)
             R.put(ok)
 
           for T in subTs:
-            mdebug("submake \"%s\"", T)
+            mdebug('submake "%s"', T)
             T.require()
           M.after(subTs, _act_after_make)
           return
