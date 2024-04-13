@@ -71,9 +71,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   ''' Main class representing a set of dependencies to make.
   '''
 
-  THREAD_STATE_ATTR = 'later_perthread_state'
-
-  later_perthread_state = ThreadState()
+  perthread_state = ThreadState()
 
   DEFAULT_PARALLELISM = 1
 
