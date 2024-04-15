@@ -114,12 +114,15 @@ class ParseError(SyntaxError):
     '''
     if a:
       message = message % a
-    self.msg = message
+    super().__init__(message)
+    self.context = context
     self.filename = context.filename
     self.lineno = context.lineno
     self.text = context.text
-    self.offset = offset
-    self.context = context
+    self.offset = context.offset
+
+  def __str__(self):
+    return f'{self.context}: {self.msg}'
 
 def nsget(namespaces, mname):
   ''' Look up `macro name `mname` in `namespaces`.
