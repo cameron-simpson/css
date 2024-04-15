@@ -437,7 +437,19 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
         self.default_target = first_target
     return ok
 
+  def add_appendfiles_mexpr(
+      self, context: FileContext, mexpr: MacroExpression
+  ):
+    for include_file in mexpr(context, self.namespaces).split():
+      if include_file:
+        if not isabspath(include_file):
+          include_file = joinpath(dirname(context.filename), include_file)
+        self.add_appendfile(include_file)
+      else:
+        warning("%s: empty include_file from mexpr %s", context, mexpr)
 
+  def add_precious_mexpr(self, context: FileContext, mexpr: MacroExpression):
+    self.precious.update(filter(None, mexpr(context, self.namespaces).split()))
 
 uses_Maker = default_params(maker=Maker.default)
 
