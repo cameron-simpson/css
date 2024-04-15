@@ -342,7 +342,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
     return R
 
   def make(self, targets):
-    ''' Synchronous call to make targets in series.
+    ''' Make `targets` and yield them as they complete.
     '''
     with Pfx("%s.make", type(self).__name__):
       ok = True
@@ -702,7 +702,7 @@ class Target(FSM, Promotable):
     return f'{self.name}[{self.fsm_state}]'
 
   @classmethod
-  def from_str(cls, name, *, maker: Maker):
+  def from_str(cls, name, *, maker: Maker) -> "Target":
     ''' Return the `Target` named `name`.
     '''
     return maker[name]
@@ -831,7 +831,7 @@ class Target(FSM, Promotable):
       return None
     return s.st_mtime
 
-  def older_than(self, other):
+  def older_than(self, other: "Target"):
     ''' Test whether we are older than another Target.
     '''
     if self.was_missing:
@@ -850,7 +850,7 @@ class Target(FSM, Promotable):
     return self.mtime < m
 
   def cancel(self):
-    ''' Cancel this Target.
+    ''' Cancel this `Target`.
         Actions will cease as soon as decorum allows.
     '''
     Result.cancel(self)
