@@ -73,13 +73,32 @@ class FileContext(HasThreadState):
   filename: str
   lineno: int
   text: str
-  parent: Optional["FileContext"] = None
+  offset: int = 0
+  parent: "FileContext" = None
+
+  # class attribute
+  perthread_state = ThreadState()
 
   def __str__(self):
     tag = f'{self.filename}:{self.lineno}'
+    if self.offset > 0:
+      tag += f':{self.offset}'
     if self.parent:
       tag = f'{self.parent}::{tag}'
     return tag
+
+  def copy(self, **changes) -> "FileContext":
+    ''' Return a shallow copy of `self` with modifications.
+    '''
+    d = dict(
+        filename=self.filename,
+        lineno=self.lineno,
+        text=self.text,
+        offset=self.offset,
+        parent=self.parent,
+    )
+    d.update(changes)
+    return type(self)(**d)
 
 class ParseError(SyntaxError):
   ''' A ParseError subclasses SyntaxError in order to change the initialiser.
