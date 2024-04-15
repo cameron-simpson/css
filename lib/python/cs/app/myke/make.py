@@ -731,6 +731,21 @@ class Target(FSM, Promotable):
           actions=actions,
       )
 
+  ##########################
+  # mapping/dict/set methods
+
+  def __hash__(self):
+    return hash(self.name)
+
+  def __eq__(self, other):
+    if self.name == other.name:
+      if self is not other:
+        raise RuntimeError(
+            f'distinct Targets have the same name {self.name!r}'
+        )
+      return True
+    return False
+
   @locked
   def succeed(self):
     ''' Mark target as successfully made.
