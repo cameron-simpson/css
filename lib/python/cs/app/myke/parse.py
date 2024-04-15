@@ -486,14 +486,14 @@ class Macro:
         namespaces = [dict(zip(self.params, param_values))] + namespaces
       return self.mexpr(context, namespaces)
 
-def scan_makefile(
+def scan_makefile_lines(
     M,
     f,
     parent_context=None,
     start_lineno=1,
     missing_ok=False,
 ):
-  ''' Read a Mykefile and yield `(FileContext,str)` tuples.
+  ''' Read a Mykefile and yield `(FileContext,str)` tuples or `ParseError` instances.
       This generator parses slosh extensions and
       :if/ifdef/ifndef/else/endif directives.
   '''
@@ -507,7 +507,9 @@ def scan_makefile(
     filename = f
     try:
       with pfx_call(open, filename) as f:
-        yield from scan_makefile(M, f, parent_context, missing_ok=missing_ok)
+        yield from scan_makefile_lines(
+            M, f, parent_context, missing_ok=missing_ok
+        )
     except OSError as e:
       if e.errno == errno.ENOENT and missing_ok:
         return
@@ -523,11 +525,6 @@ def scan_makefile(
   context = None  # FileContext(filename, lineno, line)
   prevline = None
   for lineno, line in enumerate(f, start_lineno):
-    if not line.endswith('\n'):
-      raise ParseError(
-          context, len(line), '%s:%d: unexpected EOF (missing final newline)',
-          filename, lineno
-      )
     if prevline is not None:
       # prepend previous continuation line if any
       # keep the same FileContext
@@ -536,110 +533,110 @@ def scan_makefile(
     else:
       # start of line - new FileContext
       context = FileContext(filename, lineno, line.rstrip(), parent_context)
-    with Pfx(str(context)):
-      if line.endswith('\\\n'):
-        # continuation line - gather next line before parse
-        prevline = line[:-2]
-        continue
-      # skip blank lines and comments
-      w1 = line.lstrip()
-      if not w1 or w1.startswith('#'):
-        continue
-      try:
-        # look for :if etc
-        if line.startswith(':'):
-          # top level directive
-          _, offset = get_white(line, 1)
-          word, offset = get_identifier(line, offset)
-          if not word:
-            raise SyntaxError("missing directive name")
-          _, offset = get_white(line, offset)
-          with Pfx(word):
-            if word == 'ifdef':
-              mname, offset = get_identifier(line, offset)
-              if not mname:
-                raise ParseError(context, offset, "missing macro name")
-              _, offset = get_white(line, offset)
-              if offset < len(line):
-                raise ParseError(
-                    context, offset, "extra arguments after macro name: %s",
-                    line[offset:]
-                )
-              newIfState = [False, True]
-              if all([item[0] for item in ifStack]):
-                newIfState[0] = nsget(M.namespaces, mname) is not None
-              ifStack.append(newIfState)
-              continue
-            if word == "ifndef":
-              mname, offset = get_identifier(line, offset)
-              if not mname:
-                raise ParseError(context, offset, "missing macro name")
-              _, offset = get_white(line, offset)
-              if offset < len(line):
-                raise ParseError(
-                    context, offset, "extra arguments after macro name: %s",
-                    line[offset:]
-                )
-              newIfState = [True, True]
-              if all([item[0] for item in ifStack]):
-                newIfState[0] = nsget(M.namespaces, mname) is None
-              ifStack.append(newIfState)
-              continue
-            if word == "if":
-              raise ParseError(context, offset, '":if" not yet implemented')
-              continue
-            if word == "else":
-              # extra text permitted
-              if not ifStack:
-                raise ParseError(
-                    context, 0, ":else: no active :if directives in this file"
-                )
-              if not ifStack[-1][1]:
-                raise ParseError(context, 0, ":else inside :else")
-              ifStack[-1][1] = False
-              continue
-            if word == "endif":
-              # extra text permitted
-              if not ifStack:
-                raise ParseError(
-                    context, 0, ":endif: no active :if directives in this file"
-                )
-              ifStack.pop()
-              continue
-            if word == "include":
-              if all(ifState[0] for ifState in ifStack):
-                if offset == len(line):
-                  raise ParseError(
-                      context, offset, ":include: no include files specified"
-                  )
-                include_mexpr = MacroExpression.from_text(
-                    context, offset=offset
-                )
-                for include_file in include_mexpr(context,
-                                                  M.namespaces).split():
-                  if len(include_file) == 0:
-                    continue
-                  if not isabspath(include_file):
-                    include_file = joinpath(dirname(filename), include_file)
-                  yield from scan_makefile(
-                      M,
-                      include_file,
-                      parent_context=context,
-                  )
-              continue
-        if not all(ifState[0] for ifState in ifStack):
-          # in false branch of "if"; skip line
-          continue
-      except SyntaxError as e:
-        error(e)
-        continue
-    # NB: yield is outside the Pfx context manager because Pfx does
-    # not play nicely with generators
-    yield context, line
-
+    if not line.endswith('\n'):
+      eol_context = context.copy(offset=len(line))
+      yield eol_context, ParseError(
+          eol_context,
+          'unexpected EOF (missing final newline)',
+      )
+      continue
+    if line.endswith('\\\n'):
+      # continuation line - gather next line before parse
+      prevline = line[:-2]
+      continue
+    # we have the whole line
+    offset = skipwhite(line)
+    context = context.copy(offset=offset)
+    # skip blank lines and comments
+    if offset == len(line) or line.startswith('#', offset):
+      continue
+    if line.startswith(':'):
+      # top level :directive
+      offset = skipwhite(line, offset + 1)
+      d_context = context.copy(offset=offset)
+      directive, offset = get_identifier(line, offset)
+      offset = skipwhite(line, offset)
+      if directive == "":
+        yield ParseError(d_context, "missing directive name")
+      elif directive == "ifdef":
+        mname, offset = get_identifier(line, offset)
+        if not mname:
+          yield ParseError(d_context, "missing macro name")
+        else:
+          offset = skipwhite(line, offset)
+          if offset < len(line):
+            yield ParseError(
+                context.copy(offset=offset),
+                "extra arguments after macro name: %s", line[offset:]
+            )
+          else:
+            newIfState = [False, True]
+            if all([item[0] for item in ifStack]):
+              newIfState[0] = nsget(M.namespaces, mname) is not None
+            ifStack.append(newIfState)
+      elif directive == "ifndef":
+        mname, offset = get_identifier(line, offset)
+        if not mname:
+          yield ParseError(context, "missing macro name")
+        _, offset = get_white(line, offset)
+        if offset < len(line):
+          yield ParseError(
+              context.copy(offset=offset),
+              "extra arguments after macro name: %s", line[offset:]
+          )
+        newIfState = [True, True]
+        if all([item[0] for item in ifStack]):
+          newIfState[0] = nsget(M.namespaces, mname) is None
+        ifStack.append(newIfState)
+      elif directive == "if":
+        yield ParseError(context, '":if" not yet implemented')
+      elif directive == "else":
+        # extra text permitted
+        if not ifStack:
+          yield ParseError(
+              context, ":else: no active :if directives in this file"
+          )
+        elif not ifStack[-1][1]:
+          yield ParseError(context, ":else inside :else")
+        else:
+          ifStack[-1][1] = False
+      elif directive == "endif":
+        # extra text permitted
+        if not ifStack:
+          yield ParseError(
+              context, ":endif: no active :if directives in this file"
+          )
+        else:
+          ifStack.pop()
+      elif directive == "include":
+        if all(ifState[0] for ifState in ifStack):
+          if offset == len(line):
+            yield ParseError(context, ":include: no include files specified")
+          else:
+            include_mexpr = MacroExpression.from_text(context, offset=offset)
+            for include_file in include_mexpr(context, M.namespaces).split():
+              if not isabspath(include_file):
+                include_file = joinpath(dirname(filename), include_file)
+              yield from scan_makefile_lines(
+                  M,
+                  include_file,
+                  parent_context=context,
+              )
+      else:
+        # a directive to be handled by the scan_makefile
+        yield context, line
+    else:
+      # not a directive, just yield the line if not excluded
+      if all(ifState[0] for ifState in ifStack):
+        yield context, line[context.offset:]
   if prevline is not None:
     # incomplete continuation line
-    error("%s: unexpected EOF: unterminated slosh continued line")
+    yield ParseError(
+        context,
+        "unexpected EOF: unterminated slosh continued line",
+    )
+  if ifStack:
+    yield ParseError(context, "EOF with open :if directives")
 
   if ifStack:
     raise SyntaxError("%s: EOF with open :if directives" % (filename,))
