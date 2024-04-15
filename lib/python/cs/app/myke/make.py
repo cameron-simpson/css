@@ -6,6 +6,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 import errno
+from functools import partial
 from itertools import zip_longest
 import logging
 import os
@@ -33,11 +34,12 @@ from cs.excutils import logexc
 from cs.fsm import FSM
 from cs.inttypes import Flags
 from cs.later import Later
-from cs.lex import get_identifier, get_white
-from cs.logutils import debug, info, error, exception, D
+from cs.lex import get_identifier, get_white, r
+from cs.logutils import debug, info, error, exception, D, warning
 import cs.pfx
 from cs.pfx import pfx, Pfx, pfx_method
-from cs.queues import MultiOpenMixin
+from cs.queues import ListQueue
+from cs.resources import MultiOpenMixin
 from cs.result import Result
 from cs.threads import (
     HasThreadState,
@@ -55,7 +57,7 @@ from .parse import (
     Macro,
     MacroExpression,
     ParseError,
-    scan_makefile,
+    scan_makefile_lines,
 )
 
 SHELL = '/bin/sh'
@@ -729,8 +731,8 @@ class Target(FSM, Promotable):
     ''' Cancel this `Target`.
         Actions will cease as soon as decorum allows.
     '''
-    Result.cancel(self)
     mdebug("%s: CANCEL", self)
+    super().cancel()
 
   @pfx_method
   @uses_Maker
