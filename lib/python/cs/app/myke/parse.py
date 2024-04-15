@@ -106,8 +106,9 @@ class ParseError(SyntaxError):
       (which has a .parent attribute).
   '''
 
-  def __init__(self, context, offset, message, *a):
-    ''' Initialise a ParseError given a FileContext and the offset into `context.text`.
+  @typechecked
+  def __init__(self, context: FileContext, message: str, *a):
+    ''' Initialise a `ParseError` given a `FileContext` and the offset into `context.text`.
         Accept optional arguments `*a` after the `message`; if supplied these
         are embedded into `message` with %-formatting.
     '''
@@ -492,9 +493,9 @@ def scan_makefile(
   ''' Read a Mykefile and yield `(FileContext,str)` tuples.
       This generator parses slosh extensions and
       :if/ifdef/ifndef/else/endif directives.
-
   '''
   if isinstance(f, str):
+    # open a filename
     if start_lineno != 1:
       raise ValueError(
           "start_lineno must be 1 (the default) if f is a filename"
@@ -509,18 +510,14 @@ def scan_makefile(
         return
       raise
     return
-
   if missing_ok:
     raise ValueError("missing_ok may not be true unless f is a filename")
-
   try:
     filename = f.name
   except AttributeError:
     filename = str(f)
-
   ifStack = []  # active ifStates (state, in-first-branch)
   context = None  # FileContext(filename, lineno, line)
-
   prevline = None
   for lineno, line in enumerate(f, start_lineno):
     if not line.endswith('\n'):
@@ -729,6 +726,8 @@ class MacroExpression(object):
     return cls(context, permutations), offset
 
   def __call__(self, context, namespaces):
+    ''' Calling a macro expression evaluates it.
+    '''
     assert isinstance(namespaces, list)
     if self._result is not None:
       return self._result
@@ -790,7 +789,7 @@ class MacroExpression(object):
 
 SIMPLE_MODIFIERS = 'DEG?Fv?<?'
 
-@strable(open_func=lambda context: FileContext('<string>', 1, context, None))
+@strable(open_func=lambda text: FileContext(f'<string:{text!r}>', 1, text))
 def parseMacro(context, text=None, offset=0):
   ''' Parse macro from `text` from `FileContext` `context` at `offset`.
       Return `(MacroTerm,offset)`.
