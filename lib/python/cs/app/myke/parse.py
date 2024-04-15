@@ -4,7 +4,7 @@
 ''' Makefile parsing functions.
 '''
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import errno
 from functools import cached_property
 import glob
@@ -21,14 +21,18 @@ from os.path import (
 )
 import re
 from string import whitespace
-from typing import List, Optional, Tuple, Union
+import sys
+from typing import Iterable, List, Optional, Tuple, Union
 import unittest
 
+from typeguard import typechecked
+
 from cs.deco import strable
-from cs.lex import get_other_chars, get_white, get_identifier, r
+from cs.lex import get_other_chars, get_white, get_identifier, r, skipwhite
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import prop
+from cs.threads import ThreadState, HasThreadState
 
 # mapping of special macro names to evaluation functions
 SPECIAL_MACROS = {
@@ -840,8 +844,8 @@ class MacroExpression(object):
       ch = text[offset]
       if ch == '$':
         # macro
-        M, offset = parseMacro(context, text=text, offset=offset)
-        permutations.append(M)
+        macro, offset = parseMacro(context, text=text, offset=offset)
+        permutations.append(macro)
       elif ch.isspace():
         # whitespace
         wh, offset = get_white(text, offset)
