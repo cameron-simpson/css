@@ -393,7 +393,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
             if log_level < logging.INFO:
               logger.setLevel(logging.INFO)
 
-  def loadMakefiles(self, makefiles, parent_context=None):
+  def load_makefiles(self, makefiles, parent_context=None):
     ''' Load the specified Makefiles; return success.
 
         Each top level Makefile named gets its own namespace prepended
@@ -403,6 +403,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
         Also, the default_target property is set to the first
         encountered target if not yet set.
     '''
+    from .parse import scan_makefile
     ok = True
     for makefile in makefiles:
       self.debug_parse("load makefile: %s", makefile)
@@ -414,6 +415,9 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
           if isinstance(parsed_object, Exception):
             error("exception: %s", parsed_object)
             ok = False
+          elif isinstance(parsed_object, Macro):
+            self.debug_parse("add macro %s", parsed_object)
+            ns[parsed_object.name] = parsed_object
           elif isinstance(parsed_object, Target):
             # record this Target in the Maker
             T = parsed_object
@@ -425,12 +429,9 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
               self.targets[T.name] = T
               if first_target is None:
                 first_target = T
-          elif isinstance(parsed_object, Macro):
-            self.debug_parse("add macro %s", parsed_object)
-            ns[parsed_object.name] = parsed_object
           else:
-            raise ValueError(
-                f"unsupported parse item received: {type(parsed_object)}{parsed_object!r}"
+            raise RuntimeError(
+                f'unsupported parse item received: {r(parsed_object)}'
             )
       if first_target is not None:
         self.default_target = first_target
