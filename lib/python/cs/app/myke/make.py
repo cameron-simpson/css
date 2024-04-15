@@ -409,7 +409,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
       first_target = None
       ns = {}
       self.insert_namespace(ns)
-      for parsed_object in self.parse(makefile, parent_context):
+      for parsed_object in scan_makefile(self, makefile, parent_context):
         with Pfx(parsed_object.context):
           if isinstance(parsed_object, Exception):
             error("exception: %s", parsed_object)
@@ -436,148 +436,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
         self.default_target = first_target
     return ok
 
-  def parse(self, f, parent_context=None, missing_ok=False):
-    ''' Read a Mykefile and yield Macros and Targets.
-    '''
-    from .make import Target, Action
-    action_list = None  # not in a target
-    for context, line in scan_makefile(
-        self,
-        f,
-        parent_context=parent_context,
-        missing_ok=missing_ok,
-    ):
-      with Pfx(context):
-        try:
-          if line.startswith(':'):
-            # top level directive
-            _, doffset = get_white(line, 1)
-            word, offset = get_identifier(line, doffset)
-            if not word:
-              raise ParseError(context, doffset, "missing directive name")
-            _, offset = get_white(line, offset)
-            with Pfx(word):
-              if word == 'append':
-                if offset == len(line):
-                  raise ParseError(context, offset, "nothing to append")
-                mexpr, offset = MacroExpression.parse(context, line, offset)
-                assert offset == len(line)
-                for include_file in mexpr(context, self.namespaces).split():
-                  if include_file:
-                    if not isabspath(include_file):
-                      include_file = joinpath(
-                          realpath(dirname(f.name)), include_file
-                      )
-                    self.add_appendfile(include_file)
-                continue
-              if word == 'import':
-                if offset == len(line):
-                  raise ParseError(context, offset, "nothing to import")
-                ok = True
-                missing_envvars = []
-                for envvar in line[offset:].split():
-                  if envvar:
-                    envvalue = os.environ.get(envvar)
-                    if envvalue is None:
-                      error("no $%s" % (envvar,))
-                      ok = False
-                      missing_envvars.append(envvar)
-                    else:
-                      yield Macro(
-                          context, envvar, (), envvalue.replace('$', '$$')
-                      )
-                if not ok:
-                  raise ValueError(
-                      "missing environment variables: %s" % (missing_envvars,)
-                  )
-                continue
-              if word == 'precious':
-                if offset == len(line):
-                  raise ParseError(
-                      context, offset, "nothing to mark as precious"
-                  )
-                mexpr, offset = MacroExpression.parse(context, line, offset)
-                self.precious.update(
-                    word for word in mexpr(context, self.namespaces).split()
-                    if word
-                )
-                continue
-              raise ParseError(context, doffset, "unrecognised directive")
 
-          if action_list is not None:
-            # currently collating a Target
-            if not line[0].isspace():
-              # new target or unindented assignment etc - fall through
-              # action_list is already attached to targets,
-              # so simply reset it to None to keep state
-              action_list = None
-            else:
-              # action line
-              _, offset = get_white(line)
-              if offset >= len(line) or line[offset] != ':':
-                # ordinary shell action
-                action_silent = False
-                if offset < len(line) and line[offset] == '@':
-                  action_silent = True
-                  offset += 1
-                A = Action(
-                    context, 'shell', line[offset:], silent=action_silent
-                )
-                self.debug_parse("add action: %s", A)
-                action_list.append(A)
-                continue
-              # in-target directive like ":make"
-              _, offset = get_white(line, offset + 1)
-              directive, offset = get_identifier(line, offset)
-              if not directive:
-                raise ParseError(
-                    context, offset,
-                    "missing in-target directive after leading colon"
-                )
-              A = Action(context, directive, line[offset:].lstrip())
-              self.debug_parse("add action: %s", A)
-              action_list.append(A)
-              continue
-
-          try:
-            macro = Macro.from_assignment(context, line)
-          except ValueError:
-            pass
-          else:
-            yield macro
-            continue
-
-          # presumably a target definition
-          # gather up the target as a macro expression
-          target_mexpr, offset = MacroExpression.parse(context, stopchars=':')
-          if not context.text.startswith(':', offset):
-            raise ParseError(context, offset, "no colon in target definition")
-          prereqs_mexpr, offset = MacroExpression.parse(
-              context, offset=offset + 1, stopchars=':'
-          )
-          if offset < len(context.text) and context.text[offset] == ':':
-            postprereqs_mexpr, offset = MacroExpression.parse(
-                context, offset=offset + 1
-            )
-          else:
-            postprereqs_mexpr = []
-
-          action_list = []
-          for target in target_mexpr(context, self.namespaces).split():
-            yield Target(
-                target,
-                context,
-                prereqs=prereqs_mexpr,
-                postprereqs=postprereqs_mexpr,
-                actions=action_list
-            )
-          continue
-
-          raise ParseError(context, 0, 'unparsed line')
-        except ParseError as e:
-          exception("%s", e)
-
-    self.debug_parse("finish parse")
 
 uses_Maker = default_params(maker=Maker.default)
 
