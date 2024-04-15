@@ -61,8 +61,13 @@ RE_ASSIGNMENT = re.compile(re_assignment)
 
 RE_COMMASEP = re.compile(r'\s*,\s*')
 
-@dataclass(frozen=True, slots=True)
-class FileContext:
+if sys.version_info >= (3, 10):
+  _fcdc = dataclass(frozen=True, slots=True)
+else:
+  _fcdc = dataclass(frozen=True)
+
+@_fcdc
+class FileContext(HasThreadState):
   ''' Context information for parse objects and exceptions.
   '''
   filename: str
