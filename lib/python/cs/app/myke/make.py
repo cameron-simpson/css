@@ -66,6 +66,104 @@ PRI_ACTION = 0
 PRI_MAKE = 1
 PRI_PREREQ = 2
 
+class Action(NS):
+  ''' A make action.
+      This corresponds to a line in the Mykefile and may be used
+      by multiple `Target`s.
+  '''
+
+  def __init__(self, context, variant, line, silent=False):
+    self.context = context
+    self.variant = variant
+    self.line = line
+    self.mexpr = MacroExpression.from_text(context, line)
+    self.silent = silent
+    self._lock = NRLock()
+
+  def __str__(self):
+    return f'{self.__class__.__name__}({self.variant}:{self.context.filename}:{self.context.lineno})'
+
+  __repr__ = __str__
+
+  @property
+  def prline(self):
+    ''' Printable form of this Action.
+    '''
+    return self.line.rstrip().replace('\n', '\\n')
+
+  @uses_Maker
+  @typechecked
+  def act_later(self, target: Target, *, maker: Maker) -> Result:
+    ''' Request that this `Action` occur on behalf of the `target`.
+        Return a `Result` which returns the success or failure
+        of the action.
+    '''
+    R = Result(name="%s.action(%s)" % (target, self))
+    maker.defer("%s:act[%s]" % (
+        self,
+        target,
+    ), self._act, R, target)
+    return R
+
+  @uses_Maker
+  @typechecked
+  def _act(self, R: Result, target: Target, *, maker: Maker):
+    ''' Perform this Action on behalf of the Target `target`.
+        Arrange to put the result onto `R`.
+    '''
+    with Pfx("%s.act(target=%s)", self, target):
+      try:
+        debug("start act...")
+        v = self.variant
+
+        if v == 'shell':
+          debug("shell command")
+          shcmd = self.mexpr(self.context, target.namespaces)
+          if maker.no_action or not self.silent:
+            print(shcmd)
+          if maker.no_action:
+            mdebug("OK (maker.no_action)")
+            R.put(True)
+            return
+          R.put(self._shcmd(target, shcmd))
+          return
+
+        if v == 'make':
+          subtargets = self.mexpr(self.context, target.namespaces).split()
+          mdebug("targets = %s", subtargets)
+          subTs = [maker[subtarget] for subtarget in subtargets]
+
+          def _act_after_make():
+            # analyse success of targets, update R
+            ok = True
+            for T in subTs:
+              if T.result:
+                mdebug('submake "%s" OK', T)
+              else:
+                ok = False
+                mdebug('submake "%s" FAIL"', T)
+            R.put(ok)
+
+          for T in subTs:
+            mdebug('submake "%s"', T)
+            T.require()
+          maker.after(subTs, _act_after_make)
+          return
+
+        raise NotImplementedError("unsupported variant: %s" % (self.variant,))
+      except Exception as e:
+        error("action failed: %s", e)
+        R.put(False)
+
+  def _shcmd(self, target, shcmd):
+    with Pfx("%s.act: shcmd=%r", self, shcmd):
+      argv = (target.shell, '-c', shcmd)
+      mdebug("Popen(%s,..)", argv)
+      P = Popen(argv, close_fds=True)
+      retcode = P.wait()
+      mdebug("retcode = %d", retcode)
+      return retcode == 0
+
 MakeDebugFlags = Flags('debug', 'flags', 'make', 'parse')
 
 @dataclass
@@ -839,99 +937,3 @@ class Target(FSM, Promotable):
       else:
         # all done, record success
         self.succeed()
-
-class Action(NS):
-  ''' A make action.
-      This corresponds to a line in the Mykefile and may be used
-      by multiple `Target`s.
-  '''
-
-  def __init__(self, context, variant, line, silent=False):
-    self.context = context
-    self.variant = variant
-    self.line = line
-    self.mexpr = MacroExpression.from_text(context, line)
-    self.silent = silent
-    self._lock = NRLock()
-
-  def __str__(self):
-    return f'{self.__class__.__name__}({self.variant}:{self.context.filename}:{self.context.lineno})'
-
-  __repr__ = __str__
-
-  @property
-  def prline(self):
-    ''' Printable form of this Action.
-    '''
-    return self.line.rstrip().replace('\n', '\\n')
-
-  @uses_Maker
-  def act_later(self, target: Target, *, maker: Maker) -> Result:
-    ''' Request that this `Action` occur on behalf of the `target`.
-        Return a `Result` which returns the success or failure
-        of the action.
-    '''
-    R = Result(name="%s.action(%s)" % (target, self))
-    maker.defer("%s:act[%s]" % (
-        self,
-        target,
-    ), self._act, R, target)
-    return R
-
-  @uses_Maker
-  def _act(self, R: Result, target: Target, *, maker: Maker):
-    ''' Perform this Action on behalf of the Target `target`.
-        Arrange to put the result onto `R`.
-    '''
-    with Pfx("%s.act(target=%s)", self, target):
-      try:
-        debug("start act...")
-        v = self.variant
-
-        if v == 'shell':
-          debug("shell command")
-          shcmd = self.mexpr(self.context, target.namespaces)
-          if maker.no_action or not self.silent:
-            print(shcmd)
-          if maker.no_action:
-            mdebug("OK (maker.no_action)")
-            R.put(True)
-            return
-          R.put(self._shcmd(target, shcmd))
-          return
-
-        if v == 'make':
-          subtargets = self.mexpr(self.context, target.namespaces).split()
-          mdebug("targets = %s", subtargets)
-          subTs = [maker[subtarget] for subtarget in subtargets]
-
-          def _act_after_make():
-            # analyse success of targets, update R
-            ok = True
-            for T in subTs:
-              if T.result:
-                mdebug('submake "%s" OK', T)
-              else:
-                ok = False
-                mdebug('submake "%s" FAIL"', T)
-            R.put(ok)
-
-          for T in subTs:
-            mdebug('submake "%s"', T)
-            T.require()
-          maker.after(subTs, _act_after_make)
-          return
-
-        raise NotImplementedError("unsupported variant: %s" % (self.variant,))
-      except Exception as e:
-        error("action failed: %s", e)
-        R.put(False)
-
-  def _shcmd(self, target, shcmd):
-    with Pfx("%s.act: shcmd=%r", self, shcmd):
-      argv = (target.shell, '-c', shcmd)
-      mdebug("Popen(%s,..)", argv)
-      P = Popen(argv, close_fds=True)
-      retcode = P.wait()
-      mdebug("retcode = %d", retcode)
-      return retcode == 0
