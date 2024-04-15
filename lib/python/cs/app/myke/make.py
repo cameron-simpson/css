@@ -707,6 +707,30 @@ class Target(FSM, Promotable):
     '''
     return maker[name]
 
+  @classmethod
+  @typechecked
+  def from_mexpr(
+      cls,
+      mexpr: MacroExpression,
+      context: FileContext,
+      *,
+      prereqs: MacroExpression,
+      postprereqs: MacroExpression,
+      actions: List[Action],
+      maker: Maker,
+  ) -> Iterable["Target"]:
+    ''' Generator yielding `Target`s for each name obtained from `mexpr`.
+    '''
+    actions = tuple(actions)
+    for target in mexpr(context, maker.namespaces).split():
+      yield Target(
+          target,
+          context,
+          prereqs=prereqs,
+          postprereqs=postprereqs,
+          actions=actions,
+      )
+
   @locked
   def succeed(self):
     ''' Mark target as successfully made.
