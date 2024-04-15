@@ -457,6 +457,10 @@ uses_Maker = default_params(maker=Maker.default)
 def mdebug(msg: str, *a, maker: Maker):
   return maker.make_debug(msg, *a)
 
+@uses_Maker
+def pdebug(msg: str, *a, maker: Maker):
+  return maker.make_debug(msg, *a)
+
 class TargetMap(dict):
   ''' A thread safe mapping interface to the known `Target`s.
       Makes empty targets as needed.
