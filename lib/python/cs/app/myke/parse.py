@@ -638,8 +638,148 @@ def scan_makefile_lines(
   if ifStack:
     yield ParseError(context, "EOF with open :if directives")
 
-  if ifStack:
-    raise SyntaxError("%s: EOF with open :if directives" % (filename,))
+def scan_makefile(maker,
+                  f,
+                  parent_context=None,
+                  missing_ok=False) -> Iterable[Union[Macro, "Target"]]:
+  ''' Read a Mykefile and yield `Macro`s and `Target`s.
+        This collates `ParseError`s during the scan and raises a
+        `ParseError` at the end of iteration if any occurred.
+    '''
+  from .make import Action, Target, pdebug
+  parse_errors = []
+
+  def parse_error(msg, *a):
+    if a:
+      msg = msg % a
+    e = ParseError(context, msg)
+    warning("%s", e)
+    parse_errors.append(e)
+
+  target_mexpr =None
+  action_list = None  # not in a target
+  for item in scan_makefile_lines(
+      maker,
+      f,
+      parent_context=parent_context,
+      missing_ok=missing_ok,
+  ):
+    if isinstance(item, ParseError):
+      warning("%s", item)
+      parse_errors.append(item)
+      continue
+    context, line = item
+    if skipwhite(line) == len(line):
+      # ignore blank lines - TODO: should these terminate a Target?
+      continue
+    with Pfx(context):
+      if line.startswith(':'):
+        # top level directive
+        offset = skipwhite(line, 1)
+        directive, offset = get_identifier(line, offset)
+        if not directive:
+          parse_error("missing directive name")
+        else:
+          context = context.copy(offset=offset)
+          offset = skipwhite(line, offset)
+          with Pfx(directive):
+            if directive == 'append':
+              if offset == len(line):
+                parse_error("nothing to append")
+              mexpr, offset = MacroExpression.parse(context, line, offset)
+              assert offset == len(line)
+              maker.add_appendfiles_mexpr(context, mexpr)
+            elif directive == 'import':
+              if offset == len(line):
+                parse_error("nothing to import")
+              else:
+                missing_envvars = []
+                for envvar in line[offset:].split():
+                  if envvar:
+                    envvalue = os.environ.get(envvar)
+                    if envvalue is None:
+                      error("no $%s" % (envvar,))
+                      missing_envvars.append(envvar)
+                    else:
+                      yield Macro(
+                          context, envvar, (), envvalue.replace('$', '$$')
+                      )
+                if missing_envvars:
+                  parse_error(
+                      f'missing environment variables: {missing_envvars!r}'
+                  )
+            elif directive == 'precious':
+              if offset == len(line):
+                parse_error("nothing to mark as precious")
+              else:
+                mexpr, offset = MacroExpression.parse(context, line, offset)
+                maker.add_precious_mexpr(context, mexpr)
+            else:
+              parse_error("unrecognised directive")
+      elif line[0].isspace():
+        # indented line - an action line
+        if target_mexpr is None:
+          assert action_list is None
+          parse_error("unexpected action line, no target")
+        else:
+          # action line
+          assert action_lusr is not None
+          A=None # in case of parse error
+          offset = skipwhite(line)
+          if not line.startswith(':', offset):
+            # ordinary shell action
+            action_silent = False
+            if line.startswith('@', offset):
+              action_silent = True
+              offset += 1
+            A = Action(context, 'shell', line[offset:], silent=action_silent)
+          else:
+            # in-target directive like ":make"
+            offset = skipwhite(line, offset + 1)
+            directive, offset = get_identifier(line, offset)
+            if not directive:
+              parse_error("missing in-target directive after leading colon")
+            else:
+              A = Action(context, directive, line[offset:].lstrip())
+          if A is not None:
+            pdebug("add action: %s", A)
+            action_list.append(A)
+      else:
+        # unindented line - target or macro expression
+        # try the macro expression first
+        try:
+          macro = Macro.from_assignment(context, line)
+        except ValueError as e:
+          # presumably a target definition
+          # gather up the target as a macro expression
+          target_mexpr, offset = MacroExpression.parse(context, stopchars=':')
+          if not context.text.startswith(':', offset):
+            raise ParseError(context, "no colon in target definition")
+          prereqs_mexpr, offset = MacroExpression.parse(
+              context, offset=offset + 1, stopchars=':'
+          )
+          if offset < len(context.text) and context.text[offset] == ':':
+            postprereqs_mexpr, offset = MacroExpression.parse(
+                context, offset=offset + 1
+            )
+          else:
+            postprereqs_mexpr = []
+          yield from Target.from_mexpr(target_mexpr,context,prereqs=prereqs_mexpr,postprereqs=postprereqs_mexpr,actions=action_list,maker=maker)
+          action_list = None
+        else:
+          # it was a macro assignment
+          # flush the target if any
+          if target_mexpr is not None:
+            l
+          yield macro
+  if target_mexpr is not None:
+    # create the pending Targets
+    yield from Target.from_mexpr(target_mexpr,context,prereqs=prereqs_mexpr,postprereqs=postprereqs_mexpr,actions=action_list,maker=maker)
+  if parse_errors:
+    e = ParseError(context, "parse errors from Mykefiles")
+    e.parse_errors = parse_errors
+    raise e
+  maker.debug_parse("finish parse")
 
 class MacroExpression(object):
   ''' A MacroExpression represents a piece of text into which macro
