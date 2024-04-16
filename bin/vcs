@@ -176,6 +176,40 @@ case "$op" in
       # report all branches
       branches,git) git branch ;;
       branches,hg)  hg branches ${1+"$@"} ;;
+      clean-origin,git)
+                    # clean branches which have no revs not in remotes/origin/{branch}
+                    # default branches are all but the current branch
+                    [ $# -gt 0 ] || set -- $( git branch | sed -n 's/^  //p' )
+                    xit=0
+                    set -x
+                    for br
+                    do
+                      local_revs=$( command git rev-list "$br" "^remotes/origin/$br" ) || continue
+                      if [ -n "$local_revs" ]
+                      then
+                        echo "$cmd: $op: $br:" $( echo "$local_revs" | wc -l ) local revs
+                      else
+                        git branch -d "$br" || xit=1
+                      fi
+                    done
+                    exit $xit
+                    ;;
+      clean-unmerged,git)
+                    # clean branchs which have no revs not merged into the current branch
+                    lbr=$( "$0" branch )
+                    # default branches are all but the current branch
+                    [ $# -gt 0 ] || set -- $( git branch | sed -n 's/^  //p' )
+                    for br
+                    do
+                      unmerged_revs=$( command git rev-list "$br" "^$lbr" ) || continue
+                      if [ -n "$unmerged_revs" ]
+                      then
+                        echo "$cmd: $op: $br:" $( echo "$unmerged_revs" | wc -l ) unmerged revs
+                      else
+                        git branch -d "$br" || xit=1
+                      fi
+                    done
+                    ;;
       clone2,*)     exec 3>&1 1>&2
                     clonedir=$1; shift
                     [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
@@ -259,24 +293,17 @@ case "$op" in
                     then  remote=origin
                     else  remote=$1; shift
                     fi
-                    if [ $# = 0 ]
-                    then
-                      git branch -r | sed "s/^  //;/^$remote\\//!d; / /d"
-                    else
-                      for rbr
-                      do  echo "$rbr"
-                      done
-                    fi \
-                    | while read -r rbr
-                      do
-                        lbr=${rbr##$remote/}
-                        if git branch | grep "^. $lbr\$" >/dev/null
-                        then
-                          echo "$cmd: $op: $rbr: local branch already exists"
-                        else
-                          git branch --track "$lbr" "$rbr" || break
-                        fi
-                      done
+                    [ $# -gt 0 ] || set -- $( git branch -r | sed "s/^  //;/^$remote\\//!d; / /d" )
+                    for rbr
+                    do
+                      lbr=${rbr##$remote/}
+                      if git branch | grep "^. $lbr\$" >/dev/null
+                      then
+                        echo "$cmd: $op: $rbr: local branch already exists"
+                      else
+                        git branch --track "$lbr" "$rbr" || break
+                      fi
+                    done
                     ;;
       # graph log
       glog,git)     git log \
