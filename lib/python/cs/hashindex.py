@@ -2,11 +2,65 @@
 
 ''' A command and utility functions for making listings of file content hashcodes
     and manipulating directory trees based on such a hash index.
+
+    This largely exists to solve my "what has changed remotely?" or
+    "what has been filed where?" problems by comparing file trees
+    using the files' content hashcodes.
+
+    This does require reading every file once to compute its hashcode,
+    but the hashcodes (and file sizes and mtimes when read) are
+    stored beside the file in `.fstags` files (see the `cs.fstags`
+    module), so that a file does not need to be reread on subsequent
+    comparisons.
+
+    `hashindex` knows how to invoke itself remotely using `ssh`
+    (this does require `hashindex` to be installed on the remote host)
+    and can thus be used to compare a local and remote tree, for example:
+
+        hashindex comm -1 localtree remotehost:remotetree
+
+    When you point `hashindex` at a remote tree, it uses `ssh` to
+    run `hashindex` on the remote host, so all the content hashing
+    is done locally to the remote host instead of copying files
+    over the network.
+
+    You can also use it to rearrange a tree based on the locations
+    of corresponding files in another tree. Consider a media tree
+    replicated between 2 hosts. If the source tree gets rearranged,
+    the destination can be equivalently rearranged without copying
+    the files, for example:
+
+        hashindex rearrange sourcehost:sourcetree localtree
+
+    If `fstags mv` was used to do the original rearrangement then
+    the hashcodes will be copied to the new locations, saving a
+    rescan of the source file. I keep a shell alias `mv="fstags mv"`
+    so this is routine for me.
+
+    I have a backup script [`histbackup`](https://hg.sr.ht/~cameron-simpson/css/browse/bin/histbackup)
+    which works by making a hard link tree of the previous backup
+    and `rsync`ing into it.  It has long been subject to huge
+    transfers if the source tree gets rearranged. Now it has a
+    `--hashindex` option to get it to run a `hashindex rearrange`
+    between the hard linking to the new backup tree and the `rsync`
+    from the source to the new tree.
+
+    If network bandwith is limited or quotaed, you can use the
+    comparison function to prepare a list of files missing from the
+    remote location and copy them to a transfer drive for carrying
+    to the remote site when opportune. Example:
+
+        hashindex comm -1 -o '{fspath}' src rhost:dst \\
+        | rsync -a --files-from=- src/ xferdir/
+
+    I've got a script [`pref-xfer`](https://hg.sr.ht/~cameron-simpson/css/browse/bin-cs/prep-xfer)
+    which does this with some conveniences and sanity checks.
 '''
 
 from collections import defaultdict
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
+import errno
 from getopt import GetoptError
 from io import TextIOBase
 import os
@@ -36,7 +90,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_cmd_options
 from cs.context import contextif, reconfigure_file
 from cs.deco import fmtdoc
-from cs.fs import is_valid_rpath, needdir, shortpath
+from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
 from cs.lex import r, split_remote_path
@@ -46,7 +100,7 @@ from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
 from cs.upd import print, run_task, without  # pylint: disable=redefined-builtin
 
-__version__ = '20240305-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -81,6 +135,7 @@ HASHNAME_DEFAULT = 'sha256'
 HASHINDEX_EXE_DEFAULT = 'hashindex'
 SSH_EXE_DEFAULT = 'ssh'
 SSH_EXE_ENVVAR = 'HASHINDEX_SSH'
+OUTPUT_FORMAT_DEFAULT = '{hashcode} {fspath}'
 
 def main(argv=None):
   ''' Commandline implementation.
@@ -95,7 +150,11 @@ class HashIndexCommand(BaseCommand):
 
   USAGE_FORMAT = r'''Usage: {cmd} subcommand...
     Generate or process file content hash listings.'''
-  USAGE_KEYWORDS = dict(HASHNAME_DEFAULT=HASHNAME_DEFAULT,)
+  # pylint: disable=use-dict-literal
+  USAGE_KEYWORDS = dict(
+      HASHNAME_DEFAULT=HASHNAME_DEFAULT,
+      OUTPUT_FORMAT_DEFAULT=OUTPUT_FORMAT_DEFAULT,
+  )
 
   @dataclass
   class Options(BaseCommand.Options):
@@ -112,11 +171,14 @@ class HashIndexCommand(BaseCommand):
     hashindex_exe: str = HASHINDEX_EXE_DEFAULT
     symlink_mode: bool = False
     relative: Optional[bool] = None
+    output_format: str = OUTPUT_FORMAT_DEFAULT
 
+    # pylint: disable=use-dict-literal
     COMMON_OPT_SPECS = dict(
-        e='ssh_exe',
+        e_='ssh_exe',
         h_='hashname',
         H_='hashindex_exe',
+        o_='output_format',
         **BaseCommand.Options.COMMON_OPT_SPECS,
     )
 
@@ -128,7 +190,9 @@ class HashIndexCommand(BaseCommand):
       with super().run_context(**kw):
         yield
 
-  def cmd_comm(self, argv):
+  #pylint: disable=too-many-locals
+  @uses_runstate
+  def cmd_comm(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} {{-1|-2|-3}} {{path1|-}} {{path2|-}}
           Compare the filepaths in path1 and path2 by content.
           -1            List hashes and paths only present in path1.
@@ -138,21 +202,26 @@ class HashIndexCommand(BaseCommand):
           -h hashname   Specify the file content hash algorithm name.
           -H hashindex_exe
                         Specify the remote hashindex executable.
+          -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
+          -r            Emit relative paths in the listing.
     '''
     badopts = False
     options = self.options
-    options.path1_only = False
-    options.path2_only = False
-    options.path12 = False
+    options.path1_only = False  # pylint: disable=attribute-defined-outside-init
+    options.path2_only = False  # pylint: disable=attribute-defined-outside-init
+    options.path12 = False  # pylint: disable=attribute-defined-outside-init
+    options.relative = False
     options.popopts(
         argv,
         _1='path1_only',
         _2='path2_only',
         _3='path12',
+        r='relative',
     )
     hashindex_exe = options.hashindex_exe
     hashname = options.hashname
-    runstate = options.runstate
+    output_format = options.output_format
+    relative = options.relative
     ssh_exe = options.ssh_exe
     path1_only = options.path1_only
     path2_only = options.path2_only
@@ -167,6 +236,7 @@ class HashIndexCommand(BaseCommand):
     if not argv:
       warning("missing path1")
       badopts = True
+      path1spec = None
     else:
       path1spec = argv.pop(0)
       with Pfx("path1 %r", path1spec):
@@ -182,6 +252,7 @@ class HashIndexCommand(BaseCommand):
     if not argv:
       warning("missing path2")
       badopts = True
+      path2spec = None
     else:
       path2spec = argv.pop(0)
       with Pfx("path2 %r", path2spec):
@@ -209,6 +280,7 @@ class HashIndexCommand(BaseCommand):
           hashname=hashname,
           hashindex_exe=hashindex_exe,
           ssh_exe=ssh_exe,
+          relative=relative,
       ):
         runstate.raiseif()
         if hashcode is not None:
@@ -220,6 +292,7 @@ class HashIndexCommand(BaseCommand):
           hashname=hashname,
           hashindex_exe=hashindex_exe,
           ssh_exe=ssh_exe,
+          relative=relative,
       ):
         runstate.raiseif()
         if hashcode is not None:
@@ -229,29 +302,32 @@ class HashIndexCommand(BaseCommand):
       ):
         runstate.raiseif()
         for fspath in fspaths1_by_hashcode[hashcode]:
-          print(hashcode, fspath)
+          print(output_format.format(hashcode=hashcode, fspath=fspath))
     elif path2_only:
       for hashcode in fspaths2_by_hashcode.keys() - fspaths1_by_hashcode.keys(
       ):
         runstate.raiseif()
         for fspath in fspaths2_by_hashcode[hashcode]:
-          print(hashcode, fspath)
+          print(output_format.format(hashcode=hashcode, fspath=fspath))
     else:
       assert path12
       for hashcode in fspaths2_by_hashcode.keys() & fspaths1_by_hashcode.keys(
       ):
         runstate.raiseif()
         for fspath in fspaths1_by_hashcode[hashcode]:
-          print(hashcode, fspath)
+          print(output_format.format(hashcode=hashcode, fspath=fspath))
 
-  def cmd_ls(self, argv):
-    ''' Usage: {cmd} [options...] [host:]path...
+  @uses_runstate
+  def cmd_ls(self, argv, *, runstate: RunState):
+    ''' Usage: {cmd} [options...] [[host:]path...]
           Walk filesystem paths and emit a listing.
+          The default path is the current directory.
           Options:
           -e ssh_exe    Specify the ssh executable.
           -h hashname   Specify the file content hash algorithm name.
           -H hashindex_exe
                         Specify the remote hashindex executable.
+          -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
           -r            Emit relative paths in the listing.
                         This requires each path to be a directory.
     '''
@@ -263,11 +339,11 @@ class HashIndexCommand(BaseCommand):
     )
     hashindex_exe = options.hashindex_exe
     hashname = options.hashname
+    output_format = options.output_format
     relative = options.relative
-    runstate = options.runstate
     ssh_exe = options.ssh_exe
     if not argv:
-      raise GetoptError("missing paths")
+      argv = ['.']
     xit = 0
     for path in argv:
       runstate.raiseif()
@@ -283,10 +359,11 @@ class HashIndexCommand(BaseCommand):
             hashname=hashname,
             ssh_exe=ssh_exe,
             hashindex_exe=hashindex_exe,
+            relative=relative,
         ):
           runstate.raiseif()
           if h is not None:
-            print(h, relpath(fspath, lpath) if relative else fspath)
+            print(output_format.format(hashcode=h, fspath=fspath))
     return xit
 
   @typechecked
@@ -300,6 +377,7 @@ class HashIndexCommand(BaseCommand):
                         Specify the remote hashindex executable.
             --mv        Move mode.
             -n          No action, dry run.
+            -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
             -s          Symlink mode.
           Other arguments:
             refdir      The reference directory, which may be local or remote
@@ -328,6 +406,7 @@ class HashIndexCommand(BaseCommand):
     if not argv:
       warning("missing refdir")
       badopts = True
+      refdir = None
     else:
       refspec = argv.pop(0)
       with Pfx("refdir %r", refspec):
@@ -343,6 +422,7 @@ class HashIndexCommand(BaseCommand):
     if not argv:
       warning("missing targetdir")
       badopts = True
+      targetdir = None
     else:
       targetspec = argv.pop(0)
       with Pfx("targetdir %r", targetspec):
@@ -373,6 +453,7 @@ class HashIndexCommand(BaseCommand):
           hashname=hashname,
           ssh_exe=ssh_exe,
           hashindex_exe=hashindex_exe,
+          relative=True,
       ):
         if hashcode is not None:
           fspaths_by_hashcode[hashcode].append(fspath)
@@ -419,12 +500,13 @@ class HashIndexCommand(BaseCommand):
             hashindex_exe=hashindex_exe,
             input=input_s,
             text=True,
+            doit=True,  # we pass -n to the remote hashindex
             quiet=False,
         ).returncode
     return xit
 
-@uses_fstags
 @pfx
+@uses_fstags
 def file_checksum(
     fspath: str,
     hashname: str = HASHNAME_DEFAULT,
@@ -435,12 +517,16 @@ def file_checksum(
       Warn and return `None` on `OSError`.
   '''
   hashcode, S = get_fstags_hashcode(fspath, hashname)
-  if S_ISLNK(S.st_mode):
-    # ignore symlinks
+  if not S_ISREG(S.st_mode):
+    # ignore nonregular files
     return None
   if hashcode is None:
     hashclass = BaseHashCode.hashclass(hashname)
-    with run_task(f'checksum {shortpath(fspath)}'):
+    with contextif(
+        S.st_size > 1024 * 1024,
+        run_task,
+        f'checksum {shortpath(fspath)}',
+    ):
       try:
         hashcode = hashclass.from_fspath(fspath)
       except OSError as e:
@@ -512,6 +598,9 @@ def hashindex(
     fspath: Union[str, TextIOBase, Tuple[Union[None, str], str]],
     *,
     hashname: str,
+    hashindex_exe: str,
+    ssh_exe: str,
+    relative: bool = False,
     **kw,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
@@ -520,6 +609,7 @@ def hashindex(
   '''
   match fspath:
     case TextIOBase():
+      # read hashindex from file
       f = fspath
       yield from read_hashindex(f, hashname=hashname, **kw)
       return
@@ -533,18 +623,27 @@ def hashindex(
       # a local filesystem path because the remote host is None
       pass
     case [rhost, rfspath]:
-      yield from read_remote_hashindex(rhost, rfspath, hashname=hashname, **kw)
+      # a remote fspath
+      yield from read_remote_hashindex(
+          rhost,
+          rfspath,
+          hashname=hashname,
+          hashindex_exe=hashindex_exe,
+          ssh_exe=ssh_exe,
+          relative=relative,
+          **kw,
+      )
       return
     case _:
       raise TypeError(f'hashindex: unhandled fspath={r(fspath)}')
-  # local ahshindex
+  # local hashindex
   if isfilepath(fspath):
     h = file_checksum(fspath)
     yield h, fspath
   elif isdirpath(fspath):
     for filepath in dir_filepaths(fspath):
       h = file_checksum(filepath, hashname=hashname)
-      yield h, filepath
+      yield h, relpath(filepath, fspath) if relative else filepath
   else:
     raise ValueError(
         f'hashindex: neither file nor directory: fspath={fspath!r}'
@@ -608,6 +707,7 @@ def read_remote_hashindex(
     hashname: str,
     ssh_exe=None,
     hashindex_exe=None,
+    relative: bool = False,
     check=True,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' A generator which reads a hashindex of a remote directory,
@@ -622,6 +722,8 @@ def read_remote_hashindex(
         default `SSH_EXE_DEFAULT`: `{SSH_EXE_DEFAULT!r}`
       * `hashindex_exe`: the remote `hashindex` executable,
         default `HASHINDEX_EXE_DEFAULT`: `{HASHINDEX_EXE_DEFAULT!r}`
+      * `relative`: optional flag, default `False`;
+        if true pass `'-r'` to the remote `hashindex ls` command
       * `check`: whether to check that the remote command has a `0` return code,
         default `True`
   '''
@@ -634,7 +736,8 @@ def read_remote_hashindex(
           hashindex_exe,
           'ls',
           ('-h', hashname),
-          '-r',
+          relative and '-r',
+          '--',
           localpath(rdirpath),
       )
   )
@@ -656,6 +759,7 @@ def run_remote_hashindex(
     hashindex_exe=None,
     check: bool = True,
     doit: bool = None,
+    quiet: Optional[bool] = None,
     options: BaseCommandOptions,
     **subp_options,
 ):
@@ -683,13 +787,17 @@ def run_remote_hashindex(
     hashindex_exe = options.hashindex_exe
   if doit is None:
     doit = options.doit
+  if quiet is None:
+    quiet = True
   hashindex_cmd = shlex.join(prep_argv(
       hashindex_exe,
       *argv,
   ))
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
   with without():
-    return run(remote_argv, check=check, doit=doit, quiet=True, **subp_options)
+    return run(
+        remote_argv, check=check, doit=doit, quiet=quiet, **subp_options
+    )
 
 @uses_fstags
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
@@ -789,14 +897,14 @@ def rearrange(
       opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
       with Pfx(srcpath):
         rsrcpath = relpath(srcpath, srcdirpath)
-        assert is_valid_rpath(rsrcpath), (
-            "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
-        )
+        ##assert is_valid_rpath(rsrcpath), (
+        ##    "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
+        ##)
         proxy.text = rsrcpath
         for rdstpath in rfspaths:
-          assert is_valid_rpath(rdstpath), (
-              "rdstpath:%r is not a clean subpath" % (rdstpath,)
-          )
+          ##assert is_valid_rpath(rdstpath), (
+          ##    "rdstpath:%r is not a clean subpath" % (rdstpath,)
+          ##)
           if rsrcpath == rdstpath:
             continue
           dstpath = joinpath(dstdirpath, rdstpath)
@@ -818,8 +926,6 @@ def rearrange(
             warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
           else:
             if move_mode and rsrcpath not in rfspaths:
-              if not quiet:
-                print("remove", shortpath(srcpath))
               if doit:
                 to_remove.add(srcpath)
     # purge the srcpaths last because we might want them multiple
@@ -863,7 +969,7 @@ def merge(
     except FileNotFoundError:
       pass
     except OSError as e:
-      if e.errno == os.EINVAL:
+      if e.errno == errno.EINVAL:
         # not a symlink
         raise FileExistsError(f'dstpath {dstpath!r} not a symlink: {e}') from e
       raise

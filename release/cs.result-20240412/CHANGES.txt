@@ -1,0 +1,2 @@
+lib/python/cs/result.py: cs.result: DISTINFO-python2; Result.notify: add type annotation
+lib/python/cs/result.py: cs.result: Result.bg: plumb _foo arguments to cs.threads.bg as foo

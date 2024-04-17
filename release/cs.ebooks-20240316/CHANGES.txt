@@ -1,0 +1,1 @@
+lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/kindle.py: cs.ebooks.{calibre,kindle}: put "-C calibre_path" and "-K kindle_path" into the Options.COMMON_OPT_SPECS

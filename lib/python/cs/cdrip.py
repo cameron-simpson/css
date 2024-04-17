@@ -50,7 +50,7 @@ from cs.mappings import AttrableMapping
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.psutils import run
 from cs.queues import ListQueue
-from cs.resources import MultiOpenMixin, RunStateMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate, RunStateMixin
 from cs.seq import unrepeated
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommandsMixin
 from cs.tagset import TagSet, TagsOntology
@@ -164,7 +164,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     with super().run_context():
       options = self.options
       fstags = FSTags()
-      mbdb = MBDB(mbdb_path=options.mbdb_path, runstate=options.runstate)
+      mbdb = MBDB(mbdb_path=options.mbdb_path)
       with fstags:
         with mbdb:
           mbdb_attrs = {}
@@ -175,14 +175,20 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
           else:
             mbdb_attrs.update(dev_info=dev_info)
           with stackattrs(mbdb, **mbdb_attrs):
-            with stackattrs(options, fstags=fstags, mbdb=mbdb,
-                            sqltags=mbdb.sqltags, verbose=True):
+            with stackattrs(
+                options,
+                fstags=fstags,
+                mbdb=mbdb,
+                sqltags=mbdb.sqltags,
+                verbose=True,
+            ):
 
-              def on_signal(sig, frame):
+              @uses_runstate
+              def on_signal(sig, frame, *, runstate: RunState):
                 ''' Note signal and cancel the `RunState`.
                 '''
                 warning("signal %s at %s, cancelling runstate", sig, frame)
-                options.runstate.cancel()
+                runstate.cancel()
 
               with stack_signals([SIGINT, SIGTERM], on_signal):
                 yield
@@ -946,7 +952,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
     release = self.release
     return TagSet(
         disc_id=self.mbkey,
-        disc_artist_credit='' if release is None else elease.artist_credit,
+        disc_artist_credit='' if release is None else release.artist_credit,
         disc_title=self.title,
         disc_number=self.medium_position,
         disc_total=self.medium_count,
@@ -1083,8 +1089,8 @@ class MBDB(MultiOpenMixin, RunStateMixin):
   # We drop these if we're not logged in.
   QUERY_INCLUDES_NEED_LOGIN = ['user-tags', 'user-ratings']
 
-  def __init__(self, mbdb_path=None, runstate=None):
-    RunStateMixin.__init__(self, runstate=runstate)
+  def __init__(self, mbdb_path=None):
+    RunStateMixin.__init__(self)
     # can be overlaid with discid.read of the current CDROM
     self.dev_info = None
     sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)

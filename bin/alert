@@ -181,7 +181,7 @@ then
   || printf '%s' "${esc}]9;$*${bel}" >/dev/tty \
   || xit=1
 
-  if false && [ $tnotify ]
+  if [ $tnotify ]
   then
     for var in title subtitle message
     do  eval "val=\$$var"

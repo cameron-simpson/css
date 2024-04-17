@@ -1,0 +1,2 @@
+BaseHashCode.hashclass(hashname): fall back to looking for blake3 from the blake3 module.
+BaseHashCode: new get_hashfunc(hashname) static method.

@@ -75,7 +75,7 @@ from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
-__version__ = '20240201-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -352,49 +352,46 @@ class BinaryMixin:
         Callers not wanting a warning over `min_count` should not specify it,
         and instead check the number of instances returned themselves.
     '''
-    with Pfx("%s.scan", cls.__name__):
-      if count is None:
-        if min_count is None:
-          min_count = 0
-        else:
-          if min_count < 0:
-            raise ValueError(
-                "min_count must be >=0 if specified, got: %r" % (min_count,)
-            )
-        if max_count is not None:
-          if max_count < 0:
-            raise ValueError(
-                "max_count must be >=0 if specified, got: %r" % (max_count,)
-            )
-          if max_count < min_count:
-            raise ValueError(
-                "max_count must be >= min_count, got: min_count=%r, max_count=%rr"
-                % (min_count, max_count)
-            )
+    if count is None:
+      if min_count is None:
+        min_count = 0
       else:
-        if min_count is not None or max_count is not None:
+        if min_count < 0:
           raise ValueError(
-              "scan_with_offsets: may not combine count with either min_count or max_count"
+              "min_count must be >=0 if specified, got: %r" % (min_count,)
           )
-        if count < 0:
+      if max_count is not None:
+        if max_count < 0:
           raise ValueError(
-              "count must be >=0 if specified, got: %r" % (count,)
+              "max_count must be >=0 if specified, got: %r" % (max_count,)
           )
-        min_count = max_count = count
-      scanned = 0
-      while (max_count is None or scanned < max_count) and not bfr.at_eof():
-        pre_offset = bfr.offset
-        obj = cls.parse(bfr)
-        if with_offsets:
-          yield pre_offset, obj, bfr.offset
-        else:
-          yield obj
-        scanned += 1
-      if min_count is not None and scanned < min_count:
-        warning(
-            "fewer than min_count=%s instances scanned, only %d found",
-            min_count, scanned
+        if max_count < min_count:
+          raise ValueError(
+              "max_count must be >= min_count, got: min_count=%r, max_count=%rr"
+              % (min_count, max_count)
+          )
+    else:
+      if min_count is not None or max_count is not None:
+        raise ValueError(
+            "scan_with_offsets: may not combine count with either min_count or max_count"
         )
+      if count < 0:
+        raise ValueError("count must be >=0 if specified, got: %r" % (count,))
+      min_count = max_count = count
+    scanned = 0
+    while (max_count is None or scanned < max_count) and not bfr.at_eof():
+      pre_offset = bfr.offset
+      obj = cls.parse(bfr)
+      if with_offsets:
+        yield pre_offset, obj, bfr.offset
+      else:
+        yield obj
+      scanned += 1
+    if min_count is not None and scanned < min_count:
+      warning(
+          "fewer than min_count=%s instances scanned, only %d found",
+          min_count, scanned
+      )
 
   @classmethod
   @OBSOLETE(suggestion="BinaryMixin.scan")

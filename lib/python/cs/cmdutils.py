@@ -23,7 +23,7 @@ try:
 except ImportError:
   pass
 import shlex
-from signal import SIGHUP, SIGINT, SIGTERM
+from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 import sys
 from typing import Callable, List, Mapping, Optional, Tuple
 
@@ -48,7 +48,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd
 
-__version__ = '20240211-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -158,17 +158,18 @@ class _BaseSubCommand(ABC):
       if attr.startswith(prefix):
         subcmd = cutprefix(attr, prefix)
         method = getattr(command_cls, attr)
-        subcommands_map[subcmd] = (
-            _ClassSubCommand(
-                subcmd,
-                method,
-                usage_mapping=dict(getattr(method, 'USAGE_KEYWORDS', ()))
-            ) if isclass(method) else _MethodSubCommand(
-                subcmd,
-                method,
-                usage_mapping=dict(getattr(command_cls, 'USAGE_KEYWORDS', ()))
-            )
-        )
+        if isclass(method):
+          subcommands_map[subcmd] = _ClassSubCommand(
+              subcmd,
+              method,
+              usage_mapping=dict(getattr(method, 'USAGE_KEYWORDS', ())),
+          )
+        else:
+          subcommands_map[subcmd] = _MethodSubCommand(
+              subcmd,
+              method,
+              usage_mapping=dict(getattr(command_cls, 'USAGE_KEYWORDS', ())),
+          )
     return subcommands_map
 
   def usage_text(
@@ -252,7 +253,7 @@ class _ClassSubCommand(_BaseSubCommand):
     subcmd_class = self.method
     updates = dict(command.options.__dict__)
     updates.update(cmd=subcmd)
-    command = subcmd_class(argv, **updates)
+    command = pfx_call(subcmd_class, argv, **updates)
     return command.run()
 
   def usage_format(self) -> str:
@@ -296,16 +297,16 @@ class BaseCommandOptions(HasThreadState):
               ... optional extra fields etc ...
   '''
 
-  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGTERM
+  DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
   COMMON_OPT_SPECS = _COMMON_OPT_SPECS
 
   cmd: Optional[str] = None
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
-  runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
   verbose: bool = False
+
   perthread_state = ThreadState()
 
   def copy(self, **updates):
@@ -314,17 +315,19 @@ class BaseCommandOptions(HasThreadState):
 
         Any keyword arguments are applied as attribute updates to the copy.
     '''
-    copied = type(self)(
+    copied = pfx_call(
+        type(self),
         **{
             k: v
             for k, v in self.__dict__.items()
             if not k.startswith('_')
-        }
+        },
     )
     for k, v in updates.items():
       setattr(copied, k, v)
     return copied
 
+  # TODO: remove this - the overt make-a-copy-and-with-the-copy is clearer
   @contextmanager
   def __call__(self, **updates):
     ''' Calling the options object returns a context manager whose
@@ -636,7 +639,7 @@ class BaseCommand:
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
-    options = self.options = self.Options()
+    options = self.options = self.Options(cmd=self.cmd)
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
@@ -1286,6 +1289,12 @@ class BaseCommand:
       print(usage.rstrip(), file=sys.stderr)
     return True
 
+  @uses_runstate
+  def handle_signal(self, sig, frame, *, runstate: RunState):
+    ''' The default signal handler, which cancels the default `RunState`.
+    '''
+    runstate.cancel()
+
   @contextmanager
   @uses_runstate
   @uses_upd
@@ -1306,22 +1315,18 @@ class BaseCommand:
     '''
     # redundant try/finally to remind subclassers of correct structure
     try:
-      options = self.options
-      kw_options.setdefault('runstate', runstate)
-      kw_options.setdefault('upd', upd)
-      with options(**kw_options) as run_options:
-        with run_options:  # make the default ThreadState
-          with stackattrs(self, options=run_options):
-            handle_signal = getattr(
-                self, 'handle_signal', lambda *_: runstate.cancel()
-            )
-            with stackattrs(self, cmd=self._subcmd or self.cmd):
-              with upd:
-                with runstate:
-                  with runstate.catch_signal(options.runstate_signals,
-                                             call_previous=False,
-                                             handle_signal=handle_signal):
-                    yield
+      run_options = self.options.copy(**kw_options)
+      with run_options:  # make the default ThreadState
+        with stackattrs(self, options=run_options):
+          with stackattrs(self, cmd=self._subcmd or self.cmd):
+            with upd:
+              with runstate:
+                with runstate.catch_signal(
+                    run_options.runstate_signals,
+                    call_previous=False,
+                    handle_signal=self.handle_signal,
+                ):
+                  yield
 
     finally:
       pass

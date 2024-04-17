@@ -15,17 +15,16 @@ from os.path import join as joinpath
 import random
 import sys
 import tempfile
-import threading
 from time import sleep
 import unittest
 
-from cs.context import stackkeys
-from cs.debug import thread_dump, trace
+from cs.context import contextif, stackkeys
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
-from cs.testutils import SetupTeardownMixin
+from cs.testutils import SetupTeardownMixin, assertSingleThread
 
+from .block import HashCodeBlock, IndirectBlock
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashCode, HASHCLASS_BY_NAME
 from .socket import (
@@ -78,7 +77,6 @@ STORECLASS_NAMES = tuple(
         'StreamStore', 'TCPClientStore', 'UNIXSocketClientStore', 'ProxyStore'
     )
 )
-X("STORECLASS_NAMES = %r", STORECLASS_NAMES)
 
 all_store_type_names = set(
     store_type.__name__ for store_type in ALL_STORE_TYPES
@@ -92,9 +90,10 @@ assert all(
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
-      Yield `(subtest,S)` tuples being:
+      Yield `(subtest,S,second_Store)` tuples being:
       - `subtest`: is a dict containing descriptive fields for `unittest.subtest()`
       - `S`: an empty `Store` to test
+      - `second_Store`: an optional secondary Store to open, used for client/server Stores
   '''
   subtest = {}
   for hashclass_name in HASHCLASS_NAMES:
@@ -106,18 +105,17 @@ def get_test_stores(prefix):
     ):
       for store_type in ALL_STORE_TYPES:
         if store_type.__name__ not in STORECLASS_NAMES:
-          ##X("SKIP %s:%s", hashclass_name, store_type.__name__)
           continue
         if store_type is MappingStore:
           with stackkeys(subtest, storetype=MappingStore):
             yield subtest, MappingStore(
                 'MappingStore', mapping={}, hashclass=hashclass
-            )
+            ), None
         elif store_type is MemoryCacheStore:
           with stackkeys(subtest, storetype=MemoryCacheStore):
             yield subtest, MemoryCacheStore(
                 'MemoryCacheStore', 1024 * 1024 * 1024, hashclass=hashclass
-            )
+            ), None
         elif store_type is DataDirStore:
           with stackkeys(subtest, storetype=DataDirStore):
             for index_name in INDEXCLASS_NAMES:
@@ -134,7 +132,7 @@ def get_test_stores(prefix):
                           hashclass=hashclass,
                           indexclass=indexclass,
                           rollover=rollover
-                      )
+                      ), None
         elif store_type is FileCacheStore:
           with stackkeys(subtest, storetype=FileCacheStore):
             T = tempfile.TemporaryDirectory(prefix=prefix)
@@ -144,80 +142,94 @@ def get_test_stores(prefix):
                   MappingStore('MappingStore', {}),
                   tmpdirpath,
                   hashclass=hashclass
-              )
+              ), None
         elif store_type is StreamStore:
           with stackkeys(subtest, storetype=StreamStore):
             for addif in False, True:
-              with stackkeys(subtest, addif=addif):
+              with stackkeys(subtest, addif=addif, sync=True):
                 local_store = MappingStore(
                     "MappingStore", {}, hashclass=hashclass
                 )
-                upstream_rd, upstream_wr = os.pipe()
-                downstream_rd, downstream_wr = os.pipe()
-                remote_S = StreamStore(
-                    "remote_S",
-                    upstream_rd,
-                    downstream_wr,
-                    local_store=local_store,
-                    addif=addif,
-                    hashclass=hashclass
-                )
-                S = StreamStore(
-                    "S",
-                    downstream_rd,
-                    upstream_wr,
-                    addif=addif,
-                    hashclass=hashclass
-                )
                 with local_store:
-                  with remote_S:
-                    yield subtest, S
+                  # a pipe from
+                  local_to_remote_rd, local_to_remote_wr = os.pipe()
+                  remote_to_local_rd, remote_to_local_wr = os.pipe()
+                  remote_S = StreamStore(
+                      "remote_S", (
+                          local_to_remote_rd,
+                          remote_to_local_wr,
+                      ),
+                      local_store=local_store,
+                      addif=addif,
+                      hashclass=hashclass
+                  )
+                  assert not remote_S.is_open()
+                  S = StreamStore(
+                      "S",
+                      (
+                          remote_to_local_rd,
+                          local_to_remote_wr,
+                      ),
+                      addif=addif,
+                      hashclass=hashclass,
+                      sync=subtest['sync'],
+                  )
+                  yield subtest, S, remote_S
         elif store_type is TCPClientStore:
           with stackkeys(subtest, storetype=TCPClientStore):
             for addif in False, True:
-              with stackkeys(subtest, addif=addif):
+              with stackkeys(subtest, addif=addif, sync=True):
                 local_store = MappingStore(
                     "MappingStore", {}, hashclass=hashclass
                 )
-                base_port = 9999
-                while True:
-                  bind_addr = ('127.0.0.1', base_port)
-                  try:
+                with local_store:
+                  for _ in range(4):
+                    base_port = random.randint(9999, 52000)
+                    bind_addr = ('127.0.0.1', base_port)
                     remote_S = TCPStoreServer(
-                        bind_addr, local_store=local_store
+                        bind_addr,
+                        local_store=local_store,
                     )
-                  except OSError as e:
-                    if e.errno == errno.EADDRINUSE:
-                      base_port += 1
-                    else:
+                    try:
+                      S = TCPClientStore(
+                          None,
+                          bind_addr,
+                          addif=addif,
+                          hashclass=hashclass,
+                          sync=subtest['sync'],
+                      )
+                      yield subtest, S, remote_S
+                      break
+                    except OSError as e:
+                      if e.errno == errno.EADDRINUSE:
+                        warning("OSError: %s", e)
+                        continue
                       raise
                   else:
-                    break
-                S = TCPClientStore(
-                    None, bind_addr, addif=addif, hashclass=hashclass
-                )
-                with local_store:
-                  with remote_S:
-                    yield subtest, S
+                    raise RuntimeError("no available ports found")
+
         elif store_type is UNIXSocketClientStore:
           with stackkeys(subtest, storetype=UNIXSocketClientStore):
             for addif in False, True:
-              with stackkeys(subtest, addif=addif):
+              with stackkeys(subtest, addif=addif, sync=True):
                 local_store = MappingStore(
                     "MappingStore", {}, hashclass=hashclass
                 )
-                T = tempfile.TemporaryDirectory(prefix=prefix)
-                with T as tmpdirpath:
-                  socket_path = joinpath(tmpdirpath, 'sock')
-                  remote_S = UNIXSocketStoreServer(
-                      socket_path, local_store=local_store
-                  )
-                  S = UNIXSocketClientStore(
-                      None, socket_path, addif=addif, hashclass=hashclass
-                  )
-                  with local_store:
-                    with remote_S:
-                      yield subtest, S
+                with local_store:
+                  T = tempfile.TemporaryDirectory(prefix=prefix)
+                  with T as tmpdirpath:
+                    socket_path = joinpath(tmpdirpath, 'sock')
+                    remote_S = UNIXSocketStoreServer(
+                        socket_path, local_store=local_store
+                    )
+                    S = UNIXSocketClientStore(
+                        None,
+                        socket_path,
+                        addif=addif,
+                        sync=subtest['sync'],
+                        hashclass=hashclass,
+                    )
+                    yield subtest, S, remote_S
         elif store_type is ProxyStore:
           with stackkeys(subtest, storetype=ProxyStore):
             main1 = MappingStore("main1", {}, hashclass=hashclass)
@@ -228,7 +240,7 @@ def get_test_stores(prefix):
                 hashclass=hashclass,
                 save2=(save2,)
             )
-            yield subtest, S
+            yield subtest, S, None
         else:
           raise RuntimeError(
               f'no Stopre subtests for Store type {store_type!r}'
@@ -239,8 +251,8 @@ def multitest(method):
   '''
 
   def testMethod(self):
-    for subtest, S in get_test_stores(prefix=method.__module__ + '.' +
-                                      method.__name__):
+    for subtest, S, second_Store in get_test_stores(prefix=method.__module__ +
+                                                    '.' + method.__name__):
       if STORECLASS_NAMES and type(S).__name__ not in STORECLASS_NAMES:
         continue
       with Pfx("%s:%s", S, ",".join(["%s=%s" % (k, v)
@@ -250,11 +262,19 @@ def multitest(method):
           self.supports_index_entry = type(self.S) in (DataDirStore,)
           self.hashclass = subtest['hashclass']
           S.init()
-          with S:
-            method(self)
-            S.flush()
-          self.S = None
-      S = None
+          if second_Store:
+            assert not second_Store.is_open()
+          with contextif(second_Store):
+            with S:
+              method(self)
+              S.flush()
+            if second_Store:
+              assert second_Store.is_open()
+          if second_Store:
+            assert not second_Store.is_open()
+          self.assertTrue(S.closed)
+      # run just the first combination
+      break
 
   return testMethod
 
@@ -269,17 +289,15 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
 
   @contextmanager
   def setupTeardown(self):
+    ''' Use the supplied `Store` and check that there are no left over `Thread`s afterwards.
+    '''
     S = self.S
-    self.supports_index_entry = type(self.S) in (DataDirStore,)
     if S is not None:
       with S:
         yield
     else:
       yield
-    Ts = [T for T in threading.enumerate() if not T.daemon]
-    if len(Ts) > 1:
-      with open('/dev/tty', 'w') as tty:
-        thread_dump(Ts=Ts, fp=tty)
+    assertSingleThread()
 
   @multitest
   def test00empty(self):
@@ -331,36 +349,31 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     ''' Trivial test adding 2 blocks.
     '''
     M1 = self.S
-    KS1 = set()
+    added_hashes = set()
     # test emptiness
     self.assertLen(M1, 0)
     # add one block
     data = make_randblock(rand0(8193))
     h = M1.add(data)
     self.assertIn(h, M1)
+    self.assertIn(h, M1.keys())
     self.assertEqual(M1[h], data)
-    KS1.add(h)
+    added_hashes.add(h)
     self.assertIn(h, M1)
-    mks = set(M1.keys())
-    self.assertIn(h, mks)
-    mks = set(M1.hashcodes())
-    ##self.assertEqual(set(M1.hashcodes()), KS1)
-    if mks != KS1:
-      warning(
-          "M1.hashcodes != KS1: M1 missing %r, KS1 missing %r", KS1 - mks,
-          mks - KS1
-      )
+    M1.flush()
+    M1_keys = set(M1.keys())
+    self.assertIn(h, M1_keys)
+    M1_hashcodes = set(M1.hashcodes())
+    self.assertIn(h, M1_hashcodes)
+    self.assertEqual(M1_hashcodes, added_hashes)
     # add another block
     data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
-    KS1.add(h2)
-    mks2 = set(M1.hashcodes())
-    ##self.assertEqual(mks2, KS1)
-    if mks2 != KS1:
-      warning(
-          "M1.hashcodes != KS1: M1 missing %r, KS1 missing %r", KS1 - mks2,
-          mks2 - KS1
-      )
+    added_hashes.add(h2)
+    self.assertIn(h2, M1)
+    self.assertIn(h2, M1.keys())
+    M1_hashcodes_2 = set(M1.hashcodes())
+    self.assertEqual(M1_hashcodes_2, added_hashes)
 
   @multitest
   def testhcu01test_hashcodes_from(self):
@@ -525,12 +538,15 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     ''' Test `get_index_entry`
     '''
     S = self.S
-    for _ in range(16):
-      data = make_randblock(rand0(8193))
+    datas = [make_randblock(rand0(8193)) for _ in range(16)]
+    for data in datas:
       h = S.hash(data)
       self.assertIsNone(S.get_index_entry(h))
       h2 = S.add(data)
       self.assertEqual(h, h2)
+    sleep(0.5)  # wait for the indexing queue to flush
+    for data in datas:
+      h = S.hash(data)
       entry = S.get_index_entry(h)
       if self.supports_index_entry:
         self.assertIsNotNone(entry)
@@ -539,14 +555,16 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
 
   @multitest
   def test_is_complete_indirect(self):
+    ''' Test `Store.is_complete_indirect`.
+    '''
     S = self.S
     data1 = make_randblock(rand0(8193))
     data2 = make_randblock(rand0(8193))
     h1 = S.add(data1)
-    B1 = Block(hashcode=h1, span=len(data1))
+    B1 = HashCodeBlock(hashcode=h1, span=len(data1), added=True)
     self.assertEqual(len(B1), len(data1))
     h2 = S.hash(data2)
-    B2 = Block(hashcode=h2, span=len(data2))
+    B2 = HashCodeBlock(hashcode=h2, span=len(data2), added=True)
     self.assertEqual(len(B2), len(data2))
     IB = IndirectBlock.from_subblocks((B1, B2))
     self.assertIn(h1, S)

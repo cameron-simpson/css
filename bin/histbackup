@@ -103,13 +103,14 @@ rrsync=rsync
 usehbinclude=1
 usehbfiles=1
 obackup_options=
-symlink_unchanged=1
+symlink_unchanged=
 rsopts=
 copytimes=
 rsdelete=--delete
 thisbackup=
 sshcmd="${RSYNC_RSH:-ssh} -o controlpath=none"
 reverse=
+timeout=
 verbose=
 imode=
 ##[ -t 1 ] && verbose=1
@@ -128,6 +129,9 @@ usage="Usage:
                 of the oldest younger date as the reference tree.
                 Clears any --symlink setting; --symlink must come
                 later than this if that option is required.
+  -t, --timeout timeout
+                Run the rsync with the specified timeout in seconds.
+                Also passes --partial to rsync.
   -v, --verbose Verbose. Note: _not_ passed to rsync.
   -x            Trace execution. Recite linktree and rsync invocations.
   --copy-times  Copy file timestamps from the source tree to the
@@ -153,12 +157,12 @@ usage="Usage:
                 report its basename.
   --no-symlink-if-unchanged
                 Make a link tree even when there are no changes.
+                This is the default.
   --reflink     Use \"cp --reflink\" and \"rsync --inplace\".
   --symlink-if-unchanged
                 Just symlink the top level date if there are no changes.
                 Requires a prepass \"rsync -n\" but saves a lot of hardlinks
                 and time if the tree is often unchanged.
-                This is the default.
   --rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
                 Passed to rsync.
   --symlink name Make a symlink named \"name\" pointing at the latest backup.
@@ -328,10 +332,20 @@ do
     --symlink)
       symlink=$2; shift ;;
 
-    # -item -r, --reverse
+    # =item -v, --verbose
     #
-    # Reverse dates, causing the oldest date to be chosen.
+    -r|--reverse)
+      reverse=1
+      symlink=
+      ;;
+
+    # -item -t, --timeout
     #
+    # Run rsync with the specified timeout in seconds.
+    #
+    -t|--timeout)
+      timeout=$2; rsopts="$rsopts --partial"; shift ;;
+
     # =item -v, --verbose
     #
     -r|--reverse)
@@ -468,6 +482,37 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+dorsync()
+{ [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
+  _drs_src=$1
+  _drs_dst=$2
+  shift; shift
+  case "$_drs_dst" in
+    /* | ./* | ../* ) ;;
+    *) _drs_dst=./$_drs_dst ;;
+  esac
+  set -- rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  [ -n "$timeout" ] && set -- timeout "$timeout" "$@"
+  set -- $trace "$@"
+  if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
+  then
+    set -- filter_fd 1 "$filteroutput" "$@"
+  fi
+  "$@"
+}
+
+dohashindex()
+{ [ $# -ge 2 ] || { echo "Usage: dohashindex src dst" >&2; exit 2; }
+  _dhi_src=$1
+  _dhi_dst=$2
+  shift; shift
+  case "$_dhi_dst" in
+    /* | ./* | ../* ) ;;
+    *) _dhi_dst=./$_dhi_dst ;;
+  esac
+  $trace hashindex rearrange -e "${HASHINDEX_SSH:-$sshcmd}" --mv -- "$_dhi_src" "$_dhi_dst"
+}
+
 if [ $reflink ]
 then
   mklinktree(){
@@ -557,7 +602,7 @@ then
   # check specified backup does not yet exist
   if [ -d "$dest/$thisbackup/." ]
   then
-    echo "$cmd: $dest/$thisbackup already exist, aborting" >&2
+    echo "$cmd: $dest/$thisbackup already exists, aborting" >&2
     exit 1
   fi
 else
@@ -597,37 +642,6 @@ lastbackup=$(
         | sed -n '$p'
 )
 
-dorsync()
-{ [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
-  _drs_src=$1
-  _drs_dst=$2
-  shift; shift
-  case "$_drs_dst" in
-    /* | ./* | ../* ) ;;
-    *) _drs_dst=./$_drs_dst ;;
-  esac
-  set -- $trace rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
-  if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
-  then
-    set -- filter_fd 1 "$filteroutput" "$@"
-  fi
-  set -- $trace "$@"
-  "$@"
-}
-
-dohashindex()
-{ [ $# -ge 2 ] || { echo "Usage: dohashindex src dst" >&2; exit 2; }
-  _dhi_src=$1
-  _dhi_dst=$2
-  shift; shift
-  case "$_dhi_dst" in
-    /* | ./* | ../* ) ;;
-    *) _dhi_dst=./$_dhi_dst ;;
-  esac
-  $trace hashindex rearrange -e "$sshcmd" --mv -- "$_dhi_src" "$_dhi_dst"
-}
-
-
 ok=
 
 # Probe for changes since last backup.
@@ -659,7 +673,7 @@ ok=1
   if [ -n "$lastbackup" ]
   then
     mklinktree "./$lastbackup" "$thisbackup" || exit 1
-    [ $hashindex ] && dohashindex "$src" "$thisbackup" || :
+    [ $hashindex ] && dohashindex "$src" "$thisbackup"
     dorsync "$src" "$thisbackup" -H ${1+"$@"} $obackup_options \
     || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options \
     || :

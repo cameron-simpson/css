@@ -55,6 +55,7 @@ You can also collect multiple `Result`s in completion order using the `report()`
 
 import sys
 from threading import Lock, RLock
+from typing import Callable
 
 from icontract import require
 
@@ -68,13 +69,12 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20240305-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -324,12 +324,25 @@ class Result(FSM):
     ''' Submit a function to compute the result in a separate `Thread`,
         returning the `Thread`.
 
+        Keyword arguments for `cs.threads.bg` may be supplied by
+        prefixing their names with an underscore, for example:
+
+            T = R.bg(mainloop, _pre_enter_objects=(S, fs))
+
         This dispatches a `Thread` to run `self.run_func(func,*a,**kw)`
         and as such the `Result` must be in "pending" state,
         and transitions to "running".
     '''
+    bg_kw = {}
+    for k in list(kw.keys()):
+      if k.startswith('_'):
+        bg_kw[k[1:]] = kw.pop(k)
     return bg_thread(
-        self.run_func, name=self.name, args=[func] + list(a), kwargs=kw
+        self.run_func,
+        name=self.name,
+        args=[func] + list(a),
+        kwargs=kw,
+        **bg_kw,
     )
 
   def run_func_in_thread(self, func, *a, **kw):
@@ -435,7 +448,7 @@ class Result(FSM):
       raise3(*exc_info)
     return result
 
-  def notify(self, notifier):
+  def notify(self, notifier: Callable[["Result"], None]):
     ''' After the `Result` completes, call `notifier(self)`.
 
         If the `Result` has already completed this will happen immediately.

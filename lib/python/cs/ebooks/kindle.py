@@ -46,7 +46,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqlalchemy_utils import (
     ORM,
     BasicTableMixin,
@@ -757,7 +757,8 @@ class KindleCommand(BaseCommand):
     return self.options.kindle.dbshell()
 
   # pylint: disable=too-many-locals
-  def cmd_export(self, argv):
+  @uses_runstate
+  def cmd_export(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-fnqv] [ASINs...]
           Export AZW files to Calibre library.
           -f    Force: replace the AZW3 format if already present.
@@ -771,7 +772,6 @@ class KindleCommand(BaseCommand):
     options.popopts(argv, f='force')
     kindle = options.kindle
     calibre = options.calibre
-    runstate = options.runstate
     dedrm = options.dedrm
     doit = options.doit
     force = options.force
@@ -781,8 +781,7 @@ class KindleCommand(BaseCommand):
     xit = 0
     quiet or print("export", kindle.shortpath, "=>", calibre.shortpath)
     for asin in progressbar(asins, f"export to {calibre}"):
-      if runstate.cancelled:
-        break
+      runstate.raiseif()
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
         try:
@@ -801,11 +800,10 @@ class KindleCommand(BaseCommand):
         except Exception as e:
           warning("kbook.export_to_calibre: e=%s", s(e))
           raise
-    if runstate.cancelled:
-      xit = 1
     return xit
 
-  def cmd_import_tags(self, argv):
+  @uses_runstate
+  def cmd_import_tags(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-nqv] [ASINs...]
           Import Calibre book information into the fstags for a Kindle book.
           This will support doing searches based on stuff like
@@ -815,7 +813,6 @@ class KindleCommand(BaseCommand):
     options = self.options
     kindle = options.kindle
     calibre = options.calibre
-    runstate = options.runstate
     self.popopts(argv, options, n='-doit', q='quiet', v='verbose')
     doit = options.doit
     quiet = options.quiet
@@ -823,8 +820,7 @@ class KindleCommand(BaseCommand):
     asins = argv or sorted(kindle.asins())
     xit = 0
     for asin in progressbar(asins, f"import metadata from {calibre}"):
-      if runstate.cancelled:
-        break
+      runstate.raiseif()
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
         cbooks = list(calibre.by_asin(asin))
@@ -866,8 +862,6 @@ class KindleCommand(BaseCommand):
                   print(f"  calibre.{tag_name}={tag_value!r}")
               if doit:
                 ctags[tag_name] = tag_value
-    if runstate.cancelled:
-      xit = 1
     return xit
 
   def cmd_info(self, argv):

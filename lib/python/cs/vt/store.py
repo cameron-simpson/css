@@ -15,12 +15,13 @@ import sys
 
 from icontract import require
 
+from cs.cache import CachingMapping
 from cs.deco import fmtdoc
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.queues import Channel, IterableQueue
-from cs.resources import openif
+from cs.resources import openif, RunState, uses_runstate
 from cs.result import Result, report
 from cs.threads import bg as bg_thread
 
@@ -32,7 +33,7 @@ from . import (
 )
 from .backingfile import BackingFileIndexEntry, BinaryHashCodeIndex, CompressibleBackingFile
 from .cache import FileDataMappingProxy, MemoryCacheMapping
-from .datadir import DataDir, RawDataDir, PlatonicDir
+from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS
 from .index import choose as choose_indexclass
 
@@ -101,18 +102,13 @@ class MappingStore(StoreSyncBase):
   def __len__(self):
     return len(self.mapping)
 
-  def __contains__(self, h):
+  def contains(self, h):
     return h in self.mapping
-
-  contains = __contains__
 
   def keys(self):
     ''' Proxy to `self.mapping.keys`.
     '''
     return self.mapping.keys()
-
-  def __iter__(self):
-    return iter(self.keys())
 
   def __getitem__(self, h):
     ''' Proxy to `self.mapping[h]`.
@@ -124,10 +120,12 @@ class MappingStore(StoreSyncBase):
     '''
     return self.mapping.get(h, default)
 
-  def pushto_queue(self, Q, runstate=None, progress=None):
-    ''' Push all the keys to the queue.
+  @uses_runstate
+  def pushto_queue(self, Q, runstate: RunState, progress=None):
+    ''' Push all the `Store` keys to the queue `Q`.
     '''
-    for h in progressbar(self.keys(), f'{self.name}', update_frequency=64):
+    for h in progressbar(self.keys(), f'push {self.name}', total=len(self)):
+      runstate.raiseif()
       Q.put(h)
     return True
 
@@ -443,7 +441,7 @@ class ProxyStore(StoreSyncBase):
         seen.add(h)
 
 class DataDirStore(MappingStore):
-  ''' A `MappingStore` using a `DataDir` or `RawDataDir` as its backend.
+  ''' A `MappingStore` using a `DataDir` as its backend.
   '''
 
   @fmtdoc
@@ -456,7 +454,6 @@ class DataDirStore(MappingStore):
       indexclass=None,
       rollover=None,
       lock=None,
-      raw=False,
       **kw
   ):
     ''' Initialise the DataDirStore.
@@ -469,8 +466,6 @@ class DataDirStore(MappingStore):
         * `indexclass`: passed to the data dir.
         * `rollover`: passed to the data dir.
         * `lock`: passed to the mapping.
-        * `raw`: option, default `False`.
-          If true use a `RawDataDir` otherwise a `DataDir`.
     '''
     if lock is None:
       lock = RLock()
@@ -481,14 +476,18 @@ class DataDirStore(MappingStore):
     self.hashclass = hashclass
     self.indexclass = indexclass
     self.rollover = rollover
-    datadirclass = RawDataDir if raw else DataDir
-    self._datadir = datadirclass(
+    self._datadir = DataDir(
         self.topdirpath,
         hashclass=hashclass,
         indexclass=indexclass,
-        rollover=rollover
+        rollover=rollover,
     )
-    super().__init__(name, self._datadir, hashclass=hashclass, **kw)
+    super().__init__(
+        name,
+        CachingMapping(self._datadir, missing_fallthrough=True),
+        hashclass=hashclass,
+        **kw,
+    )
     self._modify_index_lock = Lock()
 
   @contextmanager
@@ -531,6 +530,7 @@ class DataDirStore(MappingStore):
                 entry.flags |= FileDataIndexEntry.INDIRECT_COMPLETE
     '''
     with self._modify_index_lock:
+      self.mapping.flush()  # ensure the index is up to date
       with self._datadir.modify_index_entry(hashcode) as entry:
         yield entry
 
