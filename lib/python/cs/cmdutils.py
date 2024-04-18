@@ -893,8 +893,11 @@ class BaseCommand:
     ''' Do any preparsing of `argv` before the subcommand/main-args.
         Return the remaining arguments.
 
-        This default implementation returns `argv` unchanged.
+        This default implementation applies the default options
+        supported by `self.options` (an instance of `self.Options`
+        class).
     '''
+    self.options.popopts(argv)
     return argv
 
   class _OptSpec(
