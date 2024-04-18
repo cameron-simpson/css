@@ -961,14 +961,14 @@ class BaseCommand:
       ''' Parse `value` according to the spec.
           Raises a `GetoptError` for invalid values.
       '''
-      with Pfx("%s %r", self.help_text, value):
-        try:
+      try:
+        with Pfx("%s %r", self.help_text, value):
           value = pfx_call(self.parse, value)
           if self.validate is not None:
             if not pfx_call(self.validate, value):
               raise ValueError(self.unvalidated_message)
-        except ValueError as e:
-          raise GetoptError(str(e))  # pylint: disable=raise-missing-from
+      except ValueError as e:
+        raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
       return value
 
   @classmethod
