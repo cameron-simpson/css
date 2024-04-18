@@ -114,7 +114,7 @@ from cs.lex import (
     titleify_lc,
 )
 from cs.logutils import error, warning, ifverbose
-from cs.pfx import Pfx, pfx, pfx_method, pfx_call
+from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.tagset import (
     Tag,
