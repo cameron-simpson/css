@@ -121,34 +121,75 @@ def atomic_directory(infill_func, make_placeholder=False):
 
   return atomic_directory_wrapper
 
-def rpaths(
-    dirpath='.', *, only_suffixes=None, skip_suffixes=None, sort_paths=False
+@pfx
+def scandirtree(
+    dirpath='.',
+    *,
+    include_dirs=False,
+    name_selector=None,
+    only_suffixes=None,
+    skip_suffixes=None,
+    sort_names=False,
+    follow_symlinks=False,
 ):
-  ''' Yield relative file paths from a directory.
+  ''' Generator to recurse over `dirpath`, yielding `(is_dir,subpath)`
+      for all selected subpaths.
+
+      Parameters:
+      * `dirpath`: the directory to scan, default `'.'`
+      * `include_dirs`: if true yield directories; default `False`
+      * `name
+  '''
+  if name_selector is None:
+    name_selector = lambda name: name and not name.startswith('.')
+  pending = [dirpath]
+  while pending:
+    path = pending.pop(0)
+    try:
+      dirents = pfx_call(os.scandir, path)
+    except NotADirectoryError:
+      yield False, path
+      continue
+    if include_dirs:
+      yield True, path
+    if sort_names:
+      dirents = sorted(dirents, key=lambda entry: entry.name)
+    for entry in dirents:
+      name = entry.name
+      if not name_selector(name):
+        continue
+      if only_suffixes or skip_suffixes:
+        base, ext = splitext(name)
+        if only_suffixes and ext[1:] not in only_suffixes:
+          continue
+        if skip_suffixes and ext[1:] in skip_suffixes:
+          continue
+      if entry.is_dir(follow_symlinks=follow_symlinks):
+        pending.append(entry.path)
+      else:
+        yield False, entry.path
+
+def scandirpaths(dirpath='.', **scan_kw):
+  ''' A shim for `scandirtree` to yield filesystem paths from a directory.
 
       Parameters:
       * `dirpath`: optional top directory, default `'.'`
-      * `only_suffixes`: optional iterable of suffixes of interest;
-        if provided only files ending in these suffixes will be yielded
-      * `skip_suffixes`: optional iterable if suffixes to ignore;
-        if provided files ending in these suffixes will not be yielded
-      * `sort_paths`: optional flag specifying that filenames should be sorted,
-        default `False`
+
+      Other keyword arguments are passed to `scandirtree`.
   '''
-  if only_suffixes is not None:
-    only_suffixes = tuple(only_suffixes)
-  if skip_suffixes is not None:
-    skip_suffixes = tuple(skip_suffixes)
-  for subpath, subdirnames, filenames in os.walk(dirpath):
-    if sort_paths:
-      subdirnames[:] = sorted(subdirnames)
-      filenames = sorted(filenames)
-    for filename in filenames:
-      if skip_suffixes is not None and filename.endswith(skip_suffixes):
-        continue
-      if only_suffixes is not None and not filename.endswith(only_suffixes):
-        continue
-      yield relpath(joinpath(subpath, filename), dirpath)
+  for _, fspath in scandirtree(dirpath, **scan_kw):
+    yield fspath
+
+def rpaths(dirpath='.', **scan_kw):
+  ''' A shim for `scandirtree` to yield relative file paths from a directory.
+
+      Parameters:
+      * `dirpath`: optional top directory, default `'.'`
+
+      Other keyword arguments are passed to `scandirtree`.
+  '''
+  for fspath in scandirpaths(dirpath, **scan_kw):
+    yield relpath(fspath, dirpath)
 
 def fnmatchdir(dirpath, fnglob):
   ''' Return a list of the names in `dirpath` matching the glob `fnglob`.

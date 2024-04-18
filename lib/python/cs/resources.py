@@ -11,6 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import partial
+import sys
 from threading import Lock, current_thread, main_thread
 import time
 from typing import Any, Callable, Mapping, Optional, Tuple, Union
@@ -73,7 +74,12 @@ def not_closed(func):
   return not_closed_wrapper
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
-@dataclass(slots=True)
+if sys.version_info >= (3, 10):
+  _mdc = dataclass(slots=True)
+else:
+  _mdc = dataclass
+
+@_mdc
 class _MultiOpenMixinOpenCloseState:
 
   mom: "MultiOpenMixin"
