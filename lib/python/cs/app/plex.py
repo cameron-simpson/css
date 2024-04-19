@@ -304,8 +304,8 @@ def plex_linkpath(
       * `hashname`: the file content hash algorithm name
   '''
   if seen is None:
-    seet = set()
   subpath = plex_subpath(srcpath, modes=modes)
+    seen = set()
   if subpath in seen:
     quiet or warning(
         "skipping %r -> %r, we already set it up", srcpath, subpath
