@@ -5,17 +5,20 @@
 #
 
 '''
-Simple facilities for media information.
+Simple minded facilities for media information.
+This contains mostly lexical functions
+for extracting information from strings
+or constructing media filenames from metadata.
 
 The default filename parsing rules are based on my personal convention,
 which is to name media files as:
 
-  series_name--episode_info--title--source--etc....ext
+  series_name--episode_info--title--source--etc-etc.ext
 
 where the components are:
 * `series_name`:
   the programme series name downcased and with whitespace replaced by dashes;
-  in the case of standalone items like movies this is usually the studio.
+  in the case of standalone items like movies this is often the studio.
 * `episode_info`: a structures field with episode information:
   `s`_n_ is a series/season,
   `e`_n_` is an episode number within the season,
@@ -46,7 +49,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
