@@ -31,6 +31,7 @@ from cs.fstags import FSTags, rfilepaths, uses_fstags
 from cs.hashindex import merge, DEFAULT_HASHNAME
 from cs.lex import get_prefix_n
 from cs.logutils import warning
+from cs.mediainfo import scrub_title
 from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.upd import run_task, print
@@ -186,28 +187,6 @@ class PlexCommand(BaseCommand):
               continue
             except OSError as e:
               warning("failed: %s", e)
-
-def scrub_title(title: str, *, season=None, episode=None):
-  ''' Strip redundant text from the start of an episode title.
-  '''
-  title = title.strip()
-  if season:
-    spfx, n, offset = get_prefix_n(title, 's', n=season)
-    if spfx:
-      assert title.startswith(f's{season:02d}')
-      title = title[offset:]
-  if episode:
-    epfx, n, offset = get_prefix_n(title, 'e', n=episode)
-    if epfx:
-      assert title.startswith(f'e{episode:02d}')
-      title = title[offset:]
-  title = title.lstrip(' -')
-  if episode:
-    epfx, n, offset = get_prefix_n(title.lower(), 'episode ', n=episode)
-    if epfx:
-      title = title[offset:]
-    title = title.lstrip(' -')
-  return title
 
 @uses_fstags
 @typechecked

@@ -299,5 +299,30 @@ def pathname_info(pathname):
           info[field].append(value)
   return info
 
+def scrub_title(title: str, *, season=None, episode=None) -> str:
+  ''' Strip redundant text from the start of an episode title.
+
+      I frequently get "title" strings with leading season/episode information.
+      This function cleans up these strings to return the unadorned title.
+  '''
+  title = title.strip()
+  if season:
+    spfx, n, offset = get_prefix_n(title, 's', n=season)
+    if spfx:
+      assert title.startswith(f's{season:02d}')
+      title = title[offset:]
+  if episode:
+    epfx, n, offset = get_prefix_n(title, 'e', n=episode)
+    if epfx:
+      assert title.startswith(f'e{episode:02d}')
+      title = title[offset:]
+  title = title.lstrip(' -')
+  if episode:
+    epfx, n, offset = get_prefix_n(title.lower(), 'episode ', n=episode)
+    if epfx:
+      title = title[offset:]
+    title = title.lstrip(' -')
+  return title
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

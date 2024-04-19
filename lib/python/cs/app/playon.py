@@ -35,6 +35,7 @@ from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
 from cs.lex import has_format_attributes, format_attribute, get_prefix_n
 from cs.logutils import warning
+from cs.mediainfo import scrub_title
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
@@ -558,19 +559,12 @@ class Recording(SQLTagSet):
 
   @format_attribute
   def series_episode_name(self):
-    name = self.playon.Name
-    name = name.strip()
-    if self.playon.get('Season'):
-      spfx, n, offset = get_prefix_n(name, 's', n=self.playon.Season)
-      if spfx is not None:
-        assert name.startswith(f's{self.playon.Season:02d}')
-        name = name[offset:]
+    name = scrub_title(
+        self.playon.Name,
+        season=self.playon.get('Season'),
+        episode=self.playon.get('Episode'),
+    )
     if self.playon.get('Episode'):
-      epfx, n, offset = get_prefix_n(name, 'e', n=self.playon.Episode)
-      if epfx is not None:
-        assert name.startswith(f'e{self.playon.Episode:02d}')
-        name = name[offset:]
-      name = name.lstrip()
       epfx, n, offset = get_prefix_n(
           name.lower(), 'episode ', n=self.playon.Episode
       )
