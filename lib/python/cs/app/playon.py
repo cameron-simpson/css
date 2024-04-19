@@ -392,12 +392,8 @@ class PlayOnCommand(BaseCommand):
           List features.
     '''
     long_mode = False
-    opts, argv = getopt(argv, 'l', '')
-    for opt, val in opts:
-      if opt == '-l':
-        long_mode = True
-      else:
-        raise RuntimeError("unhandled option: %r" % (opt,))
+    opts = self.popopts(argv, l='long_mode')
+    long_mode = opts['long_mode']
     if argv:
       feature_id = argv.pop(0)
     else:
