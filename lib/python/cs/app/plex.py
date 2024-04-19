@@ -148,6 +148,7 @@ class PlexCommand(BaseCommand):
       raise GetoptError(f'plextree does not exist: {plextree!r}')
     with run_task('linktree') as proxy:
       seen = set()
+      plexmatch_cache = {}
       for srcroot in srcroots:
         runstate.raiseif()
         osrcdir = None
@@ -181,6 +182,7 @@ class PlexCommand(BaseCommand):
                   doit=doit,
                   quiet=False,
                   seen=seen,
+                  plexmatch_cache=plexmatch_cache,
               )
             except UnsupportedPlexModeError as e:
               verbose and warning("skipping, unsupported plex mode: %s", e)
@@ -289,6 +291,7 @@ def plex_linkpath(
     hashname=HASHNAME_DEFAULT,
     symlink_mode=True,
     seen=None,
+    plexmatch_cache=None,
 ):
   ''' Symlink `srcpath` into `plex_topdirpath`.
 
@@ -303,6 +306,8 @@ def plex_linkpath(
   '''
   if seen is None:
     seen = set()
+  if plexmatch_cache is None:
+    plexmatch_cache = {}
   subpath, plexmatches = plex_subpath(srcpath, modes=modes)
   if subpath in seen:
     quiet or warning(
@@ -331,19 +336,27 @@ def plex_linkpath(
         if not matches:
           warning("no plex matches for %r?", subdirpath)
           continue
+        # get the current plex match contents
         plexmatchpath = joinpath(plex_topdirpath, subdirpath, '.plexmatch')
-        match_hints = read_matchfile(plexmatchpath)
+        try:
+          match_hints = plexmatch_cache[plexmatchpath]
+        except KeyError:
+          match_hints = plexmatch_cache[plexmatchpath] = read_matchfile(
+              plexmatchpath
+          )
         if not quiet:
           for hint, value in sorted(matches.items()):
             if match_hints.get(hint) == value:
-              del match_hints[hint]
+              del matches[hint]
             else:
               print(shortpath(plexmatchpath), '+', f'{hint}:', value)
         if doit:
-          if match_hints:
+          if matches:
             with pfx_call(open, plexmatchpath, "a") as pmf:
               for hint, value in sorted(matches.items()):
                 print(f'{hint}:', value, file=pmf)
+            # update the cache
+            match_hints.update(matches)
 
 def read_matchfile(fspath) -> dict:
   match_hints = {}
