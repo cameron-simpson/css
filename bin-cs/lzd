@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Shell script to run LazyDocker via the jesseduffield/lazydocker docker image.
+# Closely based on the suggested alias here:
+# https://github.com/jesseduffield/lazydocker?tab=readme-ov-file#docker
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+trace=
+[ -t 2 ] && trace=set-x
+
+rcdir=${LAZYDOCKER_RCDIR:-$HOME/rc/lazydocker}
+image=lazyteam/lazydocker
+dockersock=/var/run/docker.sock
+
+set -- $trace docker run --rm -it \
+         -v "$dockersock:/var/run/docker.sock" \
+         -v "$rcdir/config":/config/jesseduffield/lazydocker \
+         "$image" ${1+"$@"}
