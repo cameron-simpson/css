@@ -42,6 +42,7 @@ import sys
 from types import SimpleNamespace as NS
 
 from cs.gimmicks import warning
+from cs.lex import get_prefix_n
 from cs.pfx import Pfx, pfx
 from cs.tagset import Tag
 
