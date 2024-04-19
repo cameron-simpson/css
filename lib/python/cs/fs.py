@@ -20,6 +20,7 @@ from os.path import (
     normpath,
     realpath,
     relpath,
+    splitext,
 )
 from tempfile import TemporaryDirectory
 from threading import Lock
@@ -155,6 +156,8 @@ def scandirtree(
     if sort_names:
       dirents = sorted(dirents, key=lambda entry: entry.name)
     for entry in dirents:
+      if entry.is_dir(follow_symlinks=follow_symlinks):
+        pending.append(entry.path)
       name = entry.name
       if not name_selector(name):
         continue
@@ -164,9 +167,7 @@ def scandirtree(
           continue
         if skip_suffixes and ext[1:] in skip_suffixes:
           continue
-      if entry.is_dir(follow_symlinks=follow_symlinks):
-        pending.append(entry.path)
-      else:
+      if include_dirs or not entry.is_dir(follow_symlinks=follow_symlinks):
         yield False, entry.path
 
 def scandirpaths(dirpath='.', **scan_kw):
