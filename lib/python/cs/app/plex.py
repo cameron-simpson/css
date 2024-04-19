@@ -303,6 +303,8 @@ def plex_linkpath(
       * `doit`: default `True`: if false do not make the link
       * `quiet`: default `False`; if false print the planned link
       * `hashname`: the file content hash algorithm name
+      * `seen`: optional set of `srcpath` values already processed
+      * `plexmatch_cache`: optional cache of `.plexmatch` contents
   '''
   if seen is None:
     seen = set()
