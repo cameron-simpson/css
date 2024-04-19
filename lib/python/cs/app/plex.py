@@ -28,7 +28,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, rfilepaths, uses_fstags
-from cs.hashindex import merge, DEFAULT_HASHNAME
+from cs.hashindex import merge, HASHNAME_DEFAULT
 from cs.lex import get_prefix_n
 from cs.logutils import warning
 from cs.mediainfo import scrub_title
@@ -288,7 +288,7 @@ def plex_linkpath(
     modes: Optional[Sequence[str]] = None,
     doit=True,
     quiet=False,
-    hashname=DEFAULT_HASHNAME,
+    hashname=HASHNAME_DEFAULT,
     symlink_mode=True,
     seen=None,
 ):
