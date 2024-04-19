@@ -4,6 +4,7 @@
 ''' Stuff for Plex media libraries.
 '''
 
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from getopt import GetoptError
@@ -15,21 +16,19 @@ from os.path import (
     exists as existspath,
     expanduser,
     isdir as isdirpath,
-    isfile as isfilepath,
     join as joinpath,
-    normpath,
     splitext,
 )
 import sys
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Tuple
 
+from icontract import ensure
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.fs import needdir, shortpath
-from cs.fstags import FSTags, rfilepaths, uses_fstags
+from cs.fs import is_valid_rpath, needdir, scandirtree, shortpath
+from cs.fstags import FSTags, uses_fstags
 from cs.hashindex import merge, HASHNAME_DEFAULT
-from cs.lex import get_prefix_n
 from cs.logutils import warning
 from cs.mediainfo import scrub_title
 from cs.pfx import Pfx, pfx_call
@@ -67,7 +66,6 @@ def main(argv=None):
 class UnsupportedPlexModeError(ValueError):
   ''' Plex path does not match the active modes.
   '''
-  pass
 
 class PlexCommand(BaseCommand):
   ''' `plex` main command line class.
@@ -304,7 +302,6 @@ def plex_linkpath(
       * `hashname`: the file content hash algorithm name
   '''
   if seen is None:
-  subpath = plex_subpath(srcpath, modes=modes)
     seen = set()
   subpath, plexmatches = plex_subpath(srcpath, modes=modes)
   if subpath in seen:
@@ -323,7 +320,7 @@ def plex_linkpath(
           hashname=hashname,
           symlink_mode=symlink_mode,
           quiet=False,
-          doit=doit
+          doit=doit,
       )
     except FileExistsError:
       warning("already exists")
@@ -359,14 +356,14 @@ def read_matchfile(fspath) -> dict:
             continue
           try:
             hint, value = line.split(':', 1)
-          except ValueError as e:
-            warning("bad syntax")
+          except ValueError:
+            warning("bad syntax, no colon")
           else:
             value = value.strip()
             if hint in ('season', 'year'):
               try:
                 value = int(value)
-              except ValueError as e:
+              except ValueError:
                 warning("%s: expected an int, got: %r", hint, value)
             match_hints[hint] = value
   except FileNotFoundError:
