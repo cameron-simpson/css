@@ -6,12 +6,28 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-trace=
-[ -t 2 ] && trace=set-x
+set -ue
 
 rcdir=${LAZYDOCKER_RCDIR:-$HOME/rc/lazydocker}
 image=lazyteam/lazydocker
 dockersock=/var/run/docker.sock
+
+cmd=$0
+usage="Usage: $cmd [command [args...]]
+    Run LazyDocker via the $image docker image."
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    -h | -help | --help | help )
+      echo "$usage" >&2
+      exit 0
+      ;;
+  esac
+fi
+
+trace=
+[ -t 2 ] && trace=set-x
 
 set -- $trace docker run --rm -it \
          -v "$dockersock:/var/run/docker.sock" \
