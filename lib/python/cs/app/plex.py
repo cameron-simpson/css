@@ -126,6 +126,7 @@ class PlexCommand(BaseCommand):
           -v          Verbose.
     '''
     options = self.options
+    options.modes = "tv"
     options.symlink_mode = False
     options.popopts(
         argv,
@@ -136,6 +137,8 @@ class PlexCommand(BaseCommand):
         v='verbose',
     )
     doit = options.doit
+    if not doit:
+      options.verbose = True
     modes = options.modes.split(',')
     plextree = options.plextree
     symlink_mode = options.symlink_mode
