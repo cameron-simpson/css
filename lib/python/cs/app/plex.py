@@ -306,6 +306,7 @@ def plex_linkpath(
   if seen is None:
   subpath = plex_subpath(srcpath, modes=modes)
     seen = set()
+  subpath, plexmatches = plex_subpath(srcpath, modes=modes)
   if subpath in seen:
     quiet or warning(
         "skipping %r -> %r, we already set it up", srcpath, subpath
@@ -326,6 +327,26 @@ def plex_linkpath(
       )
     except FileExistsError:
       warning("already exists")
+    else:
+      # make .plexmatch files
+      for subdirpath, matches in sorted(plexmatches.items()):
+        assert subpath.startswith(subdirpath + '/')
+        if not matches:
+          warning("no plex matches for %r?", subdirpath)
+          continue
+        plexmatchpath = joinpath(plex_topdirpath, subdirpath, '.plexmatch')
+        match_hints = read_matchfile(plexmatchpath)
+        if not quiet:
+          for hint, value in sorted(matches.items()):
+            if match_hints.get(hint) == value:
+              del match_hints[hint]
+            else:
+              print(shortpath(plexmatchpath), '+', f'{hint}:', value)
+        if doit:
+          if match_hints:
+            with pfx_call(open, plexmatchpath, "a") as pmf:
+              for hint, value in sorted(matches.items()):
+                print(f'{hint}:', value, file=pmf)
 
 def read_matchfile(fspath) -> dict:
   match_hints = {}
