@@ -1147,20 +1147,24 @@ class BaseCommand:
     for opt_name, opt_spec in opt_specs.items():
       with Pfx("opt_spec[%r]=%r", opt_name, opt_spec):
         needs_arg = False
+        # leading underscore for numeric options like -1
         if opt_name.startswith('_'):
           opt_name = opt_name[1:]
           if is_identifier(opt_name):
             warning(
                 "unnecessary leading underscore on valid identifier option"
             )
+        # trailing underscore indicates that the option expected an argument
         if opt_name.endswith('_'):
           needs_arg = True
           opt_name = opt_name[:-1]
+        # single character option -x
         if len(opt_name) == 1:
           opt = '-' + opt_name
           shortopts += opt_name
           if needs_arg:
             shortopts += ':'
+        # long option
         elif len(opt_name) > 1:
           opt_dashed = opt_name.replace('_', '-')
           opt = '--' + opt_dashed
@@ -1168,13 +1172,19 @@ class BaseCommand:
           default_help_text = opt
         else:
           raise ValueError("unexpected opt_name %s" % (r(opt_name),))
+        # construct an option specification list containing:
+        #   [opt_name:str] [help_text:str] [parse:Callable [validate:Callable [invalid_msg:str]]]
         if opt_spec is None:
+          # default opt_spec: opt citation and type str
           specs = [opt_name, str]
         elif isinstance(opt_spec, (list, tuple)):
+          # list or tuple: copyt to a list
           specs = list(opt_spec)
         else:
+          # promote scaler to single element list
           specs = [opt_spec]
         if specs:
+          # see if the leading spec is an option citation
           spec0 = specs[0]
           if isinstance(spec0, str) and (is_identifier(spec0) or
                                          (spec0.startswith('-')
