@@ -327,5 +327,30 @@ def plex_linkpath(
     except FileExistsError:
       warning("already exists")
 
+def read_matchfile(fspath) -> dict:
+  match_hints = {}
+  try:
+    with pfx_call(open, fspath, "r") as f:
+      for lineno, line in enumerate(f, 1):
+        with Pfx("%s:%d", fspath, lineno):
+          line = line.strip()
+          if not line or line.startswith('#'):
+            continue
+          try:
+            hint, value = line.split(':', 1)
+          except ValueError as e:
+            warning("bad syntax")
+          else:
+            value = value.strip()
+            if hint in ('season', 'year'):
+              try:
+                value = int(value)
+              except ValueError as e:
+                warning("%s: expected an int, got: %r", hint, value)
+            match_hints[hint] = value
+  except FileNotFoundError:
+    pass
+  return match_hints
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
