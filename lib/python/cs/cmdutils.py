@@ -331,12 +331,16 @@ class BaseCommandOptions(HasThreadState):
   @contextmanager
   def __call__(self, **updates):
     ''' Calling the options object returns a context manager whose
-        value is a copy of the options with any `suboptions` applied.
+        value is a shallow copy of the options with any `suboptions` applied.
 
         Example showing the semantics:
 
             >>> from cs.cmdutils import BaseCommandOptions
-            >>> options = BaseCommandOptions(x=1)
+            >>> @dataclass
+            ... class DemoOptions(BaseCommandOptions):
+            ...   x: int = 0
+            ...
+            >>> options = DemoOptions(x=1)
             >>> assert options.x == 1
             >>> assert not options.verbose
             >>> with options(verbose=True) as subopts:
@@ -398,7 +402,7 @@ class BaseCommandOptions(HasThreadState):
     '''
     for k, v in self.COMMON_OPT_SPECS.items():
       opt_specs.setdefault(k, v)
-    BaseCommand.popopts(argv, self, **opt_specs)
+    return BaseCommand.popopts(argv, self, **opt_specs)
 
 def uses_cmd_options(
     func, cls=BaseCommandOptions, options_param_name='options'
@@ -889,8 +893,11 @@ class BaseCommand:
     ''' Do any preparsing of `argv` before the subcommand/main-args.
         Return the remaining arguments.
 
-        This default implementation returns `argv` unchanged.
+        This default implementation applies the default options
+        supported by `self.options` (an instance of `self.Options`
+        class).
     '''
+    self.options.popopts(argv)
     return argv
 
   class _OptSpec(
@@ -957,14 +964,14 @@ class BaseCommand:
       ''' Parse `value` according to the spec.
           Raises a `GetoptError` for invalid values.
       '''
-      with Pfx("%s %r", self.help_text, value):
-        try:
+      try:
+        with Pfx("%s %r", self.help_text, value):
           value = pfx_call(self.parse, value)
           if self.validate is not None:
             if not pfx_call(self.validate, value):
               raise ValueError(self.unvalidated_message)
-        except ValueError as e:
-          raise GetoptError(str(e))  # pylint: disable=raise-missing-from
+      except ValueError as e:
+        raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
       return value
 
   @classmethod
@@ -1082,39 +1089,45 @@ class BaseCommand:
           of `True`; if their synonym commences with a dash they will
           imply a value of `False`, for example `n='dry_run',y='-dry_run'`
 
-        As it happens, the `BaseCommandOptions` class provided a `popopts` method
-        which is a shim for this method with `attrfor=self` i.e. the options object.
-        So common use in a command method might look like this:
+        The `BaseCommandOptions` class provides a `popopts` method
+        which is a shim for this method with `attrfor=self` i.e.
+        the options object.
+        So common use in a command method usually looks like this:
 
             class SomeCommand(BaseCommand):
 
                 def cmd_foo(self, argv):
                     options = self.options
                     # accept a -j or --jobs options
-                    options.poopts(argv, jobs=1, j='jobs')
+                    options.popopts(argv, jobs=1, j='jobs')
                     print("jobs =", options.jobs)
+
+        The `self.options` object is preprovided as an instance of
+        the `self.Options` class, which is `BaseCommandOptions` by
+        default. This presupplies support for some basic options
+        like `-v` for "verbose" and so forth, and a subcommand
+        need not describe these in a call to `self.options.popopts()`.
 
         Example:
 
             >>> import os.path
-            >>> options = SimpleNamespace(
-            ...   all=False,
-            ...   jobs=1,
-            ...   number=0,
-            ...   once=False,
-            ...   path=None,
-            ...   trace_exec=True,
-            ...   verbose=False,
-            ...   dry_run=False)
+            >>> from typing import Optional
+            >>> @dataclass
+            ... class DemoOptions(BaseCommandOptions):
+            ...   all: bool = False
+            ...   jobs: int = 1
+            ...   number: int = 0
+            ...   once: bool = False
+            ...   path: Optional[str] = None
+            ...   trace_exec: bool = False
+            ...
+            >>> options = DemoOptions()
             >>> argv = ['-1', '-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
-            >>> opt_dict = BaseCommand.popopts(
+            >>> opt_dict = options.popopts(
             ...   argv,
-            ...   options,
             ...   _1='once',
             ...   a='all',
             ...   j_=('jobs',int),
-            ...   n='dry_run',
-            ...   v='verbose',
             ...   x='-trace_exec',
             ...   y='-dry_run',
             ...   dry_run=None,
@@ -1123,8 +1136,8 @@ class BaseCommand:
             ... )
             >>> opt_dict
             {'once': True, 'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
-            >>> options
-            namespace(all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=True, verbose=True, dry_run=False)
+            >>> options # doctest: +ELLIPSIS
+            DemoOptions(cmd=None, dry_run=False, force=False, quiet=False, runstate_signals=(...), verbose=True, all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=False)
     '''
     keyfor = {}
     shortopts = ''
@@ -1134,20 +1147,24 @@ class BaseCommand:
     for opt_name, opt_spec in opt_specs.items():
       with Pfx("opt_spec[%r]=%r", opt_name, opt_spec):
         needs_arg = False
+        # leading underscore for numeric options like -1
         if opt_name.startswith('_'):
           opt_name = opt_name[1:]
           if is_identifier(opt_name):
             warning(
                 "unnecessary leading underscore on valid identifier option"
             )
+        # trailing underscore indicates that the option expected an argument
         if opt_name.endswith('_'):
           needs_arg = True
           opt_name = opt_name[:-1]
+        # single character option -x
         if len(opt_name) == 1:
           opt = '-' + opt_name
           shortopts += opt_name
           if needs_arg:
             shortopts += ':'
+        # long option
         elif len(opt_name) > 1:
           opt_dashed = opt_name.replace('_', '-')
           opt = '--' + opt_dashed
@@ -1155,13 +1172,19 @@ class BaseCommand:
           default_help_text = opt
         else:
           raise ValueError("unexpected opt_name %s" % (r(opt_name),))
+        # construct an option specification list containing:
+        #   [opt_name:str] [help_text:str] [parse:Callable [validate:Callable [invalid_msg:str]]]
         if opt_spec is None:
+          # default opt_spec: opt citation and type str
           specs = [opt_name, str]
         elif isinstance(opt_spec, (list, tuple)):
+          # list or tuple: copyt to a list
           specs = list(opt_spec)
         else:
+          # promote scaler to single element list
           specs = [opt_spec]
         if specs:
+          # see if the leading spec is an option citation
           spec0 = specs[0]
           if isinstance(spec0, str) and (is_identifier(spec0) or
                                          (spec0.startswith('-')
