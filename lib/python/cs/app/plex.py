@@ -153,9 +153,11 @@ class PlexCommand(BaseCommand):
       for srcroot in srcroots:
         runstate.raiseif()
         osrcdir = None
-        for srcpath in srcroot if isfilepath(srcroot) else sorted(
-            (joinpath(srcroot, normpath(subpath))
-             for subpath in rfilepaths(srcroot))):
+        for _, srcpath in scandirtree(
+            srcroot,
+            sort_names=True,
+            only_suffixes=('mp4', 'mkv'),
+        ):
           runstate.raiseif()
           with Pfx(srcpath):
             srcdir = dirname(srcpath)
