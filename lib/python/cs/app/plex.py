@@ -194,17 +194,29 @@ class PlexCommand(BaseCommand):
               warning("failed: %s", e)
 
 @uses_fstags
+@ensure(
+    lambda result:
+    all(is_valid_rpath(subpath) for subpath in result[1].keys())
+)
 @typechecked
 def plex_subpath(
-    fspath: str, *, modes: Optional[Sequence[str]] = None, fstags: FSTags
-):
+    fspath: str,
+    *,
+    modes: Optional[Sequence[str]] = None,
+    fstags: FSTags
+) -> Tuple[str, dict]:
   ''' Compute a Plex filesystem subpath based on the tags of `fspath`.
+      Return a 2-tuple of `(subpath,plexmatches)` containing the
+      Plex filesystem subpath and a `dict` with any entries for
+      `.plexmatch` files along the path of the form
+      `subdirpath`->`hint`->`value`.
 
       See: https://support.plex.tv/articles/naming-and-organizing-your-tv-show-files/
+      and: https://support.plex.tv/articles/plexmatch/
   '''
+  plexmatches = defaultdict(dict)
   if modes is None:
     modes = "movie", "tv"
-  assert tuple(modes) == ("tv",), "expected just [tv], got %r" % (modes,)
   filename = basename(fspath)
   # infer from filename?
   base, ext = splitext(filename)
@@ -219,40 +231,54 @@ def plex_subpath(
   extra = isinstance(tv.extra, (int, str)) and int(tv.extra)
   extra_title = tv.extra_title
   part = tv.part and int(tv.part)
+
+  def scrub(part):
+    ''' Clean up a path component.
+    '''
+    return part.replace('/', '::').strip()
+
   # compose the filesystem path
-  dstpath = []
   if tv.series_title and season and episode:
     # TV Series
-    if "tv" not in modes:
-      raise UnsupportedPlexModeError("tv not in modes %r" % (modes,))
-    dstpath.append('TV Shows')
-    series_part = tv.series_title
+    mode = 'tv'
+    if mode not in modes:
+      raise UnsupportedPlexModeError(f'{mode!r} not in modes {modes!r}')
+    toppath = 'TV Shows'
+    series_title = tv.series_title
+    series_part = series_title
     if tv.series_year:
       series_part = f'{series_part} ({tv.series_year})'
-    dstpath.append(series_part)
-    dstpath.append(f'Season {season:02d}')
+    series_path = joinpath(toppath, scrub(series_part))
+    plexmatches[series_path]['show'] = series_title
+    if tv.series_year:
+      plexmatches[series_path]['year'] = tv.series_year
+    season_part = f'Season {season:02d}'
+    season_path = joinpath(series_path, scrub(season_part))
+    plexmatches[season_path]['season'] = season
     dstfilename = series_part
     if episode:
       dstfilename += f' - s{season:02d}e{episode:02d}'
     else:
       dstfilename += f' - s{season:02d}x{extra:02d}'
+    subdirpath = season_path
   else:
     # Movie
-    if "movie" not in modes:
-      raise UnsupportedPlexModeError("movie not in modes %r" % (modes,))
-    dstpath.append('Movies')
+    mode = 'movie'
+    if mode not in modes:
+      raise UnsupportedPlexModeError(f'{mode!r} not in modes {modes!r}')
+    toppath = 'Movies'
     dstfilename = title
     if episode:
       dstfilename += f' - {episode:d}'
+    subdirpath = toppath
   if episode_title and episode_title != title:
     dstfilename += f' - {episode_title}'
   elif extra_title and extra_title != title:
     dstfilename += f' - {extra_title}'
   if part:
     dstfilename += f' - pt{part:d}'
-  dstpath.append(dstfilename + ext)
-  subpath = joinpath(*(part.replace('/', '::') for part in dstpath))
-  return subpath
+  subpath = joinpath(subdirpath, scrub(dstfilename) + ext)
+  return subpath, plexmatches
 
 # pylint: disable=redefined-builtin
 def plex_linkpath(
