@@ -8,6 +8,8 @@
 
 set -ue
 
+trace=
+[ -t 2 ] && trace=set-x
 rcdir=${LAZYDOCKER_RCDIR:-$HOME/rc/lazydocker}
 image=lazyteam/lazydocker
 dockersock=/var/run/docker.sock
@@ -20,16 +22,13 @@ if [ $# -gt 0 ]
 then
   case "$1" in
     -h | -help | --help | help )
-      echo "$usage" >&2
+      echo "$usage"
       exit 0
       ;;
   esac
 fi
 
-trace=
-[ -t 2 ] && trace=set-x
-
-set -- $trace docker run --rm -it \
+exec $trace docker run --rm -it \
          -v "$dockersock:/var/run/docker.sock" \
          -v "$rcdir/config":/config/jesseduffield/lazydocker \
          "$image" ${1+"$@"}
