@@ -12,7 +12,6 @@ ISO make the standard available here:
 * [zip file download](http://standards.iso.org/ittf/PubliclyAvailableStandards/c068960_ISO_IEC_14496-12_2015.zip)
 '''
 
-from abc import ABC
 from base64 import b64encode, b64decode
 from collections import namedtuple
 from contextlib import contextmanager
@@ -46,7 +45,7 @@ from cs.cmdutils import BaseCommand
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
 from cs.imageutils import sixel
-from cs.lex import get_identifier, get_decimal_value, cropped_repr
+from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
 from cs.py.func import prop
@@ -96,7 +95,7 @@ class MP4Command(BaseCommand):
   TAG_PREFIX = 'mp4'
 
   @uses_fstags
-  def cmd_autotag(self, argv, fstags):
+  def cmd_autotag(self, argv, fstags: FSTags):
     ''' Usage: {cmd} [-n] [-p prefix] [--prefix=prefix] paths...
           Tag paths based on embedded MP4 metadata.
           -n  No action.
@@ -2525,7 +2524,7 @@ class ILSTBoxBody(ContainerBoxBody):
               if decoder is not None:
                 value = decoder(value)
               # annotate the subbox and the ilst
-              attribute_name = '.'.join((mean_box.text, name_box.text))
+              attribute_name = f'{mean_box.text}.{name_box.text}'
               setattr(subbox, attribute_name, value)
               self.tags.add(attribute_name, value)
         else:
