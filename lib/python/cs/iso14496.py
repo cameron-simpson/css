@@ -19,7 +19,6 @@ from datetime import datetime
 from getopt import getopt, GetoptError
 import os
 import sys
-from tempfile import NamedTemporaryFile
 
 from icontract import require
 from typeguard import typechecked
@@ -44,7 +43,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
-from cs.imageutils import sixel
+from cs.imageutils import sixel_from_image_bytes
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
@@ -231,19 +230,14 @@ class MP4Command(BaseCommand):
               print(' ', box.box_type_path, str(len(tags)) + ':')
               for tag in tags:
                 if tag.name == 'moov.udta.meta.ilst.cover':
-                  bs = b64decode(tag.value)
+                  image_bs = b64decode(tag.value)
                   if sys.stdout.isatty():
                     print(f'    {tag.name}:')
-                    with NamedTemporaryFile() as T:
-                      T.write(bs)
-                      T.flush()
-                      with open(sixel(T.name), 'rb') as sixelf:
-                        with os.fdopen(os.dup(sys.stdout.fileno()), 'wb') as f:
-                          sixel_bs = sixelf.read()
-                          sys.stdout.flush()
-                          f.write(sixel_bs)
+                    with open(sixel_from_image_bytes(image_bs),
+                              'rb') as sixelf:
+                      print(sixelf.read().decode('ascii'))
                   else:
-                    print(f'    {tag.name}: {bs[:32]!r}...')
+                    print(f'    {tag.name}: {image_bs[:32]!r}...')
                 else:
                   print('   ', tag)
 
