@@ -589,9 +589,10 @@ class BoxBody(SimpleBinary, ABC):
         try:
           boxes = self.boxes
         except AttributeError:
-          warning("no .boxes")
-          boxes = ()
-        boxes = [box for box in boxes if box.box_type == box_type]
+          warning("%s.%s: no .boxes", self.__class__.__name__, attr)
+          boxes = []
+        else:
+          boxes = [box for box in boxes if box.box_type == box_type]
         if attr.endswith('s'):
           return boxes
         if attr.endswith('0'):
