@@ -20,6 +20,7 @@ from datetime import datetime
 from getopt import getopt, GetoptError
 import os
 import sys
+from tempfile import NamedTemporaryFile
 
 from icontract import require
 from typeguard import typechecked
@@ -44,6 +45,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
+from cs.imageutils import sixel
 from cs.lex import get_identifier, get_decimal_value, cropped_repr
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
@@ -230,9 +232,21 @@ class MP4Command(BaseCommand):
               print(' ', box.box_type_path, str(len(tags)) + ':')
               for tag in tags:
                 if tag.name == 'moov.udta.meta.ilst.cover':
-                  print('   ', tag.name, cropped_repr(tag.value))
+                  bs = b64decode(tag.value)
+                  if sys.stdout.isatty():
+                    print(f'    {tag.name}:')
+                    with NamedTemporaryFile() as T:
+                      T.write(bs)
+                      T.flush()
+                      with open(sixel(T.name), 'rb') as sixelf:
+                        with os.fdopen(os.dup(sys.stdout.fileno()), 'wb') as f:
+                          sixel_bs = sixelf.read()
+                          sys.stdout.flush()
+                          f.write(sixel_bs)
+                  else:
+                    print(f'    {tag.name}: {bs[:32]!r}...')
                 else:
-                  print('   ', tag, repr(tag.value))
+                  print('   ', tag)
 
   def cmd_parse(self, argv):
     ''' Usage: {cmd} [{{-|filename}}...]
