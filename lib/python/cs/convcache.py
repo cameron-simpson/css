@@ -107,12 +107,9 @@ class ConvCache(HasFSPath):
     if ext is None:
       ext = conv_subparts[0]
     suffix = '.' + ext
-    dstpath = self.pathto(
-        joinpath(conv_subpath,
-                 self.content_subpath(srcpath) + suffix)
-    )
+    dstpath = self.pathto(conv_subpath, self.content_subpath(srcpath) + suffix)
     dstdirpath = dirname(dstpath)
-    pfx_call(os.makedirs, dstdirpath)
+    needdir(dstdirpath, use_makedirs=True)
     if not existspath(dstpath):
       with Pfx('<%s %s >%s', srcpath, conv_func, dstpath):
         with atomic_filename(dstpath,
