@@ -5,15 +5,15 @@
 '''
 
 from functools import partial
-import hashlib
 from os.path import basename, splitext
 import shutil
 
 from PIL import Image
 
-from cs.convcache import ConvCache
+from cs.convcache import ConvCache, convof
 from cs.deco import ALL
 from cs.pfx import pfx_call, pfx_method
+from cs.psutils import run
 
 __all__ = []
 
@@ -96,3 +96,18 @@ class ThumbnailCache(ConvCache):
         thumb_size = int(im_dx / scale_down), int(im_dy / scale_down)
         thumbnail = image.resize(thumb_size)
         thumbnail.save(thumbpath)
+
+def create_sixel(imagepath: str, sixelpath: str):
+  ''' Use the `img2sixel` command to create a SIXEL image of `imagepath`
+      at `sixelpath`.
+  '''
+  with open(imagepath, 'rb') as imagef:
+    with open(sixelpath, 'wb') as sixelf:
+      run(['img2sixel'], check=True, stdin=imagef, stdout=sixelf)
+
+@ALL
+def sixel(imagepath: str) -> str:
+  ''' Return the filesystem path of a cached SIXEL version of the
+      image at `imagepath`.
+  '''
+  return convof(imagepath, 'im/sixel', create_sixel, ext='sixel')
