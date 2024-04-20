@@ -516,6 +516,41 @@ class BoxBody(SimpleBinary, ABC):
   '''
 
   FIELD_TYPES = dict(offset=int, post_offset=int)
+  SUBCLASSES_BY_BOXTYPE = {}
+
+  @classmethod
+  def __init_subclass__(cls, bodyclass_name=None, doc=None):
+    if bodyclass_name is not None:
+      cls.__name__ = bodyclass_name
+    if doc is not None:
+      cls.__doc__ = doc
+    # update the mapping of box_type to BoxBody subclass
+    try:
+      # explicit list of box_type byte strings
+      box_types = cls.BOX_TYPES
+    except AttributeError:
+      # infer the box_type from the class name's leading 4 characters
+      box_type = cls.boxbody_type_from_class()
+      box_types = (box_type,)
+    SUBCLASSES_BY_BOXTYPE = BoxBody.SUBCLASSES_BY_BOXTYPE
+    for box_type in box_types:
+      try:
+        existing_box_class = SUBCLASSES_BY_BOXTYPE[box_type]
+      except KeyError:
+        # new box_type as expected
+        SUBCLASSES_BY_BOXTYPE[box_type] = cls
+      else:
+        raise TypeError(
+            f'box_type {box_type!r} already in BoxBody.SUBCLASSES_BY_BOXTYPE as {existing_box_class.__name__}'
+        )
+
+  @staticmethod
+  @require(lambda box_type: len(box_type) == 4)
+  @typechecked
+  def for_box_type(box_type: bytes):
+    ''' Return the `BoxBody` subclass suitable for the `box_type`.
+    '''
+    return BoxBody.SUBCLASSES_BY_BOXTYPE.get(box_type, BoxBody)
 
   def __getattr__(self, attr):
     ''' The following virtual attributes are defined:
@@ -1007,25 +1042,7 @@ def pick_boxbody_class(box_type: bytes):
   ''' Infer a `BoxBody` subclass from the 4-byte bytes `box_type`.
       Returns `FallbackBoxBody` for unimplemented types.
   '''
-  return KNOWN_BOXBODY_CLASSES.get(box_type, FallbackBoxBody)
-
-def add_body_class(klass):
-  ''' Register a box body class in KNOWN_BOXBODY_CLASSES.
-  '''
-  global KNOWN_BOXBODY_CLASSES
-  with Pfx("add_body_class(%s)", klass):
-    try:
-      box_types = klass.BOX_TYPES
-    except AttributeError:
-      box_type = klass.boxbody_type_from_klass()
-      box_types = (box_type,)
-    for box_type in box_types:
-      if box_type in KNOWN_BOXBODY_CLASSES:
-        raise TypeError(
-            "box_type %r already in KNOWN_BOXBODY_CLASSES as %s" %
-            (box_type, KNOWN_BOXBODY_CLASSES[box_type])
-        )
-      KNOWN_BOXBODY_CLASSES[box_type] = klass
+  return BoxBody.SUBCLASSES_BY_BOXTYPE.get(box_type, FallbackBoxBody)
 
 def add_body_subclass(superclass, box_type, section, desc):
   ''' Create and register a new BoxBody class that is simply a subclass of
@@ -1036,20 +1053,17 @@ def add_body_subclass(superclass, box_type, section, desc):
   classname = box_type.upper() + 'BoxBody'
   box_type = box_type.encode('ascii')
 
-  class SubClass(superclass):
-    ''' A distinct subclass simply subclassing the parent.
-    '''
+  class _SubClass(
+      superclass,
+      bodyclass_name=classname,
+      doc=f'An {box_type!r} {desc} box - ISO14496 section {section}.',
+  ):
 
     def transcribe(self):
       ''' A stub transcribe method distinct from the parent.
       '''
       yield from super().transcribe()
 
-  SubClass.__name__ = classname
-  SubClass.__doc__ = (
-      "Box type %r %s box - ISO14496 section %s." % (box_type, desc, section)
-  )
-  add_body_class(SubClass)
   return SubClass
 
 class HasBoxesMixin:
@@ -1116,6 +1130,8 @@ class FullBoxBody(BoxBody):
       ISO14496 section 4.2.
   '''
 
+  BOX_TYPES = ()
+
   FIELD_TYPES = dict(
       BoxBody.FIELD_TYPES,
       _version__Binary=UInt8,
@@ -1167,8 +1183,6 @@ class MDATBoxBody(BoxBody):
     assert self.data is not None
     return self.data
 
-add_body_class(MDATBoxBody)
-
 class FREEBoxBody(BoxBody):
   ''' A 'free' or 'skip' box - ISO14496 section 8.1.2.
       Note the length and discard the data portion.
@@ -1196,8 +1210,6 @@ class FREEBoxBody(BoxBody):
       free_size -= n256
     if free_size > 0:
       yield bytes(free_size)
-
-add_body_class(FREEBoxBody)
 
 class FTYPBoxBody(BoxBody):
   ''' An 'ftyp' File Type box - ISO14496 section 4.3.
@@ -1234,8 +1246,6 @@ class FTYPBoxBody(BoxBody):
         for offset in range(0, len(self.brands_bs), 4)
     ]
 
-add_body_class(FTYPBoxBody)
-
 class PDINBoxBody(FullBoxBody):
   ''' A 'pdin' Progressive Download Information box - ISO14496 section 8.1.3.
   '''
@@ -1256,12 +1266,11 @@ class PDINBoxBody(FullBoxBody):
     super().parse_fields(bfr, **kw)
     self.add_field('pdinfo', list(PDINBoxBody.PDInfo.scan(bfr)))
 
-add_body_class(PDINBoxBody)
-
 class ContainerBoxBody(BoxBody):
   ''' Common subclass of several things with `.boxes`.
   '''
 
+  BOX_TYPES = ()
   FIELD_TYPES = dict(BoxBody.FIELD_TYPES, boxes=list)
 
   @pfx_method
@@ -1276,8 +1285,6 @@ class MOOVBoxBody(ContainerBoxBody):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
       Decode the contained boxes.
   '''
-
-add_body_class(MOOVBoxBody)
 
 class MVHDBoxBody(FullBoxBody):
   ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
@@ -1346,8 +1353,6 @@ class MVHDBoxBody(FullBoxBody):
     '''
     volume_short = self.volume_short
     return (volume_short >> 8) + (volume_short & 0xff) / 256.0
-
-add_body_class(MVHDBoxBody)
 
 add_body_subclass(ContainerBoxBody, 'trak', '8.3.1', 'Track')
 
@@ -1451,15 +1456,11 @@ class TKHDBoxBody(FullBoxBody):
     '''
     return self.ancestor('mvhd').timescale
 
-add_body_class(TKHDBoxBody)
-
 ##add_body_subclass(ContainerBoxBody, 'tref', '8.3.3', 'track Reference')
 
 class TREFBoxBody(ContainerBoxBody):
   ''' Track Reference BoxBody, container for trackReferenceTypeBoxes - ISO14496 section 8.3.3.
   '''
-
-add_body_class(TREFBoxBody)
 
 class TrackReferenceTypeBoxBody(BoxBody):
   ''' A TrackReferenceTypeBoxBody contains references to other tracks - ISO14496 section 8.3.3.2.
@@ -1484,7 +1485,6 @@ class TrackReferenceTypeBoxBody(BoxBody):
     super().parse_fields(bfr)
     self.add_field('track_ids', list(UInt32BE.scan(bfr)))
 
-add_body_class(TrackReferenceTypeBoxBody)
 add_body_subclass(ContainerBoxBody, 'trgr', '8.3.4', 'Track Group')
 
 class TrackGroupTypeBoxBody(FullBoxBody):
@@ -1564,8 +1564,6 @@ class MDHDBoxBody(FullBoxBody):
         ]
     ).decode('ascii')
 
-add_body_class(MDHDBoxBody)
-
 class HDLRBoxBody(FullBoxBody):
   ''' A HDLRBoxBody is a Handler Reference box - ISO14496 section 8.4.3.
   '''
@@ -1609,7 +1607,6 @@ class HDLRBoxBody(FullBoxBody):
     '''
     return bytes(self.handler_type_long).decode('ascii')
 
-add_body_class(HDLRBoxBody)
 add_body_subclass(ContainerBoxBody, b'minf', '8.4.4', 'Media Information')
 add_body_subclass(FullBoxBody, 'nmhd', '8.4.5.2', 'Null Media Header')
 
@@ -1633,7 +1630,6 @@ class ELNGBoxBody(FullBoxBody):
     yield super().transcribe()
     yield self.extended_language
 
-add_body_class(ELNGBoxBody)
 add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
 
 class _SampleTableContainerBoxBody(FullBoxBody):
@@ -1670,6 +1666,8 @@ class _SampleEntry(BoxBody):
   ''' Superclass of Sample Entry boxes.
   '''
 
+  BOX_TYPES = ()
+
   def parse_fields(self, bfr: CornuCopyBuffer):
     ''' Gather the `data_reference_inde` field.
     '''
@@ -1689,7 +1687,6 @@ class BTRTBoxBody(BoxBody):
     self.parse_field('maxBitrate', bfr, UInt32BE)
     self.parse_field('avgBitRate', bfr, UInt32BE)
 
-add_body_class(BTRTBoxBody)
 add_body_subclass(
     _SampleTableContainerBoxBody, b'stdp', '8.5.3', 'Degradation Priority'
 )
@@ -1852,8 +1849,6 @@ class CSLGBoxBody(FullBoxBody):
     except AttributeError:
       return super().__getattr__(attr)
 
-add_body_class(CSLGBoxBody)
-
 add_generic_sample_boxbody(b'stss', '8.6.2', 'Sync Sample', '>L', 'number')
 
 add_generic_sample_boxbody(
@@ -1926,8 +1921,6 @@ class URL_BoxBody(FullBoxBody):
     super().parse_fields(bfr)
     self.parse_field('location', bfr, BinaryUTF8NUL)
 
-add_body_class(URL_BoxBody)
-
 class URN_BoxBody(FullBoxBody):
   ''' An 'urn ' Data Entry URL BoxBody - section 8.7.2.1.
   '''
@@ -1943,8 +1936,6 @@ class URN_BoxBody(FullBoxBody):
     yield super().transcribe()
     yield self.name
     yield self.location
-
-add_body_class(URN_BoxBody)
 
 class STSZBoxBody(FullBoxBody):
   ''' A 'stsz' Sample Size box - section 8.7.3.2.
@@ -1996,8 +1987,6 @@ class STSZBoxBody(FullBoxBody):
     for _ in range(self.sample_count.value):
       entry_sizes.append(UInt32BE.parse_value(bfr))
     return entry_sizes
-
-add_body_class(STSZBoxBody)
 
 class STZ2BoxBody(FullBoxBody):
   ''' A 'stz2' Compact Sample Size box - section 8.7.3.3.
@@ -2108,8 +2097,6 @@ class STSCBoxBody(FullBoxBody):
       entries.append(STSCBoxBody.STSCEntry.parse_value(bfr))
     return entries
 
-add_body_class(STSCBoxBody)
-
 class STCOBoxBody(FullBoxBody):
   ''' A 'stco' Chunk Offset box - section 8.7.5.
   '''
@@ -2150,8 +2137,6 @@ class STCOBoxBody(FullBoxBody):
       chunk_offsets.append(UInt32BE.parse_value(bfr))
     return chunk_offsets
 
-add_body_class(STCOBoxBody)
-
 class CO64BoxBody(FullBoxBody):
   ''' A 'c064' Chunk Offset box - section 8.7.5.
   '''
@@ -2190,8 +2175,6 @@ class CO64BoxBody(FullBoxBody):
   ##    offsets.append(UInt64BE.from_buffer(bfr))
   ##  return offsets
 
-add_body_class(CO64BoxBody)
-
 class DREFBoxBody(FullBoxBody):
   ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
   '''
@@ -2208,8 +2191,6 @@ class DREFBoxBody(FullBoxBody):
     super().parse_fields(bfr)
     self.parse_field('entry_count', bfr, UInt32BE)
     self.parse_boxes(bfr, count=int(self.entry_count.value))
-
-add_body_class(DREFBoxBody)
 
 add_body_subclass(ContainerBoxBody, b'udta', '8.10.1', 'User Data')
 
@@ -2284,8 +2265,6 @@ class METABoxBody(FullBoxBody):
         if value is None:
           raise AttributeError("no ILST.%s" % (attr,)) from e
         return value
-
-add_body_class(METABoxBody)
 
 # class to glom all the bytes
 _ILSTRawSchema = pt_spec(
@@ -2603,8 +2582,6 @@ class ILSTBoxBody(ContainerBoxBody):
         return None
     return super().__getattr__(attr)
 
-add_body_class(ILSTBoxBody)
-
 class VMHDBoxBody(FullBoxBody):
   ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
   '''
@@ -2629,8 +2606,6 @@ class VMHDBoxBody(FullBoxBody):
     yield self.graphicsmode
     yield self.opcolor
 
-add_body_class(VMHDBoxBody)
-
 class SMHDBoxBody(FullBoxBody):
   ''' A 'smhd' Sound Media Headerbox - section 12.2.2.
   '''
@@ -2652,8 +2627,6 @@ class SMHDBoxBody(FullBoxBody):
     yield super().transcribe()
     yield self.balance
     yield self.reserved
-
-add_body_class(SMHDBoxBody)
 
 def parse_tags(path, tag_prefix=None):
   ''' Parse the tags from `path`.
