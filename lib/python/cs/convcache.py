@@ -83,7 +83,8 @@ class ConvCache(HasFSPath):
         such as `'d6/d9/c510785c468c9aa4b7bda343fb79'`.
     '''
     content_key = self.content_key(srcpath)
-    return joinpath(*splitoff(content_key.hex(), 2, 2))
+    hashname, hashhex = str(content_key).split(':', 1)
+    return joinpath(hashname, *splitoff(hashhex, 2, 2))
 
   @require(lambda conv_subpath: not isabspath(conv_subpath))
   def convof(self, srcpath, conv_subpath, conv_func, ext=None):
