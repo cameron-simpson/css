@@ -21,6 +21,9 @@ from getopt import getopt, GetoptError
 import os
 import sys
 
+from icontract import require
+from typeguard import typechecked
+
 from cs.binary import (
     UInt8,
     Int16BE,
@@ -55,7 +58,7 @@ __version__ = '20231129-post'
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 2 - Beta",
         "Environment :: Console",
         "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
@@ -1030,12 +1033,13 @@ Box.FIELD_TYPES['parent'] = (False, (type(None), Box))
 BoxBody.FIELD_TYPES['parent'] = Box
 
 def add_body_subclass(superclass, box_type, section, desc):
-  ''' Create and register a new BoxBody class that is simply a subclass of
-      another.  Returns the new class.
+  ''' Create and register a new `BoxBody` class that is simply a subclass of
+      another.
+      Return the new class.
   '''
   if isinstance(box_type, bytes):
     box_type = box_type.decode('ascii')
-  classname = box_type.upper() + 'BoxBody'
+  classname = f'{box_type.upper()}BoxBody'
   box_type = box_type.encode('ascii')
 
   class _SubClass(
