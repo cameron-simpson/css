@@ -473,7 +473,7 @@ class TimeStamp64(UInt64BE, TimeStampMixin):
 class BoxHeader(BinaryMultiValue('BoxHeader', {
     'box_size': UInt32BE,
 })):
-  ''' An ISO14496 Box header packet.
+  ''' An ISO14496 `Box` header packet.
   '''
 
   # speculative max size that will fit in the UInt32BE box_size
@@ -773,7 +773,7 @@ class Box(SimpleBinary):
 
   @classmethod
   def parse(cls, bfr: CornuCopyBuffer):
-    ''' Decode a Box from `bfr` and return it.
+    ''' Decode a `Box` from `bfr` and return it.
     '''
     self = cls()
     self.offset = bfr.offset
@@ -916,13 +916,13 @@ class Box(SimpleBinary):
 
   @property
   def box_type(self):
-    ''' The Box header type.
+    ''' The `Box` header type.
     '''
     return self.header.type
 
   @property
   def box_type_s(self):
-    ''' The Box header type as a string.
+    ''' The `Box` header type as a string.
 
         If the header type bytes decode as ASCII, return that,
         otherwise the header bytes' repr().
@@ -990,7 +990,7 @@ class Box(SimpleBinary):
         and then yields `(subbox,subsubboxes)` for each child in turn.
 
         As with `os.walk`, the returned `subboxes` list
-        may be modified to prune the subsequent walk.
+        may be modified in place to prune or reorder the subsequent walk.
     '''
     # We don't go list(self) or [].extend(self) because both of those fire
     # the transcription of the box because of list's preallocation heuristics.
@@ -1709,7 +1709,7 @@ def add_generic_sample_boxbody(
   class _SpecificSampleBoxBody(
       FullBoxBody,
       bodyclass_name=class_name,
-      doc=f'Box type {box_type!r} {desc} box - ISO14496 section {section}.',
+      doc=f'`Box` type {box_type!r} {desc} box - ISO14496 section {section}.',
   ):
 
     FIELD_TYPES = dict(
@@ -2077,7 +2077,7 @@ class STSCBoxBody(FullBoxBody):
   @locked_property
   @pfx_method
   def entries(self, bfr: CornuCopyBuffer):
-    ''' Parse the `STSCEntry` list into a list of `int`s.
+    ''' A list of `int`s parsed from the `STSCEntry` list.
     '''
     bfr = CornuCopyBuffer.from_bytes(self.entries_bs)
     entries = []
@@ -2228,7 +2228,7 @@ class METABoxBody(FullBoxBody):
     return iter(self.boxes)
 
   def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `theHandler` Box and gather the following Boxes as `boxes`.
+    ''' Gather the `theHandler` `Box` and gather the following Boxes as `boxes`.
     '''
     super().parse_fields(bfr)
     self.parse_field('theHandler', bfr, Box)
@@ -2255,7 +2255,8 @@ class METABoxBody(FullBoxBody):
 
 # class to glom all the bytes
 _ILSTRawSchema = pt_spec(
-    (lambda bfr: bfr.take(...), lambda bs: bs), name='ILSTRawSchema'
+    (lambda bfr: bfr.take(...), lambda bs: bs),
+    name='ILSTRawSchema',
 )
 
 def ILSTRawSchema(attribute_name):
@@ -2269,7 +2270,7 @@ _ILSTTextSchema = pt_spec(
         lambda bfr: bfr.take(...).decode('utf-8'),
         lambda txt: txt.encode('utf-8'),
     ),
-    name='ILSTTextSchema'
+    name='ILSTTextSchema',
 )
 
 def ILSTTextSchema(attribute_name):
@@ -2371,6 +2372,7 @@ class ILSTBoxBody(ContainerBoxBody):
   )
   FIELD_TRANSCRIBERS = dict(tags=lambda _: None,)
 
+  # the schema names are available as attributes
   SUBBOX_SCHEMA = {
       b'\xa9alb': ILSTTextSchema('album_title'),
       b'\xa9art': ILSTTextSchema('artist'),
@@ -2562,6 +2564,7 @@ class ILSTBoxBody(ContainerBoxBody):
                       self.tags.add(attribute_name, tag_value)
 
   def __getattr__(self, attr):
+    # see if this is a schema long name
     for schema_code, schema in self.SUBBOX_SCHEMA.items():
       if schema.attribute_name == attr:
         # TODO:: Huh?
@@ -2673,7 +2676,7 @@ def parse_fields(bfr, copy_offsets=None, **kw):
       * `bfr`: a `CornuCopyBuffer` provided the stream data,
         preferably seekable
       * `discard_data`: whether to discard unparsed data, default `False`
-      * `copy_offsets`: callable to receive Box offsets
+      * `copy_offsets`: callable to receive `Box` offsets
   '''
   if copy_offsets is not None:
     bfr.copy_offsets = copy_offsets
