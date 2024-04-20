@@ -4,14 +4,9 @@
 ''' Various ad hoc image related utility functions and classes.
 '''
 
-from functools import lru_cache, partial
+from functools import partial
 import hashlib
-import os
-from os.path import (
-    basename,
-    join as joinpath,
-    splitext,
-)
+from os.path import basename, splitext
 import shutil
 
 from PIL import Image
@@ -19,7 +14,6 @@ from PIL import Image
 from cs.convcache import ConvCache
 from cs.deco import ALL
 from cs.pfx import pfx_call, pfx_method
-
 
 __all__ = []
 
@@ -48,7 +42,6 @@ class ThumbnailCache(ConvCache):
       scale_step = self.DEFAULT_SCALE_STEP
     if scale_step < 1.1:
       raise ValueError("scale_step must be >= 1.1, got: %s" % (scale_step,))
-    self.cachedir = cachedir
     self.min_size = min_size
     self.scale_step = scale_step
 
@@ -88,7 +81,6 @@ class ThumbnailCache(ConvCache):
         ext=ext,
     )
 
-  @trace
   def create_thumbnail(self, imagepath: str, thumbpath: str, max_edge: int):
     ''' Write a thumbnail image no larger than `max_edge`x`max_edge`
         of `imagepath` to `thumbpath`.
