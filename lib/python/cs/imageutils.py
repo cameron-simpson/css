@@ -20,6 +20,10 @@ from cs.convcache import ConvCache
 from cs.deco import ALL
 from cs.pfx import pfx_call, pfx_method
 
+
+__all__ = []
+
+@ALL
 class ThumbnailCache(ConvCache):
   ''' A class to manage a collection of thumbnail images.
   '''
