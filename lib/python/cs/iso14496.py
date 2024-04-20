@@ -534,8 +534,12 @@ class BoxBody(SimpleBinary):
       box_types = cls.BOX_TYPES
     except AttributeError:
       # infer the box_type from the class name's leading 4 characters
-      box_type = cls.boxbody_type_from_class()
-      box_types = (box_type,)
+      try:
+        box_type = cls.boxbody_type_from_class()
+      except ValueError as e:
+        box_types = ()
+      else:
+        box_types = (box_type,)
     SUBCLASSES_BY_BOXTYPE = BoxBody.SUBCLASSES_BY_BOXTYPE
     for box_type in box_types:
       try:
@@ -693,7 +697,7 @@ class BoxBody(SimpleBinary):
       class_prefix = class_name[:4]
       if class_prefix.rstrip('_').isupper():
         return class_prefix.replace('_', ' ').lower().encode('ascii')
-    raise AttributeError("no automatic box type for %s" % (cls,))
+    raise ValueError(f'no automatic box type for class named {class_name!r}')
 
 class Box(SimpleBinary):
   ''' Base class for all boxes - ISO14496 section 4.2.
@@ -1115,8 +1119,6 @@ class FullBoxBody(BoxBody):
       ISO14496 section 4.2.
   '''
 
-  BOX_TYPES = ()
-
   FIELD_TYPES = dict(
       BoxBody.FIELD_TYPES,
       _version__Binary=UInt8,
@@ -1255,7 +1257,6 @@ class ContainerBoxBody(BoxBody):
   ''' Common subclass of several things with `.boxes`.
   '''
 
-  BOX_TYPES = ()
   FIELD_TYPES = dict(BoxBody.FIELD_TYPES, boxes=list)
 
   @pfx_method
@@ -1650,8 +1651,6 @@ add_body_subclass(
 class _SampleEntry(BoxBody):
   ''' Superclass of Sample Entry boxes.
   '''
-
-  BOX_TYPES = ()
 
   def parse_fields(self, bfr: CornuCopyBuffer):
     ''' Gather the `data_reference_inde` field.
