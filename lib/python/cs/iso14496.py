@@ -273,7 +273,7 @@ class MP4Command(BaseCommand):
       out(path)
       with Pfx(path):
         with PARSE_MODE(discard_data=True):
-          for box, tags in parse_tags(path, tag_prefix=tag_prefix):
+          for _, tags in parse_tags(path, tag_prefix=tag_prefix):
             for tag in tags:
               print(tag)
     return xit
@@ -736,22 +736,19 @@ class Box(SimpleBinary):
     ''' If there is no direct attribute from `SimpleBinary.__getattr__`,
         have a look in the `.header` and `.body`.
     '''
-    if attr in ('header', 'body'):
-      raise AttributeError("%s.%s: not present" % (type(self).__name__, attr))
-    try:
-      value = getattr(self.header, attr)
-    except AttributeError:
-      try:
-        value = getattr(self.body, attr)
-      except AttributeError:
-        raise AttributeError(
-            "%s.%s: not present via %r or the .header or .body fields" % (
-                type(self).__name__, attr,
-                ",".join(map(lambda cls: cls.__name__,
-                             type(self).__mro__))
-            )
-        )
-    return value
+    with Pfx("%s.%s", self.__class__.__name__, attr):
+      if attr not in ('header', 'body'):
+        try:
+          value = getattr(self.header, attr)
+        except AttributeError:
+          try:
+            value = getattr(self.body, attr)
+          except AttributeError as e:
+            raise AttributeError(
+                f'not present via {self.__class__.__mro__} or the .header or .body fields'
+            ) from e
+        return value
+      raise AttributeError("not present")
 
   def __iter__(self):
     ''' Iterating over a `Box` iterates over its body.
@@ -874,12 +871,11 @@ class Box(SimpleBinary):
       except AttributeError:
         try:
           BOX_TYPES = self.BOX_TYPES
-        except AttributeError:
+        except AttributeError as e:
           if not isinstance(self, Box):
             raise RuntimeError(
-                "no BOX_TYPE or BOX_TYPES to check in class %r" %
-                (type(self),)
-            )
+                f'no BOX_TYPE or BOX_TYPES to check in class {type(self)!r}'
+            ) from e
         else:
           if box_type not in BOX_TYPES:
             warning(
@@ -1024,7 +1020,7 @@ class Box(SimpleBinary):
     ''' Walk the `Box` hierarchy looking for metadata.
         Yield `(Box,TagSet)` for each `b'moov'` or `b'trak'` `Box`.
     '''
-    for box, subboxes in self.walk():
+    for box, _ in self.walk():
       if box.box_type in (b'moov', b'trak'):
         yield box, box.metatags()
 
@@ -1053,7 +1049,7 @@ def add_body_subclass(superclass, box_type, section, desc):
       '''
       yield from super().transcribe()
 
-  return SubClass
+  return _SubClass
 
 class HasBoxesMixin:
 
