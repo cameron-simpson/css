@@ -101,20 +101,25 @@ class MP4Command(BaseCommand):
           -p prefix, --prefix=prefix
               Set the prefix of added tags, default: 'mp4'
     '''
-    xit = 0
-    no_action = False
-    tag_prefix = self.TAG_PREFIX
-    opts, argv = getopt(argv, 'np:', longopts=['prefix'])
-    for option, value in opts:
-      with Pfx(option):
-        if option == '-n':
-          no_action = True
-        elif option in ('-p', '--prefix'):
-          tag_prefix = value
-        else:
-          raise RuntimeError("unsupported option")
+    options = self.options
+    options.tag_prefix = self.TAG_PREFIX
+    options.popopts(
+        argv,
+        p_=(
+            'tag_prefix',
+            f'prefix to the applied tags, default "{self.TAG_PREFIX}."'
+        ),
+        prefix_=(
+            'tag_prefix',
+            f'prefix to the applied tags, default "{self.TAG_PREFIX}."'
+        ),
+    )
+    doit = options.doit
+    tag_prefix = options.tag_prefix
+    verbose = options.verbose or not options.doit
     if not argv:
       argv = [os.getcwd()]
+    xit = 0
     with fstags:
       for top_path in argv:
         for path in scandirpaths(top_path):
@@ -122,21 +127,15 @@ class MP4Command(BaseCommand):
           with Pfx(path):
             tagged_path = fstags[path]
             with PARSE_MODE(discard_data=True):
-              try:
-                for box, tags in parse_tags(path, tag_prefix=tag_prefix):
-                  for tag in tags:
-                    if no_action:
-                      tag_s = str(tag)
-                      if len(tag_s) > 32:
-                        tag_s = tag_s[:29] + '...'
-                      print(path, '+', tag_s)
-                    else:
-                      tagged_path.add(tag)
-              except (TypeError, NameError, AttributeError, AssertionError):
-                raise
-              except Exception as e:
-                warning("%s: %s", type(e).__name__, e)
-                xit = 1
+              for _, tags in parse_tags(path, tag_prefix=tag_prefix):
+                for tag in tags:
+                  if verbose:
+                    tag_s = str(tag)
+                    if len(tag_s) > 64:
+                      tag_s = tag_s[:61] + '...'
+                    print(path, '+', tag_s)
+                  if doit:
+                    tagged_path.add(tag)
     return xit
 
   def cmd_deref(self, argv):
