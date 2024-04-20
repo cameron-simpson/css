@@ -555,8 +555,10 @@ class BaseCommand:
         Appends the usage message to the class docstring.
     '''
     usage_message = cls.usage_text()
+    # NB: 2 leading lines so that the dedenting preserves the indents for MarkDown.
     usage_doc = (
-        'Command line usage:\n\n    ' + usage_message.replace('\n', '\n    ')
+        'Command line implementation.\n\nUsage summary:\n\n    ' +
+        usage_message.replace('\n', '\n    ')
     )
     cls_doc = obj_docstring(cls)
     cls_doc = cls_doc + '\n\n' + usage_doc if cls_doc else usage_doc
