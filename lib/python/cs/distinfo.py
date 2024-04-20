@@ -55,7 +55,7 @@ from cs.logutils import error, warning, info, status, trace
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
-from cs.psutils import pipefrom as ps_pipefrom, run
+from cs.psutils import pipefrom as ps_pipefrom, pipeto as ps_pipeto, run
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
 from cs.resources import RunState, uses_runstate
@@ -431,7 +431,11 @@ class CSReleaseCommand(BaseCommand):
     options = self.options
     pkg = options.modules[pkg_name]
     docs = pkg.compute_doc(all_class_names=all_class_names)
-    print(docs.long_description)
+    if sys.stdout.isatty():
+      with ps_pipeto(['glow', '-', '-p']) as P:
+        print(docs.long_description, file=P.stdin)
+    else:
+      print(docs.long_description)
 
   # pylint: disable=too-many-locals,too-many-return-statements
   # pylint: disable=too-many-branches,too-many-statements
