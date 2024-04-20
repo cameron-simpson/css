@@ -19,6 +19,7 @@ from datetime import datetime
 from getopt import getopt, GetoptError
 import os
 import sys
+from typing import Iterable, List, Tuple
 
 from icontract import require
 from typeguard import typechecked
@@ -983,7 +984,7 @@ class Box(SimpleBinary):
     '''
     return dump_box(self, **kw)
 
-  def walk(self):
+  def walk(self) -> Iterable[Tuple["Box", List["Box"]]]:
     ''' Walk this `Box` hierarchy.
 
         Yields the starting box and its children as `(self,subboxes)`
