@@ -126,7 +126,7 @@ class HasThreadState(ContextManagerMixin):
   THREAD_STATE_ATTR = 'perthread_state'
 
   @classmethod
-  def default(cls, factory=None, raise_on_None=False):
+  def default(cls, *, factory=None, raise_on_None=False):
     ''' The default instance of this class from `cls.perthread_state.current`.
 
         Parameters:
