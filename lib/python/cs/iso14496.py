@@ -2568,10 +2568,15 @@ class ILSTBoxBody(ContainerBoxBody):
     # see if this is a schema long name
     for schema_code, schema in self.SUBBOX_SCHEMA.items():
       if schema.attribute_name == attr:
-        # TODO:: Huh?
         subbox_attr = schema_code.decode('iso8859-1').upper()
-        subbox = getattr(self, subbox_attr)
-        return None
+        with Pfx(
+            "%s.%s: schema:%r: self.%s",
+            self.__class__.__name__,
+            attr,
+            schema_code,
+            subbox_attr,
+        ):
+          return getattr(self, subbox_attr)
     return super().__getattr__(attr)
 
 class VMHDBoxBody(FullBoxBody):
