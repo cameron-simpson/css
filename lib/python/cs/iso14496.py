@@ -682,7 +682,7 @@ class BoxBody(SimpleBinary):
     self._parsed_field_names.append('boxes')
 
   @classmethod
-  def boxbody_type_from_klass(cls):
+  def boxbody_type_from_class(cls):
     ''' Compute the Box's 4 byte type field from the class name.
     '''
     class_name = cls.__name__
@@ -777,7 +777,7 @@ class Box(SimpleBinary):
       else:
         end_offset = self.offset + length
         bfr_tail = bfr.bounded(end_offset)
-      body_class = pick_boxbody_class(header.type)
+      body_class = BoxBody.for_box_type(header.type)
       body_offset = bfr_tail.offset
       self.body = body_class.parse(bfr_tail)
       # attach subBoxen to self
@@ -955,7 +955,7 @@ class Box(SimpleBinary):
   def BOX_TYPE(self):
     ''' The default .BOX_TYPE is inferred from the class name.
     '''
-    return type(self).boxbody_type_from_klass()
+    return type(self).boxbody_type_from_class()
 
   def ancestor(self, box_type):
     ''' Return the closest ancestor box of type `box_type`.
@@ -1028,15 +1028,6 @@ class Box(SimpleBinary):
 # patch us in
 Box.FIELD_TYPES['parent'] = (False, (type(None), Box))
 BoxBody.FIELD_TYPES['parent'] = Box
-
-# mapping of known box subclasses for use by factories
-KNOWN_BOXBODY_CLASSES = {}
-
-def pick_boxbody_class(box_type: bytes):
-  ''' Infer a `BoxBody` subclass from the 4-byte bytes `box_type`.
-      Returns `FallbackBoxBody` for unimplemented types.
-  '''
-  return BoxBody.SUBCLASSES_BY_BOXTYPE.get(box_type, FallbackBoxBody)
 
 def add_body_subclass(superclass, box_type, section, desc):
   ''' Create and register a new BoxBody class that is simply a subclass of
