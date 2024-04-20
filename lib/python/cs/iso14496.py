@@ -1701,9 +1701,12 @@ def add_generic_sample_boxbody(
       sample_class_name + 'V1', struct_format_v1, sample_fields
   )
 
-  class SpecificSampleBoxBody(FullBoxBody):
-    ''' Time to Sample box - section 8.6.1.
-    '''
+  class _SpecificSampleBoxBody(
+      FullBoxBody,
+      bodyclass_name=class_name,
+      doc=f'Box type {box_type!r} {desc} box - ISO14496 section {section}.',
+  ):
+
     FIELD_TYPES = dict(
         FullBoxBody.FIELD_TYPES,
         entry_count=(False, UInt32BE),
@@ -1764,17 +1767,12 @@ def add_generic_sample_boxbody(
       assert bfr.at_eof()
       return decoded
 
-  SpecificSampleBoxBody.__name__ = class_name
-  SpecificSampleBoxBody.__doc__ = (
-      "Box type %r %s box - ISO14496 section %s." % (box_type, desc, section)
-  )
   # we define these here because the names collide with the closure
-  SpecificSampleBoxBody.struct_format_v0 = struct_format_v0
-  SpecificSampleBoxBody.sample_type_v0 = sample_type_v0
-  SpecificSampleBoxBody.struct_format_v1 = struct_format_v1
-  SpecificSampleBoxBody.sample_type_v1 = sample_type_v1
-  add_body_class(SpecificSampleBoxBody)
-  return SpecificSampleBoxBody
+  _SpecificSampleBoxBody.struct_format_v0 = struct_format_v0
+  _SpecificSampleBoxBody.sample_type_v0 = sample_type_v0
+  _SpecificSampleBoxBody.struct_format_v1 = struct_format_v1
+  _SpecificSampleBoxBody.sample_type_v1 = sample_type_v1
+  return _SpecificSampleBoxBody
 
 def add_time_to_sample_boxbody(box_type, section, desc):
   ''' Add a Time to Sample box - section 8.6.1.
