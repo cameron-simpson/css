@@ -2248,19 +2248,18 @@ class METABoxBody(FullBoxBody):
   def __getattr__(self, attr):
     ''' Present the `ilst` attributes if present.
     '''
-    with Pfx("%r", attr):
-      if attr == 'boxes':
-        raise AttributeError("NO BOXES")
+    if attr != 'boxes':
       try:
+        # direct attribute access
         return super().__getattr__(attr)
       except AttributeError as e:
+        # otherwise dereference through the .ilst subbox if present
         ilst = super().__getattr__('ILST0')
-        if ilst is None:
-          raise AttributeError(attr) from e
-        value = getattr(ilst, attr, None)
-        if value is None:
-          raise AttributeError("no ILST.%s" % (attr,)) from e
-        return value
+        if ilst is not None:
+          value = getattr(ilst, attr, None)
+          if value is not None:
+            return value
+    raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
 # class to glom all the bytes
 _ILSTRawSchema = pt_spec(
