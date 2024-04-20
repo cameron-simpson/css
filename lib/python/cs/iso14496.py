@@ -512,7 +512,7 @@ class BoxHeader(BinaryMultiValue('BoxHeader', {
     if self.box_type == b'uuid':
       yield self.user_type
 
-class BoxBody(SimpleBinary, ABC):
+class BoxBody(SimpleBinary):
   ''' Abstract basis for all `Box` bodies.
   '''
 
