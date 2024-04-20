@@ -2560,6 +2560,7 @@ class ILSTBoxBody(ContainerBoxBody):
   def __getattr__(self, attr):
     for schema_code, schema in self.SUBBOX_SCHEMA.items():
       if schema.attribute_name == attr:
+        # TODO:: Huh?
         subbox_attr = schema_code.decode('iso8859-1').upper()
         subbox = getattr(self, subbox_attr)
         return None
