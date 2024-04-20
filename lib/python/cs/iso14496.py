@@ -39,7 +39,8 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags, rpaths, uses_fstags
+from cs.fs import scandirpaths
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import get_identifier, get_decimal_value, cropped_repr
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
@@ -113,7 +114,7 @@ class MP4Command(BaseCommand):
       argv = [os.getcwd()]
     with fstags:
       for top_path in argv:
-        for _, path in rpaths(top_path):
+        for path in scandirpaths(top_path):
           out(path)
           with Pfx(path):
             tagged_path = fstags[path]
