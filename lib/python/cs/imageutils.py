@@ -7,6 +7,7 @@
 from functools import partial
 from os.path import basename, splitext
 import shutil
+from tempfile import NamedTemporaryFile
 
 from PIL import Image
 
@@ -111,3 +112,12 @@ def sixel(imagepath: str) -> str:
       image at `imagepath`.
   '''
   return convof(imagepath, 'im/sixel', create_sixel, ext='sixel')
+
+def sixel_from_image_bytes(image_bs: bytes) -> str:
+  ''' Return the filesystem path of a cached SIXEL version of the
+      image data in `image_bs`.
+  '''
+  with NamedTemporaryFile(prefix='sixel_from_bytes-', suffix='.sixel') as T:
+    T.write(image_bs)
+    T.flush()
+    return sixel(T.name)
