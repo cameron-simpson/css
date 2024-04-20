@@ -220,14 +220,16 @@ class HasFSPath:
     except AttributeError:
       return "<no-fspath>"
 
-  @require(lambda subpaths: len(subpaths) > 0)
-  @require(lambda subpaths: not any(map(isabspath, subpaths)))
   def pathto(self, *subpaths):
     ''' The full path to `subpaths`, comprising a relative path
         below `self.fspath`.
         This is a shim for `os.path.join` which requires that all
         the `subpaths` be relative paths.
     '''
+    if not subpaths:
+      raise ValueError('missing subpaths')
+    if any(map(isabspath, subpaths)):
+      raise ValueError('all subpaths must be relative paths')
     return joinpath(self.fspath, *subpaths)
 
   def fnmatch(self, fnglob):
