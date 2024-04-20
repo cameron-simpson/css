@@ -1032,14 +1032,6 @@ BoxBody.FIELD_TYPES['parent'] = Box
 # mapping of known box subclasses for use by factories
 KNOWN_BOXBODY_CLASSES = {}
 
-class FallbackBoxBody(BoxBody):
-  ''' A `BoxBody` subclass which parses nothing for unimplemented `Box` types,
-      used by `pick_boxbody_class()`.
-  '''
-
-  def __str__(self):
-    return type(self).__name__
-
 def pick_boxbody_class(box_type: bytes):
   ''' Infer a `BoxBody` subclass from the 4-byte bytes `box_type`.
       Returns `FallbackBoxBody` for unimplemented types.
