@@ -297,19 +297,19 @@ B0_256 = bytes(256)
 # an arbitrary maximum read size for fetching the data section
 SIZE_16MB = 1024 * 1024 * 16
 
-def parse_deref_path(path, offset=0):
+def get_deref_path(path, offset=0):
   ''' Parse a `path` string from `offset`.
       Return the path components and the offset where the parse stopped.
 
       Path components:
-      * _identifier_: an identifier represents a Box field or if such a
+      * _identifier_: an identifier represents a `Box` field or if such a
         field is not present, a the first subbox of this type
       * `[`_index_`]`: the subbox with index _index_
 
       Examples:
 
-          >>> parse_deref_path('.abcd[5]')
-          ['abcd', 5]
+          >>> get_deref_path('.abcd[5]')
+          (['abcd', 5], 8)
   '''
   parts = []
   while offset < len(path):
@@ -335,7 +335,7 @@ def deref_box(B, path):
   '''
   with Pfx("deref_path(%r)", path):
     if isinstance(path, str):
-      parts, offset = parse_deref_path(path)
+      parts, offset = get_deref_path(path)
       if offset < len(path):
         raise ValueError(
             "parse_path(%r): stopped early at %d:%r" %
