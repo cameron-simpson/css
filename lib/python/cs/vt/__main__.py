@@ -372,8 +372,6 @@ class VTCmd(BaseCommand):
               with S:
                 with stackattrs(options, S=S):
                   yield
-              if cacheS:
-                cacheS.backend = None
       if ifdebug():
         dump_debug_threads()
 
