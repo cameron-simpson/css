@@ -15,7 +15,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.modules import module_attributes
 
-__version__ = '20220311-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -55,8 +55,11 @@ def module_doc(
     with Pfx("import_module(%r)", module_name):
       module = importlib.import_module(module_name)
   full_doc = obj_docstring(module)
+  ALL = getattr(module, '__all__', None)
   for Mname, obj in sorted(module_attributes(module), key=sort_key):
     with Pfx(Mname):
+      if ALL and Mname not in ALL:
+        continue
       if not filter_key(Mname):
         continue
       obj_module = getmodule(obj)
@@ -122,7 +125,7 @@ def module_doc(
             if attr_name.startswith('_') and not is_dunder(attr_name):
               continue
           if attr_name not in direct_attrs:
-            print("  skip, not in direct_attrs", direct_attrs)
+            ##print("  skip, not in direct_attrs", direct_attrs)
             continue
           attr = getattr(obj, attr_name)
           attr_doc = obj_docstring(attr)

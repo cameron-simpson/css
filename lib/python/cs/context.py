@@ -17,7 +17,7 @@ except ImportError:
 
 from cs.gimmicks import error
 
-__version__ = '20240316-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

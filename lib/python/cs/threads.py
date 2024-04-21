@@ -35,7 +35,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20240316-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'description':
@@ -126,7 +126,7 @@ class HasThreadState(ContextManagerMixin):
   THREAD_STATE_ATTR = 'perthread_state'
 
   @classmethod
-  def default(cls, factory=None, raise_on_None=False):
+  def default(cls, *, factory=None, raise_on_None=False):
     ''' The default instance of this class from `cls.perthread_state.current`.
 
         Parameters:

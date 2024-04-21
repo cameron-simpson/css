@@ -4,6 +4,7 @@
     or transcoded media, etc.
 '''
 
+from functools import partial
 import os
 from os.path import (
     dirname,
@@ -20,9 +21,10 @@ from typing import Optional
 
 from icontract import require
 
+from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
 from cs.fs import needdir, HasFSPath
-from cs.hashutils import SHA256
+from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.seq import splitoff
 
@@ -32,8 +34,8 @@ class ConvCache(HasFSPath):
 
   # TODO: XDG path? ~/.cache/convof ?
   DEFAULT_CACHE_BASEPATH = '~/var/cache/convof'
-  DEFAULT_HASHCLASS = SHA256
 
+  @fmtdoc
   def __init__(self, fspath: Optional[str] = None, content_key_func=None):
     ''' Initialise a `ConvCache`.
 
@@ -42,14 +44,14 @@ class ConvCache(HasFSPath):
           `ConvCache.DEFAULT_CACHE_BASEPATH`;
           if this does not exist it will be created using `os.mkdir`
         * `content_key_func`: optional function to compute a key
-          from the contents of a file, default `DEFAULT_HASHCLASS.from_fspath`
-          (the SHA256 hash of the contents)
+          from the contents of a file, default `cs.hashindex.file_checksum`
+          (the {HASHNAME_DEFAULT} hash of the contents)
     '''
     if fspath is None:
       fspath = expanduser(self.DEFAULT_CACHE_BASEPATH)
     HasFSPath.__init__(self, fspath)
     if content_key_func is None:
-      content_key_func = self.DEFAULT_HASHCLASS.from_fspath
+      content_key_func = partial(file_checksum, hashname=HASHNAME_DEFAULT)
     self._content_key_func = content_key_func
     needdir(fspath)
     self._content_keys = {}
@@ -83,7 +85,8 @@ class ConvCache(HasFSPath):
         such as `'d6/d9/c510785c468c9aa4b7bda343fb79'`.
     '''
     content_key = self.content_key(srcpath)
-    return joinpath(*splitoff(content_key.hex(), 2, 2))
+    hashname, hashhex = str(content_key).split(':', 1)
+    return joinpath(hashname, *splitoff(hashhex, 2, 2))
 
   @require(lambda conv_subpath: not isabspath(conv_subpath))
   def convof(self, srcpath, conv_subpath, conv_func, ext=None):
@@ -106,12 +109,9 @@ class ConvCache(HasFSPath):
     if ext is None:
       ext = conv_subparts[0]
     suffix = '.' + ext
-    dstpath = self.pathto(
-        joinpath(conv_subpath,
-                 self.content_subpath(srcpath) + suffix)
-    )
+    dstpath = self.pathto(conv_subpath, self.content_subpath(srcpath) + suffix)
     dstdirpath = dirname(dstpath)
-    pfx_call(os.makedirs, dstdirpath)
+    needdir(dstdirpath, use_makedirs=True)
     if not existspath(dstpath):
       with Pfx('<%s %s >%s', srcpath, conv_func, dstpath):
         with atomic_filename(dstpath,

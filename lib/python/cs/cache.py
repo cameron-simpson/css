@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-''' A few caching facilities.
+''' A few caching data structures and other lossy things with capped sizes.
 '''
 
 from collections import deque
@@ -13,21 +13,27 @@ from typing import Any, Callable, Mapping, Optional
 
 from cs.context import stackattrs, withif
 from cs.lex import r, s
-from cs.logutils import warning
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result
 from cs.seq import unrepeated
 
+__version__ = '20240412-post'
+
 DISTINFO = {
-    'description':
-    "caching data structures and other lossy things with capped sizes",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': [
+        'cs.context',
+        'cs.lex',
+        'cs.queues',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+    ],
 }
 
 class LRU_Cache(object):

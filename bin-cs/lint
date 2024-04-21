@@ -121,7 +121,7 @@ do
         if [ $ruff ]
         then
           # drop grep when ruff>3.5.0
-          $trace ruff check "$lintfile" | not grep -v ' Q000 ' || exit 1
+          $trace ruff check "$lintfile" || exit 1
         else
           $trace $python -We:invalid -m py_compile "$lintfile" || exit 1
           $trace $pyflakes "$lintfile" || xit=1
