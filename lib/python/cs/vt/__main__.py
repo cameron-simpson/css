@@ -88,6 +88,7 @@ from .scan import (
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore, ProgressStore
 from .transcribe import Transcriber
+from .uri import VTURI
 
 RANDOM_DEV = '/dev/urandom'
 
@@ -1420,12 +1421,12 @@ class VTCmd(BaseCommand):
       runstate.raiseif()
       with Pfx(fspath):
         try:
-          block = S.block_for(fspath)
+          uri = VTURI.from_fspath(fspath)
         except OSError as e:
           warning("not uploaded: %s", e)
           xit = 1
         else:
-          print(fspath, block.uri)
+          print(fspath, uri)
     return xit
 
 def lsDirent(fp, E, name):
