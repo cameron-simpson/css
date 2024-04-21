@@ -1,3 +1,4 @@
+find all .from_any methods, convert to use @promote?
 HasThreadState.default: run as a decorator if arg0 is a callable? make factory etc keyword only
 ffmpeg-resize script - 2 pass ffmpeg
 playon refresh: accept q ids to ping the API, mainly to expire zombie entries
