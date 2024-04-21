@@ -50,8 +50,9 @@ from typing import Iterable, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
+from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc
+from cs.deco import default_params, fmtdoc, promote
 from cs.later import Later
 from cs.lex import r
 from cs.logutils import warning
@@ -722,6 +723,15 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
                     entry.flags |= entry.INDIRECT_COMPLETE
     '''
     yield None
+
+  @promote
+  def block_for(self, bfr: CornuCopyBuffer) -> "Block":
+    ''' Store an object into this `Store`, return the `Block`.
+        The object may be any object acceptable to `CornuCopyBuffer.promote`.
+    '''
+    from .blockify import block_for
+    with self:
+      return block_for(bfr)
 
   @classmethod
   @fmtdoc
