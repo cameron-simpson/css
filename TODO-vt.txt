@@ -1,3 +1,4 @@
+VT URL accept trailing /basename.ext
 ConvCache: if content_key_func is a string, use it as a hash function name
   rename DataFileState.pathname to .fspath
   BlockTempfile - should this basicly be a DataFile?
