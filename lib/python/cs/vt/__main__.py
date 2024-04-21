@@ -49,6 +49,7 @@ from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 from . import (
     DISTINFO,
     Store,
+    uses_Store,
     run_modes,
     DEFAULT_CONFIG_ENVVAR,
     DEFAULT_CONFIG_PATH,
@@ -1405,6 +1406,27 @@ class VTCmd(BaseCommand):
       if not merge(target, source):
         return 1
     return 0
+
+  @uses_runstate
+  @uses_Store
+  def cmd_upload(self, argv, *, runstate: RunState, S: Store):
+    ''' Usage: {cmd} path...
+          Save each fielsystem path into the Store, print the path and its URI.
+    '''
+    if not argv:
+      raise GetoptError('missing paths')
+    xit = 0
+    for fspath in argv:
+      runstate.raiseif()
+      with Pfx(fspath):
+        try:
+          block = S.block_for(fspath)
+        except OSError as e:
+          warning("not uploaded: %s", e)
+          xit = 1
+        else:
+          print(fspath, block.uri)
+    return xit
 
 def lsDirent(fp, E, name):
   ''' Transcribe a Dirent as an ls-style listing.
