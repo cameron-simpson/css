@@ -7,8 +7,10 @@ from dataclasses import dataclass
 import re
 from typing import Optional, Union
 
+from cs.convcache import convof
 from cs.deco import Promotable
 
+from . import Store, uses_Store
 from .block import HashCodeBlock, IndirectBlock
 from .blockify import block_for
 from .hash import HashCode
@@ -64,6 +66,20 @@ class VTURI(Promotable):
             m['hashname'], m['hashtext']
         ),
     )
+
+  @classmethod
+  @uses_Store
+  def from_fspath(cls, fspath: str, *, S: Store):
+
+    def save_uri(fspath, cachepath):
+      print("VTURI.from_fspath: import", fspath)
+      uri = S.block_for(fspath).uri
+      with open(cachepath, 'w') as cachef:
+        print(uri, file=cachef)
+
+    uri_path = convof(fspath, 'vt-uri', save_uri)
+    with open(uri_path) as cachef:
+      return cls.from_uri(cachef.readline().strip())
 
   @classmethod
   def promote(cls, obj) -> "VTURI":
