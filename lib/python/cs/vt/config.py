@@ -162,7 +162,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     self.map.write(f)
 
   def __getitem__(self, clause_name):
-    ''' Return the Store defined by the named clause.
+    ''' Return the `Store` defined by the named clause.
     '''
     with self._lock:
       _, R = singleton(
@@ -239,7 +239,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     ''' Return the Archive named `archivename`.
     '''
     if (not archivename or '.' in archivename or '/' in archivename):
-      raise ValueError("invalid archive name: %r" % (archivename,))
+      raise ValueError(f'invalid archive name: {archivename!r}')
     arpath = self.pathto(f'{archivename}.vt')
     return Archive(arpath)
 
