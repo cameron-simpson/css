@@ -50,6 +50,13 @@ from . import (
     DISTINFO,
     Store,
     run_modes,
+    DEFAULT_CONFIG_ENVVAR,
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_HASHCLASS_ENVVAR,
+    VT_CACHE_STORE_DEFAULT,
+    VT_CACHE_STORE_ENVVAR,
+    VT_STORE_DEFAULT,
+    VT_STORE_ENVVAR,
 )
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
@@ -113,21 +120,15 @@ def print_hist(samples, bins=128):
 @dataclass
 class VTCmdOptions(BaseCommand.Options):
   config_map: Optional[Union[str, Mapping]] = None
-  store_spec: str = field(
-      default_factory=lambda: os.environ.
-      get(VTCmd.VT_STORE_ENVVAR, '[default]')
-  )
-  cache_store_spec: str = field(
-      default_factory=lambda: os.environ.
-      get(VTCmd.VT_CACHE_STORE_ENVVAR, '[cache]')
-  )
+  store_spec: str = field(default_factory=Store.get_default_spec)
+  cache_store_spec: str = field(default_factory=Store.get_default_cache_spec)
   # TODO: discard dflt_log
   dflt_log: Optional[str] = field(
       default_factory=lambda: os.environ.get(VTCmd.VT_LOGFILE_ENVVAR)
   )
   hashname: str = field(
       default_factory=lambda: os.environ.
-      get(VTCmd.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname)
+      get(DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname)
   )
   show_progress: bool = field(default_factory=lambda: run_modes.show_progress)
 
@@ -259,40 +260,34 @@ class VTCmd(BaseCommand):
   ''' A main programme instance.
   '''
 
-  from . import (
-      DEFAULT_CONFIG_ENVVAR,
-      DEFAULT_CONFIG_PATH,
-      DEFAULT_HASHCLASS_ENVVAR,
-      VT_CACHE_STORE_ENVVAR,
-      VT_STORE_ENVVAR,
-  )
-
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
 
   GETOPT_SPEC = 'C:S:f:h:Pqv'
 
   USAGE_KEYWORDS = {
-      'VT_STORE_ENVVAR': VT_STORE_ENVVAR,
-      'VT_CACHE_STORE_ENVVAR': VT_CACHE_STORE_ENVVAR,
       'DEFAULT_CONFIG_ENVVAR': DEFAULT_CONFIG_ENVVAR,
       'DEFAULT_CONFIG_PATH': DEFAULT_CONFIG_PATH,
-      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.hashname,
       'DEFAULT_HASHCLASS_ENVVAR': DEFAULT_HASHCLASS_ENVVAR,
+      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.hashname,
+      'VT_CACHE_STORE_DEFAULT': VT_CACHE_STORE_DEFAULT,
+      'VT_CACHE_STORE_ENVVAR': VT_CACHE_STORE_ENVVAR,
+      'VT_STORE_DEFAULT': VT_STORE_DEFAULT,
+      'VT_STORE_ENVVAR': VT_STORE_ENVVAR,
   }
 
   USAGE_FORMAT = '''Usage: {cmd} [option...] [profile] subcommand [arg...]
   Options:
     -C store  Specify the store to use as a cache.
-              Specify "NONE" for no cache.
-              Default: from ${VT_CACHE_STORE_ENVVAR} or "[cache]".
+              Specify "NONE" or the empty string for no cache.
+              Default: from ${VT_CACHE_STORE_ENVVAR} or {VT_CACHE_STORE_DEFAULT!r}.
     -S store  Specify the store to use:
                 [clause]        Specification from .vtrc.
                 /path/to/dir    DataDirStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
-              Default from ${VT_STORE_ENVVAR}, or "[default]", except for
-              the "serve" subcommand which defaults to "[server]"
-              and ignores ${VT_STORE_ENVVAR}.
+              Default from ${VT_STORE_ENVVAR}, or {VT_STORE_DEFAULT!r},
+              except for the "serve" subcommand which defaults to
+              "[server]" and ignores ${VT_STORE_ENVVAR}.
     -f config Config file. Default from ${DEFAULT_CONFIG_ENVVAR},
               otherwise {DEFAULT_CONFIG_PATH}
     -h hashclass Hashclass for Stores. Default from ${DEFAULT_HASHCLASS_ENVVAR},
@@ -367,40 +362,11 @@ class VTCmd(BaseCommand):
               if options.store_spec is None:
                 if cmd == "serve":
                   options.store_spec = store_spec
-              try:
-                S = pfx_call(Store.promote, options.store_spec, options.config)
-              except (KeyError, ValueError) as e:
-                raise GetoptError(f"unusable Store specification: {e}") from e
-              except Exception as e:
-                exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
-                raise GetoptError(f"unusable Store specification: {e}") from e
-              if options.cache_store_spec == 'NONE':
-                cacheS = None
-              else:
-                try:
-                  cacheS = pfx_call(
-                      Store, options.cache_store_spec, options.config
-                  )
-                except (KeyError, ValueError) as e:
-                  raise GetoptError(
-                      f"unusable Store specification: {e}"
-                  ) from e
-                except Exception as e:
-                  exception(
-                      f"UNEXPECTED EXCEPTION: can't open cache store: {e}"
-                  )
-                  raise GetoptError(
-                      f"unusable Store specification: {e}"
-                  ) from e
-                S = ProxyStore(
-                    "%s:%s" % (cacheS.name, S.name),
-                    read=(cacheS,),
-                    read2=(S,),
-                    copy2=(cacheS,),
-                    save=(cacheS, S),
-                    archives=((S, '*'),),
-                )
-                S.config = options.config
+              S = Store.default(
+                  config_spec=options.config_map,
+                  store_spec=options.store_spec,
+                  cache_spec=options.cache_store_spec,
+              )
               with S:
                 with stackattrs(options, S=S):
                   yield
