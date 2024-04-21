@@ -40,8 +40,9 @@ class VTURI(Promotable):
         f'/{self.hashcode!r}'
     )
 
+  @property
   def block(self) -> Union[HashCodeBlock, IndirectBlock]:
-    ''' Return a Block for this URI.
+    ''' A `Block` for this URI.
     '''
     return (
         IndirectBlock(HashCodeBlock(self.hashcode), span=self.span)
