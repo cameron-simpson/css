@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import re
 from typing import Optional, Union
 
-from cs.convcache import convof
+from cs.cache import convof
 from cs.deco import Promotable
 
 from . import Store, uses_Store

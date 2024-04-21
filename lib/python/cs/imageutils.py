@@ -11,7 +11,7 @@ from tempfile import NamedTemporaryFile
 
 from PIL import Image
 
-from cs.convcache import ConvCache, convof
+from cs.cache import ConvCache, convof
 from cs.deco import ALL
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import run
