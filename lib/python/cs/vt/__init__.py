@@ -56,7 +56,7 @@ from cs.deco import default_params, fmtdoc, promote
 from cs.later import Later
 from cs.lex import r
 from cs.logutils import warning
-from cs.progress import Progress, OverProgress, progressbar
+from cs.progress import Progress
 from cs.queues import IterableQueue, QueueIterator
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
@@ -283,7 +283,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def init(self):
     ''' Method provided to support "vt init".
         For stores requiring some physical setup,
-        for example to create an empty DataDir,
+        for example to create an empty `DataDir`,
         that code goes here.
     '''
 
