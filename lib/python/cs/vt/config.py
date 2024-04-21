@@ -143,6 +143,12 @@ class Config(SingletonMixin, HasThreadState, Promotable):
       return repr(self)
     return "Config(%s)" % (shortpath(self.path),)
 
+  @classmethod
+  def from_str(cls, spec: str):
+    ''' Promote a config spec to a `Config`.
+    '''
+    return cls(config_spec=spec)
+
   def as_text(self):
     ''' Return a text transcription of the config.
     '''
@@ -675,11 +681,3 @@ class Config(SingletonMixin, HasThreadState, Promotable):
       socket_path = clause_name
     socket_path = expand_path(socket_path)
     return UNIXSocketClientStore(store_name, socket_path, hashclass=hashclass)
-
-  @classmethod
-  def promote(cls, obj):
-    ''' Promote `obj` to a `Config`.
-    '''
-    if isinstance(obj, cls):
-      return obj
-    return cls(config_spec=obj)
