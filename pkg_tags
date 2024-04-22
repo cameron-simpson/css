@@ -94,7 +94,7 @@ cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.releas
 cs.splink ok_revision=d931f30ab0db0d1e1aef4df8295a1b20e364a4be pypi.release="20240316"
 cs.sqlalchemy_utils ok_revision="6bffe65c02777bd9ab29edc059e111f4c02b6d74" pypi.release="20230612" features={"20230612":["orchestrated_session"]}
 cs.sqltags ok_revision="70a03c3f6dca703e16121c6f0ac87e1ebd458829" pypi.release="20240316"
-cs.tagset ok_revision=eea89f0a1fdf037f03c51c8ce339e6700d76cbd3 features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20240316"
+cs.tagset ok_revision="97d0fc20d54f80f4ae64e8d43c6262dcdea7bffa" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"]} pypi.release="20240316"
 cs.tarutils ok_revision=b5ed41d868eba32d0098c9d651a36df8eb52c7ff pypi.release="20240318"
 cs.taskqueue ok_revision="5b2c7311b70519bea966bedf91008c797770c819" features={"20221207":["BaseTask"]} pypi.release="20230401"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
