@@ -28,11 +28,17 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
+        'cs.deco',
+        'cs.fileutils',
+        'cs.fs',
+        'cs.hashindex',
         'cs.lex',
+        'cs.pfx',
         'cs.queues',
         'cs.resources',
         'cs.result',
         'cs.seq',
+        'icontract',
     ],
 }
 
