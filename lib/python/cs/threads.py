@@ -35,7 +35,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20240412-post'
+__version__ = '20240422-post'
 
 DISTINFO = {
     'description':
@@ -52,6 +52,7 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
+        'cs.py.stack',
         'cs.seq',
     ],
 }
@@ -542,8 +543,8 @@ def locked_property(
 
   @transmute(exc_from=AttributeError)
   def locked_property_getprop(self):
-    ''' Attempt lockless fetch of property first.
-        Use lock if property is unset.
+    ''' Attempt lockless fetch of the property first.
+        Use lock if the property is unset.
     '''
     p = getattr(self, prop_name, unset_object)
     if p is unset_object:
@@ -583,21 +584,21 @@ class LockableMixin(object):
 
   @property
   def lock(self):
-    ''' Return the lock.
+    ''' The internal lock object.
     '''
     return self._lock
 
 def via(cmanager, func, *a, **kw):
   ''' Return a callable that calls the supplied `func` inside a
-      with statement using the context manager `cmanager`.
+      `with` statement using the context manager `cmanager`.
       This intended use case is aimed at deferred function calls.
   '''
 
-  def f():
+  def via_func_wrapper():
     with cmanager:
       return func(*a, **kw)
 
-  return f
+  return via_func_wrapper
 
 class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
                                      'name priority lock priority_lock')):

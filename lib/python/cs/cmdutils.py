@@ -48,7 +48,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd
 
-__version__ = '20240412-post'
+__version__ = '20240422-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -326,6 +326,14 @@ class BaseCommandOptions(HasThreadState):
     for k, v in updates.items():
       setattr(copied, k, v)
     return copied
+
+  def update(self, **updates):
+    ''' Modify the options in place with the mapping `updates`.
+        It would be more normal to call the options in a `with` statement
+        as shown for `__call__`.
+    '''
+    for k, v in updates.items():
+      setattr(self, k, v)
 
   # TODO: remove this - the overt make-a-copy-and-with-the-copy is clearer
   @contextmanager

@@ -1,3 +1,7 @@
+cs.cmdutils/distinfo: cmd_blah descriptions should format the usage parts
+cs.cmdutils: recite module version in command usage message?
+cs.distinfo: a leading "# pylint:" comment is not a standin for a missing docstring
+find all .from_any methods, convert to use @promote?
 HasThreadState.default: run as a decorator if arg0 is a callable? make factory etc keyword only
 ffmpeg-resize script - 2 pass ffmpeg
 playon refresh: accept q ids to ping the API, mainly to expire zombie entries

@@ -1494,7 +1494,7 @@ class Module:
     if isdirpath(basepath):
       pathlist = [
           joinpath(basepath, rpath) for rpath in
-          rpaths(basepath, skip_suffixes=skip_suffixes, sort_paths=True)
+          rpaths(basepath, skip_suffixes=skip_suffixes, sort_names=True)
       ]
     else:
       updir = dirname(basepath)

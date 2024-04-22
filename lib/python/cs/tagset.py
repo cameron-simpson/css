@@ -202,6 +202,7 @@ import os
 from os.path import (
     dirname, isdir as isdirpath, isfile as isfilepath, join as joinpath
 )
+import pathlib
 from pprint import pformat
 import re
 import sys
@@ -223,7 +224,7 @@ from cs.lex import (
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
     has_format_attributes, format_attribute, FStr, r, s
 )
-from cs.logutils import setup_logging, debug, warning, error, ifverbose
+from cs.logutils import setup_logging, warning, error, ifverbose
 from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
@@ -234,7 +235,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20240316-post'
+__version__ = '20240422.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -361,6 +362,57 @@ def as_unixtime(tag_value):
       "requires an int, float, date or datetime, got %s:%r" %
       (type(tag_value), tag_value)
   )
+
+def jsonable(obj, converted: dict):
+  ''' Convert `obj` to a JSON encodable form.
+      This returns `obj` for purely JSONable objects and a JSONable
+      deep copy of `obj` if it or some subcomponent required
+      conversion.
+      `converted` is a dict mapping object ids to their converted forms
+      to prevent loops.
+  '''
+  if obj is None:
+    return obj
+  try:
+    # known object - return conversion from the cache
+    return converted[id(obj)]
+  except KeyError:
+    pass
+  t = type(obj)
+  if t in (int, float, str, bool):
+    # return unchanged - no need to record the convobj
+    return obj
+  if isinstance(obj, pathlib.PurePath):
+    return str(obj)
+  if isinstance(t, (set, tuple, list)):
+    # convert to list
+    converted[id(obj)] = convobj = []
+    convobj.extend(jsonable(item, converted) for item in obj)
+    return convobj
+  # a mapping?
+  try:
+    keys = obj.keys
+  except AttributeError:
+    # an iterable?
+    try:
+      it = iter(obj)
+    except TypeError:
+      raise TypeError(f'jsoanble({t.__name__}): cannot convert for JSON')
+    else:
+      if it is obj:
+        raise TypeError(
+            f'jsoanble(t.__name__): refusing to convert an iterator for JSON because it would consume it'
+        )
+      # convert to list
+      converted[id(obj)] = convobj = []
+      convobj.extend(jsonable(item, converted) for item in it)
+      return convobj
+  else:
+    # a mapping
+    converted[id(obj)] = convobj = {}
+    for k in keys():
+      convobj[k] = jsonable(obj[k], converted)
+    return convobj
 
 class _FormatStringTagProxy:
   ''' A proxy for a `Tag` where `__str__` returns `str(self.value)`.
@@ -1018,7 +1070,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         if present.
     '''
     if attr in self:
-      ##debug("returning direct tag value for %r", attr)
       return self[attr]
     raise ValueError("cannot infer value for %r" % (attr,))
 
@@ -1306,13 +1357,13 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       if prefix:
         name = prefix + '.' + name
     if value is not None:
-      raise ValueError(
-          "name(%s) is not a str, value must be None" % (r(name),)
-      )
+      raise ValueError(f'name({r(name)}) is not a str, value must be None')
     try:
       value = tag.value
     except AttributeError:
-      raise ValueError("tag has no .value attribute")  # pylint: disable=raise-missing-from
+      # pylint: disable=raise-missing-from
+      # noqa: B904
+      raise ValueError("tag has no .value attribute")
     if isinstance(tag, Tag):
       # already a Tag subtype, see if the ontology needs updating or the name was changed
       if name != name0 or (ontology is not None
@@ -1365,10 +1416,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     value = self.value
     if value is None:
       return name
-    try:
-      value_s = self.transcribe_value(value)
-    except TypeError:
-      value_s = str(value)
+    value_s = self.transcribe_value(value)
     return name + '=' + value_s
 
   @classmethod
@@ -1404,9 +1452,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     # "bare" dotted identifiers
     if isinstance(value, str) and is_dotted_identifier(value):
       return value
-    # convert some values to a suitable type
-    if isinstance(value, (tuple, set)):
-      value = list(value)
     # fall back to JSON encoded form of value
     if json_options:
       # custom encoder
@@ -1416,7 +1461,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       encoder = JSONEncoder(**json_options)
     else:
       encoder = cls.JSON_ENCODER
-    return encoder.encode(value)
+    return encoder.encode(jsonable(value, {}))
 
   @classmethod
   def from_str(cls, s, offset=0, ontology=None, fallback_parse=None):
@@ -1561,7 +1606,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
       except JSONDecodeError as e:
         raise ValueError(
-            "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
+            "offset %d: raw_decode(%s): %s" %
+            (offset, cropped_repr(value_part), e)
         ) from e
       offset += suboffset
       return value, offset
@@ -1765,10 +1811,11 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     try:
       return self.typedata['key_type']
     except KeyError:
-      raise AttributeError('key_type')  # pylint: disable=raise-missing-from
+      # pylint: disable=raise-missing-from
+      # noqa: B904
+      raise AttributeError('key_type')
 
   @property
-  @pfx_method
   def member_type(self):
     ''' The type name for members of this tag.
 
@@ -1777,7 +1824,9 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     try:
       return self.typedata['member_type']
     except KeyError:
-      raise AttributeError('member_type')  # pylint: disable=raise-missing-from
+      # pylint: disable=raise-missing-from
+      # noqa: B904
+      raise AttributeError('member_type')
 
 class TagSetCriterion(Promotable):
   ''' A testable criterion for a `TagSet`.
@@ -2163,8 +2212,8 @@ class TagSetPrefixView(FormatableMixin):
     '''
     try:
       return self[attr]
-    except (KeyError, TypeError):
-      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+    except (KeyError, TypeError) as e:
+      raise AttributeError(f'{self.__class__.__name__}.{attr}') from e
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
@@ -3299,14 +3348,15 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
   def __repr__(self):
     return "%s(%r)" % (type(self).__name__, self.fspath)
 
-  def startup(self):
-    ''' No special startup.
-    '''
-
-  def shutdown(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Save the tagsets if modified.
     '''
-    self.save()
+    try:
+      with super().startup_shutdown():
+        yield
+    finally:
+      self.save()
 
   def get(self, name, default=None):
     ''' Get from the tagsets.
@@ -3351,7 +3401,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     return any(map(lambda tagset: tagset.modified, tagsets.values()))
 
   @locked_property
-  @pfx_method
   def tagsets(self):
     ''' The tag map from the tag file,
         a mapping of name=>`TagSet`.
@@ -3378,7 +3427,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     return list(self.tagsets.keys())
 
   @classmethod
-  @pfx_method
   def parse_tags_line(
       cls,
       line,
