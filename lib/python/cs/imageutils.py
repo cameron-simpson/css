@@ -18,6 +18,24 @@ from cs.psutils import run
 
 __all__ = []
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 2 - Beta",
+        "Environment :: Console",
+        "Intended Audience :: Developers",
+        "Programming Language :: Python :: 3",
+        'Topic :: Multimedia :: Graphics :: Graphics Conversion',
+    ],
+    'install_requires': [
+        'cs.cache',
+        'cs.deco',
+        'cs.pfx',
+        'cs.psutils',
+        'Pillow',
+    ],
+}
+
 @ALL
 class ThumbnailCache(ConvCache):
   ''' A class to manage a collection of thumbnail images.
