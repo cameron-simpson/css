@@ -1453,9 +1453,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     # "bare" dotted identifiers
     if isinstance(value, str) and is_dotted_identifier(value):
       return value
-    # convert some values to a suitable type
-    if isinstance(value, (tuple, set)):
-      value = list(value)
     # fall back to JSON encoded form of value
     if json_options:
       # custom encoder
@@ -1465,7 +1462,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       encoder = JSONEncoder(**json_options)
     else:
       encoder = cls.JSON_ENCODER
-    return encoder.encode(value)
+    return encoder.encode(jsonable(value, {}))
 
   @classmethod
   def from_str(cls, s, offset=0, ontology=None, fallback_parse=None):
