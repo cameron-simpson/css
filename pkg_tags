@@ -26,6 +26,7 @@ cs.clockutils pypi.release=20190101
 cs.cmdutils pypi.release="20240412" ok_revision="8cc2b2e4e6e960ad770bb9e2505fcc017b88e337" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"]}
 cs.configutils pypi.release="20220606" ok_revision="646d06810607e97ae0aaefbcce18806fb0ded874" features={"20220430":["HasConfigIni"],"20220606":["info_dict"]}
 cs.context pypi.release="20240412" ok_revision=f18985cfeda207953c39436e31d3ff1cd5bdb7bf features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"],"20230109":["contextif"],"20230125":["ContextManagerMixin_as_contextmanager"],"20230212":["stackset"],"20240212":["reconfigure_file"],"20240412":["withall","withif"]}
+cs.convcache
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20230613.1" ok_revision="927d70161547e2044cba9503c87faa734a244bd6" features={"20230613":["patch_builtins"]}
@@ -52,6 +53,7 @@ cs.hashindex ok_revision="422bbb63e33b9dc38c4cfd09210e672a5a184e46" pypi.release
 cs.hashutils ok_revision="0016356d4aea7334da42647076b5d46e70901021" pypi.release="20240412" features={"20240412":["BaseHashCode__get_hashfunc","blake3"]}
 cs.html pypi.release=20160828 ok_revision="23989d64974a81c6521174d3fe496bcfdd280d3f"
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
+cs.imageutils
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.iso14496 pypi.release="20231129" ok_revision="07f83e92607554ed09c6b3633d82b7c46aa3377d"
 cs.later pypi.release="20240412" ok_revision="07da8e9970585aabc5f2c0779be26b2684edb3e5" features={"20240305":["Later__thread_states"]}
@@ -95,7 +97,7 @@ cs.tagset ok_revision=eea89f0a1fdf037f03c51c8ce339e6700d76cbd3 features={"202212
 cs.tarutils ok_revision=b5ed41d868eba32d0098c9d651a36df8eb52c7ff pypi.release="20240318"
 cs.taskqueue ok_revision="5b2c7311b70519bea966bedf91008c797770c819" features={"20221207":["BaseTask"]} pypi.release="20230401"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
-cs.threads ok_revision="2de855981c3b80c3ee71fe96d2ead74782c16d22" pypi.release="20240412" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"]}
+cs.threads ok_revision="30ec455ec0c265b6b0f20b80ea12b3c86c67ae1c" pypi.release="20240412" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"]}
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
 cs.timeutils
 cs.tty
