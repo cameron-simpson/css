@@ -69,7 +69,9 @@ DISTINFO = {
         'cs.binary',
         'cs.buffer',
         'cs.cmdutils',
+        'cs.fs',
         'cs.fstags',
+        'cs.imageutils',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -78,6 +80,8 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'icontract',
+        'typeguard',
     ],
 }
 
