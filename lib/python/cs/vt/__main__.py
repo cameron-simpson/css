@@ -35,7 +35,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
-from cs.fileutils import file_data, shortpath
+from cs.fileutils import atomic_filename, file_data, shortpath
 from cs.lex import hexify, get_identifier
 from cs.logutils import (exception, error, warning, track, info, debug, logTo)
 from cs.pfx import Pfx, pfx_method, pfx_call
@@ -549,6 +549,37 @@ class VTCmd(BaseCommand):
       raise GetoptError(f'extra arguments: {argv!r}')
     print(self.options.config.as_text().rstrip())
     return 0
+
+  @uses_runstate
+  @uses_Store
+  def cmd_download(self, argv, *, runstate: RunState, S: Store):
+    ''' Usage: {cmd} uri...
+          Retrieve each VT URI from the Store.
+    '''
+    if not argv:
+      raise GetoptError('missing uris')
+    xit = 0
+    for uri_s in argv:
+      runstate.raiseif()
+      with Pfx(uri_s):
+        try:
+          uri = VTURI.from_uri(uri_s)
+        except ValueError as e:
+          warning("invalud VT URI: %s", e)
+          xit = 1
+        else:
+          filename = uri.filename or f'{uri.hashcode.hex()}.{uri.hashcode.hashname}'
+          with atomic_filename(filename) as f:
+            for B in progressbar(
+                uri.block.leaves,
+                filename,
+                itemlenfunc=len,
+                total=len(uri.block),
+            ):
+              assert not B.indirect
+              f.write(bytes(B))
+          print(uri_s, filename)
+    return xit
 
   def cmd_dump(self, argv):
     ''' Usage: {cmd} objects...
@@ -1410,7 +1441,7 @@ class VTCmd(BaseCommand):
   @uses_Store
   def cmd_upload(self, argv, *, runstate: RunState, S: Store):
     ''' Usage: {cmd} path...
-          Save each fielsystem path into the Store, print the path and its URI.
+          Save each filesystem path into the Store, print the path and its URI.
     '''
     if not argv:
       raise GetoptError('missing paths')
