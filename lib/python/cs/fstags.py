@@ -597,40 +597,44 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
-    directories_like_files = False
-    use_direct_tags = False
-    long_format = False
-    output_format = LS_OUTPUT_FORMAT_DEFAULT
-    opts, argv = getopt(argv, 'dlo:', longopts=['direct'])
-    for opt, value in opts:
-      with Pfx(opt):
-        if opt == '-d':
-          directories_like_files = True
-        elif opt == '--direct':
-          use_direct_tags = True
-        elif opt == '-l':
-          long_format = True
-        elif opt == '-o':
-          output_format = fstags.resolve_format_string(value)
-        else:
-          raise RuntimeError("unsupported option")
+    options.update(
+        directories_like_files=False,
+        use_direct_tags=False,
+        long_format=False,
+        output_format=LS_OUTPUT_FORMAT_DEFAULT,
+        recurse=False,
+    )
+    options.popopts(
+        argv,
+        d='directories_like_files',
+        direct='use_direct_tags',
+        l='long_format',
+        o_=('output_format', fstags.resolve_format_string),
+        r='recurse',
+    )
     xit = 0
     paths = argv or ['.']
     for path in paths:
       fullpath = realpath(path)
-      for fspath in ((fullpath,) if directories_like_files else scandirpaths(
-          fullpath, sort_names=True)):
+      for fspath in ((fullpath,)
+                     if options.directories_like_files else scandirpaths(
+                         fullpath,
+                         sort_names=True,
+                         recurse=options.recurse,
+                     )):
         runstate.raiseif()
         with Pfx(fspath):
           tags = fstags[fspath]
-          if long_format:
+          if options.long_format:
             print(fspath)
-            for tag in tags.as_tags(all_tags=not use_direct_tags):
+            for tag in tags.as_tags(all_tags=not options.use_direct_tags):
               print(" ", tag)
           else:
             try:
               listing = tags.format_as(
-                  output_format, error_sep='\n  ', direct=use_direct_tags
+                  options.output_format,
+                  error_sep='\n  ',
+                  direct=options.use_direct_tags,
               )
             except FormatAsError as e:
               error(str(e))
