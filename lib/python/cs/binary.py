@@ -1238,7 +1238,14 @@ class _BinaryMultiValue_Base(SimpleBinary):
     )
 
   __str__ = _s
+
   ##__repr__ = _s
+
+  def for_json(self):
+    return {
+        field_name: getattr(self, field_name)
+        for field_name in self.FIELD_ORDER
+    }
 
   @classmethod
   def parse(cls, bfr):
