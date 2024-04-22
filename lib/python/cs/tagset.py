@@ -1355,13 +1355,13 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       if prefix:
         name = prefix + '.' + name
     if value is not None:
-      raise ValueError(
-          "name(%s) is not a str, value must be None" % (r(name),)
-      )
+      raise ValueError(f'name({r(name)}) is not a str, value must be None')
     try:
       value = tag.value
     except AttributeError:
-      raise ValueError("tag has no .value attribute")  # pylint: disable=raise-missing-from
+      # pylint: disable=raise-missing-from
+      # noqa: B904
+      raise ValueError("tag has no .value attribute")
     if isinstance(tag, Tag):
       # already a Tag subtype, see if the ontology needs updating or the name was changed
       if name != name0 or (ontology is not None
@@ -1809,10 +1809,11 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     try:
       return self.typedata['key_type']
     except KeyError:
-      raise AttributeError('key_type')  # pylint: disable=raise-missing-from
+      # pylint: disable=raise-missing-from
+      # noqa: B904
+      raise AttributeError('key_type')
 
   @property
-  @pfx_method
   def member_type(self):
     ''' The type name for members of this tag.
 
@@ -1821,7 +1822,9 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     try:
       return self.typedata['member_type']
     except KeyError:
-      raise AttributeError('member_type')  # pylint: disable=raise-missing-from
+      # pylint: disable=raise-missing-from
+      # noqa: B904
+      raise AttributeError('member_type')
 
 class TagSetCriterion(Promotable):
   ''' A testable criterion for a `TagSet`.
@@ -2207,8 +2210,8 @@ class TagSetPrefixView(FormatableMixin):
     '''
     try:
       return self[attr]
-    except (KeyError, TypeError):
-      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+    except (KeyError, TypeError) as e:
+      raise AttributeError(f'{self.__class__.__name__}.{attr}') from e
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
