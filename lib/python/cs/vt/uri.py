@@ -4,6 +4,7 @@
 '''
 
 from dataclasses import dataclass
+from os.path import basename
 import re
 from typing import Optional, Union
 
@@ -26,6 +27,7 @@ class VTURI(Promotable):
       r'//(?P<network>[^/]*)'
       r'/(?P<indirect>[hi])'
       r'/(?P<hashname>[a-z][a-z0-9]*):(?P<hashtext>([0-9a-f][0-9a-f])+)'
+      r'(/(?P<filename>[^/?#]+))?'
       r'$', re.I
   )
 
@@ -34,12 +36,16 @@ class VTURI(Promotable):
   scheme: str = DEFAULT_SCHEME
   network: Optional[str] = None
   span: Optional[int] = None
+  filename: Optional[str] = None
 
   def __str__(self):
-    return (
-        f'{self.scheme}:'
-        f'//{self.network or ""}/{"i" if self.indirect else "h"}'
-        f'/{self.hashcode!r}'
+    return ''.join(
+        (
+            f'{self.scheme}:',
+            f'//{self.network or ""}/{"i" if self.indirect else "h"}',
+            f'/{self.hashcode.hashname}:{self.hashcode.hex()}',
+            (f'/{self.filename}' if self.filename else ''),
+        )
     )
 
   @property
@@ -65,6 +71,7 @@ class VTURI(Promotable):
         hashcode=HashCode.from_named_hashbytes_hex(
             m['hashname'], m['hashtext']
         ),
+        filename=m['filename'],
     )
 
   @classmethod
@@ -74,6 +81,7 @@ class VTURI(Promotable):
     def save_uri(fspath, cachepath):
       print("VTURI.from_fspath: import", fspath)
       uri = S.block_for(fspath).uri
+      uri.filename = basename(fspath)
       with open(cachepath, 'w') as cachef:
         print(uri, file=cachef)
 
