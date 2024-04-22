@@ -957,7 +957,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       badopts = True
     else:
       tag_choice_s = argv.pop(0)
-      with Pfx(repr(tag_choice_s)):
+      with Pfx("%r", tag_choice_s):
         try:
           remove, tag = self.parse_tag_addremove(tag_choice_s)
         except ValueError as e:
