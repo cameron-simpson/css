@@ -1414,10 +1414,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     value = self.value
     if value is None:
       return name
-    try:
-      value_s = self.transcribe_value(value)
-    except TypeError:
-      value_s = str(value)
+    value_s = self.transcribe_value(value)
     return name + '=' + value_s
 
   @classmethod
