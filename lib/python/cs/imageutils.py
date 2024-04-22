@@ -18,6 +18,8 @@ from cs.psutils import run
 
 __all__ = []
 
+__version__ = '20240422'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
