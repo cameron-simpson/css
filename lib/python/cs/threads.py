@@ -52,6 +52,7 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
+        'cs.py.stack',
         'cs.seq',
     ],
 }
