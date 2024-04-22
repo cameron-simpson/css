@@ -362,6 +362,57 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
+def jsonable(obj, converted: dict):
+  ''' Convert `obj` to a JSON encodable form.
+      This returns `obj` for purely JSONable objects and a JSONable
+      deep copy of `obj` if it or some subcomponent required
+      conversion.
+      `converted` is a dict mapping object ids to their converted forms
+      to prevent loops.
+
+      *WARNING*: iterators will be consumed by this function.
+  '''
+  if obj is None:
+    return obj
+  try:
+    # known object - return conversion from the cache
+    return converted[id(obj)]
+  except KeyError:
+    pass
+  t = type(obj)
+  if t in (int, float, str, bool):
+    # return unchanged - no need to record the convobj
+    return obj
+  if isinstance(t, (set, tuple, list)):
+    # convert to list
+    converted[id(obj)] = convobj = []
+    convobj.extend(jsonable(item, converted) for item in obj)
+    return convobj
+  # a mapping?
+  try:
+    keys = obj.keys
+  except AttributeError:
+    # an iterable?
+    try:
+      it = iter(obj)
+    except TypeError:
+      raise TypeError(f'jsoanble({t.__name__}): cannot convert for JSON')
+    else:
+      if it is obj:
+        raise TypeError(
+            f'jsoanble(t.__name__): refusing to convert an iterator for JSON because it would consume it'
+        )
+      # convert to list
+      converted[id(obj)] = convobj = []
+      convobj.extend(jsonable(item, converted) for item in it)
+      return convobj
+  else:
+    # a mapping
+    converted[id(obj)] = convobj = {}
+    for k in keys():
+      convobj[k] = jsonable(obj[k], converted)
+    return convobj
+
 class _FormatStringTagProxy:
   ''' A proxy for a `Tag` where `__str__` returns `str(self.value)`.
 
