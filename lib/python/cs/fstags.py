@@ -585,7 +585,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   @uses_runstate
   def cmd_ls(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-d] [--direct] [-o output_format] [paths...]
+    ''' Usage: {cmd} [-dlr] [--direct] [-o output_format] [paths...]
           List files from paths and their tags.
           -d          Treat directories like files, do not recurse.
           --direct    List direct tags instead of all tags.
@@ -594,6 +594,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
                       Use output_format as a Python format string to lay out
                       the listing.
                       Default: {LS_OUTPUT_FORMAT_DEFAULT}
+          -r          Recurse into subdirectories.
     '''
     options = self.options
     fstags = options.fstags
