@@ -202,6 +202,7 @@ import os
 from os.path import (
     dirname, isdir as isdirpath, isfile as isfilepath, join as joinpath
 )
+import pathlib
 from pprint import pformat
 import re
 import sys
@@ -223,7 +224,7 @@ from cs.lex import (
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
     has_format_attributes, format_attribute, FStr, r, s
 )
-from cs.logutils import setup_logging, debug, warning, error, ifverbose
+from cs.logutils import setup_logging, warning, error, ifverbose
 from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
@@ -381,6 +382,8 @@ def jsonable(obj, converted: dict):
   if t in (int, float, str, bool):
     # return unchanged - no need to record the convobj
     return obj
+  if isinstance(obj, pathlib.PurePath):
+    return str(obj)
   if isinstance(t, (set, tuple, list)):
     # convert to list
     converted[id(obj)] = convobj = []
@@ -1067,7 +1070,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         if present.
     '''
     if attr in self:
-      ##debug("returning direct tag value for %r", attr)
       return self[attr]
     raise ValueError("cannot infer value for %r" % (attr,))
 
