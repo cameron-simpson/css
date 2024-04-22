@@ -1,3 +1,4 @@
+tagger rule: tag !tagname expr to tag only if the tag is missing
 tagger autotag to run autofile with --no-mv or something like that
 comparison rules accepting int/float
 use Pattern.groupindex to inspect the regexp based rules for potential tag names
