@@ -215,6 +215,7 @@ class MP4Command(BaseCommand):
     '''
     if not argv:
       argv = ['-']
+    xit = 0
     for spec in argv:
       with Pfx(spec):
         if spec == '-':
@@ -229,17 +230,24 @@ class MP4Command(BaseCommand):
             if tags:
               print(' ', box.box_type_path, str(len(tags)) + ':')
               for tag in tags:
-                if tag.name == 'moov.udta.meta.ilst.cover':
-                  image_bs = b64decode(tag.value)
-                  if sys.stdout.isatty():
-                    print(f'    {tag.name}:')
-                    with open(sixel_from_image_bytes(image_bs),
-                              'rb') as sixelf:
-                      print(sixelf.read().decode('ascii'))
+                with Pfx(tag.name):
+                  if tag.name == 'moov.udta.meta.ilst.cover':
+                    image_bs = b64decode(tag.value)
+                    if sys.stdout.isatty():
+                      print(f'    {tag.name}:')
+                      with open(sixel_from_image_bytes(image_bs),
+                                'rb') as sixelf:
+                        print(sixelf.read().decode('ascii'))
+                    else:
+                      print(f'    {tag.name}: {image_bs[:32]!r}...')
                   else:
-                    print(f'    {tag.name}: {image_bs[:32]!r}...')
-                else:
-                  print('   ', tag)
+                    try:
+                      print('   ', tag)
+                    except TypeError as e:
+                      warning("cannot print: %s", e)
+                      xit = 1
+                      print('   ', tag.name, '=', repr(tag.value))
+    return xit
 
   def cmd_parse(self, argv):
     ''' Usage: {cmd} [{{-|filename}}...]
