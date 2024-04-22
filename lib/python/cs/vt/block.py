@@ -461,6 +461,15 @@ class Block(Transcriber, ABC, prefix=None):
         return HashCodeBlock(data=data, span=span, added=added)
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
 
+  @property
+  def uri(self):
+    ''' The block reference as a `VTURI`.
+    '''
+    if not isinstance(self, (HashCodeBlock, IndirectBlock)):
+      raise AttributeError(f'{self.__class__.__name__}.uri: not supported')
+    from .uri import VTURI  # pylint: disable=import-outside-toplevel
+    return VTURI(indirect=self.indirect, hashcode=self.hashcode)
+
 class BlockRecord(BinarySingleValue):
   ''' Support for binary parsing and transcription of blockrefs.
   '''
@@ -655,13 +664,6 @@ class HashCodeBlock(Block, prefix='B'):
     self._span = span
     Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
-
-  @property
-  def uri(self):
-    ''' The block reference as a `VTURI`.
-    '''
-    from .uri import VTURI  # pylint: disable=import-outside-toplevel
-    return VTURI(indirect=self.indirect, hashcode=self.hashcode)
 
   @property
   def data(self):

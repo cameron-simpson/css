@@ -141,19 +141,19 @@ class HashCode(
     return type(self).transcribe_obj(self)
 
   def __repr__(self):
-    return ':'.join((self.hashname, hexify(self)))
+    return f'{self.hashname}:{self.hex()}'
 
   @property
   def bare_etag(self):
     ''' An HTTP ETag string (HTTP/1.1, RFC2616 3.11) without the quote marks.
     '''
-    return f'{self.hashname}:{hexify(self)}'
+    return f'{self.hashname}:{self.hex()}'
 
   @property
   def etag(self):
     ''' An HTTP ETag string (HTTP/1.1, RFC2616 3.11).
     '''
-    return f'"{self.base_etag}"'
+    return f'"{self.bare_etag}"'
 
   def __eq__(self, other):
     return self.hashenum == other.hashenum and bytes.__eq__(self, other)
@@ -199,7 +199,7 @@ class HashCode(
   def filename(self):
     ''' A file basename for files related to this hashcode: {hashcodehex}.{hashtypename}
     '''
-    return hexify(self) + '.' + self.hashname
+    return f'{self.hex()}.{self.hashname}'
 
   @classmethod
   def from_filename(cls, filename):
@@ -222,7 +222,7 @@ class HashCode(
     return hashclass.from_hashbytes(hashbytes)
 
   def transcribe_inner(self) -> str:
-    return f'{self.hashname}:{hexify(self)}'
+    return f'{self.hashname}:{self.hex()}'
 
   @staticmethod
   def parse_inner(s, offset, stopchar, prefix):
