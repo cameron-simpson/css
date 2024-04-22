@@ -7,44 +7,16 @@ from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from os.path import join as joinpath
 from threading import RLock, Semaphore
+
 from icontract import require
 from typeguard import typechecked
+
 from cs.buffer import CornuCopyBuffer
+from cs.fs import validate_rpath
 from cs.lex import is_identifier
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.py.modules import import_module_name
-
-def is_valid_subpath(subpath):
-  ''' True if `subpath` is valid per the `validate_subpath()` function.
-  '''
-  try:
-    validate_subpath(subpath)
-  except ValueError:
-    return False
-  return True
-
-@typechecked
-def validate_subpath(subpath: str):
-  ''' Validate a subpath against `is_valid_subpath`,
-      raise `ValueError` on violations.
-
-      Criteria:
-      * not empty
-      * does not start or end with a slash (`'/'`)
-      * does not contain any multiple slashes
-  '''
-  with Pfx("validate_subpath(%r)", subpath):
-    if not subpath:
-      raise ValueError("empty subpath")
-    if subpath.startswith('/'):
-      raise ValueError("subpath starts with a slash")
-    if subpath.endswith('/'):
-      raise ValueError("subpath ends with a slash")
-    if '//' in subpath:
-      raise ValueError("subpath contains a multislash")
-    if any(map(lambda part: part in ('.', '..'), subpath.split('/'))):
-      raise ValueError("subpath contains '.' or '..'")
 
 class ParsedCloudPath(namedtuple('ParsedCloudPath',
                                  'cloudcls credentials bucket_name subpath')):
@@ -74,7 +46,7 @@ class ParsedCloudPath(namedtuple('ParsedCloudPath',
       sitepart, subpath = tail, None
     else:
       if subpath:
-        validate_subpath(subpath)
+        validate_rpath(subpath)
     credentials, bucket_name = cloudcls.parse_sitepart(sitepart)
     return cls(cloudcls, credentials, bucket_name, subpath)
 
@@ -113,8 +85,8 @@ class Cloud(ABC):
     self._conn_sem = Semaphore(max_connections)
 
   @staticmethod
-  @typechecked
   @require(lambda prefix: is_identifier(prefix))  # pylint: disable=unnecessary-lambda
+  @typechecked
   def subclass_from_prefix(prefix: str):
     ''' Return the `Cloud` subclass.
     '''
@@ -152,7 +124,7 @@ class Cloud(ABC):
     ''' Return a cloud path string.
     '''
     if subpath:
-      validate_subpath(subpath)
+      validate_rpath(subpath)
     return ParsedCloudPath(
         cloudcls=type(self),
         credentials=self.credentials,
@@ -357,7 +329,7 @@ class CloudArea(namedtuple('CloudArea', 'cloud bucket_name basepath')):
   def subarea(self, subpath):
     ''' Return a `CloudArea` which is located within this `CloudArea`.
     '''
-    validate_subpath(subpath)
+    validate_rpath(subpath)
     return type(self)(
         self.cloud, self.bucket_name, joinpath(self.basepath, subpath)
     )
@@ -369,7 +341,7 @@ class CloudArea(namedtuple('CloudArea', 'cloud bucket_name basepath')):
     return joinpath(self.cloud.bucketpath(self.bucket_name), self.basepath)
 
   def __getitem__(self, filepath):
-    validate_subpath(filepath)
+    validate_rpath(filepath)
     return CloudAreaFile(self, filepath)
 
 class CloudAreaFile(SingletonMixin):
@@ -378,14 +350,14 @@ class CloudAreaFile(SingletonMixin):
 
   @staticmethod
   def _singleton_key(cloud_area, filepath):
-    validate_subpath(filepath)
+    validate_rpath(filepath)
     return cloud_area, filepath
 
   ##@typechecked
   def __init__(self, cloud_area: CloudArea, filepath: str):
     if hasattr(self, 'filepath'):
       return
-    validate_subpath(filepath)
+    validate_rpath(filepath)
     self.cloud_area = cloud_area
     self.filepath = filepath
 

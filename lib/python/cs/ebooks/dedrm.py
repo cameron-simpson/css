@@ -5,7 +5,6 @@
 
     This is an experimental module aimed at making the DeDRM/noDRM
     packages run outside Calibre's plugin environment.
-    It does not yet work.
 '''
 
 from contextlib import contextmanager, redirect_stdout
@@ -17,12 +16,15 @@ import json
 import os
 from os.path import (
     basename,
+    dirname,
     isdir as isdirpath,
+    isfile as isfilepath,
     join as joinpath,
     normpath,
     realpath,
     splitext,
 )
+from shutil import copyfile
 import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 import time
@@ -34,7 +36,7 @@ from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import pfx, Pfx, pfx_call, pfx_method
 from cs.sqltags import SQLTags
 from cs.upd import print  # pylint: disable=redefined-builtin
 
@@ -46,18 +48,24 @@ def main(argv=None):
   return DeDRMCommand(argv).run()
 
 class DeDRMCommand(BaseCommand):
+  ''' cs.dedrm command line implementation.
+  '''
 
   GETOPT_SPEC = 'D:'
   USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
-    -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
-        For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
-        at /path/to/DeDRM_tools--noDRM you could supply:
-        -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
-        or place that value in the $DEDRM_PACKAGE_PATH environment variable.
+    Options:
+      -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
+          For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
+          at /path/to/DeDRM_tools--noDRM you could supply:
+          -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
+          or place that value in the $DEDRM_PACKAGE_PATH environment variable.
   '''
 
   @dataclass
   class Options(BaseCommand.Options):
+    ''' Command line option state.
+    '''
+
     dedrm_package_path: Optional[str] = field(
         default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
     )
@@ -125,7 +133,13 @@ class DeDRMCommand(BaseCommand):
 
   def cmd_kindlekeys(self, argv):
     ''' Usage: {cmd} [import]
-          import    Read a JSON list of key dicts and update the cached keys.
+          Print or import the Kindle DRM keys.
+          Modes:
+            import    Read a JSON list of key dicts and update the cached keys.
+          Example:
+            Import the keys from one host into the local collection:
+              ssh otherhost python3 -m cs.ebooks.dedrm kindlekeys \
+              | python3 -m cs.ebooks dedrm kindlekeys import
     '''
     dedrm = self.options.dedrm
     if not argv:
@@ -206,6 +220,9 @@ class DeDRMWrapper(Promotable):
         raise ValueError("no \"standalone\" subdirectory")
       self.dedrm_package_path = dedrm_package_path
       dedrm_DeDRM = self.import_name(self.DEDRM_PACKAGE_NAME, 'DeDRM')
+      dedrm_DeDRMError = self.import_name(
+          self.DEDRM_PACKAGE_NAME, 'DeDRMError'
+      )
 
       class CSEBookDeDRM(DeDRMOverride, dedrm_DeDRM):
         ''' Our wrapper for the DeDRM/noDRM `DeDRM` class
@@ -214,8 +231,10 @@ class DeDRMWrapper(Promotable):
         alfdir = dedrm_package_path
 
       self.dedrm = CSEBookDeDRM()
+      self.DeDRMError = dedrm_DeDRMError
     with self.dedrm_imports():
       kindlekey = self.import_name('kindlekey')
+      ##kindlekey = self.import_name('kindlekey', package=__package__)
       # monkey patch the kindlekey.kindlekeys function
       self.base_kindlekeys = kindlekey.kindlekeys
       kindlekey.kindlekeys = self.cached_kindlekeys
@@ -313,9 +332,11 @@ class DeDRMWrapper(Promotable):
           sys,
           path=[tmpdirpath, joinpath(tmpdirpath, self.DEDRM_PACKAGE_NAME)] +
           sys.path):
+        # pylint: disable=import-outside-toplevel
         import builtins
         with stackattrs(builtins, print=print):
           with redirect_stdout(sys.stderr):
+            # pylint: disable=import-outside-toplevel
             import prefs  # imported for its side effect
             yield
 
@@ -337,39 +358,73 @@ class DeDRMWrapper(Promotable):
         return M
       return pfx_call(getattr, M, name)
 
-  def remove(self, srcpath, dstpath, exists_ok=False):
+  @pfx_method
+  def remove(
+      self,
+      srcpath,
+      dstpath,
+      *,
+      booktype=None,
+      exists_ok=False,
+      obok_lib=None,
+  ):
     ''' Remove the DRM from `srcpath`, writing the resulting file to `dstpath`.
 
         Parameters:
         * `exists_ok`: if true then `dstpath` may already exist; default `False`
     '''
+    if booktype is None:
+      # infer book type from file extension
+      booktype = splitext(basename(srcpath))[1][1:].lower()
+      if booktype == '':
+        # Kobo kepub files inside the "kepub" directory
+        if basename(dirname(srcpath)).lower() == 'kepub':
+          booktype = 'kepub'
+      if not booktype:
+        raise ValueError("cannot infer book type")
     with atomic_filename(dstpath, exists_ok=exists_ok) as T:
-      dedrm = self.dedrm
-      # monkey patch temporary_file method to return tmpfilename
-      with stackattrs(dedrm, temporary_file=lambda ext: T):
-        with self.dedrm_imports():
-          dedrm.starttime = time.time()
-          # infer book type from file extension
-          booktype = splitext(basename(srcpath))[1][1:].lower()
-          if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3', 'azw4',
-                          'tpz', 'kfx-zip']:
-            # Kindle/Mobipocket
-            decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
-          elif booktype == 'pdb':
-            # eReader
-            decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
-          elif booktype == 'pdf':
-            # Adobe PDF (hopefully) or LCP PDF
-            decrypted_ebook = dedrm.PDFDecrypt(srcpath)
-          elif booktype == 'epub':
-            # Adobe Adept, PassHash (B&N) or LCP ePub
-            decrypted_ebook = dedrm.ePubDecrypt(srcpath)
-          else:
-            raise ValueError(
-                "cannot decrypt %r, unhandle book type %r" %
-                (srcpath, booktype)
-            )
-          assert decrypted_ebook == T.name
+      if booktype == 'kepub':
+        from .kobo import import_obok, decrypt_obok
+        obok = import_obok()
+        if obok_lib is None:
+          from .kobo import default_kobo_library  # pylint: disable=import-outside-toplevel
+          obok_lib = obok.KoboLibrary(desktopkobodir=default_kobo_library())
+          need_close_lib = True
+        else:
+          need_close_lib = False
+        # pylint: disable=protected-access
+        obok_book = obok.KoboBook(
+            basename(srcpath), srcpath, srcpath, 'kepub', obok_lib.__cursor
+        )
+        decrypt_obok(obok_lib, obok_book, T.name, exists_ok=True)
+        if need_close_lib:
+          obok_lib.close()
+      else:
+        dedrm = self.dedrm
+        # monkey patch temporary_file method to return tmpfilename
+        with stackattrs(dedrm, temporary_file=lambda ext: T):
+          with self.dedrm_imports():
+            dedrm.starttime = time.time()
+            if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3',
+                            'azw4', 'tpz', 'kfx-zip']:
+              # Kindle/Mobipocket
+              decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
+            elif booktype == 'pdb':
+              # eReader
+              decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
+            elif booktype == 'pdf':
+              # Adobe PDF (hopefully) or LCP PDF
+              decrypted_ebook = dedrm.PDFDecrypt(srcpath)
+            elif booktype == 'epub':
+              # Adobe Adept, PassHash (B&N) or LCP ePub
+              decrypted_ebook = dedrm.ePubDecrypt(srcpath)
+            else:
+              raise ValueError(
+                  "cannot decrypt %r, unhandled book type %r" %
+                  (srcpath, booktype)
+              )
+            if decrypted_ebook == srcpath:
+              pfx_call(copyfile, srcpath, T.name)
 
   @contextmanager
   def removed(self, srcpath):
@@ -536,8 +591,8 @@ def getLibCrypto():
 
       def set_decrypt_key(self, userkey, iv):
         self._blocksize = len(userkey)
-        if (self._blocksize != 16) and (self._blocksize !=
-                                        24) and (self._blocksize != 32):
+        if (self._blocksize != 16) and (self._blocksize
+                                        != 24) and (self._blocksize != 32):
           raise DrmException(u"AES improper key used")
           return
         keyctx = self._keyctx = AES_KEY()

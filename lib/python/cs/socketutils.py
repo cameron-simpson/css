@@ -14,7 +14,8 @@ from cs.logutils import debug, warning
 from cs.pfx import Pfx
 
 DISTINFO = {
-    'description': "some utilities for network sockets",
+    'description':
+    "some utilities for network sockets",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -35,7 +36,7 @@ def bind_next_port(sock, host, base_port):
   '''
   while True:
     try:
-      sock.bind( (host, base_port) )
+      sock.bind((host, base_port))
     except (OSError, socket.error) as e:
       if e.errno == errno.EADDRINUSE:
         base_port += 1

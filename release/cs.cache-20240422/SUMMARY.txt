@@ -1,0 +1,1 @@
+New ConvCache and convof: a cache for conversions of file contents such as thumbnails or transcoded media.

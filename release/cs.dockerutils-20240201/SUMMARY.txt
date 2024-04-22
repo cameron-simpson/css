@@ -1,0 +1,2 @@
+mount_escape: strip trailing carriage return also.
+DockerRun: new output_map attribute much like input_map; also mount existing outputs within the container.

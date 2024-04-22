@@ -9,24 +9,27 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
+from dataclasses import dataclass, field
+from functools import partial
 import sys
-from threading import Condition, Lock, RLock, current_thread, main_thread
+from threading import Lock, current_thread, main_thread
 import time
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Mapping, Optional, Tuple, Union
 
 from typeguard import typechecked
 
-from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
+from cs.context import contextif, stackattrs, setup_cmgr, ContextManagerMixin
 from cs.deco import default_params
 from cs.gimmicks import error, warning, nullcontext
 from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import prop
-from cs.py.stack import caller, frames as stack_frames, stack_dump
-from cs.threads import ThreadState, HasThreadState
+from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
+from cs.result import CancellationError
+from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20230503-post'
+__version__ = '20240422-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -43,7 +46,9 @@ DISTINFO = {
         'cs.psutils',
         'cs.py.func',
         'cs.py.stack',
+        'cs.result',
         'cs.threads',
+        'typeguard',
     ],
 }
 
@@ -69,26 +74,28 @@ def not_closed(func):
   return not_closed_wrapper
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
-class _mom_state(object):
+if sys.version_info >= (3, 10):
+  _mdc = dataclass(slots=True)
+else:
+  _mdc = dataclass
 
-  def __init__(self, mom: "MultiOpenMixin"):
-    self.mom = mom
-    self.opened = False
-    self.opens = 0
-    self.opens_from = defaultdict(int)
-    ##self.closed = False # final _close() not yet called
-    self.final_close_from = None
-    self._lock = RLock()
-    self.join_lock = None
+@_mdc
+class _MultiOpenMixinOpenCloseState:
 
-  def __repr__(self):
-    return "%s:%r" % (self.__class__.__name__, self.__dict__)
+  mom: "MultiOpenMixin"
+  opened: bool = False
+  opens: int = 0
+  opens_from: Mapping = field(default_factory=lambda: defaultdict(int))
+  final_close_from: StackSummary = None
+  join_lock: Lock = None
+  _teardown: Callable = None
+  _lock: NRLock = field(default_factory=NRLock)
 
   def open(self, caller_frame=None) -> int:
     ''' The open process:
         Bump the opens counter.
         If it goes to 1, run the startup phase of `self.mom.startup_shutdown`.
-        Return the bumped opens counter.
+        Return the incremented opens counter.
     '''
     with self._lock:
       opens = self.opens
@@ -101,7 +108,7 @@ class _mom_state(object):
         self.join_lock = Lock()
         self.join_lock.acquire()
         self._teardown = setup_cmgr(self.mom.startup_shutdown())
-      self.opened = True
+        self.opened = True
     return opens
 
   def close(
@@ -114,8 +121,9 @@ class _mom_state(object):
     ''' The close process:
         Decrement the opens counter.
         If it goes to 0, run the shutdown phase of `self.mom.startup_shutdown`.
-        Return the bumped opens counter and the return value of the shutdown phase
-        (or `None` if the shutdown was not run).
+        Return a 2-tuple `(opens,retval)` being:
+        - the decremented opens counter
+        - the return value of the shutdown phase or `None` if the shutdown was not run
     '''
     if not self.opened:
       if unopened_ok:
@@ -132,7 +140,7 @@ class _mom_state(object):
               "  opened from %s %d times", frame_key,
               self.opens_from[frame_key]
           )
-        return retval
+        return opens, retval
       opens -= 1
       self.opens = opens
       if opens == 0:
@@ -163,21 +171,19 @@ class _mom_state(object):
 ## debug: TrackedClassMixin
 class MultiOpenMixin(ContextManagerMixin):
   ''' A multithread safe mixin to count open and close calls,
-      and to call `.startup` on the first `.open`
-      and to call `.shutdown` on the last `.close`.
+      doing a startup on the first `.open` and shutdown on the last `.close`.
 
       If used as a context manager this mixin calls `open()`/`close()` from
       `__enter__()` and `__exit__()`.
 
-      It is recommended subclass implementations do as little as possible
-      during `__init__`, and do almost all setup during startup so
-      that the class may perform multiple startup/shutdown iterations.
+      It is recommended that subclass implementations do as little
+      as possible during `__init__`, and do almost all setup during
+      startup so that the class may perform multiple startup/shutdown
+      iterations.
 
-      Classes using this mixin need to:
-      * _either_ define a context manager method `.startup_shutdown`
-        which does the startup actions before yeilding
-        and then does the shutdown actions
-      * _or_ define separate `.startup` and `.shutdown` methods.
+      Classes using this mixin should define a context manager
+      method `.startup_shutdown` which does the startup actions
+      before yielding and then does the shutdown actions.
 
       Example:
 
@@ -185,15 +191,27 @@ class MultiOpenMixin(ContextManagerMixin):
               @contextmanager
               def startup_shutdown(self):
                   self._db = open_the_database()
-                  yield
-                  self._db.close()
+                  try:
+                      yield
+                  finally:
+                      self._db.close()
           ...
           with DatabaseThing(...) as db_thing:
               ... use db_thing ...
 
-      Why not a plain context manager? Because in multithreaded
-      code one wants to keep the instance "open" while any thread
-      is still using it.
+      If course, often something like a database open will itself
+      be a context manager and the `startup_shutdown` method more
+      usually looks like this:
+
+              @contextmanager
+              def startup_shutdown(self):
+                  with open_the_database() as db:
+                      self._db = db
+                      yield
+
+      Why not just write a plain context manager class? Because in
+      multithreaded or async code one wants to keep the instance
+      "open" while any thread is still using it.
       This mixin lets threads use an instance in overlapping fashion:
 
           db_thing = DatabaseThing(...)
@@ -213,31 +231,38 @@ class MultiOpenMixin(ContextManagerMixin):
         proxy's `.close`.
   '''
 
-  def __mo_getstate(self):
-    ''' Fetch the state object for the mixin,
-        something of a hack to avoid providing an __init__.
+  _mom_state_lock = Lock()
+
+  @property
+  def MultiOpenMixin_state(self):
+    ''' The state object for the mixin,
+        something of a hack to avoid providing an `__init__`.
     '''
-    # used to be self.__mo_state and catch AttributeError, but
-    # something up the MRO weirds this - suspect the ABC base class
     try:
-      state = self.__dict__['_MultiOpenMixin_state']
+      # the fast path
+      return self.__dict__['_MultiOpenMixin_state']
     except KeyError:
-      state = self.__dict__['_MultiOpenMixin_state'] = _mom_state(self)
-      assert state.opens == 0
-    return state
+      # pylint: disable=protected-access
+      with self.__class__._mom_state_lock:
+        try:
+          state = self.__dict__['_MultiOpenMixin_state']
+        except KeyError:
+          state = self.__dict__['_MultiOpenMixin_state'
+                                ] = _MultiOpenMixinOpenCloseState(self)
+      return state
 
   def tcm_get_state(self):
     ''' Support method for `TrackedClassMixin`.
     '''
-    state = self.__mo_getstate()
+    state = self.MultiOpenMixin_state
     return {'opened': state.opened, 'opens': state.opens}
 
   def __enter_exit__(self):
-    self.open(caller_frame=caller())
+    self.open()
     try:
       yield
     finally:
-      self.close(caller_frame=caller())
+      self.close()
 
   @contextmanager
   def startup_shutdown(self):
@@ -285,8 +310,8 @@ class MultiOpenMixin(ContextManagerMixin):
     ''' Increment the open count.
         On the first `.open` call `self.startup()`.
     '''
-    state = self.__mo_getstate()
-    if False:
+    state = self.MultiOpenMixin_state
+    if False:  # pylint: disable=using-constant-test
       if caller_frame is None:
         caller_frame = caller()
       frame_key = caller_frame.filename, caller_frame.lineno
@@ -317,13 +342,13 @@ class MultiOpenMixin(ContextManagerMixin):
           even if the original open never happened.
           (I'm looking at you, `cs.resources.RunState`.)
     '''
-    state = self.__mo_getstate()
-    if False:
+    state = self.MultiOpenMixin_state
+    if False:  # pylint: disable=using-constant-test
       if caller_frame is None:
         caller_frame = caller()
       frame_key = caller_frame.filename, caller_frame.lineno
       state.opens_from[frame_key] = state.opens_from.get(frame_key, 0) + 1
-    opens, retval = state.close(
+    _, retval = state.close(
         caller_frame=caller_frame,
         enforce_final_close=enforce_final_close,
         unopened_ok=unopened_ok,
@@ -335,7 +360,7 @@ class MultiOpenMixin(ContextManagerMixin):
     ''' Whether this object has been closed.
         Note: False if never opened.
     '''
-    state = self.__mo_getstate()
+    state = self.MultiOpenMixin_state
     if state.opens > 0:
       return False
     ##if state.opens < 0:
@@ -352,7 +377,12 @@ class MultiOpenMixin(ContextManagerMixin):
         Normally this is notified at the end of the shutdown procedure
         unless the object's `finalise_later` parameter was true.
     '''
-    self.__mo_getstate().join()
+    self.MultiOpenMixin_state.join()
+
+  def is_open(self):
+    ''' Test whether this object is open.
+    '''
+    return self.MultiOpenMixin_state.opens > 0
 
   @staticmethod
   def is_opened(func):
@@ -543,13 +573,16 @@ class RunState(HasThreadState):
   def __init__(
       self,
       name=None,
+      *,
       signals=None,
       handle_signal=None,
       poll_cancel: Optional[Callable] = None,
       verbose=False,
+      thread_wide=False,
   ):
     self.name = name
     self.verbose = verbose
+    self.thread_wide = thread_wide
     self._started_from = None
     self._signals = tuple(signals) if signals else ()
     self._sigstack = None
@@ -599,7 +632,7 @@ class RunState(HasThreadState):
         In particular, the `HasThreadState.Thread` factory calls this
         in the "running" state.
     '''
-    with HasThreadState.as_contextmanager(self):
+    with contextif(self.thread_wide, HasThreadState.as_contextmanager, self):
       if self.running:
         # we're already running - do not change states or push signal handlers
         # typical situation is HasThreadState.Thread setting up the "current" RunState
@@ -653,8 +686,6 @@ class RunState(HasThreadState):
     '''
     if not running_ok and self.running:
       warning("already running")
-      print("runstate.start(): originally started from:", file=sys.stderr)
-      stack_dump(Fs=self._started_from)
     else:
       self._started_from = stack_frames()
     self.cancelled = False
@@ -686,6 +717,25 @@ class RunState(HasThreadState):
     ''' Set the .cancelled attribute.
     '''
     self._cancelled = cancel_status
+
+  def raiseif(self, msg=None, *a):
+    ''' Raise `CancellationError` if cancelled.
+        This is the concise way to terminate an operation which honour
+        `.cancelled` if you're prepared to handle the exception.
+
+        Example:
+
+            for item in items:
+                runstate.raiseif()
+                ... process item ...
+    '''
+    if self.cancelled:
+      if msg is None:
+        msg = "%s.cancelled" % (self,)
+      else:
+        if a:
+          msg = msg % a
+      raise CancellationError(msg)
 
   @property
   def running(self):
@@ -749,6 +799,18 @@ class RunState(HasThreadState):
       stop_time = self.stop_time
     return max(0, stop_time - start_time)
 
+  def iter(self, it):
+    ''' Iterate over `it` while not `self.cancelled`.
+    '''
+    it = iter(it)
+    while True:
+      if self.cancelled:
+        return
+      try:
+        yield next(it)
+      except StopIteration:
+        return
+
   @contextmanager
   def catch_signal(
       self,
@@ -783,9 +845,10 @@ class RunState(HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
-# use the prevailing RunState or make a fresh one
+# default to the current RunState or make one
 uses_runstate = default_params(
-    runstate=lambda: RunState.default() or RunState()
+    runstate=lambda:
+    (RunState.default(factory=partial(RunState, thread_wide=True)))
 )
 
 class RunStateMixin(object):
@@ -794,8 +857,9 @@ class RunStateMixin(object):
       Provides: `.runstate`, `.cancelled`, `.running`, `.stopping`, `.stopped`.
   '''
 
+  @uses_runstate
   @typechecked
-  def __init__(self, runstate: RunState):
+  def __init__(self, runstate: Union[RunState, str]):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
         Parameters:

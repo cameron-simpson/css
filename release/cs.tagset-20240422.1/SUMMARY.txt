@@ -1,0 +1,1 @@
+jsonable: convert pathlib.PurePath to str, hoping this isn't too open ended a can of worms.

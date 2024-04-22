@@ -67,7 +67,7 @@ from cs.timeseries import (
 )
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20230612-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -98,9 +98,9 @@ DISTINFO = {
         'typeguard',
     ],
     'entry_points': {
-        'console_scripts': [
-            'splink = cs.splink:main',
-        ],
+        'console_scripts': {
+            'splink': 'cs.splink:main',
+        },
     },
 }
 
@@ -832,7 +832,17 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     return run(rsargv).returncode
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
-  def cmd_import(self, argv, datasets=None, doit=None, force=None):
+  @uses_upd
+  @uses_runstate
+  def cmd_import(
+      self,
+      argv,
+      runstate: RunState,
+      upd: Upd,
+      datasets=None,
+      doit=None,
+      force=None
+  ):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
           -d datasets       Comma separated list of datasets to import.
@@ -860,9 +870,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         dry_run='dry_run',
     )
     spd = options.spd
-    upd = options.upd
     fstags = options.fstags
-    runstate = options.runstate
     datasets = options.datasets
     doit = options.doit
     force = options.force
@@ -918,7 +926,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
               dataset = dsinfo.dataset
               with Pfx(rdspath):
                 dstags = fstags[dspath]
-                if not force and dstags.imported:
+                if not force and dstags.get('imported'):
                   ##print('already imported {short_dspath}')
                   continue
                 if dataset in spd.TIMESERIES_DATASETS:
@@ -964,7 +972,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                           for when, tags in progressbar(
                               when_tags,
                               short_dspath,
-                              update_frequency=16,
                               report_print=True,
                           ):
                             key = when
@@ -990,7 +997,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
-          Report infomation about the time series stored at tspath.
+          Report information about the time series stored at tspath.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))

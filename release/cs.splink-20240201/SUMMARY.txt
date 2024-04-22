@@ -1,0 +1,2 @@
+Release with the "splink" script.
+splink plot: new -U/--update option to run a "pull" before plotting.

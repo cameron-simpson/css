@@ -4,62 +4,65 @@
     variable sized blocks, arbitrarily sized data and utilising some
     domain knowledge to aid efficient block boundary selection.
 
-    *Note*: the "mount" filesystem facility uses FUSE,
-    which may need manual OS installation.
-    On MacOS this means installing `osxfuse`
-    for example from MacPorts.
-    You will also need the `llfuse` Python module,
-    which is not automatically required by this package.
-
     The package provides the `vt` command to access
     these facilities from the command line.
 
     This system has two main components:
-    * Stores: storage areas of variable sized data blocks
+    * `Store`s: storage areas of variable sized data blocks
       indexed by the cryptographic hashcode of their content
-    * Dirents: references to filesystem entities
+    * `Dirent`s: references to filesystem entities
       containing hashcode based references to the content
 
     These are logically disconnected.
-    Dirents are not associated with particular Stores;
-    it is sufficient to have access to any Store
+    Dirents are not associated with particular `Store`s;
+    it is sufficient to have access to any `Store`
     containing the required blocks.
 
-    The other common entity is the Archive,
+    The other common entity is the `Archive`,
     which is just a text file containing
-    a timestamped log of revisions of a Dirent.
+    a timestamped log of revisions of a `Dirent`.
     These can be mounted as a FUSE filesystem,
     and the `vt pack` command simply stores
-    a directory tree into the current Store,
-    and records the stored reference in an Archive file.
+    a directory tree into the current `Store`,
+    and records the stored reference in an `Archive` file.
 
     See also the Plan 9 Venti system:
     (http://library.pantek.com/general/plan9.documents/venti/venti.html,
     http://en.wikipedia.org/wiki/Venti)
     which is also a system based on variable sized blocks.
+
+    *Note*: the "mount" filesystem facility uses FUSE,
+    which may need manual OS installation.
+    On MacOS this means installing `osxfuse`,
+    for example from MacPorts.
+    You will also need the `llfuse` Python module,
+    which is not automatically required by this package.
 '''
 
 from abc import ABC, abstractmethod
+from collections.abc import MutableMapping
 from contextlib import closing, contextmanager
 import os
 from threading import Thread
 from types import SimpleNamespace as NS
-from typing import Mapping, Tuple
+from typing import Iterable, Tuple, Union
 
+from icontract import require
+from typeguard import typechecked
+
+from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc
+from cs.deco import default_params, fmtdoc, promote
 from cs.later import Later
 from cs.lex import r
 from cs.logutils import warning
-from cs.progress import Progress, OverProgress, progressbar
+from cs.progress import Progress
 from cs.queues import IterableQueue, QueueIterator
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.seq import Seq
 from cs.threads import bg as bg_thread, ThreadState, HasThreadState
-
-from icontract import require
-from typeguard import typechecked
+from cs.upd import Upd, uses_upd
 
 from .hash import (
     DEFAULT_HASHCLASS,
@@ -132,6 +135,7 @@ DEFAULT_CONFIG_PATH = '~/.vtrc'
 VT_STORE_ENVVAR = 'VT_STORE'
 VT_STORE_DEFAULT = '[default]'
 VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
+VT_CACHE_STORE_DEFAULT = '[cache]'
 DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
 
 DEFAULT_CONFIG_MAP = {
@@ -169,7 +173,7 @@ if False:
 
   # monkey patch MultiOpenMixin
   import cs.resources
-  cs.resources._mom_lockclass = RLock
+  cs.resources.MultiOpenMixin._mom_state_lock = Lock()
 else:
   from threading import (
       Lock as threading_Lock,
@@ -185,55 +189,9 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
-_progress = Progress(name="cs.vt.common.progress"),
-_over_progress = OverProgress(name="cs.vt.common.over_progress")
+run_modes = NS(show_progress=True,)
 
-# some shared default state, Thread independent
-common = NS(
-    progress=_progress,
-    over_progress=_over_progress,
-    S=None,
-)
-
-del _progress
-del _over_progress
-
-class _Defaults(ThreadState):
-  ''' Per-thread default context stack.
-
-      A Store's __enter__/__exit__ methods push/pop that store
-      from the `.S` attribute.
-  '''
-
-  # Global stack of fallback Store values.
-  # These are pushed by things like main or the fuse setup
-  # to provide a shared default across Threads.
-  _Ss = []
-
-  def __init__(self):
-    super().__init__()
-    self.progress = common.progress
-    self.fs = None
-    self.show_progress = False
-
-  def __getattr__(self, attr):
-    if attr == 'S':
-      S = common.S
-      if S is None:
-        S = self.config['default']
-      return S
-    raise AttributeError(attr)
-
-  @contextmanager
-  def common_S(self, S):
-    ''' Context manager to push a Store onto `common.S`.
-    '''
-    with stackattrs(common, S=S):
-      yield
-
-NOdefaults = _Defaults()
-
-class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
+class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
@@ -325,25 +283,78 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def init(self):
     ''' Method provided to support "vt init".
         For stores requiring some physical setup,
-        for example to create an empty DataDir,
+        for example to create an empty `DataDir`,
         that code goes here.
     '''
 
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
     params = []
-    for attr, val in sorted(self._str_attrs.items()):
+    for attr, val in sorted(getattr(self, '_str_attrs', {}).items()):
       if isinstance(val, type):
         val_s = '<%s.%s>' % (val.__module__, val.__name__)
       else:
         val_s = str(val)
       params.append(attr + '=' + val_s)
     return "%s:%s(%s)" % (
-        self.__class__.__name__, self.hashclass.hashname,
-        ','.join([repr(self.name)] + params)
+        self.__class__.__name__,
+        getattr(getattr(self, 'hashclass', None), 'hashname', "no-hashclass"),
+        ','.join([repr(getattr(self, 'name', 'no-name'))] + params),
     )
 
   __repr__ = __str__
+
+  @staticmethod
+  @fmtdoc
+  def get_default_spec():
+    ''' The default `Store` specification from `${VT_STORE_ENVVAR}`,
+        default `{VT_STORE_DEFAULT!r}`.
+    '''
+    return os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
+
+  @staticmethod
+  @fmtdoc
+  def get_default_cache_spec():
+    ''' The default cache `Store` specification from `${VT_CACHE_STORE_ENVVAR}`,
+        default `{VT_CACHE_STORE_DEFAULT!r}`.
+    '''
+    return os.environ.get(VT_CACHE_STORE_ENVVAR, VT_CACHE_STORE_DEFAULT)
+
+  @classmethod
+  def default(cls, config_spec=None, store_spec=None, cache_spec=None):
+    ''' Get the prevailing `Store` instance.
+        This calls `HasThreadState.default()` first,
+        but falls back to constrcting the default `Store` instance
+        from `Store.get_default_spec` and `Store.get_default_cache_spec`.
+        As such, the returns `Store` is not necessarily "open"
+        and users should open it for use. Example:
+
+            S = Store.default()
+            with S:
+                ... do stuff ...
+    '''
+    S = super().default()
+    if S is None:
+      # no prevailing Store
+      # construct the default Store
+      from .config import Config
+      config = Config(config_spec)
+      if store_spec is None:
+        store_spec = cls.get_default_spec()
+      if cache_spec is None:
+        cache_spec = cls.get_default_cache_spec()
+      S = cls.promote(store_spec, config)
+      if cache_spec is not None and cache_spec not in ("", "NONE"):
+        cacheS = cls.promote(cache_spec, config)
+        S = ProxyStore(
+            "%s:%s" % (cacheS.name, S.name),
+            read=(cacheS,),
+            read2=(S,),
+            copy2=(cacheS,),
+            save=(cacheS, S),
+            archives=((S, '*'),),
+        )
+    return S
 
   __bool__ = lambda self: True
 
@@ -352,10 +363,10 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     return id(self)
 
   def hash(self, data):
-    ''' Return a HashCode instance from data bytes.
+    ''' Return a `HashCode` instance from data bytes.
         NB: this does _not_ store the data.
     '''
-    return self.hashclass.from_chunk(data)
+    return self.hashclass.from_data(data)
 
   # Stores are equal only to themselves.
   def __eq__(self, other):
@@ -378,7 +389,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def __iter__(self):
     ''' Return an iterator over the Store's hashcodes.
     '''
-    return self.keys()
+    return iter(self.keys())
 
   def __getitem__(self, h):
     ''' Return the data bytes associated with the supplied hashcode.
@@ -397,16 +408,22 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         and raises `ValueError` if that does not match the supplied
         `h`.
     '''
-    h2 = self.add(data, type(h))
-    if h != h2:
-      raise ValueError("h:%s != hash(data):%s" % (h, h2))
+    if not isinstance(h, self.hashclass):
+      raise TypeError(f'h should be a {self.hashclass}, got {r(h)}')
+    if h != self.hashclass.from_bytes(data):
+      raise ValueError(f'{h=} != {self.hashclass.hashname}({data=})')
+    h2 = self.add(data)
+    assert h == h2
+
+  def __delitem__(self, h):
+    raise NotImplementedError(f'{self.__class__.__name__}.__delitem__')
 
   ###################################################
   ## Context manager methods via ContextManagerMixin.
   ##
   def __enter_exit__(self):
-    with HasThreadState.as_contextmanager(self):
-      with MultiOpenMixin.as_contextmanager(self):
+    with MultiOpenMixin.as_contextmanager(self):
+      with HasThreadState.as_contextmanager(self):
         yield
 
   ##########################
@@ -427,9 +444,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
               yield
             finally:
               self.runstate.cancel()
-        # obtain this before the Later forgets it
-        finished = L.finished_event
-      finished.wait()
+      L.wait()
 
   #############################
   ## Function dispatch methods.
@@ -437,7 +452,7 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
 
   def _defer(self, func, *args, **kwargs):
     ''' Defer a function via the internal `Later` queue.
-        Hold an `open()` on `self` to avoid easy shutdown.
+        Hold an `open()` on `self` to avoid premature shutdown.
     '''
     self.open()
 
@@ -509,10 +524,10 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
 
   @property
   def config(self):
-    ''' The configuration for use with this Store.
-        Falls back to `defaults.config`.
+    ''' The configuration for use with this `Store`.
+        Falls back to `Config.default`.
     '''
-    from .config import Config
+    from .config import Config  # pylint:disable=import-outside-toplevel
     return self._config or Config.default(factory=True)
 
   @config.setter
@@ -536,21 +551,27 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     self._blockmapdir = dirpath
 
-  @typechecked
+  @uses_upd
+  @uses_runstate
   @require(lambda capacity: capacity >= 1)
-  def pushto(self,
-             dstS,
-             *,
-             capacity: int = 64,
-             progress=None) -> Tuple[QueueIterator, Thread]:
+  @typechecked
+  def pushto(
+      self,
+      dstS,
+      *,
+      capacity: int = 64,
+      runstate: RunState,
+      upd: Upd,
+      progress=None,
+  ) -> Tuple[QueueIterator, Thread]:
     ''' Allocate a `QueueIterator` for Blocks to push from this
         Store to another Store `dstS`.
-        Return `(Q,T)` where `Q` is the new `QueueIterator` and `T` is the
+        Return `(Q,T)` where `Q` is a queue to receive blocks `T` is the
         `Thread` processing the queue.
 
         Parameters:
-        * `dstS`: the secondary Store to receive Blocks.
-        * `capacity`: the Queue capacity, arbitrary default `64`.
+        * `dstS`: the secondary Store to receive `Block`s.
+        * `capacity`: the queue capacity, arbitrary default `64`.
         * `progress`: an optional `Progress` counting submitted and completed data bytes.
 
         Once called, the caller can then `.put` Blocks onto the queue.
@@ -560,38 +581,65 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     name = "%s.pushto(%s)" % (self.name, dstS.name)
     with Pfx(name):
       Q = IterableQueue(capacity=capacity, name=name)
-      srcS = self
-      srcS.open()
+      self.open()
       dstS.open()
       T = bg_thread(
-          lambda: (
-              self._push_blocks(name, Q, srcS, dstS, progress),
-              srcS.close(),
-              dstS.close(),
-          )
+          self._push_worker,
+          args=(name, Q, dstS),
+          kwargs=dict(progress=progress, runstate=runstate, upd=upd),
       )
       return Q, T
 
   @pfx_method
-  def _push_blocks(self, name, blocks, srcS, dstS, progress):
-    ''' This is a worker function which pushes Blocks or bytes from
-        the supplied iterable `blocks` to the second Store.
+  def _push_worker(
+      self,
+      name: str,
+      blocks: Iterable,
+      dstS: "Store",
+      *,
+      progress: Union[Progress, None],
+      runstate: RunState,
+      upd: Upd,
+  ):
+    ''' This is a worker function which receives `HashCode`s or `Block`s
+        or `bytes` from the supplied iterable `blocks` and pushes
+        them to `dstS` (the second `Store`).
+        This closes `self` and `dstS` on return
+        and thus expects them to be opened in `self.pushto()`.
 
         Parameters:
         * `name`: name for this worker instance
-        * `blocks`: an iterable of `HashCode`s or Blocks or bytes-like objects
-        * `srcS`: the source Store from which to obtain block data
-        * `dstS`: the target Store to which to push Blocks
+        * `blocks`: an iterable of `HashCode`s or `Block`s or `bytes`-like objects
+        * `dstS`: the destination `Store` to which to push `Block`s
     '''
-    with srcS:
-      for item in progressbar(blocks, f'{self.name}.pushto',
-                              update_frequency=64):
+    if progress is None and not upd.disabled:
+      P = Progress(name, total=0)
+      with P.bar(report_print=True):
+        return self._push_worker(
+            name, blocks, dstS, progress=P, runstate=runstate, upd=upd
+        )
+    try:
+      if progress is None:
+        add_bg = dstS.add_bg
+      else:
+
+        def add_bg(data):
+          ''' Add the data and advance the progress on completion.
+          '''
+          R = dstS.add_bg(data)
+          R.notify(lambda _: progress.advance(len(data)))
+          return R
+
+      for item in blocks:
         if isinstance(item, HashCode):
           h = item
           if h in dstS:
+            # known, skip
             continue
-          data = srcS[h]
-          dstS.add_bg(data)
+          data = self[h]
+          dlen = len(data)
+          if progress is not None:
+            progress.total += dlen
         else:
           # a Block?
           try:
@@ -599,17 +647,95 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
           except AttributeError:
             # just data
             data = item
-            dstS.add(data)
+            dlen = len(data)
+            if progress is not None:
+              progress.total += dlen
           else:
-            # Block
+            dlen = len(item)
+            if progress is not None:
+              progress.total += dlen
+            h = item.hashcode
             if h in dstS:
+              progress += dlen
               continue
-            data = item.data
-            dstS.add_bg(data)
+        add_bg(data)
+    finally:
+      self.close()
+      dstS.close()
+
+  def is_complete_indirect(self, ih):
+    ''' Check whether `ih`, the hashcode of an indirect Block,
+        has its data and all its implied data present in this Store.
+    '''
+    entry = self.get_index_entry(ih)
+    if entry is not None and (entry.flags & entry.INDIRECT_COMPLETE):
+      # marked as complete, no need to examine the contents
+      return True
+    subblocks_data = self.get(ih)
+    if subblocks_data is None:
+      # missing hash, incomplete
+      return False
+    from .block import IndirectBlock  # pylint:disable=import-outside-toplevel
+    IB = IndirectBlock.from_subblocks_data(subblocks_data)
+    for subblock in IB.subblocks:
+      h = subblock.hashcode
+      if h not in self:
+        # missing hash, incomplete
+        return False
+      if not subblock.indirect:
+        # direct block, is complete
+        continue
+      # TODO how/when to set the flag in the index?
+      if not self.is_complete_indirect(h):
+        # subblock incomplete
+        return False
+    # ensure the index entry gets marked as complete
+    if entry is not None:
+      with self.modify_index_entry(ih) as entry2:
+        entry2.flags |= entry2.INDIRECT_COMPLETE
+    return True
+
+  def get_index_entry(self, hashcode):
+    ''' Return the index entry for `hashcode`, or `None` if there
+        is no index or the index has no entry for `hashcode`.
+    '''
+    return None
+
+  @contextmanager
+  def modify_index_entry(self, hashcode):
+    ''' Context manager to obtain and yield the index record entry for `hashcode`
+        and resave it on return.
+
+        *Important Note*:
+        on Stores with no persistent index-with-flags
+        this yields `None` for the entry and updates nothing on return;
+        callers must recognise this.
+        That is the behaviour of this default implementation.
+
+        Stores with a persistent index such as `DataDirStore` have
+        functioning versions of this method which yield a non`None`
+        result.
+
+        Example:
+
+            with index.modify_entry(hashcode) as entry:
+                if entry is not None:
+                    entry.flags |= entry.INDIRECT_COMPLETE
+    '''
+    yield None
+
+  @promote
+  def block_for(self, bfr: CornuCopyBuffer) -> "Block":
+    ''' Store an object into this `Store`, return the `Block`.
+        The object may be any object acceptable to `CornuCopyBuffer.promote`.
+    '''
+    from .blockify import block_for
+    with self:
+      return block_for(bfr)
 
   @classmethod
   @fmtdoc
-  def promote(cls, obj):
+  def promote(cls, obj, config=None):
     ''' Promote `obj` to a `Store` instance.
         Existing instances are returned unchanged.
         A `str` is promoted via `Config.Store_from_spec`
@@ -623,8 +749,9 @@ class Store(Mapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     if obj is None:
       obj = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
     if isinstance(obj, str):
-      from .config import Config
-      config = Config.default(factory=True)
+      if config is None:
+        from .config import Config  # pylint:disable=import-outside-toplevel
+        config = Config.default(factory=True)
       return config.Store_from_spec(obj)
     raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))
 

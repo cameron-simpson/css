@@ -22,7 +22,7 @@ import re
 import sys
 from threading import Semaphore
 import time
-from typing import Optional, Set
+from typing import Optional
 from urllib.parse import unquote as unpercent
 
 from icontract import require
@@ -35,6 +35,7 @@ from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
 from cs.lex import has_format_attributes, format_attribute, get_prefix_n
 from cs.logutils import warning
+from cs.mediainfo import scrub_title
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
@@ -43,9 +44,9 @@ from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import print  # pylint: disable=redefined-builtin
+from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20230703-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -57,7 +58,9 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'entry_points': {
-        'console_scripts': ['playon = cs.app.playon:main'],
+        'console_scripts': {
+            'playon': 'cs.app.playon:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils',
@@ -314,8 +317,6 @@ class PlayOnCommand(BaseCommand):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
-    options = self.options
-    upd = options.upd
     recordings = set(sqltags.recordings())
     need_refresh = (
         # any current recordings whose state is stale
@@ -324,7 +325,7 @@ class PlayOnCommand(BaseCommand):
         all(recording.is_expired() for recording in recordings)
     )
     if need_refresh:
-      with upd.run_task("refresh queue and recordings"):
+      with run_task("refresh queue and recordings"):
         Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
         for T in Ts:
           T.join()
@@ -357,7 +358,6 @@ class PlayOnCommand(BaseCommand):
         recording_ids = sqltags.recording_ids_from_str(arg)
         if not recording_ids:
           warning("no recording ids")
-          xit = 1
           continue
         for dl_id in sorted(recording_ids):
           recording = sqltags[dl_id]
@@ -385,18 +385,15 @@ class PlayOnCommand(BaseCommand):
             recording = sqltags[dl_id]
             print(dl_id, '+ downloaded')
             recording.add("downloaded")
+    return xit
 
   def cmd_feature(self, argv, locale='en_US'):
     ''' Usage: {cmd} [feature_id]
           List features.
     '''
     long_mode = False
-    opts, argv = getopt(argv, 'l', '')
-    for opt, val in opts:
-      if opt == '-l':
-        long_mode = True
-      else:
-        raise RuntimeError("unhandled option: %r" % (opt,))
+    opts = self.popopts(argv, l='long_mode')
+    long_mode = opts['long_mode']
     if argv:
       feature_id = argv.pop(0)
     else:
@@ -545,32 +542,25 @@ class Recording(SQLTagSet):
     parts = []
     if self.playon.Series:
       parts.append(self.playon.Series)
-    se_parts = []
-    if self.playon.Season is not None:
-      se_parts.append(f's{self.playon.Season:02d}')
-    if self.playon.Episode:
-      se_parts.append(f'e{self.playon.Episode:02d}')
-    if se_parts:
-      parts.append(''.join(se_parts))
+      se_parts = []
+      if self.playon.get('Season'):
+        se_parts.append(f's{self.playon.Season:02d}')
+      if self.playon.get('Episode'):
+        se_parts.append(f'e{self.playon.Episode:02d}')
+      if se_parts:
+        parts.append(''.join(se_parts))
     if not parts:
       return ''
     return sep.join(parts) + sep
 
   @format_attribute
   def series_episode_name(self):
-    name = self.playon.Name
-    name = name.strip()
-    if self.playon.Season is not None:
-      spfx, n, offset = get_prefix_n(name, 's', n=self.playon.Season)
-      if spfx is not None:
-        assert name.startswith(f's{self.playon.Season:02d}')
-        name = name[offset:]
-    if self.playon.Episode is not None:
-      epfx, n, offset = get_prefix_n(name, 'e', n=self.playon.Episode)
-      if epfx is not None:
-        assert name.startswith(f'e{self.playon.Episode:02d}')
-        name = name[offset:]
-      name = name.lstrip()
+    name = scrub_title(
+        self.playon.Name,
+        season=self.playon.get('Season'),
+        episode=self.playon.get('Episode'),
+    )
+    if self.playon.get('Episode'):
       epfx, n, offset = get_prefix_n(
           name.lower(), 'episode ', n=self.playon.Episode
       )
@@ -596,7 +586,7 @@ class Recording(SQLTagSet):
         based on the presence of a `download_path` `Tag`
         or a true `downloaded` `Tag`.
     '''
-    return self.download_path is not None or 'downloaded' in self
+    return self.get('download_path') is not None or 'downloaded' in self
 
   @format_attribute
   def is_pending(self):
@@ -1064,8 +1054,7 @@ class PlayOnAPI(HTTPServiceAPI):
           dl_url, auth=RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with pfx_call(atomic_filename, filename, mode='wb',
-                    placeholder=True) as f:
+      with pfx_call(atomic_filename, filename, mode='wb') as f:
         for chunk in progressbar(
             dl_rsp.iter_content(chunk_size=131072),
             label=filename,

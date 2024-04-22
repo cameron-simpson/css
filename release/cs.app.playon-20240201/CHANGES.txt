@@ -1,0 +1,12 @@
+lib/python/cs/app/playon.py: PlayOnCommand.cmd_dl: collapse dashes more reliably
+lib/python/cs/app/playon.py: merge playon ==> default: better download filename
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: restore the space squashing
+lib/python/cs/app/playon.py: merge playon ==> default
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand._list: sort each listing argument by recording id; autoformat
+lib/python/cs/app/playon.py: merge playon ==> default
+lib/python/cs/app/playon.py: cs.app.playon: Recording.is_downloaded: TagSets no longer default missing attributes to None, handle missing attribute
+lib/python/cs/app/playon.py: cs.app.playon: Recording: update probes of self.playon.{Season,Name} to just use truthiness
+lib/python/cs/app/playon.py: cs.app.playon: Recording.is_downloaded: adjust lookup
+lib/python/cs/app/playon.py: cs.app.playon: Recording: adjust checks for series related tags
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: plumb the runstate through to the API download method so that the user can interrupt the download
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: do not make a placeholder file

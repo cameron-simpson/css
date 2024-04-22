@@ -4,8 +4,6 @@
 ''' Datadir tests. - Cameron Simpson <cs@cskk.id.au>
 '''
 
-from itertools import product
-import os
 from os.path import abspath
 import random
 import shutil
@@ -13,17 +11,15 @@ import sys
 import tempfile
 import unittest
 
-from cs.deco import decorator
 from cs.logutils import setup_logging
-from cs.pfx import Pfx, XP
 from cs.randutils import randomish_chunks
 from cs.testutils import product_test
 
-from .datadir import DataDir, RawDataDir
+from .datadir import DataDir, FileDataIndexEntry
 from .hash import HASHCLASS_BY_NAME
 from .index import (
-    FileDataIndexEntry, class_names as indexclass_names, class_by_name as
-    indexclass_by_name
+    class_names as indexclass_names,
+    class_by_name as indexclass_by_name,
 )
 
 MAX_BLOCK_SIZE = 16383
@@ -45,7 +41,7 @@ def multitest(test_method):
   '''
   return product_test(
       test_method,
-      datadirclass=[DataDir, RawDataDir],
+      datadirclass=[DataDir],
       indexclass=[
           indexclass_by_name(indexname)
           for indexname in sorted(indexclass_names())
@@ -91,10 +87,10 @@ class TestDataDir(unittest.TestCase):
 
   def product_teardown(self):
     self.datadir.close()
-    os.system("ls -l -- " + self.datadirpath)
+    ##os.system("ls -l -- " + self.datadirpath)
     if self.do_remove_datadirpath:
       shutil.rmtree(self.datadirpath)
-    os.system("ls -l -- " + self.indexdirpath)
+    ##os.system("ls -l -- " + self.indexdirpath)
     if self.do_remove_indexdirpath:
       shutil.rmtree(self.indexdirpath)
 
@@ -128,7 +124,7 @@ class TestDataDir(unittest.TestCase):
     '''
     D = self.datadir
     with D:
-      hashfunc = D.hashclass.from_chunk
+      hashfunc = D.hashclass.from_data
       by_hash = {}
       by_data = {}
       # store RUN_SIZE random blocks
@@ -151,7 +147,8 @@ class TestDataDir(unittest.TestCase):
           self.assertTrue(hashcode in by_hash)
           self.assertTrue(data in by_data)
           self.assertTrue(hashcode in D)
-          self.assertEqual(D[hashcode], data)
+          data2 = D[hashcode]
+          self.assertEqual(data2, data)
       # now retrieve in random order
       hashcodes = list(by_hash.keys())
       random.shuffle(hashcodes)
@@ -166,7 +163,7 @@ class TestDataDir(unittest.TestCase):
           self.assertEqual(data, odata)
     # explicitly close the DataDir and reopen
     # this is because the test framework normally does the outermost open/close
-    # and therefore the datadir index lock is still sitting aroung
+    # and therefore the datadir index lock is still sitting around
     D.close()
     D = self.datadir = self._open_default_datadir()
     D.open()

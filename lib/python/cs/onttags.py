@@ -16,7 +16,7 @@ from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.deco import fmtdoc, Promotable
-from cs.fs import HasFSPath
+from cs.fs import FSPathBasedSingleton
 from cs.fstags import TagFile
 from cs.lex import cutsuffix, r
 from cs.logutils import warning
@@ -52,7 +52,7 @@ class OntCommand(TagsOntologyCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'type'
 
   @dataclass
-  class Options(OntCommand.Options):
+  class Options(TagsOntologyCommand.Options):
     ont_path: str = field(
         default_factory=lambda: os.environ.get(ONTTAGS_PATH_ENVVAR)
     )
@@ -86,7 +86,7 @@ class OntCommand(TagsOntologyCommand):
     for tn in type_names:
       print(tn)
 
-class Ont(TagsOntology, HasFSPath, Promotable):
+class Ont(FSPathBasedSingleton, TagsOntology, Promotable):
   ''' A `TagsOntology` based on a persistent store.
   '''
 

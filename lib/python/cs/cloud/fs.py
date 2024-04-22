@@ -6,14 +6,18 @@
 import errno
 import os
 from os.path import dirname, isdir as isdirpath, join as joinpath
+
 from icontract import require
 from typeguard import typechecked
+
 from cs.buffer import CornuCopyBuffer
+from cs.fs import validate_rpath
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.obj import SingletonMixin, as_dict
 from cs.pfx import Pfx, pfx_method
-from . import Cloud, validate_subpath
+
+from . import Cloud
 
 class FSCloud(SingletonMixin, Cloud):
   ''' A filesystem based cloud storage handle.
@@ -82,7 +86,7 @@ class FSCloud(SingletonMixin, Cloud):
         the upload target, allowing the upload itself to be a file
         rename or hard link of the scratch file.
     '''
-    validate_subpath(path)
+    validate_rpath(path)
     filename = os.sep + joinpath(bucket_name, path)
     tmp_dirpath = dirname(filename)
     if not isdirpath(tmp_dirpath):

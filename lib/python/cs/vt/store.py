@@ -7,41 +7,35 @@
 ''' Various Store classes.
 '''
 
-from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
+from os.path import isfile as isfilepath, splitext
 import sys
-from threading import Semaphore, Thread
-from typing import Tuple
 
 from icontract import require
-from typeguard import typechecked
 
-from cs.context import stackattrs
+from cs.cache import CachingMapping
 from cs.deco import fmtdoc
-from cs.excutils import logexc
-from cs.later import Later
-from cs.lex import r
 from cs.logutils import warning, error, info
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
-from cs.py.func import prop
-from cs.queues import Channel, IterableQueue, QueueIterator
-from cs.resources import (
-    MultiOpenMixin, openif, RunStateMixin, RunState, uses_runstate
-)
-from cs.result import report, bg as bg_result
-from cs.seq import Seq
-from cs.threads import bg as bg_thread, HasThreadState, ThreadState
+from cs.queues import Channel, IterableQueue
+from cs.resources import openif, RunState, uses_runstate
+from cs.result import Result, report
+from cs.threads import bg as bg_thread
 
-from . import defaults, Lock, RLock, VT_STORE_ENVVAR, VT_STORE_DEFAULT
-from .datadir import DataDir, RawDataDir, PlatonicDir
-from .hash import (
-    HashCode, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin,
-    MissingHashcodeError
+from . import (
+    Store,
+    Lock,
+    RLock,
+    StoreSyncBase,
 )
+from .backingfile import BackingFileIndexEntry, BinaryHashCodeIndex, CompressibleBackingFile
+from .cache import FileDataMappingProxy, MemoryCacheMapping
+from .datadir import DataDir, PlatonicDir
+from .hash import DEFAULT_HASHCLASS
+from .index import choose as choose_indexclass
 
 class StoreError(Exception):
   ''' Raised by Store operation failures.
@@ -108,18 +102,13 @@ class MappingStore(StoreSyncBase):
   def __len__(self):
     return len(self.mapping)
 
-  def __contains__(self, h):
+  def contains(self, h):
     return h in self.mapping
-
-  contains = __contains__
 
   def keys(self):
     ''' Proxy to `self.mapping.keys`.
     '''
     return self.mapping.keys()
-
-  def __iter__(self):
-    return iter(self.keys())
 
   def __getitem__(self, h):
     ''' Proxy to `self.mapping[h]`.
@@ -131,10 +120,12 @@ class MappingStore(StoreSyncBase):
     '''
     return self.mapping.get(h, default)
 
-  def pushto_queue(self, Q, runstate=None, progress=None):
-    ''' Push all the keys to the queue.
+  @uses_runstate
+  def pushto_queue(self, Q, runstate: RunState, progress=None):
+    ''' Push all the `Store` keys to the queue `Q`.
     '''
-    for h in progressbar(self.keys(), f'{self.name}', update_frequency=64):
+    for h in progressbar(self.keys(), f'push {self.name}', total=len(self)):
+      runstate.raiseif()
       Q.put(h)
     return True
 
@@ -450,7 +441,7 @@ class ProxyStore(StoreSyncBase):
         seen.add(h)
 
 class DataDirStore(MappingStore):
-  ''' A `MappingStore` using a `DataDir` or `RawDataDir` as its backend.
+  ''' A `MappingStore` using a `DataDir` as its backend.
   '''
 
   @fmtdoc
@@ -463,7 +454,6 @@ class DataDirStore(MappingStore):
       indexclass=None,
       rollover=None,
       lock=None,
-      raw=False,
       **kw
   ):
     ''' Initialise the DataDirStore.
@@ -476,8 +466,6 @@ class DataDirStore(MappingStore):
         * `indexclass`: passed to the data dir.
         * `rollover`: passed to the data dir.
         * `lock`: passed to the mapping.
-        * `raw`: option, default `False`.
-          If true use a `RawDataDir` otherwise a `DataDir`.
     '''
     if lock is None:
       lock = RLock()
@@ -488,14 +476,19 @@ class DataDirStore(MappingStore):
     self.hashclass = hashclass
     self.indexclass = indexclass
     self.rollover = rollover
-    datadirclass = RawDataDir if raw else DataDir
-    self._datadir = datadirclass(
+    self._datadir = DataDir(
         self.topdirpath,
         hashclass=hashclass,
         indexclass=indexclass,
-        rollover=rollover
+        rollover=rollover,
     )
-    super().__init__(name, self._datadir, hashclass=hashclass, **kw)
+    super().__init__(
+        name,
+        CachingMapping(self._datadir, missing_fallthrough=True),
+        hashclass=hashclass,
+        **kw,
+    )
+    self._modify_index_lock = Lock()
 
   @contextmanager
   def startup_shutdown(self):
@@ -519,6 +512,27 @@ class DataDirStore(MappingStore):
     ''' DataDirStore Archives are associated with the internal DataDir.
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
+
+  def get_index_entry(self, hashcode):
+    ''' Return the index entry for `hashcode`, or `None` if there
+        is no index or the index has no entry for `hashcode`.
+    '''
+    return self._datadir.get_index_entry(hashcode)
+
+  @contextmanager
+  def modify_index_entry(self, hashcode):
+    ''' Context manager to obtain and yield the `FileDataIndexEntry` for `hashcode`
+        and resave it on return.
+
+        Example:
+
+            with index.modify_entry(hashcode) as entry:
+                entry.flags |= FileDataIndexEntry.INDIRECT_COMPLETE
+    '''
+    with self._modify_index_lock:
+      self.mapping.flush()  # ensure the index is up to date
+      with self._datadir.modify_index_entry(hashcode) as entry:
+        yield entry
 
 def PlatonicStore(name, topdirpath, *a, meta_store=None, hashclass=None, **kw):
   ''' Factory function for platonic Stores.
@@ -786,7 +800,7 @@ class ProgressStore(StoreSyncBase):
     ''' Open the subStore.
     '''
     with self.S:  # open the substore
-      with defaults(S=self):  # but make the default Store be self
+      with self:
         yield
 
   def add(self, data):
@@ -824,19 +838,6 @@ class ProgressStore(StoreSyncBase):
     data = self.S.get(h)
     self.progress_get.position += len(data)
     return data
-
-  def get_bg(self, data):
-    ''' Advance the progress_add total, and the position on completion.
-    '''
-    LF = self.S.add_bg(data)
-
-    def notifier(LF):
-      data, exc = LF.join()
-      if exc is None:
-        self.progress_get.position += len(data)
-
-    LF.notify(notifier)
-    return LF
 
   def contains(self, h):
     return self.S.contains(h)
