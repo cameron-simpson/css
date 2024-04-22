@@ -382,6 +382,14 @@ def jsonable(obj, converted: dict):
   if t in (int, float, str, bool):
     # return unchanged - no need to record the convobj
     return obj
+  # see if the objects has a for_json() method
+  try:
+    for_json = obj.for_json
+  except AttributeError:
+    pass
+  else:
+    converted[id(obj)] = convobj = for_json()
+    return convobj
   if isinstance(obj, pathlib.PurePath):
     return str(obj)
   if isinstance(t, (set, tuple, list)):
