@@ -1604,7 +1604,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
       except JSONDecodeError as e:
         raise ValueError(
-            "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
+            "offset %d: raw_decode(%s): %s" %
+            (offset, cropped_repr(value_part), e)
         ) from e
       offset += suboffset
       return value, offset
@@ -3342,14 +3343,15 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
   def __repr__(self):
     return "%s(%r)" % (type(self).__name__, self.fspath)
 
-  def startup(self):
-    ''' No special startup.
-    '''
-
-  def shutdown(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Save the tagsets if modified.
     '''
-    self.save()
+    try:
+      with super().startup_shutdown():
+        yield
+    finally:
+      self.save()
 
   def get(self, name, default=None):
     ''' Get from the tagsets.
@@ -3394,7 +3396,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     return any(map(lambda tagset: tagset.modified, tagsets.values()))
 
   @locked_property
-  @pfx_method
   def tagsets(self):
     ''' The tag map from the tag file,
         a mapping of name=>`TagSet`.
@@ -3421,7 +3422,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     return list(self.tagsets.keys())
 
   @classmethod
-  @pfx_method
   def parse_tags_line(
       cls,
       line,
