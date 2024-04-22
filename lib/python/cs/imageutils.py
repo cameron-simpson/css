@@ -18,7 +18,7 @@ from cs.psutils import run
 
 __all__ = []
 
-__version__ = '20240422.1'
+__version__ = '20240422.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
