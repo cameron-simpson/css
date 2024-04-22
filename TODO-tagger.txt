@@ -1,3 +1,4 @@
+action call imported-name(...), autosupply: taggedpath, tags as keyword arguments
 from module import name,... to pull in callables
 tagger rule: tag !tagname expr to tag only if the tag is missing
 tagger autotag to run autofile with --no-mv or something like that
