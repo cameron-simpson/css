@@ -1,3 +1,4 @@
+comparison rules accepting int/float
 use Pattern.groupindex to inspect the regexp based rules for potential tag names
 rules: ~ prefix./regexp/ to prefix the matched names in the tags
 autotag to use the fstags autotag support, merge?
