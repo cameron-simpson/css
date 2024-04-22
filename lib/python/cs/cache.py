@@ -459,6 +459,7 @@ from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.seq import splitoff
 
+@fmtdoc
 class ConvCache(HasFSPath):
   ''' A cache for conversions of file contents such as thumbnails
       or transcoded media, etc. This keeps cached results in a file
