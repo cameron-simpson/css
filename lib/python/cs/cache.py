@@ -18,7 +18,7 @@ from cs.resources import MultiOpenMixin
 from cs.result import Result
 from cs.seq import unrepeated
 
-__version__ = '20240422'
+__version__ = '20240422-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
