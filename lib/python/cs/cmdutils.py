@@ -327,6 +327,14 @@ class BaseCommandOptions(HasThreadState):
       setattr(copied, k, v)
     return copied
 
+  def update(self, **updates):
+    ''' Modify the options in place with the mapping `updates`.
+        It would be more normal to call the options in a `with` statement
+        as shown for `__call__`.
+    '''
+    for k, v in updates.items():
+      setattr(self, k, v)
+
   # TODO: remove this - the overt make-a-copy-and-with-the-copy is clearer
   @contextmanager
   def __call__(self, **updates):
