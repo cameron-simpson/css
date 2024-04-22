@@ -132,6 +132,7 @@ def scandirtree(
     skip_suffixes=None,
     sort_names=False,
     follow_symlinks=False,
+    recurse=True,
 ):
   ''' Generator to recurse over `dirpath`, yielding `(is_dir,subpath)`
       for all selected subpaths.
@@ -139,7 +140,16 @@ def scandirtree(
       Parameters:
       * `dirpath`: the directory to scan, default `'.'`
       * `include_dirs`: if true yield directories; default `False`
-      * `name
+      * `name_selector`: optional callable to select particular names;
+        the default is to select names no starting with a dot (`'.'`)
+      * `only_suffixes`: if supplied, skip entries whose extension
+        is not in `only_suffixes`
+      * `skip_suffixes`: if supplied, skip entries whose extension
+        is in `skip_suffixes`
+      * `sort_names`: option flag, default `False`; yield entires
+        in lexical order if true
+      * `follow_symlinks`: optional flag, default `False`; passed to `scandir`
+      * `recurse`: optional flag, default `True`; if true, recurse into subdrectories
   '''
   if name_selector is None:
     name_selector = lambda name: name and not name.startswith('.')
@@ -156,7 +166,7 @@ def scandirtree(
     if sort_names:
       dirents = sorted(dirents, key=lambda entry: entry.name)
     for entry in dirents:
-      if entry.is_dir(follow_symlinks=follow_symlinks):
+      if recurse and entry.is_dir(follow_symlinks=follow_symlinks):
         pending.append(entry.path)
       name = entry.name
       if not name_selector(name):
