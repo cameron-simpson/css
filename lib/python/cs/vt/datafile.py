@@ -9,23 +9,35 @@
 ''' Implementation of DataFile: a file containing Block records.
 '''
 
+from contextlib import contextmanager
 from enum import IntFlag
+from os import SEEK_SET
+from os.path import realpath
 import sys
+from threading import Lock, RLock
 from zlib import compress, decompress
+
 from icontract import require
+
 from cs.binary import BSUInt, BSData, SimpleBinary
 from cs.buffer import CornuCopyBuffer
-from cs.fileutils import datafrom
-from .block import Block
+from cs.context import stackattrs
+from cs.fs import HasFSPath
+from cs.logutils import warning
+from cs.obj import SingletonMixin
+from cs.pfx import pfx_call, pfx_method
+from cs.resources import MultiOpenMixin
+
+from .block import HashCodeBlock
 
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 
 class DataFlag(IntFlag):
-  ''' Flag values for DataFile records.
+  ''' Flag values for `DataFile` records.
 
       Defined flags:
-      * `COMPRESSED`: the data are compressed using zlib.compress.
+      * `COMPRESSED`: the data are compressed using `zlib.compress`.
   '''
   COMPRESSED = 0x01
 
@@ -158,10 +170,87 @@ class DataFilePushable:
       if runstate and runstate.cancelled:
         return False
       data = DR.data
-      Q.put(Block(data=data))
+      Q.put(HashCodeBlock.promote(data))
       if progress:
         progress += len(data)
     return True
+
+class DataFile(SingletonMixin, HasFSPath, MultiOpenMixin):
+  ''' Management for a `.vtd` data file.
+  '''
+
+  @classmethod
+  def _singleton_key(cls, fspath: str):
+    return realpath(fspath)
+
+  @pfx_method
+  def __init__(self, fspath: str):
+    if not fspath.endswith(DATAFILE_DOT_EXT):
+      warning(f'fspath does not end with {DATAFILE_DOT_EXT!r}')
+    self.fspath = fspath
+    self.rf = None
+    self._af = None
+    self._lock = RLock()
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open the file for read, close on exit.
+    '''
+    with open(self.fspath, 'rb') as rf:
+      with stackattrs(self, rf=rf):
+        try:
+          yield
+        finally:
+          with self._lock:
+            if self._af is not None:
+              self._af.close()
+              self._af = None
+
+  def get_record(self, offset: int) -> DataRecord:
+    ''' Read the `DataRecord` at `offset`.
+    '''
+    bfr = CornuCopyBuffer.from_file(self.rf)
+    with self._lock:
+      self.rf.seek(offset, SEEK_SET)
+      DR = DataRecord.parse(bfr)
+    return DR
+
+  def scanfrom(self, *, offset=0, **scan_kw):
+    ''' Scan the file from `offset` (default `0`)
+        and yield `DataRecord` instances.
+        This honours the `BinaryMixin.scan` parameters
+        such as `with_offsets`.
+    '''
+    with pfx_call(open, self.fspath, 'rb') as rf:
+      if offset > 0:
+        rf.seek(offset, SEEK_SET)
+      bfr = CornuCopyBuffer.from_file(rf, offset=offset)
+      yield from DataRecord.scan(bfr, **scan_kw)
+
+  @property
+  def wf(self):
+    ''' The writable file for appending records to the `DataFile`.
+
+        Note that the file is opened for append with no buffering.
+    '''
+    with self._lock:
+      if self._af is None:
+        self._af = pfx_call(open, self.fspath, 'ab', buffering=0)
+      return self._af
+
+  def append(self, data: bytes):
+    ''' Append the `data` to the file.
+        Return `(DR,offset,length)` being the `DataRecord` and the
+        location and length of the resulting binary record.
+    '''
+    DR = DataRecord(data)
+    wf = self.wf
+    bs = bytes(DR)
+    with self._lock:
+      offset = wf.tell()
+      length = wf.write(bs)
+    assert length == len(bs)
+    return DR, offset, length
 
 if __name__ == '__main__':
   from .datafile_tests import selftest

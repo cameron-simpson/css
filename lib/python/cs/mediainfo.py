@@ -1,21 +1,24 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Assorted facilities for media information.
 # - Cameron Simpson <cs@cskk.id.au> 09may2018
 #
 
 '''
-Simple facilities for media information.
+Simple minded facilities for media information.
+This contains mostly lexical functions
+for extracting information from strings
+or constructing media filenames from metadata.
 
 The default filename parsing rules are based on my personal convention,
 which is to name media files as:
 
-  series_name--episode_info--title--source--etc....ext
+  series_name--episode_info--title--source--etc-etc.ext
 
 where the components are:
 * `series_name`:
   the programme series name downcased and with whitespace replaced by dashes;
-  in the case of standalone items like movies this is usually the studio.
+  in the case of standalone items like movies this is often the studio.
 * `episode_info`: a structures field with episode information:
   `s`_n_ is a series/season,
   `e`_n_` is an episode number within the season,
@@ -32,28 +35,25 @@ I also like a media filename to contain enough information
 to identify the file contents in a compact and human readable form.
 '''
 
-from __future__ import print_function
 from collections import namedtuple, defaultdict
 from os.path import basename, splitext
 import re
 import sys
 from types import SimpleNamespace as NS
-from cs.pfx import Pfx
-from cs.py.func import prop
+
+from cs.gimmicks import warning
+from cs.lex import get_prefix_n
+from cs.pfx import Pfx, pfx
 from cs.tagset import Tag
 
 DISTINFO = {
-    'description':
-    "Simple facilities for media information",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.pfx',
-        'cs.py.func',
         'cs.tagset',
     ],
 }
@@ -69,7 +69,7 @@ def main(argv=None):
   cmd = argv.pop(0)
   usage = USAGE % (cmd,)
   if not argv:
-    print("%s: missing media-filenames" % (cmd,), file=sys.stderr)
+    warning("%s: missing media-filenames", cmd)
     print(usage)
     return 2
   for pathname in argv:
@@ -176,8 +176,8 @@ class EpisodeInfo(NS):
     '''
     try:
       value = getattr(self, name)
-    except AttributeError:
-      raise KeyError(name)
+    except AttributeError as e:
+      raise KeyError(name) from e
     return value
 
   def get(self, name, default=None):
@@ -207,6 +207,7 @@ class EpisodeInfo(NS):
     return cls(**fields)
 
   @classmethod
+  @pfx
   def parse_filename_part(cls, s, offset=0):
     ''' Parse episode information from a string,
         returning the matched fields and the new offset.
@@ -215,36 +216,34 @@ class EpisodeInfo(NS):
         `s`: the string containing the episode information.
         `offset`: the starting offset of the information, default 0.
     '''
-    with Pfx("parse_filename_part: %r", s):
-      start_offset = offset
-      fields = {}
-      while offset < len(s):
-        offset0 = offset
-        for defn in cls.MARKERS:
-          if defn.name in fields:
-            # support for different definitions with a common prefix
-            # earlier definitions are matched first
-            continue
-          try:
-            value, offset = defn.parse(s, offset)
-          except ValueError:
-            pass
-          else:
-            fields[defn.name] = value
-            break
-        # parse fails, stop trying for more information
-        if offset == offset0:
+    start_offset = offset
+    fields = {}
+    while offset < len(s):
+      offset0 = offset
+      for defn in cls.MARKERS:
+        if defn.name in fields:
+          # support for different definitions with a common prefix
+          # earlier definitions are matched first
+          continue
+        try:
+          value, offset = defn.parse(s, offset)
+        except ValueError:
+          pass
+        else:
+          fields[defn.name] = value
           break
-      if offset == start_offset:
-        # no component info, try other things
-        if len(s) == 4 and s.isdigit() and s.startswith(('19', '20')):
-          fields['year'] = int(s)
-        elif len(s) == 6 and s[1:-1].isdigit() and s.startswith(
-            ('19', '20'), 1):
-          fields['year'] = int(s[1:-1])
-      return fields, offset
+      # parse fails, stop trying for more information
+      if offset == offset0:
+        break
+    if offset == start_offset:
+      # no component info, try other things
+      if len(s) == 4 and s.isdigit() and s.startswith(('19', '20')):
+        fields['year'] = int(s)
+      elif len(s) == 6 and s[1:-1].isdigit() and s.startswith(('19', '20'), 1):
+        fields['year'] = int(s[1:-1])
+    return fields, offset
 
-  @prop
+  @property
   def season(self):
     ''' .season property, synonym for .series
     '''
@@ -256,6 +255,7 @@ class EpisodeInfo(NS):
     '''
     self.series = n
 
+@pfx
 def parse_name(name, sep='--'):
   ''' Parse the descriptive part of a filename
       (the portion remaining after stripping the file extension)
@@ -263,28 +263,26 @@ def parse_name(name, sep='--'):
   '''
   unstructured_sections = ('series_name', 'episode_name', 'source_name')
   unstructured_index = 0
-  with Pfx("parse_name(%r)", name):
-    for part0 in name.split(sep):
-      with Pfx(part0):
-        part = part0.strip('- \t\r\n')
-        if not part:
-          # ignore empty parts
-          continue
-        # look for series/episode/scene/part markers
-        fields, offset = EpisodeInfo.parse_filename_part(part)
-        if offset == 0:
-          # nothing parsed, consider the unstructured sections
-          if unstructured_index < len(unstructured_sections):
-            fields = {unstructured_sections[unstructured_index]: part}
-            unstructured_index += 1
-          else:
-            fields = None
-        elif offset < len(part):
-          print(
-              "warning: parse_name %r: part %r: unparsed: %r" %
-              (name, part0, part[offset:])
-          )
-        yield part0, fields
+  for part0 in name.split(sep):
+    with Pfx(part0):
+      part = part0.strip('- \t\r\n')
+      if not part:
+        # ignore empty parts
+        continue
+      # look for series/episode/scene/part markers
+      fields, offset = EpisodeInfo.parse_filename_part(part)
+      if offset == 0:
+        # nothing parsed, consider the unstructured sections
+        if unstructured_index < len(unstructured_sections):
+          fields = {unstructured_sections[unstructured_index]: part}
+          unstructured_index += 1
+        else:
+          fields = None
+      elif offset < len(part):
+        warning(
+            "parse_name %r: part %r: unparsed: %r", name, part0, part[offset:]
+        )
+    yield part0, fields
 
 def pathname_info(pathname):
   ''' Parse information from the basename of a file pathname.
@@ -296,13 +294,38 @@ def pathname_info(pathname):
     if fields:
       for field, value in fields.items():
         if field in info:
-          print(
-              "discard %r=%r: already have %r=%r" %
-              (field, value, field, info[field])
+          warning(
+              "discard %r=%r: already have %r=%r", field, value, field,
+              info[field]
           )
         else:
           info[field].append(value)
   return info
+
+def scrub_title(title: str, *, season=None, episode=None) -> str:
+  ''' Strip redundant text from the start of an episode title.
+
+      I frequently get "title" strings with leading season/episode information.
+      This function cleans up these strings to return the unadorned title.
+  '''
+  title = title.strip()
+  if season:
+    spfx, n, offset = get_prefix_n(title, 's', n=season)
+    if spfx:
+      assert title.startswith(f's{season:02d}')
+      title = title[offset:]
+  if episode:
+    epfx, n, offset = get_prefix_n(title, 'e', n=episode)
+    if epfx:
+      assert title.startswith(f'e{episode:02d}')
+      title = title[offset:]
+  title = title.lstrip(' -')
+  if episode:
+    epfx, n, offset = get_prefix_n(title.lower(), 'episode ', n=episode)
+    if epfx:
+      title = title[offset:]
+    title = title.lstrip(' -')
+  return title
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

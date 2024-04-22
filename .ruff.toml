@@ -1,0 +1,17 @@
+exclude = [
+    '.hg',
+]
+
+line-length = 78
+indent-width = 2
+
+[lint]
+select = ["E4", "E7", "E9", "F", "B", "Q", "C90"]
+ignore = [ "E731", "Q000", "Q002" ]
+flake8-quotes.docstring-quotes = "single"
+flake8-quotes.inline-quotes = "double"
+flake8-quotes.multiline-quotes = "single"
+
+[format]
+indent-style = "space"
+quote-style = "preserve"

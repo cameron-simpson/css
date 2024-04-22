@@ -7,11 +7,13 @@ from binascii import hexlify, unhexlify
 import hashlib
 import mmap
 import os
+from typing import Optional
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
+from cs.lex import r
 
-__version__ = '20240211-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -22,17 +24,37 @@ DISTINFO = {
     'install_requires': [
         'cs.buffer',
         'cs.deco',
+        'cs.lex',
     ],
 }
 
 class BaseHashCode(bytes):
   ''' Base class for hashcodes, subclassed by `SHA1`, `SHA256` et al.
+
+      You can obtain the class for a particular hasher by name, example:
+
+          SHA256 = BaseHashCode.hashclass('sha256')
   '''
 
   __slots__ = ()
 
   # registry of classes
   by_hashname = {}
+
+  @staticmethod
+  def get_hashfunc(hashname: str):
+    ''' Fetch the hash function implied by `hashname`.
+    '''
+    try:
+      hashfunc = getattr(hashlib, hashname)
+    except AttributeError:
+      if hashname == 'blake3':
+        # see if the blake3 module is around
+        # pylint:disable=import-outside-toplevel
+        from blake3 import blake3 as hashfunc
+      else:
+        raise
+    return hashfunc
 
   @classmethod
   def hashclass(cls, hashname: str, hashfunc=None, **kw):
@@ -45,13 +67,12 @@ class BaseHashCode(bytes):
     try:
       hashcls = cls.by_hashname[hashname]
     except KeyError:
-
       if hashfunc is None:
-        hashfunc = getattr(hashlib, hashname)
+        hashfunc = cls.get_hashfunc(hashname)
 
       class hashcls(
           cls,
-          hashfunc=getattr(hashlib, hashname),
+          hashfunc=hashfunc,
           hashname=hashname,
           **kw,
       ):
@@ -60,6 +81,7 @@ class BaseHashCode(bytes):
         __slots__ = ()
 
       hashcls.__name__ = hashname.upper()
+      hashcls.__doc__ = f'Hash class for the {hashname!r} algorithm.'
     else:
       if hashfunc is not None:
         if hashfunc is not hashcls.hashfunc:
@@ -71,34 +93,35 @@ class BaseHashCode(bytes):
 
   @classmethod
   def __init_subclass__(
-      cls, *, hashfunc, hashname=None, by_hashname=None, **kw
+      cls, *, hashname: Optional[str] = None, hashfunc=None, **kw
   ):
     super().__init_subclass__(**kw)
-    if hashname is None:
+    if hashname is None and hashfunc is None:
+      # we're a superclass of another base class
       return
-    if by_hashname is None:
-      by_hashname = cls.by_hashname
+    if hashfunc is None:
+      hashfunc = cls.get_hashfunc(hashname)
+    by_hashname = cls.by_hashname
     try:
       hashcls = by_hashname[hashname]
     except KeyError:
-      hashcls = None
+      # new hash class, register it
+      by_hashname[hashname] = cls
     else:
-      if hashcls is not cls:
-        raise ValueError(
-            f'class {hashcls} already exists for hashname {hashname!r}'
-        )
+      raise ValueError(
+          f'hashname {hashname!r}: class {hashcls} already exists for hashname'
+      )
     cls.hashname = hashname
     cls.hashfunc = hashfunc
     cls.hashlen = len(hashfunc(b'').digest())
     if not cls.__doc__:
       cls.__doc__ = f'{hashfunc.__name__} hashcode class, subclass of `bytes`.'
-    if hashcls is None:
-      # new hash class, register it
-      by_hashname[hashname] = cls
 
   hashfunc = lambda bs=None: None  # pylint: disable=unnecessary-lambda-assignment
 
   def __str__(self):
+    ''' Return `f'{self.hashname}:{self.hex()}'`.
+    '''
     return f'{self.hashname}:{self.hex()}'
 
   @property

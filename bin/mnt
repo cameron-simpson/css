@@ -157,7 +157,6 @@ do_mount(){
     set -ue
     case "$type" in
       ssh | sshfs )
-        set -x
         set -- \
           set-x sshfs -f \
             -o reconnect \

@@ -8,9 +8,11 @@ import sys
 from flask import (
     Flask, render_template, request, session as flask_session, jsonify, abort
 )
+
 from cs.logutils import warning
 from cs.resources import RunStateMixin
-from . import defaults
+
+from . import uses_Store
 from .block import IndirectBlock
 from .hash import HashCode, MissingHashcodeError
 

@@ -607,7 +607,7 @@ class Rule(Promotable):
               doit=False,
               quiet=False,
           ) -> Iterable[TagChange]:
-            ''' Apply tag changes.
+            ''' Apply tag changes from this `Rule` to `tags`.
             '''
             tag_changes = []
             for tag_token in tag_tokens:

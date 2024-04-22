@@ -14,16 +14,13 @@ This stack is used to prefix logging messages and exception text with context.
 
 Usage is like this:
 
-    from cs.logutils import setup_logging, info
     from cs.pfx import Pfx
-    ...
-    setup_logging()
     ...
     def parser(filename):
       with Pfx(filename):
         with open(filename) as f:
           for lineno, line in enumerate(f, 1):
-            with Pfx(lineno) as P:
+            with Pfx(lineno):
               if line_is_invalid(line):
                 raise ValueError("problem!")
               info("line = %r", line)
@@ -57,7 +54,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20230604-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'description':
@@ -275,7 +272,7 @@ class Pfx(object):
     _state = self._state
     if exc_value is not None:
       try:
-        exc_value._pfx_prefix
+        exc_value._pfx_prefix  # noqa: B018
       except AttributeError:
         exc_value._pfx_prefix = self._state.prefix
         # prevent outer Pfx wrappers from hacking stuff as well
@@ -339,7 +336,7 @@ class Pfx(object):
     )
 
   @classmethod
-  def prefixify_exception(cls, e):
+  def prefixify_exception(cls, e):  # noqa: C901
     ''' Modify the supplied exception `e` with the current prefix.
         Return `True` if modified, `False` if unable to modify.
     '''
@@ -352,13 +349,14 @@ class Pfx(object):
         continue
       if value is None:
         continue
+      ovalue = value
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
         # prefixify the first string
         value = list(value)
         for i, v in enumerate(value):
           if isinstance(v, str):
-            value = cls.prefixify(value)
+            value[i] = cls.prefixify(v)
             did_prefix = True
             break
         value = tuple(value)
@@ -372,6 +370,10 @@ class Pfx(object):
           value = (cls.prefixify(value0), *value[1:])
         else:
           continue
+      elif attr == 'message' and not isinstance(value, StringTypes):
+        # saw django.core.exceptions.ValidationError.message
+        # is not a string but some kind of proxy object
+        continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
@@ -395,6 +397,19 @@ class Pfx(object):
             value = [cls.prefixify(repr(value))]
           else:
             value = [cls.prefixify(value[0])] + list(value[1:])
+      t0 = type(ovalue)
+      t1 = type(value)
+      if t0 is not t1:
+        if set((t0, t1)) == set((list, tuple)):
+          # convert list back to tuple or tuple back to list
+          value = t0(value)
+        else:
+          X(
+              "prefixify_exception: %s.%s.%s:%s.%s:%r is a different type from the new value:%s:%r",
+              e.__class__.__module__, e.__class__.__name__, attr,
+              ovalue.__class__.__module__, ovalue.__class__.__name__, ovalue,
+              value.__class__.__name__, value
+          )
       try:
         setattr(e, attr, value)
       except AttributeError as e2:

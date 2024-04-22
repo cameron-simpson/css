@@ -8,8 +8,9 @@ from time import sleep
 from icontract import require
 
 from cs.obj import Sentinel
+from cs.resources import RunState, uses_runstate
 
-__version__ = '20240214-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -17,7 +18,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.obj', 'icontract'],
+    'install_requires': ['cs.obj', 'cs.resources', 'icontract'],
 }
 
 MISSING = Sentinel("MISSING")
@@ -62,6 +63,7 @@ def delta(old, new, keys=None):
     d[k] = newv
   return d
 
+@uses_runstate
 @require(lambda get_state: callable(get_state))  # pylint: disable=unnecessary-lambda
 @require(lambda interval: interval > 0.0)
 def monitor(
@@ -70,7 +72,7 @@ def monitor(
     *,
     ifunchanged=False,
     interval=0.3,
-    runstate=None,
+    runstate: RunState,
 ):
   ''' A generator yielding 3-tuples of `(old,new,delta(old,new,keys))`
       at poll intervals of `interval` seconds.
@@ -89,11 +91,11 @@ def monitor(
         attribute will be polled for loop termination
   '''
   old = get_state()
-  while runstate is None or not runstate.cancelled:
+  while not runstate.cancelled:
     sleep(interval)
-    if runstate is None or not runstate.cancelled:
-      new = get_state()
-      d = delta(old, new, keys)
-      if ifunchanged or d:
-        yield old, new, d
-      old = new
+    runstate.raiseif()
+    new = get_state()
+    d = delta(old, new, keys)
+    if ifunchanged or d:
+      yield old, new, d
+    old = new

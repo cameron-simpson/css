@@ -23,7 +23,7 @@ from cs.deco import Promotable
 from cs.gimmicks import r
 from cs.py3 import pread
 
-__version__ = '20240201-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -181,9 +181,12 @@ class CornuCopyBuffer(Promotable):
 
   @property
   def buf(self):
-    ''' The first buffer.
+    ''' The first buffer, or `b''` if nothing is buffered.
     '''
-    return self.bufs[0]
+    try:
+      return self.bufs[0]
+    except IndexError:
+      return b''
 
   def close(self):
     ''' Close the buffer.

@@ -1,0 +1,1 @@
+QueueIterator.put: be more rigorous with the put + item count increment.

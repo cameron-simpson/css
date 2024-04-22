@@ -1,0 +1,2 @@
+New CachingMapping, a caching front end for another mapping.
+LRU_Cache: add keys() and items().

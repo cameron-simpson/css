@@ -34,7 +34,7 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, print_argv
 from cs.tagset import TagSet
 
-__version__ = '20240201-post'
+__version__ = '20240316.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -43,8 +43,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts':
-        ['ffmpeg-docker = cs.ffmpegutils:main_ffmpeg_docker'],
+        'console_scripts': {
+            'ffmpeg-docker': 'cs.ffmpegutils:main_ffmpeg_docker',
+        },
     },
     'install_requires': [
         'cs.dockerutils',

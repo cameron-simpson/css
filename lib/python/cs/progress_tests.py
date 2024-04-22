@@ -32,7 +32,7 @@ class TestProgress(unittest.TestCase):
     self.assertLessEqual(P.start_time, time.time())
     self.assertIsNone(P.total)
     self.assertEqual(P.throughput_window, DEFAULT_THROUGHPUT_WINDOW)
-    P2 = Progress(5)
+    P2 = Progress(position=5)
     self.assertEqual(P2.position, 5)
     self.assertEqual(P2.start, 5)
 
@@ -40,7 +40,7 @@ class TestProgress(unittest.TestCase):
     x = 3
     x += 2
     self.assertEqual(x, 5)
-    x = Progress(x)
+    x = Progress(position=x)
     self.assertEqual(int(x), 5)
     self.assertEqual(x, 5)
     x += 3
