@@ -369,8 +369,6 @@ def jsonable(obj, converted: dict):
       conversion.
       `converted` is a dict mapping object ids to their converted forms
       to prevent loops.
-
-      *WARNING*: iterators will be consumed by this function.
   '''
   if obj is None:
     return obj
