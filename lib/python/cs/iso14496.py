@@ -59,7 +59,7 @@ __version__ = '20231129-post'
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
-        "Development Status :: 2 - Beta",
+        "Development Status :: 4 - Beta",
         "Environment :: Console",
         "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
