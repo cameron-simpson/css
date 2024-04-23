@@ -111,9 +111,9 @@ class BaseTask(FSM, RunStateMixin):
   '''
 
   @uses_runstate
-  def __init__(self, *, state=None, runstate=None):
+  def __init__(self, *, state=None, runstate: RunState):
     FSM.__init__(self, state)
-    RunStateMixin.__init__(self, runstate)
+    RunStateMixin.__init__(self, runstate=runstate)
 
   @classmethod
   def tasks_as_dot(
@@ -295,6 +295,8 @@ class Task(BaseTask, HasThreadState):
       name = func
       a = list(a)
       func = a.pop(0)
+    else:
+      name = None
     if name is None:
       name = funcname(func)
     self.name = name
@@ -405,9 +407,9 @@ class Task(BaseTask, HasThreadState):
     post_task.require(self)
     return post_task
 
-  @typechecked
   @require(lambda self, otask: otask is not self)
   @require(lambda self: self.is_prepare or self.is_pending)
+  @typechecked
   def require(self, otask: 'TaskSubType'):
     ''' Add a requirement that `otask` be complete before we proceed.
         This is the simple `Task` only version of `.then()`.
