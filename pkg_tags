@@ -97,7 +97,7 @@ cs.sqlalchemy_utils ok_revision="6bffe65c02777bd9ab29edc059e111f4c02b6d74" pypi.
 cs.sqltags ok_revision="70a03c3f6dca703e16121c6f0ac87e1ebd458829" pypi.release="20240316"
 cs.tagset ok_revision="6a9454ba19d372e8ccdf7c62b222b4e4650b1fd3" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"],"20240422":["fix_Tag__str__bad_TypeError","jsonable"],"20240422.2":["jsonable__for_json"]} pypi.release="20240422.2"
 cs.tarutils ok_revision=b5ed41d868eba32d0098c9d651a36df8eb52c7ff pypi.release="20240318"
-cs.taskqueue ok_revision="09c3371a64b2e881d2a681ed752dc2894d47e41e" features={"20221207":["BaseTask"]} pypi.release="20230401"
+cs.taskqueue ok_revision="09c3371a64b2e881d2a681ed752dc2894d47e41e" features={"20221207":["BaseTask"]} pypi.release="20240423"
 cs.testutils ok_revision="8db0726c2a0f40b2fcb55d71c7985d18b4d7038a" features={"20230109":["SetupTeardownMixin","product_test"]} pypi.release="20230109"
 cs.threads ok_revision="30ec455ec0c265b6b0f20b80ea12b3c86c67ae1c" pypi.release="20240422" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"]}
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
