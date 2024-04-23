@@ -1,0 +1,2 @@
+Support "import *" by populating __all__ with X, r, s, TimingOutLock, thread_dump, stack_dump, trace.
+@trace: include the elapsed time on the return/exception log message.
