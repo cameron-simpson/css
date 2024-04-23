@@ -5,6 +5,9 @@
 
 set -ue
 
+trace=
+[ -t 2 ] && trace=set-x
+
 : ${DK_APP_USER:='appuser'}
 : ${DK_COMPOSE_CMD:='docker compose'} ## or docker-compose on older machines
 : ${DK_COMPOSE_YML:='docker-compose.yml'}
@@ -142,7 +145,7 @@ else
   shift
 fi
 
-# translate "@foo" into "-n foo exec"
+# translate pseudo-op "@foo" into "-n foo exec"
 case "$op" in
   @?*)DK_PRIMARY_SERVICE=$( expr "$op" : '@\(.*\)' )
       op=exec
@@ -341,7 +344,7 @@ case "$op" in
                 exit 2
                 ;;
           esac
-          if "$0" login update "$new_host" "$new_username"
+          if $trace "$0" login update "$new_host" "$new_username"
           then
             set -ue
             new_host_qs=$( shqstr "$new_host" )
@@ -425,7 +428,7 @@ case "$op" in
       fi
       [ $# - gt 0 ] || set -- bash
       set -x
-      $DK_COMPOSE_CMD run --rm "$service" "$@"
+      exec $DK_COMPOSE_CMD run --rm "$service" "$@"
       ;;
   update)
       set -ex
