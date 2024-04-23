@@ -60,7 +60,7 @@ from cs.seq import seq
 from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20240423'
+__version__ = '20240423-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
