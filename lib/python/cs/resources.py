@@ -859,7 +859,7 @@ class RunStateMixin(object):
 
   @uses_runstate
   @typechecked
-  def __init__(self, runstate: Union[RunState, str]):
+  def __init__(self, *, runstate: Union[RunState, str]):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
         Parameters:
