@@ -1,3 +1,4 @@
+cs.gui_tk: imgof: does this code match what thumbnailcache does?
 cs.gui_tk: imgof and pngfor to use convof
 action call imported-name(...), autosupply: taggedpath, tags as keyword arguments
 from module import name,... to pull in callables
