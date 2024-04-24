@@ -488,9 +488,13 @@ def trace_caller(func):
   def subfunc(*a, **kw):
     frame = caller()
     D(
-        "CALL %s()<%s:%d> FROM %s()<%s:%d>", func.__name__,
-        func.__code__.co_filename, func.__code__.co_firstlineno,
-        frame.funcname, frame.filename, frame.lineno
+        "CALL %s()<%s:%d> FROM %s()<%s:%d>",
+        func.__name__,
+        func.__code__.co_filename,
+        func.__code__.co_firstlineno,
+        frame.name,
+        frame.filename,
+        frame.lineno,
     )
     return func(*a, **kw)
 
