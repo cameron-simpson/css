@@ -1,0 +1,1 @@
+New scandirtree scandir based version of os.walk, yielding (is_dir,fspath). New shim scandirpaths.

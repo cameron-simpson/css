@@ -27,8 +27,8 @@ from typing import Mapping, Optional, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.deco import fmtdoc, promote
-from cs.fs import shortpath, longpath
+from cs.deco import fmtdoc, promote, Promotable
+from cs.fs import shortpath, longpath, HasFSPath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning
 from cs.obj import SingletonMixin, singleton
@@ -54,22 +54,11 @@ from .convert import (
     expand_path,
     get_integer,
     scaled_value,
-    truthy_word,
 )
 from .dir import Dir
-from .store import (
-    DataDirStore,
-    FileCacheStore,
-    MemoryCacheStore,
-    PlatonicStore,
-    ProxyStore,
-    VTDStore,
-)
-from .socket import TCPClientStore, UNIXSocketClientStore
-from .transcribe import parse
 
 # pylint: disable=too-many-public-methods
-class Config(SingletonMixin, HasThreadState):
+class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
   ''' A configuration specification.
 
       This can be driven by any mapping of mappings: {clause_name => {param => value}}.
@@ -154,6 +143,12 @@ class Config(SingletonMixin, HasThreadState):
       return repr(self)
     return "Config(%s)" % (shortpath(self.path),)
 
+  @classmethod
+  def from_str(cls, spec: str):
+    ''' Promote a config spec to a `Config`.
+    '''
+    return cls(config_spec=spec)
+
   def as_text(self):
     ''' Return a text transcription of the config.
     '''
@@ -167,7 +162,7 @@ class Config(SingletonMixin, HasThreadState):
     self.map.write(f)
 
   def __getitem__(self, clause_name):
-    ''' Return the Store defined by the named clause.
+    ''' Return the `Store` defined by the named clause.
     '''
     with self._lock:
       _, R = singleton(
@@ -202,7 +197,7 @@ class Config(SingletonMixin, HasThreadState):
     )
     return S
 
-  def get_default(self, param, default=None):
+  def get_global(self, param, default=None):
     ''' Fetch a default parameter from the [GLOBALS] clause.
     '''
     G = self.map['GLOBAL']
@@ -219,32 +214,37 @@ class Config(SingletonMixin, HasThreadState):
   def basedir(self):
     ''' The default location for local archives and stores.
     '''
-    return longpath(self.get_default('basedir', DEFAULT_BASEDIR))
+    return longpath(self.get_global('basedir', DEFAULT_BASEDIR))
+
+  @property
+  def fspath(self):
+    ''' The `.fspath` is the basedir.
+    '''
+    return self.basedir
 
   @property
   def blockmapdir(self):
     ''' The global blockmapdir.
         Falls back to `{self.basedir}/blockmaps`.
     '''
-    return longpath(
-        self.get_default('blockmapdir', joinpath(self.basedir, 'blockmaps'))
-    )
+    return longpath(self.get_global('blockmapdir', self.pathto('blockmaps')))
 
   @property
   def mountdir(self):
     ''' The default directory for mount points.
     '''
-    return longpath(self.get_default('mountdir'))
+    return longpath(self.get_global('mountdir'))
 
   def archive(self, archivename):
     ''' Return the Archive named `archivename`.
     '''
     if (not archivename or '.' in archivename or '/' in archivename):
-      raise ValueError("invalid archive name: %r" % (archivename,))
-    arpath = joinpath(self.basedir, archivename + '.vt')
+      raise ValueError(f'invalid archive name: {archivename!r}')
+    arpath = self.pathto(f'{archivename}.vt')
     return Archive(arpath)
 
   # pylint: disable=too-many-branches
+  @pfx_method
   def parse_special(self, special, readonly):
     ''' Parse the mount command's special device from `special`.
         Return `(fsname,readonly,Store,Dir,basename,archive)`.
@@ -262,7 +262,7 @@ class Config(SingletonMixin, HasThreadState):
     archive = None
     if special.startswith('D{') and special.endswith('}'):
       # D{dir}
-      specialD, offset = parse(special)
+      specialD, offset = Dir.parse(special)
       if offset != len(special):
         raise ValueError("unparsed text: %r" % (special[offset:],))
       if not isinstance(specialD, Dir):
@@ -330,6 +330,7 @@ class Config(SingletonMixin, HasThreadState):
         See also the `.Stores_from_spec` method, which returns the
         separate `Store`s unassembled.
     '''
+    from .store import ProxyStore  # pylint: disable=import-outside-toplevel
     stores = self.Stores_from_spec(store_spec, hashclass=hashclass)
     if not stores:
       raise ValueError("empty Store specification: %r" % (store_spec,))
@@ -412,12 +413,12 @@ class Config(SingletonMixin, HasThreadState):
       path=None,
       basedir=None,
       hashclass=None,
-      raw=False,
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
+    from .store import DataDirStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
-      basedir = self.get_default('basedir')
+      basedir = self.basedir
     if path is None:
       path = clause_name
     path = longpath(path)
@@ -425,13 +426,8 @@ class Config(SingletonMixin, HasThreadState):
       if path.startswith('./'):
         path = abspath(path)
       else:
-        if basedir is None:
-          raise ValueError('relative path %r but no basedir' % (path,))
-        basedir = longpath(basedir)
-        path = joinpath(basedir, path)
-    if isinstance(raw, str):
-      raw = truthy_word(raw)
-    return DataDirStore(store_name, path, hashclass=hashclass, raw=raw)
+        path = self.pathto(path)
+    return DataDirStore(store_name, path, hashclass=hashclass)
 
   def datafile_Store(
       self,
@@ -444,8 +440,9 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a VTDStore from a "datafile" clause.
     '''
+    from .store import VTDStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
-      basedir = self.get_default('basedir')
+      basedir = self.basedir
     if path is None:
       path = clause_name
     path = longpath(path)
@@ -456,7 +453,7 @@ class Config(SingletonMixin, HasThreadState):
         if basedir is None:
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
-        path = joinpath(basedir, path)
+        path = self.pathto(path)
     return VTDStore(store_name, path, hashclass=hashclass)
 
   def filecache_Store(
@@ -473,8 +470,9 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a FileCacheStore from a "filecache" clause.
     '''
+    from .store import FileCacheStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
-      basedir = self.get_default('basedir')
+      basedir = self.basedir
     if path is None:
       path = clause_name
       debug("path from clausename: %r", path)
@@ -497,7 +495,7 @@ class Config(SingletonMixin, HasThreadState):
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
         debug("longpath(basedir) ==> %r", basedir)
-        path = joinpath(basedir, path)
+        path = self.pathto(path)
         debug("path ==> %r", path)
     return FileCacheStore(
         store_name,
@@ -518,6 +516,7 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
+    from .store import MemoryCacheStore  # pylint: disable=import-outside-toplevel
     if isinstance(max_data, str):
       max_data = scaled_value(max_data)
     return MemoryCacheStore(store_name, max_data, hashclass=hashclass)
@@ -535,10 +534,11 @@ class Config(SingletonMixin, HasThreadState):
       archive=None,
       hashclass=None,
   ):
-    ''' Construct a PlatonicStore from a "datadir" clause.
+    ''' Construct a `PlatonicStore` from a "datadir" clause.
     '''
+    from .store import PlatonicStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
-      basedir = self.get_default('basedir')
+      basedir = self.basedir
     if path is None:
       path = clause_name
       debug("path from clausename: %r", path)
@@ -553,7 +553,7 @@ class Config(SingletonMixin, HasThreadState):
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
         debug("longpath(basedir) ==> %r", basedir)
-        path = joinpath(basedir, path)
+        path = self.pathto(path)
         debug("path ==> %r", path)
     if isinstance(archive, str):
       archive = longpath(archive)
@@ -584,6 +584,7 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a ProxyStore.
     '''
+    from .store import ProxyStore  # pylint: disable=import-outside-toplevel
     if save is None:
       save_stores = []
       readonly = True
@@ -648,16 +649,23 @@ class Config(SingletonMixin, HasThreadState):
       host=None,
       port=None,
       hashclass=None,
+      addif=False,
   ):
     ''' Construct a TCPClientStore from a "tcp" clause.
     '''
+    from .socket import TCPClientStore  # pylint: disable=import-outside-toplevel
     if host is None:
       host = clause_name
     if port is None:
       raise ValueError('no "port"')
     if isinstance(port, str):
       port, _ = get_integer(port, 0)
-    return TCPClientStore(store_name, (host, port), hashclass=hashclass)
+    return TCPClientStore(
+        store_name,
+        (host, port),
+        hashclass=hashclass,
+        addif=addif,
+    )
 
   @staticmethod
   def socket_Store(
@@ -669,6 +677,7 @@ class Config(SingletonMixin, HasThreadState):
   ):
     ''' Construct a `UNIXSocketClientStore` from a "socket" clause.
     '''
+    from .socket import UNIXSocketClientStore  # pylint: disable=import-outside-toplevel
     if socket_path is None:
       socket_path = clause_name
     socket_path = expand_path(socket_path)

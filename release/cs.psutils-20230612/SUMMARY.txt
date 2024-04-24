@@ -1,0 +1,2 @@
+pipefrom: default stdin=DEVNULL.
+Make many parameters keyword only.

@@ -1,0 +1,3 @@
+lib/python/cs/app/ydl.py: cs.*: drop BaseCommand.apply_defaults in favour of the Options dataclass
+lib/python/cs/app/ydl.py: cs.app.ydl: fix up access to c.loguitls.loginfo
+lib/python/cs/app/ydl.py: cs.app.ydl: add mention of working youtube_dl revision

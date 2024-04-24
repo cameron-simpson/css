@@ -5,10 +5,9 @@
 #
 
 r'''
-Assorted decorator functions.
+Assorted function decorators.
 '''
 
-from abc import ABC, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 from inspect import isgeneratorfunction, ismethod, signature, Parameter
@@ -19,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20230331-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -154,6 +153,7 @@ def decorator(deco):
     # `deco(func, *da, **kw)`.
     return lambda func: decorate(func, *da, **dkw)
 
+  metadeco.__name__ = getattr(deco, '__name__', repr(deco))
   metadeco.__doc__ = getattr(deco, '__doc__', '')
   metadeco.__module__ = getattr(deco, '__module__', None)
   return metadeco
@@ -488,7 +488,7 @@ def cachedmethod(
         except TypeError:
           changed = True
       if changed:
-        setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
+        setattr(self, rev_attr, (getattr(self, rev_attr, 0) or 0) + 1)
       return value
 
   ##  Doesn't work, has no access to self. :-(
@@ -802,6 +802,20 @@ def default_params(func, _strict=False, **param_defaults):
           ],
       ]
   )
+  sig0 = signature(func)
+  new_params = []
+  for param in sig0.parameters.values():
+    try:
+      param_default = param_defaults[param.name]
+    except KeyError:
+      new_params.append(param)
+    else:
+      new_param = param.replace(
+          annotation=typing.Optional[param.annotation],
+          default=None if param_default is param.empty else param_default,
+      )
+      new_params.append(new_param)
+  defaulted_func.__signature__ = sig0.replace(parameters=new_params)
   return defaulted_func
 
 # pylint: disable=too-many-statements
@@ -824,9 +838,16 @@ def promote(func, params=None, types=None):
       value not of the type of the annotation, the `.promote` method
       will be called to promote the value to the expected type.
 
+      Note that the `Promotable` mixin provides a `.promote()`
+      method which promotes `obj` to the class if the class has a
+      factory class method `from_`*typename*`(obj)` where *typename*
+      is `obj.__class__.__name__`.
+      A common case for me is lexical objects which have a `from_str(str)`
+      factory to produce an instance from its textual form.
+
       Additionally, if the `.promote(value)` class method raises a `TypeError`
       and `value` has a `.as_`*typename* attribute
-      where *typename* is the name of the type annotation,
+      (where *typename* is the name of the type annotation),
       if that attribute is an instance method of `value`
       then promotion will be attempted by calling `value.as_`*typename*`()`
       otherwise the attribute will be used directly
@@ -1003,14 +1024,38 @@ def promote(func, params=None, types=None):
   return promoting_func
 
 # pylint: disable=too-few-public-methods
-class Promotable(ABC):
-  ''' A class which supports the `@promote` decorator.
+class Promotable:
+  ''' A mixin class which supports the `@promote` decorator.
   '''
 
   @classmethod
-  @abstractmethod
   def promote(cls, obj):
     ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
         This method supports the `@promote` decorator.
+
+        This base method will call the `from_`*typename*`(obj)` class factory
+        method if present, where *typename* is `obj.__class__.__name__`.
+
+        Subclasses may override this method to promote other types,
+        typically:
+
+            @classmethod
+            def promote(cls, obj):
+                if isinstance(obj, cls):
+                    return obj
+                ... various specific type promotions
+                ... not done via a from_typename factory method
+                # fall back to Promotable.promote
+                return super().promote(obj)
     '''
-    raise NotImplementedError
+    if isinstance(obj, cls):
+      return obj
+    try:
+      from_type = getattr(cls, f'from_{obj.__class__.__name__}')
+    except AttributeError:
+      pass
+    else:
+      return from_type(obj)
+    raise TypeError(
+        f'{cls.__name__}.promote: cannot promote {obj.__class__.__name__}:{obj!r}'
+    )

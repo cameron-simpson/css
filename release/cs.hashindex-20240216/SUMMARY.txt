@@ -1,0 +1,5 @@
+HashIndexCommand.cmdlinkto,cmd_rearrange: run the link/mv stuff with sys.stdout in line buffered mode.
+DO not get hashcodes from symlinks.
+HashIndexCommand.cmd_ls: ignore None hashcodes, do not set xit=1.
+New run_remote_hashindex() and read_remote_hashindex() functions.
+dir_filepaths: skip dot files, the fstags .fstags file and nonregular files.

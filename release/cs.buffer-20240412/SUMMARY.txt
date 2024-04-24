@@ -1,0 +1,1 @@
+CornuCopyBuffer.buf: return b"" if nothing is buffered.

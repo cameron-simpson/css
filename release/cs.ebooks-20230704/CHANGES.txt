@@ -1,0 +1,18 @@
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: fix docstring typo
+lib/python/cs/ebooks/dedrm.py: cs.*: mark classes supporting @promote as Promotable
+lib/python/cs/ebooks/calibre.py: cs.*: replace a lot of runstate plumbing with @uses_runstate
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: update imports
+lib/python/cs/ebooks/apple.py lib/python/cs/ebooks/calibre.py: cs.cmdutils: make BaseCommandOptions a data class, upgrade subclasses elsewhere
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: tidy imports
+lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/dedrm.py lib/python/cs/ebooks/kindle.py: cs.*: drop BaseCommand.apply_defaults in favour of the Options dataclass
+lib/python/cs/ebooks/calibre.py: merge solar ==> default
+lib/python/cs/ebooks/calibre.py: CalibreCommand.Options: fix attribute name
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.startup_shutdown: hold a db session during the command
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_linkto: link series members to a subdirectory unless a specific link_format is supplied
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_linkto: downcase series subdir, replace slash with colon
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: do not make a db session for startup_shutdown, instead offer a separate db_session context manager because we need the db released to run any Calibre executable
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree._run: handle None run() result which doit=True
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: hold a db session during the listing
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.run_context: run with a calibre.db_session(), pull this from cmd_ls
+lib/python/cs/ebooks/__init__.py: cs.ebooks: show the command line full usage in the package docstring
+lib/python/cs/ebooks/__init__.py: cs.ebooks: tweak module docstring

@@ -1,0 +1,4 @@
+RunState: new optional thread_wide=False parameter - if true, set this RunState as the Thread-wide default - this mode used by @uses_runstate, unsure about this default.
+RunState: new .iter(iterable) method which iterates while not RunState.cancelled.
+MultiOpenMixin: replace __mo_getstate() method with MultiOpenMixin_state property.
+RunState.__init__: make most parameters keyword only.

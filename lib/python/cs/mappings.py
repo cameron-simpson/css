@@ -31,7 +31,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20220912.4-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'description':
@@ -129,6 +129,7 @@ def named_row_tuple(
     attr_seq = Seq(start=1)
     mapping = column_map
 
+    # pylint: disable=function-redefined
     def column_map(raw_column_name):
       ''' Function to map raw column names to the values in the
           supplied mapping.
@@ -1005,6 +1006,8 @@ class AttrableMappingMixin(object):
         `dict` at least seem not to consult that with attribute
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
+    if attr == 'ATTRABLE_MAPPING_DEFAULT':
+      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
     # try self.__dict__ first - this is because it appears that
     # getattr(dict,...) does not consult __dict__
     try:
@@ -1020,8 +1023,9 @@ class AttrableMappingMixin(object):
     try:
       return self[attr]
     except KeyError:
+      cls = type(self)
       try:
-        return self.ATTRABLE_MAPPING_DEFAULT
+        return cls.ATTRABLE_MAPPING_DEFAULT
       except AttributeError:
         names_msgs = []
         ks = list(self.keys())
@@ -1252,6 +1256,14 @@ class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
   '''
 
+def attrable(o):
+  ''' Like `jsonable`, return `o` with `dicts` replaced by `AttrableMapping`s. '''
+  if isinstance(o, dict):
+    o = AttrableMapping({k: attrable(v) for k, v in o.items()})
+  elif isinstance(o, list):
+    o = list(map(attrable, o))
+  return o
+
 class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
   ''' A handy `dict` subtype providing the basis for mapping classes
       indexed by `UUID`s.
@@ -1370,7 +1382,6 @@ class RemappedMappingProxy:
   def key(self, subk):
     ''' Return the external key for `subk`.
     '''
-    X("%s.key(subk=%r)...", self.__class__.__name__, subk)
     try:
       k = self._mapped_subkeys[subk]
     except KeyError:

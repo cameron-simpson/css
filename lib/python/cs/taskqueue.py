@@ -26,7 +26,7 @@ from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
 from cs.typingutils import subtype
 
-__version__ = '20230331-post'
+__version__ = '20240423-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -46,6 +46,7 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
+        'cs.typingutils',
         'icontract',
         'typeguard',
     ],
@@ -110,9 +111,9 @@ class BaseTask(FSM, RunStateMixin):
   '''
 
   @uses_runstate
-  def __init__(self, *, state=None, runstate=None):
+  def __init__(self, *, state=None, runstate: RunState):
     FSM.__init__(self, state)
-    RunStateMixin.__init__(self, runstate)
+    RunStateMixin.__init__(self, runstate=runstate)
 
   @classmethod
   def tasks_as_dot(
@@ -294,6 +295,8 @@ class Task(BaseTask, HasThreadState):
       name = func
       a = list(a)
       func = a.pop(0)
+    else:
+      name = None
     if name is None:
       name = funcname(func)
     self.name = name
@@ -404,9 +407,9 @@ class Task(BaseTask, HasThreadState):
     post_task.require(self)
     return post_task
 
-  @typechecked
   @require(lambda self, otask: otask is not self)
   @require(lambda self: self.is_prepare or self.is_pending)
+  @typechecked
   def require(self, otask: 'TaskSubType'):
     ''' Add a requirement that `otask` be complete before we proceed.
         This is the simple `Task` only version of `.then()`.

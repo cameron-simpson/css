@@ -22,40 +22,43 @@ set -ue
 
 cmd=$(basename "$0")
 usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
-  -d dir        Working directory, default: .
-  -q            Quiet. Turn off tracing and a lot of command output.
-  -t topdir     Top of the VCS tree.
-  -V vcs_type   Specify the VCS type to use.
-  -x            Turn on command excution tracing.
-                An empty string asks $cmd to figure this out.
+  -d dir          Working directory, default: .
+  -q              Quiet. Turn off tracing and a lot of command output.
+  -t topdir       Top of the VCS tree.
+  -V vcs_type     Specify the VCS type to use.
+  -x              Turn on command excution tracing.
+                  An empty string asks $cmd to figure this out.
   Commands:
-    branch      Report current branch name.
-    branches    Report all branch names.
-    clone2      Wrapper for \"$cmd sibling\" which copies some additional state:
-                  Files or directories named in \$VCS_CLONE2_CP are copied.
-                  Files or directories named in \$VCS_CLONE2_SYM are symlinked.
-                Relative paths in these variables are resolved
-                relative to the VCS top.
-    diff        Run the VCS diff command.
-    dl, download Download remote changes.
-                Does not update or merge the local checkout.
-    glog        Report a graphical change log.
+    branch        Report current branch name.
+    branches      Report all branch names.
+    clean-merged  Remove local branches which are completely merged
+                  into the current branch.
+    clean-origin  Remove local branches which are up to date with their origin.
+    clone2        Wrapper for \"$cmd sibling\" which copies some additional state:
+                    Files or directories named in \$VCS_CLONE2_CP are copied.
+                    Files or directories named in \$VCS_CLONE2_SYM are symlinked.
+                  Relative paths in these variables are resolved
+                  relative to the VCS top.
+    diff          Run the VCS diff command.
+    dl, download  Download remote changes.
+                  Does not update or merge the local checkout.
+    glog          Report a graphical change log.
     get-branches [remote [remote-branch-names...]]
-                Fetch all or specified remote branches.
-    info        Report VCS type, top and branch.
-    modified    Report the names of modified files.
-    record      Record partial changes: \"hg record\" or \"git add -p\".
-    remote      Report remote paths.
-    report      (Default.) Report brief summary.
+                  Fetch all or specified remote branches.
+    info          Report VCS type, top and branch.
+    modified      Report the names of modified files.
+    record        Record partial changes: \"hg record\" or \"git add -p\".
+    remote        Report remote paths.
+    report        (Default.) Report brief summary.
     sibling clonedir
-                Clone the current repo to clonedir but keep the
-                upstream the same as ours.
-    status      Report tree status.
-    tags        Report tag names.
-    top         Report top of tree.
-    tslog       Report a timesheet suitable change log:
-                  date time zone author headline
-    type        Report type of tree."
+                  Clone the current repo to clonedir but keep the
+                  upstream the same as ours.
+    status        Report tree status.
+    tags          Report tag names.
+    top           Report top of tree.
+    tslog         Report a timesheet suitable change log:
+                    date time zone author headline
+    type          Report type of tree."
 
 wd=.
 vcs_top=
@@ -94,15 +97,29 @@ cd "$wd"
 [ -n "$vcs_top" ] || {
   # locate VCS top
   case "$vcs_type" in
-    hg)   findup_test='[ -e "$FINDUP_DIR/.hg" ]' ;;
-    git)  findup_test='[ -e "$FINDUP_DIR/.git" ]' ;;
+    hg)   if [ -d .hg ]
+          then  vcs_top=$wd
+          elif [ -d ../.hg ]
+          then  vcs_top=$( dirname "$(pwd)" )
+          else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.hg" ]' )
+          fi
+          ;;
+    git)  if [ -d .git ]
+          then  vcs_top=$wd
+          elif [ -d ../.git ]
+          then  vcs_top=$( dirname "$(pwd)" )
+          else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.git" ]' )
+          fi
+          ;;
     ?*)   echo "$cmd: unsupported VCS \"$vcs_type\"" >&2; exit 1 ;;
-    *)    findup_test='[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' ;;
+    '')   if [ -d .hg -o -d .git ]
+          then  vcs_top=$wd
+          elif [ -d ../.hg -o -d ../.git ]
+          then  vcs_top=$( dirname "$(pwd)" )
+          else  vcs_top=$( findup -d . -c '[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' )
+          fi
+          ;;
   esac
-  vcs_top=$(
-      set -ue
-      findup -d . -c "$findup_test"
-  )
 } || {
   echo "$cmd: $wd: cannot locate VCS top" >&2
   exit 1
@@ -162,6 +179,40 @@ case "$op" in
       # report all branches
       branches,git) git branch ;;
       branches,hg)  hg branches ${1+"$@"} ;;
+      clean-merged,git)
+                    # clean branchs which have no revs not merged into the current branch
+                    lbr=$( "$0" branch )
+                    # default branches are all but the current branch
+                    [ $# -gt 0 ] || set -- $( git branch | sed -n 's/^  //p' )
+                    for br
+                    do
+                      unmerged_revs=$( command git rev-list "$br" "^$lbr" ) || continue
+                      if [ -n "$unmerged_revs" ]
+                      then
+                        echo "$cmd: $op: $br:" $( echo "$unmerged_revs" | wc -l ) unmerged revs
+                      else
+                        git branch -d "$br" || xit=1
+                      fi
+                    done
+                    ;;
+      clean-origin,git)
+                    # clean branches which have no revs not in remotes/origin/{branch}
+                    # default branches are all but the current branch
+                    [ $# -gt 0 ] || set -- $( git branch | sed -n 's/^  //p' )
+                    xit=0
+                    set -x
+                    for br
+                    do
+                      local_revs=$( command git rev-list "$br" "^remotes/origin/$br" ) || continue
+                      if [ -n "$local_revs" ]
+                      then
+                        echo "$cmd: $op: $br:" $( echo "$local_revs" | wc -l ) local revs
+                      else
+                        git branch -d "$br" || xit=1
+                      fi
+                    done
+                    exit $xit
+                    ;;
       clone2,*)     exec 3>&1 1>&2
                     clonedir=$1; shift
                     [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
@@ -245,24 +296,17 @@ case "$op" in
                     then  remote=origin
                     else  remote=$1; shift
                     fi
-                    if [ $# = 0 ]
-                    then
-                      git branch -r | sed "s/^  //;/^$remote\\//!d; / /d"
-                    else
-                      for rbr
-                      do  echo "$rbr"
-                      done
-                    fi \
-                    | while read -r rbr
-                      do
-                        lbr=${rbr##$remote/}
-                        if git branch | grep "^. $lbr\$" >/dev/null
-                        then
-                          echo "$cmd: $op: $rbr: local branch already exists"
-                        else
-                          git branch --track "$lbr" "$rbr" || break
-                        fi
-                      done
+                    [ $# -gt 0 ] || set -- $( git branch -r | sed "s/^  //;/^$remote\\//!d; / /d" )
+                    for rbr
+                    do
+                      lbr=${rbr##$remote/}
+                      if git branch | grep "^. $lbr\$" >/dev/null
+                      then
+                        echo "$cmd: $op: $rbr: local branch already exists"
+                      else
+                        git branch --track "$lbr" "$rbr" || break
+                      fi
+                    done
                     ;;
       # graph log
       glog,git)     git log \
@@ -272,12 +316,22 @@ case "$op" in
       glog,hg)      hg log -G --template "$VCS_FORMAT_GLOG_HG" \
                       ${1+"$@"}
                     ;;
+      in,hg)        hg in ${1+"$@"} ;;
+      in,git)       alt=origin
+                    [ $# = 0 ] || { alt=$1; shift; }
+                    "$0" glog "HEAD..$alt"
+                    ;;
       # report modified files
       modified,git) ( cd "$vcs_top"
                       git status --porcelain | awk '$1 == "M" { print $2 }'
                     )
                     ;;
       modified,hg)  hg status -n -am ${1+"$@"} ;;
+      out,hg)       hg out ${1+"$@"} ;;
+      out,git)      alt=origin
+                    [ $# = 0 ] || { alt=$1; shift; }
+                    "$0" glog "$alt..HEAD"
+                    ;;
       # record partial changes
       record,hg)    hg record ${1+"$@"} ;;
       record,git)   git add -p ${1+"$@"} && git diff --staged \
@@ -304,7 +358,7 @@ case "$op" in
                     ;;
       sibling,git)  clonedir=$1; shift
                     [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
-                    git clone "$vcs_top" "$clonedir"
+                    git clone --reference "$vcs_top" "$vcs_top" "$clonedir"
                     upstream=$( git remote get-url origin )
                     incd "$clonedir" git remote set-url origin "$upstream"
                     ;;

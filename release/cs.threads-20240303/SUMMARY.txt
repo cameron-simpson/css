@@ -1,0 +1,2 @@
+HasThreadState: rename thread_states() to get_thread_states().
+HasThreadState.get_thread_states: some logic fixes.

@@ -43,6 +43,7 @@ from typing import Callable, Iterable, Optional
 
 from typeguard import typechecked
 
+from cs.context import ContextManagerMixin
 from cs.deco import OBSOLETE, decorator, default_params
 from cs.excutils import logexc
 import cs.logutils
@@ -55,7 +56,7 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import ThreadState, HasThreadState
 
-__version__ = '20230212.1-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -64,6 +65,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.context',
         'cs.deco',
         'cs.excutils',
         'cs.logutils',
@@ -219,7 +221,7 @@ class LateFunction(Result):
       TODO: .cancel(), timeout for wait().
   '''
 
-  def __init__(self, func, name=None, retry_delay=None, thread_states=None):
+  def __init__(self, func, name=None, retry_delay=None):
     ''' Initialise a `LateFunction`.
 
         Parameters:
@@ -227,7 +229,6 @@ class LateFunction(Result):
         * `name`, if supplied, specifies an identifying name for the `LateFunction`.
         * `retry_local`: time delay before retry of this function on RetryError.
           Default from `later.retry_delay`.
-        * `thread_states`: optional thread states passed to `HasThreadState.Thread`
     '''
     Result.__init__(self)
     self.func = func
@@ -241,7 +242,6 @@ class LateFunction(Result):
     self.thread = HasThreadState.Thread(
         name=name,
         target=partial(self.run_func, func),
-        thread_states=thread_states,
     )
 
   def __str__(self):
@@ -313,7 +313,14 @@ class Later(MultiOpenMixin, HasThreadState):
 
   later_perthread_state = ThreadState()
 
-  def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
+  def __init__(
+      self,
+      capacity,
+      name=None,
+      inboundCapacity=0,
+      retry_delay=None,
+      default=False,
+  ):
     ''' Initialise the Later instance.
 
         Parameters:
@@ -341,6 +348,7 @@ class Later(MultiOpenMixin, HasThreadState):
     )
     if retry_delay is None:
       retry_delay = DEFAULT_RETRY_DELAY
+    self.default = default
     self.capacity = capacity
     self.inboundCapacity = inboundCapacity
     self.retry_delay = retry_delay
@@ -363,7 +371,7 @@ class Later(MultiOpenMixin, HasThreadState):
     '''
     for _ in zip_longest(
         MultiOpenMixin.__enter_exit__(self),
-        HasThreadState.__enter_exit__(self),
+        HasThreadState.__enter_exit__(self) if self.default else (),
     ):
       yield
 
@@ -383,7 +391,6 @@ class Later(MultiOpenMixin, HasThreadState):
         #   finished_event Event
         # queue final action to mark activity completion
         self.defer(
-            dict(thread_states=False),
             self.finished_event.set,
             _force_submit=True,
         )
@@ -612,7 +619,6 @@ class Later(MultiOpenMixin, HasThreadState):
       pfx=None,  # pylint: disable=redefined-outer-name
       LF=None,
       retry_delay=None,
-      thread_states=None,
   ):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding `LateFunction` for result collection.
@@ -650,7 +656,6 @@ class Later(MultiOpenMixin, HasThreadState):
           func,
           name=name,
           retry_delay=retry_delay,
-          thread_states=thread_states
       )
     pri_entry = list(priority)
     pri_entry.append(seq())  # ensure FIFO servicing of equal priorities
@@ -1020,7 +1025,7 @@ class SubLater(object):
     T.start()
     return T
 
-class LatePool(object):
+class LatePool(ContextManagerMixin):
   ''' A context manager after the style of subprocess.Pool
       but with deferred completion.
 
@@ -1058,7 +1063,7 @@ class LatePool(object):
         * `priority`, `delay`, `when`, `name`, `pfx`:
           default values passed to Later.submit.
         * `block`: if true, wait for `LateFunction` completion
-          before leaving __exit__.
+          before leaving `__exit__`.
     '''
     self.later = later
     self.parameters = {
@@ -1070,20 +1075,14 @@ class LatePool(object):
     self.block = block
     self.LFs = []
 
-  def __enter__(self):
-    ''' Entry handler: submit a placeholder function to the queue,
-        acquire the "commence" lock, which will be made available
-        when the placeholder gets to run.
+  def __enter_exit__(self):
+    ''' Generator supporting `__enter__` and `__exit__`.
     '''
-    return self
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    ''' Exit handler.
-        If .block is true, wait for `LateFunction` completion before return.
-    '''
-    if self.block:
-      self.join()
-    return False
+    try:
+      yield
+    finally:
+      if self.block:
+        self.join()
 
   def add(self, LF):
     ''' Add a `LateFunction` to those to be tracked by this LatePool.

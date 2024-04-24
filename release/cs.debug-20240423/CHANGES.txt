@@ -1,0 +1,8 @@
+lib/python/cs/debug.py: cs.debug: support "import *" by populating __all__ with X, r, s, TimingOutLock, thread_dump, stack_dump, trace
+lib/python/cs/debug.py: cs.debug: add pformat and pprint to __all__; use __all__ for the validation check of $CS_DEBUG_BUILTINS; allow $CS_DEBUG_BUILTINS=1 to install all of __all__ into the builtins
+lib/python/cs/debug.py: cs.debug: add cs.upd.print and cs.upd.breakpoint to __all__
+lib/python/cs/debug.py: cs.debug: add contextlib.redirect_stdout to the builtin names
+lib/python/cs/debug.py: cs.debug: replace eval() hack with setattr
+lib/python/cs/debug.py: cs.debug: do not wrap builtsin.breakpoint, gets the wrong frame
+lib/python/cs/debug.py: cs.debug: @trace: include the elapsed time on the return/exception log message
+lib/python/cs/debug.py: cs.debug: update DISTINFO
