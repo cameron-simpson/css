@@ -100,6 +100,19 @@ class _Token(Promotable, ABC):
   ''' Base class for tokens.
   '''
 
+  @classmethod
+  def token_subclasses(cls):
+    token_classes = []
+    q = ListQueue(cls.__subclasses__())
+    for subcls in q:
+      if not issubclass(subcls, _Token):
+        continue
+      if not subcls.__name__.startswith('_'):
+        token_classes.append(subcls)
+        print(cls, "token_classes +", subcls)
+      q.extend(subcls.__subclasses__())
+    return token_classes
+
   @abstractclassmethod
   def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     ''' Parse a token from `test` at `offset`.
