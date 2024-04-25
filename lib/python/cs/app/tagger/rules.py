@@ -237,15 +237,10 @@ class QuotedString(_LiteralValue):
     value, end_offset = get_qstr(text, start_offset)
     return text[start_offset:end_offset], cls(value, q), end_offset
 
+@dataclass
 class TagAddRemove(_Token):
-  ''' A `+name[="string"]` or `-name` tag update token.
-  '''
-
-  @require(lambda tag: tag.value is None or isinstance(tag.value, (int, str)))
-  @require(lambda tag, add_remove: add_remove or tag.value is None)
-  def __init__(self, tag: Tag, add_remove: Optional[bool] = True):
-    self.tag = tag
-    self.add_remove = add_remove
+  tag: Tag
+  add_remove: bool = True
 
   def __str__(self):
     if self.add_remove:
@@ -253,27 +248,30 @@ class TagAddRemove(_Token):
     return f'-{self.tag.name}'
 
   @classmethod
-  def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     start_offset = skipwhite(text, offset)
-    if text.startswith('-', start_offset):
-      add_remove = False
-    elif text.startswith('+', start_offset):
-      add_remove = True
-    else:
-      raise ValueError(f'expected + or -, got: {text[offset:offset+1]!r}')
+    with Pfx("%d:%r...", start_offset, text[start_offset:start_offset + 16]):
+      if text.startswith('-', start_offset):
+        add_remove = False
+      elif text.startswith('+', start_offset):
+        add_remove = True
+      else:
+        raise ValueError(f'expected + or -, got: {text[offset:offset+1]!r}')
     offset += 1
-    name, offset = get_dotted_identifier(text, offset)
-    if not name:
-      raise SyntaxError(
-          f'{offset}: expected dotted identifier, found {text[offset:offset+3]!r}...'
-      )
+    with Pfx("%d:%r...", offset, text[offset:offset + 16]):
+      name, offset = get_dotted_identifier(text, offset)
+      if not name:
+        raise SyntaxError(
+            f'expected dotted identifier, found {text[offset:offset+3]!r}...'
+        )
     if text.startswith("=", offset):
       if not add_remove:
         raise ValueError(f'{offset}: unexpected assignment following -{name}')
       offset += 1
-      _, qs, end_offset = QuotedString.from_str(text, offset)
-      if qs is None:
-        raise ValueError(f'{offset}: expected quoted string after {name}=')
+      with Pfx("%d:%r...", offset, text[offset:offset + 16]):
+        _, qs, end_offset = QuotedString.from_str(text, offset)
+        if qs is None:
+          raise ValueError(f'expected quoted string after {name}=')
       value = qs.value
     else:
       value = None
