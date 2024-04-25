@@ -603,6 +603,14 @@ def debug_object_shell(o, prompt=None):
   C.cmdloop(intro)
 
 _trace_indent = ""
+def log_via_print(msg, *a, file=None):
+  ''' Logging style message using `cs.upd.print`.
+  '''
+  if a:
+    msg = msg % a
+  if file is None:
+    file = sys.stdout
+  print(msg, file=file, flush=True)
 
 @ALL
 @decorator
