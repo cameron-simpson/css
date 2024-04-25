@@ -96,21 +96,36 @@ class RuleResult:
   # exceptions running the action
   failed: List[Exception] = field(default_factory=list)
 
-class _Token(ABC):
+class _Token(Promotable, ABC):
   ''' Base class for tokens.
   '''
 
   @abstractclassmethod
-  def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     ''' Parse a token from `test` at `offset`.
-        Return a 3-tuple of `(token_s,token,offset)`:
+        Return a 3-tuple of `(token_s,token,end_offset)`:
         * `token_s`: the source text of the token
         * `token`: the parsed object which the token represents
-        * `offset`: the parse offset after the token
+        * `end_offset`: the parse offset after the token
         This skips any leading whitespace.
         If there is no recognised token, return `(None,None,offset)`.
     '''
     raise NotImplementedError
+
+  @pfx_method
+  @typechecked
+  def from_str(cls, text: str) -> "_Token":
+    ''' Parse `test` as a token of type `cls`, return the token.
+        This is a wrapper for the `parse` class method.
+    '''
+    if not text or text[0].isspace():
+      raise ValueError("expected text to start with nonwhitespace")
+    token_s, token, end_offset = cls.parse(text)
+    if skipwhite(text, end_offset) != len(text):
+      raise ValueError(
+          f'unexpected text following token {cls.__name__}:{text[:end_offset]}'
+      )
+    return token
 
   @abstractmethod
   def __str__(self):
@@ -131,7 +146,7 @@ class Identifier(_Token):
     return self.name
 
   @classmethod
-  def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     ''' Parse a dotted identifier from `test`.
     '''
     start_offset = skipwhite(text, offset)
@@ -154,7 +169,7 @@ class QuotedString(_Token):
     return slosh_quote(self.value, self.quote)
 
   @classmethod
-  def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     ''' Parse a double quoted string from `text`.
     '''
     start_offset = skipwhite(text, offset)
@@ -233,7 +248,12 @@ class EqualityComparison(Comparison):
     return f'== {slosh_quote(self.compare_s,q)}'
 
   @classmethod
-  def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+  @typechecked
+  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+    ''' Match a string or numeric value in `text` at `offset`.
+        Return a 3-tuple of `(matched_text,_Token,end_offset)`
+        being the matching source text,
+    '''
     start_offset = skipwhite(text, offset)
     if not text.startswith('==', start_offset):
       raise SyntaxError(
@@ -264,7 +284,7 @@ class RegexpComparison(Comparison):
     return f'~ {self.delim}{self.regexp.pattern}{self.delim}'
 
   @classmethod
-  def from_str(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     start_offset = skipwhite(text, offset)
     if not text.startswith('~', start_offset):
       raise SyntaxError(
