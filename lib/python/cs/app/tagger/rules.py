@@ -186,6 +186,33 @@ class _LiteralValue(_Token):
   value: Any
 
 @dataclass
+class NumericValue(_LiteralValue):
+  value: Union[int, float]
+
+  # anything this matches should be a valid Python int/float
+  _token_re = re.compile(r'[-+]?\d+(\.\d*([eE]-?\d+)?)?')
+
+  def __str__(self):
+    return str(self.value)
+
+  @classmethod
+  @trace
+  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+    ''' Parse a Python style `int` or `float`.
+    '''
+    start_offset = skipwhite(text, offset)
+    m = cls._token_re.match(text, start_offset)
+    if not m:
+      raise SyntaxError(
+          f'{start_offset}: expected int or float, found {text[start_offset:start_offset+16]!r}'
+      )
+    try:
+      value = int(m.group())
+    except ValueError:
+      value = float(m.group())
+    return text[start_offset:m.end()], cls(value), m.end()
+
+@dataclass
 class QuotedString(_LiteralValue):
   ''' A double quoted string.
   '''
