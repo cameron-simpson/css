@@ -1,0 +1,1 @@
+@decorator: apply the decorated function name to the metadecorator.

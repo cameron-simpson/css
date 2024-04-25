@@ -123,13 +123,14 @@ def blockify(
     yield Block.promote(chunk)
 
 @promote
-def block_for(bfr: CornuCopyBuffer, **kw):
-  ''' Return a top Block for the contents `bfr`, an iterable of `bytes`like objects
-      such as a `CornuCopyBuffer`.
+def block_for(bfr: CornuCopyBuffer, **blockify_kw) -> Block:
+  ''' Return a top `Block` for the contents `bfr`, an iterable of
+      `bytes`like objects such as a `CornuCopyBuffer`.
+      This actually accepts any object suitable for `CornuCopyBuffer.promote`.
 
       Keyword arguments are passed to `blockify`.
   '''
-  return top_block_for(blockify(bfr, **kw))
+  return top_block_for(blockify(bfr, **blockify_kw))
 
 def spliced_blocks(B, new_blocks):
   ''' Splice (note *insert*) the iterable `new_blocks` into the data of the `Block` `B`.

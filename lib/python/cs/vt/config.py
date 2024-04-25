@@ -28,7 +28,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.deco import fmtdoc, promote, Promotable
-from cs.fs import shortpath, longpath
+from cs.fs import shortpath, longpath, HasFSPath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning
 from cs.obj import SingletonMixin, singleton
@@ -58,7 +58,7 @@ from .convert import (
 from .dir import Dir
 
 # pylint: disable=too-many-public-methods
-class Config(SingletonMixin, HasThreadState, Promotable):
+class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
   ''' A configuration specification.
 
       This can be driven by any mapping of mappings: {clause_name => {param => value}}.
@@ -143,6 +143,12 @@ class Config(SingletonMixin, HasThreadState, Promotable):
       return repr(self)
     return "Config(%s)" % (shortpath(self.path),)
 
+  @classmethod
+  def from_str(cls, spec: str):
+    ''' Promote a config spec to a `Config`.
+    '''
+    return cls(config_spec=spec)
+
   def as_text(self):
     ''' Return a text transcription of the config.
     '''
@@ -156,7 +162,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
     self.map.write(f)
 
   def __getitem__(self, clause_name):
-    ''' Return the Store defined by the named clause.
+    ''' Return the `Store` defined by the named clause.
     '''
     with self._lock:
       _, R = singleton(
@@ -191,7 +197,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
     )
     return S
 
-  def get_default(self, param, default=None):
+  def get_global(self, param, default=None):
     ''' Fetch a default parameter from the [GLOBALS] clause.
     '''
     G = self.map['GLOBAL']
@@ -208,29 +214,33 @@ class Config(SingletonMixin, HasThreadState, Promotable):
   def basedir(self):
     ''' The default location for local archives and stores.
     '''
-    return longpath(self.get_default('basedir', DEFAULT_BASEDIR))
+    return longpath(self.get_global('basedir', DEFAULT_BASEDIR))
+
+  @property
+  def fspath(self):
+    ''' The `.fspath` is the basedir.
+    '''
+    return self.basedir
 
   @property
   def blockmapdir(self):
     ''' The global blockmapdir.
         Falls back to `{self.basedir}/blockmaps`.
     '''
-    return longpath(
-        self.get_default('blockmapdir', joinpath(self.basedir, 'blockmaps'))
-    )
+    return longpath(self.get_global('blockmapdir', self.pathto('blockmaps')))
 
   @property
   def mountdir(self):
     ''' The default directory for mount points.
     '''
-    return longpath(self.get_default('mountdir'))
+    return longpath(self.get_global('mountdir'))
 
   def archive(self, archivename):
     ''' Return the Archive named `archivename`.
     '''
     if (not archivename or '.' in archivename or '/' in archivename):
-      raise ValueError("invalid archive name: %r" % (archivename,))
-    arpath = joinpath(self.basedir, archivename + '.vt')
+      raise ValueError(f'invalid archive name: {archivename!r}')
+    arpath = self.pathto(f'{archivename}.vt')
     return Archive(arpath)
 
   # pylint: disable=too-many-branches
@@ -408,7 +418,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
     '''
     from .store import DataDirStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
-      basedir = self.get_default('basedir')
+      basedir = self.basedir
     if path is None:
       path = clause_name
     path = longpath(path)
@@ -416,10 +426,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
       if path.startswith('./'):
         path = abspath(path)
       else:
-        if basedir is None:
-          raise ValueError('relative path %r but no basedir' % (path,))
-        basedir = longpath(basedir)
-        path = joinpath(basedir, path)
+        path = self.pathto(path)
     return DataDirStore(store_name, path, hashclass=hashclass)
 
   def datafile_Store(
@@ -435,7 +442,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
     '''
     from .store import VTDStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
-      basedir = self.get_default('basedir')
+      basedir = self.basedir
     if path is None:
       path = clause_name
     path = longpath(path)
@@ -446,7 +453,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
         if basedir is None:
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
-        path = joinpath(basedir, path)
+        path = self.pathto(path)
     return VTDStore(store_name, path, hashclass=hashclass)
 
   def filecache_Store(
@@ -465,7 +472,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
     '''
     from .store import FileCacheStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
-      basedir = self.get_default('basedir')
+      basedir = self.basedir
     if path is None:
       path = clause_name
       debug("path from clausename: %r", path)
@@ -488,7 +495,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
         debug("longpath(basedir) ==> %r", basedir)
-        path = joinpath(basedir, path)
+        path = self.pathto(path)
         debug("path ==> %r", path)
     return FileCacheStore(
         store_name,
@@ -531,7 +538,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
     '''
     from .store import PlatonicStore  # pylint: disable=import-outside-toplevel
     if basedir is None:
-      basedir = self.get_default('basedir')
+      basedir = self.basedir
     if path is None:
       path = clause_name
       debug("path from clausename: %r", path)
@@ -546,7 +553,7 @@ class Config(SingletonMixin, HasThreadState, Promotable):
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
         debug("longpath(basedir) ==> %r", basedir)
-        path = joinpath(basedir, path)
+        path = self.pathto(path)
         debug("path ==> %r", path)
     if isinstance(archive, str):
       archive = longpath(archive)
@@ -675,11 +682,3 @@ class Config(SingletonMixin, HasThreadState, Promotable):
       socket_path = clause_name
     socket_path = expand_path(socket_path)
     return UNIXSocketClientStore(store_name, socket_path, hashclass=hashclass)
-
-  @classmethod
-  def promote(cls, obj):
-    ''' Promote `obj` to a `Config`.
-    '''
-    if isinstance(obj, cls):
-      return obj
-    return cls(config_spec=obj)

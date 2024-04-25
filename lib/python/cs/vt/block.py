@@ -461,6 +461,15 @@ class Block(Transcriber, ABC, prefix=None):
         return HashCodeBlock(data=data, span=span, added=added)
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
 
+  @property
+  def uri(self):
+    ''' The block reference as a `VTURI`.
+    '''
+    if not isinstance(self, (HashCodeBlock, IndirectBlock)):
+      raise AttributeError(f'{self.__class__.__name__}.uri: not supported')
+    from .uri import VTURI  # pylint: disable=import-outside-toplevel
+    return VTURI(indirect=self.indirect, hashcode=self.hashcode)
+
 class BlockRecord(BinarySingleValue):
   ''' Support for binary parsing and transcription of blockrefs.
   '''
@@ -657,13 +666,6 @@ class HashCodeBlock(Block, prefix='B'):
     self.hashcode = hashcode
 
   @property
-  def uri(self):
-    ''' The block reference as a `VTURI`.
-    '''
-    from .uri import VTURI  # pylint: disable=import-outside-toplevel
-    return VTURI(indirect=self.indirect, hashcode=self.hashcode)
-
-  @property
   def data(self):
     ''' The data stored in this Block.
     '''
@@ -737,7 +739,11 @@ class HashCodeBlock(Block, prefix='B'):
       raise ValueError("invalid start:%d" % (start,))
     if end is not None and end < start:
       raise ValueError("invalid end:%d < start:%d" % (end, start))
-    bs = self.get_direct_data()
+    try:
+      bs = self.get_direct_data()
+    except KeyError as e:
+      error("%s.datafrom: self.get_direct_data(): %s", self, e)
+      return
     if start == 0:
       if end is None:
         yield bs

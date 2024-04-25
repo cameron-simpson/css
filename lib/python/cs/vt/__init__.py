@@ -50,12 +50,13 @@ from typing import Iterable, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
+from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc
+from cs.deco import default_params, fmtdoc, promote
 from cs.later import Later
 from cs.lex import r
 from cs.logutils import warning
-from cs.progress import Progress, OverProgress, progressbar
+from cs.progress import Progress
 from cs.queues import IterableQueue, QueueIterator
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
@@ -134,6 +135,7 @@ DEFAULT_CONFIG_PATH = '~/.vtrc'
 VT_STORE_ENVVAR = 'VT_STORE'
 VT_STORE_DEFAULT = '[default]'
 VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
+VT_CACHE_STORE_DEFAULT = '[cache]'
 DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
 
 DEFAULT_CONFIG_MAP = {
@@ -281,7 +283,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def init(self):
     ''' Method provided to support "vt init".
         For stores requiring some physical setup,
-        for example to create an empty DataDir,
+        for example to create an empty `DataDir`,
         that code goes here.
     '''
 
@@ -301,6 +303,58 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     )
 
   __repr__ = __str__
+
+  @staticmethod
+  @fmtdoc
+  def get_default_spec():
+    ''' The default `Store` specification from `${VT_STORE_ENVVAR}`,
+        default `{VT_STORE_DEFAULT!r}`.
+    '''
+    return os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
+
+  @staticmethod
+  @fmtdoc
+  def get_default_cache_spec():
+    ''' The default cache `Store` specification from `${VT_CACHE_STORE_ENVVAR}`,
+        default `{VT_CACHE_STORE_DEFAULT!r}`.
+    '''
+    return os.environ.get(VT_CACHE_STORE_ENVVAR, VT_CACHE_STORE_DEFAULT)
+
+  @classmethod
+  def default(cls, config_spec=None, store_spec=None, cache_spec=None):
+    ''' Get the prevailing `Store` instance.
+        This calls `HasThreadState.default()` first,
+        but falls back to constrcting the default `Store` instance
+        from `Store.get_default_spec` and `Store.get_default_cache_spec`.
+        As such, the returns `Store` is not necessarily "open"
+        and users should open it for use. Example:
+
+            S = Store.default()
+            with S:
+                ... do stuff ...
+    '''
+    S = super().default()
+    if S is None:
+      # no prevailing Store
+      # construct the default Store
+      from .config import Config
+      config = Config(config_spec)
+      if store_spec is None:
+        store_spec = cls.get_default_spec()
+      if cache_spec is None:
+        cache_spec = cls.get_default_cache_spec()
+      S = cls.promote(store_spec, config)
+      if cache_spec is not None and cache_spec not in ("", "NONE"):
+        cacheS = cls.promote(cache_spec, config)
+        S = ProxyStore(
+            "%s:%s" % (cacheS.name, S.name),
+            read=(cacheS,),
+            read2=(S,),
+            copy2=(cacheS,),
+            save=(cacheS, S),
+            archives=((S, '*'),),
+        )
+    return S
 
   __bool__ = lambda self: True
 
@@ -669,6 +723,15 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
                     entry.flags |= entry.INDIRECT_COMPLETE
     '''
     yield None
+
+  @promote
+  def block_for(self, bfr: CornuCopyBuffer) -> "Block":
+    ''' Store an object into this `Store`, return the `Block`.
+        The object may be any object acceptable to `CornuCopyBuffer.promote`.
+    '''
+    from .blockify import block_for
+    with self:
+      return block_for(bfr)
 
   @classmethod
   @fmtdoc

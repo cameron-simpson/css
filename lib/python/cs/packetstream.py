@@ -43,7 +43,7 @@ def tick_fd_2(bs):
   '''
   os.write(2, bs)
 
-__version__ = '20211208-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'description':
@@ -57,6 +57,7 @@ DISTINFO = {
     'install_requires': [
         'cs.binary',
         'cs.buffer',
+        'cs.context',
         'cs.deco',
         'cs.progress',
         'cs.units',

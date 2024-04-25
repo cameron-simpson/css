@@ -1,0 +1,11 @@
+lib/python/cs/imageutils.py: cs.imageutils: ad hoc image related utility functions and classes
+lib/python/cs/imageutils.py: cs.imageutils: move default cachedir to ~/var/cache/im/thumbnails; strip some debug statements
+lib/python/cs/imageutils.py: cs.imageutils: ThumbnailCache: subclass cs.convcache.ConvCache
+lib/python/cs/imageutils.py: cs.imageutils: use __all__
+lib/python/cs/imageutils.py: cs.imageutils: from ImInfo and iminfo, we'll just use PIL directly as needed for now
+lib/python/cs/imageutils.py: cs.imageutils: update imports, clean lint, remove debugging
+lib/python/cs/imageutils.py: cs.imageutils: new sixel(imagepath)->sixelpath function
+lib/python/cs/imageutils.py: cs.imageutils: new sixel_from_image_bytes() function to return a cached SIXEL version of some image data
+lib/python/cs/imageutils.py: cs.*: update imports for move of ConvCache and convof
+lib/python/cs/imageutils.py: cs.imageutils: __all__ + sixel_from_image_bytes
+lib/python/cs/imageutils.py: cs.imageutils: DISTINFO

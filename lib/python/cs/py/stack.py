@@ -10,7 +10,7 @@ from collections import namedtuple
 import sys
 from traceback import extract_stack
 
-__version__ = '20220918-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'description':
@@ -35,13 +35,6 @@ except ImportError:
 
     def __str__(self):
       return "%s:%d: %s" % (self.filename, self.lineno, self.line)
-
-    # compatibility with my prior Frame class
-    @property
-    def funcname(self):
-      ''' The frame function name.
-      '''
-      return self.name
 
     @property
     def linetext(self):

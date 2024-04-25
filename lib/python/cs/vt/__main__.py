@@ -35,7 +35,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
-from cs.fileutils import file_data, shortpath
+from cs.fileutils import atomic_filename, file_data, shortpath
 from cs.lex import hexify, get_identifier
 from cs.logutils import (exception, error, warning, track, info, debug, logTo)
 from cs.pfx import Pfx, pfx_method, pfx_call
@@ -49,7 +49,15 @@ from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 from . import (
     DISTINFO,
     Store,
+    uses_Store,
     run_modes,
+    DEFAULT_CONFIG_ENVVAR,
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_HASHCLASS_ENVVAR,
+    VT_CACHE_STORE_DEFAULT,
+    VT_CACHE_STORE_ENVVAR,
+    VT_STORE_DEFAULT,
+    VT_STORE_ENVVAR,
 )
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
@@ -80,6 +88,7 @@ from .scan import (
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore, ProgressStore
 from .transcribe import Transcriber
+from .uri import VTURI
 
 RANDOM_DEV = '/dev/urandom'
 
@@ -113,21 +122,15 @@ def print_hist(samples, bins=128):
 @dataclass
 class VTCmdOptions(BaseCommand.Options):
   config_map: Optional[Union[str, Mapping]] = None
-  store_spec: str = field(
-      default_factory=lambda: os.environ.
-      get(VTCmd.VT_STORE_ENVVAR, '[default]')
-  )
-  cache_store_spec: str = field(
-      default_factory=lambda: os.environ.
-      get(VTCmd.VT_CACHE_STORE_ENVVAR, '[cache]')
-  )
+  store_spec: str = field(default_factory=Store.get_default_spec)
+  cache_store_spec: str = field(default_factory=Store.get_default_cache_spec)
   # TODO: discard dflt_log
   dflt_log: Optional[str] = field(
       default_factory=lambda: os.environ.get(VTCmd.VT_LOGFILE_ENVVAR)
   )
   hashname: str = field(
       default_factory=lambda: os.environ.
-      get(VTCmd.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname)
+      get(DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname)
   )
   show_progress: bool = field(default_factory=lambda: run_modes.show_progress)
 
@@ -259,40 +262,34 @@ class VTCmd(BaseCommand):
   ''' A main programme instance.
   '''
 
-  from . import (
-      DEFAULT_CONFIG_ENVVAR,
-      DEFAULT_CONFIG_PATH,
-      DEFAULT_HASHCLASS_ENVVAR,
-      VT_CACHE_STORE_ENVVAR,
-      VT_STORE_ENVVAR,
-  )
-
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
 
   GETOPT_SPEC = 'C:S:f:h:Pqv'
 
   USAGE_KEYWORDS = {
-      'VT_STORE_ENVVAR': VT_STORE_ENVVAR,
-      'VT_CACHE_STORE_ENVVAR': VT_CACHE_STORE_ENVVAR,
       'DEFAULT_CONFIG_ENVVAR': DEFAULT_CONFIG_ENVVAR,
       'DEFAULT_CONFIG_PATH': DEFAULT_CONFIG_PATH,
-      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.hashname,
       'DEFAULT_HASHCLASS_ENVVAR': DEFAULT_HASHCLASS_ENVVAR,
+      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.hashname,
+      'VT_CACHE_STORE_DEFAULT': VT_CACHE_STORE_DEFAULT,
+      'VT_CACHE_STORE_ENVVAR': VT_CACHE_STORE_ENVVAR,
+      'VT_STORE_DEFAULT': VT_STORE_DEFAULT,
+      'VT_STORE_ENVVAR': VT_STORE_ENVVAR,
   }
 
   USAGE_FORMAT = '''Usage: {cmd} [option...] [profile] subcommand [arg...]
   Options:
     -C store  Specify the store to use as a cache.
-              Specify "NONE" for no cache.
-              Default: from ${VT_CACHE_STORE_ENVVAR} or "[cache]".
+              Specify "NONE" or the empty string for no cache.
+              Default: from ${VT_CACHE_STORE_ENVVAR} or {VT_CACHE_STORE_DEFAULT!r}.
     -S store  Specify the store to use:
                 [clause]        Specification from .vtrc.
                 /path/to/dir    DataDirStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
-              Default from ${VT_STORE_ENVVAR}, or "[default]", except for
-              the "serve" subcommand which defaults to "[server]"
-              and ignores ${VT_STORE_ENVVAR}.
+              Default from ${VT_STORE_ENVVAR}, or {VT_STORE_DEFAULT!r},
+              except for the "serve" subcommand which defaults to
+              "[server]" and ignores ${VT_STORE_ENVVAR}.
     -f config Config file. Default from ${DEFAULT_CONFIG_ENVVAR},
               otherwise {DEFAULT_CONFIG_PATH}
     -h hashclass Hashclass for Stores. Default from ${DEFAULT_HASHCLASS_ENVVAR},
@@ -367,45 +364,14 @@ class VTCmd(BaseCommand):
               if options.store_spec is None:
                 if cmd == "serve":
                   options.store_spec = store_spec
-              try:
-                S = pfx_call(Store.promote, options.store_spec, options.config)
-              except (KeyError, ValueError) as e:
-                raise GetoptError(f"unusable Store specification: {e}") from e
-              except Exception as e:
-                exception(f"UNEXPECTED EXCEPTION: can't open store: {e}")
-                raise GetoptError(f"unusable Store specification: {e}") from e
-              if options.cache_store_spec == 'NONE':
-                cacheS = None
-              else:
-                try:
-                  cacheS = pfx_call(
-                      Store, options.cache_store_spec, options.config
-                  )
-                except (KeyError, ValueError) as e:
-                  raise GetoptError(
-                      f"unusable Store specification: {e}"
-                  ) from e
-                except Exception as e:
-                  exception(
-                      f"UNEXPECTED EXCEPTION: can't open cache store: {e}"
-                  )
-                  raise GetoptError(
-                      f"unusable Store specification: {e}"
-                  ) from e
-                S = ProxyStore(
-                    "%s:%s" % (cacheS.name, S.name),
-                    read=(cacheS,),
-                    read2=(S,),
-                    copy2=(cacheS,),
-                    save=(cacheS, S),
-                    archives=((S, '*'),),
-                )
-                S.config = options.config
+              S = Store.default(
+                  config_spec=options.config_map,
+                  store_spec=options.store_spec,
+                  cache_spec=options.cache_store_spec,
+              )
               with S:
                 with stackattrs(options, S=S):
                   yield
-              if cacheS:
-                cacheS.backend = None
       if ifdebug():
         dump_debug_threads()
 
@@ -583,6 +549,37 @@ class VTCmd(BaseCommand):
       raise GetoptError(f'extra arguments: {argv!r}')
     print(self.options.config.as_text().rstrip())
     return 0
+
+  @uses_runstate
+  @uses_Store
+  def cmd_download(self, argv, *, runstate: RunState, S: Store):
+    ''' Usage: {cmd} uri...
+          Retrieve each VT URI from the Store.
+    '''
+    if not argv:
+      raise GetoptError('missing uris')
+    xit = 0
+    for uri_s in argv:
+      runstate.raiseif()
+      with Pfx(uri_s):
+        try:
+          uri = VTURI.from_uri(uri_s)
+        except ValueError as e:
+          warning("invalud VT URI: %s", e)
+          xit = 1
+        else:
+          filename = uri.filename or f'{uri.hashcode.hex()}.{uri.hashcode.hashname}'
+          with atomic_filename(filename) as f:
+            for B in progressbar(
+                uri.block.leaves,
+                filename,
+                itemlenfunc=len,
+                total=len(uri.block),
+            ):
+              assert not B.indirect
+              f.write(bytes(B))
+          print(uri_s, filename)
+    return xit
 
   def cmd_dump(self, argv):
     ''' Usage: {cmd} objects...
@@ -1439,6 +1436,27 @@ class VTCmd(BaseCommand):
       if not merge(target, source):
         return 1
     return 0
+
+  @uses_runstate
+  @uses_Store
+  def cmd_upload(self, argv, *, runstate: RunState, S: Store):
+    ''' Usage: {cmd} path...
+          Save each filesystem path into the Store, print the path and its URI.
+    '''
+    if not argv:
+      raise GetoptError('missing paths')
+    xit = 0
+    for fspath in argv:
+      runstate.raiseif()
+      with Pfx(fspath):
+        try:
+          uri = VTURI.from_fspath(fspath)
+        except OSError as e:
+          warning("not uploaded: %s", e)
+          xit = 1
+        else:
+          print(fspath, uri)
+    return xit
 
 def lsDirent(fp, E, name):
   ''' Transcribe a Dirent as an ls-style listing.

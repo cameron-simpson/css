@@ -27,8 +27,8 @@ from icontract import require, ensure
 from PIL import Image, ImageTk, UnidentifiedImageError
 from typeguard import typechecked
 
+from cs.cache import convof
 from cs.cmdutils import BaseCommand
-from cs.convcache import convof
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags
 from cs.hashutils import SHA256

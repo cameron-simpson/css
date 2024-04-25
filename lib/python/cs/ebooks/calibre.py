@@ -804,10 +804,9 @@ class CalibreMetadataDB(ORM):
     else:
       db_path = None
     self.db_path = db_path
-    self.db_url = db_url
     if not readwrite:
-      self.db_url += '?immutable=1'
-    super().__init__(self.db_url)
+      db_url += '?immutable=1'
+    super().__init__(db_url)
 
   @property
   def orm(self):

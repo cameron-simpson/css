@@ -60,7 +60,7 @@ from cs.seq import seq
 from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20230613.1-post'
+__version__ = '20240423-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -80,6 +80,7 @@ DISTINFO = {
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
+        'cs.upd',
         'cs.x',
     ],
 }
@@ -487,9 +488,13 @@ def trace_caller(func):
   def subfunc(*a, **kw):
     frame = caller()
     D(
-        "CALL %s()<%s:%d> FROM %s()<%s:%d>", func.__name__,
-        func.__code__.co_filename, func.__code__.co_firstlineno,
-        frame.funcname, frame.filename, frame.lineno
+        "CALL %s()<%s:%d> FROM %s()<%s:%d>",
+        func.__name__,
+        func.__code__.co_filename,
+        func.__code__.co_firstlineno,
+        frame.name,
+        frame.filename,
+        frame.lineno,
     )
     return func(*a, **kw)
 
@@ -642,24 +647,40 @@ def trace(
       xlog("%sCALL " + fmt, _trace_indent, *av)
     old_indent = _trace_indent
     _trace_indent += '  '
+    start_time = time.time()
     try:
       result = func(*a, **kw)
     except Exception as e:
+      end_time = time.time()
       if exception:
-        xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
+        xlog(
+            "%sCALL %s %gs RAISE %r",
+            _trace_indent,
+            log_cite,
+            end_time - start_time,
+            e,
+        )
       _trace_indent = old_indent
       raise
     else:
+      end_time = time.time()
       if retval:
         xlog(
-            "%sCALL %s RETURN %s",
+            "%sCALL %s %gs RETURN %s",
             _trace_indent,
             log_cite,
+            end_time - start_time,
             (pformat if use_pformat else repr)(result),
         )
       else:
         ##xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
-        xlog("%sRETURN %s <= %s", _trace_indent, s(result), log_cite)
+        xlog(
+            "%sRETURN %gs %s <= %s",
+            _trace_indent,
+            end_time - start_time,
+            s(result),
+            log_cite,
+        )
       _trace_indent = old_indent
       return result
 
@@ -695,6 +716,9 @@ if builtin_names_s:
     for builtin_name in (__all__ if builtin_names_s == "1" else
                          builtin_names_s.split(',')):
       if not builtin_name:
+        continue
+      if builtin_name in ('breakpoint',):
+        # breakpoint doesn't work right if wrapped, gets the wrong frame
         continue
       if builtin_name not in __all__:
         warning(

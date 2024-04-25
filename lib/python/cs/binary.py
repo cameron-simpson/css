@@ -75,7 +75,7 @@ from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
-__version__ = '20240316-post'
+__version__ = '20240422-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1238,7 +1238,14 @@ class _BinaryMultiValue_Base(SimpleBinary):
     )
 
   __str__ = _s
+
   ##__repr__ = _s
+
+  def for_json(self):
+    return {
+        field_name: getattr(self, field_name)
+        for field_name in self.FIELD_ORDER
+    }
 
   @classmethod
   def parse(cls, bfr):

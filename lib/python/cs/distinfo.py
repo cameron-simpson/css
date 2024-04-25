@@ -55,7 +55,7 @@ from cs.logutils import error, warning, info, status, trace
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
-from cs.psutils import pipefrom as ps_pipefrom, run
+from cs.psutils import pipefrom as ps_pipefrom, pipeto as ps_pipeto, run
 from cs.py.doc import module_doc
 from cs.py.modules import direct_imports
 from cs.resources import RunState, uses_runstate
@@ -431,7 +431,11 @@ class CSReleaseCommand(BaseCommand):
     options = self.options
     pkg = options.modules[pkg_name]
     docs = pkg.compute_doc(all_class_names=all_class_names)
-    print(docs.long_description)
+    if sys.stdout.isatty():
+      with ps_pipeto(['glow', '-', '-p']) as P:
+        print(docs.long_description, file=P.stdin)
+    else:
+      print(docs.long_description)
 
   # pylint: disable=too-many-locals,too-many-return-statements
   # pylint: disable=too-many-branches,too-many-statements
@@ -1490,7 +1494,7 @@ class Module:
     if isdirpath(basepath):
       pathlist = [
           joinpath(basepath, rpath) for rpath in
-          rpaths(basepath, skip_suffixes=skip_suffixes, sort_paths=True)
+          rpaths(basepath, skip_suffixes=skip_suffixes, sort_names=True)
       ]
     else:
       updir = dirname(basepath)
@@ -1866,7 +1870,7 @@ class Module:
     else:
       self.prepare_autofiles(release_dirpath)
       self.prepare_metadata(release_dirpath)
-      dist_rpaths = self.prepare_dist(release_dirpath)
+      dist_rpaths = self.prepare_dist(release_dirpath, vcs_revision)
     return dist_rpaths
 
   def prepare_autofiles(self, pkg_dir):
@@ -1919,12 +1923,12 @@ class Module:
     with pfx_call(open, joinpath(pkg_dir, 'pyproject.toml'), 'xb') as tf:
       tomli_w.dump(proj, tf, multiline_strings=True)
 
-  def prepare_dist(self, pkg_dir):
+  def prepare_dist(self, pkg_dir, vcs_version):
     ''' Run "python3 -m build ." inside `pkg_dir`, making files in `dist/`.
     '''
     distdir = joinpath(pkg_dir, 'dist')
-    sdist_rpath = f'dist/{self.name}-{self.latest_pypi_version}.tar.gz'
-    wheel_rpath = f'dist/{self.name}-{self.latest_pypi_version}-py3-none-any.whl'
+    sdist_rpath = f'dist/{vcs_version}.tar.gz'
+    wheel_rpath = f'dist/{vcs_version}-py3-none-any.whl'
     cd_run(
         pkg_dir,
         ('python3', '-m', 'build'),
@@ -1936,10 +1940,12 @@ class Module:
         ),
         '.',
     )
+    print()
     os.system(f'ls -ld {pkg_dir}/{sdist_rpath!r}')
-    os.system(f'tar tvzf {pkg_dir}/{sdist_rpath!r}')
+    os.system(f'set -x; tar tvzf {pkg_dir}/{sdist_rpath!r}')
+    print()
     os.system(f'ls -ld {pkg_dir}/{wheel_rpath!r}')
-    os.system(f'unzip -l {pkg_dir}/{wheel_rpath!r}')
+    os.system(f'set -x; unzip -l {pkg_dir}/{wheel_rpath!r}')
     return dict(sdist=sdist_rpath, wheel=wheel_rpath)
 
 if __name__ == '__main__':

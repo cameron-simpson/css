@@ -249,16 +249,13 @@ class Inodes:
   def load_fs_inode_dirents(self, D):
     ''' Load entries from an `fs_inode_dirents` Dir into the Inode table.
     '''
-    X("LOAD FS INODE DIRENTS:")
-    dump_Dirent(D)
+    ##dump_Dirent(D)
     for name, E in D.entries.items():
-      X("  name=%r, E=%r", name, E)
       with Pfx(name):
         # get the refcount from the :uuid:refcount" name
         _, refcount_s = name.split(':')[:2]
         I = self.add(E)
         I.refcount = int(refcount_s)
-        X("  I=%s", I)
 
   def get_fs_inode_dirents(self):
     ''' Create an `fs_inode_dirents` Dir containing Inodes which
@@ -270,8 +267,7 @@ class Inodes:
         D["%s:%d" % (uuid, I.refcount)] = I.E
       else:
         warning("refcount=%s, SKIP %s", I.refcount, I.E)
-    X("GET FS INODE DIRENTS:")
-    dump_Dirent(D)
+    ##dump_Dirent(D)
     return D
 
   def _new_inum(self):
@@ -435,14 +431,10 @@ class FileSystem(HasThreadState):
     try:
       with Pfx("fs_inode_dirents"):
         fs_inode_dirents = E.meta.get("fs_inode_dirents")
-        X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
         if fs_inode_dirents:
           inode_dir = _Dirent.from_str(fs_inode_dirents)
           dump_Dirent(inode_dir)
           inodes.load_fs_inode_dirents(inode_dir)
-        else:
-          X("NO INODE IMPORT")
-        X("FileSystem mntE:")
       with self.S:
         with self:
           dump_Dirent(mntE)
