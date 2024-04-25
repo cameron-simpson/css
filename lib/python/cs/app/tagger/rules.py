@@ -183,6 +183,9 @@ class Identifier(_Token):
     return text[start_offset:end_offset], cls(name), end_offset
 
 class QuotedString(_Token):
+class _LiteralValue(_Token):
+  value: Any
+
   ''' A double quoted string.
   '''
 
