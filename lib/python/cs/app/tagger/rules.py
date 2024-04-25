@@ -182,16 +182,16 @@ class Identifier(_Token):
       )
     return text[start_offset:end_offset], cls(name), end_offset
 
-class QuotedString(_Token):
 class _LiteralValue(_Token):
   value: Any
 
+@dataclass
+class QuotedString(_LiteralValue):
   ''' A double quoted string.
   '''
 
-  def __init__(self, value: str, quote: str):
-    self.value = value
-    self.quote = quote
+  value: str
+  quote: str = '"'
 
   def __str__(self):
     return slosh_quote(self.value, self.quote)
