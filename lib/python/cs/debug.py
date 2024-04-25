@@ -641,7 +641,10 @@ def trace(
     _xlog = xlog
     if _xlog is None:
       _xlog = os.environ.get('CS_DEBUG_TRACE') or _trace_xlog
-      if _xlog == "print":
+      if _xlog == "X":
+        # the old default behaviour using X()
+        _xlog = None
+      elif _xlog == "print":
         _xlog = log_via_print
       elif _xlog == "warning":
         from cs.gimmicks import warning
