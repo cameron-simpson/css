@@ -603,6 +603,8 @@ def debug_object_shell(o, prompt=None):
   C.cmdloop(intro)
 
 _trace_indent = ""
+_trace_xlog = None
+
 def log_via_print(msg, *a, file=None):
   ''' Logging style message using `cs.upd.print`.
   '''
@@ -623,6 +625,7 @@ def trace(
     use_pformat=False,
     with_caller=False,
     with_pfx=False,
+    xlog=None,
 ):
   ''' Decorator to report the call and return of a function.
   '''
@@ -633,41 +636,58 @@ def trace(
     ''' Wrapper for `func` to trace call and return.
     '''
     global _trace_indent  # pylint: disable=global-statement
-    if with_pfx:
-      # late import so that we can use this in modules we import
-      # pylint: disable=import-outside-toplevel
-      try:
-        from cs.pfx import XP as xlog
-      except ImportError:
-        xlog = X
-    else:
-      xlog = X
+    global _trace_xlog  # pylint: disable=global-statement
+    # set up the log function
+    _xlog = xlog
+    if _xlog is None:
+      _xlog = os.environ.get('CS_DEBUG_TRACE') or _trace_xlog
+      if _xlog == "print":
+        _xlog = log_via_print
+      elif _xlog == "warning":
+        from cs.gimmicks import warning
+        _xlog = warning
+      elif isinstance(_xlog, str) and _xlog != "":
+        warning(
+            "@trace: unsupported $CS_DEBUG_TRACE=%s, I expect print or warning",
+            _xlog,
+        )
+        _xlog = None
+      if not _xlog:
+        if with_pfx:
+          # late import so that we can use this in modules we import
+          # pylint: disable=import-outside-toplevel
+          try:
+            from cs.pfx import XP as _xlog
+          except ImportError:
+            _xlog = X
+        else:
+          _xlog = X
     log_cite = citation
     if with_caller:
       log_cite = log_cite + "from[%s]" % (caller(),)
     if call:
       fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("%sCALL " + fmt, _trace_indent, *av)
+      _xlog("%sCALL " + fmt, _trace_indent, *av)
     old_indent = _trace_indent
     _trace_indent += '  '
     try:
       result = func(*a, **kw)
     except Exception as e:
       if exception:
-        xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
+        _xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
       _trace_indent = old_indent
       raise
     else:
       if retval:
-        xlog(
+        _xlog(
             "%sCALL %s RETURN %s",
             _trace_indent,
             log_cite,
             (pformat if use_pformat else repr)(result),
         )
       else:
-        ##xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
-        xlog("%sRETURN %s <= %s", _trace_indent, s(result), log_cite)
+        ##_xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
+        _xlog("%sRETURN %s <= %s", _trace_indent, s(result), log_cite)
       _trace_indent = old_indent
       return result
 
