@@ -33,7 +33,7 @@ from icontract import ensure, require
 from typeguard import typechecked
 
 from cs.deco import decorator, promote, Promotable
-from cs.fs import needdir
+from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, TaggedPath, uses_fstags
 from cs.hashindex import merge
 from cs.lex import (
@@ -43,7 +43,8 @@ from cs.lex import (
     skipwhite,
 )
 from cs.logutils import ifverbose, warning
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.queues import ListQueue
 from cs.tagset import Tag, TagSet
 from cs.upd import print
 
