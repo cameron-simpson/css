@@ -383,27 +383,45 @@ class Rule(Promotable):
       match_test: Callable[[str, TagSet], dict],
       action: Callable[..., Iterable[Action]],
       *,
-      quick=False
+      quick=False,
+      filename=None,
+      lineno=None,
   ):
     self.definition = definition
     self.match_attribute = match_attribute
     self.match_test = match_test
     self.action = action
     self.quick = quick
+    self.filename = filename
+    self.lineno = lineno
 
   def __str__(self):
     return self.definition
 
   # TODO: repr should do what str does now
   def __repr__(self):
-    return (
-        f'{self.__class__.__name__}('
-        f'{self.definition!r},'
-        f'{self.match_attribute},'
-        f'match_test={self.match_test!r},'
-        f'action={self.action},'
-        f'quick={self.quick},'
-        ')'
+    filename = self.filename
+    lineno = self.lineno
+    return ''.join(
+        filter(
+            None, (
+                f'{self.__class__.__name__}'
+                '(',
+                (
+                    ('' if filename is None else f'{shortpath(filename)}:')
+                    if lineno is None else (
+                        f'{lineno}:' if filename is None else
+                        f'{shortpath(filename)}:{lineno}:'
+                    )
+                ),
+                f'{self.definition!r},',
+                f'{self.match_attribute},',
+                f'match_test={self.match_test!r},',
+                f'action={self.action},',
+                self.quick and f'quick={self.quick},'
+                ')',
+            )
+        )
     )
 
   @uses_fstags
@@ -554,7 +572,12 @@ class Rule(Promotable):
       yield TokenRecord(matched=token_s, token=token, end_offset=offset)
 
   @classmethod
-  def from_str(cls, rule_s: str) -> Union["Rule", None]:
+  def from_str(
+      cls,
+      rule_s: str,
+      filename=None,
+      lineno: int = None,
+  ) -> Union["Rule", None]:
     ''' Parse `rule_s` as a text definition of a `Rule`.
 
         Syntax:
@@ -743,7 +766,13 @@ class Rule(Promotable):
     return False
 
   @classmethod
-  def from_file(cls, lines: [str, Iterable[str]]):
+  def from_file(
+      cls,
+      lines: [str, Iterable[str]],
+      *,
+      filename: str = None,
+      start_lineno: int = 1,
+  ):
     ''' Read rules from `lines`.
         If `lines` is a string, treat it as a filename and open it for read.
     '''
@@ -751,11 +780,14 @@ class Rule(Promotable):
       filename = lines
       with Pfx(filename):
         with open(filename, encoding='utf-8') as lines:
-          return cls.from_file(lines)
+          return cls.from_file(
+              lines, filename=filename, start_lineno=start_lineno
+          )
     rules = []
-    for lineno, line in enumerate(lines, 1):
+    for lineno, line in enumerate(lines, start_lineno):
       with Pfx(lineno):
-        R = cls.from_str(line)
+        R = cls.from_str(line, filename=filename, lineno=lineno)
+        print(filename, lineno, R)
         if R is not None:
           rules.append(R)
     return rules
