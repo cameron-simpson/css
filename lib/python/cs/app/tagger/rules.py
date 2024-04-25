@@ -125,6 +125,7 @@ class _Token(Promotable, ABC):
     '''
     raise NotImplementedError
 
+  @classmethod
   @pfx_method
   @typechecked
   def from_str(cls, text: str) -> "_Token":
@@ -133,11 +134,22 @@ class _Token(Promotable, ABC):
     '''
     if not text or text[0].isspace():
       raise ValueError("expected text to start with nonwhitespace")
-    token_s, token, end_offset = cls.parse(text)
-    if skipwhite(text, end_offset) != len(text):
+    token_classes = cls.token_subclasses()
+    for subcls in token_classes:
+      print("from_str: try", subcls, "parse", repr(text))
+      try:
+        token_s, token, end_offset = subcls.parse(text)
+      except (SyntaxError, ValueError) as e:
+        print("from_str: exception:", e)
+      else:
+        break
+    else:
       raise ValueError(
-          f'unexpected text following token {cls.__name__}:{text[:end_offset]}'
+          f'no {cls.__name__} subclass matched'
+          f', tried: {", ".join(subcls.__name for subcls in token_classes)}'
       )
+    if end_offset != len(text):
+      raise ValueError('whitespace after token {token.matched!r}')
     return token
 
   @abstractmethod
