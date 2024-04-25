@@ -280,7 +280,7 @@ class TagAddRemove(_Token):
         tag=Tag(name, value), add_remove=add_remove
     ), end_offset
 
-class Comparison(_Token, ABC):
+class _Comparison(_Token, ABC):
   ''' Abstract base class for comparisons.
   '''
 
@@ -288,9 +288,8 @@ class Comparison(_Token, ABC):
   def __call__(self, value, tags):
     raise NotImplementedError
 
-class EqualityComparison(Comparison):
-  ''' A comparison of some string for equality.
-      Return is `None` on no omatch or the `Match.groupdict()` on a match.
+class EqualityComparison(_Comparison):
+  ''' A comparison of some value for equality.
   '''
 
   @typechecked
@@ -320,7 +319,7 @@ class EqualityComparison(Comparison):
   def __call__(self, value_s: str, tags: TagSet):
     return value_s == self.compare_s
 
-class RegexpComparison(Comparison):
+class RegexpComparison(_Comparison):
   ''' A comparison of some string using a regular expression.
       Return is `None` on no omatch or the `Match.groupdict()` on a match.
   '''
@@ -723,7 +722,7 @@ class Rule(Promotable):
     match_op = tokens.pop(0).token
     with Pfx(match_op):
       match match_op:
-        case Comparison():
+        case _Comparison():
           return match_op, match_attribute
         case _:
           raise ValueError(f'unsupported match-op {r(match_op)}')
