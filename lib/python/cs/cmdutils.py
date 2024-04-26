@@ -142,7 +142,17 @@ class SubCommand:
       return pfx_call(method, argv, cmd=self.cmd).run()
     return method(argv)
 
+  def default_usage(self):
+    ''' Return `'{cmd} [options...]'` or `'{cmd} subcommand [options...]'`.
     '''
+    has_subcommands_test = getattr(
+        self.method, 'has_subcommands', lambda: False
+    )
+    return (
+        '{cmd} subcommand [options...]'
+        if has_subcommands_test() else '{cmd} [options...]'
+    )
+
         else:
 
   def usage_text(
