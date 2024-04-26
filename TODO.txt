@@ -1,3 +1,4 @@
+test2
 vt2: test1
 vt2: test1
 test1
