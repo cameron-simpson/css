@@ -127,7 +127,6 @@ class SubCommand:
   method: Callable  # a method or a subclass of BaseCommand
   usage_mapping: Mapping[str, Any] = field(default_factory=dict)
 
-  @abstractmethod
   def __call__(
       self, subcmd: str, base_command: "BaseCommandSubType", argv: List[str]
   ):
@@ -138,7 +137,10 @@ class SubCommand:
         * `base_command`: the instance of `BaseCommand`
         * `argv`: the command line arguments after the subcommand name
     '''
-    raise NotImplementedError
+    method = self.method
+    if isclass(method):
+      return pfx_call(method, argv, cmd=self.cmd).run()
+    return method(argv)
 
   @staticmethod
   def from_class(command_cls: "BaseCommandSubType") -> Mapping[str, Callable]:
