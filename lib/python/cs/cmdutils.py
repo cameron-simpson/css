@@ -714,16 +714,21 @@ class BaseCommand:
       raise
 
   @classmethod
+  @cache
   def subcommands(cls):
     ''' Return a mapping of subcommand names to subcommand specifications
         for class attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
         by default `'cmd_'`.
     '''
-    try:
-      subcmds = cls.__dict__['_subcommands']
-    except KeyError:
-      subcmds = cls._subcommands = _BaseSubCommand.from_class(cls)
-    return subcmds
+    prefix = cls.SUBCOMMAND_METHOD_PREFIX
+    class_usage_mapping = getattr(cls, 'USAGE_KEYWORDS', {})
+    mapping = {}
+    for method_name in dir(cls):
+      if method_name.startswith(prefix):
+        method = getattr(cls, method_name)
+        subcmd = cutprefix(method_name, prefix)
+        mapping[subcmd] = SubCommand(subcmd, method, class_usage_mapping)
+    return mapping
 
   @classmethod
   def has_subcommands(cls):
