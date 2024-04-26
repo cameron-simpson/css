@@ -1462,7 +1462,7 @@ class BaseCommandCmd(Cmd):
       command's subcommands.
 
       The `BaseCommand.cmdloop()` class method instantiates an
-      instance of this cand calls its `.cmdloop()` method
+      instance of this and calls its `.cmdloop()` method
       i.e. `cmd.Cmd.cmdloop`.
   '''
 
