@@ -251,7 +251,7 @@ class _ClassSubCommand(_BaseSubCommand):
       self, subcmd: str, command: "BaseCommandSubType", argv: List[str]
   ):
     subcmd_class = self.method
-    updates = dict(command.options.__dict__)
+    updates = command.options.as_dict()
     updates.update(cmd=subcmd)
     command = pfx_call(subcmd_class, argv, **updates)
     return command.run()
@@ -309,20 +309,18 @@ class BaseCommandOptions(HasThreadState):
 
   perthread_state = ThreadState()
 
+  def as_dict(self):
+    ''' Return the optionas as a `dict`.
+    '''
+    return {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
+
   def copy(self, **updates):
     ''' Return a new instance of `BaseCommandOptions` (well, `type(self)`)
         which is a shallow copy of the public attributes from `self.__dict__`.
 
         Any keyword arguments are applied as attribute updates to the copy.
     '''
-    copied = pfx_call(
-        type(self),
-        **{
-            k: v
-            for k, v in self.__dict__.items()
-            if not k.startswith('_')
-        },
-    )
+    copied = pfx_call(type(self), **self.as_dict())
     for k, v in updates.items():
       setattr(copied, k, v)
     return copied
