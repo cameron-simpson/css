@@ -142,32 +142,8 @@ class SubCommand:
       return pfx_call(method, argv, cmd=self.cmd).run()
     return method(argv)
 
-  @staticmethod
-  def from_class(command_cls: "BaseCommandSubType") -> Mapping[str, Callable]:
-    ''' Return a mapping of subcommand names to subcommand specifications
-        for class attributes which commence with
-        `command_cls.SUBCOMMAND_METHOD_PREFIX`,
-        by default `'cmd_'`.
     '''
-    prefix = command_cls.SUBCOMMAND_METHOD_PREFIX
-    subcommands_map = {}
-    for attr in dir(command_cls):
-      if attr.startswith(prefix):
-        subcmd = cutprefix(attr, prefix)
-        method = getattr(command_cls, attr)
-        if isclass(method):
-          subcommands_map[subcmd] = _ClassSubCommand(
-              subcmd,
-              method,
-              usage_mapping=dict(getattr(method, 'USAGE_KEYWORDS', ())),
-          )
         else:
-          subcommands_map[subcmd] = _MethodSubCommand(
-              subcmd,
-              method,
-              usage_mapping=dict(getattr(command_cls, 'USAGE_KEYWORDS', ())),
-          )
-    return subcommands_map
 
   def usage_text(
       self,
