@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# My to-do list: one line desciptions in TOO.txt or TODO-category.txt.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [subsection:] [task-description...]"
+
+category=
+path=$( findup TODO.txt || : )
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    help | -\? | -h | -help | --help )
+      if [ $# = 1 ]
+      then
+        echo "$usage" >&2
+        exit 2
+      fi
+      ;;
+    ?*:)
+      category=$( expr "x$1" : 'x\(.*\):' )
+      path2=$( findup "TODO-$category.txt" || : )
+      [ -f "$path2" ] && { path=$path2; shift; }
+      ;;
+  esac
+fi
+
+[ -f "$path" ] || {
+  echo "$cmd: no TODO.txt file found" >&2
+  exit 1
+}
+
+# no args? just list the TODOs
+[ $# -gt 0 ] || {
+    echo "$path"
+    sed -n 's/./  &/p' "$path"
+    exit
+}
+
+dlog log -c "TODO,$category" "TODO: $*"
+
+[ -s "$path" ] || echo >>"$path"
+
+if $trace bsed "1i\\
+$*" "$path"
+then
+    tododir=$( dirname "$path" )
+    ( cd "$tododir"
+      vcs_type=$( vcs type 2>/dev/null ) || exit 0
+      base=$( basename "$path" )
+      case "$vcs_type" in
+          hg)   $trace hg commit -m "$base: $*" -- "$path" ;;
+          git)  $trace git add -- "$path" && $trace git commit -m "$base: $*" ;;
+          *)    echo "TODO: not in hg or git, aborting" >&2
+                exit 1
+                ;;
+      esac
+    )
+fi
