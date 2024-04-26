@@ -1,3 +1,4 @@
+TODO: accept -f to specify the file?
 test2
 test2
 vt2: test1
