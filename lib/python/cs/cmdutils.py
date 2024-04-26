@@ -14,7 +14,7 @@ from cmd import Cmd
 from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
 from os.path import basename
@@ -118,19 +118,14 @@ def docmd(dofunc):
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
 
-class _BaseSubCommand(ABC):
-  ''' The basis for the classes implementing subcommands.
+@dataclass
+class SubCommand:
+  ''' An implementation for a subcommand.
   '''
 
-  def __init__(self, cmd, method, *, usage_mapping=None):
-    self.cmd = cmd
-    self.method = method
-    self.usage_mapping = usage_mapping or {}
-
-  def __str__(self):
-    return "%s(cmd=%r,method=%s,..)" % (
-        type(self).__name__, self.cmd, self.method
-    )
+  cmd: str
+  method: Callable  # a method or a subclass of BaseCommand
+  usage_mapping: Mapping[str, Any] = field(default_factory=dict)
 
   @abstractmethod
   def __call__(
