@@ -557,21 +557,6 @@ class BaseCommand:
   SUBCOMMAND_ARGV_DEFAULT = None
   Options = BaseCommandOptions
 
-  def __init_subclass__(cls):
-    ''' Update subclasses of `BaseCommand`.
-
-        Appends the usage message to the class docstring.
-    '''
-    usage_message = cls.usage_text()
-    # NB: 2 leading lines so that the dedenting preserves the indents for MarkDown.
-    usage_doc = (
-        'Command line implementation.\n\nUsage summary:\n\n    ' +
-        usage_message.replace('\n', '\n    ')
-    )
-    cls_doc = obj_docstring(cls)
-    cls_doc = cls_doc + '\n\n' + usage_doc if cls_doc else usage_doc
-    cls.__doc__ = cls_doc
-
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
     ''' Initialise the command line.
