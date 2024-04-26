@@ -761,14 +761,18 @@ class BaseCommand:
     subcmds = cls.subcommands()
     usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     usage_format_mapping.update(format_mapping)
-    usage_format = getattr(
-        cls,
-        'USAGE_FORMAT',
-        (
-            'Usage: {cmd} subcommand [...]'
-            if has_subcmds else 'Usage: {cmd} [...]'
-        ),
-    )
+    try:
+      usage_format = cls.USAGE_FORMAT
+    except AttributeError:
+      usage_format = "\n".join(
+          (
+              (
+                  'Usage: {cmd} subcommand [...]'
+                  if has_subcmds else 'Usage: {cmd} [...]'
+              ),
+              *stripped_dedent(cls.__doc__).split("\n"),
+          )
+      )
     usage_message = usage_format.format_map(usage_format_mapping)
     if subcmd:
       if not has_subcmds:
@@ -791,9 +795,6 @@ class BaseCommand:
           subusage = subcmd_spec.usage_text(
               short=short, usage_format_mapping=usage_format_mapping
           )
-          cls.subcommand_usage_text(
-              attr, usage_format_mapping=usage_format_mapping, short=short
-          )
           if subusage:
             subusages.append(subusage.replace('\n', '\n  '))
       if subusages:
@@ -804,10 +805,8 @@ class BaseCommand:
             [
                 usage_message,
                 '  ' + subcmds_header + ':',
-            ] + [
-                '    ' + subusage.replace('\n', '\n    ')
-                for subusage in subusages
-            ]
+            ] +
+            ['  ' + subusage.replace('\n', '\n  ') for subusage in subusages]
         )
     return usage_message
 
