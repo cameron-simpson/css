@@ -729,6 +729,15 @@ class BaseCommand:
     return subcmds
 
   @classmethod
+  def has_subcommands(cls):
+    ''' Test whether the class defines additional subcommands.
+    '''
+    subcmds = set(cls.subcommands())
+    subcmds.discard('help')
+    subcmds.discard('shell')
+    return bool(subcmds)
+
+  @classmethod
   def usage_text(
       cls, *, cmd=None, format_mapping=None, subcmd=None, short=False
   ):
@@ -748,8 +757,8 @@ class BaseCommand:
     if format_mapping is None:
       format_mapping = {}
     format_mapping.setdefault('cmd', cmd)
+    has_subcmds = cls.has_subcommands()
     subcmds = cls.subcommands()
-    has_subcmds = subcmds and list(subcmds) != ['help']
     usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     usage_format_mapping.update(format_mapping)
     usage_format = getattr(
