@@ -150,7 +150,7 @@ class SubCommand:
     '''
     method = self.method
     if isclass(method):
-      return pfx_call(method, argv, cmd=self.cmd).run()
+      return pfx_call(method, argv, cmd=self.get_cmd()).run()
     return method(argv)
 
   def default_usage(self):
