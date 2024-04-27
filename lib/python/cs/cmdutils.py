@@ -797,56 +797,6 @@ class BaseCommand:
         short=short, show_subcmds=subcmd or True
     )
 
-  @classmethod
-  def subcommand_usage_text(
-      cls, subcmd, usage_format_mapping=None, short=False
-  ):
-    ''' Return the usage text for a subcommand.
-
-        Parameters:
-        * `subcmd`: the subcommand name
-        * `short`: just include the first line of the usage message,
-          intented for when there are many subcommands
-    '''
-    method = cls.subcommands()[subcmd].method
-    subusage = None
-    # support (method, get_suboptions)
-    try:
-      classy = issubclass(method, BaseCommand)
-    except TypeError:
-      classy = False
-    if classy:
-      # first paragraph of the class usage text
-      doc = method.usage_text(cmd=subcmd)
-      subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
-    else:
-      # extract the usage from the object docstring
-      doc = obj_docstring(method)
-      if doc:
-        if 'Usage:' in doc:
-          # extract the Usage: paragraph
-          pre_usage, post_usage = doc.split('Usage:', 1)
-          pre_usage = pre_usage.strip()
-          post_usage_format, *_ = post_usage.split('\n\n', 1)
-          subusage_format = stripped_dedent(post_usage_format)
-        else:
-          # extract the first paragraph
-          subusage_format, *_ = doc.split('\n\n', 1)
-      else:
-        # default usage text - include the docstring below a header
-        subusage_format = "\n  ".join(
-            ['{cmd} ...'] + [doc.split('\n\n', 1)[0]]
-        )
-    if subusage_format:
-      if short:
-        subusage_format, *_ = subusage_format.split('\n', 1)
-      mapping = dict(sys.modules[method.__module__].__dict__)
-      if usage_format_mapping:
-        mapping.update(usage_format_mapping)
-      mapping.update(cmd=subcmd)
-      subusage = subusage_format.format_map(mapping)
-    return subusage or None
-
   @pfx_method
   # pylint: disable=no-self-use
   def apply_opt(self, opt, val):
