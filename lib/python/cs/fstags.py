@@ -2042,10 +2042,12 @@ class FSTagsConfig(FSPathBasedSingleton):
         * `rcfilepath`: the path to the confguration file
           If `None`, default to `'{RCFILE}'` (from `RCFILE`).
     '''
-    if super().__init__(rcfilepath):
-      self.provided = {}
-      if physical is not None:
-        self.provided.update(physical=physical)
+    if 'provided' in self.__dict__:
+      return
+    super().__init__(rcfilepath)
+    self.provided = {}
+    if physical is not None:
+      self.provided.update(physical=physical)
 
   @pfx_method
   def __getattr__(self, attr):
