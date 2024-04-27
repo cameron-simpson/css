@@ -233,51 +233,61 @@ class SubCommand:
 
   def usage_text(
       self,
+      *,
       short: bool,
-      usage_format_mapping: Optional[Mapping] = None
+      recurse: bool = False,
+      show_subcmds: Optional[Union[bool, str, List[str]]] = None,
+      usage_mapping: Optional[Mapping] = None,
   ) -> str:
     ''' Return the filled out usage text for this subcommand.
     '''
-    usage_format_mapping = usage_format_mapping or {}
-    subusage_format = self.usage_format()  # pylint: disable=no-member
-    if subusage_format:
-      if short:
-        # the summary line and opening sentence of the description
-        lines = subusage_format.split('\n')
-        subusage_lines = [lines.pop(0)]
-        while subusage_lines[-1].endswith('\\'):
-          subusage_lines.append(lines.pop(0))
-        if lines and lines[0].endswith('.'):
-          subusage_lines.append(lines.pop(0))
-        subusage_format = '\n'.join(subusage_lines)
-      mapping = {
-          k: v
-          for k, v in sys.modules[self.method.__module__].__dict__.items()
-          if k and not k.startswith('_')
-      }
-      if usage_format_mapping:
-        mapping.update(usage_format_mapping)
-      if self.usage_mapping:
-        mapping.update(self.usage_mapping)
-      mapping.update(cmd=self.cmd)
-      with Pfx("format %r using %r", subusage_format, mapping):
-        subusage = subusage_format.format_map(mapping)
-    return subusage or None
-
-class _MethodSubCommand(_BaseSubCommand):
-  ''' A class to represent a subcommand implemented with a method.
-  '''
-
-  def __call__(
-      self, subcmd: str, command: "BaseCommandSubType", argv: List[str]
-  ):
-    with Pfx(subcmd):
-      method = self.method
-      if ismethod(method):
-        # already bound
-        return method(argv)
-      # unbound - supply the instance for use as self
-      return method(command, argv)
+    if show_subcmds is None:
+      show_subcmds = not short
+    if isinstance(show_subcmds, bool):
+      if show_subcmds:
+        show_subcmds = self.get_subcmds()
+      else:
+        show_subcmds = []
+    elif isinstance(show_subcmds, str):
+      show_subcmds = [show_subcmds]
+    method = self.method
+    usage_mapping = usage_mapping or {}
+    usage_format = self.get_usage_format()  # pylint: disable=no-member
+    if short:
+      # just the summary line and opening sentence of the description
+      lines = usage_format.split('\n')
+      usage_lines = [lines.pop(0)]
+      while usage_lines[-1].endswith('\\'):
+        usage_lines.append(lines.pop(0))
+      if lines and lines[0].endswith('.'):
+        usage_lines.append(lines.pop(0))
+      usage_format = '\n'.join(usage_lines)
+    mapping = {
+        k: v
+        for k, v in sys.modules[method.__module__].__dict__.items()
+        if k and not k.startswith('_')
+    }
+    if usage_mapping:
+      mapping.update(usage_mapping)
+    if self.usage_mapping:
+      mapping.update(self.usage_mapping)
+    mapping.update(cmd=self.get_cmd())
+    with Pfx("format %r using %r", usage_format, mapping):
+      usage = usage_format.format_map(mapping)
+    if recurse or show_subcmds:
+      # include the (or some) subcmds
+      subusages = [
+          subcommand.usage_text(
+              short=short,
+              recurse=recurse,
+          )
+          for subcmd, subcommand in sorted(self.get_subcommands().items())
+          if show_subcmds is None or subcmd in show_subcmds
+      ]
+      if subusages:
+        subusage_listing = "\n".join(["Subcommands:", *map(indent, subusages)])
+        usage = f'{usage}\n{indent(subusage_listing)}'
+    return usage
 
   def usage_format(self):
     ''' Return the usage format string from the method docstring.
