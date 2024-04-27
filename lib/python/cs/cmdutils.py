@@ -1365,9 +1365,8 @@ class BaseCommand:
     unknown = False
     for subcmd in argv:
       with Pfx(subcmd):
-        subcmd_ = subcmd.replace('-', '_').replace('.', '_')
         try:
-          subcommand = subcmds[subcmd_]
+          subcommand = cls.subcommand(subcmd)
         except KeyError:
           warning("unknown subcommand")
           unknown = True
