@@ -205,6 +205,12 @@ class SubCommand:
         usage_format = self.default_usage()
     return usage_format
 
+  def get_usage_keywords(self):
+    ''' Return a mapping to be used when formatting the usage format string.
+    '''
+    usage_mapping = dict(getattr(self.method, 'USAGE_KEYWORDS', {}))
+    return usage_mapping
+
   def usage_text(
       self,
       short: bool,
