@@ -48,7 +48,7 @@ from types import SimpleNamespace as NS
 
 from cs.deco import ALL, decorator
 from cs.fs import shortpath
-from cs.lex import s, r, is_identifier  # pylint: disable=unused-import
+from cs.lex import s, r, is_identifier, is_dotted_identifier  # pylint: disable=unused-import
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
@@ -688,6 +688,56 @@ def trace(
   traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
   return traced_function_wrapper
 
+def trace_DEBUG(debug_spec=None):
+  ''' Apply the `@trace` decorator to functions specified by `debug_spec`,
+      default from the environment variable `$DEBUG`.
+  '''
+  with Pfx("trace_DEBUG"):
+    try:
+      import importlib
+    except ImportError as e:
+      warning("trace_DEBUG: cannot import importlib, no applying: %s", e)
+      return
+    if debug_spec is None:
+      debug_spec = os.environ.get('DEBUG', '')
+    if isinstance(debug_spec, str):
+      debug_spec = debug_spec.split(',')
+    with Pfx("%r", debug_spec):
+      module_names = []
+      function_names = []
+      for spec in debug_spec:
+        with Pfx(spec):
+          if is_dotted_identifier(spec):
+            module_names.sppend(spec)
+          elif ':' in spec:
+            # module:funcname
+            module_name, func_name = spec.split(':', 1)
+            if (is_dotted_identifier(module_name)
+                and is_dotted_identifier(func_name)):
+              function_names.append((module_name, func_name))
+    for module_name in module_names:
+      with Pfx("module %s", module_name):
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError as e:
+          warning("cannot import: %s", e)
+          continue
+        M.DEBUG = True
+    for module_name, func_name in function_names:
+      with Pfx("function %s:%s", module_name, func_name):
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError as e:
+          warning("cannot import: %s", e)
+          continue
+        try:
+          F = getattr(M, func_name)
+        except AttributeError as e:
+          warning("function %s not found: %s", e)
+          continue
+        if callable(F):
+          setattr(M, func_name, trace(F))
+
 def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.
   '''
@@ -733,3 +783,4 @@ if builtin_names_s:
         )
         continue
       setattr(builtins, builtin_name, vs[builtin_name])
+trace_DEBUG()
