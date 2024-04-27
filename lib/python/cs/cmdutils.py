@@ -123,8 +123,11 @@ class SubCommand:
   ''' An implementation for a subcommand.
   '''
 
-  cmd: str
-  method: Callable  # a method or a subclass of BaseCommand
+  # a method or a subclass of BaseCommand
+  method: Callable
+  # the notional name of the command/subcommand
+  cmd: str = None
+  # optional additional usage keyword mapping
   usage_mapping: Mapping[str, Any] = field(default_factory=dict)
 
   def __call__(
