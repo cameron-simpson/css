@@ -773,7 +773,12 @@ class BaseCommand:
     return subcommands[subcmd_]
 
   def usage_text(
-      cls, *, cmd=None, format_mapping=None, subcmd=None, short=False
+      self,
+      *,
+      cmd=None,
+      format_mapping=None,
+      subcmd=None,
+      short=False,
   ):
     ''' Compute the "Usage:" message for this class
         from the top level `USAGE_FORMAT`
@@ -786,63 +791,11 @@ class BaseCommand:
         * `subcmd`: constrain the usage to a particular subcommand named `subcmd`;
           this is used to produce a shorter usage for subcommand usage failures
     '''
-    if cmd is None:
-      cmd = cutsuffix(cls.__name__, 'Command').lower()
-    if format_mapping is None:
-      format_mapping = {}
-    format_mapping.setdefault('cmd', cmd)
-    has_subcmds = cls.has_subcommands()
-    subcmds = cls.subcommands()
-    usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
-    usage_format_mapping.update(format_mapping)
-    try:
-      usage_format = cls.USAGE_FORMAT
-    except AttributeError:
-      usage_format = "\n".join(
-          (
-              (
-                  'Usage: {cmd} subcommand [...]'
-                  if has_subcmds else 'Usage: {cmd} [...]'
-              ),
-              *stripped_dedent(cls.__doc__).split("\n"),
-          )
-      )
-    usage_message = usage_format.format_map(usage_format_mapping)
-    if subcmd:
-      if not has_subcmds:
-        raise ValueError("subcmd=%r: no subcommands!" % (subcmd,))
-      subcmd_ = subcmd.replace('-', '_').replace('.', '_')
-      try:
-        subcmds[subcmd_]
-      except KeyError:
-        # pylint: disable=raise-missing-from
-        raise ValueError(
-            "subcmd=%r: unknown subcommand, I know %r" %
-            (subcmd, sorted(subcmds.keys()))
-        )
-      subcmd = subcmd_
-    if has_subcmds:
-      subusages = []
-      for attr, subcmd_spec in (sorted(subcmds.items()) if subcmd is None else
-                                ((subcmd, subcmds[subcmd]),)):
-        with Pfx(attr):
-          subusage = subcmd_spec.usage_text(
-              short=short, usage_format_mapping=usage_format_mapping
-          )
-          if subusage:
-            subusages.append(subusage.replace('\n', '\n  '))
-      if subusages:
-        subcmds_header = 'Subcommands' if subcmd is None else 'Subcommand'
-        if short:
-          subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
-        usage_message = '\n'.join(
-            [
-                usage_message,
-                '  ' + subcmds_header + ':',
-            ] +
-            ['  ' + subusage.replace('\n', '\n  ') for subusage in subusages]
-        )
-    return usage_message
+    return SubCommand(
+        method=type(self), cmd=self.cmd
+    ).usage_text(
+        short=short, show_subcmds=subcmd or True
+    )
 
   @classmethod
   def subcommand_usage_text(
