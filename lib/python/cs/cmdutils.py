@@ -130,6 +130,14 @@ class SubCommand:
   # optional additional usage keyword mapping
   usage_mapping: Mapping[str, Any] = field(default_factory=dict)
 
+  def get_cmd(self) -> str:
+    if self.cmd is None:
+      method = self.method
+      if isclass(method):
+        return cutsuffix(method.__name__, 'Command').lower()
+      return cutprefix(method.__name__, self.SUBCOMMAND_METHOD_PREFIX)
+    return self.cmd
+
   def __call__(
       self, subcmd: str, base_command: "BaseCommandSubType", argv: List[str]
   ):
