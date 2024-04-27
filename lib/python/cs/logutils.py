@@ -506,7 +506,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
     level = logging.VERBOSE
   else:
     level = logging.WARNING
-  flags = [F.upper() for F in env_debug.split(',') if len(F)]
+  flags = []
   for flag in env_debug.split(','):
     flag = flag.strip()
     if not flag:
@@ -527,6 +527,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       pass
     else:
       uc_flag = flag.upper()
+      flags.append(uc_flag)
       if uc_flag == 'DEBUG':
         level = logging.DEBUG
       elif uc_flag == 'STATUS':
