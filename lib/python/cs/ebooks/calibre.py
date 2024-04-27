@@ -1091,13 +1091,15 @@ class CalibreCommand(BaseCommand):
   GETOPT_SPEC = 'C:K:O:'
 
   USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]
-  -C calibre_library
-    Specify calibre library location.
-  -K kindle_library
-    Specify kindle library location.
-  -O other_calibre_library
-    Specify alternate calibre library location, the default library
-    for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.'''
+  Operate on a Calibre library.
+  Options:
+    -C calibre_library
+      Specify calibre library location.
+    -K kindle_library
+      Specify kindle library location.
+    -O other_calibre_library
+      Specify alternate calibre library location, the default library
+      for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.'''
 
   # envar $CALIBRE_LIBRARY_OTHER as push/pull etc "other library"
   OTHER_LIBRARY_PATH_ENVVAR = CalibreTree.FSPATH_ENVVAR + '_OTHER'
