@@ -289,49 +289,6 @@ class SubCommand:
         usage = f'{usage}\n{indent(subusage_listing)}'
     return usage
 
-  def usage_format(self):
-    ''' Return the usage format string from the method docstring.
-    '''
-    doc = obj_docstring(self.method)
-    if doc:
-      if 'Usage:' in doc:
-        # extract the Usage: paragraph
-        pre_usage, post_usage = doc.split('Usage:', 1)
-        pre_usage = pre_usage.strip()
-        post_usage_format, *_ = post_usage.split('\n\n', 1)
-        subusage_format = stripped_dedent(post_usage_format)
-      else:
-        # extract the first paragraph
-        lines = ['{cmd} ...']
-        doc_p1 = stripped_dedent(doc.split('\n\n', 1)[0])
-        if doc_p1:
-          lines.extend(map(format_escape, doc_p1.split('\n')))
-        subusage_format = "\n  ".join(lines)
-    else:
-      # default usage text
-      subusage_format = '{cmd} ...'
-    return subusage_format
-
-class _ClassSubCommand(_BaseSubCommand):
-  ''' A class to represent a subcommand implemented with a `BaseCommand` subclass.
-  '''
-
-  def __call__(
-      self, subcmd: str, command: "BaseCommandSubType", argv: List[str]
-  ):
-    subcmd_class = self.method
-    updates = command.options.as_dict()
-    updates.update(cmd=subcmd)
-    command = pfx_call(subcmd_class, argv, **updates)
-    return command.run()
-
-  def usage_format(self) -> str:
-    ''' Return the usage format string from the class.
-    '''
-    doc = self.method.usage_text(cmd=self.cmd)
-    subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
-    return subusage_format
-
 # gimmkicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
     n='dry_run',
