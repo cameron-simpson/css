@@ -231,6 +231,7 @@ class SubCommand:
       return {}
     return get_subcommands()
 
+  @typechecked
   def usage_text(
       self,
       *,
@@ -289,7 +290,7 @@ class SubCommand:
         usage = f'{usage}\n{indent(subusage_listing)}'
     return usage
 
-# gimmkicked name to support @fmtdoc on BaseCommandOptions.popopts
+# gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
     n='dry_run',
     q='quiet',
@@ -640,7 +641,7 @@ class BaseCommand:
         and with `cmd=None` for `main`.
     '''
     subcmds = self.subcommands()
-    has_subcmds = subcmds and sorted(subcmds) != ['help', 'shell']
+    has_subcmds = self.has_subcommands()
     if argv is None:
       # using sys.argv:
       # argv0 comes from sys.argv[0], which is discarded
@@ -656,7 +657,7 @@ class BaseCommand:
       else:
         argv0 = cmd
     if cmd is None:
-      cmd = basename(argv0)
+      cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
     self.cmd = cmd
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
@@ -672,7 +673,6 @@ class BaseCommand:
     self._printed_usage = False
     # we catch GetoptError from this suite...
     subcmd = None  # default: no subcmd specific usage available
-    short_usage = False
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
       # catch bare -h or --help if no 'h' in the getopt_spec
@@ -681,11 +681,8 @@ class BaseCommand:
         argv = ['help']
       else:
         # we do this regardless in order to honour '--'
-        try:
-          opts, argv = getopt(argv, getopt_spec, '')
-        except GetoptError:
-          short_usage = True
-          raise
+
+        opts, argv = getopt(argv, getopt_spec, '')
         self.apply_opts(opts)
         # we do this regardless so that subclasses can do some presubcommand parsing
         # after any command line options
@@ -699,13 +696,12 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
-        self._run = _MethodSubCommand(None, main)
+        self._run = SubCommand(main)
       else:
         # expect a subcommand on the command line
         if not argv:
           default_argv = getattr(self, 'SUBCOMMAND_ARGV_DEFAULT', None)
           if not default_argv:
-            short_usage = True
             raise GetoptError(
                 "missing subcommand, expected one of: %s" %
                 (', '.join(sorted(subcmds.keys())),)
@@ -720,7 +716,6 @@ class BaseCommand:
           subcommand = subcmds[subcmd_]
         except KeyError:
           # pylint: disable=raise-missing-from
-          short_usage = True
           bad_subcmd = subcmd
           subcmd = None
           raise GetoptError(
@@ -736,7 +731,7 @@ class BaseCommand:
           cmd,
           self.options,
           e,
-          self.usage_text(subcmd=subcmd, short=short_usage),
+          self.usage_text(subcmd=subcmd, short=True),
       ):
         self._printed_usage = True
         return
@@ -756,7 +751,9 @@ class BaseCommand:
       if method_name.startswith(prefix):
         method = getattr(cls, method_name)
         subcmd = cutprefix(method_name, prefix)
-        mapping[subcmd] = SubCommand(subcmd, method, class_usage_mapping)
+        mapping[subcmd] = SubCommand(
+            method, cmd=subcmd, usage_mapping=class_usage_mapping
+        )
     return mapping
 
   @classmethod
