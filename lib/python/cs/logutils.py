@@ -492,8 +492,6 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       Return an object with the following attributes:
       * `.level`: A logging level.
       * `.flags`: All the words from `$DEBUG` as separated by commas and uppercased.
-      * `.module_names`: Module names to be debugged.
-      * `.function_names`: Functions to be traced in the form *module_name*`.`*func_name*.
   '''
   if env_debug is None:
     if environ is None:
@@ -509,8 +507,6 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   else:
     level = logging.WARNING
   flags = [F.upper() for F in env_debug.split(',') if len(F)]
-  module_names = []
-  function_names = []
   for flag in env_debug.split(','):
     flag = flag.strip()
     if not flag:
@@ -524,13 +520,11 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       else:
         level = logging.INFO
     elif flag[0].islower() and is_dotted_identifier(flag):
-      # modulename
-      module_names.append(flag)
+      # modulename - now honoured by cs.debug, not this
+      pass
     elif ':' in flag:
-      # module:funcname
-      module_name, func_name = flag.split(':', 1)
-      if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
-        function_names.append((module_name, func_name))
+      # module:funcname - now honoured by cs.debug, not this
+      pass
     else:
       uc_flag = flag.upper()
       if uc_flag == 'DEBUG':
@@ -549,8 +543,6 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   return NS(
       level=level,
       flags=flags,
-      module_names=module_names,
-      function_names=function_names
   )
 
 def D(msg, *args):
