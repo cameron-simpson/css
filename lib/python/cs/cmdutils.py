@@ -164,7 +164,46 @@ class SubCommand:
         if has_subcommands_test() else '{cmd} [options...]'
     )
 
+  def get_usage_format(self) -> str:
+    ''' Return the usage format string for this subcommand.
+
+        This first tries `self.method.USAGE_FORMAT`, falling back
+        to deriving it from `obj_docstring(self.method)`.
+        Usually a subcommand with is another `BaseCommand` instance
+        will have a `.USAGE_FORMAT` attribute and a subcommand which
+        is a method will derive the usage from its docstring.
+
+        When deriving from the docstring we look for a paragraph
+        commencing with the string `Usage:` and otherwise fall back
+        to its first parapgraph.
+    '''
+    try:
+      usage_format = self.USAGE_FORMAT
+    except AttributeError:
+      doc = obj_docstring(self.method)
+      if doc:
+        try:
+          _, post_usage = doc.split('Usage:', 1)
+        except ValueError:
+          # default usage line and first paragraph
+          usage_format = self.default_usage()
+          paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
+          if paragraph1:
+            usage_format = f'{usage_format}\n{indent(paragraph1)}'
         else:
+          # extract the Usage: paragraph
+          usage_format, *_ = post_usage.strip().split('\n\n', 1)
+          try:
+            top_line, post_lines = usage_format.split("\n", 1)
+          except ValueError:
+            # single line usage only
+            pass
+          else:
+            usage_format = f'{top_line}\n{indent(post_lines)}'
+      else:
+        # default usage text
+        usage_format = self.default_usage()
+    return usage_format
 
   def usage_text(
       self,
