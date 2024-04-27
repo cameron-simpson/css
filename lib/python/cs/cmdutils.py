@@ -766,6 +766,12 @@ class BaseCommand:
     return bool(subcmds)
 
   @classmethod
+  @cache
+  def subcommand(cls, subcmd: str):
+    subcmd_ = subcmd.replace('-', '_').replace('.', '_')
+    subcommands = cls.subcommands()
+    return subcommands[subcmd_]
+
   def usage_text(
       cls, *, cmd=None, format_mapping=None, subcmd=None, short=False
   ):
