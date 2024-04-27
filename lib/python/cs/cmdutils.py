@@ -211,6 +211,26 @@ class SubCommand:
     usage_mapping = dict(getattr(self.method, 'USAGE_KEYWORDS', {}))
     return usage_mapping
 
+  def get_subcmds(self):
+    ''' Return the names of `self.method`'s subcommands in lexical order.
+    '''
+    method = self.method
+    try:
+      get_subcommands = method.subcommands
+    except AttributeError:
+      return []
+    return sorted(get_subcommands().keys())
+
+  def get_subcommands(self):
+    ''' Return `self.method`'s mapping of subcommand name to `SubCommand`.
+    '''
+    method = self.method
+    try:
+      get_subcommands = method.subcommands
+    except AttributeError:
+      return {}
+    return get_subcommands()
+
   def usage_text(
       self,
       short: bool,
