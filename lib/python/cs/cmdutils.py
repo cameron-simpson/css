@@ -15,8 +15,10 @@ from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import cache, partial
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
+from itertools import chain
 from os.path import basename
 try:
   import readline  # pylint: disable=unused-import
@@ -25,7 +27,7 @@ except ImportError:
 import shlex
 from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 import sys
-from typing import Callable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 
 from typeguard import typechecked
 
@@ -35,6 +37,7 @@ from cs.lex import (
     cutprefix,
     cutsuffix,
     format_escape,
+    indent,
     is_identifier,
     r,
     stripped_dedent,
@@ -251,7 +254,6 @@ class SubCommand:
         show_subcmds = []
     elif isinstance(show_subcmds, str):
       show_subcmds = [show_subcmds]
-    method = self.method
     usage_mapping = usage_mapping or {}
     usage_format = self.get_usage_format()  # pylint: disable=no-member
     if short:
