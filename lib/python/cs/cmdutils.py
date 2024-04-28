@@ -680,7 +680,7 @@ class BaseCommand:
     loginfo = setup_logging(cmd=self.cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
-    self._run = lambda subcmd, command, argv: 2
+    self._run = lambda argv: 2
     # we catch GetoptError from this suite...
     subcmd = None  # default: no subcmd specific usage available
     try:
