@@ -1,6 +1,9 @@
+:import     CSS_HG_REPOS
+
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-hg_repos        = sr.ht-css ssh://janus-wg/hg/css ssh://borg-wg/hg/css
+##hg_repos        = sr.ht-css ssh://janus-wg/hg/css ssh://borg-wg/hg/css
+hg_repos        = sr.ht-css $(CSS_HG_REPOS)
 git_repos       = bitbucket-css github-css
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
