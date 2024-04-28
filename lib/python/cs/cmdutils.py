@@ -1185,14 +1185,12 @@ class BaseCommand:
         then this may be provided by the `run_context()`
         context manager method.
     '''
-    # short circuit if we've already complainted about bad invocation
-    if self._printed_usage:
-      return 2
+    self._prerun_setup()
     options = self.options
     try:
       with self.run_context(**kw_options):
         try:
-          return self._run(self._subcmd, self, self._argv)
+          return self._run(self, self._argv)
         except CancellationError:
           error("cancelled")
           return 1
@@ -1201,11 +1199,8 @@ class BaseCommand:
           self.cmd,
           options,
           e,
-          (None if self._printed_usage else self.usage_text(
-              cmd=self.cmd, subcmd=self._subcmd)),
-          subcmd=self._subcmd,
+          self.usage_text(cmd=self.cmd),
       ):
-        self._printed_usage = True
         return 2
       raise
 
@@ -1252,7 +1247,7 @@ class BaseCommand:
     '''
     warning("%s", e)
     if usage:
-      print(usage.rstrip(), file=sys.stderr)
+      print("Usage:", usage, file=sys.stderr)
     return True
 
   @uses_runstate
