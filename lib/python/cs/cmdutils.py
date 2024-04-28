@@ -135,6 +135,12 @@ class SubCommand:
   # optional additional usage keyword mapping
   usage_mapping: Mapping[str, Any] = field(default_factory=dict)
 
+  @property
+  def instance(self):
+    ''' An instance of the class for `self.method`.
+    '''
+    return self.method(...) if isclass(self.method) else self.method.__self__
+
   def get_cmd(self) -> str:
     if self.cmd is None:
       method = self.method
