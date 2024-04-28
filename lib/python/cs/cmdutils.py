@@ -149,19 +149,20 @@ class SubCommand:
       return cutprefix(method.__name__, self.SUBCOMMAND_METHOD_PREFIX)
     return self.cmd
 
-  def __call__(
-      self, subcmd: str, base_command: "BaseCommandSubType", argv: List[str]
-  ):
+  @typechecked
+  def __call__(self, base_command: "BaseCommandSubType", argv: List[str]):
     ''' Run the subcommand.
 
         Parameters:
-        * `subcmd`: the subcommand name
         * `base_command`: the instance of `BaseCommand`
         * `argv`: the command line arguments after the subcommand name
     '''
     method = self.method
     if isclass(method):
-      return pfx_call(method, argv, cmd=self.get_cmd()).run()
+      # plumb the options through to the subcommand
+      updates = base_command.options.as_dict()
+      updates.update(cmd=self.get_cmd())
+      return pfx_call(method, argv, **updates).run()
     return method(argv)
 
   def default_usage(self):
