@@ -1279,15 +1279,14 @@ class BaseCommand:
       run_options = self.options.copy(**kw_options)
       with run_options:  # make the default ThreadState
         with stackattrs(self, options=run_options):
-          with stackattrs(self, cmd=self._subcmd or self.cmd):
-            with upd:
-              with runstate:
-                with runstate.catch_signal(
-                    run_options.runstate_signals,
-                    call_previous=False,
-                    handle_signal=self.handle_signal,
-                ):
-                  yield
+          with upd:
+            with runstate:
+              with runstate.catch_signal(
+                  run_options.runstate_signals,
+                  call_previous=False,
+                  handle_signal=self.handle_signal,
+              ):
+                yield
 
     finally:
       pass
