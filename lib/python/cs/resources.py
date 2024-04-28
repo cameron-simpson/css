@@ -29,7 +29,7 @@ from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20240422-post'
+__version__ = '20240423-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -859,7 +859,7 @@ class RunStateMixin(object):
 
   @uses_runstate
   @typechecked
-  def __init__(self, runstate: Union[RunState, str]):
+  def __init__(self, *, runstate: Union[RunState, str]):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
         Parameters:

@@ -18,7 +18,7 @@ from cs.resources import MultiOpenMixin
 from cs.result import Result
 from cs.seq import unrepeated
 
-__version__ = '20240412-post'
+__version__ = '20240422.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,11 +28,17 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
+        'cs.deco',
+        'cs.fileutils',
+        'cs.fs',
+        'cs.hashindex',
         'cs.lex',
+        'cs.pfx',
         'cs.queues',
         'cs.resources',
         'cs.result',
         'cs.seq',
+        'icontract',
     ],
 }
 
@@ -453,6 +459,7 @@ from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.seq import splitoff
 
+@fmtdoc
 class ConvCache(HasFSPath):
   ''' A cache for conversions of file contents such as thumbnails
       or transcoded media, etc. This keeps cached results in a file

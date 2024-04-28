@@ -48,7 +48,7 @@ from types import SimpleNamespace as NS
 
 from cs.deco import ALL, decorator
 from cs.fs import shortpath
-from cs.lex import s, r, is_identifier  # pylint: disable=unused-import
+from cs.lex import s, r, is_identifier, is_dotted_identifier  # pylint: disable=unused-import
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
@@ -60,7 +60,7 @@ from cs.seq import seq
 from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20230613.1-post'
+__version__ = '20240423-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -80,6 +80,7 @@ DISTINFO = {
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
+        'cs.upd',
         'cs.x',
     ],
 }
@@ -487,9 +488,13 @@ def trace_caller(func):
   def subfunc(*a, **kw):
     frame = caller()
     D(
-        "CALL %s()<%s:%d> FROM %s()<%s:%d>", func.__name__,
-        func.__code__.co_filename, func.__code__.co_firstlineno,
-        frame.funcname, frame.filename, frame.lineno
+        "CALL %s()<%s:%d> FROM %s()<%s:%d>",
+        func.__name__,
+        func.__code__.co_filename,
+        func.__code__.co_firstlineno,
+        frame.name,
+        frame.filename,
+        frame.lineno,
     )
     return func(*a, **kw)
 
@@ -642,30 +647,96 @@ def trace(
       xlog("%sCALL " + fmt, _trace_indent, *av)
     old_indent = _trace_indent
     _trace_indent += '  '
+    start_time = time.time()
     try:
       result = func(*a, **kw)
     except Exception as e:
+      end_time = time.time()
       if exception:
-        xlog("%sCALL %s RAISE %r", _trace_indent, log_cite, e)
+        xlog(
+            "%sCALL %s %gs RAISE %r",
+            _trace_indent,
+            log_cite,
+            end_time - start_time,
+            e,
+        )
       _trace_indent = old_indent
       raise
     else:
+      end_time = time.time()
       if retval:
         xlog(
-            "%sCALL %s RETURN %s",
+            "%sCALL %s %gs RETURN %s",
             _trace_indent,
             log_cite,
+            end_time - start_time,
             (pformat if use_pformat else repr)(result),
         )
       else:
         ##xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
-        xlog("%sRETURN %s <= %s", _trace_indent, s(result), log_cite)
+        xlog(
+            "%sRETURN %gs %s <= %s",
+            _trace_indent,
+            end_time - start_time,
+            s(result),
+            log_cite,
+        )
       _trace_indent = old_indent
       return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
   traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
   return traced_function_wrapper
+
+def trace_DEBUG(debug_spec=None):
+  ''' Apply the `@trace` decorator to functions specified by `debug_spec`,
+      default from the environment variable `$DEBUG`.
+  '''
+  with Pfx("trace_DEBUG"):
+    try:
+      import importlib
+    except ImportError as e:
+      warning("trace_DEBUG: cannot import importlib, no applying: %s", e)
+      return
+    if debug_spec is None:
+      debug_spec = os.environ.get('DEBUG', '')
+    if isinstance(debug_spec, str):
+      debug_spec = debug_spec.split(',')
+    with Pfx("%r", debug_spec):
+      module_names = []
+      function_names = []
+      for spec in debug_spec:
+        with Pfx(spec):
+          if is_dotted_identifier(spec):
+            module_names.sppend(spec)
+          elif ':' in spec:
+            # module:funcname
+            module_name, func_name = spec.split(':', 1)
+            if (is_dotted_identifier(module_name)
+                and is_dotted_identifier(func_name)):
+              function_names.append((module_name, func_name))
+    for module_name in module_names:
+      with Pfx("module %s", module_name):
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError as e:
+          warning("cannot import: %s", e)
+          continue
+        M.DEBUG = True
+    for module_name, func_name in function_names:
+      with Pfx("function %s:%s", module_name, func_name):
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError as e:
+          warning("cannot import: %s", e)
+          continue
+        try:
+          F = getattr(M, func_name)
+        except AttributeError as e:
+          warning("function %s not found: %s", e)
+          continue
+        if callable(F):
+          setattr(M, func_name, trace(F))
 
 def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.
@@ -712,3 +783,6 @@ if builtin_names_s:
         )
         continue
       setattr(builtins, builtin_name, vs[builtin_name])
+
+# honour the $DEBUG trace flags
+trace_DEBUG()

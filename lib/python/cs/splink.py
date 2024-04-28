@@ -123,7 +123,7 @@ DEFAULT_PLOT_EVENT_LABELS = (
 pfx_listdir = partial(pfx_call, os.listdir)
 
 def main(argv=None):
-  ''' SP-Link command line mode.
+  ''' SP-Link command line mode using the `SPLinkCommand` class.
   '''
   return SPLinkCommand(argv).run()
 

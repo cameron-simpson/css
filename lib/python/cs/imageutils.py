@@ -18,6 +18,26 @@ from cs.psutils import run
 
 __all__ = []
 
+__version__ = '20240422.1-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 5 - Production/Stable",
+        "Environment :: Console",
+        "Intended Audience :: Developers",
+        "Programming Language :: Python :: 3",
+        'Topic :: Multimedia :: Graphics :: Graphics Conversion',
+    ],
+    'install_requires': [
+        'cs.cache',
+        'cs.deco',
+        'cs.pfx',
+        'cs.psutils',
+        'Pillow',
+    ],
+}
+
 @ALL
 class ThumbnailCache(ConvCache):
   ''' A class to manage a collection of thumbnail images.
@@ -113,6 +133,7 @@ def sixel(imagepath: str) -> str:
   '''
   return convof(imagepath, 'im/sixel', create_sixel, ext='sixel')
 
+@ALL
 def sixel_from_image_bytes(image_bs: bytes) -> str:
   ''' Return the filesystem path of a cached SIXEL version of the
       image data in `image_bs`.

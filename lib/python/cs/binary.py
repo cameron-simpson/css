@@ -19,8 +19,8 @@
     Terminology used below:
     * buffer:
       an instance of `cs.buffer.CornuCopyBuffer`,
-      which presents an iterable of bytes-like values
-      via various useful methods;
+      which manages an iterable of bytes-like values
+      and has various useful methods;
       it also has a few factory methods to make one from a variety of sources
       such as bytes, iterables, binary files, `mmap`ped files,
       TCP data streams, etc.
@@ -75,7 +75,7 @@ from cs.lex import cropped, cropped_repr, typed_str
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
-__version__ = '20240316-post'
+__version__ = '20240422-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1238,7 +1238,14 @@ class _BinaryMultiValue_Base(SimpleBinary):
     )
 
   __str__ = _s
+
   ##__repr__ = _s
+
+  def for_json(self):
+    return {
+        field_name: getattr(self, field_name)
+        for field_name in self.FIELD_ORDER
+    }
 
   @classmethod
   def parse(cls, bfr):

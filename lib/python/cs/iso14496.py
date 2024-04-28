@@ -54,12 +54,12 @@ from cs.threads import locked_property, ThreadState
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
-__version__ = '20231129-post'
+__version__ = '20240422-post'
 
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
-        "Development Status :: 2 - Beta",
+        "Development Status :: 4 - Beta",
         "Environment :: Console",
         "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
@@ -69,7 +69,9 @@ DISTINFO = {
         'cs.binary',
         'cs.buffer',
         'cs.cmdutils',
+        'cs.fs',
         'cs.fstags',
+        'cs.imageutils',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -78,6 +80,8 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'icontract',
+        'typeguard',
     ],
 }
 
@@ -215,6 +219,7 @@ class MP4Command(BaseCommand):
     '''
     if not argv:
       argv = ['-']
+    xit = 0
     for spec in argv:
       with Pfx(spec):
         if spec == '-':
@@ -229,17 +234,24 @@ class MP4Command(BaseCommand):
             if tags:
               print(' ', box.box_type_path, str(len(tags)) + ':')
               for tag in tags:
-                if tag.name == 'moov.udta.meta.ilst.cover':
-                  image_bs = b64decode(tag.value)
-                  if sys.stdout.isatty():
-                    print(f'    {tag.name}:')
-                    with open(sixel_from_image_bytes(image_bs),
-                              'rb') as sixelf:
-                      print(sixelf.read().decode('ascii'))
+                with Pfx(tag.name):
+                  if tag.name == 'moov.udta.meta.ilst.cover':
+                    image_bs = b64decode(tag.value)
+                    if sys.stdout.isatty():
+                      print(f'    {tag.name}:')
+                      with open(sixel_from_image_bytes(image_bs),
+                                'rb') as sixelf:
+                        print(sixelf.read().decode('ascii'))
+                    else:
+                      print(f'    {tag.name}: {image_bs[:32]!r}...')
                   else:
-                    print(f'    {tag.name}: {image_bs[:32]!r}...')
-                else:
-                  print('   ', tag)
+                    try:
+                      print('   ', tag)
+                    except TypeError as e:
+                      warning("cannot print: %s", e)
+                      xit = 1
+                      print('   ', tag.name, '=', repr(tag.value))
+    return xit
 
   def cmd_parse(self, argv):
     ''' Usage: {cmd} [{{-|filename}}...]
