@@ -765,11 +765,10 @@ class BaseCommand:
         )
     return mapping
 
-  @classmethod
-  def has_subcommands(cls):
+  def has_subcommands(self):
     ''' Test whether the class defines additional subcommands.
     '''
-    subcmds = set(cls.subcommands())
+    subcmds = set(self.subcommands())
     subcmds.discard('help')
     subcmds.discard('shell')
     return bool(subcmds)
