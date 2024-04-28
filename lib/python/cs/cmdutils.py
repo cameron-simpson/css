@@ -126,8 +126,6 @@ class SubCommand:
   ''' An implementation for a subcommand.
   '''
 
-  # the source BaseCommand instance
-  command: "BaseCommand"
   # a method or a subclass of BaseCommand
   method: Callable
   # the notional name of the command/subcommand
@@ -710,7 +708,7 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
-        self._run = SubCommand(self, main)
+        self._run = SubCommand(main)
       else:
         # expect a subcommand on the command line
         if not argv:
@@ -763,7 +761,7 @@ class BaseCommand:
         method = getattr(self, method_name)
         subcmd = cutprefix(method_name, prefix)
         mapping[subcmd] = SubCommand(
-            self, method, cmd=subcmd, usage_mapping=usage_mapping
+            method, cmd=subcmd, usage_mapping=usage_mapping
         )
     return mapping
 
