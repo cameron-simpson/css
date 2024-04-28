@@ -89,6 +89,20 @@ class VTURI(Promotable):
     with open(uri_path) as cachef:
       return cls.from_uri(cachef.readline().strip())
 
+  def saveas(self, fspath):
+    ''' Save the contents of this `VTURI` to the filesystem path `fspath`.
+    '''
+    filename = uri.filename or f'{uri.hashcode.hex()}.{uri.hashcode.hashname}'
+    with atomic_filename(fspath) as f:
+      for B in progressbar(
+          uri.block.leaves,
+          filename,
+          itemlenfunc=len,
+          total=len(uri.block),
+      ):
+        assert not B.indirect
+        f.write(bytes(B))
+
   @classmethod
   def promote(cls, obj) -> "VTURI":
     ''' Promote `obj` to a `VTURI`.
