@@ -256,7 +256,7 @@ class SubCommand:
     ''' Return the filled out usage text for this subcommand.
     '''
     if show_subcmds is None:
-      show_subcmds = not short
+      show_subcmds = True
     if isinstance(show_subcmds, bool):
       if show_subcmds:
         show_subcmds = self.get_subcmds()
