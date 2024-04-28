@@ -168,9 +168,14 @@ class SubCommand:
   def default_usage(self):
     ''' Return `'{cmd} [options...]'` or `'{cmd} subcommand [options...]'`.
     '''
-    has_subcommands_test = getattr(
-        self.method, 'has_subcommands', lambda: False
-    )
+    if isclass(self.method):
+      has_subcommands_test = getattr(
+          self.instance, 'has_subcommands', lambda: False
+      )
+    else:
+      has_subcommands_test = getattr(
+          self.method, 'has_subcommands', lambda: False
+      )
     return (
         '{cmd} subcommand [options...]'
         if has_subcommands_test() else '{cmd} [options...]'
