@@ -325,8 +325,9 @@ def setup_logging(**kw):
       It is also available as the global `cs.logutils.loginfo`.
   '''
   global loginfo
-  loginfo = LoggingState(**kw)
-  loginfo.apply()
+  logstate = LoggingState(**kw)
+  logstate.apply()
+  loginfo = logstate
   return loginfo
 
 class PfxFormatter(Formatter):
