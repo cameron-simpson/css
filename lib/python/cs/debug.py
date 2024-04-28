@@ -783,4 +783,6 @@ if builtin_names_s:
         )
         continue
       setattr(builtins, builtin_name, vs[builtin_name])
+
+# honour the $DEBUG trace flags
 trace_DEBUG()
