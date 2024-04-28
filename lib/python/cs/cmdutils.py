@@ -650,37 +650,39 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
-    subcmds = self.subcommands()
-    has_subcmds = self.has_subcommands()
     if argv is None:
-      # using sys.argv:
-      # argv0 comes from sys.argv[0], which is discarded
+      # using sys.argv
       argv = list(sys.argv)
-      argv0 = argv.pop(0)
+    elif argv is ...:
+      # dummy mode for BaseCOmmand instances made to access this
+      # but not run a command
+      pass
     else:
-      # argv provided:
-      # if cmd is None, pop argv0 from argv
-      # otherwise set argv0=cmd
+      # argv provided
       argv = list(argv)
-      if cmd is None:
-        argv0 = argv.pop(0)
-      else:
-        argv0 = cmd
     if cmd is None:
-      cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
-    self.cmd = cmd
-    log_level = getattr(options, 'log_level', None)
-    loginfo = setup_logging(cmd, level=log_level)
-    # post: argv is list of arguments after the command name
-    self.loginfo = loginfo
-    options = self.options = self.Options(cmd=self.cmd)
+      if argv is ... or not argv:
+        cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
+      else:
+        cmd = basename(argv.pop(0))
+    options = self.Options(cmd=cmd)
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
+    self.cmd = cmd
     self._argv = argv
+    self.options = options
+
+  def _prerun_setup(self):
+    argv = self._argv
+    options = self.options
+    subcmds = self.subcommands()
+    has_subcmds = self.has_subcommands()
+    log_level = getattr(options, 'log_level', None)
+    loginfo = setup_logging(cmd=self.cmd, level=log_level)
+    # post: argv is list of arguments after the command name
+    self.loginfo = loginfo
     self._run = lambda subcmd, command, argv: 2
-    self._subcmd = None
-    self._printed_usage = False
     # we catch GetoptError from this suite...
     subcmd = None  # default: no subcmd specific usage available
     try:
@@ -706,7 +708,7 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
-        self._run = SubCommand(main)
+        self._run = SubCommand(self, main)
       else:
         # expect a subcommand on the command line
         if not argv:
@@ -721,9 +723,8 @@ class BaseCommand:
               if isinstance(default_argv, str) else list(default_argv)
           )
         subcmd = argv.pop(0)
-        subcmd_ = subcmd.replace('-', '_').replace('.', '_')
         try:
-          subcommand = subcmds[subcmd_]
+          subcommand = self.subcommand(subcmd)
         except KeyError:
           # pylint: disable=raise-missing-from
           bad_subcmd = subcmd
@@ -735,15 +736,13 @@ class BaseCommand:
               )
           )
         self._run = subcommand
-      self._subcmd = subcmd
     except GetoptError as e:
       if self.getopt_error_handler(
-          cmd,
+          options.cmd,
           self.options,
           e,
-          self.usage_text(subcmd=subcmd, short=True),
+          self.usage_text(short=True, show_subcmds=subcmd),
       ):
-        self._printed_usage = True
         return
       raise
 
