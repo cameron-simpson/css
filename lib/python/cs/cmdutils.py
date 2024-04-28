@@ -277,11 +277,7 @@ class SubCommand:
       if lines and lines[0].endswith('.'):
         usage_lines.append(lines.pop(0))
       usage_format = '\n'.join(usage_lines)
-    mapping = {
-        k: v
-        for k, v in sys.modules[method.__module__].__dict__.items()
-        if k and not k.startswith('_')
-    }
+    mapping = self.get_usage_keywords()
     if usage_mapping:
       mapping.update(usage_mapping)
     if self.usage_mapping:
