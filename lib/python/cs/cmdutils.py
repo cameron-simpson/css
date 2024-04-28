@@ -126,6 +126,8 @@ class SubCommand:
   ''' An implementation for a subcommand.
   '''
 
+  # the source BaseCommand instance
+  command: "BaseCommand"
   # a method or a subclass of BaseCommand
   method: Callable
   # the notional name of the command/subcommand
