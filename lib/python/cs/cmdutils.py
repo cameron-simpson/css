@@ -235,6 +235,8 @@ class SubCommand:
     ''' Return `self.method`'s mapping of subcommand name to `SubCommand`.
     '''
     method = self.method
+    if isclass(method):
+      method = method(...)
     try:
       get_subcommands = method.subcommands
     except AttributeError:
