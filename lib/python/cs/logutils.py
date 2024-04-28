@@ -358,33 +358,10 @@ def ftrace(func):
   '''
   M = func.__module__
 
-  def func_wrap(*a, **kw):
-    do_debug = M.__dict__.get('DEBUG', False)
-    wrapper = _ftrace(func) if do_debug else func
-    return wrapper(*a, **kw)
 
   return func_wrap
 
-def _ftrace(func):
-  ''' Decorator to trace the call and return of a function.
-  '''
-  fname = '.'.join((func.__module__, funccite(func)))
 
-  def traced_func(*a, **kw):
-    citation = "%s(*%s, **%s)" % (
-        fname, pformat(a, depth=1), pformat(kw, depth=2)
-    )
-    XP("CALL %s", citation)
-    try:
-      result = func(*a, **kw)
-    except Exception as e:
-      XP("EXCEPTION from %s: %s %s", citation, type(e), e)
-      raise
-    else:
-      XP("RESULT from %s: %r", citation, result)
-      return result
-
-  return traced_func
 
 class PfxFormatter(Formatter):
   ''' A Formatter subclass that has access to the program's `cmd` and `Pfx` state.
