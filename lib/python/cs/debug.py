@@ -622,6 +622,15 @@ def trace(
     with_pfx=False,
 ):
   ''' Decorator to report the call and return of a function.
+
+      Decorator parameters:
+      * `call`: trace the call, default `True`
+      * `retval`: trace the return, default `False`
+      * `exception`: trace raised exceptions, default `True`
+      * `use_pformat`: present the return value using
+        `pformat` instead of `repr`, default `False`
+      * `with_caller`: include the caller if this function, default `False`
+      * `with_pfx`: include the current `Pfx` prefix, default `False`
   '''
 
   citation = funccite(func)
