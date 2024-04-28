@@ -9,16 +9,14 @@
     and other command line related stuff.
 '''
 
-from abc import ABC, abstractmethod
 from cmd import Cmd
 from code import interact
 from collections import namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import cache, partial
+from functools import cache
 from getopt import getopt, GetoptError
-from inspect import isclass, ismethod
-from itertools import chain
+from inspect import isclass
 from os.path import basename
 try:
   import readline  # pylint: disable=unused-import
@@ -36,7 +34,6 @@ from cs.deco import default_params, fmtdoc, Promotable
 from cs.lex import (
     cutprefix,
     cutsuffix,
-    format_escape,
     indent,
     is_identifier,
     r,
