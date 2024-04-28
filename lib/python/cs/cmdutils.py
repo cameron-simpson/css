@@ -1291,16 +1291,13 @@ class BaseCommand:
     finally:
       pass
 
-  # pylint: disable=unused-argument
-  @classmethod
-  def cmd_help(cls, argv):
+  def cmd_help(self, argv):
     ''' Usage: {cmd} [-l] [subcommand-names...]
           Print help for subcommands.
           This outputs the full help for the named subcommands,
           or the short help for all subcommands if no names are specified.
           -l  Long help even if no subcommand-names provided.
     '''
-    subcmds = cls.subcommands()
     if argv and argv[0] == '-l':
       argv.pop(0)
       short = False
@@ -1308,28 +1305,24 @@ class BaseCommand:
       short = False
     else:
       short = True
+    subcmds = self.subcommands()
     argv = argv or sorted(subcmds)
-    xit = 0
-    print("help:")
     unknown = False
+    show_subcmds = []
     for subcmd in argv:
-      with Pfx(subcmd):
-        try:
-          subcommand = cls.subcommand(subcmd)
-        except KeyError:
-          warning("unknown subcommand")
-          unknown = True
-          xit = 1
-          continue
-        subusage = subcommand.usage_text(short)
-        if not subusage:
-          warning("no help")
-          xit = 1
-          continue
-        print(' ', subusage.replace('\n', '\n    '))
+      if subcmd in subcmds:
+        show_subcmds.append(subcmd)
+      else:
+        warning("unknown subcommand %r", subcmd)
+        unknown = True
     if unknown:
       warning("I know: %s", ', '.join(sorted(subcmds.keys())))
-    return xit
+    if short:
+      print("Longer help with the -l option.")
+    print(
+        "Usage:",
+        self.usage_text(short=short, show_subcmds=show_subcmds or None)
+    )
 
   def cmd_shell(self, argv):
     ''' Usage: {cmd}
