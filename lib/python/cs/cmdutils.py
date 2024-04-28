@@ -194,8 +194,9 @@ class SubCommand:
         commencing with the string `Usage:` and otherwise fall back
         to its first parapgraph.
     '''
+    method = self.method
     try:
-      usage_format = self.USAGE_FORMAT
+      usage_format = method.USAGE_FORMAT
     except AttributeError:
       doc = obj_docstring(self.method)
       if doc:
@@ -220,7 +221,9 @@ class SubCommand:
       else:
         # default usage text
         usage_format = self.default_usage()
-    return usage_format
+    # The existing USAGE_FORMAT based usages have the word "Usage:"
+    # at the front but this is supplied at print time now.
+    return cutprefix(usage_format, 'Usage:').lstrip()
 
   def get_usage_keywords(self):
     ''' Return a mapping to be used when formatting the usage format string.
