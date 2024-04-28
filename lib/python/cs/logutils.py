@@ -61,6 +61,7 @@ from threading import Lock
 import time
 import traceback
 from types import SimpleNamespace as NS
+
 from cs.ansi_colour import colourise, env_no_color
 from cs.context import stackattrs
 from cs.deco import fmtdoc, logging_wrapper
@@ -302,7 +303,7 @@ class LoggingState(NS):
       if loginfo is None:
         # only do this the first time
         # TODO: fix this clumsy hack, some kind of stackable state?
-        main_handler.setFormatter(PfxFormatter(format))
+        main_handler.setFormatter(PfxFormatter(self.format))
         if self.supplant_root_logger:
           root_logger.handlers.pop(0)
         root_logger.addHandler(main_handler)
