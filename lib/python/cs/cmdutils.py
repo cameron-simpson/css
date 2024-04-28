@@ -123,6 +123,8 @@ class SubCommand:
   ''' An implementation for a subcommand.
   '''
 
+  # the BaseCommand instance with which we're associated
+  command: "BaseCommand"
   # a method or a subclass of BaseCommand
   method: Callable
   # the notional name of the command/subcommand
@@ -145,17 +147,16 @@ class SubCommand:
     return self.cmd
 
   @typechecked
-  def __call__(self, base_command: "BaseCommandSubType", argv: List[str]):
+  def __call__(self, argv: List[str]):
     ''' Run the subcommand.
 
         Parameters:
-        * `base_command`: the instance of `BaseCommand`
         * `argv`: the command line arguments after the subcommand name
     '''
     method = self.method
     if isclass(method):
       # plumb the options through to the subcommand
-      updates = base_command.options.as_dict()
+      updates = self.command.options.as_dict()
       updates.update(cmd=self.get_cmd())
       return pfx_call(method, argv, **updates).run()
     return method(argv)
@@ -705,7 +706,7 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
-        self._run = SubCommand(main)
+        self._run = SubCommand(self, main)
       else:
         # expect a subcommand on the command line
         if not argv:
@@ -758,7 +759,7 @@ class BaseCommand:
         method = getattr(self, method_name)
         subcmd = cutprefix(method_name, prefix)
         mapping[subcmd] = SubCommand(
-            method, cmd=subcmd, usage_mapping=usage_mapping
+            self, method, cmd=subcmd, usage_mapping=usage_mapping
         )
     return mapping
 
@@ -795,7 +796,9 @@ class BaseCommand:
         * `subcmd`: constrain the usage to a particular subcommand named `subcmd`;
           this is used to produce a shorter usage for subcommand usage failures
     '''
-    return SubCommand(method=type(self)).usage_text(
+    return SubCommand(
+        self, method=type(self)
+    ).usage_text(
         short=short, show_subcmds=show_subcmds
     )
 
@@ -1187,7 +1190,7 @@ class BaseCommand:
     try:
       with self.run_context(**kw_options):
         try:
-          return self._run(self, self._argv)
+          return self._run(self._argv)
         except CancellationError:
           error("cancelled")
           return 1
