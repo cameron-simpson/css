@@ -773,11 +773,10 @@ class BaseCommand:
     subcmds.discard('shell')
     return bool(subcmds)
 
-  @classmethod
   @cache
-  def subcommand(cls, subcmd: str):
+  def subcommand(self, subcmd: str):
     subcmd_ = subcmd.replace('-', '_').replace('.', '_')
-    subcommands = cls.subcommands()
+    subcommands = self.subcommands()
     return subcommands[subcmd_]
 
   def usage_text(
