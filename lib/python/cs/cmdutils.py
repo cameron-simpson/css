@@ -748,22 +748,22 @@ class BaseCommand:
         return
       raise
 
-  @classmethod
   @cache
-  def subcommands(cls):
+  def subcommands(self):
     ''' Return a mapping of subcommand names to subcommand specifications
         for class attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
         by default `'cmd_'`.
     '''
+    cls = type(self)
     prefix = cls.SUBCOMMAND_METHOD_PREFIX
-    class_usage_mapping = getattr(cls, 'USAGE_KEYWORDS', {})
+    usage_mapping = getattr(cls, 'USAGE_KEYWORDS', {})
     mapping = {}
     for method_name in dir(cls):
       if method_name.startswith(prefix):
-        method = getattr(cls, method_name)
+        method = getattr(self, method_name)
         subcmd = cutprefix(method_name, prefix)
         mapping[subcmd] = SubCommand(
-            method, cmd=subcmd, usage_mapping=class_usage_mapping
+            self, method, cmd=subcmd, usage_mapping=usage_mapping
         )
     return mapping
 
