@@ -569,15 +569,7 @@ class VTCmd(BaseCommand):
           xit = 1
         else:
           filename = uri.filename or f'{uri.hashcode.hex()}.{uri.hashcode.hashname}'
-          with atomic_filename(filename) as f:
-            for B in progressbar(
-                uri.block.leaves,
-                filename,
-                itemlenfunc=len,
-                total=len(uri.block),
-            ):
-              assert not B.indirect
-              f.write(bytes(B))
+          uri.saveas(filename)
           print(uri_s, filename)
     return xit
 
