@@ -784,8 +784,8 @@ class BaseCommand:
       *,
       cmd=None,
       format_mapping=None,
-      subcmd=None,
       short=False,
+      show_subcmds=None,
   ):
     ''' Compute the "Usage:" message for this class
         from the top level `USAGE_FORMAT`
@@ -798,10 +798,8 @@ class BaseCommand:
         * `subcmd`: constrain the usage to a particular subcommand named `subcmd`;
           this is used to produce a shorter usage for subcommand usage failures
     '''
-    return SubCommand(
-        method=type(self), cmd=self.cmd
-    ).usage_text(
-        short=short, show_subcmds=subcmd or True
+    return SubCommand(method=type(self)).usage_text(
+        short=short, show_subcmds=show_subcmds
     )
 
   @pfx_method
