@@ -376,7 +376,7 @@ class PfxFormatter(Formatter):
     if isinstance(formatter, PfxFormatter):
       return
     try:
-      getattr(formatter, 'PfxFormatter__monkey_patched')
+      formatter.PfxFormatter__monkey_patched
     except AttributeError:
       old_format = formatter.format
 
@@ -401,7 +401,7 @@ class PfxFormatter(Formatter):
         try:
           with stackattrs(record, msg=new_msg, args=new_args):
             return old_format(record)
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except
           # unsupported in some way, fall back to the original
           # and lose the prefix
           return old_format(record)
