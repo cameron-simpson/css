@@ -1062,6 +1062,11 @@ class LiteralBlock(Block, prefix='LB'):
     '''
     return self._data
 
+  @property
+  @uses_Store
+  def hashcode(self, *, S: Store):
+    return S.add(self._data)
+
   def transcribe_inner(self) -> str:
     ''' Transcribe the block data in texthexified form.
     '''
