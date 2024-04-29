@@ -1,4 +1,4 @@
-VTURI.saveas: unpack a directory if self.isdir
+TODO: accept -f to specify the file?
 dk update: figure out the git rev associated with the imagewhich would be pulled, list log from fstag dk.lastrev to that rev
 cs.cmdutils/distinfo: cmd_blah descriptions should format the usage parts
 cs.cmdutils: recite module version in command usage message?
