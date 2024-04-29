@@ -429,6 +429,19 @@ class Block(Transcriber, ABC, prefix=None):
               break
             subB.pushto_queue(Q, progress=progress)
 
+  @property
+  def uri(self):
+    ''' The block reference as a `VTURI`.
+    '''
+    if isinstance(self, (HashCodeBlock, IndirectBlock)):
+      block = self
+    elif isinstance(self, LiteralBlock):
+      block = HashCodeBlock(data=self.data)
+    else:
+      raise TypeError(f'{self.__class__.__name__}.uri: not supported')
+    from .uri import VTURI  # pylint: disable=import-outside-toplevel
+    return VTURI(indirect=block.indirect, hashcode=block.hashcode)
+
   @classmethod
   @typechecked
   def promote(cls, blockish, added=False, literal_threshold=32) -> "Block":
@@ -460,15 +473,6 @@ class Block(Transcriber, ABC, prefix=None):
           return LiteralBlock(data=data)
         return HashCodeBlock(data=data, span=span, added=added)
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
-
-  @property
-  def uri(self):
-    ''' The block reference as a `VTURI`.
-    '''
-    if not isinstance(self, (HashCodeBlock, IndirectBlock)):
-      raise AttributeError(f'{self.__class__.__name__}.uri: not supported')
-    from .uri import VTURI  # pylint: disable=import-outside-toplevel
-    return VTURI(indirect=self.indirect, hashcode=self.hashcode)
 
 class BlockRecord(BinarySingleValue):
   ''' Support for binary parsing and transcription of blockrefs.
