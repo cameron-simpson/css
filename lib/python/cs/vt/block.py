@@ -717,7 +717,14 @@ class HashCodeBlock(Block, prefix='B'):
     '''
     _span = self._span
     if _span is None:
-      self._span = _span = len(self._data)
+      if self._data is None:
+        S = Store.default()
+        self._data = S[self.hashcode]
+      try:
+        self._span = _span = len(self._data)
+      except TypeError as e:
+        X("len(self._data): %s", e)
+        breakpoint()
     return _span
 
   @span.setter
