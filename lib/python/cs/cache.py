@@ -540,10 +540,9 @@ class ConvCache(HasFSPath):
         * `force`: option flag to require conversion even if the
           cache has an entry
     '''
-    conv_subpath = normpath(conv_subpath)
+    # ensure that conv_subpath is a clean normalised subpath
+    validate_rpath(conv_subpath)
     conv_subparts = splitpath(conv_subpath)
-    # TODO: is_valid_subpath?
-    assert conv_subparts and '.' not in conv_subparts and '..' not in conv_subparts
     if ext is None:
       # assume the first component is a file extension
       # works for things like png/64/64
