@@ -98,9 +98,10 @@ from pathlib import PurePath
 import shutil
 import sys
 from threading import Lock, RLock
-from typing import Mapping, Optional
+from typing import Any, Callable, Mapping, Optional, Tuple, Union
 
 from icontract import ensure, require
+from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -157,6 +158,7 @@ DISTINFO = {
         'cs.threads',
         'cs.upd',
         'icontract',
+        'typeguard',
     ],
 }
 
@@ -1639,7 +1641,7 @@ class HasFSTagsMixin:
 
 # pylint: disable=too-many-ancestors
 class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
-  ''' Class to manipulate the tags for a specific path.
+  ''' Class to manipulate the tags for a specific filesystem path.
   '''
 
   @uses_fstags
@@ -1831,6 +1833,17 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
     '''
     return self.merged_tags()
 
+  def cached_value(
+      self,
+      prefix: str,
+      name: str,
+      *,
+      state_func: Optional[Callable[str, Mapping[str, Any]]] = None,
+  ) -> "CachedValue":
+    ''' Return `CachedValue` managing the  `prefix.name` tag.
+    '''
+    return CachedValue(self, prefix, name, state_func=state_func)
+
   def infer_from_basename(self, rules=None):
     ''' Apply `rules` to the basename of this `TaggedPath`,
         return a `TagSet` of inferred `Tag`s.
@@ -1982,6 +1995,83 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
     ''' Return the path of the directory associated with this `FSTagsTagFile`.
     '''
     return dirname(self.fspath)
+
+class CachedValue:
+  ''' Manage a cached value stored in a `TaggedPath`.
+      The value and the validity state are stored in a prefixed
+      subsection of the tags.
+
+      This is how modules like `cs.hashindex` cache file content hashcodes.
+
+      The default state function is `TaggedPath.stat_size_mtime`,
+      which returns `{'st_size':st_size,'st_mtime':int(st_mtime)}` by default,
+      essentially the same criteria used by `rsync(1)` to skip
+      comparing file contents.
+
+      Example:
+
+            tags = fstags[fspath]
+            hash
+  '''
+
+  @typechecked
+  def __init__(
+      self,
+      taggedpath: TaggedPath,
+      prefix: str,
+      name: str,
+      *,
+      state_func: Optional[Callable[str, Mapping[str, Any]]] = None,
+  ):
+    ''' Initialise a cached value reference.
+
+        Parameters:
+        * `taggedpath`: the `TaggedPath` tagged file system path
+        * `prefix`: the tags prefix
+        * `name`: the tag name for the value
+        * `state_func`; an optional function to compute the current
+          state if `taggedpath`; the default is
+          `CachedValue.stat_size_mtime` which returns the current
+          file `st_size` and `st_mtime`
+    '''
+    if state_func is None:
+      state_func = self.stat_size_mtime
+    self.tags = taggedpath
+    self.prefix = prefix
+    self.name = name
+    self.state_func = state_func
+
+  @staticmethod
+  def stat_size_mtime(
+      fspath: str, round_mtime=int, follow_symlinks=True
+  ) -> dict:
+    ''' Return the default cache state mapping.
+        This function `stat`s the `fspath` and returns `{'size':st_size,'mtime':int(st_mtime)}`.
+    '''
+    st = os.stat(fspath) if follow_symlinks else os.lstat(fspath)
+    return dict(st_size=st.st_size, st_mtime=round_mtime(st.st_mtime))
+
+  def get(self) -> Tuple[Union[Any, None], Mapping[str, Any]]:
+    ''' Get the cached value if the current state matches the cache
+        state, otherwise `None`.
+        Return the valu or `None` and the current state.
+    '''
+    current_state = self.state_func(self.tags.fspath)
+    subtags = self.tags.subtags(self.prefix)
+    cache_state = {k: subtags.get(k) for k in current_state.keys()}
+    return (
+        subtags.get(self.name) if cache_state == current_state else None
+    ), current_state
+
+  def set(self, value: Any, *, state: Mapping = None):
+    ''' Update the cached value and associated state.
+        If the state is omitted, the current state is used.
+    '''
+    if state is None:
+      state = self.state_func(self.tags.fspath)
+    subtags = self.tags.subtags(self.prefix)
+    subtags.update(state)
+    subtags[self.name] = value
 
 class CascadeRule:
   ''' A cascade rule of possible source tag names to provide a target tag.
