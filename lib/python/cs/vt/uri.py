@@ -19,6 +19,21 @@ from .hash import HashCode
 @dataclass
 class VTURI(Promotable):
   ''' A representation of a `HashCodeBlock` as a URI.
+
+      Most URIs commence with `x-vt://` with no network component.
+
+      This is the followed by a `/f` is the Block encodes a `FileDirent`
+      or `/d` if the Block encodes a `Dir`, otherwise the Block
+      should be the direct file content.
+
+      The Block itself then follows as `/[ih]/hashname:hashhex`
+      with `i` for an `IndirectBlock` or `h` for a `HashCodeBlock`
+      then the hash function name eg `sha1` and the hash digest in hexadecimal.
+
+      This may be followed with `/filename` to provide a default filename for the content.
+
+      Then a final `/` follows if the URI is for a directory,
+      in which case the Block will encode a `Dir`.
   '''
 
   DEFAULT_SCHEME = 'x-vt'
