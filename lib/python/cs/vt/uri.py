@@ -4,16 +4,23 @@
 '''
 
 from dataclasses import dataclass
-from os.path import basename
+import os
+from os.path import basename, isdir as isdirpath, isfile as isfilepath
 import re
+from stat import S_ISDIR, S_ISREG
 from typing import Optional, Union
 
 from cs.cache import convof
 from cs.deco import Promotable
+from cs.fileutils import atomic_filename
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.progress import progressbar
 
 from . import Store, uses_Store
 from .block import HashCodeBlock, IndirectBlock
 from .blockify import block_for
+from .dir import _Dirent, Dir, FileDirent
 from .hash import HashCode
 
 @dataclass
