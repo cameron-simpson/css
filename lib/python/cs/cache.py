@@ -6,17 +6,36 @@
 from collections import deque
 from collections.abc import MutableMapping
 from contextlib import contextmanager
+from functools import partial
 from itertools import chain
+import os
+from os.path import (
+    dirname,
+    exists as existspath,
+    expanduser,
+    isabs as isabspath,
+    join as joinpath,
+    realpath,
+    split as splitpath,
+)
+from stat import S_ISREG
 from threading import Lock, RLock, Thread
 import time
 from typing import Any, Callable, Mapping, Optional
 
 from cs.context import stackattrs, withif
+from cs.deco import fmtdoc
+from cs.fileutils import atomic_filename
+from cs.fs import needdir, HasFSPath, validate_rpath
+from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.lex import r, s
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result
-from cs.seq import unrepeated
+from cs.seq import splitoff, unrepeated
+
+from icontract import require
 
 __version__ = '20240422.1-post'
 
@@ -431,34 +450,6 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
     self._workQ.put((self.FLUSH, R))
     return R()
 
-''' A cache for storing conversions of source files such as thumbnails
-    or transcoded media, etc.
-'''
-
-from functools import partial
-import os
-from os.path import (
-    dirname,
-    exists as existspath,
-    expanduser,
-    isabs as isabspath,
-    join as joinpath,
-    normpath,
-    realpath,
-    split as splitpath,
-)
-from stat import S_ISREG
-from typing import Optional
-
-from icontract import require
-
-from cs.deco import fmtdoc
-from cs.fileutils import atomic_filename
-from cs.fs import needdir, HasFSPath
-from cs.hashindex import file_checksum, HASHNAME_DEFAULT
-from cs.pfx import Pfx, pfx_call, pfx_method
-from cs.seq import splitoff
-
 @fmtdoc
 class ConvCache(HasFSPath):
   ''' A cache for conversions of file contents such as thumbnails
@@ -554,6 +545,8 @@ class ConvCache(HasFSPath):
     # TODO: is_valid_subpath?
     assert conv_subparts and '.' not in conv_subparts and '..' not in conv_subparts
     if ext is None:
+      # assume the first component is a file extension
+      # works for things like png/64/64
       ext = conv_subparts[0]
     suffix = '.' + ext
     dstpath = self.pathto(conv_subpath, self.content_subpath(srcpath) + suffix)
