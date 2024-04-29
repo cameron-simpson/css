@@ -524,8 +524,17 @@ class ConvCache(HasFSPath):
     return joinpath(hashname, *splitoff(hashhex, 2, 2))
 
   @require(lambda conv_subpath: not isabspath(conv_subpath))
-  def convof(self, srcpath, conv_subpath, conv_func, ext=None):
-    ''' Return the filesystem path of the cached conversion of `srcpath` via `conv_func`.
+  def convof(
+      self,
+      srcpath,
+      conv_subpath,
+      conv_func,
+      *,
+      ext=None,
+      force=False,
+  ):
+    ''' Return the filesystem path of the cached conversion of
+        `srcpath` via `conv_func`.
 
         Parameters:
         * `srcpath`: the source filesystem path
@@ -537,9 +546,12 @@ class ConvCache(HasFSPath):
           to the filesystem path `dstpath`
         * `ext`: an optional filename extension, default from the
           first component of `conv_subpath`
+        * `force`: option flag to require conversion even if the
+          cache has an entry
     '''
     conv_subpath = normpath(conv_subpath)
     conv_subparts = splitpath(conv_subpath)
+    # TODO: is_valid_subpath?
     assert conv_subparts and '.' not in conv_subparts and '..' not in conv_subparts
     if ext is None:
       ext = conv_subparts[0]
@@ -547,17 +559,23 @@ class ConvCache(HasFSPath):
     dstpath = self.pathto(conv_subpath, self.content_subpath(srcpath) + suffix)
     dstdirpath = dirname(dstpath)
     needdir(dstdirpath, use_makedirs=True)
-    if not existspath(dstpath):
+    if force or not existspath(dstpath):
       with Pfx('<%s %s >%s', srcpath, conv_func, dstpath):
-        with atomic_filename(dstpath,
-                             prefix=f'{self.__class__.__name__}.convof-',
-                             suffix=suffix) as T:
+        with atomic_filename(
+            dstpath,
+            prefix=
+            f'.{self.__class__.__name__}.convof--{conv_subpath.replace(os.sep,"--")}--',
+            suffix=suffix,
+            exists_ok=force,
+        ) as T:
           pfx_call(conv_func, srcpath, T.name)
     return dstpath
 
 _default_conv_cache = ConvCache()
 
-def convof(srcpath, conv_subpath, conv_func, ext=None):
+def convof(srcpath, conv_subpath, conv_func, ext=None, force=False):
   ''' `ConvCache.convof` using the default cache.
   '''
-  return _default_conv_cache.convof(srcpath, conv_subpath, conv_func, ext=ext)
+  return _default_conv_cache.convof(
+      srcpath, conv_subpath, conv_func, ext=ext, force=force
+  )
