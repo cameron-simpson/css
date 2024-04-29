@@ -520,7 +520,7 @@ def file_checksum(
   if not S_ISREG(st.st_mode):
     # ignore nonregular files
     return None
-  cached_hash = fstags[fspath].cached_value('{checksum.{hashname}', 'hashcode')
+  cached_hash = fstags[fspath].cached_value(f'checksum.{hashname}', 'hashcode')
   hashcode = None
   hashcode_s, state = cached_hash.get()
   if hashcode_s is not None:
