@@ -119,6 +119,7 @@ def blockify(
       label=f'blockify({chunks_name})',
       itemlenfunc=len,
       units_scale=BINARY_BYTES_SCALE,
+      total=bfr.final_offset,
   ):
     yield Block.promote(chunk)
 
