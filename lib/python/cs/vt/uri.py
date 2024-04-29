@@ -45,28 +45,39 @@ class VTURI(Promotable):
 
   DEFAULT_SCHEME = 'x-vt'
   _URI_RE = re.compile(
-      r'(?P<scheme>[a-z][-a-z0-9]*):'
-      r'//(?P<network>[^/]*)'
-      r'/(?P<indirect>[hi])'
+      r'(?P<scheme>[a-z][-a-z0-9]*):'  # scheme, normally x-vt
+      r'//(?P<network>[^/]*)'  # network part, empty by default
+      r'(?P<dirent_type>/[fd])?'  # /f for FileDirent, /d for Dir
+      r'/(?P<indirect>[hi])'  # (i)ndirect blockref or direct (h)
+      # hashname:hashcodehex
       r'/(?P<hashname>[a-z][a-z0-9]*):(?P<hashtext>([0-9a-f][0-9a-f])+)'
-      r'(/(?P<filename>[^/?#]+))?'
-      r'$', re.I
+      r'(/(?P<filename>[^/?#]+))?'  # informational path basename
+      r'(?P<dir_indicator>/?)'  # "/" if a directory Dirent, "" otherwise
+      r'$',
+      re.I,
   )
 
-  hashcode: HashCode
-  indirect: bool
-  scheme: str = DEFAULT_SCHEME
-  network: Optional[str] = None
+  # TODO: validate the various field values against each other?
+
+  hashcode: HashCode  # content hashcode
+  indirect: bool  # hashcode is indirect -> HashCodeBlock vs IndirectBlock
+  isdirent: bool = False  # the content is a Dirent
+  isdir: bool = False  # require isdirent, says that the dirent is a Dir
   span: Optional[int] = None
   filename: Optional[str] = None
+  scheme: str = DEFAULT_SCHEME
+  network: Optional[str] = None
 
   def __str__(self):
     return ''.join(
         (
             f'{self.scheme}:',
-            f'//{self.network or ""}/{"i" if self.indirect else "h"}',
+            f'//{self.network or ""}',
+            (('/d' if self.isdir else '/f') if self.isdirent else ''),
+            f'/{"i" if self.indirect else "h"}',
             f'/{self.hashcode.hashname}:{self.hashcode.hex()}',
             (f'/{self.filename}' if self.filename else ''),
+            ('/' if self.isdir else ''),
         )
     )
 
