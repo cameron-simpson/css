@@ -102,6 +102,7 @@ class CornuCopyBuffer(Promotable):
       copy_chunks=None,
       close=None,
       progress=None,
+      final_offset=None,
   ):
     ''' Prepare the buffer.
 
@@ -139,6 +140,11 @@ class CornuCopyBuffer(Promotable):
         * `progress`: an optional `cs.Progress.progress` instance
           to which to report data consumed from `input_data`;
           any object supporting `+=` is acceptable
+        * `final_offset`: optional `int` specifying the largest
+          offset expected to be reached, intended for uses such as
+          callers presenting a pregress indication; this is, for
+          example, provided by `CornuCopyBuffer.from_fd` for regular
+          files using the `stat.st_size` field
     '''
     self.bufs = []
     if buf is None or not buf:
@@ -162,6 +168,7 @@ class CornuCopyBuffer(Promotable):
     self.input_offset_displacement = input_offset - offset
     self._close = close
     self.progress = progress
+    self.final_offset = final_offset
 
   def selfcheck(self, msg=''):
     ''' Integrity check for the buffer, useful during debugging.
@@ -208,8 +215,27 @@ class CornuCopyBuffer(Promotable):
     '''
     self.close()
 
+  @staticmethod
+  def _stat_final_offset(f):
+    ''' Return the `final_offset` value from a file descriptor or file,
+        or `None` if it cannot be determined from `os.fstat()`.
+    '''
+    if isinstance(f, int):
+      st = fstat(f)
+    else:
+      try:
+        fd = f.fileno()
+      except AttributeError:
+        return None
+      if fd is None:
+        return None
+      st = fstat(fd)
+    if not S_ISREG(st.st_mode):
+      return None
+    return st.st_size
+
   @classmethod
-  def from_fd(cls, fd, readsize=None, offset=None, **kw):
+  def from_fd(cls, fd, readsize=None, offset=None, final_offset=None, **kw):
     ''' Return a new `CornuCopyBuffer` attached to an open file descriptor.
 
         Internally this constructs a `SeekableFDIterator` for regular
@@ -229,11 +255,16 @@ class CornuCopyBuffer(Promotable):
           start with this offset
         Other keyword arguments are passed to the buffer constructor.
     '''
-    if S_ISREG(fstat(fd).st_mode):
+    st = fstat(fd)
+    if S_ISREG(st.st_mode):
+      if final_offset is None:
+        final_offset = st.st_size
       it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
     else:
       it = FDIterator(fd, readsize=readsize, offset=offset)
-    return cls(it, offset=it.offset, close=it.close, **kw)
+    return cls(
+        it, offset=it.offset, close=it.close, final_offset=final_offset, **kw
+    )
 
   def as_fd(self, maxlength=Ellipsis):
     ''' Create a pipe and dispatch a `Thread` to copy
@@ -292,10 +323,10 @@ class CornuCopyBuffer(Promotable):
         Other keyword arguments are passed to the buffer constructor.
     '''
     it = SeekableMMapIterator(fd, readsize=readsize, offset=offset)
-    return cls(it, offset=it.offset, **kw)
+    return cls(it, offset=it.offset, final_offset=it.end_offset, **kw)
 
   @classmethod
-  def from_file(cls, f, readsize=None, offset=None, **kw):
+  def from_file(cls, f, readsize=None, offset=None, final_offset=None, **kw):
     ''' Return a new `CornuCopyBuffer` attached to an open file.
 
         Internally this constructs a `SeekableFileIterator`, which
@@ -325,14 +356,16 @@ class CornuCopyBuffer(Promotable):
         is_seekable = True
     if offset is None:
       offset = foffset
+    if final_offset is None:
+      final_offset = cls._stat_final_offset(f)
     it = (
         SeekableFileIterator(f, readsize=readsize, offset=offset)
         if is_seekable else FileIterator(f, readsize=readsize, offset=offset)
     )
-    return cls(it, offset=it.offset, **kw)
+    return cls(it, offset=it.offset, final_offset=final_offset, **kw)
 
   @classmethod
-  def from_filename(cls, filename: str, offset=None, **kw):
+  def from_filename(cls, filename: str, offset=None, final_offset=None, **kw):
     ''' Open the file named `filename` and return a new `CornuCopyBuffer`.
 
         If `offset` is provided, skip to that position in the file.
@@ -342,7 +375,9 @@ class CornuCopyBuffer(Promotable):
         Other keyword arguments are passed to the buffer constructor.
     '''
     f = open(filename, 'rb')  # pylint: disable=consider-using-with
-    bfr = cls.from_file(f, close=f.close, **kw)
+    if final_offset is None:
+      final_offset = cls._stat_final_offset(f)
+    bfr = cls.from_file(f, close=f.close, final_offset=final_offset, **kw)
     if offset is not None:
       if offset < 0:
         S = os.fstat(f.fileno())
@@ -391,7 +426,7 @@ class CornuCopyBuffer(Promotable):
     bs = memoryview(bs)
     if offset > 0 or end_offset < len(bs):
       bs = bs[offset:end_offset]
-    return cls([bs], offset=offset, **kw)
+    return cls([bs], offset=offset, final_offset=end_offset, **kw)
 
   def __str__(self):
     return "%s(offset:%d,buf:%d)" % (
@@ -881,7 +916,7 @@ class CornuCopyBuffer(Promotable):
     finally:
       subbfr.flush()
 
-  def bounded(self, end_offset):
+  def bounded(self, end_offset) -> "CornuCopyBuffer":
     ''' Return a new `CornuCopyBuffer` operating on a bounded view
         of this buffer.
 
@@ -953,7 +988,9 @@ class CornuCopyBuffer(Promotable):
         be suspended.
     '''
     bfr2 = CornuCopyBuffer(
-        _BoundedBufferIterator(self, end_offset), offset=self.offset
+        _BoundedBufferIterator(self, end_offset),
+        offset=self.offset,
+        final_offset=end_offset,
     )
 
     def flush():
