@@ -143,19 +143,117 @@ class VTURI(Promotable):
     )
 
   @classmethod
-  @uses_Store
-  def from_fspath(cls, fspath: str, *, S: Store):
+  @pfx_method
+  def from_fspath(
+      cls,
+      fspath: str,
+      *,
+      as_dirent=None,
+      filename=None,
+      follow_symlinks=False,
+      force=False,
+  ):
+    ''' Return a URI for the filesystem path `fspath`.
+    '''
+    st = pfx_call((os.stat if follow_symlinks else os.lstat), fspath)
+    if S_ISDIR(st.st_mode):
+      if as_dirent is not None and not as_dirent:
+        raise ValueError(
+            f'a directory path requires as_dirent=True, got {as_dirent!r}'
+        )
+      return cls.from_dirpath(
+          fspath,
+          filename=filename,
+          follow_symlinks=follow_symlinks,
+          force=force
+      )
+    if S_ISREG(st.st_mode):
+      return cls.from_filepath(
+          fspath, as_dirent=as_dirent, filename=filename, force=force
+      )
+    raise ValueError('neither file nor directory')
 
-    def save_uri(fspath, cachepath):
+  @classmethod
+  @pfx_method
+  @uses_Store
+  def from_filepath(
+      cls,
+      fspath: str,
+      *,
+      S: Store,
+      as_dirent=False,
+      filename=None,
+      force=False,
+  ):
+    ''' Store the file `fspath` unless we have already cached its content based URI.
+        Return the `VTURI`.
+
+        This call believes it is storing a file and so it _will_ follow a symlink.
+        Use `from_fspath` for a `follow_symlinks` parameter (default `False`).
+    '''
+    if not isfilepath(fspath):
+      raise ValueError(f'not a regular file: {fspath!r}')
+    if filename is None:
+      filename = basename(fspath)
+
+    def save_file_uri(fspath, cachepath):
       print("VTURI.from_fspath: import", fspath)
       uri = S.block_for(fspath).uri
-      uri.filename = basename(fspath)
+      uri.filename = filename
       with open(cachepath, 'w') as cachef:
         print(uri, file=cachef)
 
-    uri_path = convof(fspath, 'vt-uri', save_uri)
+    # get URI for nondirent file contents
+    uri_path = convof(fspath, 'vt-uri', save_file_uri, force=force)
     with open(uri_path) as cachef:
-      return cls.from_uri(cachef.readline().strip())
+      uri = cls.from_uri(cachef.readline().strip())
+    return (
+        cls.from_Dirent(FileDirent(filename, uri.content_block))
+        if as_dirent else uri
+    )
+
+  @classmethod
+  @pfx_method
+  @uses_fstags
+  @uses_Store
+  def from_dirpath(
+      cls,
+      dirpath: str,
+      *,
+      fstags: FSTags,
+      S: Store,
+      filename=None,
+      follow_symlinks=False,
+      force=False,
+  ):
+    if not isdirpath(dirpath):
+      raise ValueError(f'not a directory path: {dirpath!r}')
+    if filename is None:
+      filename = basename(dirpath)
+    D = Dir(filename)
+    # we use an FSTags based cache for the file checksums
+    # so take hold now so that we only update at the end
+    with fstags:
+      for entry in pfx_call(os.scandir, dirpath):
+        with Pfx(entry.name):
+          assert entry.name not in D
+          if entry.is_dir(follow_symlinks=follow_symlinks):
+            uri = cls.from_dirpath(
+                entry.path,
+                follow_symlinks=follow_symlinks,
+                force=force,
+            )
+          elif entry.is_file(follow_symlinks=follow_symlinks):
+            uri = cls.from_filepath(
+                entry.path,
+                as_dirent=True,
+                force=force,
+            )
+          else:
+            warning("skipping, neither file nor directory")
+            continue
+          D[entry.name] = uri.as_Dirent(entry.name)
+    return cls.from_Dirent(D, filename=filename)
 
   def saveas(self, fspath):
     ''' Save the contents of this `VTURI` to the filesystem path `fspath`.
