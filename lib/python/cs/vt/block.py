@@ -54,6 +54,7 @@ from cs.logutils import warning, error
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.resources import uses_runstate
+from cs.result import ResultSet
 from cs.threads import locked
 
 from .hash import HashCode, io_fail
@@ -688,9 +689,9 @@ class HashCodeBlock(Block, prefix='B'):
   def need_direct_data(cls, blocks):
     ''' Bulk request the direct data for `blocks`.
     '''
-    Rs = []
     from . import Store
     S = Store.default()
+    Rs = ResultSet()
     for B in blocks:
       try:
         d = B._data
@@ -707,9 +708,8 @@ class HashCodeBlock(Block, prefix='B'):
           error("need_direct_data: B=%s: %s", B, e)
       else:
         # request the data
-        Rs.append(S._defer(B.get_direct_data))
-    for R in Rs:
-      R.join()
+        Rs.add(S._defer(B.get_direct_data))
+    Rs.wait()
 
   @prop
   def span(self):  # pylint: disable=method-hidden
