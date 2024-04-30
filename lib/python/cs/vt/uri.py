@@ -170,6 +170,23 @@ class VTURI(Promotable):
         f.write(bytes(B))
 
   @classmethod
+  def from_Dirent(
+      cls,
+      E: "_Dirent",
+      filename=None,
+  ):
+    ''' Return a URI for the supplied Dirent `E`.
+    '''
+    block = HashCodeBlock(data=bytes(E))
+    return cls(
+        isdirent=True,
+        isdir=E.isdir,
+        hashcode=block.hashcode,
+        indirect=block.indirect,
+        filename=filename,
+    )
+
+  @classmethod
   def promote(cls, obj) -> "VTURI":
     ''' Promote `obj` to a `VTURI`.
 
