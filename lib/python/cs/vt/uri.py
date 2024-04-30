@@ -13,6 +13,7 @@ from typing import Optional, Union
 from cs.cache import convof
 from cs.deco import Promotable
 from cs.fileutils import atomic_filename
+from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
@@ -255,6 +256,7 @@ class VTURI(Promotable):
           D[entry.name] = uri.as_Dirent(entry.name)
     return cls.from_Dirent(D, filename=filename)
 
+  # TODO: unpack a directory if self.isdir
   def saveas(self, fspath):
     ''' Save the contents of this `VTURI` to the filesystem path `fspath`.
     '''
