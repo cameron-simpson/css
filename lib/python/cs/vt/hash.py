@@ -190,12 +190,6 @@ class HashCode(
     return cls.from_data(chunk)
 
   @property
-  def hashfunc(self):
-    ''' Convenient hook to this `HashCode`'s class' `.from_data` method.
-    '''
-    return self.__class__.from_data
-
-  @property
   def filename(self):
     ''' A file basename for files related to this hashcode: {hashcodehex}.{hashtypename}
     '''
