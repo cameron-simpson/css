@@ -36,14 +36,14 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import atomic_filename, file_data, shortpath
-from cs.lex import hexify, get_identifier
+from cs.lex import hexify, get_identifier, s
 from cs.logutils import (exception, error, warning, track, info, debug, logTo)
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar, Progress
 from cs.py.modules import import_extra
 from cs.resources import RunState, uses_runstate, CancellationError
 from cs.tty import ttysize
-from cs.units import BINARY_BYTES_SCALE
+from cs.units import BINARY_BYTES_SCALE, transcribe_bytes_geek
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
 from . import (
@@ -69,9 +69,10 @@ from .blockify import (
 from .compose import get_store_spec
 from .config import Config
 from .convert import expand_path
+from .datadir import DataDir
 from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
-from .dir import Dir, FileDirent
+from .dir import _Dirent, Dir, FileDirent
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .index import LMDBIndex
 from .merge import merge
@@ -1281,7 +1282,7 @@ class VTCmd(BaseCommand):
               )
             except ValueError as e:
               raise GetoptError(
-                  "invalid Store specification after \"name:\": %s" % (e,)
+                  f'invalid Store specification after "name:": {e}'
               ) from e
             if offset < len(named_store_spec):
               raise GetoptError(
@@ -1320,9 +1321,7 @@ class VTCmd(BaseCommand):
         srv.join()
       else:
         raise GetoptError(
-            "invalid serve argument,"
-            " I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r"
-            % (address,)
+            f'invalid serve argument, I expect "-" or "/path/to/socket" or "[host]:port", got: {address!r}'
         )
     return 0
 
