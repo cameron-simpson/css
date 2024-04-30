@@ -6,62 +6,121 @@
 
 set -ue
 
+: ${GH_REPO:=''}
+
+nl='
+'
 trace=
 [ -t 2 ] && trace=set-x
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [subsection:] [task-description...]"
 
-category=
-path=$( findup TODO.txt || : )
+# TODO files (the default) or "gh" :CLI tool
+mode=TODO   # vs GH
+[ -n "$GH_REPO" ] && mode=GH
 
-if [ $# -gt 0 ]
-then
-  case "$1" in
-    help | -\? | -h | -help | --help )
-      if [ $# = 1 ]
-      then
-        echo "$usage" >&2
-        exit 2
-      fi
-      ;;
-    ?*:)
-      category=$( expr "x$1" : 'x\(.*\):' )
-      path2=$( findup "TODO-$category.txt" || : )
-      [ -f "$path2" ] && { path=$path2; shift; }
-      ;;
-  esac
-fi
+case "$mode" in
+  TODO)
+    category=
+    todo_path=$( findup TODO.txt || : )
 
-[ -f "$path" ] || {
-  echo "$cmd: no TODO.txt file found" >&2
-  exit 1
-}
-
-# no args? just list the TODOs
-[ $# -gt 0 ] || {
-    echo "$path"
-    sed -n 's/./  &/p' "$path"
-    exit
-}
-
-dlog log -c "TODO,$category" "TODO: $*"
-
-[ -s "$path" ] || echo >>"$path"
-
-if $trace bsed "1i\\
-$*" "$path"
-then
-    tododir=$( dirname "$path" )
-    ( cd "$tododir"
-      vcs_type=$( vcs type 2>/dev/null ) || exit 0
-      base=$( basename "$path" )
-      case "$vcs_type" in
-          hg)   $trace hg commit -m "$base: $*" -- "$path" ;;
-          git)  $trace git add -- "$path" && $trace git commit -m "$base: $*" ;;
-          *)    echo "TODO: not in hg or git, aborting" >&2
-                exit 1
-                ;;
+    if [ $# -gt 0 ]
+    then
+      case "$1" in
+        help | -\? | -h | -help | --help )
+          if [ $# = 1 ]
+          then
+            echo "$usage" >&2
+            exit 2
+          fi
+          ;;
+        ?*:)
+          category=$( expr "x$1" : 'x\(.*\):' )
+          todo_path2=$( findup "TODO-$category.txt" || : )
+          [ -f "$todo_path2" ] && { todo_path=$todo_path2; shift; }
+          ;;
       esac
-    )
-fi
+    fi
+
+    [ -f "$todo_path" ] || {
+      echo "$cmd: no TODO.txt file found" >&2
+      exit 1
+    }
+
+    # no args? just list the TODOs
+    [ $# -gt 0 ] || {
+        echo "$todo_path"
+        sed -n 's/./  &/p' "$todo_path"
+        exit
+    }
+
+    dlog log -c "TODO,$category" "TODO: $*"
+
+    [ -s "$todo_path" ] || echo >>"$todo_path"
+
+    if $trace bsed "1i\\
+    $*" "$todo_path"
+    then
+        tododir=$( dirname "$todo_path" )
+        ( cd "$tododir"
+          vcs_type=$( vcs type 2>/dev/null ) || exit 0
+          base=$( basename "$todo_path" )
+          case "$vcs_type" in
+              hg)   $trace hg commit -m "$base: $*" -- "$todo_path" ;;
+              git)  $trace git add -- "$todo_path" && $trace git commit -m "$base: $*" ;;
+              *)    echo "TODO: not in hg or git, aborting" >&2
+                    exit 1
+                    ;;
+          esac
+        )
+    fi
+    ;;
+  GH)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing NEW or issue number" >&2
+      exit 2
+    fi
+    case "$1" in
+      # create new issue or new TODO in existing issue
+      NEW | [1-9] | [1-9]*[0-9] )
+            number=$1
+            shift
+            ;;
+      *)    branch="$( vcs branch )"
+            case "$branch" in
+              [1-9]*[0-9]-*)
+                number=$( expr "$branch" : '\([1-9][0-9]*\).*' )
+                ;;
+              *)echo "$cmd: cannot infer issue number from current VCS branch \"$branch\"" >&2
+                exit 2
+                ;;
+            esac
+            ;;
+    esac
+    case "$number" in
+      NEW ) [ $# = 0 ] && {
+              echo "$cmd NEW: missing issue title words" >&2
+              exit 2
+            }
+            gh issue create --title "$*" --assignee @me
+            ;;
+      [1-9] | [1-9]*[0-9] )
+            [ $# = 0 ] && {
+              echo "$cmd $number: missing issue $number TODO words" >&2
+              exit 2
+            }
+            body=$(
+                $trace gh issue list --search "$number" --json number,body \
+                | $trace jq -r ".  | map(select(.number==$number)) | .[0].body" \
+                | tr -d '\015'
+            )
+            $trace gh issue edit "$number" --body "$body$nl- [ ] $*"
+            ;;
+    esac
+    ;;
+  *)echo "$0: unsupported mode: $mode" >&2
+    exit 2
+    ;;
+esac
