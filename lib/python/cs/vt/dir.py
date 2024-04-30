@@ -15,6 +15,7 @@ import stat
 import sys
 from threading import Lock
 import time
+from typing import Mapping
 from uuid import UUID, uuid4
 
 from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
@@ -85,8 +86,8 @@ class DirentRecord(BinarySingleValue):
     return self.value
 
   @classmethod
-  def parse_value(cls, bfr):
-    ''' Unserialise a serialised Dirent.
+  def parse_value(cls, bfr) -> "_Dirent":
+    ''' Unserialise a single serialised Dirent from `bfr`.
     '''
     type_ = BSUInt.parse_value(bfr)
     flags = DirentFlags(BSUInt.parse_value(bfr))
@@ -954,7 +955,7 @@ class Dir(_Dirent, DirLike, prefix='D'):
 
   @property
   @locked
-  def entries(self):
+  def entries(self) -> Mapping[str, _Dirent]:
     ''' Property containing the live dictionary holding the Dir entries.
     '''
     emap = self._entries
