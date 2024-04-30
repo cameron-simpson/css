@@ -2291,6 +2291,7 @@ def update_xattr_value(fspath, xattr_name, new_xattr_value):
     return old_xattr_value
 
 # A default general purpose FSTags instance.
+# NB: not opened.
 DEFAULT_FSTAGS = FSTags()
 
 if __name__ == '__main__':
