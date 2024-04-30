@@ -9,15 +9,15 @@
 : ${DIFFOPTS='-u'}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-v] [-i suf] {-f script|{-e sedcmd}...|sedcmd}... [--] files...
-	-v		Verbose.
-	+v		Not verbose.
-	-s		Silent.
+usage="Usage: $cmd [options...] [sedcmd] files...
 	-d diffopt	Option string for diff.
+	-e sedcmd	Passed to sed.
+	-f script	Passed to sed.
 	-i suf		Copy original to original.suf if changed.
 	-n		Passed to sed.
-	-f script	Passed to sed.
-	-e sedcmd	Passed to sed.
+	-s		Silent.
+	-v		Verbose.
+	+v		Not verbose.
 	sedcmd		Passed to sed."
 
 diff=diff
@@ -39,16 +39,16 @@ while [ $# -gt 0 ]
 do
     case $1 in
 	--)	shift ; break ;;
-	-v)	silent= verbose=1 ;;
-	+v)	verbose= ;;
-	-s)	silent=1 verbose= ;;
 	-d)	DIFFOPTS=$2; shift ;;
+	-e)	ecmd="$ecmd
+			$2"; shift ;;
 	-f)	fflag=1; sedscript=$2; shift ;;
 	-i)	ibak=$2; shift ;;
 	-i?*)	ibak=`expr "x$1" : 'x-i\(.*\)'` ;;
 	-n)	sedopts="$sedopts $1" ;;
-	-e)	ecmd="$ecmd
-			$2"; shift ;;
+	-s)	silent=1 verbose= ;;
+	-v)	silent= verbose=1 ;;
+	+v)	verbose= ;;
 	-*)	echo "$cmd: $1: unknown option" >&2
 		badopts=1
 		;;
