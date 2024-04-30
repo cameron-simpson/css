@@ -399,7 +399,7 @@ class Block(Transcriber, ABC, prefix=None):
     )
 
   @uses_runstate
-  def pushto_queue(self, Q, *, runstate, progress=None):
+  def pushto_queue(self, Q, *, runstate: RunState, progress=None):
     ''' Push this `Block` and any implied subblocks to a queue.
 
         Parameters:
@@ -724,6 +724,7 @@ class HashCodeBlock(Block, prefix='B'):
       try:
         self._span = _span = len(self._data)
       except TypeError as e:
+        from cs.debug import X
         X("len(self._data): %s", e)
         breakpoint()
     return _span
@@ -1183,7 +1184,7 @@ class _SubBlock(Block, prefix='SubB'):
   @classmethod
   # pylint: disable=too-many-arguments
   def parse_inner(cls, s, offset, stopchar, prefix):
-    offset, block, suboffset, subspan = self.parse_mapping(
+    offset, block, suboffset, subspan = cls.parse_mapping(
         s, offset, stopchar, required=('block', 'offset', 'span')
     )
     return cls(block, suboffset, subspan), offset
