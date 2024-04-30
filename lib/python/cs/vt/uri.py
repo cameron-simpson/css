@@ -189,12 +189,15 @@ class VTURI(Promotable):
   @classmethod
   def promote(cls, obj) -> "VTURI":
     ''' Promote `obj` to a `VTURI`.
+        Note that all of these are essentially "free" conversions;
+        this will never accept a filesystem path which might need
+        Storing in order to make a URI.
 
         `obj` may be:
         * `VTURI`: unchanged
         * `str`: use `VTURI.from_uri`
         * `HashCodeBlock` or `IndirectBlock`: use `obj.uri`
-        * `bytes`:
+        * `Dir`,`FileDirent`: use `cls.from_Dirent(obj)`
     '''
     if isinstance(obj, cls):
       return obj
@@ -202,6 +205,8 @@ class VTURI(Promotable):
       return cls.from_uri(obj)
     if isinstance(obj, (HashCodeBlock, IndirectBlock)):
       return obj.uri
+    if isinstance(obj, (Dir, FileDirent)):
+      return cls.from_Dirent(obj)
     block = block_for(obj)
     if not isinstance(block, (HashCodeBlock, IndirectBlock)):
       block = HashCodeBlock(data=bytes(block))
