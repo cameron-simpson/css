@@ -520,37 +520,40 @@ def file_checksum(
   if not S_ISREG(st.st_mode):
     # ignore nonregular files
     return None
-  cached_hash = fstags[fspath].cached_value(f'checksum.{hashname}', 'hashcode')
-  hashcode = None
-  hashcode_s, state = cached_hash.get()
-  if hashcode_s is not None:
-    if isinstance(hashcode_s, str):
-      try:
-        hashcode = BaseHashCode.from_prefixed_hashbytes_hex(hashcode_s)
-      except (TypeError, ValueError) as e:
-        # unrecognised hashcode
-        warning("cannot decode hashcode %s: %s", r(hashcode_s), e)
+  with fstags:
+    cached_hash = fstags[fspath].cached_value(
+        f'checksum.{hashname}', 'hashcode'
+    )
+    hashcode = None
+    hashcode_s, state = cached_hash.get()
+    if hashcode_s is not None:
+      if isinstance(hashcode_s, str):
+        try:
+          hashcode = BaseHashCode.from_prefixed_hashbytes_hex(hashcode_s)
+        except (TypeError, ValueError) as e:
+          # unrecognised hashcode
+          warning("cannot decode hashcode %s: %s", r(hashcode_s), e)
+        else:
+          # wrong hash type
+          if hashcode.hashname != hashname:
+            warning("ignoring unexpected hashname %r", hashcode.hashname)
+            hashcode = None
       else:
-        # wrong hash type
-        if hashcode.hashname != hashname:
-          warning("ignoring unexpected hashname %r", hashcode.hashname)
-          hashcode = None
-    else:
-      warning("ignoring not string cached value: %s", r(hashcode_s))
-  if hashcode is None:
-    # out of date or no cached entry
-    hashclass = BaseHashCode.hashclass(hashname)
-    with contextif(
-        st.st_size > 1024 * 1024,
-        run_task,
-        f'checksum {shortpath(fspath)}',
-    ):
-      try:
-        hashcode = hashclass.from_fspath(fspath)
-      except OSError as e:
-        warning("%s.from_fspath(%r): %s", hashclass.__name__, fspath, e)
-      else:
-        cached_hash.set(str(hashcode), state=state)
+        warning("ignoring not string cached value: %s", r(hashcode_s))
+    if hashcode is None:
+      # out of date or no cached entry
+      hashclass = BaseHashCode.hashclass(hashname)
+      with contextif(
+          st.st_size > 1024 * 1024,
+          run_task,
+          f'checksum {shortpath(fspath)}',
+      ):
+        try:
+          hashcode = hashclass.from_fspath(fspath)
+        except OSError as e:
+          warning("%s.from_fspath(%r): %s", hashclass.__name__, fspath, e)
+        else:
+          cached_hash.set(str(hashcode), state=state)
   return hashcode
 
 def hashindex(
