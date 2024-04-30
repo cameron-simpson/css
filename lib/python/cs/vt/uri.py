@@ -29,7 +29,7 @@ class VTURI(Promotable):
 
       Most URIs commence with `x-vt://` with no network component.
 
-      This is the followed by a `/f` is the Block encodes a `FileDirent`
+      This may then be followed by a `/f` is the Block encodes a `FileDirent`
       or `/d` if the Block encodes a `Dir`, otherwise the Block
       should be the direct file content.
 
@@ -47,7 +47,7 @@ class VTURI(Promotable):
   _URI_RE = re.compile(
       r'(?P<scheme>[a-z][-a-z0-9]*):'  # scheme, normally x-vt
       r'//(?P<network>[^/]*)'  # network part, empty by default
-      r'(?P<dirent_type>/[fd])?'  # /f for FileDirent, /d for Dir
+      r'(/(?P<dirent_type>[fd]))?'  # /f for FileDirent, /d for Dir
       r'/(?P<indirect>[hi])'  # (i)ndirect blockref or direct (h)
       # hashname:hashcodehex
       r'/(?P<hashname>[a-z][a-z0-9]*):(?P<hashtext>([0-9a-f][0-9a-f])+)'
@@ -84,6 +84,7 @@ class VTURI(Promotable):
   @property
   def block(self) -> Union[HashCodeBlock, IndirectBlock]:
     ''' A `Block` for this URI.
+        Note that its meaning depends on `self.isdirent`.
     '''
     return (
         IndirectBlock(HashCodeBlock(self.hashcode), span=self.span)
