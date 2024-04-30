@@ -107,6 +107,22 @@ class VTURI(Promotable):
     E = self.as_Dirent()
     return E.block
 
+  def as_Dirent(self, filename=None):
+    ''' Return a Dirent for this VTURI.
+    '''
+    if filename is None:
+      filename = self.filename
+    if self.isdirent:
+      bs = trace(bytes)(self.block)
+      E, offset = _Dirent.from_bytes(bs)
+      if offset < len(bs):
+        raise ValueError(
+            f'unparsed data after Dirent {E}: {bs[offset:offset+16]}...'
+        )
+    else:
+      E = FileDirent(filename, self.block)
+    return E
+
   @classmethod
   def from_uri(cls, uri_s):
     ''' Make a `VTURI` from a URI string.
