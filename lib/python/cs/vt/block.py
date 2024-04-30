@@ -39,6 +39,7 @@
 from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
 import sys
+from threading import RLock
 from typing import Optional
 
 from icontract import require
@@ -50,12 +51,11 @@ from cs.binary import (
 from cs.buffer import CornuCopyBuffer
 from cs.lex import untexthexify, get_decimal_value, r
 from cs.logutils import warning, error
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.resources import uses_runstate
 from cs.threads import locked
 
-from . import RLock, Store, uses_Store
 from .hash import HashCode, io_fail
 from .transcribe import Transcriber, hexify
 
@@ -254,8 +254,7 @@ class Block(Transcriber, ABC, prefix=None):
       yield self
 
   @locked
-  @uses_Store
-  def get_blockmap(self, *, force=False, blockmapdir=None, S):
+  def get_blockmap(self, *, force=False, blockmapdir=None):
     ''' Get the blockmap for this block, creating it if necessary.
 
         Parameters:
@@ -270,7 +269,8 @@ class Block(Transcriber, ABC, prefix=None):
       warning("making blockmap for %s", self)
       from .blockmap import BlockMap  # pylint: disable=import-outside-toplevel
       if blockmapdir is None:
-        blockmapdir = S.blockmapdir
+        from . import Store
+        blockmapdir = Store.default().blockmapdir
       self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
@@ -397,10 +397,9 @@ class Block(Transcriber, ABC, prefix=None):
         "unsupported open mode, expected 'rb' or 'w+b', got: %r" % (mode,)
     )
 
-  @uses_Store
   @uses_runstate
-  def pushto_queue(self, Q, *, S, runstate, progress=None):
-    ''' Push this Block and any implied subblocks to a queue.
+  def pushto_queue(self, Q, *, runstate, progress=None):
+    ''' Push this `Block` and any implied subblocks to a queue.
 
         Parameters:
         * `Q`: optional preexisting Queue, which itself should have
@@ -416,18 +415,17 @@ class Block(Transcriber, ABC, prefix=None):
     '''
     if progress is not None and progress.total is None:
       progress.total = 0
-    with S:
-      if progress is not None:
-        progress.total += len(self)
-      Q.put(self)
-      if self.indirect:
-        # recurse, reusing the Queue
-        with runstate:
-          for subB in self.subblocks:
-            if runstate.cancelled:
-              warning("%s: push cancelled", self)
-              break
-            subB.pushto_queue(Q, progress=progress)
+    if progress is not None:
+      progress.total += len(self)
+    Q.put(self)
+    if self.indirect:
+      # recurse, reusing the Queue
+      with runstate:
+        for subB in self.subblocks:
+          if runstate.cancelled:
+            warning("%s: push cancelled", self)
+            break
+          subB.pushto_queue(Q, progress=progress)
 
   @property
   def uri(self):
@@ -655,8 +653,8 @@ class HashCodeBlock(Block, prefix='B'):
         if hashcode is None:
           raise ValueError("added=%s but no hashcode supplied" % (added,))
       else:
-        S = Store.default()
-        h = S.add(data)
+        from . import Store
+        h = Store.default().add(data)
         if hashcode is None:
           hashcode = h
         elif h != hashcode:
@@ -681,16 +679,18 @@ class HashCodeBlock(Block, prefix='B'):
     with self._lock:
       data = self._data
       if data is None:
+        from . import Store
         S = Store.default()
         data = self._data = S[self.hashcode]
     return data
 
   @classmethod
-  @uses_Store
-  def need_direct_data(cls, blocks, *, S):
+  def need_direct_data(cls, blocks):
     ''' Bulk request the direct data for `blocks`.
     '''
     Rs = []
+    from . import Store
+    S = Store.default()
     for B in blocks:
       try:
         d = B._data
@@ -718,6 +718,7 @@ class HashCodeBlock(Block, prefix='B'):
     _span = self._span
     if _span is None:
       if self._data is None:
+        from . import Store
         S = Store.default()
         self._data = S[self.hashcode]
       try:
@@ -781,27 +782,27 @@ class HashCodeBlock(Block, prefix='B'):
     return B, offset
 
   @io_fail
-  @uses_Store
+  @pfx_method
   def fsck(self, *, recurse=False, S):  # pylint: disable=unused-argument
-    ''' Check this HashCodeBlock.
+    ''' Check this `HashCodeBlock`.
     '''
+    from . import Store
+    S = Store.default()
     ok = True
     hashcode = self.hashcode
-    with Pfx(hashcode):
-      with S:
-        try:
-          data = S[hashcode]
-        except KeyError:
-          error("not in Store %s", S)
-          ok = False
-        else:
-          if len(self) != len(data):
-            error("len(self)=%d, len(data)=%d", len(self), len(data))
-            ok = False
-          h = S.hash(data)
-          if h != hashcode:
-            error("hash(data):%s != self.hashcode:%s", h, hashcode)
-            ok = False
+    try:
+      data = S[hashcode]
+    except KeyError:
+      error("not in Store %s", S)
+      ok = False
+    else:
+      if len(self) != len(data):
+        error("len(self)=%d, len(data)=%d", len(self), len(data))
+        ok = False
+      h = S.hash(data)
+      if h != hashcode:
+        error("hash(data):%s != self.hashcode:%s", h, hashcode)
+        ok = False
     return ok
 
   @classmethod
@@ -919,10 +920,11 @@ class IndirectBlock(Block, prefix='I'):
     superB, offset = Transcriber.parse(s, offset)
     return cls(superB, span), offset
 
-  @uses_Store
-  def datafrom(self, start=0, end=None, *, S):
+  def datafrom(self, start=0, end=None):
     ''' Yield data from a point in the Block.
     '''
+    from . import Store
+    S = Store.default()
     if end is None:
       end = self.span
     if start >= end:
@@ -969,12 +971,12 @@ class IndirectBlock(Block, prefix='I'):
               ok = False
     return ok
 
-  @uses_Store
-  def is_complete(self, S: Store):
+  def is_complete(self):
     ''' Check that the superblock and all the dependent blocks are
         complete in the Store.
     '''
-    return S.is_complete_indirect(self.hashcode)
+    from . import Store
+    return Store.default().is_complete_indirect(self.hashcode)
 
 class RLEBlock(Block, prefix='RLE'):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes
@@ -1063,9 +1065,9 @@ class LiteralBlock(Block, prefix='LB'):
     return self._data
 
   @property
-  @uses_Store
-  def hashcode(self, *, S: Store):
-    return S.add(self._data)
+  def hashcode(self):
+    from . import Store
+    return Store.default().add(self._data)
 
   def transcribe_inner(self) -> str:
     ''' Transcribe the block data in texthexified form.
