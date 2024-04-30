@@ -133,6 +133,8 @@ class VTURI(Promotable):
     return cls(
         scheme=m['scheme'],
         network=m['network'] or None,
+        isdir=m['dirent_type'] == 'd',
+        isdirent=bool(m['dirent_type']),
         indirect=m['indirect'] == 'i',
         hashcode=HashCode.from_named_hashbytes_hex(
             m['hashname'], m['hashtext']
