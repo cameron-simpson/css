@@ -114,7 +114,7 @@ class VTURI(Promotable):
     if filename is None:
       filename = self.filename
     if self.isdirent:
-      bs = trace(bytes)(self.block)
+      bs = bytes(self.block)
       E, offset = _Dirent.from_bytes(bs)
       if offset < len(bs):
         raise ValueError(
@@ -198,7 +198,6 @@ class VTURI(Promotable):
       filename = basename(fspath)
 
     def save_file_uri(fspath, cachepath):
-      print("VTURI.from_fspath: import", fspath)
       uri = S.block_for(fspath).uri
       uri.filename = filename
       with open(cachepath, 'w') as cachef:
