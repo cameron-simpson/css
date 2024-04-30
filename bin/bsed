@@ -1,8 +1,10 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # bsed - batch edit with sed
 #	- Cameron Simpson <cs@cskk.id.au>
 #
+
+set -ue
 
 : ${TMPDIR:=/tmp}
 : ${BSEDOPTS=''}
@@ -10,15 +12,15 @@
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [sedcmd] files...
-	-d diffopt	Option string for diff.
-	-e sedcmd	Passed to sed.
-	-f script	Passed to sed.
-	-i suf		Copy original to original.suf if changed.
-	-n		Passed to sed.
-	-s		Silent.
-	-v		Verbose.
-	+v		Not verbose.
-	sedcmd		Passed to sed."
+    -d diffopt      Option string for diff.
+    -e sedcmd       Passed to sed.
+    -f script       Passed to sed.
+    -i suf          Copy original to original.suf if changed.
+    -n              Passed to sed.
+    -s              Silent.
+    -v              Verbose.
+    +v              Not verbose.
+    sedcmd          Passed to sed."
 
 diff=diff
 fflag=
@@ -38,21 +40,21 @@ badopts=
 while [ $# -gt 0 ]
 do
     case $1 in
-	--)	shift ; break ;;
-	-d)	DIFFOPTS=$2; shift ;;
-	-e)	ecmd="$ecmd
-			$2"; shift ;;
-	-f)	fflag=1; sedscript=$2; shift ;;
-	-i)	ibak=$2; shift ;;
-	-i?*)	ibak=`expr "x$1" : 'x-i\(.*\)'` ;;
-	-n)	sedopts="$sedopts $1" ;;
-	-s)	silent=1 verbose= ;;
-	-v)	silent= verbose=1 ;;
-	+v)	verbose= ;;
-	-*)	echo "$cmd: $1: unknown option" >&2
-		badopts=1
-		;;
-	*)	break ;;
+        --)     shift ; break ;;
+        -d)     DIFFOPTS=$2; shift ;;
+        -e)     ecmd="$ecmd
+                        $2"; shift ;;
+        -f)     fflag=1; sedscript=$2; shift ;;
+        -i)     ibak=$2; shift ;;
+        -i?*)   ibak=`expr "x$1" : 'x-i\(.*\)'` ;;
+        -n)     sedopts="$sedopts $1" ;;
+        -s)     silent=1 verbose= ;;
+        -v)     silent= verbose=1 ;;
+        +v)     verbose= ;;
+        -*)     echo "$cmd: $1: unknown option" >&2
+                badopts=1
+                ;;
+        *)      break ;;
     esac
     shift
 done
@@ -64,12 +66,12 @@ then
 else
     if [ -z "$ecmd" ]
     then
-	case $# in
-	    0)	echo "$cmd: missing sed command" >&2
-		badopts=1
-		;;
-	    *)	ecmd=$1; shift ;;
-	esac
+        case $# in
+            0)  echo "$cmd: missing sed command" >&2
+                badopts=1
+                ;;
+            *)  ecmd=$1; shift ;;
+        esac
     fi
     sedf="$sedf -e \"\$ecmd\""
 fi
@@ -84,8 +86,8 @@ trap 'rm -f "$tmp"; exit 1' 1 2 15
 xit=0
 ok=1
 
-while	[ $ok ] || xit=1	# catch okness from previous loop pass
-	[ $# -gt 0 ]		# loop condition
+while   [ $ok ] || xit=1        # catch okness from previous loop pass
+        [ $# -gt 0 ]            # loop condition
 do
 
     file=$1; shift
@@ -93,9 +95,9 @@ do
     # transmute "-" into list of filenames from stdin
     if [ "x$file" = x- ]
     then
-	[ $verbose ] && echo "reading filenames from stdin..."
-	set -- `cat` ${1+"$@"}
-	continue
+        [ $verbose ] && echo "reading filenames from stdin..."
+        set -- `cat` ${1+"$@"}
+        continue
     fi
 
     # modify $file to avoid misinterpretation
@@ -109,31 +111,31 @@ do
 
     if [ ! -f "$file" ]
     then
-	echo "$cmd: $file: not a regular file, skipped" >&2
-	continue
+        echo "$cmd: $file: not a regular file, skipped" >&2
+        continue
     fi
 
     bakfile= bakdir=
     case "$ibak" in
-	'')	;;
-	*/)	case "$file" in
-			*/*)	bfile=`basename "$file"`
-				dfile=`dirname "$file"`
-				;;
-			*)	bfile=$file
-				dfile=.
-		esac
-		bakdir=$dfile/$ibak
-		bakfile=$bakdir/$bfile
-		;;
-	*)	bakfile=$file.$ibak
-		;;
+        '')     ;;
+        */)     case "$file" in
+                        */*)    bfile=`basename "$file"`
+                                dfile=`dirname "$file"`
+                                ;;
+                        *)      bfile=$file
+                                dfile=.
+                esac
+                bakdir=$dfile/$ibak
+                bakfile=$bakdir/$bfile
+                ;;
+        *)      bakfile=$file.$ibak
+                ;;
     esac
 
     if [ -n "$bakfile" ] && [ -f "$bakfile" ]
     then
-	echo "$cmd: $file: backup $bakfile already exists, original unchanged" >&2
-	continue
+        echo "$cmd: $file: backup $bakfile already exists, original unchanged" >&2
+        continue
     fi
 
     [ $verbose ] && echo "$file ..."
@@ -147,66 +149,66 @@ do
        | sed -e '$!b notlast' -e '/^$/d' -e ':notlast' \
        | eval "$sedf >\$tmp"
     then
-	# check for changes
-	if cmp -s "$file" "$tmp"
-	then
-	    ok=1		# no change
-	    continue
+        # check for changes
+        if cmp -s "$file" "$tmp"
+        then
+            ok=1                # no change
+            continue
 
 # Theoretically the sed should fail if the disc fills.
 # Therefore dropping this test, which is a hack and breaks things
 # when we really do end up with empty files.
 # - Cameron Simpson <cs@cskk.id.au> 09nov2001
 #
-#	else
-#	    if [ ! -s "$tmp" ]
-#	    then
-#		echo "$cmd: warning: tmpfile empty! skipping $file" >&2
-#		continue
-#	    fi
+#       else
+#           if [ ! -s "$tmp" ]
+#           then
+#               echo "$cmd: warning: tmpfile empty! skipping $file" >&2
+#               continue
+#           fi
 #
 
 
-	fi
-	[ $silent ] || $diff $DIFFOPTS "$file" "$tmp"
+        fi
+        [ $silent ] || $diff $DIFFOPTS "$file" "$tmp"
 
-	# ensure we have a backup
-	if [ -n "$bakfile" ]
-	then
-	    if [ -f "$bakfile" ]
-	    then
-		echo "$cmd: $file: backup $bakfile already exists, original unchanged" >&2
-		continue
-	    fi
-	    if cp "$file" "$bakfile" && cmp -s "$file" "$bakfile"
-	    then :
-	    else echo "$cmd: $file: can't make backup, original unchanged" >&2
-		 continue
-	    fi
-	fi
+        # ensure we have a backup
+        if [ -n "$bakfile" ]
+        then
+            if [ -f "$bakfile" ]
+            then
+                echo "$cmd: $file: backup $bakfile already exists, original unchanged" >&2
+                continue
+            fi
+            if cp "$file" "$bakfile" && cmp -s "$file" "$bakfile"
+            then :
+            else echo "$cmd: $file: can't make backup, original unchanged" >&2
+                 continue
+            fi
+        fi
 
-	# copy changed version in
-	if cat "$tmp" > "$file" && cmp -s "$tmp" "$file"
-	then
-	    ok=1	# backup & update ok
-	    continue
-	fi
+        # copy changed version in
+        if cat "$tmp" > "$file" && cmp -s "$tmp" "$file"
+        then
+            ok=1        # backup & update ok
+            continue
+        fi
 
-	echo "$cmd: $file: can't update" >&2
-	if [ -n "$bakfile" ]
-	then
-	    if cat "$bakfile" > "$file"
-	    then
-		echo "$cmd: $file: original restored" >&2
-		rm "$bakfile"
-	    else
-		echo "$cmd: $file: restore failed; original left in $bakfile" >&2
-	    fi
-	else
-	    echo "$cmd: $file: no backup, may be corrupt" >&2
-	fi
+        echo "$cmd: $file: can't update" >&2
+        if [ -n "$bakfile" ]
+        then
+            if cat "$bakfile" > "$file"
+            then
+                echo "$cmd: $file: original restored" >&2
+                rm "$bakfile"
+            else
+                echo "$cmd: $file: restore failed; original left in $bakfile" >&2
+            fi
+        else
+            echo "$cmd: $file: no backup, may be corrupt" >&2
+        fi
     else
-	echo "$cmd: $file: edit fails; original unchanged" >&2
+        echo "$cmd: $file: edit fails; original unchanged" >&2
         if [ $fflag ]
         then
           echo "      sed script file was $sedscipt" >&2
