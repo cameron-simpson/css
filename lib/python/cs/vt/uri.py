@@ -91,6 +91,22 @@ class VTURI(Promotable):
         if self.indirect else HashCodeBlock(self.hashcode, span=self.span)
     )
 
+  @property
+  @pfx_method
+  def content_block(self):
+    ''' Return a `Block` holding the file content for this URI.
+    '''
+    if self.isdir:
+      raise AttributeError(
+          f'{self.__class__.__name__}.content_block: not available for directories'
+      )
+    if not self.isdirent:
+      # the block is the content
+      return self.block
+    # the block encodes a dirent - decode and return the dirent block
+    E = self.as_Dirent()
+    return E.block
+
   @classmethod
   def from_uri(cls, uri_s):
     ''' Make a `VTURI` from a URI string.
