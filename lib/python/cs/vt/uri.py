@@ -158,13 +158,14 @@ class VTURI(Promotable):
   def saveas(self, fspath):
     ''' Save the contents of this `VTURI` to the filesystem path `fspath`.
     '''
-    filename = uri.filename or f'{uri.hashcode.hex()}.{uri.hashcode.hashname}'
+    top_block = self.content_block
+    filename = self.filename or f'{self.hashcode.hex()}.{self.hashcode.hashname}'
     with atomic_filename(fspath) as f:
       for B in progressbar(
-          uri.block.leaves,
+          top_block.leaves,
           filename,
           itemlenfunc=len,
-          total=len(uri.block),
+          total=len(top_block),
       ):
         assert not B.indirect
         f.write(bytes(B))
