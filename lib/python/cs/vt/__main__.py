@@ -786,7 +786,7 @@ class VTCmd(BaseCommand):
         else:
           print()
         try:
-          D, offset = parse(path)
+          D, offset = _Dirent.parse(path)
         except ValueError as e:
           warning("parse error: %s", e)
           xit = 1
@@ -1078,7 +1078,7 @@ class VTCmd(BaseCommand):
       except ValueError:
         # try an object transcription eg "D{...}"
         try:
-          obj, offset = parse(pushable_spec)
+          obj, offset = Transcriber.parse(pushable_spec)
         except ValueError:
           # fall back: relative path to .vtd file
           if pushable_spec.endswith('.vtd') and isfilepath(pushable_spec):
