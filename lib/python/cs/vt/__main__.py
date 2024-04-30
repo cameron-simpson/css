@@ -1190,69 +1190,49 @@ class VTCmd(BaseCommand):
         raise GetoptError("unrecognised pushables")
     return self._push(srcS, dstS, *pushables)
 
+  @uses_Store
   @uses_runstate
-  def cmd_save(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-F] [{{ospath|-}}...]
+  def cmd_save(self, argv, *, runstate: RunState, S: Store):
+    ''' Usage: {cmd} [-FU] [{{ospath|-}}...]
           Save the contents of each ospath to the Store.
           The argument "-" reads data from standard input and prints a fileref.
           The default argument list is "-".
           -F  Print a FileDirent instead of a block ref for file contents.
+          -U  Print a VT URI instead of a block ref for file contents.
     '''
     options = self.options
     use_filedirent = False
-    if argv and argv[0] == '-F':
-      use_filedirent = True
-      argv.pop(0)
+    options.print_dirent = False
+    options.print_uri = False
+    options.popopts(
+        argv,
+        F='print_dirent',
+        U='print_uri',
+    )
+    if options.print_dirent and options.print_uri:
+      raise GetoptError('only one of -F and -U may be used')
     if not argv:
       argv = ['-']
     xit = 0
-    for ospath in argv:
-      with Pfx(ospath):
-        if ospath == '-':
-          chunks = CornuCopyBuffer.from_fd(0)
-          try:
-            st = os.fstat(0)
-          except OSError as e:
-            warning("fstat(0): %s", e)
-            st = None
-        elif not existspath(ospath):
-          error("missing")
-          xit = 1
-          continue
-        elif isdirpath(ospath):
-          target = Dir(basename(ospath))
-          source = OSDir(ospath)
-          merge(target, source)
-          print(target, ospath)
-          continue
+    for fspath in argv:
+      runstate.raiseif()
+      with Pfx(fspath):
+        if fspath == '-':
+          block = S.block_for(0)
+          uri = block.uri
         else:
           try:
-            st = os.stat(ospath)
+            uri = VTURI.from_fspath(fspath)
           except OSError as e:
-            warning("stat(%r): %s", ospath, e)
-            st = None
-          chunks = CornuCopyBuffer.from_filename(ospath, readsize=1024 * 1024)
-        block = top_block_for(
-            progressbar(
-                blockify(chunks),
-                label=ospath,
-                itemlenfunc=len,
-                units_scale=BINARY_BYTES_SCALE,
-                runstate=runstate,
-                total=(
-                    st.st_size
-                    if st is not None and S_ISREG(st.st_mode) else None
-                ),
-            )
-        )
-        if runstate.cancelled:
-          error("cancelled")
-          xit = 1
-          break
-        print(
-            FileDirent(ospath, block=block) if use_filedirent else block,
-            ospath
-        )
+            warning("%s", e)
+            xit = 1
+            continue
+        if options.print_dirent:
+          print(FileDirent(fspath, block=uri.block), fspath)
+        elif options.print_uri:
+          print(uri, fspath)
+        else:
+          print(uri.block, fspath)
     return xit
 
   @uses_runstate
