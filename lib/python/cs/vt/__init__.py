@@ -396,10 +396,10 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         Raise `MissingHashcodeError` (a subclass of `KeyError`)
         if the hashcode is not present.
     '''
-    block = self.get(h)
-    if block is None:
+    data = self.get(h)
+    if data is None:
       raise MissingHashcodeError(h)
-    return block
+    return data
 
   def __setitem__(self, h, data):
     ''' Save `data` against hash key `h`.
