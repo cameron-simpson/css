@@ -53,7 +53,7 @@ from cs.lex import untexthexify, get_decimal_value, r
 from cs.logutils import warning, error
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
-from cs.resources import uses_runstate
+from cs.resources import RunState, uses_runstate
 from cs.result import ResultSet
 from cs.threads import locked
 
