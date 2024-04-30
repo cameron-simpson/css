@@ -14,7 +14,12 @@ trace=
 [ -t 2 ] && trace=set-x
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [subsection:] [task-description...]"
+usage="Usage:
+  TODO.txt mode:
+    $cmd [subsection:] [task-description...]"
+  GitHub gh mode:
+    $cmd NEW issue title
+    $cmd [number] todo text"
 
 # TODO files (the default) or "gh" :CLI tool
 mode=TODO   # vs GH
