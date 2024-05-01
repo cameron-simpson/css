@@ -15,7 +15,7 @@ from cs.logutils import warning
 from cs.pfx import pfx
 from cs.progress import progressbar
 from cs.queues import IterableQueue
-from cs.resources import uses_runstate
+from cs.resources import RunState, uses_runstate
 from cs.seq import tee
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
@@ -99,6 +99,7 @@ def indirect_blocks(blocks):
       block = IndirectBlock.from_subblocks(subblocks)
     yield block
 
+@uses_runstate
 @promote
 def blockify(
     bfr: CornuCopyBuffer,
@@ -106,7 +107,8 @@ def blockify(
     chunks_name=None,
     scanner=None,
     min_block=None,
-    max_block=None
+    max_block=None,
+    runstate: RunState,
 ):
   ''' Wrapper for `blocked_chunks_of` which yields `Block`s
       from the data from `bfr`.
@@ -121,6 +123,7 @@ def blockify(
       units_scale=BINARY_BYTES_SCALE,
       total=bfr.final_offset,
   ):
+    runstate.raiseif()
     yield Block.promote(chunk)
 
 @promote
