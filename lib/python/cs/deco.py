@@ -1022,7 +1022,8 @@ def promote(func, params=None, types=None):
             arg_value = as_value
       except TypeError:
         # promotion fails
-        if optional and arg_value is None:
+        if (optional and arg_value is param.default
+            and param.default is not Parameter.empty):
           # allow omitted/unconverted optional value with default None
           continue
         raise
