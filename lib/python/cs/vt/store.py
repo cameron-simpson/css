@@ -15,14 +15,16 @@ import sys
 
 from icontract import require
 
-from cs.cache import CachingMapping
+from cs.cache import CachingMapping, ConvCache
 from cs.deco import fmtdoc
+from cs.hashindex import file_checksum
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.queues import Channel, IterableQueue
 from cs.resources import openif, RunState, uses_runstate
 from cs.result import Result, report
+from cs.seq import get0
 from cs.threads import bg as bg_thread
 
 from . import (
@@ -186,6 +188,7 @@ class ProxyStore(StoreSyncBase):
       read2=(),
       copy2=(),
       archives=(),
+      conv_cache=None,
       **kw
   ):
     ''' Initialise a ProxyStore.
@@ -201,8 +204,14 @@ class ProxyStore(StoreSyncBase):
         * `copy2`: optional iterable of Stores to receive copies
           of data obtained via `read2` Stores.
         * `archives`: search path for archive names
+        * `conv_cache`: optional `cs.cache.ConvCache`, default will
+          be inferred from `read`
     '''
-    super().__init__(name, **kw)
+    if conv_cache is None:
+      # use the firsy .conv_cache from the read Stores
+      read = list(read)
+      conv_cache = get0(filter(lambda readStore: readStore.conv_cache, read))
+    super().__init__(name, conv_cache=conv_cache, **kw)
     self.save = frozenset(save)
     self.read = frozenset(read)
     self.save2 = frozenset(save2)
@@ -454,6 +463,7 @@ class DataDirStore(MappingStore):
       indexclass=None,
       rollover=None,
       lock=None,
+      conv_cache=None,
       **kw
   ):
     ''' Initialise the DataDirStore.
@@ -482,10 +492,16 @@ class DataDirStore(MappingStore):
         indexclass=indexclass,
         rollover=rollover,
     )
+    if conv_cache is None:
+      conv_cache = ConvCache(
+          self._datadir.pathto('convof'),
+          content_key_func=partial(file_checksum, hashname=hashclass.hashname),
+      )
     super().__init__(
         name,
         CachingMapping(self._datadir, missing_fallthrough=True),
         hashclass=hashclass,
+        conv_cache=conv_cache,
         **kw,
     )
     self._modify_index_lock = Lock()
