@@ -90,14 +90,14 @@ def the(iterable, context=None):
   return it
 
 def first(iterable):
-  ''' Return the first item from an iterable; raise IndexError on empty iterables.
+  ''' Return the first item from an iterable; raise `IndexError` on empty iterables.
   '''
-  for i in iterable:
-    return i
+  for item in iterable:
+    return item
   raise IndexError("empty iterable %r" % (iterable,))
 
 def last(iterable):
-  ''' Return the last item from an iterable; raise IndexError on empty iterables.
+  ''' Return the last item from an iterable; raise `IndexError` on empty iterables.
   '''
   nothing = True
   for item in iterable:
