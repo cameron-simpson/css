@@ -952,6 +952,7 @@ def promote(func, params=None, types=None):
     if param.default is not Parameter.empty:
       anno_origin = typing.get_origin(annotation)
       anno_args = typing.get_args(annotation)
+      # recognise Optional[T], which becomes Union[T,None]
       if (anno_origin is typing.Union and len(anno_args) == 2
           and anno_args[-1] is type(None)):
         optional = True
@@ -965,7 +966,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (annotation, promote_method, optional)
+    promotions[param_name] = (param, annotation, promote_method, optional)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -981,16 +982,16 @@ def promote(func, params=None, types=None):
             __name__, arg_value
         )
     )
-    for param_name, (annotation, promote_method,
+    for param_name, (param, annotation, promote_method,
                      optional) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
         # parameter not supplied
-        continue
-      if optional and arg_value is None:
-        # skip omitted optional value
-        continue
+        if param.default is Parameter.empty:
+          continue
+        # fill in the default values
+        arg_value = param.default
       if isinstance(arg_value, annotation):
         # already of the desired type
         continue
