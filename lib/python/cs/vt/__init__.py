@@ -157,8 +157,9 @@ DEFAULT_CONFIG_MAP = {
     },
 }
 
-# intercept Lock and RLock
 if False:
+  # intercept Lock and RLock
+  from cs.threads import NRLock
   from .debug import DebuggingLock
 
   def RLock():
@@ -173,7 +174,7 @@ if False:
 
   # monkey patch MultiOpenMixin
   import cs.resources
-  cs.resources.MultiOpenMixin._mom_state_lock = Lock()
+  cs.resources.MultiOpenMixin._mom_state_lock = NRLock()
 else:
   from threading import (
       Lock as threading_Lock,
