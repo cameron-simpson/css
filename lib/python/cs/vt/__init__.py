@@ -239,7 +239,13 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   @pfx_method
   @fmtdoc
   def __init__(
-      self, name, *, capacity=None, hashclass=None, runstate: RunState
+      self,
+      name,
+      *,
+      capacity=None,
+      conv_cache=None,
+      hashclass=None,
+      runstate: RunState,
   ):
     ''' Initialise the Store.
 
@@ -248,10 +254,17 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
           if `None`, a sequential name based on the Store class name
           is generated
         * `capacity`: a capacity for the internal `Later` queue, default 4
+        * `convcache`: optional `cs.cache.ConvCache` for persistent
+          storage of certain cached values
         * `hashclass`: the hash class to use for this Store,
           default: `DEFAULT_HASHCLASS` (`{DEFAULT_HASHCLASS.__name__}`)
         * `runstate`: a `cs.resources.RunState` for external control;
           if not supplied one is allocated
+
+        `conv_cache`: most `Store`s do not have one of these, but
+        a `DatqDirStore` does, a `ProxyStore` returns the first
+        conv cache from its read Stores and a `FileCacheStore`
+        presents the conv cache of its backend.
     '''
     if not isinstance(name, str):
       raise TypeError(
@@ -270,6 +283,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     self._str_attrs = {}
     self.name = name
     self._capacity = capacity
+    self.conv_cache = conv_cache
     self.later = None
     self.hashclass = hashclass
     self._config = None
