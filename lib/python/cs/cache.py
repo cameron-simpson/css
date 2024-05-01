@@ -503,7 +503,7 @@ class ConvCache(HasFSPath):
       self._content_keys[srcpath] = content_key, signature
     return content_key
 
-  def content_subpath(self, srcpath):
+  def content_subpath(self, srcpath) -> str:
     ''' Return the content key based subpath component.
 
         This default assumes the content key is a hash code and
@@ -523,7 +523,7 @@ class ConvCache(HasFSPath):
       *,
       ext=None,
       force=False,
-  ):
+  ) -> str:
     ''' Return the filesystem path of the cached conversion of
         `srcpath` via `conv_func`.
 
@@ -565,7 +565,7 @@ class ConvCache(HasFSPath):
 
 _default_conv_cache = ConvCache()
 
-def convof(srcpath, conv_subpath, conv_func, ext=None, force=False):
+def convof(srcpath, conv_subpath, conv_func, *, ext=None, force=False):
   ''' `ConvCache.convof` using the default cache.
   '''
   return _default_conv_cache.convof(
