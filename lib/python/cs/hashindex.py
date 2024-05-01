@@ -638,7 +638,7 @@ def hashindex(
       raise TypeError(f'hashindex: unhandled fspath={r(fspath)}')
   # local hashindex
   if isfilepath(fspath):
-    h = file_checksum(fspath)
+    h = file_checksum(fspath, hashname=hashname)
     yield h, fspath
   elif isdirpath(fspath):
     for filepath in dir_filepaths(fspath):
