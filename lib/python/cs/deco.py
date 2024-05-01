@@ -996,29 +996,36 @@ def promote(func, params=None, types=None):
         # already of the desired type
         continue
       try:
-        promoted_value = promote_method(arg_value)
-      except TypeError as te:
-        # see if the value has an as_TypeName() method
-        as_method_name = "as_" + annotation.__name__
         try:
-          as_annotation = getattr(arg_value, as_method_name)
-        except AttributeError:
-          # no .as_TypeName, reraise the original TypeError
-          raise te  # pylint: disable=raise-missing-from
-        else:
-          if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
-            # bound instance method of arg_value
-            try:
-              as_value = as_annotation()
-            except (TypeError, ValueError) as e:
-              raise TypeError(
-                  "%s: %s.%s(): %s" %
-                  (get_context(), param_name, as_method_name, e)
-              ) from e
+          promoted_value = promote_method(arg_value)
+        except TypeError as te:
+          # see if the value has an as_TypeName() method
+          as_method_name = "as_" + annotation.__name__
+          try:
+            as_annotation = getattr(arg_value, as_method_name)
+          except AttributeError:
+            # no .as_TypeName, reraise the original TypeError
+            raise te  # pylint: disable=raise-missing-from
           else:
-            # assuming a property or even a plain attribute
-            as_value = as_annotation
-          arg_value = as_value
+            if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
+              # bound instance method of arg_value
+              try:
+                as_value = as_annotation()
+              except (TypeError, ValueError) as e:
+                raise TypeError(
+                    "%s: %s.%s(): %s" %
+                    (get_context(), param_name, as_method_name, e)
+                ) from e
+            else:
+              # assuming a property or even a plain attribute
+              as_value = as_annotation
+            arg_value = as_value
+      except TypeError:
+        # promotion fails
+        if optional and arg_value is None:
+          # allow omitted/unconverted optional value with default None
+          continue
+        raise
       else:
         arg_value = promoted_value
       arg_mapping[param_name] = arg_value
