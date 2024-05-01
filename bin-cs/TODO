@@ -6,7 +6,7 @@
 
 set -ue
 
-: ${GH_REPO:=''}
+: "${GH_REPO:=}"
 
 nl='
 '
@@ -16,7 +16,7 @@ trace=
 cmd=$( basename "$0" )
 usage="Usage:
   TODO.txt mode:
-    $cmd [subsection:] [task-description...]"
+    $cmd [subsection:] [task-description...]
   GitHub gh mode:
     $cmd NEW issue title
     $cmd [number] todo text"
