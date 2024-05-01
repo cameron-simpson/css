@@ -4,7 +4,8 @@
 # Cameron Simpson <cs@cskk.id.au>
 #
 
+set -x
 if which chroma >/dev/null 2>&1
 then  exec chroma ${1+"$@"}
-then  exec shl ${1+"$@"}
+else  exec shl ${1+"$@"}
 fi
