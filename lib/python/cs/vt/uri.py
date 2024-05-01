@@ -17,6 +17,7 @@ from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
+from cs.resources import RunState, uses_runstate
 
 from . import Store, uses_Store
 from .block import HashCodeBlock, IndirectBlock
@@ -204,12 +205,14 @@ class VTURI(Promotable):
   @pfx_method
   @uses_fstags
   @uses_Store
+  @uses_runstate
   def from_dirpath(
       cls,
       dirpath: str,
       *,
       fstags: FSTags,
       S: Store,
+      runstate: RunState,
       filename=None,
       follow_symlinks=False,
       force=False,
@@ -223,7 +226,8 @@ class VTURI(Promotable):
     # so take hold now so that we only update at the end
     with fstags:
       for entry in pfx_call(os.scandir, dirpath):
-        with Pfx(entry.name):
+        with Pfx("scandir(%s)/%s", dirpath, entry.name):
+          runstate.raiseif()
           assert entry.name not in D
           if entry.is_dir(follow_symlinks=follow_symlinks):
             uri = cls.from_dirpath(
@@ -244,7 +248,8 @@ class VTURI(Promotable):
     return cls.from_Dirent(D, filename=filename)
 
   # TODO: unpack a directory if self.isdir
-  def saveas(self, fspath):
+  @uses_runstate
+  def saveas(self, fspath, *, runstate: RunState):
     ''' Save the contents of this `VTURI` to the filesystem path `fspath`.
     '''
     top_block = self.content_block
@@ -256,6 +261,7 @@ class VTURI(Promotable):
           itemlenfunc=len,
           total=len(top_block),
       ):
+        runstate.raiseif()
         assert not B.indirect
         f.write(bytes(B))
 
