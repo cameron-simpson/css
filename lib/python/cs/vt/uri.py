@@ -86,7 +86,6 @@ class VTURI(Promotable):
   @property
   def block(self) -> Union[HashCodeBlock, IndirectBlock]:
     ''' A `Block` for this URI.
-        Note that its meaning depends on `self.isdirent`.
     '''
     return (
         IndirectBlock(HashCodeBlock(self.hashcode), span=self.span)
