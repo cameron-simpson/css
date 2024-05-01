@@ -328,7 +328,7 @@ class PacketConnection(MultiOpenMixin):
         # disconnect might leave the receiver hanging anyway
         ps = self._pending_states()
         if ps:
-          warning("PENDING STATES AT SHUTDOWN: %r", ps)
+          warning("%d PENDING STATES AT SHUTDOWN", len(ps))
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
