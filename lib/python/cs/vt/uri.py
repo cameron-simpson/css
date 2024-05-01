@@ -196,21 +196,9 @@ class VTURI(Promotable):
       raise ValueError(f'not a regular file: {fspath!r}')
     if filename is None:
       filename = basename(fspath)
-
-    def save_file_uri(fspath, cachepath):
-      uri = S.block_for(fspath).uri
-      uri.filename = filename
-      with open(cachepath, 'w') as cachef:
-        print(uri, file=cachef)
-
-    # get URI for nondirent file contents
-    uri_path = convof(fspath, 'vt-uri', save_file_uri, force=force)
-    with open(uri_path) as cachef:
-      uri = cls.from_uri(cachef.readline().strip())
-    return (
-        cls.from_Dirent(FileDirent(filename, uri.content_block))
-        if as_dirent else uri
-    )
+    uri = S.block_for(fspath).uri
+    uri.filename = filename
+    return uri
 
   @classmethod
   @pfx_method
