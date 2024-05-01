@@ -732,6 +732,12 @@ class FileCacheStore(StoreSyncBase):
       if new_backend:
         new_backend.open()
 
+  @property
+  def conv_cache(self):
+    ''' The `conv_cache` from the backend `Store`.
+    '''
+    return None if self._backend is None else self._backend.conv_cache
+
   @contextmanager
   def startup_shutdown(self):
     with super().startup_shutdown():
