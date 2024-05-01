@@ -139,7 +139,7 @@ class ProxyStore(StoreSyncBase):
       * Read Stores. Requested data may be obtained from these Stores.
       * Copy Stores. Data retrieved from a `read2` Store is copied to these Stores.
 
-      A example setup utilising a working ProxyStore might look like this:
+      A example setup utilising a working `ProxyStore` might look like this:
 
           ProxyStore(
             save=[local,upstream],
@@ -154,11 +154,10 @@ class ProxyStore(StoreSyncBase):
       * `upstream`: is a remote high latency Store such as a `TCPStore`.
       * `spool`: is a local secondary Store, probably a `DataDirStore`.
 
-      This setup causes all saved data to be saved to `local` and
-      `upstream`.
-      If a save to `local` or `upstream` fails,
-      for example if the upstream is offline,
-      the save is repeated to the `spool`,
+      This example setup causes all saved data to be saved to `local`
+      and `upstream`.
+      If a save to `local` or `upstream` fails, for example if the
+      upstream is offline, the save is repeated to the `spool`,
       intended as a holding location for data needing a resave.
 
       Reads are attempted first from the `read` Stores, then from
@@ -172,7 +171,7 @@ class ProxyStore(StoreSyncBase):
       This supports obtaining an Archive by name
       from the first Store whose glob matches the name.
 
-      TODO: replay and purge the spool? Probably better as a separate
+      TODO: replay and purge the `save2` spool? Probably better as a separate
       pushto operation:
 
           vt -S spool_store pushto --delete upstream_store
@@ -194,7 +193,7 @@ class ProxyStore(StoreSyncBase):
     ''' Initialise a ProxyStore.
 
         Parameters:
-        * `name`: ProxyStore name.
+        * `name`: `ProxyStore` name
         * `save`: iterable of Stores to which to save blocks
         * `read`: iterable of Stores from which to fetch blocks
         * `save2`: fallback Store for saves which fail
@@ -469,13 +468,13 @@ class DataDirStore(MappingStore):
     ''' Initialise the DataDirStore.
 
         Parameters:
-        * `name`: Store name.
-        * `topdirpath`: top directory path.
+        * `name`: Store name
+        * `topdirpath`: top directory path
         * `hashclass`: hash class,
-          default: `DEFAULT_HASHCLASS` (`{DEFAULT_HASHCLASS.__name__}`).
-        * `indexclass`: passed to the data dir.
-        * `rollover`: passed to the data dir.
-        * `lock`: passed to the mapping.
+          default: `DEFAULT_HASHCLASS` (`{DEFAULT_HASHCLASS.__name__}`)
+        * `indexclass`: passed to the data dir
+        * `rollover`: passed to the data dir
+        * `lock`: optional `RLock`, passed to the `DataDir` mapping
     '''
     if lock is None:
       lock = RLock()
