@@ -154,12 +154,7 @@ else
   shift
 fi
 
-# translate pseudo-op "@foo" into "-n foo exec"
-case "$op" in
-  @?*)DK_PRIMARY_SERVICE=$( expr "$op" : '@\(.*\)' )
-      op=exec
-      ;;
-esac
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
