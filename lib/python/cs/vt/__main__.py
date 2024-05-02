@@ -1410,26 +1410,12 @@ class VTCmd(BaseCommand):
         return 1
     return 0
 
-  @uses_runstate
-  @uses_Store
-  def cmd_upload(self, argv, *, runstate: RunState, S: Store):
+  def cmd_upload(self, argv):
     ''' Usage: {cmd} path...
-          Save each filesystem path into the Store, print the path and its URI.
+          Save each filesystem path into the Store, print the URI.
+          This is just "save -U".
     '''
-    if not argv:
-      raise GetoptError('missing paths')
-    xit = 0
-    for fspath in argv:
-      runstate.raiseif()
-      with Pfx(fspath):
-        try:
-          uri = VTURI.from_fspath(fspath)
-        except OSError as e:
-          warning("not uploaded: %s", e)
-          xit = 1
-        else:
-          print(fspath, uri)
-    return xit
+    return self.cmd_save(['-U'] + argv)
 
 def lsDirent(fp, E, name):
   ''' Transcribe a Dirent as an ls-style listing.
