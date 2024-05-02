@@ -744,36 +744,29 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     yield None
 
-  @promote
-  def _block_for(self, bfr: CornuCopyBuffer) -> "Block":
-    ''' Store an object into this `Store`, return the `Block`.
-        The object may be any object acceptable to `CornuCopyBuffer.promote`.
-    '''
+  def block_for(self, src, *, name=None) -> "Block":
     from .blockify import block_for
     with self:
-      return block_for(bfr)
+      # use the cache if given a filesystem path and we have a .conv_cache
+      if isinstance(src, str):
+        conv_cache = self.conv_cache
+        if conv_cache is not None:
+          from .uri import VTURI
 
-  def block_for(self, src) -> "Block":
-    # use the cache if given a filesystem path and we have a .conv_cache
-    if isinstance(src, str):
-      conv_cache = self.conv_cache
-      if conv_cache is not None:
-        from .uri import VTURI
+          def cache_file_uri(fspath, cachepath):
+            ''' Generate the URI for `fspath` and store in `cachepath`.
+            '''
+            uri = block_for(src, name=name).uri
+            with open(cachepath, 'w') as cachef:
+              print(uri, file=cachef)
 
-        def cache_file_uri(fspath, cachepath):
-          ''' Generate the URI for `fspath` and store in `cachepath`.
-          '''
-          uri = self._block_for(src).uri
-          with open(cachepath, 'w') as cachef:
-            print(uri, file=cachef)
-
-        uri_cachepath = conv_cache.convof(
-            src, f'filepath.vturi.{self.hashclass.hashname}', cache_file_uri
-        )
-        with open(uri_cachepath) as cachef:
-          uri = VTURI.from_uri(cachef.readline().strip())
-        return uri.block
-    return self._block_for(src)
+          uri_cachepath = conv_cache.convof(
+              src, f'filepath.vturi.{self.hashclass.hashname}', cache_file_uri
+          )
+          with open(uri_cachepath) as cachef:
+            uri = VTURI.from_uri(cachef.readline().strip())
+          return uri.block
+      return block_for(src, name=name)
 
   @classmethod
   @fmtdoc
