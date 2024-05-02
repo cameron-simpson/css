@@ -61,7 +61,7 @@ from . import (
     VT_STORE_DEFAULT,
     VT_STORE_ENVVAR,
 )
-from .archive import Archive, FileOutputArchive, CopyModes
+from .archive import Archive, FilePathArchive, FileOutputArchive, CopyModes
 from .blockify import (
     blocked_chunks_of,
     top_block_for,
@@ -999,23 +999,17 @@ class VTCmd(BaseCommand):
       if not pathexists(fspath):
         error("missing")
         return 1
-      arpath = ospath + '.vt'
-      A = Archive(arpath, missing_ok=True)
-      last_entry = A.last
-      when, target = last_entry.when, last_entry.dirent
-      if target is None:
-        target = Dir(basename(ospath))
-      if isdirpath(ospath):
-        source = OSDir(ospath)
-      else:
-        source = OSFile(ospath)
-      if not merge(target, source):
-        error("merge into %r fails", arpath)
+      arpath = fspath + '.vt'
+      try:
+        uri = VTURI.from_fspath(fspath)
+      except OSError as e:
+        warning("%s", e)
         return 1
-      A.update(target)
-      info("remove %r", ospath)
-      if isdirpath(ospath):
-        shutil.rmtree(ospath)
+      A = FilePathArchive(arpath, missing_ok=True)
+      A.update(uri.as_Dirent())
+      info("remove %r", fspath)
+      if isdirpath(fspath):
+        shutil.rmtree(fspath)
       else:
         os.remove(fspath)
     return 0
