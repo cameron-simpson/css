@@ -8,16 +8,21 @@ set -ue
 trace=
 [ -t 2 ] && trace=set-x
 
-: ${DK_APP_USER:='appuser'}
-: ${DK_COMPOSE_CMD:='docker compose'} ## or docker-compose on older machines
-: ${DK_COMPOSE_YML:='docker-compose.yml'}
-: ${DK_CP_PREFIX:='.'}
-: ${DK_ENVVARS:=''}
-: ${DK_EXEC_PREFIX:=''}
-: ${DK_PRIMARY_SERVICE='gunicorn'}
-: ${DK_PSQL_SERVICE=''}
-: ${DK_PSQL_DBNAME=''}
-: ${DK_PSQL_SETUP_USERNAME=''}
+: "${DK_APP_USER:=appuser}"
+: "${DK_COMPOSE_CMD:=docker compose}" ## or docker-compose on older machines
+: "${DK_COMPOSE_YML:=docker-compose.yml}"
+: "${DK_CP_PREFIX:=.}"
+: "${DK_ENVVARS:=}"
+: "${DK_EXEC_PREFIX:=}"
+: "${DK_LOGGEDIN_HOST:=}"
+: "${DK_LOGGEDIN_USERNAME:=}"
+: "${DK_LOGIN_HOST:=}"
+: "${DK_LOGIN_USERNAME:=}"
+: "${DK_PRIMARY_SERVICE:=gunicorn}"
+: "${DK_PSQL_SERVICE:=}"
+: "${DK_PSQL_DBNAME:=}"
+: "${DK_PSQL_SETUP_USERNAME:=}"
+: "${DK_REPO:=}"
 
 docker_compose_opts=
 docker_exec_opts=-i
