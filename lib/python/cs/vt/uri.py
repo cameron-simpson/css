@@ -18,6 +18,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
+from cs.units import BINARY_BYTES_SCALE
 
 from . import Store, uses_Store
 from .block import HashCodeBlock, IndirectBlock
@@ -259,6 +260,7 @@ class VTURI(Promotable):
           filename,
           itemlenfunc=len,
           total=len(top_block),
+          units_scale=BINARY_BYTES_SCALE,
       ):
         runstate.raiseif()
         assert not B.indirect
