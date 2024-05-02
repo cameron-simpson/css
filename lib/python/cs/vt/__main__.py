@@ -36,6 +36,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import atomic_filename, file_data, shortpath
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import hexify, get_identifier, s
 from cs.logutils import (exception, error, warning, track, info, debug, logTo)
 from cs.pfx import Pfx, pfx_method, pfx_call
@@ -345,7 +346,8 @@ class VTCmd(BaseCommand):
       sys.exit(1)
 
   @contextmanager
-  def run_context(self):
+  @uses_fstags
+  def run_context(self, *, fstags: FSTags):
     ''' Set up and tear down the surrounding context.
     '''
     with super().run_context():
@@ -357,22 +359,23 @@ class VTCmd(BaseCommand):
         with stackattrs(run_modes, config=config):
           # redo these because defaults is already initialised
           with stackattrs(run_modes, show_progress=show_progress):
-            if cmd in ("config", "datadir", "dump", "help", "init", "profile",
-                       "scan"):
-              yield
-            else:
-              # open the default Store
-              if options.store_spec is None:
-                if cmd == "serve":
-                  options.store_spec = store_spec
-              S = Store.default(
-                  config_spec=options.config_map,
-                  store_spec=options.store_spec,
-                  cache_spec=options.cache_store_spec,
-              )
-              with S:
-                with stackattrs(options, S=S):
-                  yield
+            with fstags:
+              if cmd in ("config", "datadir", "dump", "help", "init",
+                         "profile", "scan"):
+                yield
+              else:
+                # open the default Store
+                if options.store_spec is None:
+                  if cmd == "serve":
+                    options.store_spec = options.store_spec
+                S = Store.default(
+                    config_spec=options.config_map,
+                    store_spec=options.store_spec,
+                    cache_spec=options.cache_store_spec,
+                )
+                with S:
+                  with stackattrs(options, S=S):
+                    yield
       if ifdebug():
         dump_debug_threads()
 
