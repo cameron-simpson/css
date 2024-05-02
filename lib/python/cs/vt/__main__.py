@@ -994,7 +994,6 @@ class VTCmd(BaseCommand):
     fspath = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments after path: %r" % (argv,))
-    modes = CopyModes(trust_size_mtime=True)
     with Pfx(fspath):
       if not pathexists(fspath):
         error("missing")
