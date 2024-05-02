@@ -1191,15 +1191,16 @@ class VTCmd(BaseCommand):
   @uses_Store
   @uses_runstate
   def cmd_save(self, argv, *, runstate: RunState, S: Store):
-    ''' Usage: {cmd} [-FU] [{{ospath|-}}...]
-          Save the contents of each ospath to the Store.
-          The argument "-" reads data from standard input and prints a fileref.
+    ''' Usage: {cmd} [-FU] [{{fspath|-}}...]
+          Save the contents of each filesystem path to the Store.
+          Write the content reference to the standard output.
+          The argument "-" reads data from standard input.
           The default argument list is "-".
-          -F  Print a FileDirent instead of a block ref for file contents.
-          -U  Print a VT URI instead of a block ref for file contents.
+          The default content reference is a block ref.
+          -F  Print a FileDirent instead of a block ref.
+          -U  Print a VT URI instead of a block ref.
     '''
     options = self.options
-    use_filedirent = False
     options.print_dirent = False
     options.print_uri = False
     options.popopts(
@@ -1216,6 +1217,10 @@ class VTCmd(BaseCommand):
       runstate.raiseif()
       with Pfx(fspath):
         if fspath == '-':
+          if sys.stdin.isatty():
+            warning("stdin is a tty, skipped")
+            xit = 1
+            continue
           block = S.block_for(0)
           uri = block.uri
         else:
