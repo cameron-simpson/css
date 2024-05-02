@@ -173,8 +173,20 @@ class DirentRecord(BinarySingleValue):
 
 class _Dirent(Transcriber, prefix=None):
   ''' Incomplete base class for *`Dirent` objects.
+
+      Special notes:
+
+      We have a `._prev_dirent_blockref` private attribute, passed
+      as the optional `prev_dirent_blockref` init parameter, which
+      is a `Block` containing the encoding of the immediate ancestor
+      `Dirent` is this `Dirent` is a revision, such as a more recent
+      backup snapshot. This is a `Block` because being an actual
+      `Dirent` would lead to an unbounded recursion of `Dirent`s.
+      Instead the `Block` is fetched and decoded at need in the
+      `.prev_dirent` property.
   '''
 
+  @typechecked
   def __init__(
       self,
       type_,
@@ -183,7 +195,7 @@ class _Dirent(Transcriber, prefix=None):
       meta=None,
       uuid=None,
       parent=None,
-      prevblock=None,
+      prev_dirent_blockref: Optional[Block] = None,
       block=None,
       **kw
   ):
@@ -197,7 +209,7 @@ class _Dirent(Transcriber, prefix=None):
           *note*: for `IndirectDirent`s this is a reference to another
           `Dirent`'s UUID.
         * `parent`: optional parent Dirent
-        * `prevblock`: optional Block whose contents are the binary
+        * `prev_dirent_blockref`: optional Block whose contents are the binary
           transcription of this Dirent's previous state - another
           Dirent
     '''
@@ -215,9 +227,9 @@ class _Dirent(Transcriber, prefix=None):
       self.type = type_
       self.name = name
       self.uuid = uuid
-      assert prevblock is None or isinstance(prevblock, Block), \
-          "not Block: prevblock=%r" % (prevblock,)
-      self._prev_dirent_blockref = prevblock
+      assert prev_dirent_blockref is None or isinstance(prev_dirent_blockref, Block), \
+          "not Block: prev_dirent_blockref=%r" % (prev_dirent_blockref,)
+      self._prev_dirent_blockref = prev_dirent_blockref
       if not isinstance(meta, Meta):
         M = Meta({'a': DEFAULT_DIR_ACL if self.isdir else DEFAULT_FILE_ACL})
         if meta is None:
@@ -323,7 +335,7 @@ class _Dirent(Transcriber, prefix=None):
         attrs['block'] = block
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is not None:
-      attrs['prevblock'] = prev_blockref
+      attrs['prev_dirent_blockref'] = prev_blockref
     tokens.append(self.transcribe_mapping_inner(attrs))
     return ''.join(tokens)
 
@@ -385,7 +397,7 @@ class _Dirent(Transcriber, prefix=None):
   def prev_dirent(self):
     ''' Return the previous Dirent.
 
-        If not None, during encoding or transcription, if self !=
+        If not `None`, during encoding or transcription, if self !=
         prev_dirent, include it in the encoding or transcription.
 
         TODO: parse out multiple blockrefs.
