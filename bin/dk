@@ -380,7 +380,7 @@ case "$op" in
       exit $?
       ;;
   pid)ptn=$( echo "$*" | tr ' ' '|' )
-      grep NSpid: /proc/*/status | egrep "$ptn"
+      $trace egrep "NSpid:.*$ptn" /proc/*/status || :
       exit $?
       ;;
   rsh)
