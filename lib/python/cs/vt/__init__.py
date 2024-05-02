@@ -353,6 +353,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             with S:
                 ... do stuff ...
     '''
+    from .store import ProxyStore
     S = super().default()
     if S is None:
       # no prevailing Store
