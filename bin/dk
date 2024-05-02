@@ -421,10 +421,9 @@ case "$op" in
       # invoke an inet-mode sshd inside the container
       set -x
       DK_EXEC_PREFIX=; export DK_EXEC_PREFIX
-      exec "$0" -n "$primary_container" \
       subdk exec mkdir -p /run/sshd
       subdk exec su "$DK_APP_USER" -c 'umask 022; cd; mkdir -p .ssh; >>.ssh/authorized_keys'
-            exec /usr/sbin/sshd \
+      subdk exec /usr/sbin/sshd \
                   -edi \
                   -o AuthenticationMethods=publickey \
                   -o PubkeyAcceptedKeyTypes=+ssh-dss \
