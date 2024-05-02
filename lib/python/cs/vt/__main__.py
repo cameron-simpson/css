@@ -986,17 +986,17 @@ class VTCmd(BaseCommand):
     return xit
 
   def cmd_pack(self, argv):
-    ''' Usage: {cmd} ospath
-          Store and replace ospath with an archive file ospath.vt.
+    ''' Usage: {cmd} fspath
+          Store and replace the filesystem path with an archive file fspath.vt.
     '''
     if not argv:
       raise GetoptError("missing path")
-    ospath = argv.pop(0)
+    fspath = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments after path: %r" % (argv,))
     modes = CopyModes(trust_size_mtime=True)
-    with Pfx(ospath):
-      if not pathexists(ospath):
+    with Pfx(fspath):
+      if not pathexists(fspath):
         error("missing")
         return 1
       arpath = ospath + '.vt'
@@ -1017,7 +1017,7 @@ class VTCmd(BaseCommand):
       if isdirpath(ospath):
         shutil.rmtree(ospath)
       else:
-        os.remove(ospath)
+        os.remove(fspath)
     return 0
 
   def cmd_profile(self, argv):
