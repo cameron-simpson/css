@@ -87,6 +87,8 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       \$DK_APP_USER ($DK_APP_USER).
     sshd
       Invoke an inet-mode sshd inside the container.
+    strace {docker-pid|regexp}...
+      Strace all the processes which match.
     try [name [command...]]
       Shorthand for \"$DK_COMPOSE_CMD run --rm name command...\".
       The default name comes from \$DK_PRIMARY_SERVICE ($DK_PRIMARY_SERVICE).
@@ -428,6 +430,38 @@ case "$op" in
                   -o AuthenticationMethods=publickey \
                   -o PubkeyAcceptedKeyTypes=+ssh-dss \
                   ${1+"$@"}
+      exit $?
+      ;;
+  strace)
+      pids=
+      for match
+      do
+        case "$match" in
+          [1-9] | [1-9]*[0-9] )
+              ospid=$( subdk ospid "$match" )
+              pids="$pids $ospid"
+              ;;
+          *)  ospids=$(
+                  "$0" ospid $(
+                      subdk exec ps ax \
+                      | grep "$match" \
+                      | awk '{ print $1 }'
+                  )
+              )
+              pids="$pids $ospids"
+              ;;
+        esac
+      done
+      set -- $pids
+      [ $# -gt 0 ] || {
+        echo "$0 strace: no matches" >&2
+        exit 1
+      }
+      strace_opts=
+      for pid in $pids
+      do  strace_opts="$strace_opts -p $pid"
+      done
+      exec $trace sudo strace $strace_opts
       ;;
   try)
       if [ $# = 0 ]
