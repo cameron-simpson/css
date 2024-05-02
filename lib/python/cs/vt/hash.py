@@ -8,6 +8,7 @@ from abc import ABC
 from binascii import unhexlify
 from bisect import bisect_left
 from hashlib import sha1, sha256
+from inspect import isclass
 from os.path import splitext
 import sys
 
@@ -15,7 +16,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.binary import BSUInt, BinarySingleValue
-from cs.deco import OBSOLETE
+from cs.deco import OBSOLETE, promote, Promotable
 from cs.excutils import exc_fold
 from cs.hashutils import BaseHashCode
 from cs.lex import get_identifier, hexify
@@ -266,7 +267,31 @@ class Hash_SHA256(
 ):
   __slots__ = ()
 
-DEFAULT_HASHCLASS = Hash_SHA1
+class HashCodeType(type, Promotable):
+  ''' A kind of factory class for producing `HashCode` subclasses.
+      This exists to let me provide a promotion for hash class names.
+  '''
+
+  @staticmethod
+  def from_NoneType(none: type(None)):
+    '''Return the default `Store` hashclass for `None`.
+    '''
+    from . import Store
+    return Store.get_default_hashclass()
+
+  @staticmethod
+  def from_str(hashname: str):
+    ''' Return the `HashCode` subclass for `hashname`.
+    '''
+    return HashCode.by_hashname[hashname]
+
+  @classmethod
+  def promote(self, obj):
+    ''' Pass `HashCode` subclasses, promote the rest (`str` and `None`).
+    '''
+    if isclass(obj) and issubclass(obj, HashCode):
+      return obj
+    return super().promote(obj)
 
 class HashCodeUtilsMixin:
   ''' Utility methods for classes which use `HashCode`s as keys.
@@ -438,10 +463,9 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
   '''
 
-  def __init__(self, hashclass=None):
+  @promote
+  def __init__(self, hashclass: HashCodeType = None):
     dict.__init__(self)
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
     self.hashclass = hashclass
 
   def __str__(self):
