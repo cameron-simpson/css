@@ -886,7 +886,7 @@ class DataDir(FilesDir):
             offset = DFstate.scanned_to
             hashclass = self.hashclass
             scanner = DFstate.scanfrom(offset=offset)
-            if run_modes.show_progress:
+            if run_modes.show_progress and new_size - offset >= 1024 * 1024:
               scanner = progressbar(
                   scanner,
                   "%s: scan %s" %
@@ -897,6 +897,7 @@ class DataDir(FilesDir):
                       lambda pre_dr_post: pre_dr_post[2] - pre_dr_post[0]
                   ),
                   units_scale=BINARY_BYTES_SCALE,
+                  report_print=True,
               )
             for pre_offset, DR, post_offset in scanner:
               hashcode = hashclass.from_data(DR.data)
