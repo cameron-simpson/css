@@ -222,15 +222,15 @@ class HashCode(
   def transcribe_inner(self) -> str:
     return f'{self.hashname}:{self.hex()}'
 
-  @staticmethod
-  def parse_inner(s, offset, stopchar, prefix):
+  @classmethod
+  def parse_inner(cls, s, offset, stopchar, prefix):
     ''' Parse hashname:hashhextext from `s` at offset `offset`.
         Return HashCode instance and new offset.
     '''
     hashname, offset = get_identifier(s, offset)
     if not hashname:
       raise ValueError("missing hashname at offset %d" % (offset,))
-    hashclass = HASHCLASS_BY_NAME[hashname]
+    hashclass = cls.by_hashname[hashname]
     if offset >= len(s) or s[offset] != ':':
       raise ValueError("missing colon at offset %d" % (offset,))
     offset += 1
@@ -245,7 +245,6 @@ class HashCode(
     return H, offset
 
 # legacy names, to be removed (TODO)
-HASHCLASS_BY_NAME = HashCode.by_hashname
 HASHCLASS_BY_ENUM = HashCode.by_hashenum
 
 # enums for hash types; need to be stable for the binary transcription
