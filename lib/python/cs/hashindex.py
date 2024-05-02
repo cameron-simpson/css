@@ -546,7 +546,7 @@ def file_checksum(
       with contextif(
           st.st_size > 1024 * 1024,
           run_task,
-          f'checksum {shortpath(fspath)}',
+          f'checksum {hashname}:{shortpath(fspath)}',
       ):
         try:
           hashcode = hashclass.from_fspath(fspath)
