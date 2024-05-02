@@ -65,9 +65,10 @@ from cs.threads import bg as bg_thread, ThreadState, HasThreadState
 from cs.upd import Upd, uses_upd
 
 from .hash import (
-    DEFAULT_HASHCLASS,
-    HASHCLASS_BY_NAME,
+    HASHNAME_DEFAULT,
+    HASHNAME_ENVVAR,
     HashCode,
+    HashCodeType,
     HashCodeUtilsMixin,
     MissingHashcodeError,
 )
@@ -113,6 +114,7 @@ DISTINFO = {
         'cs.units',
         'cs.upd',
         'cs.x',
+        'blake3',
         'icontract',
         'lmdb',
     ],
@@ -136,7 +138,6 @@ VT_STORE_ENVVAR = 'VT_STORE'
 VT_STORE_DEFAULT = '[default]'
 VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
 VT_CACHE_STORE_DEFAULT = '[cache]'
-DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
 
 DEFAULT_CONFIG_MAP = {
     'GLOBAL': {
@@ -238,13 +239,14 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   @uses_runstate
   @pfx_method
   @fmtdoc
+  @promote
   def __init__(
       self,
       name,
       *,
       capacity=None,
       conv_cache=None,
-      hashclass=None,
+      hashclass: HashCodeType = None,
       runstate: RunState,
   ):
     ''' Initialise the Store.
@@ -256,8 +258,8 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         * `capacity`: a capacity for the internal `Later` queue, default 4
         * `convcache`: optional `cs.cache.ConvCache` for persistent
           storage of certain cached values
-        * `hashclass`: the hash class to use for this Store,
-          default: `DEFAULT_HASHCLASS` (`{DEFAULT_HASHCLASS.__name__}`)
+        * `hashclass`: the hash class to use for this Store, or the name of a
+          hash class; default from `Store.get_default_hashclass()`
         * `runstate`: a `cs.resources.RunState` for external control;
           if not supplied one is allocated
 
@@ -272,11 +274,6 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       )
     if name is None:
       name = "%s%d" % (type(self).__name__, next(self._seq()))
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
-    elif isinstance(hashclass, str):
-      hashclass = HASHCLASS_BY_NAME[hashclass]
-    assert issubclass(hashclass, HashCode)
     if capacity is None:
       capacity = 4
     RunStateMixin.__init__(self, runstate=runstate)
@@ -334,6 +331,14 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         default `{VT_CACHE_STORE_DEFAULT!r}`.
     '''
     return os.environ.get(VT_CACHE_STORE_ENVVAR, VT_CACHE_STORE_DEFAULT)
+
+  @staticmethod
+  @fmtdoc
+  def get_default_hashclass():
+    ''' The default hashclass from `${HASHNAME_ENVVAR}`, default `{HASHNAME_DEFAULT!r}`.
+    '''
+    hashname = os.environ.get(HASHNAME_ENVVAR, HASHNAME_DEFAULT)
+    return HashCode.by_hashname[hashname]
 
   @classmethod
   def default(cls, config_spec=None, store_spec=None, cache_spec=None):

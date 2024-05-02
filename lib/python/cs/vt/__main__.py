@@ -53,7 +53,8 @@ from . import (
     run_modes,
     DEFAULT_CONFIG_ENVVAR,
     DEFAULT_CONFIG_PATH,
-    DEFAULT_HASHCLASS_ENVVAR,
+    HASHNAME_DEFAULT,
+    HASHNAME_ENVVAR,
     VT_CACHE_STORE_DEFAULT,
     VT_CACHE_STORE_ENVVAR,
     VT_STORE_DEFAULT,
@@ -73,7 +74,7 @@ from .datadir import DataDir
 from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
 from .dir import _Dirent, Dir, FileDirent
-from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+from .hash import HashCode
 from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
@@ -130,8 +131,7 @@ class VTCmdOptions(BaseCommand.Options):
       default_factory=lambda: os.environ.get(VTCmd.VT_LOGFILE_ENVVAR)
   )
   hashname: str = field(
-      default_factory=lambda: os.environ.
-      get(DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.hashname)
+      default_factory=lambda: Store.get_default_hashclass().hashname
   )
   show_progress: bool = field(default_factory=lambda: run_modes.show_progress)
 
@@ -140,10 +140,10 @@ class VTCmdOptions(BaseCommand.Options):
     ''' The `HashCode` subclass for `self.hashname`.
       '''
     try:
-      return HASHCLASS_BY_NAME[self.hashname]
+      return HashCode.by_hashname[self.hashname]
     except KeyError as e:
       raise AttributeError(
-          f'{self.__class__.__name__}.hashclass: unknown hashclass name {self.hashname!r} (I know {sorted(HASHCLASS_BY_NAME.keys())})'
+          f'{self.__class__.__name__}.hashclass: unknown hashclass name {self.hashname!r} (I know {sorted(HashCode.by_hashname.keys())})'
       ) from e
 
   @property
@@ -270,8 +270,8 @@ class VTCmd(BaseCommand):
   USAGE_KEYWORDS = {
       'DEFAULT_CONFIG_ENVVAR': DEFAULT_CONFIG_ENVVAR,
       'DEFAULT_CONFIG_PATH': DEFAULT_CONFIG_PATH,
-      'DEFAULT_HASHCLASS_ENVVAR': DEFAULT_HASHCLASS_ENVVAR,
-      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.hashname,
+      'HASHNAME_ENVVAR': HASHNAME_ENVVAR,
+      'HASHNAME_DEFAULT': HASHNAME_DEFAULT,
       'VT_CACHE_STORE_DEFAULT': VT_CACHE_STORE_DEFAULT,
       'VT_CACHE_STORE_ENVVAR': VT_CACHE_STORE_ENVVAR,
       'VT_STORE_DEFAULT': VT_STORE_DEFAULT,
@@ -293,8 +293,8 @@ class VTCmd(BaseCommand):
               "[server]" and ignores ${VT_STORE_ENVVAR}.
     -f config Config file. Default from ${DEFAULT_CONFIG_ENVVAR},
               otherwise {DEFAULT_CONFIG_PATH}
-    -h hashclass Hashclass for Stores. Default from ${DEFAULT_HASHCLASS_ENVVAR},
-              otherwise {DEFAULT_HASHCLASS_NAME}
+    -h hashclass Hashclass for Stores. Default from ${HASHNAME_ENVVAR},
+              otherwise `{HASHNAME_DEFAULT!r}`.
     -P        Progress: show a progress bar of top level Store activity.
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.

@@ -26,7 +26,7 @@ from cs.testutils import SetupTeardownMixin, assertSingleThread
 
 from .block import HashCodeBlock, IndirectBlock
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
-from .hash import HashCode, HASHCLASS_BY_NAME
+from .hash import HashCode
 from .socket import (
     TCPStoreServer, TCPClientStore, UNIXSocketStoreServer,
     UNIXSocketClientStore
@@ -97,7 +97,7 @@ def get_test_stores(prefix):
   '''
   subtest = {}
   for hashclass_name in HASHCLASS_NAMES:
-    hashclass = HASHCLASS_BY_NAME[hashclass_name]
+    hashclass = HashCode.by_hashname[hashclass_name]
     with stackkeys(
         subtest,
         hashname=hashclass_name,

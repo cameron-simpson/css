@@ -23,7 +23,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin, openif
 
-from .hash import HashCode, HashCodeUtilsMixin, DEFAULT_HASHCLASS
+from .hash import HashCode, HashCodeUtilsMixin
 from .index import choose as choose_indexclass
 from .util import openfd_append, openfd_read
 

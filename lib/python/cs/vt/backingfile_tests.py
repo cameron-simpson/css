@@ -17,7 +17,7 @@ from .backingfile import (
     BinaryHashCodeIndex,
     BackingFileIndexEntry,
 )
-from .hash import HASHCLASS_BY_NAME
+from .hash import HashCode
 from .store import VTDStore
 
 RUN_SIZE = 128
@@ -31,7 +31,7 @@ class TestBackingFile(unittest.TestCase):
     ''' Save RUN_SIZE random blocks, close, retrieve in random order.
     '''
     for cls in RawBackingFile, CompressibleBackingFile:
-      for _, hashclass in sorted(HASHCLASS_BY_NAME.items()):
+      for _, hashclass in sorted(HashCode.by_hashname.items()):
         with self.subTest(cls=cls, hashclass=hashclass):
           with NamedTemporaryFile(dir='.', prefix=cls.__name__ + '-') as T:
             blocks = {}
@@ -61,7 +61,7 @@ class TestBackingFile(unittest.TestCase):
     ''' Like test_shuffled_randomblocks but using a .vtd file and binary index file:
         save RUN_SIZE random blocks, close, retrieve in random order.
     '''
-    for _, hashclass in sorted(HASHCLASS_BY_NAME.items()):
+    for _, hashclass in sorted(HashCode.by_hashname.items()):
       with self.subTest(hashclass=hashclass):
         with TemporaryDirectory(dir='.') as TDname:
           with NamedTemporaryFile(dir=TDname, prefix='VTDStore-',

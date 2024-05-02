@@ -28,6 +28,7 @@ from .transcribe import Transcriber
 
 HASHNAME_DEFAULT = 'blake3'
 HASHNAME_ENVVAR = 'VT_HASHNAME'
+
 class MissingHashcodeError(KeyError):
   ''' Subclass of KeyError
       raised when accessing a hashcode is not present in the Store.

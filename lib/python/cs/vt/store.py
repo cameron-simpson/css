@@ -16,7 +16,7 @@ import sys
 from icontract import require
 
 from cs.cache import CachingMapping, ConvCache
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, promote
 from cs.hashindex import file_checksum
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx_method
@@ -36,7 +36,7 @@ from . import (
 from .backingfile import BackingFileIndexEntry, BinaryHashCodeIndex, CompressibleBackingFile
 from .cache import FileDataMappingProxy, MemoryCacheMapping
 from .datadir import DataDir, PlatonicDir
-from .hash import DEFAULT_HASHCLASS
+from .hash import HashCodeType
 from .index import choose as choose_indexclass
 
 class StoreError(Exception):
@@ -452,13 +452,13 @@ class DataDirStore(MappingStore):
   ''' A `MappingStore` using a `DataDir` as its backend.
   '''
 
-  @fmtdoc
+  @promote
   def __init__(
       self,
       name,
       topdirpath,
       *,
-      hashclass=None,
+      hashclass: HashCodeType = None,
       indexclass=None,
       rollover=None,
       lock=None,
@@ -470,8 +470,8 @@ class DataDirStore(MappingStore):
         Parameters:
         * `name`: Store name
         * `topdirpath`: top directory path
-        * `hashclass`: hash class,
-          default: `DEFAULT_HASHCLASS` (`{DEFAULT_HASHCLASS.__name__}`)
+        * `hashclass`: hash class or hash class name,
+          default from `Store.get_default_hashclass()`
         * `indexclass`: passed to the data dir
         * `rollover`: passed to the data dir
         * `lock`: optional `RLock`, passed to the `DataDir` mapping
@@ -480,9 +480,6 @@ class DataDirStore(MappingStore):
       lock = RLock()
     self._lock = lock
     self.topdirpath = topdirpath
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
-    self.hashclass = hashclass
     self.indexclass = indexclass
     self.rollover = rollover
     self._datadir = DataDir(
@@ -549,7 +546,15 @@ class DataDirStore(MappingStore):
       with self._datadir.modify_index_entry(hashcode) as entry:
         yield entry
 
-def PlatonicStore(name, topdirpath, *a, meta_store=None, hashclass=None, **kw):
+@promote
+def PlatonicStore(
+    name,
+    topdirpath,
+    *a,
+    meta_store=None,
+    hashclass: HashCodeType = None,
+    **kw,
+):
   ''' Factory function for platonic Stores.
 
       This is needed because if a meta_store is specified then it
@@ -574,12 +579,13 @@ class _PlatonicStore(MappingStore):
   ''' A `MappingStore` using a `PlatonicDir` as its backend.
   '''
 
+  @promote
   def __init__(
       self,
       name,
       topdirpath,
       *,
-      hashclass,
+      hashclass: HashCodeType = None,
       indexclass=None,
       follow_symlinks=False,
       archive=None,
@@ -588,8 +594,6 @@ class _PlatonicStore(MappingStore):
       lock=None,
       **kw
   ):
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
     if lock is None:
       lock = RLock()
     self.lock = lock
@@ -629,12 +633,18 @@ def MemoryCacheStore(name, max_data, hashclass=None):
   return MappingStore(name, MemoryCacheMapping(max_data), hashclass=hashclass)
 
 @pfx_method
-def VTDStore(name, path, *, hashclass, index=None, preferred_indexclass=None):
+@promote
+def VTDStore(
+    name,
+    path,
+    *,
+    hashclass: HashCodeType = None,
+    index=None,
+    preferred_indexclass=None,
+):
   ''' Factory to return a `MappingStore` using a `BackingFile`
       using a single `.vtd` file.
   '''
-  if hashclass is None:
-    hashclass = DEFAULT_HASHCLASS
   with Pfx(path):
     if not path.endswith('.vtd'):
       warning("does not end with .vtd")
