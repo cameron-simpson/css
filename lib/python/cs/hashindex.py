@@ -126,12 +126,13 @@ DISTINFO = {
         'cs.psutils',
         'cs.resources',
         'cs.upd',
+        'blake3',
         'icontract',
         'typeguard',
     ],
 }
 
-HASHNAME_DEFAULT = 'sha256'
+HASHNAME_DEFAULT = 'blake3'
 HASHINDEX_EXE_DEFAULT = 'hashindex'
 SSH_EXE_DEFAULT = 'ssh'
 SSH_EXE_ENVVAR = 'HASHINDEX_SSH'
