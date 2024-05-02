@@ -25,6 +25,9 @@ from cs.resources import MultiOpenMixin
 from .pushpull import missing_hashcodes
 from .transcribe import Transcriber
 
+
+HASHNAME_DEFAULT = 'blake3'
+HASHNAME_ENVVAR = 'VT_HASHNAME'
 class MissingHashcodeError(KeyError):
   ''' Subclass of KeyError
       raised when accessing a hashcode is not present in the Store.
@@ -105,7 +108,7 @@ class HashCode(
 
   __slots__ = ()
 
-  # local registries
+  # local registries, supplanting those from BaseHashCode
   by_hashname = {}
   by_hashenum = {}
 
@@ -245,9 +248,19 @@ class HashCode(
 HASHCLASS_BY_NAME = HashCode.by_hashname
 HASHCLASS_BY_ENUM = HashCode.by_hashenum
 
-# enums for hash types; TODO: remove and use names throughout
+# enums for hash types; need to be stable for the binary transcription
 HASH_SHA1_T = 0
 HASH_SHA256_T = 1
+HASH_BLAKE3_T = 2
+
+# pylint: disable=missing-class-docstring
+class Hash_BLAKE3(
+    HashCode,
+    hashname='blake3',
+    hashenum=HASH_BLAKE3_T,
+    prefix='H',
+):
+  __slots__ = ()
 
 # pylint: disable=missing-class-docstring
 class Hash_SHA1(
