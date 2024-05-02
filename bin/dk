@@ -69,6 +69,10 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       \$DK_LOGGEDIN_HOST and \$DK_LOGGEDIN_USERNAME.
     logs
       Passed to $DK_COMPOSE_CMD -f \$DK_PRIMARY_SERVICE.
+    ospid docker-pids...
+      Report the host system pids corresponding to the docker-pids.
+    pid pids...
+      Look for pids (host or docker) in /proc/*/status.
     rsh name command...
       Run command inside \"name\" in an rsh/ssh compatible way, to
       support use as a drop in for commands which themselves can use
@@ -368,6 +372,15 @@ case "$op" in
   logs)
       set -x
       [ $# -gt 0 ] || set -- -f -t --tail=50 "$DK_PRIMARY_SERVICE"
+      ;;
+  ospid)
+      for pid
+      do
+        $trace awk -v "pid=$pid" \
+          '$1 == "NSpid:" && $3 == pid { print $2 }' \
+          /proc/*/status || :
+      done
+      exit $?
       ;;
   pid)ptn=$( echo "$*" | tr ' ' '|' )
       grep NSpid: /proc/*/status | egrep "$ptn"
