@@ -440,7 +440,7 @@ case "$op" in
       else
         service=$1; shift
       fi
-      [ $# - gt 0 ] || set -- bash
+      [ $# -gt 0 ] || set -- bash
       set -x
       exec $DK_COMPOSE_CMD run --rm "$service" "$@"
       ;;
