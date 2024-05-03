@@ -645,28 +645,27 @@ def VTDStore(
   ''' Factory to return a `MappingStore` using a `BackingFile`
       using a single `.vtd` file.
   '''
-  with Pfx(path):
-    if not path.endswith('.vtd'):
-      warning("does not end with .vtd")
-    if not isfilepath(path):
-      raise ValueError("missing path %r" % (path,))
-    pathbase, _ = splitext(path)
-    if index is None:
-      index_basepath = f"{pathbase}-index-{hashclass.hashname}"
-      indexclass = choose_indexclass(
-          index_basepath, preferred_indexclass=preferred_indexclass
-      )
-      binary_index = indexclass(index_basepath)
-      index = BinaryHashCodeIndex(
-          hashclass=hashclass,
-          binary_index=binary_index,
-          index_entry_class=BackingFileIndexEntry
-      )
-    return MappingStore(
-        name,
-        CompressibleBackingFile(path, hashclass=hashclass, index=index),
-        hashclass=hashclass
+  if not path.endswith('.vtd'):
+    warning("does not end with .vtd")
+  if not isfilepath(path):
+    raise ValueError("missing path %r" % (path,))
+  pathbase, _ = splitext(path)
+  if index is None:
+    index_basepath = f"{pathbase}-index-{hashclass.hashname}"
+    indexclass = choose_indexclass(
+        index_basepath, preferred_indexclass=preferred_indexclass
     )
+    binary_index = indexclass(index_basepath)
+    index = BinaryHashCodeIndex(
+        hashclass=hashclass,
+        binary_index=binary_index,
+        index_entry_class=BackingFileIndexEntry
+    )
+  return MappingStore(
+      name,
+      CompressibleBackingFile(path, hashclass=hashclass, index=index),
+      hashclass=hashclass
+  )
 
 class FileCacheStore(StoreSyncBase):
   ''' A Store wrapping another Store that provides fast access to
