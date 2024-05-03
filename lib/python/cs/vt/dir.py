@@ -15,8 +15,10 @@ import stat
 import sys
 from threading import Lock
 import time
-from typing import Mapping
+from typing import Mapping, Optional
 from uuid import UUID, uuid4
+
+from typeguard import typechecked
 
 from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
