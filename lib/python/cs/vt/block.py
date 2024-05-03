@@ -784,27 +784,27 @@ class HashCodeBlock(Block, prefix='B'):
 
   @io_fail
   @pfx_method
-  def fsck(self, *, recurse=False, S):  # pylint: disable=unused-argument
+  def fsck(self, *, recurse=False):
     ''' Check this `HashCodeBlock`.
     '''
     from . import Store
-    S = Store.default()
-    ok = True
-    hashcode = self.hashcode
-    try:
-      data = S[hashcode]
-    except KeyError:
-      error("not in Store %s", S)
-      ok = False
-    else:
-      if len(self) != len(data):
-        error("len(self)=%d, len(data)=%d", len(self), len(data))
+    with Store.default() as S:
+      ok = True
+      hashcode = self.hashcode
+      try:
+        data = S[hashcode]
+      except KeyError:
+        error("not in Store %s", S)
         ok = False
-      h = S.hash(data)
-      if h != hashcode:
-        error("hash(data):%s != self.hashcode:%s", h, hashcode)
-        ok = False
-    return ok
+      else:
+        if len(self) != len(data):
+          error("len(self)=%d, len(data)=%d", len(self), len(data))
+          ok = False
+        h = S.hash(data)
+        if h != hashcode:
+          error("hash(data):%s != self.hashcode:%s", h, hashcode)
+          ok = False
+      return ok
 
   @classmethod
   def promote(cls, obj):
