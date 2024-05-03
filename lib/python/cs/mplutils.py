@@ -59,20 +59,26 @@ class FigureSize:
 
   # width in inches
   dx: Union[int, float] = field(
-      default_factory=getenv(
-          DEFAULT_DX_ENVVAR, default=DEFAULT_DX, parse=float
+      default_factory=lambda: getenv(
+          FigureSize.DEFAULT_DX_ENVVAR,
+          default=FigureSize.DEFAULT_DX,
+          parse=float
       )
   )
   # height in inches
   dy: Union[int, float] = field(
-      default_factory=getenv(
-          DEFAULT_DY_ENVVAR, default=DEFAULT_DY, parse=float
+      default_factory=lambda: getenv(
+          FigureSize.DEFAULT_DY_ENVVAR,
+          default=FigureSize.DEFAULT_DY,
+          parse=float
       )
   )
   # dots (pixels) per inch
   dpi: Union[int, float] = field(
-      default_factory=getenv(
-          DEFAULT_DPI_ENVVAR, default=DEFAULT_DPI, parse=float
+      default_factory=lambda: getenv(
+          FigureSize.DEFAULT_DPI_ENVVAR,
+          default=FigureSize.DEFAULT_DPI,
+          parse=float
       )
   )
 
@@ -218,7 +224,7 @@ def print_figure(figure_or_ax, imgformat=None, file=None):
       imgformat = 'sixel'
     else:
       imgformat = 'png'
-  with saved_figure(figure_or_ax) as tmpimgpath:
+  with saved_figure(figure_or_ax, ext='png') as tmpimgpath:
     with open(tmpimgpath, 'rb') as imgf:
       if imgformat == 'sixel':
         file.flush()
