@@ -11,6 +11,7 @@ import sys
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import fmtdoc, promote
+from cs.fs import shortpath
 from cs.logutils import warning
 from cs.pfx import pfx
 from cs.progress import progressbar
@@ -104,7 +105,7 @@ def indirect_blocks(blocks):
 def blockify(
     bfr: CornuCopyBuffer,
     *,
-    chunks_name=None,
+    name=None,
     scanner=None,
     min_block=None,
     max_block=None,
@@ -113,12 +114,12 @@ def blockify(
   ''' Wrapper for `blocked_chunks_of` which yields `Block`s
       from the data from `bfr`.
   '''
-  if chunks_name is None:
-    chunks_name = bfr.__class__.__name__
-  for chunk in progressbar(
+  if name is None:
+    name = bfr.__class__.__name__
+  for chunk in trace(progressbar)(
       blocked_chunks_of(bfr, scanner=scanner, min_block=min_block,
                         max_block=max_block),
-      label=f'blockify({chunks_name})',
+      label=f'blockify({name})',
       itemlenfunc=len,
       units_scale=BINARY_BYTES_SCALE,
       total=bfr.final_offset,
@@ -126,15 +127,19 @@ def blockify(
     runstate.raiseif()
     yield Block.promote(chunk)
 
-@promote
-def block_for(bfr: CornuCopyBuffer, **blockify_kw) -> Block:
+def block_for(src, *, name=None, **blockify_kw) -> Block:
   ''' Return a top `Block` for the contents `bfr`, an iterable of
       `bytes`like objects such as a `CornuCopyBuffer`.
       This actually accepts any object suitable for `CornuCopyBuffer.promote`.
 
       Keyword arguments are passed to `blockify`.
   '''
-  return top_block_for(blockify(bfr, **blockify_kw))
+  if name is None:
+    if isinstance(src, int):
+      name = f'fd:{src}'
+    elif isinstance(src, str):
+      name = shortpath(src)
+  return top_block_for(blockify(src, name=name, **blockify_kw))
 
 def spliced_blocks(B, new_blocks):
   ''' Splice (note *insert*) the iterable `new_blocks` into the data of the `Block` `B`.
