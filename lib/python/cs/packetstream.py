@@ -29,7 +29,7 @@ from cs.predicate import post_condition
 from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError, MultiOpenMixin, RunState
-from cs.result import Result
+from cs.result import Result, ResultSet
 from cs.seq import seq, Seq
 from cs.threads import locked, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
@@ -280,7 +280,7 @@ class PacketConnection(MultiOpenMixin):
           # per channel
           _channel_request_tags={0: set()},
           # LateFunctions for the requests we are performing for the remote system
-          _running=set(),
+          _running=ResultSet(),
           # requests we have outstanding against the remote system, per channel
           _pending={0: {}},
           # sequence of tag numbers
@@ -316,8 +316,8 @@ class PacketConnection(MultiOpenMixin):
           # block new requests
           runstate.cancel()
           # complete accepted but incomplete requests
-          for LF in list(self._running):
-            LF.join()
+          if self._running:
+            self._running.wait()
         # there should not be any outstanding work
         later.wait()
         # close the stream to the remote and wait
