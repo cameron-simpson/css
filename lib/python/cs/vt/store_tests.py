@@ -78,6 +78,10 @@ STORECLASS_NAMES = tuple(
     )
 )
 
+print("HASHCLASS_NAMES =", HASHCLASS_NAMES)
+print("INDEXCLASS_NAMES =", INDEXCLASS_NAMES)
+print("STORECLASS_NAMES =", STORECLASS_NAMES)
+
 all_store_type_names = set(
     store_type.__name__ for store_type in ALL_STORE_TYPES
 )
@@ -253,7 +257,10 @@ def multitest(method):
   def testMethod(self):
     for subtest, S, second_Store in get_test_stores(prefix=method.__module__ +
                                                     '.' + method.__name__):
+      ##print("S =", type(S))
+      ##print("S =", S)
       if STORECLASS_NAMES and type(S).__name__ not in STORECLASS_NAMES:
+        ##print("  skip", S)
         continue
       with Pfx("%s:%s", S, ",".join(["%s=%s" % (k, v)
                                      for k, v in sorted(subtest.items())])):
@@ -273,8 +280,8 @@ def multitest(method):
           if second_Store:
             assert not second_Store.is_open()
           self.assertTrue(S.closed)
-      # run just the first combination
-      break
+      ### run just the first combination
+      ##break
 
   return testMethod
 
