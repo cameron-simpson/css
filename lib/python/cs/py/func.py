@@ -38,14 +38,16 @@ def funcname(func):
       Several objects do not have a __name__ attribute, such as partials.
   '''
   try:
-    return func.__qualname__
+    name = func.__qualname__
   except AttributeError:
     try:
-      return func.__name__
+      name = func.__name__
     except AttributeError:
       if isinstance(func, partial):
-        return "partial(%s)" % (funcname(func.func),)
-      return str(func)
+        name = "partial(%s)" % (funcname(func.func),)
+      else:
+        name = str(func)
+  return "%s:%s" % (func.__module__, name)
 
 def funccite(func):
   ''' Return a citation for a function (name and code location).
