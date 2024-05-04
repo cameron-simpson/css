@@ -125,8 +125,9 @@ def blockify(
       total=bfr.final_offset,
   ):
     runstate.raiseif()
-    yield Block.promote(chunk)
+    yield Block.from_bytes(chunk)
 
+@trace
 def block_for(src, *, name=None, **blockify_kw) -> Block:
   ''' Return a top `Block` for the contents `bfr`, an iterable of
       `bytes`like objects such as a `CornuCopyBuffer`.
