@@ -429,8 +429,8 @@ class CornuCopyBuffer(Promotable):
     return cls([bs], offset=offset, final_offset=end_offset, **kw)
 
   def __str__(self):
-    return "%s(offset:%d,buf:%d)" % (
-        type(self).__name__, self.offset, self.buflen
+    return "%s(offset:%d:%r,buf:%d)" % (
+        type(self).__name__, self.offset, self.final_offset, self.buflen
     )
 
   def __len__(self):
@@ -1018,13 +1018,13 @@ class CornuCopyBuffer(Promotable):
     if isinstance(obj, cls):
       return obj
     if isinstance(obj, int):
-      obj = cls.from_fd(obj)
-    elif isinstance(obj, str):
-      obj = cls.from_filename(obj)
-    elif isinstance(obj, (bytes, bytearray, mmap.mmap, memoryview)):
-      obj = cls.from_bytes(obj)
-    elif hasattr(obj, 'read1') or hasattr(obj, 'read'):
-      obj = cls.from_file(obj)
+      return cls.from_fd(obj)
+    if isinstance(obj, str):
+      return cls.from_filename(obj)
+    if isinstance(obj, (bytes, bytearray, mmap.mmap, memoryview)):
+      return cls.from_bytes(obj)
+    if hasattr(obj, 'read1') or hasattr(obj, 'read'):
+      return cls.from_file(obj)
     try:
       iter(obj)
     except TypeError:
