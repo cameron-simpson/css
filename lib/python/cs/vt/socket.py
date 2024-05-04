@@ -19,12 +19,11 @@ from icontract import require
 
 from cs.context import stackattrs
 from cs.excutils import logexc
-from cs.pfx import Pfx
-from cs.py.func import prop
+from cs.pfx import Pfx, pfx_method
 from cs.queues import MultiOpenMixin
 from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
-from cs.threads import bg as bg_thread, joinif
+from cs.threads import bg as bg_thread
 
 from . import Store, uses_Store
 from .stream import StreamStore
@@ -126,7 +125,7 @@ class _ClientConnectionHandler(StreamRequestHandler):
     super().setup()
     self.store_server = self.server.store_server
 
-  @prop
+  @property
   def exports(self):
     ''' Return the exports mapping.
     '''
