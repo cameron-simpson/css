@@ -24,7 +24,6 @@ from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.resources import uses_runstate
@@ -395,7 +394,7 @@ class _Dirent(Transcriber, prefix=None):
         and (block is None if oblock is None else block == oblock)
     )
 
-  @prop
+  @property
   def prev_dirent(self):
     ''' Return the previous Dirent.
 
@@ -675,7 +674,7 @@ class IndirectDirent(_Dirent, prefix='Indirect'):
       raise
     return I.E
 
-  @prop
+  @property
   def ref(self):
     ''' The referenced Dirent via the default FileSystem.
     '''
@@ -696,7 +695,7 @@ class IndirectDirent(_Dirent, prefix='Indirect'):
     '''
     self.ref.meta = new_meta
 
-  @prop
+  @property
   def block(self):
     ''' The content block for the referenced Dirent.
     '''
@@ -930,7 +929,7 @@ class Dir(_Dirent, DirLike, prefix='D'):
   # DirLike.lstat uses the common stat method
   lstat = stat
 
-  @prop
+  @property
   def changed(self):
     ''' Whether this Dir has been changed.
     '''

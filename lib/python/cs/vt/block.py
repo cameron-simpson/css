@@ -52,7 +52,6 @@ from cs.buffer import CornuCopyBuffer
 from cs.lex import untexthexify, get_decimal_value, r
 from cs.logutils import warning, error
 from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop
 from cs.resources import RunState, uses_runstate
 from cs.result import ResultSet
 from cs.threads import locked
@@ -258,7 +257,7 @@ class Block(Transcriber, ABC, prefix=None):
       return self.data == odata
     return h == h.from_data(odata)
 
-  @prop
+  @property
   def leaves(self):
     ''' Return the leaf (direct) blocks.
     '''
@@ -723,7 +722,7 @@ class HashCodeBlock(Block, prefix='B'):
         Rs.add(S._defer(B.get_direct_data))
     Rs.wait()
 
-  @prop
+  @property
   def span(self):  # pylint: disable=method-hidden
     ''' Return the data length, computing it from the data if required.
     '''
@@ -904,7 +903,7 @@ class IndirectBlock(Block, prefix='I'):
     ''' Return a tuple of Blocks decoded from the raw indirect block data. '''
     return tuple(map(lambda BR: BR.block, BlockRecord.scan(subblocks_data)))
 
-  @prop
+  @property
   @locked
   def subblocks(self):
     ''' The immediate subblocks of this indirect block.

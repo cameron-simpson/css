@@ -75,7 +75,6 @@ from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
-from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.threads import locked, bg as bg_thread, joinif

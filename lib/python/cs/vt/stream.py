@@ -33,7 +33,6 @@ from cs.lex import r
 from cs.logutils import debug, warning, error
 from cs.packetstream import PacketConnection
 from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop
 from cs.resources import ClosedError
 from cs.result import CancellationError, Result
 from cs.threads import locked
@@ -562,7 +561,7 @@ class StreamStoreArchive(BaseArchive):
   def __str__(self):
     return "%s(%s,%r)" % (type(self).__name__, self.S, self.archive_name)
 
-  @prop
+  @property
   def last(self):
     ''' The last Archive entry `(when,E)` or `(None,None)`.
     '''

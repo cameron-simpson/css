@@ -25,7 +25,6 @@ from cs.inttypes import Flags
 from cs.lex import unctrl, get_ini_clause_entryname
 from cs.logutils import warning, exception, debug
 from cs.pfx import Pfx, pfx, pfx_call
-from cs.py.func import prop
 from .dir import _Dirent, DirentRecord
 from .meta import NOUSERID, NOGROUPID
 
@@ -85,7 +84,7 @@ class BaseArchive(ABC):
   def __iter__(self):
     raise NotImplementedError("no .__iter__")
 
-  @prop
+  @property
   def last(self):
     ''' The last ArchiveEntry from the Archive, or ArchiveEntry(None,None).
     '''
