@@ -97,8 +97,8 @@ _setup:
 
 _venv:
     $(uv) venv --seed '$(venv_dir)'
-    $(uv) pip install -U $$( grep '^[a-z]' $(venv_requirements) )
-    $(venv_pip) install -U $$( grep '^[^a-z#]' $(venv_requirements) )
+    $(uv) pip install -U $$( grep -i '^[a-z]' $(venv_requirements) )
+    $(venv_pip) install -U $$( grep -i '^[^a-z#]' $(venv_requirements) )
 
 _tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
