@@ -1,6 +1,7 @@
 arrow
 b2sdk
 bs4
+blake3
 build
 ## not a package, no pyproject.toml
 ## -e git+https://github.com/noDRM/DeDRM_tools.git@v7.2.1#egg=dedrm&subdirectory=DeDRM_plugin
