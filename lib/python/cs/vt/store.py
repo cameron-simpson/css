@@ -701,8 +701,8 @@ class FileCacheStore(StoreSyncBase):
         Other keyword arguments are passed to `StoreSyncBase.__init__`.
     '''
     super().__init__(name, runstate=runstate, **kw)
-    self._str_attrs.update(backend=backend)
     self._backend = None
+    self._str_attrs.update(backend=backend)
     self.cache = FileDataMappingProxy(
         backend,
         dirpath=dirpath,
@@ -717,7 +717,7 @@ class FileCacheStore(StoreSyncBase):
     self.backend = backend
 
   def __getattr__(self, attr):
-    return getattr(self.backend, attr)
+    return getattr(self._backend, attr)
 
   @property
   def backend(self):
