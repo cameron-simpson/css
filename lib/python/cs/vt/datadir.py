@@ -879,10 +879,10 @@ class DataDir(FilesDir):
               info("skip nonfile")
               continue
           if new_size > DFstate.scanned_to:
-            warning(
-                "%s: new_size:%d > DFstate.scanned_to:%d", DFstate, new_size,
-                DFstate.scanned_to
-            )
+            ##warning(
+            ##    "%s: new_size:%d > DFstate.scanned_to:%d", DFstate, new_size,
+            ##    DFstate.scanned_to
+            ##)
             offset = DFstate.scanned_to
             hashclass = self.hashclass
             scanner = DFstate.scanfrom(offset=offset)
