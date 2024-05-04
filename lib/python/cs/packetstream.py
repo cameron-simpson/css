@@ -487,13 +487,14 @@ class PacketConnection(MultiOpenMixin):
     ''' Synchronous request.
         Submits the request, then calls the `Result` returned from the request.
     '''
-    return self.request(
+    R = self.request(
         rq_type,
         flags=flags,
         payload=payload,
         decode_response=decode_response,
         channel=channel
-    )()
+    )
+    return R()
 
   @logexc
   # pylint: disable=too-many-arguments
