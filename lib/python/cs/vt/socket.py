@@ -79,12 +79,16 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
         around a call to this method.
     '''
     with super().startup_shutdown():
+      # self.socket_server is now running
+      assert self.socket_server is not None
+      # dispatch a Thread running self.socket_server.serve_forever()
       with stackattrs(
           self,
           socket_server_thread=bg_thread(
               self.socket_server.serve_forever,
               kwargs={'poll_interval': 0.5},
-              name="%s(%s)[server-thread]" % (type(self), self.S),
+              name=
+              f'{self.__class__.__name__}({self.S})[server-thread]{self.socket_server}.serve_forever',
               daemon=False,
           ),
       ):
@@ -147,22 +151,18 @@ class _ClientConnectionHandler(StreamRequestHandler):
 
 class _TCPServer(ThreadingMixIn, TCPServer):
 
+  @pfx_method
   def __init__(self, store_server, bind_addr):
-    with Pfx("%s.__init__(store_server=%s, bind_addr=%r)", type(self).__name__,
-             store_server, bind_addr):
-      TCPServer.__init__(self, bind_addr, _ClientConnectionHandler)
-      self.bind_addr = bind_addr
-      self.store_server = store_server
+    TCPServer.__init__(self, bind_addr, _ClientConnectionHandler)
+    self.bind_addr = bind_addr
+    self.store_server = store_server
 
   def __str__(self):
-    return "%s(%r,%s)" % (
-        type(self).__name__,
-        self.bind_addr,
-        self.store_server,
-    )
+    return f'{self.__class__.__name__}:{self.bind_addr}:{self.store_server}'
 
 class TCPStoreServer(_SocketStoreServer):
-  ''' A threading TCPServer that accepts connections from TCPClientStores.
+  ''' This class manages a threading `TCPServer` that accepts
+      connections from `TCPClientStores`.
   '''
 
   def __init__(self, bind_addr, **kw):
@@ -172,6 +172,11 @@ class TCPStoreServer(_SocketStoreServer):
 
   @contextmanager
   def startup_shutdown(self):
+    ''' On startup create a `_TCPServer(ThreadingMixIn,TCPServer)`
+        and run the startup for `_SocketStoreServer` which dispatches
+        a `Thread` to run the TCP service.
+        The shutdown phase runs the server shutdown.
+    '''
     with stackattrs(
         self,
         socket_server=_TCPServer(self, self.bind_addr),
