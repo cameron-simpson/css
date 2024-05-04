@@ -319,7 +319,7 @@ class PacketConnection(MultiOpenMixin):
           if self._running:
             self._running.wait()
         # there should not be any outstanding work
-        later.wait()
+        later.wait_outstanding()
         # close the stream to the remote and wait
         self._sendQ.close(enforce_final_close=True)
         self._send_thread.join()
