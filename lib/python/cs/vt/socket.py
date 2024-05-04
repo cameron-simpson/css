@@ -181,11 +181,8 @@ class TCPStoreServer(_SocketStoreServer):
         self,
         socket_server=_TCPServer(self, self.bind_addr),
     ):
-      try:
-        with super().startup_shutdown():
-          yield
-      finally:
-        self.socket_server.shutdown()
+      with super().startup_shutdown():
+        yield
 
 class TCPClientStore(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
