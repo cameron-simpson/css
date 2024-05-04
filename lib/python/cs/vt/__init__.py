@@ -237,7 +237,6 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   perthread_state = ThreadState()
 
   @uses_runstate
-  @pfx_method
   @fmtdoc
   @promote
   def __init__(
@@ -264,7 +263,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
           if not supplied one is allocated
 
         `conv_cache`: most `Store`s do not have one of these, but
-        a `DatqDirStore` does, a `ProxyStore` returns the first
+        a `DataDirStore` does, a `ProxyStore` returns the first
         conv cache from its read Stores and a `FileCacheStore`
         presents the conv cache of its backend.
     '''
@@ -300,7 +299,6 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     '''
 
   def __str__(self):
-    ##return "STORE(%s:%s)" % (type(self), self.name)
     params = []
     for attr, val in sorted(getattr(self, '_str_attrs', {}).items()):
       if isinstance(val, type):
