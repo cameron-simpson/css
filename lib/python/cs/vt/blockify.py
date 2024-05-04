@@ -116,7 +116,7 @@ def blockify(
   '''
   if name is None:
     name = bfr.__class__.__name__
-  for chunk in trace(progressbar)(
+  for chunk in progressbar(
       blocked_chunks_of(bfr, scanner=scanner, min_block=min_block,
                         max_block=max_block),
       label=f'blockify({name})',
