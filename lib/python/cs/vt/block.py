@@ -40,7 +40,7 @@ from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
 import sys
 from threading import RLock
-from typing import Optional
+from typing import Optional, Union
 
 from icontract import require
 from typeguard import typechecked
@@ -99,9 +99,23 @@ class Block(Transcriber, ABC, prefix=None):
     '''
     return self.datafrom()
 
+  @staticmethod
+  def from_bytes(
+      data: bytes,
+      literal_threshold=32,
+      added=False,
+  ) -> Union["HashCodeBlock", "LiteralBlock"]:
+    ''' Factory to return a `LiteralBlock` for short chunks or a
+        `HashCodeBlock` for longer chunks.
+    '''
+    span = len(data)
+    if span <= literal_threshold:
+      return LiteralBlock(data=data)
+    return HashCodeBlock(data=data, span=span, added=added)
+
   # pylint: disable=too-many-branches,too-many-locals,too-many-return-statements
   def __eq__(self, oblock):
-    ''' Compare this Block with another Block for data equality.
+    ''' Compare this `Block` with another `Block` for data equality.
     '''
     if self is oblock:
       return True
@@ -466,11 +480,9 @@ class Block(Transcriber, ABC, prefix=None):
       case HashCode() as hashcode, int() as span:
         return HashCodeBlock(hashcode=hashcode, span=span, added=added)
       case _:
-        data = bytes(blockish)
-        span = len(data)
-        if span <= literal_threshold and issubclass(LiteralBlock, cls):
-          return LiteralBlock(data=data)
-        return HashCodeBlock(data=data, span=span, added=added)
+        return cls.from_bytes(
+            bytes(blockish, literal_threshold=literal_threshold, added=added)
+        )
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
 
 class BlockRecord(BinarySingleValue):
