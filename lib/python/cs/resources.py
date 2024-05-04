@@ -19,12 +19,12 @@ from typing import Any, Callable, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import contextif, stackattrs, setup_cmgr, ContextManagerMixin
-from cs.deco import default_params
+from cs.deco import decorator, default_params
 from cs.gimmicks import error, warning, nullcontext
 from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
-from cs.py.func import prop
+from cs.py.func import funcname, prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
@@ -846,10 +846,20 @@ class RunState(HasThreadState):
     self.cancel()
 
 # default to the current RunState or make one
-uses_runstate = default_params(
-    runstate=lambda:
-    (RunState.default(factory=partial(RunState, thread_wide=True)))
-)
+@decorator
+def uses_runstate(func, name=None):
+  ''' Decorator to fill in the `runstate` parameter as the default
+      `RunState` or a new thread wide one.
+  '''
+  if name is None:
+    name = funcname(func)
+  return default_params(
+      func,
+      runstate=lambda: (
+          RunState.
+          default(factory=partial(RunState, name=name, thread_wide=True))
+      )
+  )
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
