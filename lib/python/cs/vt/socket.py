@@ -88,14 +88,13 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
               daemon=False,
           ),
       ):
-        try:
-          yield
-        finally:
-          if self.socket_server:
+        with self.runstate:
+          try:
+            yield
+          finally:
+            assert self.socket_server is not None
             self.socket_server.shutdown()
-          joinif(self.socket_server_thread)
-          if self.socket_server and self.socket_server.socket is not None:
-            self.socket_server.socket.close()
+            self.socket_server_thread.join()
 
   def shutdown_now(self):
     ''' Issue closes until all current opens have been consumed.
