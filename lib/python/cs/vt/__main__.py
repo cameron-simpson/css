@@ -483,7 +483,7 @@ class VTCmd(BaseCommand):
         for offset in progressbar(
             scan_offsets(inbfr),
             label=mode,
-            itemlenfunc=lambda offset: offset - last_offset,
+            itemlenfunc=lambda scan_offset: scan_offset - last_offset,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
             report_print=True,
