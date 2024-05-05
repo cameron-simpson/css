@@ -382,7 +382,7 @@ case "$op" in
       exit $?
       ;;
   pid)ptn=$( echo "$*" | tr ' ' '|' )
-      $trace egrep "NSpid:.*$ptn" /proc/*/status || :
+      cat /proc/*/status | $trace egrep "NSpid:.*$ptn" || :
       exit $?
       ;;
   rsh)
