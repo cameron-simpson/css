@@ -11,6 +11,7 @@ ffmpeg_exe=${FFMPEG_EXE:-ffmpeg-docker}
 fmt=mp4
 glob='*timelapse.avi'
 mtime=+2
+outdir=
 scale=1280x720
 vcodec=libx265
 
@@ -18,18 +19,25 @@ nopt=
 xopt=
 trace=
 [ -t 2 ] && trace=set-x
+tracefind=$trace
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [options...] motion-directories...
-  Recode timelapse videos to be more compact for long term storage.
+  Transcode timelapse videos to be more compact for long term storage.
   Options:
-    -bitrate rate       The target average bitrate, default $bitrate, passed to ffmpeg.
-    -ffmpeg ffmpeg_exe  The ffmpeg command to run. Default from \$FFMPEG_EXE or ffmpeg-docker.
+    -bitrate rate       The target average bitrate, default $bitrate,
+                        passed to ffmpeg.
+    -d output           The output directory for the transcoded
+                        videos, default the source directory.
+    -ffmpeg ffmpeg_exe  The ffmpeg command to run. Default from
+                        \$FFMPEG_EXE or ffmpeg-docker.
     -fmt format         File format extension, default $fmt, passed to ffmpeg.
     -keep               Do not remove the original file. (Default.)
-    -mtime +n           File age criterion for timelapse video files, default $mtime, passed to find.
+    -mtime +n           File age criterion for timelapse video
+                        files, default $mtime, passed to find.
     -n                  No action. Recite planned actions.
-    -name glob          Glob to match timelapse video files, passed to find.
+    -name glob          Glob to match timelapse video files, default $glob,
+                        passed to find.
     -rm                 Remove the original file.
     -scale XxY          Scale filter, default $scale, passed to ffmpeg.
     -vcodec codec       Video codec, default $vcodec, passed to ffmpeg.
@@ -41,6 +49,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -bitrate)   bitrate=$2; shift ;;
+    -d)         outdir=$2; shift ;;
     -ffmpeg)    ffmpeg_exe=$2; shift ;;
     -fmt)       fmt=$2; shift ;;
     -keep)      keep=1 ;;
@@ -50,7 +59,7 @@ do
     -rm)        keep= ;;
     -scale)     scale=$2; shift ;;
     -vcodec)    vcodec=$2; shift ;;
-    -x)         nopt= xopt=-x trace=set-x ;;
+    -x)         nopt= xopt=-x trace=set-x tracefind=set-x ;;
     --)         shift; break ;;
     -?*)        echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)          break ;;
@@ -72,6 +81,11 @@ else
   done
 fi
 
+[ -z "$outdir" ] || [ -d "$outdir/" ] || {
+  echo "$cmd: output directory is not a directory: $outdir" >&2
+  badopts=1
+}
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 xit=0
@@ -80,13 +94,15 @@ for md
 do
   if [ -d "$md/" ]
   then
-    $trace find "$@" -type f -name "$glob" -mtime "$mtime" \
-      -exec "$0" $nopt $xopt \
-                -bitrate "$bitrate" -ffmpeg "$ffmpeg_exe" -fmt "$fmt" \
-                -mtime "$mtime" -name "$glob" -scale "$scale" -vcodec "$vcodec" \
-                -- {} ';'
+    $tracefind find "$@" \
+                   -type f -name "$glob" -mtime "$mtime" \
+                   -exec "$0" $nopt $xopt -d "$outdir" \
+                       -bitrate "$bitrate" -ffmpeg "$ffmpeg_exe" -fmt "$fmt" \
+                       -mtime "$mtime" -name "$glob" -scale "$scale" -vcodec "$vcodec" \
+                       -- {} ';'
   else
     outfile=$( expr "x$md" : 'x\(.*\)\.[^/.][^/.]*' )--$scale--$vcodec--$bitrate.$fmt
+    [ -z "$outdir" ] || outfile=$outdir/$( basename "$outfile" )
     case "$outfile" in
       /*) ;; *) outfile=./$outfile ;;
     esac
