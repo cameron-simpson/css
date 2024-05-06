@@ -377,11 +377,18 @@ class PacketConnection(MultiOpenMixin):
         # there should not be any outstanding work
         later.wait_outstanding()
         # close the stream to the remote and wait
-        self._sendQ.close(enforce_final_close=True)
-        self._send_thread.join()
-        # we do not wait for the receiver - anyone hanging on outstanding
-        # requests will get them as they come in, and in theory a network
-        # disconnect might leave the receiver hanging anyway
+        with run_task("%s: close sendQ, wait for sender" % (self,),
+                      report_print=True):
+          self._sendQ.close(enforce_final_close=True)
+          self._send_thread.join()
+        with run_task(
+            "%s: wait for _recv_thread %s" % (
+                self,
+                self._recv_thread,
+            ),
+            report_print=True,
+        ):
+          self._recv_thread.join()
         ps = self._pending_states()
         if ps:
           warning("%d PENDING STATES AT SHUTDOWN", len(ps))
@@ -434,9 +441,13 @@ class PacketConnection(MultiOpenMixin):
   def _pending_cancel(self):
     ''' Cancel all the pending requests.
     '''
-    for chtag, _ in self._pending_states():
+    for chtag, _ in progressbar(
+        self._pending_states(),
+        "%s: cancel pending requests",
+        units_scale=DECIMAL_SCALE,
+        report_print=True,
+    ):
       channel, tag = chtag
-      warning("%s: cancel pending request %d:%s", self, channel, tag)
       _, result = self._pending_pop(channel, tag)
       result.cancel()
 
