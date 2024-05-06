@@ -375,7 +375,9 @@ class PacketConnection(MultiOpenMixin):
             ):
               self.requests_in_progress.wait()
         # there should not be any outstanding work
-        later.wait_outstanding()
+        with run_task("%s: wait for outstanding LateFunctions" % (self,),
+                      report_print=True):
+          later.wait_outstanding()
         # close the stream to the remote and wait
         with run_task("%s: close sendQ, wait for sender" % (self,),
                       report_print=True):
