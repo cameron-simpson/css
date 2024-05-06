@@ -651,6 +651,9 @@ class PacketConnection(MultiOpenMixin):
     ):
       if packet == self.EOF_Packet:
         break
+      if packet == self.ERQ_Packet:
+        self.requests_allowed = False
+        continue
       channel = packet.channel
       tag = packet.tag
       flags = packet.flags
@@ -662,6 +665,8 @@ class PacketConnection(MultiOpenMixin):
           if self.request_handler is None:
             # we are only a client, not a server
             self._reject(channel, tag, "no request handler")
+          elif not self.requests_allowed:
+            self._reject(channel, tag, "requests no longer allowed")
           elif runstate.cancelled:
             # we are shutting down, no new work accepted
             self._reject(channel, tag, "rejecting request: runstate.cancelled")
