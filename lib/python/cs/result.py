@@ -53,6 +53,7 @@ You can also collect multiple `Result`s in completion order using the `report()`
         print(x)    # print result
 '''
 
+from queue import Queue
 import sys
 from threading import Lock, RLock
 from typing import Callable
@@ -65,7 +66,6 @@ from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
 from cs.pfx import pfx_method
 from cs.py.func import funcname, func_a_kw_fmt
-from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
@@ -84,7 +84,6 @@ DISTINFO = {
         'cs.mappings',
         'cs.pfx',
         'cs.py.func',
-        'cs.py3',
         'cs.seq',
         'cs.threads',
         'icontract',
@@ -425,7 +424,8 @@ class Result(FSM):
       raise CancellationError(self)
     result, exc_info = self.join()
     if exc_info:
-      raise3(*exc_info)
+      _, exc_value, exc_traceback = exc_info
+      raise exc_value.with_traceback(exc_traceback)
     return result
 
   def notify(self, notifier: Callable[["Result"], None]):
