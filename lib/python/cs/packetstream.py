@@ -310,7 +310,7 @@ class PacketConnection(MultiOpenMixin):
           # per channel
           _channel_request_tags={0: set()},
           # LateFunctions for the requests we are performing for the remote system
-          _running=ResultSet(),
+          requests_in_progress=ResultSet(),
           # requests we have outstanding against the remote system, per channel
           _pending={0: {}},
           # sequence of tag numbers
@@ -364,8 +364,12 @@ class PacketConnection(MultiOpenMixin):
                   # announce end of requests to the remote end
                   self.end_requests()
           # complete accepted but incomplete requests
-          if self._running:
-            self._running.wait()
+          if self.requests_in_progress:
+            with run_task(
+                "%s: wait for local running requests" % (self,),
+                report_print=True,
+            ):
+              self.requests_in_progress.wait()
         # there should not be any outstanding work
         later.wait_outstanding()
         # close the stream to the remote and wait
@@ -640,8 +644,9 @@ class PacketConnection(MultiOpenMixin):
                   self._run_request, channel, tag, self.request_handler,
                   rq_type, flags, payload
               )
-              self._running.add(LF)
-              LF.notify(self._running.remove)
+              # record the LateFunction and arrange its removal on completion
+              self.requests_in_progress.add(LF)
+              LF.notify(self.requests_in_progress.remove)
       else:
         # response to a previous request from us
         with Pfx("response[%d:%d]", channel, tag):
