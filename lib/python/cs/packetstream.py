@@ -621,6 +621,7 @@ class PacketConnection(MultiOpenMixin):
         self._reject(channel, tag, "exception during handler")
       else:
         self._respond(channel, tag, result_flags, result_payload)
+      # release this tag, potentially available for reuse
       self._channel_request_tags[channel].remove(tag)
 
   def end_requests(self):
@@ -692,8 +693,13 @@ class PacketConnection(MultiOpenMixin):
               requests[channel].add(tag)
               # queue the work function and track it
               LF = self._later.defer(
-                  self._run_request, channel, tag, self.request_handler,
-                  rq_type, flags, payload
+                  self._run_request,
+                  channel,
+                  tag,
+                  self.request_handler,
+                  rq_type,
+                  flags,
+                  payload,
               )
               # record the LateFunction and arrange its removal on completion
               self.requests_in_progress.add(LF)
