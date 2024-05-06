@@ -47,6 +47,30 @@ class FSMError(Exception):
     super().__init__(msg)
     self.fsm = fsm
 
+# TODO: should this subclass FSMError?
+class CancellationError(Exception):
+  ''' Raised when trying to make use of an `FSM` which is cancelled.
+
+      For example, this is raised by `cs.result.Result`
+      when accessing `result` or `exc_info` after cancellation.
+  '''
+
+  def __init__(self, message=None, **kw):
+    ''' Initialise the `CancellationError`.
+
+        The optional `message` parameter (default `"cancelled"`)
+        is set as the `message` attribute.
+        Other keyword parameters set their matching attributes.
+    '''
+    if message is None:
+      message = "cancelled"
+    elif not isinstance(message, str):
+      message = 'cancelled: ' + str(message)
+    Exception.__init__(self, message)
+    self.message = message
+    for k, v in kw.items():
+      setattr(self, k, v)
+
 FSMTransitionEvent = namedtuple(
     'FSMTransitionEvent', 'old_state new_state event when extra'
 )
@@ -235,6 +259,9 @@ class FSM(DOTNodeMixin):
                        self.__callbacks[new_state]):
         try:
           pfx_call(callback, self, transition)
+        except CancellationError:
+          # ignore cancelled callbacks, eg an FSM instance in cancelled state
+          pass
         except Exception as e:  # pylint: disable=broad-except
           exception("exception from callback %s: %s", callback, e)
     return new_state
