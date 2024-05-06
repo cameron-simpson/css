@@ -7,7 +7,7 @@
 ''' A general purpose bidirectional packet stream connection.
 '''
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import errno
 import os
@@ -159,10 +159,28 @@ class PacketConnection(MultiOpenMixin):
   ''' A bidirectional binary connection for exchanging requests and responses.
   '''
 
+  CH0_TAG_START = 0
   # special packet indicating end of stream
   EOF_Packet = Packet(
-      is_request=True, channel=0, tag=0, flags=0, rq_type=0, payload=b''
+      is_request=True,
+      channel=0,
+      tag=CH0_TAG_START,
+      flags=0,
+      rq_type=0,
+      payload=b''
   )
+  CH0_TAG_START += 1
+
+  # special packet indicating requests
+  ERQ_Packet = Packet(
+      is_request=True,
+      channel=0,
+      tag=CH0_TAG_START,
+      flags=0,
+      rq_type=0,
+      payload=b''
+  )
+  CH0_TAG_START += 1
 
   # pylint: disable=too-many-arguments
   @promote
@@ -274,6 +292,7 @@ class PacketConnection(MultiOpenMixin):
       later = Later(4, name="%s:Later" % (self,))
       with stackattrs(
           self,
+          requests_allowed=self.request_handler is not None,
           notify_recv_eof=set(),
           notify_send_eof=set(),
           # tags of remote requests in play against the local system,
@@ -285,7 +304,7 @@ class PacketConnection(MultiOpenMixin):
           _pending={0: {}},
           # sequence of tag numbers
           # TODO: later, reuse old tags to prevent monotonic growth of tag field?
-          _tag_seq=Seq(1),
+          _tag_seq=defaultdict(Seq),
           # work queue for local requests
           _later=later,
           # dispatch queue of Packets to send
@@ -295,6 +314,11 @@ class PacketConnection(MultiOpenMixin):
           _sent=set(),
           _send_queued=set(),
       ):
+        # advance the channel 0 tag sequence past CH0_TAG_START
+        # to avoid the tags used by the EOF and ERQ packets
+        tag_seq0 = self._tag_seq[0]
+        for _ in range(self.CH0_TAG_START):
+          next(tag_seq0)
         with self._later:
           runstate = self._runstate
           with runstate:
@@ -335,8 +359,8 @@ class PacketConnection(MultiOpenMixin):
     '''
     self._recv_thread.join()
 
-  def _new_tag(self):
-    return next(self._tag_seq)
+  def _new_tag(self, channel: int) -> int:
+    return next(self._tag_seq[channel])
 
   def _pending_states(self):
     ''' Return a list of ( (channel, tag), Request_State ) for the currently pending requests.
@@ -437,7 +461,7 @@ class PacketConnection(MultiOpenMixin):
       flags=0,
       payload=b'',
       decode_response=None,
-      channel=0
+      channel=0,
   ) -> Result:
     ''' Compose and dispatch a new request, returns a `Result`.
 
@@ -467,7 +491,7 @@ class PacketConnection(MultiOpenMixin):
       raise ValueError("rq_type may not be negative (%s)" % (rq_type,))
     # reserve type 0 for end-of-requests
     rq_type += 1
-    tag = self._new_tag()
+    tag = self._new_tag(channel)
     R = Result(f'{self.name}:{tag}')
     self._pending_add(channel, tag, Request_State(decode_response, R))
     self._queue_packet(
