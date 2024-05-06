@@ -740,10 +740,20 @@ class PacketConnection(MultiOpenMixin):
 
   # pylint: disable=too-many-branches
   @logexc
-  def _send_loop(self):
+  def _send_loop(
+      self,
+      *,
+      rq_in_progress: Progress,
+      rq_out_progress: Progress,
+  ):
     ''' Send packets upstream.
         Write every packet directly to self._send.
         Flush whenever the queue is empty.
+
+        This runs until either of:
+        - the send queue is closed
+        - the remote has announced end-of-requests and we have no
+          outstanding requests
     '''
     ##XX = self.tick
     with PrePfx("_SEND [%s]", self):
@@ -787,6 +797,9 @@ class PacketConnection(MultiOpenMixin):
               warning("remote end closed")
               break
             raise
+          if not self.requests_allowed and not self.requests_in_progress:
+            # all requests completed, no new ones allowed
+            break
         # send EOF packet to remote receiver and close self._send
         try:
           ##XX(b'>EOF')
