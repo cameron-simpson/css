@@ -650,8 +650,7 @@ class PacketConnection(MultiOpenMixin):
           self._sent.add(sig)
           try:
             ##XX(b'>')
-            for bs in P.transcribe_flat():
-              fp.write(bs)
+            P.write(fp)
             if Q.empty():
               # no immediately ready further packets: flush the output buffer
               if grace > 0:
@@ -659,10 +658,11 @@ class PacketConnection(MultiOpenMixin):
                 ##XX(b'Sg')
                 sleep(grace)
                 if Q.empty():
-                  # still nothing
+                  # still nothing, flush
                   ##XX(b'F')
                   fp.flush()
               else:
+                # no grace period, flush immediately
                 ##XX(b'F')
                 fp.flush()
           except OSError as e:
@@ -673,9 +673,7 @@ class PacketConnection(MultiOpenMixin):
         # send EOF packet to remote receiver and close self._send
         try:
           ##XX(b'>EOF')
-          for bs in self.EOF_Packet.transcribe_flat():
-            fp.write(bs)
-          fp.flush()
+          self.EOF_Packet.write(self._send, flush=True)
         except (OSError, IOError) as e:
           if e.errno == errno.EPIPE:
             debug("remote end closed: %s", e)
