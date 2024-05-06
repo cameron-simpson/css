@@ -454,6 +454,8 @@ class PacketConnection(MultiOpenMixin):
       result.cancel()
 
   def _queue_packet(self, P):
+    if self._sendQ is None:
+      raise EOFError("_sendQ is None")
     sig = (P.channel, P.tag, P.is_request)
     if sig in self._send_queued:
       raise RuntimeError("requeue of %s: %s" % (sig, P))
