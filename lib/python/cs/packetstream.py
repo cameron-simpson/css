@@ -14,6 +14,7 @@ import os
 import sys
 from time import sleep
 from threading import Lock
+from typing import Callable, Tuple, Union
 
 from icontract import ensure
 
@@ -553,13 +554,32 @@ class PacketConnection(MultiOpenMixin):
 
   @logexc
   # pylint: disable=too-many-arguments
-  def _run_request(self, channel, tag, handler, rq_type, flags, payload):
+  def _run_request(
+      self,
+      # (channel,tag) identify a particular request
+      channel: int,
+      tag: int,
+      # a callable(rq_type,flags,payload) to perform the request
+      handler: Callable[[int, int, bytes], Union[None, int, bytes, str,
+                                                 Tuple[int, bytes]]],
+      # the Packet contents for use by the handler
+      rq_type: int,
+      flags: int,
+      payload: bytes,
+  ):
     ''' Run a request and queue a response packet.
     '''
     with Pfx(
-        "_run_request[channel=%d,tag=%d,rq_type=%d,flags=0x%02x,payload=%s]",
-        channel, tag, rq_type, flags,
-        repr(payload) if len(payload) <= 32 else repr(payload[:32]) + '...'):
+        "_run_request:%d:%d[rq_type=%d,flags=0x%02x,payload_len=%d]",
+        channel,
+        tag,
+        rq_type,
+        flags,
+        len(
+            payload
+        ),  ##repr(payload) if len(payload) <= 32 else repr(payload[:32]) + '...'
+    ):
+      # the default result
       result_flags = 0
       result_payload = b''
       try:
