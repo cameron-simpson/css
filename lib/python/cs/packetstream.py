@@ -283,6 +283,9 @@ class PacketConnection(MultiOpenMixin):
     self._pending = None
     self._runstate = RunState(str(self))
     self._lock = Lock()
+    self._sendQ = None
+    self._sent = None
+    self._send_queued = None
 
   def __str__(self):
     return "PacketConnection[%s]" % (self.name,)
