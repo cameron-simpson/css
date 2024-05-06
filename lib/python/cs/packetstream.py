@@ -623,6 +623,11 @@ class PacketConnection(MultiOpenMixin):
         self._respond(channel, tag, result_flags, result_payload)
       self._channel_request_tags[channel].remove(tag)
 
+  def end_requests(self):
+    ''' Queue the magic end-of-requests `Packet`.
+    '''
+    self._sendQ.put(self.ERQ_Packet)
+
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @logexc
   @pfx_method
