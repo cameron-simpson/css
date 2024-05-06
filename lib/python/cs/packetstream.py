@@ -469,15 +469,18 @@ class PacketConnection(MultiOpenMixin):
     error("rejecting request: " + str(payload))
     if isinstance(payload, str):
       payload = payload.encode('utf-8')
-    self._queue_packet(
-        Packet(
-            is_request=False,
-            channel=channel,
-            tag=tag,
-            flags=0,
-            payload=payload
-        )
-    )
+    try:
+      self._queue_packet(
+          Packet(
+              is_request=False,
+              channel=channel,
+              tag=tag,
+              flags=0,
+              payload=payload
+          )
+      )
+    except EOFError as e:
+      pass
 
   def _respond(self, channel, tag, flags, payload):
     ''' Issue a valid response.
