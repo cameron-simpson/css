@@ -104,7 +104,8 @@ if (sys.version_info.major < 3
   )
 
 def flatten(chunks):
-  ''' Flatten `chunks` into an iterable of `bytes` instances.
+  ''' Flatten `chunks` into an iterable of `bytes`-like instances.
+      None of the `bytes` instances will be empty.
 
       This exists to allow subclass methods to easily return
       transcribeable things (having a `.transcribe` method), ASCII
@@ -131,7 +132,8 @@ def flatten(chunks):
     if chunks:
       yield chunks
   elif isinstance(chunks, str):
-    yield chunks.encode('ascii')
+    if chunks:
+      yield chunks.encode('ascii')
   else:
     for subchunk in chunks:
       yield from flatten(subchunk)
