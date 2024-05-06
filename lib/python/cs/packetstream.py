@@ -26,13 +26,14 @@ from cs.later import Later
 from cs.logutils import debug, warning, error, exception
 from cs.pfx import Pfx, PrePfx, pfx_method
 from cs.predicate import post_condition
-from cs.progress import progressbar
+from cs.progress import Progress, progressbar
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError, MultiOpenMixin, RunState
 from cs.result import Result, ResultSet
 from cs.seq import seq, Seq
 from cs.threads import locked, bg as bg_thread
-from cs.units import BINARY_BYTES_SCALE
+from cs.units import BINARY_BYTES_SCALE, DECIMAL_SCALE
+from cs.upd import run_task
 
 def tick_fd_2(bs):
   ''' A low level tick function to write a short binary tick
@@ -289,6 +290,16 @@ class PacketConnection(MultiOpenMixin):
   @contextmanager
   def startup_shutdown(self):
     with super().startup_shutdown():
+      rq_in_progress = Progress(
+          "%s: rq in" % (self,),
+          total=0,
+          units_scale=DECIMAL_SCALE,
+      )
+      rq_out_progress = Progress(
+          "%s: request out" % (self,),
+          total=0,
+          units_scale=DECIMAL_SCALE,
+      )
       later = Later(4, name="%s:Later" % (self,))
       with stackattrs(
           self,
@@ -322,23 +333,36 @@ class PacketConnection(MultiOpenMixin):
         with self._later:
           runstate = self._runstate
           with runstate:
-            # dispatch Thread to process received packets
-            self._recv_thread = bg_thread(
-                self._receive_loop,
-                name="%s[_receive_loop]" % (self.name,),
-                kwargs=dict(
-                    notify_recv_eof=self.notify_recv_eof, runstate=runstate
-                ),
-            )
-            # dispatch Thread to send data
-            # primary purpose is to bundle output by deferring flushes
-            self._send_thread = bg_thread(
-                self._send_loop,
-                name="%s[_send]" % (self.name,),
-            )
-            yield
-          # block new requests
-          runstate.cancel()
+            with rq_in_progress.bar(stalled="idle",
+                                    report_print=True) as rq_in_bar:
+              with rq_out_progress.bar(stalled="idle",
+                                       report_print=True) as rq_out_bar:
+                # dispatch Thread to process received packets
+                self._recv_thread = bg_thread(
+                    self._receive_loop,
+                    name="%s[_receive_loop]" % (self.name,),
+                    kwargs=dict(
+                        notify_recv_eof=self.notify_recv_eof,
+                        runstate=runstate,
+                        rq_in_progress=rq_in_progress,
+                        rq_out_progress=rq_out_progress,
+                    ),
+                )
+                # dispatch Thread to send data
+                # primary purpose is to bundle output by deferring flushes
+                self._send_thread = bg_thread(
+                    self._send_loop,
+                    name="%s[_send]" % (self.name,),
+                    kwargs=dict(
+                        rq_in_progress=rq_in_progress,
+                        rq_out_progress=rq_out_progress,
+                    ),
+                )
+                try:
+                  yield
+                finally:
+                  # announce end of requests to the remote end
+                  self.end_requests()
           # complete accepted but incomplete requests
           if self._running:
             self._running.wait()
@@ -558,7 +582,14 @@ class PacketConnection(MultiOpenMixin):
   @logexc
   @pfx_method
   @ensure(lambda self: self._recv is None)
-  def _receive_loop(self, *, notify_recv_eof: set, runstate: RunState):
+  def _receive_loop(
+      self,
+      *,
+      notify_recv_eof: set,
+      runstate: RunState,
+      rq_in_progress: Progress,
+      rq_out_progress: Progress,
+  ):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
     ##XX = self.tick
@@ -577,6 +608,7 @@ class PacketConnection(MultiOpenMixin):
       if packet.is_request:
         # request from upstream client
         with Pfx("request[%d:%d]", channel, tag):
+          rq_in_progress.total += 1  # note new request
           if self.request_handler is None:
             # we are only a client, not a server
             self._reject(channel, tag, "no request handler")
@@ -620,6 +652,7 @@ class PacketConnection(MultiOpenMixin):
             # no such pending pair - response to unknown request
             error("%d.%d: response to unknown request: %s", channel, tag, e)
           else:
+            rq_out_progress += 1  # note completion
             decode_response, R = rq_state
             # first flag is "ok"
             ok = (flags & 0x01) != 0
@@ -672,6 +705,10 @@ class PacketConnection(MultiOpenMixin):
           if sig in self._sent:
             raise RuntimeError("second send of %s" % (P,))
           self._sent.add(sig)
+          if P.is_request:
+            rq_out_progress.total += 1  # note new sent rq
+          else:
+            rq_in_progress += 1  # note we completed a rq
           try:
             ##XX(b'>')
             P.write(fp)
