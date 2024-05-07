@@ -324,7 +324,6 @@ class PacketConnection(MultiOpenMixin):
           _later=later,
           # dispatch queue of Packets to send
           _sendQ=IterableQueue(16),
-          _lock=Lock(),
           # debugging: check for reuse of (channel,tag) etc
           _sent=set(),
           _send_queued=set(),
