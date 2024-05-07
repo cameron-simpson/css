@@ -450,7 +450,7 @@ class PacketConnection(MultiOpenMixin):
     '''
     for chtag, _ in progressbar(
         self._pending_states(),
-        "%s: cancel pending requests",
+        f'{self}: cancel pending requests',
         units_scale=DECIMAL_SCALE,
         report_print=True,
     ):
