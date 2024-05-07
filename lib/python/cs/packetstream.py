@@ -540,8 +540,8 @@ class PacketConnection(MultiOpenMixin):
         * `payload`: the response payload, decoded by decode_response
           if specified
     '''
-    if self._runstate.cancelled:
-      raise ClosedError("shutting down: self.cancelled")
+    if not self._runstate.running:
+      raise ClosedError(f'not running: {self._runstate}')
     if rq_type < 0:
       raise ValueError("rq_type may not be negative (%s)" % (rq_type,))
     # reserve type 0 for end-of-requests
