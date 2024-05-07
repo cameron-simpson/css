@@ -98,7 +98,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
-from cs.upd import print, run_task, without  # pylint: disable=redefined-builtin
+from cs.upd import above as above_upd, print, run_task  # pylint: disable=redefined-builtin
 
 __version__ = '20240412-post'
 
@@ -757,7 +757,7 @@ def run_remote_hashindex(
       *argv,
   ))
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
-  with without():
+  with above_upd():
     return run(
         remote_argv, check=check, doit=doit, quiet=quiet, **subp_options
     )
