@@ -532,7 +532,7 @@ def report(LFs):
   Q = Queue()
   n = 0
   notify = Q.put
-  for LF in LFs:
+  for LF in list(LFs):
     n += 1
     LF.notify(notify)
   for _ in range(n):
