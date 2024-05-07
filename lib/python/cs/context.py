@@ -71,7 +71,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
 
       Additionally, `cmgr` may be a callable, in which case the
       context manager itself is obtained by calling
-      `cmgr,*cmgr_args,**cmgr_kwargs)`. Otherwise `cmgr` is assumed
+      `cmgr(*cmgr_args,**cmgr_kwargs)`. Otherwise `cmgr` is assumed
       to be a context manager already, and it is an error to provide
       `cmgr_args` or `cmgr_kwargs`.
 
