@@ -336,6 +336,7 @@ class PacketConnection(MultiOpenMixin):
         with self._later:
           runstate = self._runstate
           with runstate:
+            # runstate->RUNNING
             with rq_in_progress.bar(stalled="idle",
                                     report_print=True) as rq_in_bar:
               with rq_out_progress.bar(stalled="idle",
@@ -366,6 +367,7 @@ class PacketConnection(MultiOpenMixin):
                 finally:
                   # announce end of requests to the remote end
                   self.end_requests()
+          # runstate->STOPPED, should block new requests
           # complete accepted but incomplete requests
           if self.requests_in_progress:
             with run_task(
@@ -373,10 +375,14 @@ class PacketConnection(MultiOpenMixin):
                 report_print=True,
             ):
               self.requests_in_progress.wait()
-        # there should not be any outstanding work
-        with run_task("%s: wait for outstanding LateFunctions" % (self,),
-                      report_print=True):
-          later.wait_outstanding()
+          # complete any outstanding requests from the remote
+          if later.outstanding:  ## HUH??
+            warning(
+                "surprise! %d outstanding Later jobs", len(later.outstanding)
+            )
+            with run_task(f'{self}: wait for outstanding LateFunctions',
+                          report_print=True):
+              later.wait_outstanding()
         # close the stream to the remote and wait
         with run_task("%s: close sendQ, wait for sender" % (self,),
                       report_print=True):
