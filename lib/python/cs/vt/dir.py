@@ -180,7 +180,7 @@ class _Dirent(Transcriber, prefix=None):
       We have a `._prev_dirent_blockref` private attribute, passed
       as the optional `prev_dirent_blockref` init parameter, which
       is a `Block` containing the encoding of the immediate ancestor
-      `Dirent` is this `Dirent` is a revision, such as a more recent
+      `Dirent` if this `Dirent` is a revision, such as a more recent
       backup snapshot. This is a `Block` because being an actual
       `Dirent` would lead to an unbounded recursion of `Dirent`s.
       Instead the `Block` is fetched and decoded at need in the
