@@ -1005,7 +1005,9 @@ def without(func):
 
   def _without_upd_wrapper(*a, **kw):
     upd = Upd.default()
-    with contextif(upd is None or upd.disabled, upd.above):
+    if upd is None:
+      return func(*a, **kw)
+    with upd.above():
       return func(*a, **kw)
 
   return _without_upd_wrapper
@@ -1021,7 +1023,7 @@ def above(*, upd: Upd):
           with above_upd():
               os.system('ls -la')
   '''
-  return upd.above()
+  return contextif(None if upd is None else upd.above())
 
 # pylint: disable=redefined-builtin
 breakpoint = without(builtin_breakpoint)
