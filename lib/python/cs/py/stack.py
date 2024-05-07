@@ -61,6 +61,13 @@ except ImportError:
     def format(self):
       return [self.format_frame_summary(frame) for frame in self]
 
+    @staticmethod
+    def format_frame_summary(frame):
+      return (
+          "%s:%d: %s: %s\n" %
+          (frame.filename, frame.lineno, frame.name, frame.line)
+      )
+
 def frames():
   ''' Return the current stack as a list of `Frame` objects.
   '''
