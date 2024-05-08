@@ -786,7 +786,7 @@ class NRLock:
   ''' A nonrecursive lock.
       Attempting to take this lock when it is already held by the current `Thread`
       will raise `DeadlockError`.
-      Otherwise this behaves likc `threading.Lock`.
+      Otherwise this behaves like `threading.Lock`.
   '''
 
   __slots__ = ('_lock', '_lock_thread', '_locked_by')
@@ -813,7 +813,9 @@ class NRLock:
     '''
     lock = self._lock
     if lock.locked() and current_thread() is self._lock_thread:
-      raise DeadlockError('lock already held by current Thread')
+      raise DeadlockError(
+          f'lock already held by current Thread:{self._locked_by}'
+      )
     acquired = lock.acquire(*a, **kw)
     if acquired:
       if caller_frame is None:
