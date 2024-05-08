@@ -133,9 +133,13 @@ do
       xit=1
       continue
     }
-    if $trace "$ffmpeg_exe" -i "$md" \
-                  -vf "scale=$scale" -c:v "$vcodec" -b:v "$bitrate" \
-                  "$outfile"
+    if time $trace "$ffmpeg_exe" \
+                  -r "$timelapse_fps" \
+                  -i "$md" \
+                  $from_to_opts \
+                  -fps_mode passthrough \
+                  -vf "scale=$scale" -c:v "$vcodec" -bufsize 1M -maxrate:v "$bitrate" \
+                  "$outfile" </dev/null
     then  [ $keep ] || $trace rm -- "$md" || xit=1
     else  rm -f -- "$outfile"
     fi
