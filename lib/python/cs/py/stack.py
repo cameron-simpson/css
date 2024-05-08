@@ -93,7 +93,7 @@ def caller(frame_index=-3):
 def stack_dump(
     f=None,
     indent=0,
-    frames=None,
+    summary=None,
     skip=None,
     select=None,
     format_frame=None,
@@ -103,10 +103,10 @@ def stack_dump(
       Parameters:
       * `f`: the output file object, default `sys.stderr`
       * `indent`: how many spaces to indent the stack lines, default `0`
-      * `frames`: the stack `Frame`s to write,
+      * `summary`: the stack `Frame`s to write,
         default obtained from the current stack
-      * `skip`: the number of `Frame`s to trim from the end of `frames`;
-        if `frames` is `None` this defaults to `2` to trim the `Frame`s
+      * `skip`: the number of `Frame`s to trim from the end of `summary`;
+        if `summary` is `None` this defaults to `2` to trim the `Frame`s
         for the `stack_dump` function and its call to `frames()`,
         otherwise the default is `0` to use the supplied `Frame`s as is
       * `select`: if not `None`, select particular frames;
@@ -115,28 +115,31 @@ def stack_dump(
   '''
   if f is None:
     f = sys.stderr
-  if frames is None:
-    frames = frames()
+  if summary is None:
+    summary = frames()
     if skip is None:
       skip = 2
-  elif skip is None:
-    skip = 0
+  elif not isinstance(summary, StackSummary):
+    summary = StackSummary(list(summary))
+    if skip is None:
+      skip = 0
+  assert isinstance(summary, StackSummary)
   if skip > 0:
-    frames = frames[:-skip]
-  summary = StackSummary.from_list(list(frames))
+    summary[-skip:] = []
   if format_frame is None:
     try:
       format_frame = summary.format_frame_summary
     except AttributeError:
-      format_frame = lambda frame: str(frame) + '\n'
-  for F in frames:
+      format_frame = lambda frame: "%s:%d: %s: %s\n" % (
+          frame.filename, frame.lineno, frame.name, frame.line
+      )
+  for F in summary:
     if select is not None:
       if isinstance(select, str):
         if select not in F.filename:
           continue
-      else:
-        if not select(F):
-          continue
+      elif not select(F):
+        continue
     formatted = format_frame(F)
     indent_s = ' ' * indent
     print(
@@ -152,6 +155,13 @@ def stack_dump(
         file=f,
         sep='',
     )
+    ##print(
+    ##    indent_s,
+    ##    "  ",
+    ##    F.line,
+    ##    file=f,
+    ##    sep='',
+    ##)
 
 if __name__ == '__main__':
   import cs.py.stack_tests
