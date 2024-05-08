@@ -43,11 +43,15 @@ except ImportError:
       return self.line
 
   class StackSummary(list):
+    ''' Fallback `StackSummary` class for older Pythons.
+    '''
 
     @classmethod
     def extract(
         cls, frame_gen, limit=None, lookup_lines=None, capture_locals=False
     ):
+      ''' Constract a `StackSummary` from an iterable of stack frames.
+      '''
       # not yet implemented
       assert limit is None
       assert capture_locals is None
@@ -56,20 +60,28 @@ except ImportError:
 
     @classmethod
     def from_list(cls, frame_list):
+      ''' Constract a `StackSummary` from a list of stack frames.
+      '''
       return cls(FrameSummary(raw_frame) for raw_frame in frame_list)
 
     def format(self):
+      ''' Return a list of the stack frames formatted as strings.
+      '''
       return [self.format_frame_summary(frame) for frame in self]
 
     @staticmethod
     def format_frame_summary(frame):
+      ''' The default frame format function.
+          This implementation produces a single line of text.
+      '''
       return (
           "%s:%d: %s: %s\n" %
           (frame.filename, frame.lineno, frame.name, frame.line)
       )
 
 def frames():
-  ''' Return the current stack as a list of `Frame` objects.
+  ''' Return the current stack as a `StackSummary` instance, a list
+      of `FrameSummary` instances.
   '''
   return StackSummary.from_list(extract_stack())
 
