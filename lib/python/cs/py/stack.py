@@ -160,20 +160,6 @@ def stack_dump(
         file=f,
         sep='',
     )
-    print(
-        indent_s,
-        "  ",
-        F.line,
-        file=f,
-        sep='',
-    )
-    ##print(
-    ##    indent_s,
-    ##    "  ",
-    ##    F.line,
-    ##    file=f,
-    ##    sep='',
-    ##)
 
 if __name__ == '__main__':
   import cs.py.stack_tests
