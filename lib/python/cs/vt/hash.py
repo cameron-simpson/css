@@ -4,22 +4,18 @@
 ''' Functions and classes around hashcodes.
 '''
 
-from abc import ABC
-from binascii import unhexlify
 from bisect import bisect_left
-from hashlib import sha1, sha256
 from inspect import isclass
 from os.path import splitext
 import sys
 
 from icontract import require
-from typeguard import typechecked
 
 from cs.binary import BSUInt, BinarySingleValue
 from cs.deco import OBSOLETE, promote, Promotable
 from cs.excutils import exc_fold
 from cs.hashutils import BaseHashCode
-from cs.lex import get_identifier, hexify
+from cs.lex import get_identifier
 from cs.resources import MultiOpenMixin
 
 from .pushpull import missing_hashcodes
@@ -223,7 +219,7 @@ class HashCode(
     return f'{self.hashname}:{self.hex()}'
 
   @classmethod
-  def parse_inner(cls, s, offset, stopchar, prefix):
+  def parse_inner(cls, s, offset, *, stopchar, prefix):
     ''' Parse hashname:hashhextext from `s` at offset `offset`.
         Return HashCode instance and new offset.
     '''
@@ -286,7 +282,8 @@ class HashCodeType(type, Promotable):
   def from_NoneType(none: type(None)):
     '''Return the default `Store` hashclass for `None`.
     '''
-    from . import Store
+    assert none is None
+    from . import Store  # pylint: disable=import-outside-toplevel
     return Store.get_default_hashclass()
 
   @staticmethod
@@ -295,6 +292,7 @@ class HashCodeType(type, Promotable):
     '''
     return HashCode.by_hashname[hashname]
 
+  # pylint: disable=bad-mcs-classmethod-argument
   @classmethod
   def promote(self, obj):
     ''' Pass `HashCode` subclasses, promote the rest (`str` and `None`).
@@ -338,10 +336,11 @@ class HashCodeUtilsMixin:
       hashstate.update(bs)
     return hashclass.from_data(hashstate.digest())
 
+  # pylint: disable=unidiomatic-typecheck
   @require(
-      lambda self, start_hashcode: start_hashcode is None or
-      type(start_hashcode) is self.hashclass
-  )  # pylint: disable=unidiomatic-typecheck
+      lambda self, start_hashcode:
+      (start_hashcode is None or type(start_hashcode) is self.hashclass)
+  )
   def hash_of_hashcodes(
       self, *, start_hashcode=None, after=False, length=None
   ):
@@ -373,11 +372,11 @@ class HashCodeUtilsMixin:
     '''
     return missing_hashcodes(self, other, window_size=window_size)
 
-  @require(
-      lambda self, start_hashcode: start_hashcode is None or
-      type(start_hashcode) is self.hashclass
-  )
   # pylint: disable=too-many-branches,unidiomatic-typecheck
+  @require(
+      lambda self, start_hashcode:
+      (start_hashcode is None or type(start_hashcode) is self.hashclass)
+  )
   def hashcodes_from(self, *, start_hashcode=None):
     ''' Default generator yielding hashcodes from this object until none remains.
 
@@ -413,10 +412,11 @@ class HashCodeUtilsMixin:
       yield hashcode
       ndx += 1
 
+  # pylint: disable=unidiomatic-typecheck
   @require(
-      lambda self, start_hashcode: start_hashcode is None or
-      type(start_hashcode) is self.hashclass
-  )  # pylint: disable=unidiomatic-typecheck
+      lambda self, start_hashcode:
+      (start_hashcode is None or type(start_hashcode) is self.hashclass)
+  )
   def hashcodes(self, *, start_hashcode=None, after=False, length=None):
     ''' Generator yielding up to `length` hashcodes `>=start_hashcode`.
         This relies on `.hashcodes_from` as the source of hashcodes.
