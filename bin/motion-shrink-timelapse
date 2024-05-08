@@ -15,6 +15,7 @@ glob='*timelapse.avi'
 mtime=+2
 outdir=
 scale=1280x720
+timelapse_fps=1
 vcodec=libx265
 
 nopt=
@@ -42,6 +43,8 @@ usage="Usage: $cmd [options...] motion-directories...
     -n                  No action. Recite planned actions.
     -name glob          Glob to match timelapse video files, default $glob,
                         passed to find.
+    -r fps              Specify the frame rate of the source timelapse video.
+                        Default: $timelapse_fps.
     -rm                 Remove the original file.
     -scale XxY          Scale filter, default $scale, passed to ffmpeg.
     -vcodec codec       Video codec, default $vcodec, passed to ffmpeg.
@@ -74,6 +77,7 @@ do
     -mtime)     mtime=$2; shift ;;
     -n)         nopt=-n xopt= trace=echo ;;
     -name)      glob=$2; shift ;;
+    -r)         timelapse_fps=$2; shift ;;
     -rm)        keep= ;;
     -scale)     scale=$2; shift ;;
     -vcodec)    vcodec=$2; shift ;;
