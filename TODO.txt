@@ -1,3 +1,4 @@
+motion-shrink-timelapse: use -disposition to extract the 7am video from as JPG and add as the embedded cover
     motion-shrink-timelapse: -metadata fields
     zz
 TODO: accept -f to specify the file?
