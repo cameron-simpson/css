@@ -126,7 +126,7 @@ do
     outfile=$( expr "x$md" : 'x\(.*\)\.[^/.][^/.]*' )--$scale--$vcodec--$bitrate.$fmt
     [ -z "$outdir" ] || outfile=$outdir/$( basename "$outfile" )
     case "$outfile" in
-      /*) ;; *) outfile=./$outfile ;;
+      /* | ./* | ../* ) ;; *) outfile=./$outfile ;;
     esac
     [ -e "$outfile" ] && {
       echo "$0: $md: output file already exists: $outfile" >&2
