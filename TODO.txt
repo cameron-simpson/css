@@ -1,3 +1,4 @@
+    motion-shrink-timelapse: -metadata fields
     zz
 TODO: accept -f to specify the file?
 test2
