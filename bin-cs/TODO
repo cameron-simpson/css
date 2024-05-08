@@ -65,7 +65,7 @@ case "$mode" in
     [ -s "$todo_path" ] || echo >>"$todo_path"
 
     if $trace bsed "1i\\
-    $*" "$todo_path"
+$*" "$todo_path"
     then
         tododir=$( dirname "$todo_path" )
         ( cd "$tododir"
