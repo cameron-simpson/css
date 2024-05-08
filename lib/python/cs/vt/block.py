@@ -480,7 +480,7 @@ class Block(Transcriber, ABC, prefix=None):
         return HashCodeBlock(hashcode=hashcode, span=span, added=added)
       case _:
         return cls.from_bytes(
-            bytes(blockish, literal_threshold=literal_threshold, added=added)
+            bytes(blockish), literal_threshold=literal_threshold, added=added
         )
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
 
