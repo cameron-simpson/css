@@ -6,7 +6,7 @@
 set -ue
 
 keep=1
-bitrate=100k
+bitrate=200k
 ffmpeg_exe=${FFMPEG_EXE:-ffmpeg-docker}
 fmt=mp4
 glob='*timelapse.avi'
