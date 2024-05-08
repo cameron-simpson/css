@@ -12,6 +12,7 @@ from_to=
 from_to_opts=
 fmt=mp4
 glob='*timelapse.avi'
+missing=
 mtime=+2
 outdir=
 scale=1280x720
@@ -32,12 +33,13 @@ usage="Usage: $cmd [options...] motion-directories...
     from+duration       Select the video from from for duration.
     -bitrate rate       The target average bitrate, default $bitrate,
                         passed to ffmpeg.
-    -d output           The output directory for the transcoded
+    -o output           The output directory for the transcoded
                         videos, default the source directory.
     -ffmpeg ffmpeg_exe  The ffmpeg command to run. Default from
                         \$FFMPEG_EXE or ffmpeg-docker.
     -fmt format         File format extension, default $fmt, passed to ffmpeg.
     -keep               Do not remove the original file. (Default.)
+    -missing            Skip the ffmpeg if the output already exists.
     -mtime +n           File age criterion for timelapse video
                         files, default $mtime, passed to find.
     -n                  No action. Recite planned actions.
@@ -74,6 +76,7 @@ do
     -ffmpeg)    ffmpeg_exe=$2; shift ;;
     -fmt)       fmt=$2; shift ;;
     -keep)      keep=1 ;;
+    -missing)   missing=1 ;;
     -mtime)     mtime=$2; shift ;;
     -n)         nopt=-n xopt= trace=echo ;;
     -name)      glob=$2; shift ;;
@@ -130,7 +133,7 @@ do
     esac
     [ -e "$outfile" ] && {
       echo "$0: $md: output file already exists: $outfile" >&2
-      xit=1
+      [ $missing ] || xit=1
       continue
     }
     if time $trace "$ffmpeg_exe" \
