@@ -6,7 +6,7 @@ build
 ## -e git+https://github.com/noDRM/DeDRM_tools.git@v7.2.1#egg=dedrm&subdirectory=DeDRM_plugin
 discid
 enum34
--e git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python
+ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git@master
 icontract
 lmdb
 lxml
@@ -37,4 +37,4 @@ typeguard
 watchdog
 yapf
 ##youtube-dl
--e git+https://github.com/ytdl-org/youtube-dl.git@26035bde4#egg=youtube-dl
+youtube-dl @ git+https://github.com/ytdl-org/youtube-dl.git@26035bde4
