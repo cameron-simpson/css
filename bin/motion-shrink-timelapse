@@ -8,6 +8,8 @@ set -ue
 keep=1
 bitrate=200k
 ffmpeg_exe=${FFMPEG_EXE:-ffmpeg-docker}
+from_to=
+from_to_opts=
 fmt=mp4
 glob='*timelapse.avi'
 mtime=+2
@@ -25,6 +27,8 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd [options...] motion-directories...
   Transcode timelapse videos to be more compact for long term storage.
   Options:
+    from..[to]          Select the video from from to to.
+    from+duration       Select the video from from for duration.
     -bitrate rate       The target average bitrate, default $bitrate,
                         passed to ffmpeg.
     -d output           The output directory for the transcoded
@@ -48,6 +52,20 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
+    -[0-9]*..* | [0-9]*..*)
+                from_to=$1
+                from=$( expr "$1" : '\(..*\)\.\..*' )
+                to=$(   expr "$1" : '..*\.\.\(.*\)' )
+                from_to_opts="$from_to_opts -ss $from"
+                [ -n "$to" ] && from_to_opts="$from_to_opts -to $to"
+                ;;
+    -[0-9]*+* | [0-9]*+*)
+                from_to=$1
+                from=$( expr "$1" : '\(..*\)+.*' )
+                duration=$(   expr "$1" : '..*+\(.*\)' )
+                from_to_opts="$from_to_opts -ss $from"
+                [ -n "$duration" ] && from_to_opts="$from_to_opts -t $duration"
+                ;;
     -bitrate)   bitrate=$2; shift ;;
     -d)         outdir=$2; shift ;;
     -ffmpeg)    ffmpeg_exe=$2; shift ;;
@@ -96,7 +114,7 @@ do
   then
     $tracefind find "$@" \
                    -type f -name "$glob" -mtime "$mtime" \
-                   -exec "$0" $nopt $xopt -d "$outdir" \
+                   -exec "$0" $nopt $xopt -d "$outdir" $from_to \
                        -bitrate "$bitrate" -ffmpeg "$ffmpeg_exe" -fmt "$fmt" \
                        -mtime "$mtime" -name "$glob" -scale "$scale" -vcodec "$vcodec" \
                        -- {} ';'
