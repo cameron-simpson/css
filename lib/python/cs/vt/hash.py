@@ -25,7 +25,6 @@ from cs.resources import MultiOpenMixin
 from .pushpull import missing_hashcodes
 from .transcribe import Transcriber
 
-
 HASHNAME_DEFAULT = 'blake3'
 HASHNAME_ENVVAR = 'VT_HASHNAME'
 
@@ -83,7 +82,7 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
     ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
     '''
     hashenum = BSUInt.parse_value(bfr)
-    hashcls = HASHCLASS_BY_ENUM[hashenum]
+    hashcls = HashCode.by_hashenum[hashenum]
     return hashcls.from_hashbytes(bfr.take(hashcls.hashlen))
 
   # pylint: disable=arguments-renamed
@@ -245,9 +244,6 @@ class HashCode(
     H = hashclass.from_hashbytes_hex(hashtext)
     return H, offset
 
-# legacy names, to be removed (TODO)
-HASHCLASS_BY_ENUM = HashCode.by_hashenum
-
 # enums for hash types; need to be stable for the binary transcription
 HASH_SHA1_T = 0
 HASH_SHA256_T = 1
@@ -282,7 +278,8 @@ class Hash_SHA256(
 
 class HashCodeType(type, Promotable):
   ''' A kind of factory class for producing `HashCode` subclasses.
-      This exists to let me provide a promotion for hash class names.
+      This exists to let me provide a promotion for hash class names
+      to a hash class.
   '''
 
   @staticmethod
