@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# Re
+# Transcode timelapse videos to be more compact for long term storage.
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
