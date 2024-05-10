@@ -34,7 +34,7 @@ usage="Usage: $cmd [options...] motion-directories...
     from+duration       Select the video from from for duration.
     -bitrate rate       The target average bitrate, default $bitrate,
                         passed to ffmpeg.
-    -o output           The output directory for the transcoded
+    -d output           The output directory for the transcoded
                         videos, default the source directory.
     -ffmpeg ffmpeg_exe  The ffmpeg command to run. Default from
                         \$FFMPEG_EXE or ffmpeg-docker.
@@ -132,6 +132,7 @@ do
     case "$outfile" in
       /* | ./* | ../* ) ;; *) outfile=./$outfile ;;
     esac
+    # the output file must not exist
     [ -e "$outfile" ] && {
       echo "$0: $md: output file already exists: $outfile" >&2
       [ $missing ] || xit=1
@@ -145,7 +146,7 @@ do
                   -vf "scale=$scale" -c:v "$vcodec" -bufsize 1M -maxrate:v "$bitrate" \
                   "$outfile" </dev/null
     then  [ $keep ] || $trace rm -- "$md" || xit=1
-    else  rm -f -- "$outfile"
+    else  $trace rm -f -- "$outfile"
     fi
   fi
 done
