@@ -66,7 +66,7 @@ from collections import namedtuple
 from struct import Struct  # pylint: disable=no-name-in-module
 import sys
 from types import SimpleNamespace
-from typing import List, Union
+from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import OBSOLETE, promote, strable
@@ -206,7 +206,7 @@ def pt_spec(pt, name=None):
     '''
 
     @staticmethod
-    def parse_value(bfr):
+    def parse_value(bfr: CornuCopyBuffer):
       ''' Parse value form buffer.
       '''
       return f_parse_value(bfr)
@@ -397,7 +397,9 @@ class BinaryMixin:
 
   @classmethod
   @OBSOLETE(suggestion="BinaryMixin.scan")
-  def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
+  def scan_with_offsets(
+      cls, bfr: CornuCopyBuffer, count=None, min_count=None, max_count=None
+  ):
     ''' Wrapper for `scan()` which yields `(pre_offset,instance,post_offset)`
         indicating the start and end offsets of the yielded instances.
         All parameters are as for `scan()`.
@@ -516,7 +518,7 @@ class AbstractBinary(ABC, BinaryMixin):
 
   # pylint: disable=deprecated-decorator
   @abstractclassmethod
-  def parse(cls, bfr):
+  def parse(cls, bfr: CornuCopyBuffer):
     ''' Parse an instance of `cls` from the buffer `bfr`.
     '''
     raise NotImplementedError("parse")
@@ -526,8 +528,7 @@ class AbstractBinary(ABC, BinaryMixin):
     ''' Return or yield `bytes`, ASCII string, `None` or iterables
         comprising the binary form of this instance.
 
-        This aims for maximum convenience
-        when transcribing a data structure.
+        This aims for maximum convenience when transcribing a data structure.
 
         This may be implemented as a generator, yielding parts of the structure.
 
@@ -626,13 +627,13 @@ class BinarySingleValue(AbstractBinary):
     return self.value == other.value
 
   @classmethod
-  def scan_values(cls, bfr, **kw):
+  def scan_values(cls, bfr: CornuCopyBuffer, **kw):
     ''' Scan `bfr`, yield values.
     '''
     return map(lambda instance: instance.value, cls.scan(bfr, **kw))
 
   @classmethod
-  def parse(cls, bfr):
+  def parse(cls, bfr: CornuCopyBuffer):
     ''' Parse an instance from `bfr`.
 
         Subclasses must implement this method or `parse_value`.
@@ -641,7 +642,7 @@ class BinarySingleValue(AbstractBinary):
     return cls(value)
 
   @classmethod
-  def parse_value(cls, bfr):
+  def parse_value(cls, bfr: CornuCopyBuffer):
     ''' Parse a value from `bfr` based on this class.
 
         Subclasses must implement this method or `parse`.
@@ -682,7 +683,7 @@ class BinaryByteses(AbstractBinary):
     return "%s:%r" % (type(self).__name__, self.values)
 
   @classmethod
-  def parse(cls, bfr):
+  def parse(cls, bfr: CornuCopyBuffer):
     self = cls()
     self.values.extend(bfr)
     return self
@@ -710,7 +711,7 @@ class BinaryListValues(AbstractBinary):
   @classmethod
   def parse(
       cls,
-      bfr,
+      bfr: CornuCopyBuffer,
       count=None,
       *,
       end_offset=None,
@@ -859,7 +860,7 @@ def BinaryMultiStruct(
           return self[0]
 
       @classmethod
-      def parse_value(cls, bfr):
+      def parse_value(cls, bfr: CornuCopyBuffer):
         ''' Parse a value from `bfr`, return the value.
         '''
         bs = bfr.take(struct.size)
@@ -885,7 +886,9 @@ def BinaryMultiStruct(
   _binary_multi_struct_classes[key] = struct_class
   return struct_class
 
-def BinarySingleStruct(class_name, struct_format, field_name=None):
+def BinarySingleStruct(
+    class_name: str, struct_format: str, field_name: Optional[str] = None
+):
   ''' A convenience wrapper for `BinaryMultiStruct`
       for `struct_format`s with a single field.
 
@@ -1043,7 +1046,7 @@ class BSUInt(BinarySingleValue):
   )
 
   @staticmethod
-  def parse_value(bfr):
+  def parse_value(bfr: CornuCopyBuffer) -> int:
     ''' Parse an extensible byte serialised unsigned `int` from a buffer.
 
         Continuation octets have their high bit set.
@@ -1063,7 +1066,7 @@ class BSUInt(BinarySingleValue):
     return n
 
   @staticmethod
-  def decode_bytes(data, offset=0):
+  def decode_bytes(data, offset=0) -> Tuple[int, int]:
     ''' Decode an extensible byte serialised unsigned `int` from `data` at `offset`.
         Return value and new offset.
 
@@ -1115,20 +1118,20 @@ class BSData(BinarySingleValue):
   )
 
   @property
-  def data(self):
+  def data(self) -> bytes:
     ''' An alias for the `.value` attribute.
     '''
     return self.value
 
   @property
-  def data_offset(self):
+  def data_offset(self) -> int:
     ''' The length of the length indicator,
         useful for computing the location of the raw data.
     '''
     return len(BSUInt(len(self.value)))
 
   @classmethod
-  def parse_value(cls, bfr):
+  def parse_value(cls, bfr: CornuCopyBuffer) -> bytes:
     ''' Parse the data from `bfr`.
     '''
     data_length = BSUInt.parse_value(bfr)
@@ -1144,7 +1147,7 @@ class BSData(BinarySingleValue):
     yield data
 
   @staticmethod
-  def data_offset_for(bs):
+  def data_offset_for(bs) -> int:
     ''' Compute the `data_offset` which would obtain for the bytes `bs`.
     '''
     return BSData(bs).data_offset
@@ -1164,7 +1167,9 @@ class BSString(BinarySingleValue):
 
   # pylint: disable=arguments-differ
   @staticmethod
-  def parse_value(bfr, encoding='utf-8', errors='strict'):
+  def parse_value(
+      bfr: CornuCopyBuffer, encoding='utf-8', errors='strict'
+  ) -> str:
     ''' Parse a run length encoded string from `bfr`.
     '''
     strlen = BSUInt.parse_value(bfr)
@@ -1182,7 +1187,7 @@ class BSString(BinarySingleValue):
     return b''.join((BSUInt.transcribe_value(len(payload)), payload))
 
 class BSSFloat(BinarySingleValue):
-  ''' A float transcribed as a BSString of str(float).
+  ''' A float transcribed as a `BSString` of `str(float)`.
   '''
 
   TEST_CASES = (
@@ -1191,8 +1196,8 @@ class BSSFloat(BinarySingleValue):
   )
 
   @classmethod
-  def parse_value(cls, bfr):
-    ''' Parse a BSSFloat from a buffer and return the float.
+  def parse_value(cls, bfr: CornuCopyBuffer) -> float:
+    ''' Parse a `BSSFloat` from a buffer and return the `float`.
     '''
     s = BSString.parse_value(bfr)
     return float(s)
@@ -1200,7 +1205,7 @@ class BSSFloat(BinarySingleValue):
   # pylint: disable=arguments-renamed
   @staticmethod
   def transcribe_value(f):
-    ''' Transcribe a float.
+    ''' Transcribe a `float`.
     '''
     return BSString.transcribe_value(str(f))
 
@@ -1231,7 +1236,12 @@ class _BinaryMultiValue_Base(SimpleBinary):
       That is done by the `BinaryMultiValue` class factory.
   '''
 
-  def _s(self, *, crop_length=64, choose_name=None):
+  def _s(
+      self,
+      *,
+      crop_length: int = 64,
+      choose_name: Optional[Callable[[str], bool]] = None,
+  ):
     ''' Common implementation of `__str__` and `__repr__`.
         Transcribe type and attributes, cropping long values
         and omitting private values.
@@ -1263,14 +1273,14 @@ class _BinaryMultiValue_Base(SimpleBinary):
 
   ##__repr__ = _s
 
-  def for_json(self):
+  def for_json(self) -> Mapping[str, Any]:
     return {
         field_name: getattr(self, field_name)
         for field_name in self.FIELD_ORDER
     }
 
   @classmethod
-  def parse(cls, bfr):
+  def parse(cls, bfr: CornuCopyBuffer):
     ''' Default parse: parse each predefined field from the buffer in order
         and set the associated attributes.
 
@@ -1311,7 +1321,7 @@ class _BinaryMultiValue_Base(SimpleBinary):
         self.parse_field(field_name, bfr)
     return self
 
-  def parse_field(self, field_name, bfr, **kw):
+  def parse_field(self, field_name: str, bfr: CornuCopyBuffer, **kw):
     ''' Parse `bfr` for the data for `field_name`
         and set the associated attribute.
     '''
@@ -1333,7 +1343,7 @@ class _BinaryMultiValue_Base(SimpleBinary):
       # outside Pfx because this is a generator :-(
       yield transcription
 
-  def transcribe_field(self, field_name):
+  def transcribe_field(self, field_name: str):
     ''' Return the transcription of `field_name`.
     '''
     field = self.FIELDS[field_name]
@@ -1474,7 +1484,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
     )
     return bmv_class
 
-def BinaryFixedBytes(class_name, length: int):
+def BinaryFixedBytes(class_name: str, length: int):
   ''' Factory for an `AbstractBinary` subclass matching `length` bytes of data.
       The bytes are saved as the attribute `.data`.
   '''
@@ -1492,7 +1502,7 @@ class BinaryUTF8NUL(BinarySingleValue):
   )
 
   @staticmethod
-  def parse_value(bfr):
+  def parse_value(bfr: CornuCopyBuffer) -> str:
     ''' Read a NUL terminated UTF-8 string from `bfr`, return field.
     '''
     # probe for the terminating NUL
@@ -1554,7 +1564,7 @@ class BinaryUTF16NUL(BinarySingleValue):
   VALID_ENCODINGS = ('utf_16_le', 'utf_16_be')
 
   # pylint: disable=super-init-not-called
-  def __init__(self, value, *, encoding):
+  def __init__(self, value: str, *, encoding: str):
     if encoding not in self.VALID_ENCODINGS:
       raise ValueError(
           'unexpected encoding %r, expected one of %r' %
@@ -1565,7 +1575,7 @@ class BinaryUTF16NUL(BinarySingleValue):
 
   # pylint: disable=arguments-differ
   @classmethod
-  def parse(cls, bfr, *, encoding):
+  def parse(cls, bfr: CornuCopyBuffer, *, encoding: str):
     ''' Parse the encoding and value and construct an instance.
     '''
     value = cls.parse_value(bfr, encoding=encoding)
@@ -1573,8 +1583,8 @@ class BinaryUTF16NUL(BinarySingleValue):
 
   # pylint: disable=arguments-differ
   @staticmethod
-  def parse_value(bfr, *, encoding):
-    ''' Read a NUL terminated UTF-16 string from `bfr`, return a `UTF16NULField`..
+  def parse_value(bfr: CornuCopyBuffer, *, encoding: str) -> str:
+    ''' Read a NUL terminated UTF-16 string from `bfr`, return a `UTF16NULField`.
         The mandatory parameter `encoding` specifies the UTF16 encoding to use
         (`'utf_16_be'` or `'utf_16_le'`).
     '''
@@ -1601,7 +1611,7 @@ class BinaryUTF16NUL(BinarySingleValue):
 
   # pylint: disable=arguments-differ
   @staticmethod
-  def transcribe_value(value, encoding='utf-16'):
+  def transcribe_value(value: str, encoding='utf-16'):
     ''' Transcribe `value` in UTF-16 with a terminating NUL.
     '''
     yield value.encode(encoding)
