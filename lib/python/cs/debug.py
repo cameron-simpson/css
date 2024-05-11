@@ -53,7 +53,7 @@ import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
-from cs.py.func import funccite, func_a_kw_fmt
+from cs.py.func import funccite, funcname, func_a_kw_fmt
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
@@ -634,7 +634,7 @@ def trace(
       * `with_pfx`: include the current `Pfx` prefix, default `False`
   '''
 
-  citation = funccite(func)
+  citation = funcname(func)  ## funccite(func)
 
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
