@@ -259,6 +259,7 @@ def LogExceptions(conceal=False):
 
   return NoExceptions(handler)
 
+@decorator
 def logexc(func):
   ''' Decorator to log exceptions and reraise.
   '''
@@ -267,13 +268,9 @@ def logexc(func):
     with LogExceptions():
       return func(*a, **kw)
 
-  try:
-    name = func.__name__
-  except AttributeError:
-    name = str(func)
-  logexc_wrapper.__name__ = 'logexc(%s)' % (name,)
   return logexc_wrapper
 
+@decorator
 def logexc_gen(genfunc):
   ''' Decorator to log exceptions and reraise for generators.
   '''
@@ -288,7 +285,6 @@ def logexc_gen(genfunc):
           return
         yield item
 
-  logexc_gen_wrapper.__name__ = 'logexc_gen(%s)' % (genfunc.__name__,)
   return logexc_gen_wrapper
 
 @decorator
