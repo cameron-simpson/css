@@ -449,15 +449,17 @@ class PacketConnection(MultiOpenMixin):
   def _pending_cancel(self):
     ''' Cancel all the pending requests.
     '''
-    for chtag, _ in progressbar(
-        self._pending_states(),
-        f'{self}: cancel pending requests',
-        units_scale=DECIMAL_SCALE,
-        report_print=True,
-    ):
-      channel, tag = chtag
-      _, result = self._pending_pop(channel, tag)
-      result.cancel()
+    pending = self._pending_states()
+    if pending:
+      for chtag, _ in progressbar(
+          pending,
+          f'{self}: cancel pending requests',
+          units_scale=DECIMAL_SCALE,
+          report_print=True,
+      ):
+        channel, tag = chtag
+        _, result = self._pending_pop(channel, tag)
+        result.cancel()
 
   def _queue_packet(self, P):
     if self._sendQ is None:
