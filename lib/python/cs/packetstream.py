@@ -638,6 +638,11 @@ class PacketConnection(MultiOpenMixin):
     '''
     self._sendQ.put(self.ERQ_Packet)
 
+  def send_eof(self):
+    ''' Queue the magic EOF `Packet`.
+    '''
+    self._sendQ.put(self.EOF_Packet)
+
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @logexc
   @pfx_method
