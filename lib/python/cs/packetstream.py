@@ -646,7 +646,6 @@ class PacketConnection(MultiOpenMixin):
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @logexc
   @pfx_method
-  @ensure(lambda self: self._recv is None)
   def _receive_loop(
       self,
       *,
