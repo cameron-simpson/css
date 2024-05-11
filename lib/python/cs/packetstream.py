@@ -756,7 +756,6 @@ class PacketConnection(MultiOpenMixin):
     # alert any listeners of receive EOF
     for notify in notify_recv_eof:
       notify(self)
-    self._recv = None
 
   # pylint: disable=too-many-branches
   @logexc
@@ -839,7 +838,6 @@ class PacketConnection(MultiOpenMixin):
         except Exception as e:
           error("(_SEND) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
           raise
-        self._send = None
 
 if __name__ == '__main__':
   from cs.debug import selftest
