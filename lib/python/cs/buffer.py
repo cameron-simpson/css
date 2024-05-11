@@ -608,12 +608,11 @@ class CornuCopyBuffer(Promotable):
             "insufficient input data, wanted %d bytes but only found %d" %
             (min_size, self.buflen)
         )
-      else:
-        if self.progress is not None:
-          self.progress += len(next_chunk)
       if next_chunk:
         self.bufs.append(next_chunk)
         self.buflen += len(next_chunk)
+        if self.progress is not None:
+          self.progress += len(next_chunk)
     ##assert self.buflen >= min_size
     ##assert self.buflen == sum(len(buf) for buf in self.bufs)
 
