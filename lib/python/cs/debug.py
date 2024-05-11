@@ -57,6 +57,7 @@ from cs.py.func import funccite, func_a_kw_fmt
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
+from cs.threads import ThreadState
 from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
 from cs.x import X
 
@@ -607,7 +608,7 @@ def debug_object_shell(o, prompt=None):
   C.prompt = prompt
   C.cmdloop(intro)
 
-_trace_indent = ""
+_trace_state = ThreadState(indent='')
 
 @ALL
 @decorator
@@ -638,7 +639,7 @@ def trace(
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
     '''
-    global _trace_indent  # pylint: disable=global-statement
+    global _trace_state  # pylint: disable=global-statement
     if with_pfx:
       # late import so that we can use this in modules we import
       # pylint: disable=import-outside-toplevel
@@ -653,9 +654,9 @@ def trace(
       log_cite = log_cite + "from[%s]" % (caller(),)
     if call:
       fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("%sCALL " + fmt, _trace_indent, *av)
-    old_indent = _trace_indent
-    _trace_indent += '  '
+      xlog("%sCALL " + fmt, _trace_state.indent, *av)
+    old_indent = _trace_state.indent
+    _trace_state.indent += '  '
     start_time = time.time()
     try:
       result = func(*a, **kw)
@@ -664,33 +665,33 @@ def trace(
       if exception:
         xlog(
             "%sCALL %s %gs RAISE %r",
-            _trace_indent,
+            _trace_state.indent,
             log_cite,
             end_time - start_time,
             e,
         )
-      _trace_indent = old_indent
+      _trace_state.indent = old_indent
       raise
     else:
       end_time = time.time()
       if retval:
         xlog(
             "%sCALL %s %gs RETURN %s",
-            _trace_indent,
+            _trace_state.indent,
             log_cite,
             end_time - start_time,
             (pformat if use_pformat else repr)(result),
         )
       else:
-        ##xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
+        ##xlog("%sRETURN %s <= %s", _trace_state.indent, type(result), log_cite)
         xlog(
             "%sRETURN %gs %s <= %s",
-            _trace_indent,
+            _trace_state.indent,
             end_time - start_time,
             s(result),
             log_cite,
         )
-      _trace_indent = old_indent
+      _trace_state.indent = old_indent
       return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
