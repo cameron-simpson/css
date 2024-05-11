@@ -474,7 +474,7 @@ class PacketConnection(MultiOpenMixin):
     except ClosedError as e:
       warning("%s: packet not sent: %s (P=%s)", self._sendQ, e, P)
 
-  def _reject(self, channel, tag, payload=bytes(())):
+  def _reject(self, channel, tag, payload=b''):
     ''' Issue a rejection of the specified request.
     '''
     error("rejecting request: " + str(payload))
