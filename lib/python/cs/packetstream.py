@@ -402,8 +402,9 @@ class PacketConnection(MultiOpenMixin):
           warning("%d PENDING STATES AT SHUTDOWN", len(ps))
 
   def join(self):
-    ''' Wait for the receive side of the connection to terminate.
+    ''' Wait for the send and receive workers to terminate.
     '''
+    self._send_thread.join()
     self._recv_thread.join()
 
   def _new_tag(self, channel: int) -> int:
