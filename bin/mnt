@@ -13,8 +13,8 @@ rcfile=$HOME/.mntrc
 umount=
 mount_point=
 trace=
-use_tmux=1
 [ -t 2 ] && trace=set-x
+use_tmux=1
 sshfs_opts=
 sshfs_idmap_mode=user
 sshfs_nomap_mode=ignore
@@ -22,8 +22,9 @@ sshfs_nomap_mode=ignore
 cmd=$(basename "$0")
 usage="Usage:
   $cmd [-f rcfile] ALL
+  $cmd [-f rcfile] /mount/point
   $cmd [-f rcfile] mount-path [/mount/point]
-  $cmd [-u] {mount-path|/mount/point}...
+  $cmd -u {mount-path|/mount/point}...
     -d          Daemon mode: do not run in the foreground.
     -f rcfile   Specify config file. Default: $rcfile
     -o sshfs-opt Add an option for use with sshfs.
@@ -185,7 +186,7 @@ do_mount(){
         exit 1
         ;;
     esac
-    exec "$@"
+    exec $trace "$@"
   )
 }
 
