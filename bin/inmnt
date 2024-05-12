@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Run a command inside an sshfs mount.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+: "${TMPDIR:-/tmp}"
+
+cmd=$( basename "$0" )
+usage="Usage: $0 sshhost:path [command [args...]]"
+
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing sshhost:path" >&2
+  badopts=1
+else
+  sshfspath=$1; shift
+fi
+
+[ $# = 0 ] && set -- "$SHELL"
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+mntdir=$TMPDIR/sshfs-mnt
+[ -d "$mntdir" ] || $trace mkdir -- "$mntdir"
+mntpath=$mntdir/mnt-$$-$( echo "$sshfspath" | tr / _ )
+$trace mnt -d -X -- "$sshfspath" "$mntpath"
+xit=0
+( cd "$mntpath" && $trace "$@" ) || xit=$?
+$trace umount "$mntpath"
+exit $xit
