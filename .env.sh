@@ -4,7 +4,17 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-export VIRTUAL_ENV=$ENV_DEV_DIR/venv    # for uv
-export PYTHON3=$VIRTUAL_ENV/bin/python3
-export PATH=$ENV_DEV_DIR/bin-cs:$ENV_DEV_DIR/bin:$VIRTUAL_ENV/bin:$PATH
+for venv_sfx in "-$ARCH" ""
+do
+  venv=$ENV_DEV_DIR/venv$venv_sfx
+  [ -x "$venv/bin/python3" ] && break
+  venv=
+done
+
+[ -z "$venv" ] || {
+  export VIRTUAL_ENV=$venv    # for uv
+  export PYTHON3=$VIRTUAL_ENV/bin/python3
+  export PATH=$ENV_DEV_DIR/bin-cs:$ENV_DEV_DIR/bin:$VIRTUAL_ENV/bin:$PATH
+}
+
 ##export PYTHONWARNINGS=default
