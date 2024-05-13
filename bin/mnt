@@ -27,6 +27,7 @@ usage="Usage:
   $cmd -u {mount-path|/mount/point}...
     -d          Daemon mode: do not run in the foreground.
     -f rcfile   Specify config file. Default: $rcfile
+    -F sshcfg   Specify an ssh config file to use.
     -o sshfs-opt Add an option for use with sshfs.
     -u          Unmount the mount-path.
     -X          Run the mount directly, not in tmux.
@@ -49,6 +50,7 @@ do
   case "$1" in
     -d) daemon=1 ;;
     -f) rcfile=$1; shift ;;
+    -F) sshfs_opts="$sshfs_opts -F $2"; shift ;;
     -o) sshfs_opts="$sshfs_opts -o $2"; shift ;;
     -u) umount=1 ;;
     -X) use_tmux= ;;
