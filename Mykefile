@@ -16,12 +16,13 @@ RSYNC_TARGET_PYTHON_ENVVAR = RSYNC_TARGET_PYTHON
 target  = bin
 
 dev = env-dev -d $. -x
+trace = set-x
 base_python = "$${PYTHON_EXE:-python3}"
 venv_dir = $./venv-$(ARCH)
 venv_requirements = $./venv-requirements.txt
-venv_pip = $(venv_python) -m pip
-venv_python = $(venv_dir)/bin/python
-uv = VIRTUAL_ENV=$(venv_dir) uv
+venv_pip = $(trace) $(venv_python) -m pip
+venv_python = $(trace) $(venv_dir)/bin/python
+uv = VIRTUAL_ENV=$(venv_dir) $(trace) uv
 
 rewrite = rewriteif -0 -v
 
@@ -97,8 +98,14 @@ _setup:
 
 _venv:
     $(uv) venv --seed '$(venv_dir)'
-    $(uv) pip install -U $$( grep -i '^[a-z]' $(venv_requirements) )
-    $(venv_pip) install -U $$( grep -i '^[^a-z#]' $(venv_requirements) )
+    uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
+    if grep -i '^ *[a-z]' $(venv_requirements) >"$$uv_reqs" \
+    then  $(uv) pip install -U -r "$$uv_reqs" \
+    fi
+    pip_reqs=$$TMPDIR/reqs-pip-$$$$.txt \
+    if grep -i '^ *[^a-z#]' $(venv_requirements) >"$$pip_reqs" \
+    then  $(venv_pip) install -U -r "$$pip_reqs" \
+    fi
 
 _tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
