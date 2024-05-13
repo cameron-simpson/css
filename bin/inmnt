@@ -12,7 +12,14 @@ cmd=$( basename "$0" )
 usage="Usage: $0 [options...] {sshhost:path|@rhost} [command [args...]]
   -F sshcfg Specify ssh config file, passed to mnt (for sshfs).
   -o opt    Passed to mnt (for sshfs).
-  -q        Turn off tracing."
+  -q        Turn off tracing.
+  The default command is the user's shell (from \$SHELL).
+  Modes:
+    sshhost:path
+            Use a remote directory locally.
+            Mount path from sshhost and run the command in it.
+    @rhost  Use the current directory remotely.
+            Ssh to rhost and run \"mnt thishost:pwd command\"."
 
 trace=
 [ -t 2 ] && trace=set-x
