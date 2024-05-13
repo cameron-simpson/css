@@ -29,6 +29,7 @@ usage="Usage:
     -f rcfile   Specify config file. Default: $rcfile
     -F sshcfg   Specify an ssh config file to use.
     -o sshfs-opt Add an option for use with sshfs.
+    -q          Quiet. Turn off tracing, if any.
     -u          Unmount the mount-path.
     -X          Run the mount directly, not in tmux.
     -x          Trace the executed command.
@@ -52,6 +53,7 @@ do
     -f) rcfile=$1; shift ;;
     -F) sshfs_opts="$sshfs_opts -F $2"; shift ;;
     -o) sshfs_opts="$sshfs_opts -o $2"; shift ;;
+    -q) trace= ;;
     -u) umount=1 ;;
     -X) use_tmux= ;;
     -x) trace=set-x ;;
@@ -278,7 +280,7 @@ case "$mnt_arg" in
     ;;
 esac
 
-[ -d "$mount_point" ] || set-x mkdir "$mount_point" || exit 1
+[ -d "$mount_point" ] || $trace mkdir "$mount_point" || exit 1
 do_mount "$mount_path" "$mount_point" || xit=1
 
 exit $xit
