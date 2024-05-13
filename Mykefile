@@ -1,4 +1,4 @@
-:import     CSS_HG_REPOS
+:import     ARCH CSS_HG_REPOS
 
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
@@ -17,7 +17,7 @@ target  = bin
 
 dev = env-dev -d $. -x
 base_python = "$${PYTHON_EXE:-python3}"
-venv_dir = $./venv
+venv_dir = $./venv-$(ARCH)
 venv_requirements = $./venv-requirements.txt
 venv_pip = $(venv_python) -m pip
 venv_python = $(venv_dir)/bin/python
