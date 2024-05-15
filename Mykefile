@@ -16,7 +16,7 @@ target  = bin
 
 dev = env-dev -d $. -x
 base_python = "$${PYTHON_EXE:-python3}"
-venv_dir = $./venv-$ARCH
+venv_dir = $./venv-$(ARCH)
 venv_requirements = $./venv-requirements.txt
 venv_pip = $(venv_python) -m pip
 venv_python = $(venv_dir)/bin/python
