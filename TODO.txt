@@ -1,3 +1,4 @@
+if no series/season/episode, check the thumbnail path for "series | season N" p
 cs.cmdutils/distinfo: cmd_blah descriptions should format the usage parts
 cs.cmdutils: recite module version in command usage message?
 cs.distinfo: a leading "# pylint:" comment is not a standin for a missing docstring
