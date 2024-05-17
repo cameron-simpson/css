@@ -13,6 +13,8 @@ from_to=
 from_to_opts=
 fmt=mp4
 glob='*timelapse.avi'
+ffloglevel=repeat+error
+[ -t 2 ] && ffloglevel=repeat+info
 missing=
 mtime=+2
 outdir=
@@ -139,6 +141,7 @@ do
       continue
     }
     if time $trace "$ffmpeg_exe" \
+                  -loglevel "$ffloglevel" \
                   -r "$timelapse_fps" \
                   -i "$md" \
                   $from_to_opts \
