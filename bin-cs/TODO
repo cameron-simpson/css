@@ -109,7 +109,8 @@ $*" "$todo_path"
               echo "$cmd NEW: missing issue title words" >&2
               exit 2
             }
-            $trace gh issue create --title "$*" --assignee "${GH_NEW_ASSIGN:-@me}" --body '' --project "${GH_NEW_PROJECT:-}"
+            ## omitted, some kind of perms issue: --project "${GH_NEW_PROJECT:-}"
+            $trace gh issue create --title "$*" --assignee "${GH_NEW_ASSIGN:-@me}" --body "$body"
             ;;
       [1-9] | [1-9]*[0-9] )
             [ $# = 0 ] && {
