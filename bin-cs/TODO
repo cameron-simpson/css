@@ -109,6 +109,20 @@ $*" "$todo_path"
               echo "$cmd NEW: missing issue title words" >&2
               exit 2
             }
+            body=
+            if [ -t 0 -a -t 1 ]
+            then
+              echo "Enter subtasks one per line, blank line to finish:"
+              while echo -n "- [ ] "; read -r subtask
+              do
+                [ -n "$subtask" ] || break
+                subtask="- [ ] $subtask"
+                if [ -n "$body" ]
+                then  body="$body$nl$subtask"
+                else  body=$subtask
+                fi
+              done
+            fi
             ## omitted, some kind of perms issue: --project "${GH_NEW_PROJECT:-}"
             $trace gh issue create --title "$*" --assignee "${GH_NEW_ASSIGN:-@me}" --body "$body"
             ;;
