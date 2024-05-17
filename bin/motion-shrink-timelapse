@@ -102,7 +102,7 @@ then
 else
   for md
   do
-    [ -s "$md" -o -d "$md/" ] || {
+    [ -s "$md" ] || [ -d "$md/" ] || {
       echo "$cmd: not a file or directory: $md" >&2
       badopts=1
     }
