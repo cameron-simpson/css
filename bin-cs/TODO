@@ -113,7 +113,7 @@ $*" "$todo_path"
             if [ -t 0 -a -t 1 ]
             then
               echo "Enter subtasks one per line, blank line to finish:"
-              while echo -n "- [ ] "; read -r subtask
+              while necho "- [ ] "; read -r subtask
               do
                 [ -n "$subtask" ] || break
                 subtask="- [ ] $subtask"
