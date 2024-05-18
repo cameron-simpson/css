@@ -36,13 +36,6 @@ except ImportError:
     def __str__(self):
       return "%s:%d: %s" % (self.filename, self.lineno, self.line)
 
-    # compatibility with my prior Frame class
-    @property
-    def funcname(self):
-      ''' The frame function name.
-      '''
-      return self.name
-
     @property
     def linetext(self):
       ''' The line of source code.
