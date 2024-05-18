@@ -557,15 +557,16 @@ class Recording(SQLTagSet):
     ''' Return a series prefix for recording containing the series name
         and season and episode, or `''`.
     '''
+    sei = self.sei
     sep = '--'
     parts = []
-    if self.playon.Series:
-      parts.append(self.playon.Series)
+    if sei.series:
+      parts.append(sei.series)
       se_parts = []
-      if self.playon.get('Season'):
-        se_parts.append(f's{self.playon.Season:02d}')
-      if self.playon.get('Episode'):
-        se_parts.append(f'e{self.playon.Episode:02d}')
+      if sei.season:
+        se_parts.append(f's{sei.season:02d}')
+      if sei.episode is not None:
+        se_parts.append(f'e{sei.episode:02d}')
       if se_parts:
         parts.append(''.join(se_parts))
     if not parts:
@@ -574,17 +575,10 @@ class Recording(SQLTagSet):
 
   @format_attribute
   def series_episode_name(self):
-    name = scrub_title(
-        self.playon.Name,
-        season=self.playon.get('Season'),
-        episode=self.playon.get('Episode'),
-    )
-    if self.playon.get('Episode'):
-      epfx, n, offset = get_prefix_n(
-          name.lower(), 'episode ', n=self.playon.Episode
-      )
-      if epfx is not None:
-        name = name[offset:]
+    sei = self.sei
+    name = sei.episode_title
+    if sei.episode_part:
+      name += f'--pt{sei.episode_part:02d}'
     return name.strip()
 
   @format_attribute
