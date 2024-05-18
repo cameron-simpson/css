@@ -117,7 +117,7 @@ class PlayOnCommand(BaseCommand):
   # default "ls" output format
   LS_FORMAT = (
       '{playon.ID} {playon.HumanSize} {resolution}'
-      ' {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
+      ' {nice_name} {playon.ProviderID} {status:upper}'
   )
 
   # default "queue" output format
@@ -533,10 +533,13 @@ class Recording(SQLTagSet):
     ''' A nice name for the recording: the PlayOn series and name,
         omitting the series if `None`.
     '''
-    playon_tags = self.subtags('playon')
-    citation = playon_tags.Name
-    if playon_tags.Series and playon_tags.Series != 'none':
-      citation = playon_tags.Series + " - " + citation
+    sei = self.sei
+    if sei.series:
+      citation = f'{sei.series} - s{sei.season:02d}e{sei.episode:02d} - {sei.episode_title}'
+      if sei.episode_part:
+        citation += f' - pt{sei.episode_part:02d}'
+    else:
+      citation = sei.episode_title
     return citation
 
   @format_attribute
