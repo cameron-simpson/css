@@ -35,6 +35,7 @@ from cs.context import stackattrs
 from cs.deco import fmtdoc, promote, Promotable
 from cs.fileutils import atomic_filename
 from cs.lex import (
+    cutprefix,
     cutsuffix,
     format_attribute,
     get_prefix_n,
@@ -675,6 +676,9 @@ class SeriesEpisodeInfo(Promotable):
     playon_season = R.get('playon.Season')
     playon_episode = R.get('playon.Episode')
     episode_title = R.get('playon.Name')
+    # sometimes the series is prepended to the episode title
+    if playon_series:
+      episode_title = cutprefix(episode_title, f'{playon_series} - ')
     # strip the trailing part info eg ": Part One"
     part_suffix, episode_part = get_suffix_part(episode_title)
     if part_suffix:
@@ -687,7 +691,7 @@ class SeriesEpisodeInfo(Promotable):
         episode_title.lower(), 'e', n=playon_episode, offset=offset
     )
     if offset > 0:
-      # strip the SSSeEE and any following spaces or dashes
+      # strip the sSSeEE and any following spaces or dashes
       episode_title = episode_title[offset:].lstrip(' -')
     # fall back from provided stuff to inferred stuff
     series = playon_series or browse_series
