@@ -1348,7 +1348,7 @@ class BaseCommand:
     '''
     # redundant try/finally to remind subclassers of correct structure
     try:
-      run_options = self.options.copy(**kw_options)
+      run_options = self.options.copy(runstate=runstate, **kw_options)
       with run_options:  # make the default ThreadState
         with stackattrs(self, options=run_options):
           with stackattrs(self, cmd=self._subcmd or self.cmd):

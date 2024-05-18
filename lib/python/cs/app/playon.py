@@ -10,6 +10,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from functools import cached_property
 from getopt import getopt, GetoptError
 from netrc import netrc
 import os
@@ -22,7 +23,7 @@ import re
 import sys
 from threading import Semaphore
 import time
-from typing import Optional
+from typing import Any, Mapping, Optional
 from urllib.parse import unquote as unpercent
 
 from icontract import require
@@ -31,9 +32,16 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, promote, Promotable
 from cs.fileutils import atomic_filename
-from cs.lex import has_format_attributes, format_attribute, get_prefix_n
+from cs.lex import (
+    cutprefix,
+    cutsuffix,
+    format_attribute,
+    get_prefix_n,
+    get_suffix_part,
+    has_format_attributes,
+)
 from cs.logutils import warning
 from cs.mediainfo import scrub_title
 from cs.pfx import Pfx, pfx_method, pfx_call
@@ -42,6 +50,7 @@ from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
+from cs.tagset import TagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
@@ -108,7 +117,7 @@ class PlayOnCommand(BaseCommand):
   # default "ls" output format
   LS_FORMAT = (
       '{playon.ID} {playon.HumanSize} {resolution}'
-      ' {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
+      ' {nice_name} {playon.ProviderID} {status:upper}'
   )
 
   # default "queue" output format
@@ -246,6 +255,7 @@ class PlayOnCommand(BaseCommand):
       argv = ['pending']
     api = options.api
     filename_format = options.filename_format
+    runstate = options.runstate
     sem = Semaphore(dl_jobs)
 
     @typechecked
@@ -259,7 +269,7 @@ class PlayOnCommand(BaseCommand):
           )
           filename = re.sub('---+', '--', filename)
           try:
-            api.download(dl_id, filename=filename)
+            api.download(dl_id, filename=filename, runstate=runstate)
           except ValueError as e:
             warning("download fails: %s", e)
             return None
@@ -513,15 +523,24 @@ class Recording(SQLTagSet):
     '''
     return self.get('playon.ID')
 
+  @cached_property
+  def sei(self):
+    ''' A `SeriesEpisodeInfo` inferred from this `Recording`.
+    '''
+    return SeriesEpisodeInfo.from_Recording(self)
+
   @format_attribute
   def nice_name(self):
     ''' A nice name for the recording: the PlayOn series and name,
         omitting the series if `None`.
     '''
-    playon_tags = self.subtags('playon')
-    citation = playon_tags.Name
-    if playon_tags.Series and playon_tags.Series != 'none':
-      citation = playon_tags.Series + " - " + citation
+    sei = self.sei
+    if sei.series:
+      citation = f'{sei.series} - s{sei.season:02d}e{sei.episode:02d} - {sei.episode_title}'
+      if sei.episode_part:
+        citation += f' - pt{sei.episode_part:02d}'
+    else:
+      citation = sei.episode_title
     return citation
 
   @format_attribute
@@ -538,15 +557,16 @@ class Recording(SQLTagSet):
     ''' Return a series prefix for recording containing the series name
         and season and episode, or `''`.
     '''
+    sei = self.sei
     sep = '--'
     parts = []
-    if self.playon.Series:
-      parts.append(self.playon.Series)
+    if sei.series:
+      parts.append(sei.series)
       se_parts = []
-      if self.playon.get('Season'):
-        se_parts.append(f's{self.playon.Season:02d}')
-      if self.playon.get('Episode'):
-        se_parts.append(f'e{self.playon.Episode:02d}')
+      if sei.season:
+        se_parts.append(f's{sei.season:02d}')
+      if sei.episode is not None:
+        se_parts.append(f'e{sei.episode:02d}')
       if se_parts:
         parts.append(''.join(se_parts))
     if not parts:
@@ -555,17 +575,10 @@ class Recording(SQLTagSet):
 
   @format_attribute
   def series_episode_name(self):
-    name = scrub_title(
-        self.playon.Name,
-        season=self.playon.get('Season'),
-        episode=self.playon.get('Episode'),
-    )
-    if self.playon.get('Episode'):
-      epfx, n, offset = get_prefix_n(
-          name.lower(), 'episode ', n=self.playon.Episode
-      )
-      if epfx is not None:
-        name = name[offset:]
+    sei = self.sei
+    name = sei.episode_title
+    if sei.episode_part:
+      name += f'--pt{sei.episode_part:02d}'
     return name.strip()
 
   @format_attribute
@@ -626,6 +639,70 @@ class Recording(SQLTagSet):
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
+
+@dataclass
+class SeriesEpisodeInfo(Promotable):
+  ''' Episode information from a TV series episode.
+  '''
+
+  series: str
+  season: int
+  episode: int
+  episode_title: Optional[str] = None
+  episode_part: Optional[int] = None
+
+  @classmethod
+  def from_Recording(cls, R: Mapping[str, Any]):
+    ''' Infer series episode information from a `Recording`
+        or any mapping with ".playon.*" keys.
+    '''
+    # match a Playon browse path like "... | The Flash | Season 9"
+    browse_path = R['playon.BrowsePath']
+    browse_re_s = r'\|\s+(?P<series_s>[^|\s][^|]*[^|\s])\s+\|\s+season\s+(?P<season_s>\d+)$'
+    m = re.search(
+        browse_re_s,
+        browse_path,
+        re.I,
+    )
+    browse_series = m and m.group('series_s')
+    browse_season = m and int(m.group('season_s'))
+    playon_series = R.get('playon.Series')
+    # ignore the series "None", still unsure if this is some furphy
+    # from a genuine None value
+    if playon_series and playon_series.lower() == 'none':
+      playon_series = None
+    playon_season = R.get('playon.Season')
+    playon_episode = R.get('playon.Episode')
+    episode_title = R.get('playon.Name')
+    # sometimes the series is prepended to the episode title
+    if playon_series:
+      episode_title = cutprefix(episode_title, f'{playon_series} - ')
+    # strip the trailing part info eg ": Part One"
+    part_suffix, episode_part = get_suffix_part(episode_title)
+    if part_suffix:
+      episode_title = cutsuffix(episode_title, part_suffix)
+    # strip leading "sSSeEE - " prefix
+    spfx, episode_title_season, offset = get_prefix_n(
+        episode_title.lower(), 's', n=playon_season
+    )
+    epfx, episode_title_episode, offset = get_prefix_n(
+        episode_title.lower(), 'e', n=playon_episode, offset=offset
+    )
+    if offset > 0:
+      # strip the sSSeEE and any following spaces or dashes
+      episode_title = episode_title[offset:].lstrip(' -')
+    # fall back from provided stuff to inferred stuff
+    series = playon_series or browse_series
+    season = playon_season or episode_title_season or browse_season
+    episode = playon_episode or episode_title_episode
+    SEI = cls(
+        series=series,
+        season=season,
+        episode=episode,
+        episode_title=episode_title,
+        episode_part=episode_part,
+    )
+    return SEI
 
 class LoginState(SQLTagSet):
 
@@ -1063,8 +1140,7 @@ class PlayOnAPI(HTTPServiceAPI):
             itemlenfunc=len,
             report_print=True,
         ):
-          if runstate.cancelled:
-            raise CancellationError
+          runstate.raiseif()
           offset = 0
           length = len(chunk)
           while offset < length:

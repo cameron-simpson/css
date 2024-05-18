@@ -1,3 +1,4 @@
+if no series/season/episode, check the thumbnail path for "series | season N" p
 motion-shrink-timelapse: use -disposition to extract the 7am video from as JPG and add as the embedded cover
     motion-shrink-timelapse: -metadata fields
     zz
