@@ -492,6 +492,81 @@ def get_prefix_n(s, prefix, n=None, *, offset=0):
     return no_match
   return matched, gn, offset
 
+NUMERAL_NAMES = {
+    'en': {
+        # all the single word numbers
+        'zero': 0,
+        'nought': 0,
+        'one': 1,
+        'two': 2,
+        'three': 3,
+        'four': 4,
+        'five': 5,
+        'six': 6,
+        'seven': 7,
+        'eight': 8,
+        'nine': 9,
+        'ten': 10,
+        'eleven': 11,
+        'twelve': 12,
+        'thirteen': 13,
+        'fourteen': 14,
+        'fifteen': 15,
+        'sixteen': 16,
+        'seventeen': 17,
+        'eighteen': 18,
+        'nineteen': 19,
+        'twenty': 20,
+    },
+}
+
+def get_suffix_part(s, *, keywords=('part',), numeral_map=None):
+  ''' Strip a trailing "part N" suffix from the string `s`.
+      Return the matched suffix and the number part number.
+      Retrn `(None,None)` on no match.
+
+      Parameters:
+      * `s`: the string
+      * `keywords`: an iterable of `str` to match, or a single `str`;
+        default `'part'`
+      * `numeral_map`: an optional mapping of numeral names to numeric values;
+        default `NUMERAL_NAMES['en']`, the English numerals
+
+      Exanmple:
+
+          >>> get_suffix_part('s09e10 - A New World: Part One')
+          (': Part One', 1)
+  '''
+  if isinstance(keywords, str):
+    keywords = (keywords,)
+  if numeral_map is None:
+    numeral_map = NUMERAL_NAMES['en']
+  regexp_s = ''.join(
+      (
+          r'\W+(',
+          r'|'.join(keywords),
+          r')\s+(?P<numeral>\d+|',
+          r'|'.join(numeral_map.keys()),
+          r')\s*$',
+      )
+  )
+  regexp = re.compile(regexp_s, re.I)
+  m = regexp.search(s)
+  if not m:
+    return None, None
+  numeral = m.group('numeral')
+  try:
+    part_n = int(numeral)
+  except ValueError:
+    try:
+      part_n = numeral_map[numeral]
+    except KeyError:
+      try:
+        part_n = numeral_map[numeral.lower()]
+      except KeyError:
+        return None, None
+  return m.group(0), part_n
+
 # pylint: disable=redefined-outer-name
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in `string.whitespace`
