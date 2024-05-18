@@ -255,6 +255,7 @@ class PlayOnCommand(BaseCommand):
       argv = ['pending']
     api = options.api
     filename_format = options.filename_format
+    runstate = options.runstate
     sem = Semaphore(dl_jobs)
 
     @typechecked
@@ -268,7 +269,7 @@ class PlayOnCommand(BaseCommand):
           )
           filename = re.sub('---+', '--', filename)
           try:
-            api.download(dl_id, filename=filename)
+            api.download(dl_id, filename=filename, runstate=runstate)
           except ValueError as e:
             warning("download fails: %s", e)
             return None
@@ -1145,8 +1146,7 @@ class PlayOnAPI(HTTPServiceAPI):
             itemlenfunc=len,
             report_print=True,
         ):
-          if runstate.cancelled:
-            raise CancellationError
+          runstate.raiseif()
           offset = 0
           length = len(chunk)
           while offset < length:
