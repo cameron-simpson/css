@@ -8,7 +8,7 @@
 '''
 
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from functools import cached_property
 from getopt import getopt, GetoptError
@@ -704,6 +704,11 @@ class SeriesEpisodeInfo(Promotable):
     )
     return SEI
 
+  def as_dict(self):
+    ''' Return the non-`None` values as a `dict`.
+    '''
+    return {k: v for k, v in asdict(self).items() if v is not None}
+
 class LoginState(SQLTagSet):
 
   @property
@@ -1157,7 +1162,10 @@ class PlayOnAPI(HTTPServiceAPI):
     if dl_rsp is not None:
       recording.set('download_path', fullpath)
     # apply the SQLTagSet to the FSTags TagSet
-    self.fstags[fullpath].update(recording.subtags('playon'), prefix='playon')
+    tagged = self.fstags[fullpath]
+    tagged.update(recording.subtags('playon'), prefix='playon')
+    # and also the Series/Season/Episode info
+    tagged.update(recording.sei.as_dict())
     return recording
 
 if __name__ == '__main__':
