@@ -43,7 +43,7 @@ from cs.lex import (
     has_format_attributes,
 )
 from cs.logutils import warning
-from cs.mediainfo import scrub_title
+from cs.mediainfo import SeriesEpisodeInfo
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
@@ -525,9 +525,9 @@ class Recording(SQLTagSet):
 
   @cached_property
   def sei(self):
-    ''' A `SeriesEpisodeInfo` inferred from this `Recording`.
+    ''' A `PlayonSeriesEpisodeInfo` inferred from this `Recording`.
     '''
-    return SeriesEpisodeInfo.from_Recording(self)
+    return PlayonSeriesEpisodeInfo.from_Recording(self)
 
   @format_attribute
   def nice_name(self):
@@ -641,21 +641,24 @@ class Recording(SQLTagSet):
         print_func(" ", tag)
 
 @dataclass
-class SeriesEpisodeInfo(Promotable):
-  ''' Episode information from a TV series episode.
+class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
+  ''' A `SeriesEpisodeInfo` with a `from_Recording()` factory method to build 
+      one from a PlayOn `Recording` instead or other mapping with `playon.*` keys.
   '''
-
-  series: str
-  season: int
-  episode: int
-  episode_title: Optional[str] = None
-  episode_part: Optional[int] = None
 
   @classmethod
   def from_Recording(cls, R: Mapping[str, Any]):
     ''' Infer series episode information from a `Recording`
         or any mapping with ".playon.*" keys.
     '''
+    # get a basic SEI from the title
+    episode_title = R.get('playon.Name')
+    playon_series = R.get('playon.Series')
+    playon_season = R.get('playon.Season')
+    playon_episode = R.get('playon.Episode')
+    self = cls.from_str(episode_title, series=playon_series)
+    # now override various fields from the playon tags
+    ###############################################################
     # match a Playon browse path like "... | The Flash | Season 9"
     browse_path = R['playon.BrowsePath']
     browse_re_s = r'\|\s+(?P<series_s>[^|\s][^|]*[^|\s])\s+\|\s+season\s+(?P<season_s>\d+)$'
@@ -666,14 +669,10 @@ class SeriesEpisodeInfo(Promotable):
     )
     browse_series = m and m.group('series_s')
     browse_season = m and int(m.group('season_s'))
-    playon_series = R.get('playon.Series')
     # ignore the series "None", still unsure if this is some furphy
     # from a genuine None value
     if playon_series and playon_series.lower() == 'none':
       playon_series = None
-    playon_season = R.get('playon.Season')
-    playon_episode = R.get('playon.Episode')
-    episode_title = R.get('playon.Name')
     # sometimes the series is prepended to the episode title
     if playon_series:
       episode_title = cutprefix(episode_title, f'{playon_series} - ')
@@ -692,9 +691,11 @@ class SeriesEpisodeInfo(Promotable):
       # strip the sSSeEE and any following spaces or dashes
       episode_title = episode_title[offset:].lstrip(' -')
     # fall back from provided stuff to inferred stuff
-    series = playon_series or browse_series
-    season = playon_season or episode_title_season or browse_season
-    episode = playon_episode or episode_title_episode
+    self.series = playon_series or self.series or browse_series
+    self.season = playon_season or self.season or episode_title_season or browse_season
+    self.episode = playon_episode or self.episode or episode_title_episode
+    self.episode_part = episode_part
+    return self
     SEI = cls(
         series=series,
         season=season,
@@ -703,11 +704,6 @@ class SeriesEpisodeInfo(Promotable):
         episode_part=episode_part,
     )
     return SEI
-
-  def as_dict(self):
-    ''' Return the non-`None` values as a `dict`.
-    '''
-    return {k: v for k, v in asdict(self).items() if v is not None}
 
 class LoginState(SQLTagSet):
 

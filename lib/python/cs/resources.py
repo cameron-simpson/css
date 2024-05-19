@@ -677,7 +677,7 @@ class RunState(FSM, HasThreadState):
             try:
               yield self
             except Exception:
-              self.fsm_cancel()
+              self.fsm_event('cancel')
               raise
             finally:
               self.fsm_event('stop')
