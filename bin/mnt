@@ -63,7 +63,6 @@ do
   esac
   shift
 done
-[ $# -gt 0 ] && [ "x$1" = x-u ] && { umount=1; shift; }
 
 [ $# = 0 ] && {
   echo "$cmd: missing mount-path" >&2
