@@ -36,13 +36,16 @@ to identify the file contents in a compact and human readable form.
 '''
 
 from collections import namedtuple, defaultdict
+from dataclasses import asdict, dataclass
 from os.path import basename, splitext
 import re
 import sys
 from types import SimpleNamespace as NS
+from typing import Optional
 
+from cs.deco import Promotable
 from cs.gimmicks import warning
-from cs.lex import get_prefix_n
+from cs.lex import cutsuffix, get_prefix_n, get_suffix_part
 from cs.pfx import Pfx, pfx
 from cs.tagset import Tag
 
@@ -53,6 +56,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.lex',
         'cs.pfx',
         'cs.tagset',
     ],
@@ -326,6 +332,58 @@ def scrub_title(title: str, *, season=None, episode=None) -> str:
       title = title[offset:]
     title = title.lstrip(' -')
   return title
+
+@dataclass
+class SeriesEpisodeInfo(Promotable):
+  ''' Episode information from a TV series episode.
+  '''
+
+  series: str
+  season: int
+  episode: int
+  episode_title: Optional[str] = None
+  episode_part: Optional[int] = None
+
+  @classmethod
+  def from_str(cls, episode_title: str, series=None):
+    ''' Infer a `SeriesEpisodeInfo` from an episode title.
+
+        This recognises the common `'sSSeEE - Episode Title'` format
+        and variants like `Series Name - sSSeEE - Episode Title'`
+        or `'sSSeEE - Episode Title - Part: One'`.
+    '''
+    if not series:
+      # look for leading "series - sSSeEE"
+      m = re.match(
+          r'(?P<series>\S.*\S)\s+(-\s+)?(?=s\d+e\d+\s)', episode_title, re.I
+      )
+      if m:
+        series = m.group('series')
+        episode_title = episode_title[m.end():]
+    # strip leading "sSSeEE - " prefix
+    _, season, offset = get_prefix_n(episode_title.lower(), 's')
+    _, episode, offset = get_prefix_n(
+        episode_title.lower(), 'e', offset=offset
+    )
+    if offset > 0:
+      # strip the sSSeEE and any following spaces or dashes
+      episode_title = episode_title[offset:].lstrip(' -')
+    # strip the trailing part info eg ": Part One"
+    part_suffix, episode_part = get_suffix_part(episode_title)
+    if part_suffix:
+      episode_title = cutsuffix(episode_title, part_suffix)
+    return cls(
+        series=series,
+        season=season,
+        episode=episode,
+        episode_title=episode_title,
+        episode_part=episode_part,
+    )
+
+  def as_dict(self):
+    ''' Return the non-`None` values as a `dict`.
+    '''
+    return {k: v for k, v in asdict(self).items() if v is not None}
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
