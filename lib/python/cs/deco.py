@@ -753,7 +753,7 @@ def default_params(func, _strict=False, **param_defaults):
 
       Atypical one off direct use:
 
-          @default_params(dbconn=open_default_dbconn,debug=lambda: settings.DB_DEBUG_MODE)
+          @default_params(dbconn=open_default_dbconn,debug=lambda:settings.DB_DEBUG_MODE)
           def dbquery(query, *, dbconn):
               dbconn.query(query)
 
@@ -764,13 +764,13 @@ def default_params(func, _strict=False, **param_defaults):
 
           # calling code which needs a ds3client
           @uses_ds3
-          def do_something(.., *, ds3client,...):
+          def do_something(.., *, ds3client, ...):
               ... make queries using ds3client ...
 
       This replaces the standard boilerplate and avoids replicating
       knowledge of the default factory as exhibited in this legacy code:
 
-          def do_something(.., *, ds3client=None,...):
+          def do_something(.., *, ds3client=None, ...):
               if ds3client is None:
                   ds3client = get_ds3client()
               ... make queries using ds3client ...
