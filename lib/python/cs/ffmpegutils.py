@@ -35,7 +35,7 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, print_argv
 from cs.tagset import TagSet
 
-__version__ = '20240316.1-post'
+__version__ = '20240519'
 
 DISTINFO = {
     'keywords': ["python3"],
