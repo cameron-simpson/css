@@ -19,13 +19,13 @@ from typing import Any, Callable, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import contextif, stackattrs, setup_cmgr, ContextManagerMixin
-from cs.deco import default_params
+from cs.deco import default_params, OBSOLETE
+from cs.fsm import FSM
 from cs.gimmicks import error, warning, nullcontext
 from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
-from cs.py.func import prop
-from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
+from cs.py.stack import caller, frames as stack_frames, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
 
@@ -40,11 +40,11 @@ DISTINFO = {
     'install_requires': [
         'cs.context',
         'cs.deco',
+        'cs.fsm',
         'cs.gimmicks',
         'cs.obj',
         'cs.pfx',
         'cs.psutils',
-        'cs.py.func',
         'cs.py.stack',
         'cs.result',
         'cs.threads',
@@ -521,7 +521,7 @@ class Pool(object):
           self.pool.append(o)
 
 # pylint: disable=too-many-instance-attributes
-class RunState(HasThreadState):
+class RunState(FSM, HasThreadState):
   ''' A class to track a running task whose cancellation may be requested.
 
       Its purpose is twofold, to provide easily queriable state
@@ -570,6 +570,25 @@ class RunState(HasThreadState):
 
   perthread_state = ThreadState()
 
+  FSM_TRANSITIONS = {
+      'IDLE': {
+          'start': 'RUNNING',
+      },
+      'RUNNING': {
+          'cancel': 'STOPPING',
+          'stop': 'STOPPED',
+      },
+      'STOPPING': {
+          'stop': 'STOPPED',
+          'cancel': 'STOPPING',
+      },
+      'STOPPED': {
+          'start': 'RUNNING',
+      },
+  }
+
+  FSM_DEFAULT_STATE = 'IDLE'
+
   def __init__(
       self,
       name=None,
@@ -580,6 +599,7 @@ class RunState(HasThreadState):
       verbose=False,
       thread_wide=False,
   ):
+    FSM.__init__(self)
     self.name = name
     self.verbose = verbose
     self.thread_wide = thread_wide
@@ -608,24 +628,32 @@ class RunState(HasThreadState):
   __nonzero__ = __bool__
 
   def __str__(self):
-    return "%s:%s[%s:%gs]" % (
-        (
-            type(self).__name__ if self.name is None else ':'.join(
-                (type(self).__name__, repr(self.name))
-            )
-        ), id(self), self.state, self.run_time
+    return "%s(%s):%s:%gs" % (
+        self.__class__.__name__,
+        '' if self.name is None else repr(self.name),
+        self.fsm_state,
+        self.run_time,
+    )
+
+  def __repr__(self):
+    return "%s:%d(%s):%s:%gs" % (
+        self.__class__.__name__,
+        id(self),
+        '' if self.name is None else repr(self.name),
+        self.fsm_state,
+        self.run_time,
     )
 
   def __enter_exit__(self):
     ''' The `__enter__`/`__exit__` generator function:
-        * push this RunState via HasThreadState
-        * catch signals
+        * push this `RunState` via `HasThreadState`
+        * catch signals if we are in the main `Thread`
         * start
         * `yield self` => run
-        * cancel on exception during run
+        * cancel on exception during the run
         * stop
 
-        Note that if the `RunState` is already runnings we do not
+        Note that if the `RunState` is already running we do not
         do any of that stuff apart from the `yield self` because
         we assume whatever setup should have been done has already
         been done.
@@ -645,38 +673,44 @@ class RunState(HasThreadState):
               if in_main else nullcontext()) as sigstack:
           with (stackattrs(self, _sigstack=sigstack)
                 if sigstack is not None else nullcontext()):
-            self.start(running_ok=True)
+            self.fsm_event('start')
             try:
               yield self
             except Exception:
-              self.cancel()
+              self.fsm_cancel()
               raise
             finally:
-              self.stop()
+              self.fsm_event('stop')
 
-  @prop
+  def fsm_event(self, event: str, **extra):
+    ''' Override `FSM.fsm_event` to apply side effects to particular transitions.
+
+        On `'cancel'` set the cancelled flag.
+        On `'start'` clear the cancelled flag and set `.start_time`.
+        On `'stop'`set `.stop_time`.
+    '''
+    new_state = super().fsm_event(event, **extra)
+    if event == 'cancel':
+      self._canceled = True
+    elif event == 'start':
+      self._cancelled = False
+      self.start_time = time.time()
+      self._started_from = stack_frames()
+    elif event == 'stop':
+      self.stop_time = time.time()
+    return new_state
+
+  @property
+  @OBSOLETE('.fsm_event')
   def state(self):
     ''' The `RunState`'s state as a string.
-
-        Meanings:
-        * `"pending"`: not yet running/started.
-        * `"stopping"`: running and cancelled.
-        * `"running"`: running and not cancelled.
-        * `"cancelled"`: cancelled and no longer running.
-        * `"stopped"`: no longer running and not cancelled.
+        Deprecated, new uses should consult `self.fsm_state`.
     '''
-    start_time = self.start_time
-    if start_time is None:
-      label = "pending"
-    elif self.running:
-      if self.cancelled:
-        label = "stopping"
-      else:
-        label = "running"
-    elif self.cancelled:
-      label = "cancelled"
+    fsm_state = self.fsm_state
+    if fsm_state == 'IDLE':
+      label = 'pending'
     else:
-      label = "stopped"
+      label = fsm_state.lower()
     return label
 
   @pfx_method
@@ -684,21 +718,21 @@ class RunState(HasThreadState):
     ''' Start: adjust state, set `start_time` to now.
         Sets `.cancelled` to `False` and sets `.running` to `True`.
     '''
-    if not running_ok and self.running:
+    if self.fsm_state in ('RUNNING', 'STOPPING') and not running_ok:
       warning("already running")
-    else:
-      self._started_from = stack_frames()
-    self.cancelled = False
-    self.running = True
+    self.fsm_event('start')
 
   def stop(self):
-    ''' Stop: adjust state, set `stop_time` to now.
-        Sets sets `.running` to `False`.
+    ''' Fire the `'stop'` event.
     '''
-    self.running = False
+    self.fsm_event('stop')
 
   # compatibility
-  end = stop
+  @OBSOLETE('.stop')
+  def end(self):
+    ''' Obsolete synonym for `.stop()`.
+    '''
+    self.stop()
 
   @property
   def cancelled(self):
@@ -739,48 +773,20 @@ class RunState(HasThreadState):
 
   @property
   def running(self):
-    ''' Property expressing whether the task is running.
+    ''' Whether the state is `'RUNNING'` or `'STOPPING'`.
     '''
-    return self._running
-
-  @running.setter
-  def running(self, status):
-    ''' Set the running property.
-
-        `status`: the new running state, a Boolean
-
-        A change in status triggers the time measurements.
-    '''
-    if self._running:
-      # running -> not running
-      if not status:
-        self.stop_time = time.time()
-        self.total_time += self.run_time
-        for notify in self.notify_end:
-          notify(self)
-    elif status:
-      # not running -> running
-      self.start_time = time.time()
-      for notify in self.notify_start:
-        notify(self)
-    self._running = status
+    return self.fsm_state in ('RUNNING', 'STOPPING')
 
   @property
   def stopping(self):
-    ''' Is the process stopping? Running is true and cancelled is true.
+    ''' Is the process stopping?
     '''
-    return self.running and self.cancelled
-
-  @property
-  def stopped(self):
-    ''' Was the process stopped? Running is false and cancelled is true.
-    '''
-    return self.cancelled and not self.running
+    return self.fsm_state == 'STOPPING'
 
   def cancel(self):
     ''' Set the cancelled flag; the associated process should notice and stop.
     '''
-    self.cancelled = True
+    self.fsm_event('cancel')
     for notify in self.notify_cancel:
       notify(self)
 
@@ -793,7 +799,7 @@ class RunState(HasThreadState):
     start_time = self.start_time
     if start_time is None:
       return 0.0
-    if self.running:
+    if self.is_running:
       stop_time = time.time()
     else:
       stop_time = self.stop_time
