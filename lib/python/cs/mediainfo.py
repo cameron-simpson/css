@@ -49,7 +49,7 @@ from cs.lex import cutsuffix, get_prefix_n, get_suffix_part
 from cs.pfx import Pfx, pfx
 from cs.tagset import Tag
 
-__version__ = '20240519'
+__version__ = '20240519-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
