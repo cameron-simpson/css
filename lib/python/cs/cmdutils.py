@@ -48,7 +48,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd
 
-__version__ = '20240422-post'
+__version__ = '20240519'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
