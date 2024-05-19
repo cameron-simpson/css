@@ -1331,7 +1331,7 @@ class BaseCommand:
   @contextmanager
   @uses_runstate
   @uses_upd
-  def run_context(self, *, runstate: RunState, upd: Upd, **kw_options):
+  def run_context(self, *, runstate: RunState, upd: Upd, **options_kw):
     ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
 
         This default does several things, and subclasses should
@@ -1348,7 +1348,7 @@ class BaseCommand:
     '''
     # redundant try/finally to remind subclassers of correct structure
     try:
-      run_options = self.options.copy(runstate=runstate, **kw_options)
+      run_options = self.options.copy(runstate=runstate, **options_kw)
       with run_options:  # make the default ThreadState
         with stackattrs(self, options=run_options):
           with stackattrs(self, cmd=self._subcmd or self.cmd):
