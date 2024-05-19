@@ -10,7 +10,7 @@ from collections import namedtuple
 import sys
 from traceback import extract_stack
 
-__version__ = '20240519'
+__version__ = '20240519-post'
 
 DISTINFO = {
     'description':
