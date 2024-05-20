@@ -13,9 +13,11 @@ from os.path import basename, dirname, join as joinpath
 import pwd
 import stat
 import sys
+
 from cs.logutils import setup_logging, warning, error
 
-USAGE = "Usage: %s [-n] [path]"
+USAGE = '''Usage: %s [-n] [path]
+  -n  Limit the result to at most n path components.'''
 
 def main(argv):
   cmd = basename(argv.pop(0))
@@ -44,7 +46,7 @@ def main(argv):
   if nparts:
     shortpv = shortp.split('/')
     if len(shortpv) > nparts:
-      shortp = '/'.join(shortpv[len(shortpv) - nparts:])
+      shortp = '/'.join(shortpv[-nparts:])
   print(shortp)
 
 def short_path(path, no_tilde=False, no_symlinks=False):
