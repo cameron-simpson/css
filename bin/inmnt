@@ -82,6 +82,9 @@ case "$sshfspath" in
           echo   ForwardAgent yes >>'$reverse_cfg'
           echo   ProxyCommand nc -U $reverse_sock >>'$reverse_cfg'
           ##ssh-add -l
+          INMNT_SRCHOST='$host'
+          INMNT_SRCPATH='$localdir'
+          export INMNT_SRCHOST INMNT_SRCPATH
           $trace inmnt -F '$reverse_cfg' $inmntopts '$rssh_host:$localdir' $*
           xit=\$?
           rm -f '$reverse_cfg' '$reverse_sock'
