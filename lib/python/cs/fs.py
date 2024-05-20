@@ -340,8 +340,8 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
 SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 
 @fmtdoc
-def shortpath(path, prefixes=None):
-  ''' Return `path` with the first matching leading prefix replaced.
+def shortpath(fspath, prefixes=None):
+  ''' Return `fspath` with the first matching leading prefix replaced.
 
       The `prefixes` is an optional iterable of `(prefix,subst)`
       to consider for replacement.  Each `prefix` is subject to
@@ -351,11 +351,12 @@ def shortpath(path, prefixes=None):
   '''
   if prefixes is None:
     prefixes = SHORTPATH_PREFIXES_DEFAULT
+  # replace leading prefix
   for prefix, subst in prefixes:
     prefix = expandvars(prefix)
-    if path.startswith(prefix):
-      return subst + path[len(prefix):]
-  return path
+    if fspath.startswith(prefix):
+      return subst + fspath[len(prefix):]
+  return fspath
 
 def longpath(path, prefixes=None):
   ''' Return `path` with prefixes and environment variables substituted.
