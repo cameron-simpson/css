@@ -28,7 +28,7 @@ from typing import Any, Callable, Optional, Union
 
 from icontract import require
 
-from cs.deco import decorator
+from cs.deco import decorator, fmtdoc
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
@@ -337,20 +337,20 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
     self._lock = lock
     return True
 
-DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
+SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 
+@fmtdoc
 def shortpath(path, prefixes=None):
   ''' Return `path` with the first matching leading prefix replaced.
 
-      Parameters:
-      * `environ`: environment mapping if not os.environ
-      * `prefixes`: optional iterable of `(prefix,subst)` to consider for replacement;
-        each `prefix` is subject to environment variable
-        substitution before consideration
-        The default considers "$HOME/" for replacement by "~/".
+      The `prefixes` is an optional iterable of `(prefix,subst)`
+      to consider for replacement.  Each `prefix` is subject to
+      environment variable substitution before consideration.
+      The default `prefixes` is from `DEFAULT_SHORTEN_PREFIXES`:
+      `{DEFAULT_SHORTEN_PREFIXES!r}`.
   '''
   if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
+    prefixes = SHORTPATH_PREFIXES_DEFAULT
   for prefix, subst in prefixes:
     prefix = expandvars(prefix)
     if path.startswith(prefix):
@@ -362,7 +362,7 @@ def longpath(path, prefixes=None):
       The converse of `shortpath()`.
   '''
   if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
+    prefixes = SHORTPATH_PREFIXES_DEFAULT
   for prefix, subst in prefixes:
     if path.startswith(subst):
       path = prefix + path[len(subst):]
