@@ -852,9 +852,20 @@ class RunState(FSM, HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
-
 @decorator
 def uses_runstate(func, name=None):
+  ''' A wrapper for `@default_params` which makes a new thread wide
+      `RunState` parameter `runstate` if missing.
+      The optional decorator parameter `name` may be used to specify
+      a name for the new `RunState` if one is made. The default
+      comes from the wrapped function's name.
+
+      Example:
+
+          @uses_runstate
+          def do_something(blah, *, runstate:RunState):
+              ... do something, polling the runstate as approriate ...
+  '''
   if name is None:
     name = funccite(func)
   return default_params(
