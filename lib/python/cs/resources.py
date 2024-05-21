@@ -795,7 +795,7 @@ class RunState(FSM, HasThreadState):
     start_time = self.start_time
     if start_time is None:
       return 0.0
-    if self.is_running:
+    if self.is_running or self.stop_time is None:
       stop_time = time.time()
     else:
       stop_time = self.stop_time
