@@ -16,7 +16,7 @@ from netrc import netrc
 import os
 from os import environ
 from os.path import (
-    basename, exists as pathexists, expanduser, realpath, splitext
+    basename, exists as existspath, expanduser, realpath, samefile, splitext
 )
 from pprint import pformat, pprint
 import re
@@ -34,6 +34,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc, promote, Promotable
 from cs.fileutils import atomic_filename
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -165,7 +166,7 @@ class PlayOnCommand(BaseCommand):
     )
     filename_format: str = field(
         default_factory=lambda: environ.
-        get('PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT)
+        get('FILENAME_FORMAT_ENVVAR', DEFAULT_FILENAME_FORMAT)
     )
 
   @contextmanager
@@ -228,6 +229,52 @@ class PlayOnCommand(BaseCommand):
     result = api.cdsurl_data(suburl)
     pprint(result)
 
+  @uses_fstags
+  def cmd_rename(self, argv, *, fstags: FSTags):
+    ''' Usage: {cmd} [-o filename_format] filenames...
+          Rename the filenames according to their fstags.
+          -n    No action, dry run.
+          -o filename_format
+                Format for the new filename, default {DEFAULT_FILENAME_FORMAT!r}.
+    '''
+    options = self.options
+    options.popopts(argv, n='dry_run', o_='filename_format')
+    api = options.api
+    doit = options.doit
+    filename_format = options.filename_format
+    if not argv:
+      raise GetoptError("missing filenames")
+    xit = 0
+    for fspath in argv:
+      with Pfx(fspath):
+        if not existspath(fspath):
+          warning("does not exist")
+          xit = 1
+          continue
+        _, ext = splitext(basename(fspath))
+        playon_id = fstags[fspath].get('playon.ID')
+        if not playon_id:
+          warning("no playon.ID, skipping")
+          xit = 1
+          continue
+        recording = api[playon_id]
+        new_filename = recording.filename(filename_format)
+        new_pfx, new_ext = splitext(new_filename)
+        new_filename = new_pfx + ext
+        if new_filename in (fspath, basename(fspath)):
+          continue
+        with Pfx("-> %s", new_filename):
+          if existspath(new_filename):
+            warning("already exists")
+            if not samefile(fspath, new_filename):
+              xit = 1
+            continue
+          print("mv", fspath, new_filename)
+          if doit:
+            fstags.mv(fspath, new_filename)
+            fstags[new_filename].update(recording)
+    return xit
+
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_dl(self, argv):
     ''' Usage: {cmd} [-j jobs] [-n] [recordings...]
@@ -262,12 +309,7 @@ class PlayOnCommand(BaseCommand):
     def _dl(dl_id: int, sem):
       try:
         with sqltags:
-          filename = api[dl_id].format_as(filename_format)
-          filename = (
-              filename.lower().replace(' - ', '--').replace(' ', '-')
-              .replace('_', ':').replace(os.sep, ':') + '.'
-          )
-          filename = re.sub('---+', '--', filename)
+          filename = api[dl_id].filename(filename_format)
           try:
             api.download(dl_id, filename=filename, runstate=runstate)
           except ValueError as e:
@@ -489,7 +531,8 @@ class PlayOnCommand(BaseCommand):
       if service_id is not None and playon.ID != service_id:
         print("skip", playon.ID)
         continue
-      print(playon.ID, playon.Name, playon.LoginMetadata["URL"])
+      login_meta = playon.LoginMetadata
+      print(playon.ID, playon.Name, login_meta['URL'] if login_meta else {})
       if service_id is None:
         continue
       for tag in playon:
@@ -628,6 +671,21 @@ class Recording(SQLTagSet):
       return False
     return super().is_stale(max_age=max_age)
 
+  @fmtdoc
+  def filename(self, filename_format=None) -> str:
+    ''' Return the computed filename per `filename_format`,
+        default from `DEFAULT_FILENAME_FORMAT`: `{DEFAULT_FILENAME_FORMAT!r}`.
+    '''
+    if filename_format is None:
+      filename_format = DEFAULT_FILENAME_FORMAT
+    filename = self.format_as(filename_format)
+    filename = (
+        filename.lower().replace(' - ', '--').replace(' ', '-')
+        .replace('_', ':').replace(os.sep, ':') + '.'
+    )
+    filename = re.sub('---+', '--', filename)
+    return filename
+
   def ls(self, ls_format=None, long_mode=False, print_func=None):
     ''' List a recording.
     '''
@@ -696,14 +754,6 @@ class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
     self.episode = playon_episode or self.episode or episode_title_episode
     self.episode_part = episode_part
     return self
-    SEI = cls(
-        series=series,
-        season=season,
-        episode=episode,
-        episode_title=episode_title,
-        episode_part=episode_part,
-    )
-    return SEI
 
 class LoginState(SQLTagSet):
 
@@ -1113,7 +1163,7 @@ class PlayOnAPI(HTTPServiceAPI):
     elif filename.endswith('.'):
       _, dl_ext = splitext(dl_basename)
       filename = filename[:-1] + dl_ext
-    if pathexists(filename):
+    if existspath(filename):
       warning(
           "SKIPPING download of %r: already exists, just tagging", filename
       )
