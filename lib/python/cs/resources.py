@@ -46,6 +46,7 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'cs.psutils',
+        'cs.py.func',
         'cs.py.stack',
         'cs.result',
         'cs.threads',
