@@ -246,14 +246,12 @@ class PlayOnCommand(BaseCommand):
       raise GetoptError("missing filenames")
     xit = 0
     for fspath in argv:
-      print(fspath)
       with Pfx(fspath):
         if not existspath(fspath):
           warning("does not exist")
           xit = 1
           continue
         _, ext = splitext(basename(fspath))
-        print("ext =", ext)
         playon_id = fstags[fspath].get('playon.ID')
         if not playon_id:
           warning("no playon.ID, skipping")
@@ -263,7 +261,6 @@ class PlayOnCommand(BaseCommand):
         new_filename = recording.filename(filename_format)
         new_pfx, new_ext = splitext(new_filename)
         new_filename = new_pfx + ext
-        print("new_filename =", new_filename)
         if new_filename in (fspath, basename(fspath)):
           continue
         with Pfx("-> %s", new_filename):
@@ -272,11 +269,10 @@ class PlayOnCommand(BaseCommand):
             if not samefile(fspath, new_filename):
               xit = 1
             continue
+          print("mv", fspath, new_filename)
           if doit:
             fstags.mv(fspath, new_filename)
             fstags[new_filename].update(recording)
-          else:
-            print("mv", fspath, new_filename)
     return xit
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
