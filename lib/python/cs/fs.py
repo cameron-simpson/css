@@ -22,6 +22,8 @@ from os.path import (
     relpath,
     splitext,
 )
+from pathlib import Path
+from pwd import getpwuid
 from tempfile import TemporaryDirectory
 from threading import Lock
 from typing import Any, Callable, Optional, Union
@@ -340,17 +342,115 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
 SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 
 @fmtdoc
-def shortpath(fspath, prefixes=None):
+def shortpath(
+    fspath, prefixes=None, *, collapseuser=False, foldsymlinks=False
+):
   ''' Return `fspath` with the first matching leading prefix replaced.
+
+      Parameters:
+      * `prefixes`: optional list of `(prefix,subst)` pairs
+      * `collapseuser`: optional flag to enable detection of user
+        home directory paths; default `False`
+      * `foldsymlinks`: optional flag to enable detection of
+        convenience symlinks which point deeper into the path;
+        default `False`
 
       The `prefixes` is an optional iterable of `(prefix,subst)`
       to consider for replacement.  Each `prefix` is subject to
       environment variable substitution before consideration.
-      The default `prefixes` is from `DEFAULT_SHORTEN_PREFIXES`:
-      `{DEFAULT_SHORTEN_PREFIXES!r}`.
+      The default `prefixes` is from `SHORTPATH_PREFIXES_DEFAULT`:
+      `{SHORTPATH_PREFIXES_DEFAULT!r}`.
   '''
   if prefixes is None:
     prefixes = SHORTPATH_PREFIXES_DEFAULT
+  if collapseuser or foldsymlinks:
+    # our resolved path
+    leaf = Path(fspath).resolve()
+    assert leaf.is_absolute()
+    # Paths from leaf-parent to root
+    parents = list(leaf.parents)
+    paths = [leaf] + parents
+
+    def statkey(P):
+      ''' A 2-tuple of `(st_dev,st_info)` from `P.stat()`
+            or `None` if the `stat` fails.
+        '''
+      try:
+        S = P.stat()
+      except OSError:
+        return None
+      return S.st_dev, S.st_ino
+
+    base_s = None
+    if collapseuser:
+      # scan for the lowest homedir in the path
+      pws = {}
+      for i, path in enumerate(paths):
+        try:
+          st = path.stat()
+        except OSError:
+          continue
+        try:
+          pw = pws[st.st_uid]
+        except KeyError:
+          pw = pws[st.st_uid] = getpwuid(st.st_uid)
+        if path.samefile(pw.pw_dir):
+          base_s = '~' if pw.pw_uid == os.geteuid() else f'~{pw.pw_name}'
+          paths = paths[:i + 1]
+          break
+    # a list of (Path,display) from base to leaf
+    paths_as = [[path, None] for path in reversed(paths)]
+    # note the display for the base Path
+    paths_as[0][1] = base_s
+    if not foldsymlinks:
+      keep_as = paths_as
+    else:
+      # look for symlinks which point deeper into the path
+      # map path keys to (i,path)
+      pathindex_by_key = {
+          sk: i
+          for sk, i in
+          ((statkey(path_as[0]), i) for i, path_as in enumerate(paths_as))
+          if sk is not None
+      }
+      # scan from the base towards the leaf, excluding the leaf
+      i = 0
+      keep_as = []
+      while i < len(paths_as) - 1:
+        path_as = paths_as[i]
+        keep_as.append(path_as)
+        path = path_as[0]
+        skip_to_i = None
+        try:
+          for entry in os.scandir(path):
+            if not entry.name.isalpha():
+              continue
+            ep = Path(entry.path)
+            try:
+              if not ep.is_symlink():
+                continue
+            except OSError:
+              continue
+            # see the the symlink resolves to a path entry
+            try:
+              pathndx = pathindex_by_key[statkey(ep)]
+            except KeyError:
+              continue
+            if skip_to_i is None or pathndx > skip_to_i:
+              # we will advance to skip_to_i
+              skip_to_i = pathndx
+              # note the symlink name for this component
+              paths_as[skip_to_i][1] = ep.name
+          i = i + 1 if skip_to_i is None else skip_to_i
+        except OSError:
+          i += 1
+    parts = list(
+        (path_as[0].path if i == 0 else path_as[0].name
+         ) if path_as[1] is None else path_as[1]
+        for i, path_as in enumerate(keep_as)
+    )
+    parts.append(leaf.name)
+    fspath = os.sep.join(parts)
   # replace leading prefix
   for prefix, subst in prefixes:
     prefix = expandvars(prefix)
