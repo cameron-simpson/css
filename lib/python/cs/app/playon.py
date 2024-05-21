@@ -273,8 +273,8 @@ class PlayOnCommand(BaseCommand):
               xit = 1
             continue
           if doit:
-            trace(fstags.mv)(fspath, new_filename)
-            trace(fstags[new_filename].update)(recording)
+            fstags.mv(fspath, new_filename)
+            fstags[new_filename].update(recording)
           else:
             print("mv", fspath, new_filename)
     return xit
@@ -535,7 +535,8 @@ class PlayOnCommand(BaseCommand):
       if service_id is not None and playon.ID != service_id:
         print("skip", playon.ID)
         continue
-      print(playon.ID, playon.Name, playon.LoginMetadata["URL"])
+      login_meta = playon.LoginMetadata
+      print(playon.ID, playon.Name, login_meta['URL'] if login_meta else {})
       if service_id is None:
         continue
       for tag in playon:
