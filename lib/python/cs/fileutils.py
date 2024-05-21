@@ -1708,7 +1708,7 @@ def atomic_filename(
     dir = dirname(filename)
   fprefix, fsuffix = splitext(basename(filename))
   if prefix is None:
-    prefix = '.' + fprefix
+    prefix = '.' + fprefix + '-'
   if suffix is None:
     suffix = fsuffix
   if not exists_ok and existspath(filename):
