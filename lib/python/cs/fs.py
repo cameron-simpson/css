@@ -28,8 +28,6 @@ from tempfile import TemporaryDirectory
 from threading import Lock
 from typing import Any, Callable, Optional, Union
 
-from icontract import require
-
 from cs.deco import decorator, fmtdoc
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
@@ -46,7 +44,6 @@ DISTINFO = {
         'cs.deco',
         'cs.obj',
         'cs.pfx',
-        'icontract',
     ],
 }
 
