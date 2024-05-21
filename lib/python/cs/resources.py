@@ -19,12 +19,13 @@ from typing import Any, Callable, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import contextif, stackattrs, setup_cmgr, ContextManagerMixin
-from cs.deco import default_params, OBSOLETE
+from cs.deco import decorator, default_params, OBSOLETE
 from cs.fsm import FSM
 from cs.gimmicks import error, warning, nullcontext
 from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
+from cs.py.func import funccite
 from cs.py.stack import caller, frames as stack_frames, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
@@ -851,11 +852,18 @@ class RunState(FSM, HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
-# default to the current RunState or make one
-uses_runstate = default_params(
-    runstate=lambda:
-    (RunState.default(factory=partial(RunState, thread_wide=True)))
-)
+
+@decorator
+def uses_runstate(func, name=None):
+  if name is None:
+    name = funccite(func)
+  return default_params(
+      func,
+      runstate=lambda: (
+          RunState.
+          default(factory=partial(RunState, name=name, thread_wide=True))
+      )
+  )
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
