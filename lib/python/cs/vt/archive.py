@@ -114,7 +114,7 @@ class BaseArchive(ABC):
         fields = line.split(None, 3)
         _, unixtime, dent = fields[:3]
         when = float(unixtime)
-        E, offset = _Dirent.from_str(dent)
+        E, offset = _Dirent.parse(dent)
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
         ##info("when=%s, E=%s", when, E)

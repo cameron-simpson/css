@@ -10,19 +10,17 @@
 import random
 import sys
 import unittest
-from cs.binary_tests import TestBinaryClasses
+
+from cs.binary_tests import BaseTestBinaryClasses
+
 from . import hash as hash_module
 from .hash import HASHCLASS_BY_NAME, decode as decode_hash
-from .transcribe import Transcriber, parse
+from .transcribe import Transcriber
 
-class TestDataFileBinaryClasses(TestBinaryClasses, unittest.TestCase):
+class TestHashBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Hook to test the hash `AbstractBinary` subclasses.
   '''
-
-  def setUp(self):
-    ''' Test the hash module `AbstractBinary` subclasses.
-    '''
-    self.module = hash_module
+  test_module = hash_module
 
 class TestHashing(unittest.TestCase):
   ''' Tests for the hashcode facility.
@@ -40,11 +38,11 @@ class TestHashing(unittest.TestCase):
       with self.subTest(hash_name=hash_name):
         for _ in range(10):
           rs = bytes(random.randint(0, 255) for _ in range(100))
-          H = cls.from_chunk(rs)
+          H = cls.from_data(rs)
           self.assertEqual(cls.hashfunc(rs).digest(), bytes(H))
           self.assertTrue(isinstance(H, Transcriber))
           Hs = str(H)
-          H2, offset = parse(Hs)
+          H2, offset = Transcriber.parse(Hs)
           self.assertTrue(offset == len(Hs))
           self.assertEqual(H, H2)
           # bytes(hash_num + hash_bytes)

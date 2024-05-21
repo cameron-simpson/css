@@ -57,13 +57,13 @@ class PDFCommand(BaseCommand):
   ''' Command line tool for doing things with PDF files.
   '''
 
-  def cmd_extract_images(self, argv):
+  @uses_runstate
+  def cmd_extract_images(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} pdf-files...
           Extract the images from the named page files.
     '''
     if not argv:
       raise GetoptError('missing pdf-files')
-    runstate = self.options.runstate
     for pdf_filename in argv:
       runstate.raiseif()
       with Pfx(pdf_filename):
@@ -81,13 +81,13 @@ class PDFCommand(BaseCommand):
 
   cmd_xi = cmd_extract_images
 
-  def cmd_make_cbz(self, argv):
+  @uses_runstate
+  def cmd_make_cbz(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} pdf-files...
           Extract the images from the named page files.
     '''
     if not argv:
       raise GetoptError('missing pdf-files')
-    runstate = self.options.runstate
     for pdf_filename in argv:
       runstate.raiseif()
       with Pfx(pdf_filename):
@@ -98,13 +98,13 @@ class PDFCommand(BaseCommand):
         cbzpath = f'{base}.cbz'
         pdf.make_cbz(cbzpath)
 
-  def cmd_scan(self, argv):
+  @uses_runstate
+  def cmd_scan(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} pdf-files...
           Scan the PDF-data in pdf-files and report.
     '''
     if not argv:
       raise GetoptError('missing pdf-files')
-    runstate = self.options.runstate
     for pdf_filename in argv:
       runstate.raiseif()
       with Pfx(pdf_filename):
@@ -155,8 +155,7 @@ class PDFCommand(BaseCommand):
             print("   ", obj.image)
         break
         for token in pdf.tokens:
-          if runstate.cancelled:
-            return 1
+          runstate.raiseif()
           if isinstance(token, Comment):
             print('=>', r(token))
           elif isinstance(token, Stream):

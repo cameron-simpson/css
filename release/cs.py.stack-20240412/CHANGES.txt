@@ -1,0 +1,2 @@
+lib/python/cs/py/stack.py: cs.py.stack: stack_dump: new select parameter to pick interesting frames for the listing
+lib/python/cs/py/stack.py: cs.py.stack: provide StackSummary and FrameSummary if Python too old, associated refactors

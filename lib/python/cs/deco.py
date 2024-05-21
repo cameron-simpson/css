@@ -5,10 +5,9 @@
 #
 
 r'''
-Assorted decorator functions.
+Assorted function decorators.
 '''
 
-from abc import ABC, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 from inspect import isgeneratorfunction, ismethod, signature, Parameter
@@ -19,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20240303-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -154,6 +153,7 @@ def decorator(deco):
     # `deco(func, *da, **kw)`.
     return lambda func: decorate(func, *da, **dkw)
 
+  metadeco.__name__ = getattr(deco, '__name__', repr(deco))
   metadeco.__doc__ = getattr(deco, '__doc__', '')
   metadeco.__module__ = getattr(deco, '__module__', None)
   return metadeco
@@ -753,7 +753,7 @@ def default_params(func, _strict=False, **param_defaults):
 
       Atypical one off direct use:
 
-          @default_params(dbconn=open_default_dbconn,debug=lambda: settings.DB_DEBUG_MODE)
+          @default_params(dbconn=open_default_dbconn,debug=lambda:settings.DB_DEBUG_MODE)
           def dbquery(query, *, dbconn):
               dbconn.query(query)
 
@@ -764,13 +764,13 @@ def default_params(func, _strict=False, **param_defaults):
 
           # calling code which needs a ds3client
           @uses_ds3
-          def do_something(.., *, ds3client,...):
+          def do_something(.., *, ds3client, ...):
               ... make queries using ds3client ...
 
       This replaces the standard boilerplate and avoids replicating
       knowledge of the default factory as exhibited in this legacy code:
 
-          def do_something(.., *, ds3client=None,...):
+          def do_something(.., *, ds3client=None, ...):
               if ds3client is None:
                   ds3client = get_ds3client()
               ... make queries using ds3client ...
@@ -802,6 +802,20 @@ def default_params(func, _strict=False, **param_defaults):
           ],
       ]
   )
+  sig0 = signature(func)
+  new_params = []
+  for param in sig0.parameters.values():
+    try:
+      param_default = param_defaults[param.name]
+    except KeyError:
+      new_params.append(param)
+    else:
+      new_param = param.replace(
+          annotation=typing.Optional[param.annotation],
+          default=None if param_default is param.empty else param_default,
+      )
+      new_params.append(new_param)
+  defaulted_func.__signature__ = sig0.replace(parameters=new_params)
   return defaulted_func
 
 # pylint: disable=too-many-statements
@@ -1020,7 +1034,7 @@ class Promotable:
         This method supports the `@promote` decorator.
 
         This base method will call the `from_`*typename*`(obj)` class factory
-        method if present, where *typename* is `obj._-class__.__name__`.
+        method if present, where *typename* is `obj.__class__.__name__`.
 
         Subclasses may override this method to promote other types,
         typically:

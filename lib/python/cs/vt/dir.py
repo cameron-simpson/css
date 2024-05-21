@@ -28,16 +28,13 @@ from cs.resources import uses_runstate
 from cs.threads import locked
 
 from . import PATHSEP, RLock
-from .block import Block, _Block, BlockRecord
+from .block import Block, BlockRecord, HashCodeBlock, LiteralBlock
 from .blockify import top_block_for, blockify
 from .file import RWBlockFile
 from .hash import io_fail
 from .meta import Meta, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
 from .paths import path_split, DirLike, FileLike
-from .transcribe import (
-    Transcriber, parse as parse_transcription, register as
-    register_transcriber, hexify
-)
+from .transcribe import Transcriber, hexify
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -168,16 +165,14 @@ class DirentRecord(BinarySingleValue):
     if not flags & DirentFlags.NOBLOCK:
       yield BlockRecord.transcribe_value(block)
     if flags & DirentFlags.HASPREVDIRENT:
-      assert isinstance(E._prev_dirent_blockref, _Block)
+      assert isinstance(E._prev_dirent_blockref, Block)
       yield BlockRecord.transcribe_value(E._prev_dirent_blockref)
     if flags & DirentFlags.EXTENDED:
       yield extended_data
 
-class _Dirent(Transcriber):
-  ''' Incomplete base class for Dirent objects.
+class _Dirent(Transcriber, prefix=None):
+  ''' Incomplete base class for *`Dirent` objects.
   '''
-
-  transcribe_prefix = 'DIRENT'
 
   def __init__(
       self,
@@ -219,8 +214,8 @@ class _Dirent(Transcriber):
       self.type = type_
       self.name = name
       self.uuid = uuid
-      assert prevblock is None or isinstance(prevblock, _Block), \
-          "not _Block: prevblock=%r" % (prevblock,)
+      assert prevblock is None or isinstance(prevblock, Block), \
+          "not Block: prevblock=%r" % (prevblock,)
       self._prev_dirent_blockref = prevblock
       if not isinstance(meta, Meta):
         M = Meta({'a': DEFAULT_DIR_ACL if self.isdir else DEFAULT_FILE_ACL})
@@ -242,18 +237,6 @@ class _Dirent(Transcriber):
         self.__class__.__name__, id(self), self.type, self.name,
         ':' + self.uuid if self.uuid else '', self.meta
     )
-
-  @classmethod
-  def from_str(cls, s, offset=0):
-    ''' Parse a Dirent transcription from the str `s`.
-    '''
-    E, offset2 = parse_transcription(s, offset)
-    if not isinstance(E, cls):
-      raise ValueError(
-          "expected instance of %s (got %s) at offset %d of %r" %
-          (cls, type(E), offset, s)
-      )
-    return E, offset2
 
   @staticmethod
   def from_components(type_, name, **kw):
@@ -318,14 +301,15 @@ class _Dirent(Transcriber):
     '''
     return id(self)
 
-  def transcribe_inner(self, T, fp, attrs=None):
-    ''' Transcribe the inner components of the Dirent as text.
+  def transcribe_inner(self, attrs=None) -> str:
+    ''' Transcribe the inner components of the `Dirent` as text.
     '''
     if attrs is None:
       attrs = {}
+    tokens = []
     if self.name and self.name != '.':
-      T.transcribe(self.name, fp=fp)
-      fp.write(':')
+      tokens.append(self.transcribe_obj(self.name))
+      tokens.append(':')
     if type(self) is _Dirent:
       attrs['type'] = self.type
     if self.uuid:
@@ -339,21 +323,24 @@ class _Dirent(Transcriber):
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is not None:
       attrs['prevblock'] = prev_blockref
-    T.transcribe_mapping(attrs, fp)
+    tokens.append(self.transcribe_mapping_inner(attrs))
+    return ''.join(tokens)
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar, prefix):
+  def parse_inner(cls, s, offset, stopchar, prefix):
     ''' Parse [name:]attrs from `s` at offset `offset`.
         Return _Dirent instance and new offset.
     '''
-    name, offset2 = T.parse_qs(s, offset, optional=True)
+    name, offset2 = cls.parse_qs(s, offset, optional=True)
     if name is None:
       name = ''
     else:
-      if s[offset2] != ':':
-        raise ValueError("offset %d: missing colon after name" % (offset2,))
+      if not s.startswith(':', offset2):
+        raise ValueError(
+            f'offset {offset2}: missing colon after name {name!r}'
+        )
       offset = offset2 + 1
-    attrs, offset = T.parse_mapping(s, offset, stopchar)
+    attrs, offset = cls.parse_mapping(s, offset, stopchar)
     type_ = {
         'F': DirentType.FILE,
         'D': DirentType.DIR,
@@ -425,13 +412,14 @@ class _Dirent(Transcriber):
       if self._prev_dirent_blockref is not None:
         self.changed = True
     elif E == self:
-      warning(
-          "%r.prev_dirent=%s: ignore setting previous to our own state", self,
-          E
-      )
+      pass
+      ##warning(
+      ##  "%r.prev_dirent=%s: ignore setting previous to our own state", self,
+      ##  E
+      ##)
     else:
       Ebs = E.encode()
-      self._prev_dirent_blockref = Block(data=Ebs)
+      self._prev_dirent_blockref = HashCodeBlock.promote(Ebs)
       self.changed = True
 
   def snapshot(self):
@@ -589,21 +577,9 @@ class _Dirent(Transcriber):
       typemode = stat.S_IFREG
     return typemode
 
-register_transcriber(
-    _Dirent, (
-        'INVALIDDirent',
-        'SymLink',
-        'Indirect',
-        'D',
-        'F',
-    )
-)
-
-class InvalidDirent(_Dirent):
+class InvalidDirent(_Dirent, prefix='INVALIDDirent'):
   ''' Encapsulation for an invalid Dirent data chunk.
   '''
-
-  transcribe_prefix = 'INVALIDDirent'
 
   def __init__(self, name, *, chunk=None, **kw):
     ''' An invalid Dirent.
@@ -620,19 +596,18 @@ class InvalidDirent(_Dirent):
     '''
     return self.chunk
 
-  def transcribe_inner(self, T, fp):
+  def transcribe_inner(self) -> str:
     ''' Transcribe the inner components of this InvalidDirent's transcription.
     '''
-    return super().transcribe_inner(T, fp, {'chunks': self.chunk})
+    return super().transcribe_inner({'chunks': self.chunk})
 
-class SymlinkDirent(_Dirent):
+class SymlinkDirent(_Dirent, prefix='SymLink'):
   ''' A symbolic link.
   '''
 
-  transcribe_prefix = 'SymLink'
-
   def __init__(self, name, *, target=None, **kw):
     super().__init__(DirentType.SYMBOLIC, name, **kw)
+    self.block = None
     if target is None:
       if self.meta.pathref is None:
         raise ValueError("missing target")
@@ -645,12 +620,7 @@ class SymlinkDirent(_Dirent):
     '''
     return self.meta.pathref
 
-  def transcribe_inner(self, T, fp):
-    ''' Transcribe the inner components for a SymlinkDirent.
-    '''
-    return super().transcribe_inner(T, fp, {})
-
-class IndirectDirent(_Dirent):
+class IndirectDirent(_Dirent, prefix='Indirect'):
   ''' An indirect `Dirent`, referring to another `Dirent` by UUID.
 
       This is how a feature like a hard link is implented in a vt filesystem.
@@ -717,12 +687,7 @@ class IndirectDirent(_Dirent):
     '''
     return self.ref.block
 
-  def transcribe_inner(self, T, fp):
-    ''' Transcribe the inner components of an IndirectDirent.
-    '''
-    return super().transcribe_inner(T, fp, {})
-
-class FileDirent(_Dirent, MultiOpenMixin, FileLike):
+class FileDirent(_Dirent, MultiOpenMixin, FileLike, prefix='F'):
   ''' A _Dirent subclass referring to a file.
 
       If closed, ._block refers to the file content.
@@ -733,14 +698,12 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
       offsets in their file handle objects.
   '''
 
-  transcribe_prefix = 'F'
-
   def __init__(self, name, block=None, **kw):
     _Dirent.__init__(self, DirentType.FILE, name, **kw)
     MultiOpenMixin.__init__(self)
     self._lock = Lock()
     if block is None:
-      block = Block(data=b'')
+      block = LiteralBlock(data=b'')
     self.open_file = None
     self._block = block
     self._check()
@@ -809,7 +772,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     with self._lock:
       if self.open_file is None:
         return self._block
-    return self.open_file.sync()
+      return self.open_file.sync()
 
   @block.setter
   @locked
@@ -846,7 +809,10 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     ''' Flush the contents of the file.
         Presumes the Dirent is open.
     '''
-    return self.open_file.flush(scanner, dispatch=dispatch)
+    f = self.open_file
+    if f is None:
+      return None
+    return f.flush(scanner, dispatch=dispatch)
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
@@ -894,11 +860,6 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
       if self.meta.mtime is not None:
         os.utime(path, (st.st_atime, self.meta.mtime))
 
-  def transcribe_inner(self, T, fp):
-    ''' Transcribe the inner components of this FileDirent's transcription.
-    '''
-    return _Dirent.transcribe_inner(self, T, fp, {})
-
   def pushto_queue(self, Q, progress=None):
     ''' Push the Block with the file contents to a queue.
 
@@ -920,7 +881,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     B = self.block
     return B.fsck(recurse=recurse)
 
-class Dir(_Dirent, DirLike):
+class Dir(_Dirent, DirLike, prefix='D'):
   ''' A directory.
 
       Special attributes:
@@ -930,8 +891,6 @@ class Dir(_Dirent, DirLike):
         This accepts an ongoing compute cost for .block to avoid
         setting the flag on every file.write etc.
   '''
-
-  transcribe_prefix = 'D'
 
   def __init__(self, name, block=None, **kw):
     ''' Initialise this directory.
@@ -966,7 +925,7 @@ class Dir(_Dirent, DirLike):
   @locked
   def changed(self, status):
     ''' Mark this dirent as changed or not changed;
-        propagate truth to parent Dir if present.
+        propagate truth to ancestor `Dir`s.
     '''
     if not status:
       raise ValueError("cannot clear .changed")
@@ -1039,7 +998,7 @@ class Dir(_Dirent, DirLike):
           self[name].encode() for name in names if name != '.' and name != '..'
       )
       # TODO: if len(data) >= 16384 blockify?
-      B = self._block = Block(data=data)
+      B = self._block = Block.promote(data)
       self._changed = False
     else:
       B = self._block
@@ -1275,9 +1234,6 @@ class Dir(_Dirent, DirLike):
     with Pfx("update_notification(%s,when=%s,source=%s)", newE, when, source):
       if newE is not self:
         self.update(newE)
-
-  def transcribe_inner(self, T, fp):
-    return _Dirent.transcribe_inner(self, T, fp, {})
 
   @pfx_method
   @uses_runstate

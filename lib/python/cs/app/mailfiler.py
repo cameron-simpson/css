@@ -77,9 +77,11 @@ from cs.mailutils import (
 from cs.obj import singleton
 from cs.pfx import Pfx
 from cs.py.modules import import_module_name
+from cs.resources import RunState, uses_runstate
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked
+from cs.upd import Upd, uses_upd
 
 __version__ = '20200719-post'
 
@@ -195,8 +197,6 @@ class MailFilerCommand(BaseCommand):
         delay=options.delay,
         justone=options.justone,
         no_remove=options.no_remove,
-        runstate=options.runstate,
-        upd=self.loginfo.upd
     )
 
   def cmd_save(self, argv):
@@ -411,6 +411,8 @@ class MailFiler(NS):
       )
     return wmdir
 
+  @uses_upd
+  @uses_runstate
   def monitor(
       self,
       folders,
@@ -418,8 +420,8 @@ class MailFiler(NS):
       delay=None,
       justone=False,
       no_remove=False,
-      runstate=None,
-      upd=None,
+      runstate: RunState,
+      upd: Upd,
   ):
     ''' Monitor the specified `folders`, a list of folder spcifications.
         If `delay` is not None, poll the folders repeatedly with a

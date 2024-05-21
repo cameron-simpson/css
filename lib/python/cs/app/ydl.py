@@ -40,8 +40,10 @@ import logging
 from os.path import splitext
 import sys
 from threading import RLock, Semaphore
+
 from youtube_dl import YoutubeDL
 from youtube_dl.utils import DownloadError
+
 from cs.cmdutils import BaseCommand
 from cs.excutils import logexc
 from cs.fstags import FSTags

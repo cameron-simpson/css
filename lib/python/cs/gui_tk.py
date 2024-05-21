@@ -27,8 +27,8 @@ from icontract import require, ensure
 from PIL import Image, ImageTk, UnidentifiedImageError
 from typeguard import typechecked
 
+from cs.cache import convof
 from cs.cmdutils import BaseCommand
-from cs.convcache import convof
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags
 from cs.hashutils import SHA256
@@ -228,7 +228,7 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
 
   @classmethod
   def of(cls, w):
-    ''' The geometry of this widget in root coordinates.
+    ''' The geometry of the widget `w` in root coordinates.
     '''
     x, y = w.winfo_rootx(), w.winfo_rooty()
     dx, dy = w.winfo_width(), w.winfo_height()

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import json
 import os
 from os.path import (
+    dirname,
     isdir as isdirpath,
     isfile as isfilepath,
 )
@@ -34,7 +35,7 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, print_argv
 from cs.tagset import TagSet
 
-__version__ = '20240201-post'
+__version__ = '20240519-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -43,8 +44,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts':
-        ['ffmpeg-docker = cs.ffmpegutils:main_ffmpeg_docker'],
+        'console_scripts': {
+            'ffmpeg-docker': 'cs.ffmpegutils:main_ffmpeg_docker',
+        },
     },
     'install_requires': [
         'cs.dockerutils',
@@ -348,7 +350,7 @@ def ffmpeg_docker(
     ffmpeg_exe: Optional[str] = None,
     docker_exe: Optional[str] = None,
     image: Optional[str] = None,
-    outputpath: str = '.',
+    output_hostdir: Optional[str] = None,
 ) -> Optional[CompletedProcess]:
   ''' Invoke `ffmpeg` using docker.
   '''
@@ -359,9 +361,7 @@ def ffmpeg_docker(
     ffmpeg_exe = FFMPEG_DOCKER_EXE_DEFAULT
   if image is None:
     image = FFMPEG_DOCKER_IMAGE_DEFAULT
-  if not isdirpath(outputpath):
-    raise ValueError(f'outputpath:{outputpath!r}: not a directory')
-  DR = DockerRun(image=image, outputpath=outputpath)
+  DR = DockerRun(image=image)
   DR.popopts(docker_run_opts)
   if docker_run_opts:
     raise ValueError(f'unparsed docker_run args: {docker_run_opts!r}')
@@ -381,6 +381,8 @@ def ffmpeg_docker(
         outputpath = arg
         outputpath = cutprefix(outputpath, 'file:')
         ffmpeg_argv.append(DR.add_output(outputpath))
+        if output_hostdir is None:
+          output_hostdir = dirname(outputpath)
       elif arg == '-i':
         # an input filename
         # TODO: URLs?
@@ -431,4 +433,5 @@ def ffmpeg_docker(
           ffmpeg_argv.append(arg)
         else:
           ffmpeg_argv.extend([arg, ffmpeg_args.pop(0)])
+  DR.output_hostdir = output_hostdir
   return DR.run(*ffmpeg_argv, docker_exe=docker_exe, doit=doit, quiet=quiet)
