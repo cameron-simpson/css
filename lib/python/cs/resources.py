@@ -692,7 +692,10 @@ class RunState(FSM, HasThreadState):
     '''
     new_state = super().fsm_event(event, **extra)
     if event == 'cancel':
-      self._canceled = True
+      self._cancelled = True
+      # TODO: use the main FSM callback mechanism
+      for notify in self.notify_cancel:
+        notify(self)
     elif event == 'start':
       self._cancelled = False
       self.start_time = time.time()
@@ -747,12 +750,6 @@ class RunState(FSM, HasThreadState):
         return True
     return False
 
-  @cancelled.setter
-  def cancelled(self, cancel_status):
-    ''' Set the .cancelled attribute.
-    '''
-    self._cancelled = cancel_status
-
   def raiseif(self, msg=None, *a):
     ''' Raise `CancellationError` if cancelled.
         This is the concise way to terminate an operation which honour
@@ -788,8 +785,6 @@ class RunState(FSM, HasThreadState):
     ''' Set the cancelled flag; the associated process should notice and stop.
     '''
     self.fsm_event('cancel')
-    for notify in self.notify_cancel:
-      notify(self)
 
   @property
   def run_time(self):
