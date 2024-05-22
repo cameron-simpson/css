@@ -22,6 +22,7 @@ from os.path import (
     dirname,
     exists as existspath,
     isdir as isdirpath,
+    isfile as isfilepath,
     join as joinpath,
     normpath,
     relpath,
@@ -75,6 +76,8 @@ URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
 
+MIRROR_SRCBASE = 'https://github.com/cameron-simpson/css/blob/main'
+
 DISTINFO_CLASSIFICATION = {
     "Programming Language": "Python",
     "Development Status": "4 - Beta",
@@ -98,7 +101,14 @@ TAG_PYPI_RELEASE = 'pypi.release'
 
 # defaults for packages without their own specifics
 DISTINFO_DEFAULTS = {
-    'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
+    'urls': {
+        'Monorepo Hg/Mercurial Mirror':
+        'https://hg.sr.ht/~cameron-simpson/css',
+        'Monorepo Git Mirror':
+        'https://github.com/cameron-simpson/css',
+        'MonoRepo Commits':
+        'https://bitbucket.org/cameron_simpson/css/commits/all',
+    },
 }
 
 re_RELEASE_TAG = re.compile(
@@ -1260,6 +1270,16 @@ class Module:
       if topic == 'License':
         license_type = parts[-1]
 
+    # source URLs
+    urls = dinfo['urls']
+    basepath = self.basepath
+    if isdirpath(basepath):
+      urls['Source'] = joinpath(MIRROR_SRCBASE, basepath)
+    elif isfilepath(basepath + '.py'):
+      urls['Source'] = joinpath(MIRROR_SRCBASE, basepath + '.py')
+    else:
+      warning("cannot compute Source URL: basepath=%r", basepath)
+
     if self.is_package:
       # stash the package in a top level directory of that name
       ## dinfo['package_dir'] = {package_name: package_name}
@@ -1291,7 +1311,7 @@ class Module:
         'author_email',
         'version',
         'license',
-        'url',
+        'urls',
     ):
       with Pfx(kw):
         if kw not in dinfo:
@@ -1331,7 +1351,7 @@ class Module:
         license={"text": dinfo.pop('license')},
         keywords=dinfo.pop('keywords'),
         dependencies=dinfo.pop('install_requires'),
-        urls={'URL': dinfo.pop('url')},
+        urls=dinfo.pop('urls'),
         classifiers=dinfo.pop('classifiers'),
     )
     version = dinfo.pop('version', None)
