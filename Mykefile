@@ -1,9 +1,7 @@
-:import     ARCH CSS_HG_REPOS
-
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
 ##hg_repos        = sr.ht-css ssh://janus-wg/hg/css ssh://borg-wg/hg/css
-hg_repos        = sr.ht-css $(CSS_HG_REPOS)
+hg_repos        = sr.ht-css $${CSS_HG_REPOS}}
 git_repos       = bitbucket-css github-css
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
@@ -18,7 +16,7 @@ target  = bin
 dev = env-dev -d $. -x
 trace = set-x
 base_python = "$${PYTHON_EXE:-python3}"
-venv_dir = $./venv-$(ARCH)
+venv_dir = "$${VIRTUAL_ENV:-$./venv-$$ARCH}"
 venv_requirements = $./venv-requirements.txt
 venv_pip = $(trace) $(venv_python) -m pip
 venv_python = $(trace) $(venv_dir)/bin/python
@@ -97,14 +95,14 @@ _setup:
     :make _tags _venv
 
 _venv:
-    $(uv) venv --seed '$(venv_dir)'
+    $(uv) venv --seed $(venv_dir)
     uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
     if grep -i '^ *[a-z]' $(venv_requirements) >"$$uv_reqs" \
-    then  $(uv) pip install -U -r "$$uv_reqs" \
+    then  $(uv) pip install -r "$$uv_reqs" \
     fi
     pip_reqs=$$TMPDIR/reqs-pip-$$$$.txt \
     if grep -i '^ *[^a-z#]' $(venv_requirements) >"$$pip_reqs" \
-    then  $(venv_pip) install -U -r "$$pip_reqs" \
+    then  $(venv_pip) install -r "$$pip_reqs" \
     fi
 
 _tags:  tags
