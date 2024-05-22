@@ -19,7 +19,7 @@ usage="Usage: $0 [options...] {sshhost:path|@rhost} [command [args...]]
             Use a remote directory locally.
             Mount path from sshhost and run the command in it.
     @rhost  Use the current directory remotely.
-            Ssh to rhost and run \"mnt thishost:pwd command\"."
+            Ssh to rhost and run \"inmnt thishost:pwd command\"."
 
 trace=
 [ -t 2 ] && trace=set-x
@@ -96,7 +96,7 @@ case "$sshfspath" in
       [ $# = 0 ] && set -- "$SHELL"
       mntdir=$TMPDIR/sshfs-mnt
       [ -d "$mntdir" ] || $trace mkdir -- "$mntdir"
-      mntpath=$mntdir/mnt-$$-$( echo "$sshfspath" | tr / _ )
+      mntpath=$mntdir/mnt-$$-$( echo "$sshfspath" | tr /: __ )
       $trace mnt -d -X $mntopts -- "$sshfspath" "$mntpath"
       xit=0
       ( cd "$mntpath" && $trace "$@" ) || xit=$?
