@@ -4,6 +4,8 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
+: "${VIRTUAL_ENV:=}"
+
 [ -n "$VIRTUAL_ENV" ] || {
   for venv_sfx in "-$ARCH" ""
   do
