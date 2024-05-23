@@ -1,3 +1,11 @@
+RunState.notify_cancel: use the FSM notification system
+cs.fsm: why is the default state a per-thread perthread_state.initial_state d
+cs.cmdutils: solidify the thread wide runstate setup in run_context after merging the playon branch
+RunState: subclass FSM
+if no series/season/episode, check the thumbnail path for "series | season N" p
+motion-shrink-timelapse: use -disposition to extract the 7am video from as JPG and add as the embedded cover
+    motion-shrink-timelapse: -metadata fields
+    zz
 TODO: accept -f to specify the file?
 dk update: figure out the git rev associated with the imagewhich would be pulled, list log from fstag dk.lastrev to that rev
 cs.cmdutils/distinfo: cmd_blah descriptions should format the usage parts

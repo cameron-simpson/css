@@ -15,8 +15,9 @@ from cs.gimmicks import exception
 from cs.gvutils import gvprint, gvsvg, quote as gvq, DOTNodeMixin
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
+from cs.seq import first
 
-__version__ = '20240316-post'
+__version__ = '20240519-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -29,6 +30,7 @@ DISTINFO = {
         'cs.gvutils>=20230816',
         'cs.lex',
         'cs.pfx',
+        'cs.seq',
         'typeguard',
     ],
 }
@@ -98,7 +100,7 @@ class FSM(DOTNodeMixin):
   def __init__(self, state=None, *, history=None, lock=None, transitions=None):
     ''' Initialise the `FSM` from:
         * `state`: optional _positional_ parameter for the initial state,
-          default `self.FSM_DEFAULT_STATE`
+          default `self.FSM_DEFAULT_STATE` or the first key from `self.FSM_TRANSITIONS`
         * `history`: an optional object to record state transition
           history, default `None`; if not `None` this should be an
           iterable object with a `.append(entry)` method such as a
@@ -127,7 +129,7 @@ class FSM(DOTNodeMixin):
       try:
         state = self.FSM_DEFAULT_STATE
       except AttributeError:
-        pass
+        state = first(self.FSM_TRANSITIONS.keys())
     if lock is None:
       lock = Lock()
     if transitions is not None:

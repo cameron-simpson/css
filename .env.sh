@@ -19,7 +19,9 @@
 
 [ -z "$VIRTUAL_ENV" ] || {
   export PYTHON3=$VIRTUAL_ENV/bin/python3
-  export PATH=$ENV_DEV_DIR/bin-cs:$ENV_DEV_DIR/bin:$VIRTUAL_ENV/bin:$PATH
+  export PATH=$VIRTUAL_ENV/bin:$PATH
 }
+
+export PATH=$ENV_DEV_DIR/bin-cs:$ENV_DEV_DIR/bin:$PATH
 
 ##export PYTHONWARNINGS=default

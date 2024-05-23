@@ -61,7 +61,7 @@ from cs.threads import ThreadState
 from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20240423-post'
+__version__ = '20240519-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
