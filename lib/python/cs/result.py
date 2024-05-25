@@ -58,8 +58,6 @@ import sys
 from threading import Lock, RLock
 from typing import Callable
 
-from icontract import require
-
 from cs.deco import OBSOLETE
 from cs.fsm import FSM, CancellationError
 from cs.gimmicks import exception, warning
@@ -86,7 +84,6 @@ DISTINFO = {
         'cs.py.func',
         'cs.seq',
         'cs.threads',
-        'icontract',
     ],
 }
 
