@@ -49,15 +49,15 @@ class FSMError(Exception):
     super().__init__(msg)
     self.fsm = fsm
 
-# TODO: should this subclass FSMError?
-class CancellationError(Exception):
-  ''' Raised when trying to make use of an `FSM` which is cancelled.
+class CancellationError(FSMError):
+  ''' Subclass of `FSMError` Raised when trying to make use of an
+      `FSM` which is cancelled.
 
-      For example, this is raised by `cs.result.Result`
-      when accessing `result` or `exc_info` after cancellation.
+      For example, this is raised by a `cs.result.Result`
+      when accessing `.result` or `.exc_info` after cancellation.
   '''
 
-  def __init__(self, message=None, **kw):
+  def __init__(self, message=None, *, fsm=None, **kw):
     ''' Initialise the `CancellationError`.
 
         The optional `message` parameter (default `"cancelled"`)
@@ -68,7 +68,7 @@ class CancellationError(Exception):
       message = "cancelled"
     elif not isinstance(message, str):
       message = 'cancelled: ' + str(message)
-    Exception.__init__(self, message)
+    super().__init__(message, fsm=fsm)
     self.message = message
     for k, v in kw.items():
       setattr(self, k, v)
