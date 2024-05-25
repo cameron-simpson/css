@@ -156,7 +156,7 @@ class Result(FSM):
     # the result collection lock
     self._get_lock = Lock()
     self._get_lock.acquire()  # pylint: disable=consider-using-with
-    self._lock = lock
+    self.__lock = lock
     if result is not None:
       self.result = result
 
@@ -445,7 +445,7 @@ class Result(FSM):
       self.collected = True
       return notifier(fsm)
 
-    with self._lock:
+    with self.__lock:
       self.fsm_callback('CANCELLED', callback)
       self.fsm_callback('DONE', callback)
       state = self.fsm_state
