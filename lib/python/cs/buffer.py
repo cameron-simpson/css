@@ -200,15 +200,11 @@ class CornuCopyBuffer(Promotable):
 
   def close(self):
     ''' Close the buffer.
-        This calls the `close` callable supplied
-        when the buffer was initialised, if any,
-        in order to release resources such as open file descriptors.
-        The callable will be called only on the first `close()` call.
-
-        *Note*: this does *not* prevent subsequent reads or iteration
-        from the buffer; it is only for resource cleanup,
-        though that cleanup might itself break iteration.
+        This discards the internal buffer of "read but not consumed" data
+        and calls the `close` callable supplied when the buffer was
+        initialised, if any.
     '''
+    self.bufs = None
     if self._close:
       self._close()
       self._close = None
