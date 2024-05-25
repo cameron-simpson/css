@@ -190,6 +190,21 @@ class Result(FSM):
     '''
     return self.fsm_state
 
+  def _complete(self, result, exc_info):
+    ''' Set the result or exception.
+        Alert people to completion.
+    '''
+    if result is not None and exc_info is not None:
+      raise ValueError(
+          "one of (result, exc_info) must be None, got (%r, %r)" %
+          (result, exc_info)
+      )
+    with self.__lock:
+      self.fsm_event('complete')
+      self._result = result  # pylint: disable=attribute-defined-outside-init
+      self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+      self._get_lock.release()
+
   @property
   def ready(self):
     ''' True if the `Result` state is `DONE` or `CANCELLED`..
@@ -336,42 +351,6 @@ class Result(FSM):
     T = self.bg(func, *a, **kw)
     T.join()
     return self()
-
-  @require(
-      lambda self: self.fsm_state in
-      (self.PENDING, self.RUNNING, self.CANCELLED)
-  )
-  def _complete(self, result, exc_info):
-    ''' Set the result.
-        Alert people to completion.
-        Expect to be called _inside_ `self._lock`.
-    '''
-    if result is not None and exc_info is not None:
-      raise ValueError(
-          "one of (result, exc_info) must be None, got (%r, %r)" %
-          (result, exc_info)
-      )
-    with self._lock:
-      state = self.fsm_state
-      if state in (self.PENDING, self.RUNNING, self.CANCELLED):
-        self._result = result  # pylint: disable=attribute-defined-outside-init
-        self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
-        self._get_lock.release()
-        if state != self.CANCELLED:
-          self.fsm_event('complete')
-      elif state == self.DONE:
-        warning(
-            "<%s>: state is %s, ignoring result=%r, exc_info=%r",
-            self,
-            self.fsm_state,
-            result,
-            exc_info,
-        )
-      else:
-        raise RuntimeError(
-            "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE)"
-            % (self, self.fsm_state)
-        )
 
   @pfx_method
   def join(self):
