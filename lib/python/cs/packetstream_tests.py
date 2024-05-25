@@ -22,6 +22,9 @@ from cs.testutils import SetupTeardownMixin
 from . import packetstream
 from .packetstream import Packet, PacketConnection
 
+from cs.debug import thread_dump
+from threading import enumerate as enumerate_threads, main_thread
+
 class TestPacketStreamBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Test for all the `AbstractBinary` subclasses.
   '''
@@ -54,28 +57,51 @@ class TestPacket(unittest.TestCase):
                 self.assertEqual(offset, len(bs))
                 self.assertEqual(P, P2)
 
-class _TestStream:
+class _TestStream(SetupTeardownMixin):
   ''' Base class for stream tests.
   '''
 
-  def setUp(self):
+  @contextmanager
+  def setupTeardown(
+      self,
+      upstream_rd,
+      upstream_wr,
+      downstream_rd,
+      downstream_wr,
+  ):
     ''' Set up: open the streams.
     '''
-    self._open_Streams()
-
-  # pylint: disable=no-self-use
-  def _open_Streams(self):
-    raise unittest.SkipTest("base test")
-
-  def tearDown(self):
-    ''' Tear down: shutdown and close the streams.
-    '''
-    self.local_conn.shutdown()
-    self.remote_conn.shutdown()
-    self._close_Streams()
-
-  def _close_Streams(self):
-    pass
+    clsname = self.__class__.__name__
+    with PacketConnection(
+        downstream_rd,
+        upstream_wr,
+        f'{clsname}-local',
+        request_handler=self._request_handler,  ## TODO remove this 
+    ) as local_conn:
+      if not local_conn.requests_allowed:
+        raise RuntimeError
+      with PacketConnection(
+          upstream_rd,
+          downstream_wr,
+          f'{clsname}-remote',
+          request_handler=self._request_handler,
+      ) as remote_conn:
+        if not remote_conn.requests_allowed:
+          raise RuntimeError
+        with stackattrs(self, local_conn=local_conn, remote_conn=remote_conn):
+          try:
+            yield
+          finally:
+            # We explicitly send end of requests and end of file
+            # because we're running both local and remote.
+            # This is supposed to work automaticlly if we're only
+            # running the local end.
+            local_conn.end_requests()
+            local_conn.send_eof()
+            remote_conn.end_requests()
+            remote_conn.send_eof()
+      remote_conn.join()
+    local_conn.join()
 
   @staticmethod
   def _decode_response(flags, payload):
@@ -107,7 +133,7 @@ class _TestStream:
     ''' Throw 16 packets up, collect responses after requests queued.
     '''
     rqs = []
-    for _ in range(16):
+    for _ in range(1678):
       size = rand0(16385)
       data = make_randblock(size)
       flags = rand0(65537)
@@ -121,7 +147,7 @@ class _TestStream:
       self.assertEqual(flags, 0x11)
       self.assertEqual(payload, bytes(reversed(data)))
 
-class TestStreamPipes(SetupTeardownMixin, unittest.TestCase, _TestStream):
+class TestStreamPipes(_TestStream, unittest.TestCase):
   ''' Test streaming over pipes.
   '''
 
@@ -129,28 +155,42 @@ class TestStreamPipes(SetupTeardownMixin, unittest.TestCase, _TestStream):
   def setupTeardown(self):
     ''' Set up streams using UNIX pipes.
     '''
-    self.upstream_rd, self.upstream_wr = os.pipe()
-    self.downstream_rd, self.downstream_wr = os.pipe()
-    with PacketConnection(self.downstream_rd, self.upstream_wr,
-                          name="local-pipes") as local_conn:
-      with PacketConnection(self.upstream_rd, self.downstream_wr,
-                            request_handler=self._request_handler,
-                            name="remote-pipes") as remote_conn:
-        with stackattrs(self, local_conn=local_conn, remote_conn=remote_conn):
-          yield
-    for fd in (
-        self.upstream_rd,
-        self.upstream_wr,
-        self.downstream_rd,
-        self.downstream_wr,
-    ):
-      try:
-        pfx_call(os.close, fd)
-      except OSError as e:
-        warning("close(fd:%d): %s", fd, e)
+    upstream_rd, upstream_wr = os.pipe()
+    downstream_rd, downstream_wr = os.pipe()
+    try:
+      with super().setupTeardown(
+          upstream_rd,
+          upstream_wr,
+          downstream_rd,
+          downstream_wr,
+      ):
+        yield
+    finally:
+      # workers should be complete
+      Ts = enumerate_threads()
+      ok = True
+      for T in Ts:
+        if T is main_thread():
+          continue
+        if T.name.endswith(('.ticker', '(_ticker)')):
+          continue
+        ok = False
+      if not ok:
+        thread_dump()
+        breakpoint()
+      for fd in (
+          upstream_rd,
+          upstream_wr,
+          downstream_rd,
+          downstream_wr,
+      ):
+        try:
+          pfx_call(os.close, fd)
+        except OSError as e:
+          warning("close(fd:%d): %s", fd, e)
+          raise
 
-class TestStreamUNIXSockets(SetupTeardownMixin, unittest.TestCase,
-                            _TestStream):
+class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
   ''' Test streaming over sockets.
   '''
 
@@ -158,31 +198,30 @@ class TestStreamUNIXSockets(SetupTeardownMixin, unittest.TestCase,
   def setupTeardown(self):
     ''' Set up streams using UNIX sockets.
     '''
-    self.upstream_rd, self.upstream_wr = socket.socketpair()
-    self.downstream_rd, self.downstream_wr = socket.socketpair()
-    with PacketConnection(OpenSocket(self.downstream_rd, False),
-                          OpenSocket(self.upstream_wr, True),
-                          name="local-socketpair") as local_conn:
-      with PacketConnection(OpenSocket(self.upstream_rd,
-                                       False), OpenSocket(self.downstream_wr,
-                                                          True),
-                            request_handler=self._request_handler,
-                            name="remote-socketpair") as remote_conn:
-        with stackattrs(self, local_conn=local_conn, remote_conn=remote_conn):
-          yield
-    self.upstream_rd.close()
-    self.upstream_wr.close()
-    self.downstream_rd.close()
-    self.downstream_wr.close()
+    upstream_rd, upstream_wr = socket.socketpair()
+    downstream_rd, downstream_wr = socket.socketpair()
+    try:
+      with super().setupTeardown(
+          upstream_rd.fileno(),
+          upstream_wr.fileno(),
+          downstream_rd.fileno(),
+          downstream_wr.fileno(),
+      ):
+        yield
+    finally:
+      upstream_rd.close()
+      upstream_wr.close()
+      downstream_rd.close()
+      downstream_wr.close()
 
 # pylint: disable=too-many-instance-attributes
-class TestStreamTCP(SetupTeardownMixin, unittest.TestCase, _TestStream):
+class TestStreamTCP(_TestStream, unittest.TestCase):
   ''' Test streaming over TCP.
   '''
 
   @contextmanager
   def setupTeardown(self):
-    ''' Set up strreams using TCP connections.
+    ''' Set up streams using TCP connections.
     '''
     self.listen_sock = socket.socket()
     self.listen_port = bind_next_port(self.listen_sock, '127.0.0.1', 9999)
@@ -192,21 +231,25 @@ class TestStreamTCP(SetupTeardownMixin, unittest.TestCase, _TestStream):
     accept_Thread.start()
     self.upstream_sock = socket.socket()
     self.upstream_sock.connect(('127.0.0.1', self.listen_port))
-    accept_Thread.join()
-    self.assertIsNotNone(self.downstream_sock)
-    self.upstream_fp_rd = OpenSocket(self.upstream_sock, False)
-    self.upstream_fp_wr = OpenSocket(self.upstream_sock, True)
-    with PacketConnection(self.upstream_fp_rd, self.upstream_fp_wr,
-                          name="local-tcp") as local_conn:
-      self.downstream_fp_rd = OpenSocket(self.downstream_sock, False)
-      self.downstream_fp_wr = OpenSocket(self.downstream_sock, True)
-      with PacketConnection(self.downstream_fp_rd, self.downstream_fp_wr,
-                            request_handler=self._request_handler,
-                            name="remote-tcp") as remote_conn:
-        with stackattrs(self, local_conn=local_conn, remote_conn=remote_conn):
+    try:
+      accept_Thread.join()
+      self.assertIsNotNone(self.downstream_sock)
+      try:
+        self.upstream_fp_rd = OpenSocket(self.upstream_sock, False)
+        self.upstream_fp_wr = OpenSocket(self.upstream_sock, True)
+        self.downstream_fp_rd = OpenSocket(self.downstream_sock, False)
+        self.downstream_fp_wr = OpenSocket(self.downstream_sock, True)
+        with super().setupTeardown(
+            self.upstream_fp_rd,
+            self.upstream_fp_wr,
+            self.downstream_fp_rd,
+            self.downstream_fp_wr,
+        ):
           yield
-    self.upstream_sock.close()
-    self.downstream_sock.close()
+      finally:
+        self.downstream_sock.close()
+    finally:
+      self.upstream_sock.close()
 
   def _accept(self):
     self.downstream_sock, _ = self.listen_sock.accept()
