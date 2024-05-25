@@ -16,17 +16,13 @@ from time import sleep
 from threading import Lock
 from typing import Callable, Tuple, Union
 
-from icontract import ensure
-
 from cs.binary import SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import promote
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import debug, warning, error, exception
 from cs.pfx import Pfx, PrePfx, pfx_method
-from cs.predicate import post_condition
 from cs.progress import Progress, progressbar
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError, MultiOpenMixin, RunState
@@ -73,7 +69,6 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
-        'icontract',
     ]
 }
 
@@ -264,6 +259,9 @@ class PacketConnection(MultiOpenMixin):
   def __str__(self):
     return "PacketConnection[%s]" % (self.name,)
 
+  def __repr__(self):
+    return f'{self.__class__.__name__}[{getattr(self,"name","not-yet-named")}]{id(self)}'
+
   @contextmanager
   def startup_shutdown(self):
     with super().startup_shutdown():
@@ -281,6 +279,8 @@ class PacketConnection(MultiOpenMixin):
       with stackattrs(
           self,
           requests_allowed=self.request_handler is not None,
+          # TODO: drop notify_recv_eof - only used by vt.stream and
+          #       possibly no longer
           notify_recv_eof=set(),
           notify_send_eof=set(),
           # tags of remote requests in play against the local system,
@@ -310,7 +310,7 @@ class PacketConnection(MultiOpenMixin):
         if isinstance(self.send, int):
           # fdopen the file descriptor and close the file when done
           # NB: *do not* close the file descriptor
-          sendf = trace(os.fdopen)(self.send, 'wb', closefd=False)
+          sendf = os.fdopen(self.send, 'wb', closefd=False)
           sendf_close = sendf.close
         else:
           # use as is, do not close
@@ -321,10 +321,8 @@ class PacketConnection(MultiOpenMixin):
             runstate = self._runstate
             with runstate:
               # runstate->RUNNING
-              with rq_in_progress.bar(stalled="idle",
-                                      report_print=True) as rq_in_bar:
-                with rq_out_progress.bar(stalled="idle",
-                                         report_print=True) as rq_out_bar:
+              with rq_in_progress.bar(stalled="idle", report_print=True):
+                with rq_out_progress.bar(stalled="idle", report_print=True):
                   # dispatch Thread to process received packets
                   self._recv_thread = bg_thread(
                       self._receive_loop,
@@ -482,7 +480,7 @@ class PacketConnection(MultiOpenMixin):
               payload=payload
           )
       )
-    except EOFError as e:
+    except EOFError:
       pass
 
   def _respond(self, channel, tag, flags, payload):
@@ -649,7 +647,6 @@ class PacketConnection(MultiOpenMixin):
   ):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
-    ##XX = self.tick
     recv_last_offset = recv_bfr.offset
 
     def recv_len_func(_):
@@ -704,6 +701,7 @@ class PacketConnection(MultiOpenMixin):
               if rq_type == 0:
                 # magic EOF rq_type - must be malformed (!=EOF_Packet)
                 error("malformed EOF packet received: %s", packet)
+                ##breakpoint()
                 break
               # normalise rq_type
               rq_type -= 1
@@ -757,8 +755,9 @@ class PacketConnection(MultiOpenMixin):
     # end of received packets: cancel any outstanding requests
     self._pending_cancel()
     # alert any listeners of receive EOF
-    for notify in notify_recv_eof:
-      notify(self)
+    if notify_recv_eof:
+      for notify in notify_recv_eof:
+        notify(self)
 
   # pylint: disable=too-many-branches
   @logexc
@@ -778,7 +777,6 @@ class PacketConnection(MultiOpenMixin):
         - the remote has announced end-of-requests and we have no
           outstanding requests
     '''
-    ##XX = self.tick
     with PrePfx("_SEND [%s]", self):
       Q = self._sendQ
       grace = self.packet_grace
@@ -803,41 +801,18 @@ class PacketConnection(MultiOpenMixin):
         else:
           rq_in_progress += 1  # note we completed a rq
         try:
-          ##XX(b'>')
           P.write(sendf)
           if Q.empty():
             # no immediately ready further packets: flush the output buffer
             if grace > 0:
               # allow a little time for further Packets to queue
-              ##XX(b'Sg')
               sleep(grace)
               if Q.empty():
                 # still nothing, flush
-                ##XX(b'F')
-                try:
-                  sendf.flush()
-                except OSError as e:
-                  raise
-              else:
-                0 and X(
-                    "%s send: no flush !!!!!!!!!!!! Q.empty()=%s", self,
-                    Q.empty()
-                )
+                sendf.flush()
             else:
               # no grace period, flush immediately
-              ##XX(b'F')
-              0 and X("%s send: FLUSH", self)
-              try:
-                sendf.flush()
-              except OSError as e:
-                X("_send_loop: sendf:%s.flush(): %s", sendf, e)
-                ##breakpoint()
-                raise
-          else:
-            0 and X(
-                "%s send: no flush 2 !!!!!!!!!!!! Q.empty()=%s", self,
-                Q.empty()
-            )
+              sendf.flush()
         except OSError as e:
           if e.errno == errno.EPIPE:
             warning("remote end closed")
@@ -849,7 +824,6 @@ class PacketConnection(MultiOpenMixin):
           break
       # send EOF packet to remote receiver
       try:
-        ##XX(b'>EOF')
         self.EOF_Packet.write(sendf, flush=True)
       except (OSError, IOError) as e:
         if e.errno == errno.EPIPE:
