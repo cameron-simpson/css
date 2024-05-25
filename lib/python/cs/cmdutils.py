@@ -1281,7 +1281,6 @@ class BaseCommand:
         with stackattrs(
             self,
             options=run_options,
-            cmd=self._subcmd or self.cmd,
         ):
           with upd:
             with runstate:
