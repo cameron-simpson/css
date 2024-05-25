@@ -17,7 +17,7 @@ from os import fstat, pread, SEEK_SET, SEEK_CUR, SEEK_END
 import mmap
 from stat import S_ISREG
 import sys
-from threading import Thread
+from threading import Lock, Thread
 
 from cs.deco import Promotable
 from cs.gimmicks import r
@@ -1239,6 +1239,8 @@ class FDIterator(_FetchIterator):
     self.close()
 
   def close(self):
+    ''' Close `self.fd` if it is nt yet `None`.
+    '''
     with self._lock:
       if self.fd is not None:
         os.close(self.fd)
