@@ -246,10 +246,6 @@ class CornuCopyBuffer(Promotable):
         iteration that `CornuCopyBuffer` consumes, but also seek
         support if the underlying file descriptor is seekable.
 
-        *Note*: a `SeekableFDIterator` makes an `os.dup` of the
-        supplied file descriptor, so the caller is responsible for
-        closing the original.
-
         Parameters:
         * `fd`: the operating system file descriptor
         * `readsize`: an optional preferred read size
@@ -266,7 +262,7 @@ class CornuCopyBuffer(Promotable):
     else:
       it = FDIterator(fd, readsize=readsize, offset=offset)
     return cls(
-        it, offset=it.offset, close=it.close, final_offset=final_offset, **kw
+        it, close=it.close, offset=it.offset, final_offset=final_offset, **kw
     )
 
   def as_fd(self, maxlength=Ellipsis):
@@ -313,10 +309,6 @@ class CornuCopyBuffer(Promotable):
         provides the iteration that `CornuCopyBuffer` consumes, but
         also seek support.
 
-        *Note*: a `SeekableMMapIterator` makes an `os.dup` of the
-        supplied file descriptor, so the caller is responsible for
-        closing the original.
-
         Parameters:
         * `fd`: the operating system file descriptor
         * `readsize`: an optional preferred read size
@@ -326,7 +318,9 @@ class CornuCopyBuffer(Promotable):
         Other keyword arguments are passed to the buffer constructor.
     '''
     it = SeekableMMapIterator(fd, readsize=readsize, offset=offset)
-    return cls(it, offset=it.offset, final_offset=it.end_offset, **kw)
+    return cls(
+        it, offset=it.offset, close=it.close, final_offset=it.end_offset, **kw
+    )
 
   @classmethod
   def from_file(cls, f, readsize=None, offset=None, final_offset=None, **kw):
@@ -604,6 +598,7 @@ class CornuCopyBuffer(Promotable):
       try:
         next_chunk = next(self.input_data)
       except StopIteration:
+        # no more input_data
         if min_size is Ellipsis or short_ok:
           return
         # pylint: disable=raise-missing-from
@@ -634,7 +629,7 @@ class CornuCopyBuffer(Promotable):
   def takev(self, size, short_ok=False):
     ''' Return the next `size` bytes as a list of chunks
         (because the internal buffering is also a list of chunks).
-        Other arguments are as for extend().
+        Other arguments are as for `.extend()`.
 
         See `.take()` to get a flat chunk instead of a list.
     '''
@@ -1228,13 +1223,9 @@ class SeekableIteratorMixin:
 
 class FDIterator(_FetchIterator):
   ''' An iterator over the data of a file descriptor.
-
-      *Note*: the iterator works with an os.dup() of the file
-      descriptor so that it can close it with impunity; this requires
-      the caller to close their descriptor.
   '''
 
-  def __init__(self, fd, offset=None, readsize=None, align=True):
+  def __init__(self, fd: int, offset=None, readsize=None, align=True):
     ''' Initialise the iterator.
 
         Parameters:
@@ -1249,8 +1240,9 @@ class FDIterator(_FetchIterator):
     '''
     if offset is None:
       offset = 0
-    _Iterator.__init__(self, offset=offset, readsize=readsize, align=align)
-    # dup the fd so that we can close it with impunity
+    super().__init__(offset=offset, readsize=readsize, align=align)
+    # dup the fd so that it cannot be closed out from under us
+    # (well, via the original fd - anyone can call os.close())
     self.fd = os.dup(fd)
 
   def close(self):
@@ -1267,18 +1259,16 @@ class FDIterator(_FetchIterator):
 
 class SeekableFDIterator(FDIterator, SeekableIteratorMixin):
   ''' An iterator over the data of a seekable file descriptor.
-
-      *Note*: the iterator works with an `os.dup()` of the file
-      descriptor so that it can close it with impunity; this requires
-      the caller to close their descriptor.
   '''
 
   def __init__(self, fd, offset=None, **kw):
     if offset is None:
       offset = os.lseek(fd, 0, SEEK_CUR)
-    FDIterator.__init__(self, fd, offset=offset, **kw)
+    super().__init__(fd, offset=offset, **kw)
 
   def _fetch(self, readsize):
+    ''' Fetch data using `os.pread`.
+    '''
     return pread(self.fd, readsize, self.offset)
 
   @property
@@ -1287,11 +1277,8 @@ class SeekableFDIterator(FDIterator, SeekableIteratorMixin):
     '''
     return os.fstat(self.fd).st_size
 
-class FileIterator(_Iterator, SeekableIteratorMixin):
+class FileIterator(_FetchIterator, SeekableIteratorMixin):
   ''' An iterator over the data of a file object.
-
-      *Note*: the iterator closes the file on `__del__` or if its
-      `.close` method is called.
   '''
 
   def __init__(self, fp, offset=None, readsize=None, align=False):
@@ -1309,7 +1296,9 @@ class FileIterator(_Iterator, SeekableIteratorMixin):
     '''
     if offset is None:
       offset = 0
-    _Iterator.__init__(self, offset=offset, readsize=readsize, align=align)
+    _FetchIterator.__init__(
+        self, offset=offset, readsize=readsize, align=align
+    )
     self.fp = fp
     # try to use the frugal read method if available
     try:
@@ -1358,15 +1347,11 @@ class SeekableFileIterator(FileIterator, SeekableIteratorMixin):
     new_offset = self.fp.seek(new_offset, mode)
     return super().seek(new_offset, SEEK_SET)
 
-class SeekableMMapIterator(_Iterator, SeekableIteratorMixin):
+class SeekableMMapIterator(_FetchIterator, SeekableIteratorMixin):
   ''' An iterator over the data of a mappable file descriptor.
-
-      *Note*: the iterator works with an `mmap` of an `os.dup()` of the
-      file descriptor so that it can close it with impunity; this
-      requires the caller to close their descriptor.
   '''
 
-  def __init__(self, fd, offset=None, readsize=None, align=True):
+  def __init__(self, fd: int, offset=None, readsize=None, align=True):
     ''' Initialise the iterator.
 
         Parameters:
@@ -1380,8 +1365,10 @@ class SeekableMMapIterator(_Iterator, SeekableIteratorMixin):
     '''
     if offset is None:
       offset = os.lseek(fd, 0, SEEK_CUR)
-    _Iterator.__init__(self, offset=offset, readsize=readsize, align=align)
-    self.fd = os.dup(fd)
+    _FetchIterator.__init__(
+        self, offset=offset, readsize=readsize, align=align
+    )
+    self.fd = fd
     self.base_offset = 0
     self.mmap = mmap.mmap(
         self.fd, 0, flags=mmap.MAP_PRIVATE, prot=mmap.PROT_READ
@@ -1389,17 +1376,15 @@ class SeekableMMapIterator(_Iterator, SeekableIteratorMixin):
     self.mv = memoryview(self.mmap)
 
   def close(self):
-    ''' Detach from the file descriptor and mmap and close.
+    ''' Close the mmap and detach.
     '''
-    if self.fd is not None:
+    if self.mmap is not None:
       try:
         self.mmap.close()
       except BufferError:
         pass
       else:
         self.mmap = None
-        os.close(self.fd)
-        self.fd = None
 
   @property
   def end_offset(self):
