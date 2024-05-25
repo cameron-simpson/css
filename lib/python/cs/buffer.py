@@ -13,7 +13,7 @@
 
 from contextlib import contextmanager
 import os
-from os import fstat, SEEK_SET, SEEK_CUR, SEEK_END
+from os import fstat, pread, SEEK_SET, SEEK_CUR, SEEK_END
 import mmap
 from stat import S_ISREG
 import sys
@@ -21,7 +21,6 @@ from threading import Thread
 
 from cs.deco import Promotable
 from cs.gimmicks import r
-from cs.py3 import pread
 
 __version__ = '20240412-post'
 
@@ -32,7 +31,11 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
-    'install_requires': ['cs.deco', 'cs.gimmicks', 'cs.py3'],
+    'install_requires': [
+        'cs.deco',
+        'cs.gimmicks',
+        'python_version>=3.3',  # for os.pread
+    ],
 }
 
 DEFAULT_READSIZE = 131072
