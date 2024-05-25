@@ -185,10 +185,9 @@ class PacketConnection(MultiOpenMixin):
   CH0_TAG_START += 1
 
   # pylint: disable=too-many-arguments
-  @promote
   def __init__(
       self,
-      recv: CornuCopyBuffer,
+      recv,
       send,
       name=None,
       *,
@@ -241,7 +240,7 @@ class PacketConnection(MultiOpenMixin):
     if name is None:
       name = str(seq())
     self.name = name
-    self._recv = recv
+    self.recv = recv
     if isinstance(send, int):
       self._send = os.fdopen(send, 'wb')
     else:
@@ -255,18 +254,6 @@ class PacketConnection(MultiOpenMixin):
         tick = tick_fd_2
       else:
         tick = lambda bs: None  # pylint: disable=unnecessary-lambda-assignment
-    self._recv_last_offset = 0
-    if recv_len_func is None:
-
-      def recv_len_func(_):
-        ''' The default length of a packet is the length of the _recv.offset change.
-        '''
-        new_offset = self._recv.offset
-        length = new_offset - self._recv_last_offset
-        self._recv_last_offset = new_offset
-        return length
-
-    self._recv_len_func = recv_len_func
     self._send_last_offset = 0
     if send_len_func is None:
 
@@ -334,69 +321,77 @@ class PacketConnection(MultiOpenMixin):
         tag_seq0 = self._tag_seq[0]
         for _ in range(self.CH0_TAG_START):
           next(tag_seq0)
-        with self._later:
-          runstate = self._runstate
-          with runstate:
-            # runstate->RUNNING
-            with rq_in_progress.bar(stalled="idle",
-                                    report_print=True) as rq_in_bar:
-              with rq_out_progress.bar(stalled="idle",
-                                       report_print=True) as rq_out_bar:
-                # dispatch Thread to process received packets
-                self._recv_thread = bg_thread(
-                    self._receive_loop,
-                    name="%s[_receive_loop]" % (self.name,),
-                    kwargs=dict(
-                        notify_recv_eof=self.notify_recv_eof,
-                        runstate=runstate,
-                        rq_in_progress=rq_in_progress,
-                        rq_out_progress=rq_out_progress,
-                    ),
-                )
-                # dispatch Thread to send data
-                # primary purpose is to bundle output by deferring flushes
-                self._send_thread = bg_thread(
-                    self._send_loop,
-                    name="%s[_send]" % (self.name,),
-                    kwargs=dict(
-                        rq_in_progress=rq_in_progress,
-                        rq_out_progress=rq_out_progress,
-                    ),
-                )
-                try:
-                  yield
-                finally:
-                  # announce end of requests to the remote end
-                  self.end_requests()
-          # runstate->STOPPED, should block new requests
-          # complete accepted but incomplete requests
-          if self.requests_in_progress:
-            with run_task(
-                "%s: wait for local running requests" % (self,),
-                report_print=True,
-            ):
-              self.requests_in_progress.wait()
-          # complete any outstanding requests from the remote
-          if later.outstanding:  ## HUH??
-            warning(
-                "surprise! %d outstanding Later jobs", len(later.outstanding)
-            )
-            with run_task(f'{self}: wait for outstanding LateFunctions',
-                          report_print=True):
-              later.wait_outstanding()
-        # close the stream to the remote and wait
-        with run_task("%s: close sendQ, wait for sender" % (self,),
-                      report_print=True):
-          self._sendQ.close(enforce_final_close=True)
-          self._send_thread.join()
-        with run_task(
-            "%s: wait for _recv_thread %s" % (
-                self,
-                self._recv_thread,
-            ),
-            report_print=True,
-        ):
-          self._recv_thread.join()
+        recv_bfr = CornuCopyBuffer.promote(self.recv)
+        try:
+          with self._later:
+            runstate = self._runstate
+            with runstate:
+              # runstate->RUNNING
+              with rq_in_progress.bar(stalled="idle",
+                                      report_print=True) as rq_in_bar:
+                with rq_out_progress.bar(stalled="idle",
+                                         report_print=True) as rq_out_bar:
+                  # dispatch Thread to process received packets
+                  self._recv_thread = bg_thread(
+                      self._receive_loop,
+                      name="%s[_receive_loop]" % (self.name,),
+                      kwargs=dict(
+                          recv_bfr=recv_bfr,
+                          notify_recv_eof=self.notify_recv_eof,
+                          runstate=runstate,
+                          rq_in_progress=rq_in_progress,
+                          rq_out_progress=rq_out_progress,
+                      ),
+                  )
+                  # dispatch Thread to send data
+                  # primary purpose is to bundle output by deferring flushes
+                  self._send_thread = bg_thread(
+                      self._send_loop,
+                      name="%s[_send]" % (self.name,),
+                      kwargs=dict(
+                          rq_in_progress=rq_in_progress,
+                          rq_out_progress=rq_out_progress,
+                      ),
+                  )
+                  try:
+                    yield
+                  finally:
+                    # announce end of requests to the remote end
+                    self.end_requests()
+            # runstate->STOPPED, should block new requests
+            # complete accepted but incomplete requests
+            if self.requests_in_progress:
+              with run_task(
+                  "%s: wait for local running requests" % (self,),
+                  report_print=True,
+              ):
+                self.requests_in_progress.wait()
+            # complete any outstanding requests from the remote
+            if later.outstanding:  ## HUH??
+              warning(
+                  "LLLLLLLLLLLLLL  surprise! %d outstanding Later jobs",
+                  len(later.outstanding)
+              )
+              with run_task(f'{self}: wait for outstanding LateFunctions',
+                            report_print=True):
+                later.wait_outstanding()
+          # close the stream to the remote and wait
+          with run_task("%s: close sendQ, wait for sender" % (self,),
+                        report_print=True):
+            self._sendQ.close(enforce_final_close=True)
+            self._send_thread.join()
+          with run_task(
+              "%s: wait for _recv_thread %s" % (
+                  self,
+                  self._recv_thread,
+              ),
+              report_print=True,
+          ):
+            self._recv_thread.join()
+        finally:
+          # close the receive buffer
+          recv_bfr.close()
+          recv_bfr = None
         ps = self._pending_states()
         if ps:
           warning("%d PENDING STATES AT SHUTDOWN", len(ps))
