@@ -233,20 +233,9 @@ class Result(FSM):
     return not self.ready
 
   def cancel(self):
-    ''' Cancel this function.
-        If `self.fsm_state` is `PENDING`` or `'CANCELLED'`, return `True`.
-        Otherwise return `False` (too late to cancel).
+    ''' Cancel this `Result`.
     '''
-    with self._lock:
-      state = self.fsm_state
-      if state == self.CANCELLED:
-        # already cancelled - this is ok, no call to ._complete
-        return True
-      if state == self.DONE:
-        # completed - "fail" the cancel, no call to ._complete
-        return False
-      self.fsm_event('cancel')
-    return True
+    self.fsm_event('cancel')
 
   @property
   def result(self):
