@@ -210,7 +210,7 @@ class PacketConnection(MultiOpenMixin):
           If this is an `int` it is taken to be an OS file descriptor,
           otherwise it should be a binary file like object with `.write(bytes)`
           and `.flush()` methods.
-          This objects _is not closed_ by the `PacketConnection`;
+          This object _is not closed_ by the `PacketConnection`;
           the caller has responsibility for that.
         * `send_len_func`: optional function to compute the data
           length of a sent packet; the default watches the offset
@@ -241,10 +241,7 @@ class PacketConnection(MultiOpenMixin):
       name = str(seq())
     self.name = name
     self.recv = recv
-    if isinstance(send, int):
-      self._send = os.fdopen(send, 'wb')
-    else:
-      self._send = send
+    self.send = send
     if packet_grace is None:
       packet_grace = DEFAULT_PACKET_GRACE
     if tick is None:
@@ -254,18 +251,6 @@ class PacketConnection(MultiOpenMixin):
         tick = tick_fd_2
       else:
         tick = lambda bs: None  # pylint: disable=unnecessary-lambda-assignment
-    self._send_last_offset = 0
-    if send_len_func is None:
-
-      def send_len_func(_):
-        ''' The default length of a packet is the length of the _send.offset change.
-        '''
-        new_offset = self._send.offset
-        length = new_offset - self._send_last_offset
-        self._send_last_offset = new_offset
-        return length
-
-    self._send_len_func = send_len_func
     self.packet_grace = packet_grace
     self.request_handler = request_handler
     self.tick = tick
@@ -322,6 +307,15 @@ class PacketConnection(MultiOpenMixin):
         for _ in range(self.CH0_TAG_START):
           next(tag_seq0)
         recv_bfr = CornuCopyBuffer.promote(self.recv)
+        if isinstance(self.send, int):
+          # fdopen the file descriptor and close the file when done
+          # NB: *do not* close the file descriptor
+          sendf = trace(os.fdopen)(self.send, 'wb', closefd=False)
+          sendf_close = sendf.close
+        else:
+          # use as is, do not close
+          sendf = self.send
+          sendf_close = lambda: None
         try:
           with self._later:
             runstate = self._runstate
@@ -349,6 +343,7 @@ class PacketConnection(MultiOpenMixin):
                       self._send_loop,
                       name="%s[_send]" % (self.name,),
                       kwargs=dict(
+                          sendf=sendf,
                           rq_in_progress=rq_in_progress,
                           rq_out_progress=rq_out_progress,
                       ),
@@ -389,6 +384,8 @@ class PacketConnection(MultiOpenMixin):
           ):
             self._recv_thread.join()
         finally:
+          # close the send file
+          sendf_close()
           # close the receive buffer
           recv_bfr.close()
           recv_bfr = None
@@ -643,6 +640,7 @@ class PacketConnection(MultiOpenMixin):
   @pfx_method
   def _receive_loop(
       self,
+      recv_bfr,
       *,
       notify_recv_eof: set,
       runstate: RunState,
@@ -652,11 +650,22 @@ class PacketConnection(MultiOpenMixin):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
     ##XX = self.tick
+    recv_last_offset = recv_bfr.offset
+
+    def recv_len_func(_):
+      ''' Meaure the bytes consumed scanning a packet.
+      '''
+      nonlocal recv_last_offset
+      new_offset = recv_bfr.offset
+      length = new_offset - recv_last_offset
+      recv_last_offset = new_offset
+      return length
+
     for packet in progressbar(
-        Packet.scan(self._recv),
+        Packet.scan(recv_bfr),
         label=f'<= {self.name}',
         units_scale=BINARY_BYTES_SCALE,
-        itemlenfunc=self._recv_len_func,
+        itemlenfunc=recv_len_func,
     ):
       if packet == self.EOF_Packet:
         break
@@ -756,11 +765,12 @@ class PacketConnection(MultiOpenMixin):
   def _send_loop(
       self,
       *,
+      sendf,
       rq_in_progress: Progress,
       rq_out_progress: Progress,
   ):
     ''' Send packets upstream.
-        Write every packet directly to self._send.
+        Write every packet directly to `sendf`.
         Flush whenever the queue is empty.
 
         This runs until either of:
@@ -770,68 +780,87 @@ class PacketConnection(MultiOpenMixin):
     '''
     ##XX = self.tick
     with PrePfx("_SEND [%s]", self):
-      with post_condition(("_send is None", lambda: self._send is None)):
-        fp = self._send
-        Q = self._sendQ
-        grace = self.packet_grace
-        for P in progressbar(
-            Q,
-            label=f'=> {self.name}',
-            units_scale=BINARY_BYTES_SCALE,
-            itemlenfunc=len,
-        ):
-          sig = (P.channel, P.tag, P.is_request)
-          if sig in self._sent:
-            if P == self.EOF_Packet:
-              warning("second send of EOF_Packet")
-            elif P == self.ERQ_Packet:
-              warning("second send of ERQ_Packet")
-            else:
-              raise RuntimeError("second send of %s" % (P,))
-          self._sent.add(sig)
-          if P.is_request:
-            rq_out_progress.total += 1  # note new sent rq
+      Q = self._sendQ
+      grace = self.packet_grace
+      for P in progressbar(
+          Q,
+          label=f'=> {self.name}',
+          units_scale=BINARY_BYTES_SCALE,
+          itemlenfunc=len,
+      ):
+        sig = (P.channel, P.tag, P.is_request)
+        if sig in self._sent:
+          if P == self.EOF_Packet:
+            warning("second send of EOF_Packet")
+          elif P == self.ERQ_Packet:
+            ##warning("second send of ERQ_Packet")
+            pass
           else:
-            rq_in_progress += 1  # note we completed a rq
-          try:
-            ##XX(b'>')
-            P.write(fp)
-            if Q.empty():
-              # no immediately ready further packets: flush the output buffer
-              if grace > 0:
-                # allow a little time for further Packets to queue
-                ##XX(b'Sg')
-                sleep(grace)
-                if Q.empty():
-                  # still nothing, flush
-                  ##XX(b'F')
-                  fp.flush()
-              else:
-                # no grace period, flush immediately
-                ##XX(b'F')
-                fp.flush()
-          except OSError as e:
-            if e.errno == errno.EPIPE:
-              warning("remote end closed")
-              break
-            raise
-          if not self.requests_allowed and not self.requests_in_progress:
-            # all requests completed, no new ones allowed
-            break
-        # send EOF packet to remote receiver and close self._send
+            raise RuntimeError("second send of %s" % (P,))
+        self._sent.add(sig)
+        if P.is_request:
+          rq_out_progress.total += 1  # note new sent rq
+        else:
+          rq_in_progress += 1  # note we completed a rq
         try:
-          ##XX(b'>EOF')
-          self.EOF_Packet.write(self._send, flush=True)
-        except (OSError, IOError) as e:
-          if e.errno == errno.EPIPE:
-            debug("remote end closed: %s", e)
-          elif e.errno == errno.EBADF:
-            warning("local end closed: %s", e)
+          ##XX(b'>')
+          P.write(sendf)
+          if Q.empty():
+            # no immediately ready further packets: flush the output buffer
+            if grace > 0:
+              # allow a little time for further Packets to queue
+              ##XX(b'Sg')
+              sleep(grace)
+              if Q.empty():
+                # still nothing, flush
+                ##XX(b'F')
+                try:
+                  sendf.flush()
+                except OSError as e:
+                  raise
+              else:
+                0 and X(
+                    "%s send: no flush !!!!!!!!!!!! Q.empty()=%s", self,
+                    Q.empty()
+                )
+            else:
+              # no grace period, flush immediately
+              ##XX(b'F')
+              0 and X("%s send: FLUSH", self)
+              try:
+                sendf.flush()
+              except OSError as e:
+                X("_send_loop: sendf:%s.flush(): %s", sendf, e)
+                ##breakpoint()
+                raise
           else:
-            raise
-        except Exception as e:
-          error("(_SEND) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
+            0 and X(
+                "%s send: no flush 2 !!!!!!!!!!!! Q.empty()=%s", self,
+                Q.empty()
+            )
+        except OSError as e:
+          if e.errno == errno.EPIPE:
+            warning("remote end closed")
+            break
           raise
+        if (not self.is_open() and not self.requests_allowed
+            and not self.requests_in_progress):
+          # not in use, all requests completed, no new ones allowed
+          break
+      # send EOF packet to remote receiver
+      try:
+        ##XX(b'>EOF')
+        self.EOF_Packet.write(sendf, flush=True)
+      except (OSError, IOError) as e:
+        if e.errno == errno.EPIPE:
+          debug("remote end closed: %s", e)
+        elif e.errno == errno.EBADF:
+          warning("local end closed: %s", e)
+        else:
+          raise
+      except Exception as e:
+        error("(_SEND) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
+        raise
 
 if __name__ == '__main__':
   from cs.debug import selftest
