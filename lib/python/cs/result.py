@@ -241,14 +241,16 @@ class Result(FSM):
   def result(self):
     ''' The result.
         This property is not available before completion.
+        Accessing this on a cancelled `Result` raises `CancellationError`.
     '''
     state = self.fsm_state
-    if state not in (self.CANCELLED, self.DONE):
-      raise AttributeError("%s not ready: no .result attribute" % (self,))
-    self.collected = True
-    if state == self.CANCELLED:
-      raise CancellationError
-    return self._result
+    if state == 'DONE':
+      self.collected = True
+      return self._result
+    if state == 'CANCELLED':
+      self.collected = True
+      raise CancellationError(".result: cancelled", fsm=self)
+    raise AttributeError(f'.result: {self} not ready')
 
   @result.setter
   def result(self, new_result):
@@ -265,14 +267,16 @@ class Result(FSM):
   def exc_info(self):
     ''' The exception information from a completed `Result`.
         This is not available before completion.
+        Accessing this on a cancelled `Result` raises `CancellationError`.
     '''
     state = self.fsm_state
-    if state not in (self.CANCELLED, self.DONE):
-      raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
-    self.collected = True
-    if state == self.CANCELLED:
-      raise CancellationError
-    return self._exc_info
+    if state == 'DONE':
+      self.collected = True
+      return self._exc_info
+    if state == 'CANCELLED':
+      self.collected = True
+      raise CancellationError(".exc_info: cancelled", fsm=self)
+    raise AttributeError(f'.exc_info: {self} not ready')
 
   @exc_info.setter
   def exc_info(self, exc_info):
