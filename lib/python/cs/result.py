@@ -125,6 +125,7 @@ class Result(FSM):
   def __init__(
       self,
       name=None,
+      *,
       lock=None,
       result=None,
       state=None,
@@ -146,14 +147,13 @@ class Result(FSM):
       lock = RLock()
     if name is None:
       name = "%s-%d" % (type(self).__name__, next(self._seq))
-    if state is None:
-      state = self.PENDING
     self.name = name
     self.extra = AttrableMapping()
     if extra:
       self.extra.update(extra)
     FSM.__init__(self, state, lock=lock)
     self.collected = False
+    # the result collection lock
     self._get_lock = Lock()
     self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._lock = lock
