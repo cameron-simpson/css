@@ -394,7 +394,7 @@ class Result(FSM):
     if a:
       self.run_func(*a, **kw)
     if self.is_cancelled:
-      raise CancellationError(self)
+      raise CancellationError(self, fsm=self)
     result, exc_info = self.join()
     if exc_info:
       _, exc_value, exc_traceback = exc_info
