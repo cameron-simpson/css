@@ -248,24 +248,25 @@ class NoExceptions(object):
         warning("IGNORE> " + line[:-1])
     return True
 
-def LogExceptions(conceal=False):
+def LogExceptions(log=None, conceal=False):
   ''' Wrapper for `NoExceptions` which reports exceptions and optionally
       suppresses them.
   '''
 
-  def handler(exc_type, exc_value, _):
-    exception("EXCEPTION: <%s> %s", exc_type, exc_value)
+  def handler(exc_type, exc_value, exc_tb):
+    logmsg = exception if log is None else log
+    logmsg("EXCEPTION: <%s> %s", exc_type, exc_value)
     return conceal
 
   return NoExceptions(handler)
 
 @decorator
-def logexc(func):
+def logexc(func, **deco_kw):
   ''' Decorator to log exceptions and reraise.
   '''
 
   def logexc_wrapper(*a, **kw):
-    with LogExceptions():
+    with LogExceptions(**deco_kw):
       return func(*a, **kw)
 
   return logexc_wrapper
