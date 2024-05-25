@@ -64,6 +64,11 @@ class OpenSocket(object):
   def __str__(self):
     return "%s[fd=%d,fd0=%d]" % (type(self).__name__, self._fd, self._fd0)
 
+  def isatty(self):
+    ''' We are not a tty.
+    '''
+    return False
+
   def write(self, data):
     ''' Write to the socket.
     '''
