@@ -1140,14 +1140,7 @@ class _FetchIterator:
     self.readsize = readsize
     self.align = align
     self.next_hint = None
-
-  def __del__(self):
-    self.close()
-
-  def close(self):
-    ''' Close the iterator; required by subclasses.
-    '''
-    raise NotImplementedError("missing close method")
+    self._lock = Lock()
 
   def _fetch(self, readsize):
     raise NotImplementedError("no _fetch method in class %s" % (type(self),))
@@ -1201,21 +1194,22 @@ class SeekableIteratorMixin:
   def seek(self, new_offset, mode=SEEK_SET):
     ''' Move the logical offset.
     '''
-    if mode == SEEK_SET:
-      pass
-    elif mode == SEEK_CUR:
-      new_offset += self.offset
-    elif mode == SEEK_END:
-      try:
-        end_offset = self.end_offset
-      except AttributeError as e:
-        # pylint: disable=raise-missing-from
-        raise ValueError("mode=SEEK_END unsupported: %s" % (e,))
-      new_offset += end_offset
-    else:
-      raise ValueError("unknown mode %d" % (mode,))
-    self.offset = new_offset
-    return new_offset
+    with self._lock:
+      if mode == SEEK_SET:
+        pass
+      elif mode == SEEK_CUR:
+        new_offset += self.offset
+      elif mode == SEEK_END:
+        try:
+          end_offset = self.end_offset
+        except AttributeError as e:
+          # pylint: disable=raise-missing-from
+          raise ValueError("mode=SEEK_END unsupported: %s" % (e,))
+        new_offset += end_offset
+      else:
+        raise ValueError("unknown mode %d" % (mode,))
+      self.offset = new_offset
+      return new_offset
 
 class FDIterator(_FetchIterator):
   ''' An iterator over the data of a file descriptor.
@@ -1241,17 +1235,18 @@ class FDIterator(_FetchIterator):
     # (well, via the original fd - anyone can call os.close())
     self.fd = os.dup(fd)
 
-  def close(self):
-    ''' Close the file descriptor.
-    '''
-    if self.fd is not None:
-      os.close(self.fd)
-      self.fd = None
+  def __del__(self):
+    self.close()
 
-  __del__ = close
+  def close(self):
+    with self._lock:
+      if self.fd is not None:
+        os.close(self.fd)
+        self.fd = None
 
   def _fetch(self, readsize):
-    return os.read(self.fd, readsize)
+    with self._lock:
+      return os.read(self.fd, readsize)
 
 class SeekableFDIterator(FDIterator, SeekableIteratorMixin):
   ''' An iterator over the data of a seekable file descriptor.
