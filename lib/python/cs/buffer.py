@@ -1121,8 +1121,8 @@ class CopyingIterator(object):
     # proxy other attributes from the base iterator
     return getattr(self.it, attr)
 
-class _Iterator(object):
-  ''' A base class for iterators over seekable things.
+class _FetchIterator:
+  ''' A base class for iterators over objects with a read-like `_fetch()` method.
   '''
 
   def __init__(self, offset=0, readsize=None, align=False):
@@ -1203,7 +1203,7 @@ class _Iterator(object):
     return data
 
 # pylint: disable=too-few-public-methods
-class SeekableIteratorMixin(object):
+class SeekableIteratorMixin:
   ''' Mixin supplying a logical with a `seek` method.
   '''
 
@@ -1226,7 +1226,7 @@ class SeekableIteratorMixin(object):
     self.offset = new_offset
     return new_offset
 
-class FDIterator(_Iterator):
+class FDIterator(_FetchIterator):
   ''' An iterator over the data of a file descriptor.
 
       *Note*: the iterator works with an os.dup() of the file
