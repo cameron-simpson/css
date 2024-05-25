@@ -104,9 +104,6 @@ class Result(FSM):
   _seq = Seq()
 
   FSM_TRANSITIONS = {
-      'PREPARE': {
-          'prepared': 'PENDING',
-      },
       'PENDING': {
           'dispatch': 'RUNNING',
           'cancel': 'CANCELLED',
@@ -116,8 +113,12 @@ class Result(FSM):
           'cancel': 'CANCELLED',
           'complete': 'DONE',
       },
-      'CANCELLED': {},
-      'DONE': {},
+      'CANCELLED': {
+          'cancel': 'CANCELLED',
+      },
+      'DONE': {
+          'cancel': 'DONE',
+      },
   }
 
   # pylint: disable=too-many-arguments
