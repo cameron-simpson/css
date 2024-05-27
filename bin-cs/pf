@@ -128,13 +128,17 @@ case $arg1 in
         if [ $# = 0 ]
         then
           echo "Please choose connections to restart or ALL."
-          echo "Current connections:"
-          portfwd_connected
+          echo
+          echo "Current auto connections:"
+          portfwd_auto | fmt
+          echo
+          echo "Currently connected:"
+          portfwd_connected | fmt
         else
           for name
           do
             case "$name" in
-              ALL)  for pfname in $(portfwd_connected)
+              ALL)  for pfname in $(portfwd_auto)
                     do  set-x svcd restart "portfwd-$pfname"
                     done
                     ;;
