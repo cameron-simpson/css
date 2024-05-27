@@ -1,3 +1,4 @@
+atomic_filename: use the O_EXCL tick for reliable rename-to-target stuff?
 RunState.notify_cancel: use the FSM notification system
 cs.fsm: why is the default state a per-thread perthread_state.initial_state d
 cs.cmdutils: solidify the thread wide runstate setup in run_context after merging the playon branch
