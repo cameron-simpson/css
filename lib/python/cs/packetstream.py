@@ -21,6 +21,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.later import Later
+from cs.lex import r
 from cs.logutils import debug, warning, error, exception
 from cs.pfx import Pfx, PrePfx, pfx_method
 from cs.progress import Progress, progressbar
@@ -183,33 +184,23 @@ class PacketConnection(MultiOpenMixin):
   def __init__(
       self,
       recv,
-      send,
+      send=None,
       name=None,
       *,
       request_handler=None,
       packet_grace=None,
       tick=None,
-      recv_len_func=None,
-      send_len_func=None,
   ):
-    ''' Initialise the PacketConnection.
+    ''' Initialise the `PacketConnection`.
 
         Parameters:
-        * `recv`: inbound binary stream.
-          This value is automatically promoted to a `cs.buffer.CornuCopyBuffer`
-          by the `CornuCopyBuffer.promote` method.
-        * `recv_len_func`: optional function to compute the data
-          length of a received packet; the default watches the offset
-          on the receive stream
+        * `recv`,`send`: the inbound and outbound binary streams.
         * `send`: outbound binary stream.
           If this is an `int` it is taken to be an OS file descriptor,
           otherwise it should be a binary file like object with `.write(bytes)`
           and `.flush()` methods.
           This object _is not closed_ by the `PacketConnection`;
           the caller has responsibility for that.
-        * `send_len_func`: optional function to compute the data
-          length of a sent packet; the default watches the offset
-          on the send stream
         * `packet_grace`:
           default pause in the packet sending worker
           to allow another packet to be queued
@@ -231,12 +222,43 @@ class PacketConnection(MultiOpenMixin):
           If `None`, do nothing.
           If a Boolean, call `tick_fd_2` if true, otherwise do nothing.
           Otherwise `tick` should be a callable accepting a byteslike value.
+
+        The `(recv,send)` pair indicate the inbound and outbound binary streams.
+
+        For preexisting streams such as pipes or sockets these can be:
+        * `recv`: anything acceptable to `CornuCopyBuffer.promote()`,
+          typically a file descriptor or a binary file with `.write`
+          and `.flush` methods.
+        * `send`: a file descriptor or a binary file with `.write`
+          and `.flush` methods.
+
+        For "on demand" use, `recv` may be a callable and `send` may be `None`.
+        In this case, `recv()` must return a 3-tuple of
+        `(recv,send,shutdown)` being values for `recv` and `send`
+        as above, and a shutdown function to do the necessary "close"
+        of the new `recv` and `send`. `shutdown` may be `None` if there is
+        no meaningful close operation.
+        The `PacketConnection`'s `startup_shutdown` method will
+        call `recv()` to obtain the binary streams and call the
+        `shutdown` on completion.
+        This supports use for on demand connections, eg:
+
+            P = PacketConnection(connect_to_server)
+            ......
+            with P:
+                ... use P to to work ...
+
+        where `connect_to_server()` might connect to some remote service.
     '''
     if name is None:
       name = str(seq())
     self.name = name
-    self.recv = recv
-    self.send = send
+    if send is None:
+      if not callable(recv):
+        raise TypeError(
+            f'if send is None, recv must be a callable returning (recv,send,shutdown); got {r(recv)}'
+        )
+    self.recv_send = recv, send
     if packet_grace is None:
       packet_grace = DEFAULT_PACKET_GRACE
     if tick is None:
@@ -306,87 +328,97 @@ class PacketConnection(MultiOpenMixin):
         tag_seq0 = self._tag_seq[0]
         for _ in range(self.CH0_TAG_START):
           next(tag_seq0)
-        recv_bfr = CornuCopyBuffer.promote(self.recv)
-        if isinstance(self.send, int):
-          # fdopen the file descriptor and close the file when done
-          # NB: *do not* close the file descriptor
-          sendf = os.fdopen(self.send, 'wb', closefd=False)
-          sendf_close = sendf.close
+        recv_send = self.recv_send
+        if callable(recv_send):
+          send, recv, shutdown_recv_send = recv_send()
         else:
-          # use as is, do not close
-          sendf = self.send
-          sendf_close = lambda: None
+          recv, send = recv_send
+          shutdown_recv_send = None
         try:
-          with self._later:
-            runstate = self._runstate
-            with runstate:
-              # runstate->RUNNING
-              with rq_in_progress.bar(stalled="idle", report_print=True):
-                with rq_out_progress.bar(stalled="idle", report_print=True):
-                  # dispatch Thread to process received packets
-                  self._recv_thread = bg_thread(
-                      self._receive_loop,
-                      name="%s[_receive_loop]" % (self.name,),
-                      kwargs=dict(
-                          recv_bfr=recv_bfr,
-                          notify_recv_eof=self.notify_recv_eof,
-                          runstate=runstate,
-                          rq_in_progress=rq_in_progress,
-                          rq_out_progress=rq_out_progress,
-                      ),
-                  )
-                  # dispatch Thread to send data
-                  # primary purpose is to bundle output by deferring flushes
-                  self._send_thread = bg_thread(
-                      self._send_loop,
-                      name="%s[_send]" % (self.name,),
-                      kwargs=dict(
-                          sendf=sendf,
-                          rq_in_progress=rq_in_progress,
-                          rq_out_progress=rq_out_progress,
-                      ),
-                  )
-                  try:
-                    yield
-                  finally:
-                    # announce end of requests to the remote end
-                    self.end_requests()
-            # runstate->STOPPED, should block new requests
-            # complete accepted but incomplete requests
-            if self.requests_in_progress:
-              with run_task(
-                  "%s: wait for local running requests" % (self,),
-                  report_print=True,
-              ):
-                self.requests_in_progress.wait()
-            # complete any outstanding requests from the remote
-            if later.outstanding:  ## HUH??
-              warning(
-                  "LLLLLLLLLLLLLL  surprise! %d outstanding Later jobs",
-                  len(later.outstanding)
-              )
-              with run_task(f'{self}: wait for outstanding LateFunctions',
-                            report_print=True):
-                later.wait_outstanding()
-          # close the stream to the remote and wait
-          with run_task("%s: close sendQ, wait for sender" % (self,),
-                        report_print=True):
-            self._sendQ.close(enforce_final_close=True)
-            self._send_thread.join()
-          with run_task(
-              "%s: wait for _recv_thread %s" % (
-                  self,
-                  self._recv_thread,
-              ),
-              report_print=True,
-          ):
-            self._recv_thread.join()
+          recv_bfr = CornuCopyBuffer.promote(recv)
+          if isinstance(send, int):
+            # fdopen the file descriptor and close the file when done
+            # NB: *do not* close the file descriptor
+            sendf = os.fdopen(send, 'wb', closefd=False)
+            sendf_close = sendf.close
+          else:
+            # use as is, do not close
+            sendf = send
+            sendf_close = lambda: None
+          try:
+            with self._later:
+              runstate = self._runstate
+              with runstate:
+                # runstate->RUNNING
+                with rq_in_progress.bar(stalled="idle", report_print=True):
+                  with rq_out_progress.bar(stalled="idle", report_print=True):
+                    # dispatch Thread to process received packets
+                    self._recv_thread = bg_thread(
+                        self._recv_loop,
+                        name="%s[_recv_loop]" % (self.name,),
+                        kwargs=dict(
+                            recv_bfr=recv_bfr,
+                            notify_recv_eof=self.notify_recv_eof,
+                            runstate=runstate,
+                            rq_in_progress=rq_in_progress,
+                            rq_out_progress=rq_out_progress,
+                        ),
+                    )
+                    # dispatch Thread to send data
+                    # primary purpose is to bundle output by deferring flushes
+                    self._send_thread = bg_thread(
+                        self._send_loop,
+                        name="%s[_send]" % (self.name,),
+                        kwargs=dict(
+                            sendf=sendf,
+                            rq_in_progress=rq_in_progress,
+                            rq_out_progress=rq_out_progress,
+                        ),
+                    )
+                    try:
+                      yield
+                    finally:
+                      # announce end of requests to the remote end
+                      self.end_requests()
+              # runstate->STOPPED, should block new requests
+              # complete accepted but incomplete requests
+              if self.requests_in_progress:
+                with run_task(
+                    "%s: wait for local running requests" % (self,),
+                    report_print=True,
+                ):
+                  self.requests_in_progress.wait()
+              # complete any outstanding requests from the remote
+              if later.outstanding:  ## HUH??
+                warning(
+                    "LLLLLLLLLLLLLL  surprise! %d outstanding Later jobs",
+                    len(later.outstanding)
+                )
+                with run_task(f'{self}: wait for outstanding LateFunctions',
+                              report_print=True):
+                  later.wait_outstanding()
+            # close the stream to the remote and wait
+            with run_task("%s: close sendQ, wait for sender" % (self,),
+                          report_print=True):
+              self._sendQ.close(enforce_final_close=True)
+              self._send_thread.join()
+            with run_task(
+                "%s: wait for _recv_thread %s" % (
+                    self,
+                    self._recv_thread,
+                ),
+                report_print=True,
+            ):
+              self._recv_thread.join()
+          finally:
+            # close the send file
+            sendf_close()
+            # close the receive buffer
+            recv_bfr.close()
+            recv_bfr = None
         finally:
-          # close the send file
-          sendf_close()
-          # close the receive buffer
-          recv_bfr.close()
-          recv_bfr = None
+          if shutdown_recv_send is not None:
+            shutdown_recv_send()
         ps = self._pending_states()
         if ps:
           warning("%d PENDING STATES AT SHUTDOWN", len(ps))
@@ -636,7 +668,7 @@ class PacketConnection(MultiOpenMixin):
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @logexc
   @pfx_method
-  def _receive_loop(
+  def _recv_loop(
       self,
       recv_bfr,
       *,
