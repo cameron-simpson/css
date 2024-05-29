@@ -15,7 +15,7 @@ from functools import lru_cache
 from subprocess import Popen, PIPE
 from threading import Lock
 import time
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
 from icontract import require
 from typeguard import typechecked
@@ -29,9 +29,10 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.context import contextif, stackattrs
+from cs.deco import fmtdoc
 from cs.lex import r
 from cs.logutils import debug, warning, error
-from cs.packetstream import PacketConnection
+from cs.packetstream import PacketConnection, PacketConnectionRecvSend
 from cs.pfx import Pfx, pfx_method
 from cs.resources import ClosedError
 from cs.result import CancellationError, Result
@@ -47,6 +48,8 @@ from .hash import (
 )
 from .pushpull import missing_hashcodes_by_checksum
 from .store import StoreError, StoreSyncBase
+
+STREAM_CAPACITY_DEFAULT = 1024
 
 class RqType(IntEnum):
   ''' Packet opcode values.
@@ -70,49 +73,62 @@ class StreamStore(StoreSyncBase):
       or simply to implement the server side.
   '''
 
+  @fmtdoc
   @typechecked
   def __init__(
       self,
       name: str,
-      recv_send,
+      recv_send: PacketConnectionRecvSend,
       *,
       addif: bool = False,
-      connect: Optional[Callable] = None,
       local_store=None,
       exports=None,
       capacity=None,
       sync: bool = False,
-      **kw
+      on_demand=False,
+      **syncstore_kw,
   ):
     ''' Initialise the `StreamStore`.
 
         Parameters:
+        * `name`: the Store name.
+        * `recv_send`: used to prepare the underlying `PacketConnection`
         * `addif`: optional mode causing `.add` to probe the peer for
           the data chunk's hash and to only submit an ADD request
           if the block is missing; this is a bandwith optimisation
           at the expense of latency.
-        * `connect`: if not `None`, a function to return `recv` and `send`.
-          If specified, the `recv` and `send` parameters must be `None`.
+        * `capacity`: the capacity of the queue associaed with this Store;
+          default from `STREAM_CAPACITY_DEFAULT` (`{STREAM_CAPACITY_DEFAULT}`)
         * `exports`: a mapping of name=>Store providing requestable Stores
         * `local_store`: optional local Store for serving requests from the peer.
-        * `name`: the Store name.
-        * `recv`: inbound binary stream.
-          If this is an `int` it is taken to be an OS file descriptor,
-          otherwise it should be a `cs.buffer.CornuCopyBuffer`
-          or a file like object with a `read1` or `read` method.
-        * `send`: outbound binary stream.
-          If this is an `int` it is taken to be an OS file descriptor,
-          otherwise it should be a file like object with `.write(bytes)`
-          and `.flush()` methods.
-          For a file descriptor sending is done via an `os.dup()` of
-          the supplied descriptor, so the caller remains responsible
-          for closing the original descriptor.
+        * `on_demand`: default `False; if true, use the Store in on-demand mode
         * `sync`: optional flag, default `False`;
           if true a `.add()` will block until acknowledged by the far end;
           if false a `.add()` will queue the add packet and return
           the hashcode immediately
-
         Other keyword arguments are passed to `StoreSyncBase.__init__`.
+
+        The `recv_send` parameter is used to prepare the underlying
+        `PacketConnection`. It may take the following forms:
+        * a 2-tuple of `(recv,send)` suitable for passing directly
+          to the `PacketConnection` setup; typically this is a pair
+          of fie descriptors or a pair of binary file streams
+        * a callable returning a 3-tuple of `(recv,send,close)` as
+          for `PacketConnection`'s callable mode
+
+        The on demand mode makes use of a `PacketConnection`'s on
+        demand mode and does not open the connection when the Store
+        is opened.  Instead each operation (`add()` etc) uses the
+        connection which will be opened and closed around it. Users
+        doing multiple operations should run them inside the `connected()`
+        context manager method. Example:
+
+            with self.connected():
+                if block in not self:
+                    self.add(chunk)
+
+        This supports a Store using a remote backend which may not
+        always be available.
 
         Note: because a `sync` mode of `False` (the default) breaks this assertion:
 
@@ -125,8 +141,16 @@ class StreamStore(StoreSyncBase):
         override the default `sync` mode.
     '''
     if capacity is None:
-      capacity = 1024
-    super().__init__(name, capacity=capacity, **kw)
+      capacity = STREAM_CAPACITY_DEFAULT
+    super().__init__(name, capacity=capacity, **syncstore_kw)
+    self.conn = PacketConnection(
+        recv_send,
+        self.name,
+        request_handler=self._handle_request,
+        packet_grace=0,
+        tick=True,
+    )
+    self.on_demand = on_demand
     self._lock = Lock()
     self.mode_addif = addif
     self._contains_cache = set()
@@ -135,37 +159,6 @@ class StreamStore(StoreSyncBase):
     self.exports = exports
     # caching method
     self.get_Archive = lru_cache(maxsize=64)(self.raw_get_Archive)
-    # parameters controlling connection hysteresis
-    self._conn_attempt_last = 0.0
-    self._conn_attempt_delay = 10.0
-    self._conn = None
-    match recv_send:
-      case cmgr_func if callable(cmgr_func):
-        # A callable returns a context manager yielding the receive and send objects.
-        get_recv_send = cmgr_func
-
-      case [recv, send]:
-        # Use the supplied receive and send objects.
-
-        @contextmanager
-        def get_recv_send():
-          ''' Use the supplied receive and send objects.
-          '''
-          yield recv, send
-
-      case int(fd):
-        # Use a file descriptor for receive and send.
-
-        def get_recv_send():
-          ''' Use a file descriptor for receive and send.
-          '''
-          yield fd, fd
-
-      case _:
-        raise ValueError(
-            f'invalid recv_send:{r(recv_send)}, expected a callable, (recv,send) 2-tuple or an int OS file descriptor'
-        )
-    self._get_recv_send = get_recv_send
     assert not self.closed
     assert not self.is_open()
 
@@ -190,60 +183,18 @@ class StreamStore(StoreSyncBase):
     '''
     with super().startup_shutdown():
       with contextif(self.local_store):
-        with self._get_recv_send() as (recv, send):
-          with self._packet_connection(recv, send) as conn:
-            with stackattrs(self, _conn=conn):
-              yield
-
-  @pfx_method
-  def connection(self):
-    ''' Return the current connection, creating it if necessary.
-        Returns `None` if there was no current connection
-        and it is too soon since the last connection attempt.
-    '''
-    with self._lock:
-      conn = self._conn
-      if conn is None:
-        next_attempt = self._conn_attempt_last + self._conn_attempt_delay
-        now = time.time()
-        if now >= next_attempt:
-          self._conn_attempt_last = now
+        with contextif(not self.on_demand, self.conn):
           try:
-            recv, send = self.connect()
-          except Exception as e:  # pylint: disable=broad-except
-            error("connect fails: %s: %s", type(e).__name__, e)
-          else:
-            self._conn = conn = self._packet_connection(recv, send)
-            # arrange to disassociate if the channel goes away
-            conn.notify_recv_eof.add(self._packet_disconnect)
-            conn.notify_send_eof.add(self._packet_disconnect)
-    return conn
+            yield
+          finally:
+            warning("%s: STREAM STORE SHUTDOWN", self)
 
-  def _packet_connection(self, recv, send) -> PacketConnection:
-    ''' Wrap a pair of binary streams in a `PacketConnection`.
+  @contextmanager
+  def connected(self):
+    ''' A context manager ensuring that the `PacketConnection` is open.
     '''
-    conn = PacketConnection(
-        recv,
-        send,
-        self._handle_request,
-        name=self.name,
-        packet_grace=0,
-        tick=True
-    )
-    return conn
-
-  @locked
-  def _packet_disconnect(self, conn):
-    debug("PacketConnection DISCONNECT notification: %s", conn)
-    oconn = self._conn
-    if oconn is conn:
-      self._conn = None
-      self._conn_attempt_last = time.time()
-    else:
-      debug(
-          "disconnect of %s, but that is not the current connection, ignoring",
-          conn
-      )
+    with self.conn:
+      yield
 
   def join(self):
     ''' Wait for the `PacketConnection` to shut down.
