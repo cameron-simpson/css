@@ -18,7 +18,7 @@ from typing import Callable, Protocol, Tuple, Union, runtime_checkable
 
 from cs.binary import SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
-from cs.context import stackattrs
+from cs.context import closeall, stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.lex import r
@@ -200,6 +200,7 @@ class PacketConnection(MultiOpenMixin):
   '''
 
   CH0_TAG_START = 0
+
   # special packet indicating end of stream
   EOF_Packet = Packet(
       is_request=True,
@@ -211,7 +212,7 @@ class PacketConnection(MultiOpenMixin):
   )
   CH0_TAG_START += 1
 
-  # special packet indicating requests
+  # special packet indicating that there will be no more requests
   ERQ_Packet = Packet(
       is_request=True,
       channel=0,
@@ -583,7 +584,7 @@ class PacketConnection(MultiOpenMixin):
   ) -> Result:
     ''' Compose and dispatch a new request, returns a `Result`.
 
-        Allocates a new tag, a Result to deliver the response, and
+        Allocates a new tag, a `Result` to deliver the response, and
         records the response decode function for use when the
         response arrives.
 
@@ -597,32 +598,44 @@ class PacketConnection(MultiOpenMixin):
           response_payload_bytes) and returning the decoded response payload
           value; if unspecified, the response payload bytes are used
 
-        The Result will yield an `(ok, flags, payload)` tuple, where:
+        The `Result` will yield an `(ok, flags, payload)` tuple, where:
         * `ok`: whether the request was successful
         * `flags`: the response flags
         * `payload`: the response payload, decoded by decode_response
           if specified
     '''
-    if not self._runstate.running:
-      raise ClosedError(f'not running: {self._runstate}')
-    if rq_type < 0:
-      raise ValueError("rq_type may not be negative (%s)" % (rq_type,))
-    # reserve type 0 for end-of-requests
-    rq_type += 1
-    tag = self._new_tag(channel)
-    R = Result(f'{self.name}:{tag}')
-    self._pending_add(channel, tag, Request_State(decode_response, R))
-    self._queue_packet(
-        Packet(
-            is_request=True,
-            channel=channel,
-            tag=tag,
-            flags=flags,
-            rq_type=rq_type,
-            payload=payload
-        )
-    )
-    return R
+    close = closeall([self])
+
+    def post_request_close(result, transition):
+      close()
+
+    close.__name__ = f'closeall[{self}]'
+    queued = False
+    try:
+      if rq_type < 0:
+        raise ValueError("rq_type may not be negative (%s)" % (rq_type,))
+      # reserve type 0 for end-of-requests
+      rq_type += 1
+      tag = self._new_tag(channel)
+      R = Result(f'{self.name}:{tag}')
+      R.fsm_callback('DONE', post_request_close)
+      R.fsm_callback('CANCELLED', post_request_close)
+      self._pending_add(channel, tag, Request_State(decode_response, R))
+      self._queue_packet(
+          Packet(
+              is_request=True,
+              channel=channel,
+              tag=tag,
+              flags=flags,
+              rq_type=rq_type,
+              payload=payload
+          )
+      )
+      queued = True
+      return R
+    finally:
+      if not queued:
+        close()
 
   @not_closed
   def do(self, rq_type, flags=0, payload=b'', decode_response=None, channel=0):
