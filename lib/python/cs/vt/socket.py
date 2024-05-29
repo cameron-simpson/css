@@ -14,6 +14,7 @@ from socket import socket, AF_INET, AF_UNIX
 from socketserver import (
     TCPServer, UnixStreamServer, ThreadingMixIn, StreamRequestHandler
 )
+from typing import Callable, Tuple
 
 from icontract import require
 
@@ -187,35 +188,25 @@ class TCPClientStore(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
   '''
 
-  def __init__(self, name, bind_addr, addif=False, **kw):
+  def __init__(self, name, bind_addr, *streamstore_kw):
     if name is None:
       name = "%s(bind_addr=%r)" % (self.__class__.__name__, bind_addr)
     self.sock_bind_addr = bind_addr
     self.sock = None
-    StreamStore.__init__(self, name, self._tcp_connect, addif=addif, **kw)
+    StreamStore.__init__(
+        self, name, self._tcp_client_connect, **streamstore_kw
+    )
 
-  @contextmanager
-  def startup_shutdown(self):
-    try:
-      with super().startup_shutdown():
-        yield
-    finally:
-      if self.sock is not None:
-        self.sock.close()
-        self.sock = None
-
-  @contextmanager
-  @require(lambda self: not self.sock)
-  def _tcp_connect(self):
+  def _tcp_client_connect(self) -> Tuple[OpenSocket, OpenSocket, Callable]:
+    ''' A method to connect to a `TCPStoreServer`.
+        It returns the receive socket, the send socket and the shutdown function.
+    '''
     # TODO: IPv6 support
     self.sock = socket(AF_INET)
-    try:
-      with Pfx("%s.sock.connect(%r)", self, self.sock_bind_addr):
-        self.sock.connect(self.sock_bind_addr)
-      yield OpenSocket(self.sock, False), OpenSocket(self.sock, True)
-    finally:
-      self.sock.close()
-      self.sock = None
+    with Pfx("%s.sock.connect(%r)", self, self.sock_bind_addr):
+      self.sock.connect(self.sock_bind_addr)
+    return OpenSocket(self.sock,
+                      False), OpenSocket(self.sock, True), self.sock.close
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
@@ -259,32 +250,23 @@ class UNIXSocketClientStore(StreamStore):
   ''' A Store attached to a remote Store at `socket_path`.
   '''
 
-  def __init__(self, name, socket_path, addif=False, **kw):
+  def __init__(self, name, socket_path, addif=False, **streamstore_kw):
     if name is None:
       name = "%s(socket_path=%r)" % (self.__class__.__name__, socket_path)
     self.socket_path = socket_path
     self.sock = None
-    StreamStore.__init__(self, name, self._unixsock_connect, addif=addif, **kw)
-
-  @contextmanager
-  def startup_shutdown(self):
-    try:
-      with super().startup_shutdown():
-        yield
-    finally:
-      if self.sock is not None:
-        self.sock.close()
-        self.sock = None
+    StreamStore.__init__(
+        self, name, self._unixsock_connect, addif=addif, **streamstore_kw
+    )
 
   @contextmanager
   @require(lambda self: not self.sock)
   def _unixsock_connect(self):
+    ''' A method to connect to a `UNIXSocketStoreServer`.
+        It returns the receive socket, the send socket and the shutdown function.
+    '''
     self.sock = socket(AF_UNIX)
-    try:
-      with Pfx("%s.sock.connect(%r)", self, self.socket_path):
-        self.sock.connect(self.socket_path)
-        yield OpenSocket(self.sock, False), OpenSocket(self.sock, True)
-    finally:
-      if self.sock is not None:
-        self.sock.close()
-        self.sock = None
+    with Pfx("%s.sock.connect(%r)", self, self.socket_path):
+      self.sock.connect(self.socket_path)
+    return OpenSocket(self.sock,
+                      False), OpenSocket(self.sock, True), self.sock.close
