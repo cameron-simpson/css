@@ -4,7 +4,6 @@
 '''
 
 from contextlib import contextmanager
-import signal
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
@@ -14,6 +13,10 @@ except ImportError:
     ''' A simple `nullcontext` for older Pythons
     '''
     yield None
+
+from functools import partial
+import signal
+from typing import Callable, Iterable
 
 from cs.gimmicks import error
 
@@ -696,10 +699,23 @@ def _withall(obj_it):
 
 @contextmanager
 def withall(objs):
-  ''' Enter every object `obj` in `obj_list` except those which are `None`
+  ''' Enter every object `obj` in `objs` except those which are `None`
       using `with obj:`, then yield.
   '''
   yield from _withall(obj for obj in objs if obj is not None)
+
+def closeall(objs: Iterable) -> Callable:
+  ''' Enter all the objects from `objs` using `with`
+      and return a function to close them all.
+
+      This is for situations where resources must be obtained now
+      but released at a later time on completion of some operation,
+      for example where we are dispatching a thread to work with
+      the resources.
+  '''
+  cmgr_it = twostep(withall(objs))
+  next(cmgr_it)
+  return partial(next, cmgr_it)
 
 @contextmanager
 def reconfigure_file(f, **kw):
