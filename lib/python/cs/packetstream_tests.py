@@ -73,16 +73,14 @@ class _TestStream(SetupTeardownMixin):
     '''
     clsname = self.__class__.__name__
     with PacketConnection(
-        downstream_rd,
-        upstream_wr,
+        (downstream_rd, upstream_wr),
         f'{clsname}-local',
         request_handler=self._request_handler,  ## TODO remove this 
     ) as local_conn:
       if not local_conn.requests_allowed:
         raise RuntimeError
       with PacketConnection(
-          upstream_rd,
-          downstream_wr,
+          (upstream_rd, downstream_wr),
           f'{clsname}-remote',
           request_handler=self._request_handler,
       ) as remote_conn:
