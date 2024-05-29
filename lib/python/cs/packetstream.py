@@ -14,7 +14,7 @@ import os
 import sys
 from time import sleep
 from threading import Lock
-from typing import Callable, Tuple, Union
+from typing import Callable, Protocol, Tuple, Union, runtime_checkable
 
 from cs.binary import SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
@@ -152,6 +152,48 @@ class Packet(SimpleBinary):
 
 Request_State = namedtuple('RequestState', 'decode_response result')
 
+# type specifications for the recv_send parameter
+@runtime_checkable
+class ReadableFile(Protocol):
+  ''' The requirements for a file used to receive.
+  '''
+
+  def read(self, size: int) -> bytes:
+    ''' Read up to `size` bytes.
+    '''
+    ...
+
+@runtime_checkable
+class SendableFile(Protocol):
+  ''' The requirements for a file used to send.
+  '''
+
+  def write(self, bs: bytes) -> int:
+    ''' Write bytes, return the number of bytes written.
+    '''
+    ...
+
+  def flush(self) -> None:
+    ''' Flush any buffer of written bytes.
+    '''
+    ...
+
+# we read from a file descriptor or a readable file or a CornuCopyBuffer
+PacketConnectionRecv = Union[int, ReadableFile, CornuCopyBuffer]
+# we send to a writable file descriptor or a writeable buffered file
+PacketConnectionSend = Union[int, SendableFile]
+PacketConnectionRecvSend = Union[
+    Tuple[PacketConnectionRecv, PacketConnectionSend],
+    Callable[
+        (),
+        Tuple[
+            PacketConnectionRecv,
+            PacketConnectionSend,
+            Callable[(), None],
+        ],
+    ],
+]
+
 # pylint: disable=too-many-instance-attributes
 class PacketConnection(MultiOpenMixin):
   ''' A bidirectional binary connection for exchanging requests and responses.
@@ -183,8 +225,7 @@ class PacketConnection(MultiOpenMixin):
   # pylint: disable=too-many-arguments
   def __init__(
       self,
-      recv,
-      send=None,
+      recv_send: PacketConnectionRecvSend,
       name=None,
       *,
       request_handler=None,
@@ -253,12 +294,7 @@ class PacketConnection(MultiOpenMixin):
     if name is None:
       name = str(seq())
     self.name = name
-    if send is None:
-      if not callable(recv):
-        raise TypeError(
-            f'if send is None, recv must be a callable returning (recv,send,shutdown); got {r(recv)}'
-        )
-    self.recv_send = recv, send
+    self.recv_send = recv_send
     if packet_grace is None:
       packet_grace = DEFAULT_PACKET_GRACE
     if tick is None:
