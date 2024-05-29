@@ -235,13 +235,7 @@ class PacketConnection(MultiOpenMixin):
     ''' Initialise the `PacketConnection`.
 
         Parameters:
-        * `recv`,`send`: the inbound and outbound binary streams.
-        * `send`: outbound binary stream.
-          If this is an `int` it is taken to be an OS file descriptor,
-          otherwise it should be a binary file like object with `.write(bytes)`
-          and `.flush()` methods.
-          This object _is not closed_ by the `PacketConnection`;
-          the caller has responsibility for that.
+        * `recv_send`: specify the receive and send streams
         * `packet_grace`:
           default pause in the packet sending worker
           to allow another packet to be queued
@@ -264,6 +258,13 @@ class PacketConnection(MultiOpenMixin):
           If a Boolean, call `tick_fd_2` if true, otherwise do nothing.
           Otherwise `tick` should be a callable accepting a byteslike value.
 
+        The `recv_send` parameter is used to prepare the connection.
+        It may take the following forms:
+        * a 2-tuple of `(recv,send)` specifying the receive and send streams
+        * an `int` specifying a single file descriptor used for
+          both receive and send
+        * a callable returning a 3-tuple of `(recv,send,close)` as
+          for `PacketConnection`'s callable mode
         The `(recv,send)` pair indicate the inbound and outbound binary streams.
 
         For preexisting streams such as pipes or sockets these can be:
