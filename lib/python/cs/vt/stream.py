@@ -199,23 +199,18 @@ class StreamStore(StoreSyncBase):
   def join(self):
     ''' Wait for the `PacketConnection` to shut down.
     '''
-    conn = self._conn
-    if conn:
-      conn.join()
+    self.conn.join()
 
   def do_bg(self, rq) -> Result:
     ''' Wrapper for `self.conn.request` to catch and report failed autoconnection.
         Raises `StoreError` on `ClosedError` or `CancellationError`.
     '''
-    conn = self.connection()
-    if conn is None:
-      raise StoreError("no connection")
+    conn = self.conn
     try:
       submitted = conn.request(
           rq.RQTYPE, getattr(rq, 'packet_flags', 0), bytes(rq)
       )
     except ClosedError as e:
-      self._conn = None
       raise StoreError("connection closed: %s" % (e,), request=rq) from e
     except CancellationError as e:
       raise StoreError("request cancelled: %s" % (e,), request=rq) from e
@@ -242,7 +237,10 @@ class StreamStore(StoreSyncBase):
         Otherwise it returns a `(flags,payload)` tuple
         and the caller can assume the request was ok.
     '''
-    return self.do_bg(rq)()
+    with self.conn:
+      R = self.do_bg(rq)
+      result = R()
+      return result
 
   @staticmethod
   def decode_request(rq_type, flags, payload):
