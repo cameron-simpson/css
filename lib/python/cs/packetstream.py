@@ -740,6 +740,94 @@ class PacketConnection(MultiOpenMixin):
       recv_last_offset = new_offset
       return length
 
+    def recv_request(packet):
+      ''' Process a request Packet from the upstream client.
+      '''
+      # request from upstream client
+      channel = packet.channel
+      tag = packet.tag
+      flags = packet.flags
+      payload = packet.payload
+      with Pfx("request[%d:%d]", channel, tag):
+        rq_in_progress.total += 1  # note new request
+        if self.request_handler is None:
+          # we are only a client, not a server
+          self._reject(channel, tag, "no request handler")
+        elif not self.requests_allowed:
+          self._reject(channel, tag, "requests no longer allowed")
+        elif runstate.cancelled:
+          # we are shutting down, no new work accepted
+          self._reject(channel, tag, "rejecting request: runstate.cancelled")
+        else:
+          requests = self._channel_request_tags
+          if channel not in requests:
+            # unknown channel
+            self._reject(channel, tag, "unknown channel %d")
+          elif tag in self._channel_request_tags[channel]:
+            self._reject(
+                channel, tag,
+                "channel %d: tag already in use: %d" % (channel, tag)
+            )
+          else:
+            # payload for requests is the request enum and data
+            rq_type = packet.rq_type
+            # normalise rq_type
+            rq_type -= 1
+            requests[channel].add(tag)
+            # queue the work function and track it
+            LF = self._later.defer(
+                self._run_request,
+                channel,
+                tag,
+                self.request_handler,
+                rq_type,
+                flags,
+                payload,
+            )
+            # record the LateFunction and arrange its removal on completion
+            self.requests_in_progress.add(LF)
+            LF.notify(self.requests_in_progress.remove)
+
+    def recv_response(packet):
+      ''' Process a response Packet from the upstream client.
+      '''
+      # response to a previous request from us
+      channel = packet.channel
+      tag = packet.tag
+      flags = packet.flags
+      with Pfx("response[%d:%d]", channel, tag):
+        # response: get state of matching pending request, remove state
+        try:
+          rq_state = self._pending_pop(channel, tag)
+        except ValueError as e:
+          # no such pending pair - response to unknown request
+          error("%d.%d: response to unknown request: %s", channel, tag, e)
+        else:
+          rq_out_progress.position += 1  # note completion
+          decode_response, R = rq_state
+          # first flag is "ok"
+          ok = (flags & 0x01) != 0
+          flags >>= 1
+          payload = packet.payload
+          if ok:
+            # successful reply
+            # return (True, flags, decoded-response)
+            if decode_response is None:
+              # return payload bytes unchanged
+              R.result = (True, flags, payload)
+            else:
+              # decode payload
+              try:
+                result = decode_response(flags, payload)
+              except Exception:  # pylint: disable=broad-except
+                R.exc_info = sys.exc_info()
+              else:
+                R.result = (True, flags, result)
+          else:
+            # unsuccessful: return (False, other-flags, payload-bytes)
+            R.result = (False, flags, payload)
+
+    # process the packets from upstream
     for packet in progressbar(
         Packet.scan(recv_bfr),
         label=f'<= {self.name}',
@@ -751,89 +839,10 @@ class PacketConnection(MultiOpenMixin):
       if packet == self.ERQ_Packet:
         self.requests_allowed = False
         continue
-      channel = packet.channel
-      tag = packet.tag
-      flags = packet.flags
-      payload = packet.payload
       if packet.is_request:
-        # request from upstream client
-        with Pfx("request[%d:%d]", channel, tag):
-          rq_in_progress.total += 1  # note new request
-          if self.request_handler is None:
-            # we are only a client, not a server
-            self._reject(channel, tag, "no request handler")
-          elif not self.requests_allowed:
-            self._reject(channel, tag, "requests no longer allowed")
-          elif runstate.cancelled:
-            # we are shutting down, no new work accepted
-            self._reject(channel, tag, "rejecting request: runstate.cancelled")
-          else:
-            requests = self._channel_request_tags
-            if channel not in requests:
-              # unknown channel
-              self._reject(channel, tag, "unknown channel %d")
-            elif tag in self._channel_request_tags[channel]:
-              self._reject(
-                  channel, tag,
-                  "channel %d: tag already in use: %d" % (channel, tag)
-              )
-            else:
-              # payload for requests is the request enum and data
-              rq_type = packet.rq_type
-              if rq_type == 0:
-                # magic EOF rq_type - must be malformed (!=EOF_Packet)
-                error("malformed EOF packet received: %s", packet)
-                ##breakpoint()
-                break
-              # normalise rq_type
-              rq_type -= 1
-              requests[channel].add(tag)
-              # queue the work function and track it
-              LF = self._later.defer(
-                  self._run_request,
-                  channel,
-                  tag,
-                  self.request_handler,
-                  rq_type,
-                  flags,
-                  payload,
-              )
-              # record the LateFunction and arrange its removal on completion
-              self.requests_in_progress.add(LF)
-              LF.notify(self.requests_in_progress.remove)
+        recv_request(packet)
       else:
-        # response to a previous request from us
-        with Pfx("response[%d:%d]", channel, tag):
-          # response: get state of matching pending request, remove state
-          try:
-            rq_state = self._pending_pop(channel, tag)
-          except ValueError as e:
-            # no such pending pair - response to unknown request
-            error("%d.%d: response to unknown request: %s", channel, tag, e)
-          else:
-            rq_out_progress += 1  # note completion
-            decode_response, R = rq_state
-            # first flag is "ok"
-            ok = (flags & 0x01) != 0
-            flags >>= 1
-            payload = packet.payload
-            if ok:
-              # successful reply
-              # return (True, flags, decoded-response)
-              if decode_response is None:
-                # return payload bytes unchanged
-                R.result = (True, flags, payload)
-              else:
-                # decode payload
-                try:
-                  result = decode_response(flags, payload)
-                except Exception:  # pylint: disable=broad-except
-                  R.exc_info = sys.exc_info()
-                else:
-                  R.result = (True, flags, result)
-            else:
-              # unsuccessful: return (False, other-flags, payload-bytes)
-              R.result = (False, flags, payload)
+        recv_response(packet)
     # end of received packets: cancel any outstanding requests
     self._pending_cancel()
     # alert any listeners of receive EOF
