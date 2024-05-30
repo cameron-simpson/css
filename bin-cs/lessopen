@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Used by less(1) via $LESSOPEN. Run chroma or shl.
+# Cameron Simpson <cs@cskk.id.au>
+#
+
+if which chroma >/dev/null 2>&1
+then  [ "$*" = - ] && set --; set -- chroma ${1+"$@"}
+else  set -- shl ${1+"$@"}
+fi
+set -x
+exec "$@"

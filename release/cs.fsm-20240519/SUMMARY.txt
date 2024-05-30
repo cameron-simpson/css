@@ -1,0 +1,1 @@
+FSM: default for FSM_DEFAULT_STATE is the first key from FSM_TRANSITIONS (relies on ordered dicts, so Python 3.6 onward).

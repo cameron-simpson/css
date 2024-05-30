@@ -833,15 +833,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
   @uses_upd
-  @uses_runstate
   def cmd_import(
-      self,
-      argv,
-      runstate: RunState,
-      upd: Upd,
-      datasets=None,
-      doit=None,
-      force=None
+      self, argv, *, upd: Upd, datasets=None, doit=None, force=None
   ):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
@@ -874,6 +867,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     datasets = options.datasets
     doit = options.doit
     force = options.force
+    runstate = options.runstate
     if not datasets:
       warning("empty dataset list")
     for dataset in datasets:

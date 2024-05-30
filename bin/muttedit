@@ -47,7 +47,7 @@ Environment:
     If not empty, implies -w mode with its value.
 
 The default mode is window mode if \$MUTTEDIT_WINDOWPROG is set,
-otherwise pane mode (-T) if $TMUX is set, otherwise inline."
+otherwise pane mode (-T) if \$TMUX is set, otherwise inline."
 
 badopts=
 
