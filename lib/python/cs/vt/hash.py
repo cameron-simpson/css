@@ -181,6 +181,14 @@ class HashCode(
     return bytes(HashCodeField(self))
 
   @classmethod
+  def decode(cls, bs):
+    ''' Decode a `HashCode` from the binary transcription.
+    '''
+    h = HashCodeField.from_bytes(bs).value
+    assert isinstance(h, cls) and type(h) is not cls
+    return h
+
+  @classmethod
   @OBSOLETE(suggestion='use BaseHashCode.from_data)')
   def from_chunk(cls, chunk):
     ''' Factory function returning a `HashCode` object from a data block.
