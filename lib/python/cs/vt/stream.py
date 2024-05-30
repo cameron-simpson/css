@@ -360,12 +360,9 @@ class StreamStore(StoreSyncBase):
     return found
 
   def flush(self):
-    if self._conn is None:
-      pass  # XP("SKIP FLUSH WHEN _conn=None")
-    else:
-      flags, payload = self.do(FlushRequest())
-      assert flags == 0
-      assert not payload
+    flags, payload = self.do(FlushRequest())
+    assert flags == 0
+    assert not payload
     local_store = self.local_store
     if local_store is not None:
       local_store.flush()
