@@ -663,12 +663,16 @@ def trace(
     except Exception as e:
       end_time = time.time()
       if exception:
+        xlog_kw = {}
+        if xlog is X:
+          xlog_kw['colour'] = 'red'
         xlog(
             "%sCALL %s %gs RAISE %r",
             _trace_state.indent,
             log_cite,
             end_time - start_time,
             e,
+            **xlog_kw,
         )
       _trace_state.indent = old_indent
       raise
