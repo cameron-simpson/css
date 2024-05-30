@@ -436,6 +436,7 @@ class PacketConnection(MultiOpenMixin):
                               report_print=True):
                   later.wait_outstanding()
             # close the stream to the remote and wait
+            self.send_eof()
             with run_task("%s: close sendQ, wait for sender" % (self,),
                           report_print=True):
               self._sendQ.close(enforce_final_close=True)
