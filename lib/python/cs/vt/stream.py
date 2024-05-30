@@ -112,7 +112,7 @@ class StreamStore(StoreSyncBase):
         `PacketConnection`. It may take the following forms:
         * a 2-tuple of `(recv,send)` suitable for passing directly
           to the `PacketConnection` setup; typically this is a pair
-          of fie descriptors or a pair of binary file streams
+          of file descriptors or a pair of binary file streams
         * a callable returning a 3-tuple of `(recv,send,close)` as
           for `PacketConnection`'s callable mode
 
@@ -204,7 +204,7 @@ class StreamStore(StoreSyncBase):
       conn.join()
 
   def do_bg(self, rq) -> Result:
-    ''' Wrapper for `self._conn.request` to catch and report failed autoconnection.
+    ''' Wrapper for `self.conn.request` to catch and report failed autoconnection.
         Raises `StoreError` on `ClosedError` or `CancellationError`.
     '''
     conn = self.connection()
@@ -236,7 +236,7 @@ class StreamStore(StoreSyncBase):
 
   @typechecked
   def do(self, rq) -> Tuple[int, bytes]:
-    ''' Synchronous interface to `self._conn.request`
+    ''' Synchronous interface to `self.conn.request`
         In addition to the exceptions raised by `self.do_bg()`
         this method raises `StoreError` if the response is not ok.
         Otherwise it returns a `(flags,payload)` tuple
