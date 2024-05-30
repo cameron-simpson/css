@@ -293,30 +293,23 @@ class StreamStore(StoreSyncBase):
         If not specified, use the `sync` mode supplied when the
         `StreamStore` was initialised.
     '''
-    h = self.hash(data)
-    if self.mode_addif:
-      # lower bandwidth, higher latency
-      if self.contains(h):
-        return h
-    rq = AddRequest(data=data, hashenum=self.hashclass.hashenum)
-    if sync is None:
-      sync = self.mode_sync
-    if sync:
-      flags, payload = self.do(rq)
-      h2, offset = hash_decode(payload)
-      if offset != len(payload):
-        raise StoreError(
-            "extra payload data after hashcode: %r" % (payload[offset:],)
-        )
-      assert flags == 0
-      if h != h2:
-        raise RuntimeError(
-            "precomputed hash %s:%s != hash from .add %s:%s" %
-            (type(h), h, type(h2), h2)
-        )
-    else:
-      self.do_bg(rq)
-    return h
+    with self.conn:
+      h = self.hash(data)
+      if self.mode_addif:
+        # lower bandwidth, higher latency
+        if self.contains(h):
+          return h
+      rq = AddRequest(data=data, hashenum=self.hashclass.hashenum)
+      if sync is None:
+        sync = self.mode_sync
+      if sync:
+        flags, payload = self.do(rq)
+        assert flags == 0
+        h2 = HashCode.decode(payload)
+        assert h == h2
+      else:
+        self.do_bg(rq)
+      return h
 
   def get(self, h, default=None):
     try:
