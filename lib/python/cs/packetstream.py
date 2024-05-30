@@ -837,6 +837,11 @@ class PacketConnection(MultiOpenMixin):
     ):
       if packet == self.EOF_Packet:
         break
+      if packet.is_request and packet.rq_type == 0:
+        # magic EOF rq_type - must be malformed (!=EOF_Packet)
+        error("malformed EOF packet received: %s", packet)
+        ##breakpoint()
+        break
       if packet == self.ERQ_Packet:
         self.requests_allowed = False
         continue
@@ -891,7 +896,7 @@ class PacketConnection(MultiOpenMixin):
         if P.is_request:
           rq_out_progress.total += 1  # note new sent rq
         else:
-          rq_in_progress += 1  # note we completed a rq
+          rq_in_progress.position += 1  # note we completed a rq
         try:
           P.write(sendf)
           if Q.empty():
