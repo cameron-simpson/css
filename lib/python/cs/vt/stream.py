@@ -266,7 +266,7 @@ class StreamStore(StoreSyncBase):
       raise ValueError("no local_store, request rejected")
     rq = self.decode_request(rq_type, flags, payload)
     with local_store:
-      return rq.do(self)
+      return rq.do_local(self)
 
   @pfx_method
   def __len__(self):
@@ -593,7 +593,7 @@ class AddRequest(
     '''
     return HashCode.by_index(self.hashenum)
 
-  def do(self, stream):
+  def do_local(self, stream):
     ''' Add data to the local store, return serialised hashcode.
     '''
     local_store = stream._local_store
@@ -617,7 +617,7 @@ class GetRequest(UnFlaggedPayloadMixin, HashCodeField):
   def hashcode(self):
     return self.value
 
-  def do(self, stream):
+  def do_local(self, stream):
     ''' Return data from the local store by hashcode.
     '''
     local_store = stream._local_store
@@ -639,7 +639,7 @@ class ContainsRequest(UnFlaggedPayloadMixin, HashCodeField):
   def hashcode(self):
     return self.value
 
-  def do(self, stream):
+  def do_local(self, stream):
     ''' Test for hashcode, return `1` for present, `0` otherwise.
     '''
     local_store = stream._local_store
@@ -659,7 +659,7 @@ class ContainsIndirectRequest(UnFlaggedPayloadMixin, HashCodeField):
   def hashcode(self):
     return self.value
 
-  def do(self, stream):
+  def do_local(self, stream):
     ''' Test for hashcode, return `1` for present, `0` otherwise.
     '''
     local_store = stream._local_store
@@ -676,7 +676,7 @@ class FlushRequest(UnFlaggedPayloadMixin, BinaryMultiValue('FlushRequest',
   RQTYPE = RqType.FLUSH
 
   @staticmethod
-  def do(stream):
+  def do_local(stream):
     ''' Flush the `local_store`.
     '''
     local_store = stream._local_store
@@ -692,7 +692,7 @@ class LengthRequest(UnFlaggedPayloadMixin, BinaryMultiValue('LengthRequest',
   RQTYPE = RqType.LENGTH
 
   @staticmethod
-  def do(stream):
+  def do_local(stream):
     ''' Return the number of indexed blocks in `local_store`.
     '''
     local_store = stream._local_store
@@ -773,7 +773,7 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
       yield HashCodeField.transcribe_value(start_hashcode)
     yield BSUInt.transcribe_value(self.length)
 
-  def do(self, stream):
+  def do_local(self, stream):
     ''' Return serialised hashcodes from the local store.
     '''
     local_store = stream._local_store
@@ -797,7 +797,7 @@ class HashOfHashCodesRequest(HashCodesRequest):
 
   RQTYPE = RqType.HASHCODES_HASH
 
-  def do(self, stream):
+  def do_local(self, stream):
     ''' Return a hash of hashcodes from the local store.
     '''
     local_store = stream._local_store
@@ -822,7 +822,7 @@ class ArchiveLastRequest(
 
   RQTYPE = RqType.ARCHIVE_LAST
 
-  def do(self, stream):
+  def do_local(self, stream):
     ''' Return data from the local store by hashcode.
     '''
     local_store = stream._local_store
@@ -843,7 +843,7 @@ class ArchiveListRequest(
 
   RQTYPE = RqType.ARCHIVE_LIST
 
-  def do(self, stream):
+  def do_local(self, stream):
     ''' Return ArchiveEntry transcriptions from the named Archive.
     '''
     local_store = stream._local_store
@@ -864,7 +864,7 @@ class ArchiveUpdateRequest(
 
   RQTYPE = RqType.ARCHIVE_UPDATE
 
-  def do(self, stream):
+  def do_local(self, stream):
     ''' Return data from the local store by hashcode.
     '''
     local_store = stream._local_store
