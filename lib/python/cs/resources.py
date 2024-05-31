@@ -575,6 +575,7 @@ class RunState(FSM, HasThreadState):
   FSM_TRANSITIONS = {
       'IDLE': {
           'start': 'RUNNING',
+          'cancel': 'IDLE',
       },
       'RUNNING': {
           'cancel': 'STOPPING',
