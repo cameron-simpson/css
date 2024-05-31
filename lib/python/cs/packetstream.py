@@ -580,8 +580,10 @@ class PacketConnection(MultiOpenMixin):
       rq_type,
       flags=0,
       payload=b'',
+      *,
       decode_response=None,
       channel=0,
+      label=None,
   ) -> Result:
     ''' Compose and dispatch a new request, returns a `Result`.
 
@@ -605,6 +607,16 @@ class PacketConnection(MultiOpenMixin):
         * `payload`: the response payload, decoded by decode_response
           if specified
     '''
+    if label is None:
+      label = ','.join(
+          filter(
+              len, (
+                  f'rq_type={rq_type}',
+                  f'0b{flags:b}' if flags else '',
+                  f'{len(payload)}bs' if len(payload) else '',
+              )
+          )
+      )
     close = closeall([self])
 
     def post_request_close(result, transition):
@@ -618,7 +630,7 @@ class PacketConnection(MultiOpenMixin):
       # reserve type 0 for end-of-requests
       rq_type += 1
       tag = self._new_tag(channel)
-      R = Result(f'{self.name}:{tag}')
+      R = Result(f'{self.name}:{tag}:{label}')
       R.fsm_callback('DONE', post_request_close)
       R.fsm_callback('CANCELLED', post_request_close)
       self._pending_add(channel, tag, Request_State(decode_response, R))
@@ -639,7 +651,16 @@ class PacketConnection(MultiOpenMixin):
         close()
 
   @not_closed
-  def do(self, rq_type, flags=0, payload=b'', decode_response=None, channel=0):
+  def do(
+      self,
+      rq_type,
+      flags=0,
+      payload=b'',
+      *,
+      decode_response=None,
+      channel=0,
+      label=None
+  ):
     ''' Synchronous request.
         Submits the request, then calls the `Result` returned from the request.
     '''
@@ -647,8 +668,9 @@ class PacketConnection(MultiOpenMixin):
         rq_type,
         flags=flags,
         payload=payload,
+        channel=channel,
         decode_response=decode_response,
-        channel=channel
+        label=label,
     )
     return R()
 
