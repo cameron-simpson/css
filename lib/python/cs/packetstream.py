@@ -429,7 +429,7 @@ class PacketConnection(MultiOpenMixin):
               # complete any outstanding requests from the remote
               if later.outstanding:  ## HUH??
                 warning(
-                    "LLLLLLLLLLLLLL  surprise! %d outstanding Later jobs",
+                    "%d unexpected outstanding Later jobs",
                     len(later.outstanding)
                 )
                 with run_task(f'{self}: wait for outstanding LateFunctions',
