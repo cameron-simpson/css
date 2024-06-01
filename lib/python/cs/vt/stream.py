@@ -97,7 +97,7 @@ class StreamStore(StoreSyncBase):
           the data chunk's hash and to only submit an ADD request
           if the block is missing; this is a bandwith optimisation
           at the expense of latency.
-        * `capacity`: the capacity of the queue associaed with this Store;
+        * `capacity`: the capacity of the queue associated with this Store;
           default from `STREAM_CAPACITY_DEFAULT` (`{STREAM_CAPACITY_DEFAULT}`)
         * `exports`: a mapping of name=>Store providing requestable Stores
         * `local_store`: optional local Store for serving requests from the peer.
@@ -285,9 +285,10 @@ class StreamStore(StoreSyncBase):
     ''' Add `data` to the Store, return its hashcode.
 
         The optinal `sync` parameter may be used to control whether
-        this add is synchronous (return after the remote Store
-        has completed the add) or asynchronous (return as soon as
-        the add requests has been queued for the remote Store).
+        this add is synchronous (return after the remote Store has
+        completed the add) or asynchronous (return as soon as the
+        add request has been queued for delivery to for the remote
+        Store).
         If not specified, use the `sync` mode supplied when the
         `StreamStore` was initialised.
     '''
@@ -344,7 +345,7 @@ class StreamStore(StoreSyncBase):
       self._contains_cache.add(h)
     return found
 
-  def is_complete_indirect(self, ih):
+  def is_complete_indirect(self, ih) -> bool:
     ''' Check whether `ih`, the hashcode of an indirect Block,
         has its data and all its implied data present in this Store.
     '''
@@ -357,7 +358,7 @@ class StreamStore(StoreSyncBase):
       raise StoreError("unexpected flags: 0x%02x" % (flags,))
     if payload:
       raise StoreError("unexpected payload: %r" % (payload,))
-    return found
+    return bool(found)
 
   def flush(self):
     flags, payload = self.do(FlushRequest())
@@ -665,8 +666,10 @@ class ContainsIndirectRequest(UnFlaggedPayloadMixin, HashCodeField):
     hashcode = self.hashcode
     return 1 if local_store.is_complete_indirect(hashcode) else 0
 
-class FlushRequest(UnFlaggedPayloadMixin, BinaryMultiValue('FlushRequest',
-                                                           {})):
+class FlushRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue('FlushRequest', {}),
+):
   ''' A flush request.
   '''
 
@@ -681,8 +684,10 @@ class FlushRequest(UnFlaggedPayloadMixin, BinaryMultiValue('FlushRequest',
       raise ValueError("no local_store, request rejected")
     local_store.flush()
 
-class LengthRequest(UnFlaggedPayloadMixin, BinaryMultiValue('LengthRequest',
-                                                            {})):
+class LengthRequest(
+    UnFlaggedPayloadMixin,
+    BinaryMultiValue('LengthRequest', {}),
+):
   ''' Request the length (number of indexed Blocks) of the remote Store.
   '''
 
