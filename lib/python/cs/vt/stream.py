@@ -28,15 +28,13 @@ from cs.binary import (
     SimpleBinary,
 )
 from cs.buffer import CornuCopyBuffer
-from cs.context import contextif, stackattrs
+from cs.context import contextif
 from cs.deco import fmtdoc
-from cs.lex import r
-from cs.logutils import debug, warning, error
+from cs.logutils import warning, error
 from cs.packetstream import PacketConnection, PacketConnectionRecvSend
 from cs.pfx import Pfx, pfx_method
 from cs.resources import ClosedError
 from cs.result import CancellationError, Result
-from cs.threads import locked
 
 from .archive import BaseArchive, ArchiveEntry
 from .dir import _Dirent
