@@ -37,6 +37,7 @@ class TestResult(unittest.TestCase):
     R.put(9)
     self.assertTrue(R.ready)
     self.assertEqual(R.get(), 9)
+    time.sleep(0.1)
     self.assertEqual(countery[0], 2)
     R.notify(count)
     self.assertTrue(R.ready)
