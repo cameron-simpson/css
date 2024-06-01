@@ -18,7 +18,7 @@ import tempfile
 from time import sleep
 import unittest
 
-from cs.context import contextif, stackkeys
+from cs.context import contextif, stackkeys, stackattrs
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
@@ -253,44 +253,49 @@ def get_test_stores(prefix):
           )
 
 def multitest(method):
-  ''' Decorator to permute a test method for multiple Store types and hash classes.
+  ''' A decorator to permute a test method for multiple Store types and hash classes.
   '''
 
   def testMethod(self):
-    for subtest, S, second_Store in get_test_stores(prefix=method.__module__ +
-                                                    '.' + method.__name__):
+    for subtest, S, second_Store in get_test_stores(
+        prefix=f'{method.__module__}.{method.__name__}'):
       if STORECLASS_NAMES and type(S).__name__ not in STORECLASS_NAMES:
-        ##print("  skip", S)
+        print("  skip", S)
         continue
       with Pfx("%s:%s", S, ",".join(["%s=%s" % (k, v)
                                      for k, v in sorted(subtest.items())])):
+        print(f'test {method.__name__} S={S} second_Store={second_Store}')
         with self.subTest(test_store=S, **subtest):
-          self.S = S
-          self.supports_index_entry = type(self.S) in (DataDirStore,)
-          self.hashclass = subtest['hashclass']
-          S.init()
-          with S:
-            with RunState(f'testMethod(S={S})') as runS:
-              secondT = None
-              if second_Store:
-                assert not second_Store.is_open()
+          with stackattrs(
+              self,
+              S=S,
+              supports_index_entry=type(self.S) in (DataDirStore,),
+              hashclass=subtest['hashclass'],
+          ):
+            S.init()
+            with S:
+              with RunState(f'testMethod(S={S})') as runS:
+                secondT = None
+                if second_Store:
+                  assert not second_Store.is_open()
 
-                def second_while_S():
-                  while not runS.is_stopped:
-                    sleep(0.25)
+                  def second_while_S():
+                    while not runS.is_stopped:
+                      sleep(0.25)
 
-                secondT = bg_thread(
-                    second_while_S, pre_enter_objects=[second_Store]
-                )
-              # make S the "current" store
-              with S:
-                method(self)
-          if second_Store:
-            secondT.join()
-            assert not second_Store.is_open()
-          else:
-            assert not secondT
-          self.assertTrue(S.closed)
+                  secondT = bg_thread(
+                      second_while_S, pre_enter_objects=[second_Store]
+                  )
+                from cs.debug import trace
+                # make S the "current" store
+                with S:
+                  method(self)
+            if second_Store:
+              secondT.join()
+              assert not second_Store.is_open()
+            else:
+              assert not secondT
+            self.assertTrue(S.closed)
       ### run just the first combination
       ##break
 
