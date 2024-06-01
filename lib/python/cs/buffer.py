@@ -681,7 +681,7 @@ class CornuCopyBuffer(Promotable):
     return b''.join(taken)
 
   def readline(self):
-    ''' Return a binary "line" from `self`, where a line is defined by
+    r'''Return a binary "line" from `self`, where a line is defined by
         its ending `b'\n'` delimiter.
         The final line from a buffer might not have a trailing newline;
         `b''` is returned at EOF.
