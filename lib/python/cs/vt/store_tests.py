@@ -269,16 +269,27 @@ def multitest(method):
           self.supports_index_entry = type(self.S) in (DataDirStore,)
           self.hashclass = subtest['hashclass']
           S.init()
+          with S:
+            with RunState(f'testMethod(S={S})') as runS:
+              secondT = None
+              if second_Store:
+                assert not second_Store.is_open()
+
+                def second_while_S():
+                  while not runS.is_stopped:
+                    sleep(0.25)
+
+                secondT = trace(bg_thread)(
+                    second_while_S, pre_enter_objects=[second_Store]
+                )
+              # make S the "current" store
+              with S:
+                trace(method)(self)
           if second_Store:
+            trace(secondT.join)()
             assert not second_Store.is_open()
-          with contextif(second_Store):
-            with S:
-              method(self)
-              S.flush()
-            if second_Store:
-              assert second_Store.is_open()
-          if second_Store:
-            assert not second_Store.is_open()
+          else:
+            assert not secondT
           self.assertTrue(S.closed)
       ### run just the first combination
       ##break
