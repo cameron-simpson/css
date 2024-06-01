@@ -408,15 +408,15 @@ class Result(FSM):
     # TODO: adjust all users of .notify() to use fsm_callback and
     # accept a transition object?
     # pylint: disable=unused-argument
-    def callback(fsm, fsm_transition):
+    def result_callback_wrapper(fsm, fsm_transition):
       ''' `FSM.fsm_callback` shim for plain `notify(Result)` notifier functions.
       '''
       self.collected = True
       return notifier(fsm)
 
     with self.__lock:
-      self.fsm_callback('CANCELLED', callback)
-      self.fsm_callback('DONE', callback)
+      self.fsm_callback('CANCELLED', result_callback_wrapper)
+      self.fsm_callback('DONE', result_callback_wrapper)
       state = self.fsm_state
     # already cancelled or done? call the notifier immediately
     if state in (self.CANCELLED, self.DONE):
