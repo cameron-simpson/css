@@ -285,7 +285,7 @@ class FSM(DOTNodeMixin):
 
     # run the callbacks in a Thread
     Thread(
-        name=f'{self} run-callbacks {old_state}->{event}->{new_state}',
+        name=f'{self} run_callbacks {old_state}->{event}->{new_state}',
         target=run_callbacks,
     ).start()
     return new_state
@@ -334,7 +334,7 @@ class FSM(DOTNodeMixin):
       sep='\n',
       graph_name=None,
       history_style=None
-  ):
+  ) -> str:
     ''' Compute a DOT syntax graph description from a transitions dictionary.
 
         Parameters:
@@ -387,7 +387,7 @@ class FSM(DOTNodeMixin):
     return sep.join(dot)
 
   @property
-  def fsm_dot(self):
+  def fsm_dot(self) -> str:
     ''' A DOT syntax description of `self.FSM_TRANSITIONS`.
     '''
     return self.fsm_transitions_as_dot(self.FSM_TRANSITIONS)
@@ -406,7 +406,7 @@ class FSM(DOTNodeMixin):
     '''
     return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
 
-  def fsm_as_svg(self, layout=None, history_style=None, **dot_kw):
+  def fsm_as_svg(self, layout=None, history_style=None, **dot_kw) -> str:
     ''' Render the state transition diagram as SVG. '''
     return gvsvg(
         self.fsm_transitions_as_dot(history_style=history_style),
@@ -415,7 +415,7 @@ class FSM(DOTNodeMixin):
     )
 
   @property
-  def fsm_svg(self):
+  def fsm_svg(self) -> str:
     ''' The state transition diagram as SVG. '''
     return self.fsm_as_svg()
 
