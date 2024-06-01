@@ -55,7 +55,7 @@ You can also collect multiple `Result`s in completion order using the `report()`
 
 from queue import Queue
 import sys
-from threading import Lock, RLock
+from threading import Lock, RLock, Thread
 from typing import Callable
 
 from cs.deco import OBSOLETE
