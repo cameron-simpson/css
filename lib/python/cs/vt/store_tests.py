@@ -126,6 +126,9 @@ def get_test_stores(prefix):
           with stackkeys(subtest, storetype=DataDirStore):
             for index_name in INDEXCLASS_NAMES:
               indexclass = get_index_by_name(index_name)
+              if not indexclass.is_supported():
+                print(f'skip index {index_name}, not supported')
+                continue
               with stackkeys(subtest, indexname=index_name,
                              indexclass=indexclass):
                 for rollover in 200000, :
