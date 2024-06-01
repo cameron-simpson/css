@@ -248,6 +248,8 @@ class FSM(DOTNodeMixin):
         transtion, the callback should still return promptly.
         Also, to avoid needless races between the callbacks,
         the callbacks are called in series in the callback `Thread`.
+        Finally, remember that this method returns _before_ the
+        callbacks are complete.
     '''
     with self.__lock:
       old_state = self.fsm_state
@@ -301,6 +303,10 @@ class FSM(DOTNodeMixin):
         to `state` as `callback(self,FSMEventTransition)`.
         The special `state` value `FSM.FSM_ANY_STATE` may be supplied
         to register a callback which fires for every state transition.
+
+        *Important note*:
+        see the notes for the `fsm_event` method about how the
+        callbacks are run.
 
             >>> fsm = FSM('state1',transitions={
             ...   'state1':{'ev_a':'state2'},
