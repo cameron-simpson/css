@@ -108,6 +108,8 @@ class TestResult(unittest.TestCase):
     R = self.R
     R2 = R.post_notify(lambda r2: print("r2 =", r2))
     R.result = 1
+    time.sleep(0.1)
+    self.assertTrue(R2.ready)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
