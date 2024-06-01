@@ -24,8 +24,7 @@ from cs.context import (
     ContextManagerMixin,
     stackattrs,
     stackset,
-    twostep,
-    withall,
+    closeall,
 )
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
@@ -366,7 +365,7 @@ def bg(
     thread_factory = HasThreadState.Thread
   ##thread_prefix = prefix() + ': ' + name
   thread_prefix = name
-  preopen_close_it = None
+  preopen_close = None
 
   def thread_body():
     ''' Establish a basic `Pfx` context for the target `func`.
@@ -375,9 +374,9 @@ def bg(
       with Pfx("Thread:%d:%s", current_thread().ident, thread_prefix):
         return func(*args, **kwargs)
     finally:
-      if preopen_close_it is not None:
+      if preopen_close is not None:
         # do the closes
-        next(preopen_close_it)
+        preopen_close()
 
   T = thread_factory(
       name=thread_prefix,
@@ -389,10 +388,7 @@ def bg(
   if daemon is not None:
     T.daemon = daemon
   if pre_enter_objects:
-    # prepare a context manager to open all the pre_enter_objects
-    preopen_close_it = twostep(withall(pre_enter_objects))
-    # do the opens
-    next(preopen_close_it)
+    preopen_close = closeall(pre_enter_objects)
   if not no_start:
     T.start()
   return T
