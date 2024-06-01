@@ -197,9 +197,9 @@ class Result(FSM):
           (result, exc_info)
       )
     with self.__lock:
-      self.fsm_event('complete')
       self._result = result  # pylint: disable=attribute-defined-outside-init
       self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+      self.fsm_event('complete')
       self._get_lock.release()
 
   @property
