@@ -430,6 +430,14 @@ class Result(FSM):
         `retval` is the result of `self`, and use that to complete
         the secondary `Result`.
 
+        *Important note*: because the completion lock object is
+        released after the internal `FSM.fsm_event` call, the
+        callback used to implement `.post_notify` is fired before
+        the lock object is released. As such, it would deadlock as
+        it waits for completion of `self` by using that lock.
+        Therefore the callback dispatches a separate `Thread` to
+        wait for `self` and then run `post_func`.
+
         Example:
 
             # submit packet to data stream
@@ -441,13 +449,22 @@ class Result(FSM):
 
         If the `Result` has already completed this will happen immediately.
     '''
-    post_R = Result(f'POST_RESULT[{self.name}]')
+    post_R = Result(f'post_notify({self.name}):{post_func}')
 
-    def notifier(preR):
+    def post_notify_notifier(preR):
+      '''Run `post_func(self())`.'''
       retval = preR()
       post_R.run_func(post_func, retval)
 
-    self.notify(notifier)
+    # We dispatch the post_func in a separate Thread because it
+    # will deadlock on the completion of self.
+    self.notify(
+        lambda preR: Thread(
+            name=f'{self}.post_notify({post_func})',
+            target=post_notify_notifier,
+            args=(preR,)
+        ).start()
+    )
     return post_R
 
 def in_thread(func):
