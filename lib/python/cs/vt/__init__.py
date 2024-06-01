@@ -682,7 +682,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       self.close()
       dstS.close()
 
-  def is_complete_indirect(self, ih):
+  def is_complete_indirect(self, ih) -> bool:
     ''' Check whether `ih`, the hashcode of an indirect Block,
         has its data and all its implied data present in this Store.
     '''
