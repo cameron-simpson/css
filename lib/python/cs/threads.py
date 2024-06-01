@@ -785,17 +785,19 @@ class NRLock:
       Otherwise this behaves like `threading.Lock`.
   '''
 
-  __slots__ = ('_lock', '_lock_thread', '_locked_by')
+  __slots__ = ('_lock', '_lock_thread', '_locked_by', '_name')
 
-  def __init__(self):
+  def __init__(self, name=None):
     self._lock = Lock()
     self._lock_thread = None
     self._locked_by = None
+    self._name = name
 
   def __repr__(self):
     return (
-        f'{self.__class__.__name__}:{self._lock}:{self._lock_thread}:{self._locked_by}'
-        if self.locked() else f'{self.__class__.__name__}:{self._lock}'
+        f'{self.__class__.__name__}:{self._name!r}:{self._lock}:{self._lock_thread}:{self._locked_by}'
+        if self.locked() else
+        f'{self.__class__.__name__}:{self._name!r}:{self._lock}'
     )
 
   def locked(self):
