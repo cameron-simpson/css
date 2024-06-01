@@ -823,6 +823,8 @@ class NRLock:
     return acquired
 
   def release(self):
+    ''' Release the lock as for `threading.Lock`.
+    '''
     self._lock.release()
     self._lock_thread = None
     self._locked_by = None
