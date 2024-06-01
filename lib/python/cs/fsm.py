@@ -240,16 +240,10 @@ class FSM(DOTNodeMixin):
         If there are callbacks for `new_state` or `FSM.FSM_ANY_STATE`,
         call each callback as `callback(self,transition)`.
 
-        *Important note*: the callbacks are run in a distinct
-        `Thread` to prevent deadlocks with `self` and hold the
-        internal mutex to deter further state transitions of
-        `self` until the callbacks are complete.
-        If you need to dispatch a long running activity from a state
-        transtion, the callback should still return promptly.
-        Also, to avoid needless races between the callbacks,
-        the callbacks are called in series in the callback `Thread`.
-        Finally, remember that this method returns _before_ the
-        callbacks are complete.
+        *Important note*: the callbacks are run in series in the
+        current `Thread`.  If you need to dispatch a long running
+        activity from a state transtion, the callback should still
+        return promptly.
     '''
     with self.__lock:
       old_state = self.fsm_state
@@ -269,27 +263,21 @@ class FSM(DOTNodeMixin):
       )
       if self.fsm_history is not None:
         self.fsm_history.append(transition)
-
-    def run_callbacks():
-      ''' Thread worker to run the callbacks.
-      '''
-      with Pfx("run_callbacks %s->%s", old_state, new_state):
-        with self.__lock:
-          for callback in (self.__callbacks[FSM.FSM_ANY_STATE] +
-                           self.__callbacks[new_state]):
-            try:
-              pfx_call(callback, self, transition)
-            except CancellationError:
-              # ignore cancelled callbacks, eg an FSM instance in cancelled state
-              pass
-            except Exception as e:  # pylint: disable=broad-except
-              exception("exception from callback %s: %s", callback, e)
-
-    # run the callbacks in a Thread
-    Thread(
-        name=f'{self} run_callbacks {old_state}->{event}->{new_state}',
-        target=run_callbacks,
-    ).start()
+    with Pfx(
+        "fsm_event: run callbacks %s->%s->%s",
+        old_state,
+        event,
+        new_state,
+    ):
+      for callback in (self.__callbacks[FSM.FSM_ANY_STATE] +
+                       self.__callbacks[new_state]):
+        try:
+          pfx_call(callback, self, transition)
+        except CancellationError:
+          # ignore cancelled callbacks, eg an FSM instance in cancelled state
+          pass
+        except Exception as e:  # pylint: disable=broad-except
+          exception("exception from callback %s: %s", callback, e)
     return new_state
 
   @property
@@ -303,10 +291,6 @@ class FSM(DOTNodeMixin):
         to `state` as `callback(self,FSMEventTransition)`.
         The special `state` value `FSM.FSM_ANY_STATE` may be supplied
         to register a callback which fires for every state transition.
-
-        *Important note*:
-        see the notes for the `fsm_event` method about how the
-        callbacks are run.
 
             >>> fsm = FSM('state1',transitions={
             ...   'state1':{'ev_a':'state2'},
