@@ -120,7 +120,11 @@ class _TestStream(SetupTeardownMixin):
     '''
     for _ in range(16):
       R = self.local_conn.request(
-          1, 0x55, bytes((2, 3)), self._decode_response, 0
+          1,
+          0x55,
+          bytes((2, 3)),
+          decode_response=self._decode_response,
+          channel=0,
       )
       ok, flags, payload = R()
       self.assertTrue(ok, "response status not ok")
@@ -135,7 +139,13 @@ class _TestStream(SetupTeardownMixin):
       size = rand0(16385)
       data = make_randblock(size)
       flags = rand0(65537)
-      R = self.local_conn.request(0, flags, data, self._decode_response, 0)
+      R = self.local_conn.request(
+          0,
+          flags,
+          data,
+          decode_response=self._decode_response,
+          channel=0,
+      )
       rqs.append((R, flags, data))
     random.shuffle(rqs)
     for rq in rqs:
