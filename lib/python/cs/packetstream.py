@@ -10,6 +10,7 @@
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import errno
+from functools import partial
 import os
 import sys
 from time import sleep
@@ -798,14 +799,17 @@ class PacketConnection(MultiOpenMixin):
             rq_type -= 1
             requests[channel].add(tag)
             # queue the work function and track it
-            LF = self._later.defer(
-                self._run_request,
-                channel,
-                tag,
-                self.request_handler,
-                rq_type,
-                flags,
-                payload,
+            LF = self._later.submit(
+                partial(
+                    self._run_request,
+                    channel,
+                    tag,
+                    self.request_handler,
+                    rq_type,
+                    flags,
+                    payload,
+                ),
+                name=f'{self}._recv_loop._run_request:{packet}',
             )
             # record the LateFunction and arrange its removal on completion
             self.requests_in_progress.add(LF)
