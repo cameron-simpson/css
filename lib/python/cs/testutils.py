@@ -104,7 +104,7 @@ class SetupTeardownMixin:
     super().tearDown()
 
 def assertSingleThread(include_daemon=False):
-  ''' Test that the is only one `Thread` still running.
+  ''' Test that there is only one `Thread` still running.
   '''
   mainT = threading.main_thread()
   Ts = [
