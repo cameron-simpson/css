@@ -22,7 +22,9 @@ from cs.context import contextif, stackkeys
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
+from cs.resources import RunState
 from cs.testutils import SetupTeardownMixin, assertSingleThread
+from cs.threads import bg as bg_thread
 
 from .block import HashCodeBlock, IndirectBlock
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
@@ -257,8 +259,6 @@ def multitest(method):
   def testMethod(self):
     for subtest, S, second_Store in get_test_stores(prefix=method.__module__ +
                                                     '.' + method.__name__):
-      ##print("S =", type(S))
-      ##print("S =", S)
       if STORECLASS_NAMES and type(S).__name__ not in STORECLASS_NAMES:
         ##print("  skip", S)
         continue
@@ -279,14 +279,14 @@ def multitest(method):
                   while not runS.is_stopped:
                     sleep(0.25)
 
-                secondT = trace(bg_thread)(
+                secondT = bg_thread(
                     second_while_S, pre_enter_objects=[second_Store]
                 )
               # make S the "current" store
               with S:
-                trace(method)(self)
+                method(self)
           if second_Store:
-            trace(secondT.join)()
+            secondT.join()
             assert not second_Store.is_open()
           else:
             assert not secondT
@@ -315,6 +315,7 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
         yield
     else:
       yield
+    sleep(1.0)
     assertSingleThread()
 
   @multitest
@@ -322,7 +323,8 @@ class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
     ''' Test that a new Store is empty.
     '''
     S = self.S
-    self.assertLen(S, 0)
+    Slen = len(S)
+    self.assertEqual(Slen, 0)
 
   @multitest
   def test01add_new_block(self):
