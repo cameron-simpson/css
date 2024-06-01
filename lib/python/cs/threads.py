@@ -291,7 +291,7 @@ class HasThreadState(ContextManagerMixin):
     return builtin_Thread(name=name, target=target_wrapper, **Thread_kw)
 
   def bg(self, func, *, enter_objects=None, pre_enter_objects=None, **bg_kw):
-    ''' Get a `Thread` using `type(elf).Thread` and start it.
+    ''' Get a `Thread` using `type(self).Thread` and start it.
         Return the `Thread`.
 
         The `HasThreadState.Thread` factory duplicates the current `Thread`'s
