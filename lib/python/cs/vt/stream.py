@@ -206,7 +206,9 @@ class StreamStore(StoreSyncBase):
     conn = self.conn
     try:
       submitted = conn.submit(
-          rq.RQTYPE, getattr(rq, 'packet_flags', 0), bytes(rq)
+          rq.RQTYPE,
+          bytes(rq),
+          getattr(rq, 'packet_flags', 0),
       )
     except ClosedError as e:
       raise StoreError("connection closed: %s" % (e,), request=rq) from e

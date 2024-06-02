@@ -119,10 +119,10 @@ class _TestStream(SetupTeardownMixin):
     ''' Half duplex test to throw the same packet up and back repeatedly.
     '''
     for _ in range(16):
-      R = self.local_conn.request(
+      R = self.local_conn.submit(
           1,
-          0x55,
           bytes((2, 3)),
+          0x55,
           decode_response=self._decode_response,
           channel=0,
       )
@@ -139,10 +139,10 @@ class _TestStream(SetupTeardownMixin):
       size = rand0(16385)
       data = make_randblock(size)
       flags = rand0(65537)
-      R = self.local_conn.request(
+      R = self.local_conn.submit(
           0,
-          flags,
           data,
+          flags,
           decode_response=self._decode_response,
           channel=0,
       )
