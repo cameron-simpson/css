@@ -472,6 +472,7 @@ class PacketConnection(MultiOpenMixin):
   def _new_tag(self, channel: int) -> int:
     return next(self._tag_seq[channel])
 
+  @locked
   def _pending_states(self) -> List[Tuple[Tuple[int, int], Request_State]]:
     ''' Return a `list` of `( (channel,tag), Request_State )` 2-tuples
         for the currently pending requests.
