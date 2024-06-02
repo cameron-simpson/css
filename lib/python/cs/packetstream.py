@@ -588,8 +588,8 @@ class PacketConnection(MultiOpenMixin):
   def submit(
       self,
       rq_type: int,
-      payload: bytes = b'',
       flags: int = 0,
+      payload: bytes = b'',
       *,
       decode_response=None,
       channel=0,
@@ -603,10 +603,10 @@ class PacketConnection(MultiOpenMixin):
 
         Parameters:
         * `rq_type`: request type code, an `int`
-        * `payload`: optional bytes-like object to accompany the request;
-          default `b''`
         * `flags`: optional flags to accompany the request, an int;
           default `0`.
+        * `payload`: optional bytes-like object to accompany the request;
+          default `b''`
         * `decode_response`: optional callable accepting (response_flags,
           response_payload_bytes) and returning the decoded response payload
           value; if unspecified, the response payload bytes are used
@@ -677,8 +677,8 @@ class PacketConnection(MultiOpenMixin):
     '''
     R = self.submit(
         rq_type,
-        payload=payload,
         flags=flags,
+        payload=payload,
         channel=channel,
         decode_response=decode_response,
         label=label,

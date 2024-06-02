@@ -121,8 +121,8 @@ class _TestStream(SetupTeardownMixin):
     for _ in range(16):
       R = self.local_conn.submit(
           1,
-          bytes((2, 3)),
           0x55,
+          bytes((2, 3)),
           decode_response=self._decode_response,
           channel=0,
       )
@@ -141,8 +141,8 @@ class _TestStream(SetupTeardownMixin):
       flags = rand0(65537)
       R = self.local_conn.submit(
           0,
-          data,
           flags,
+          data,
           decode_response=self._decode_response,
           channel=0,
       )
