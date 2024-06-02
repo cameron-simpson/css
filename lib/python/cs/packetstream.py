@@ -151,7 +151,7 @@ class Packet(SimpleBinary):
     yield BSUInt.transcribe_value(length)
     yield bss
 
-Request_State = namedtuple('RequestState', 'decode_response result')
+RequestState = namedtuple('RequestState', 'decode_response result')
 
 # type specifications for the recv_send parameter
 @runtime_checkable
@@ -473,8 +473,8 @@ class PacketConnection(MultiOpenMixin):
     return next(self._tag_seq[channel])
 
   @locked
-  def _pending_states(self) -> List[Tuple[Tuple[int, int], Request_State]]:
-    ''' Return a `list` of `( (channel,tag), Request_State )` 2-tuples
+  def _pending_states(self) -> List[Tuple[Tuple[int, int], RequestState]]:
+    ''' Return a `list` of `( (channel,tag), RequestState )` 2-tuples
         for the currently pending requests.
     '''
     states = []
@@ -486,7 +486,7 @@ class PacketConnection(MultiOpenMixin):
     return states
 
   @locked
-  def _pending_add(self, channel: int, tag: int, state: Request_State):
+  def _pending_add(self, channel: int, tag: int, state: RequestState):
     ''' Record some state against `(channel,tag)`.
     '''
     pending = self._pending
@@ -498,7 +498,7 @@ class PacketConnection(MultiOpenMixin):
     self._pending[channel][tag] = state
 
   @locked
-  def _pending_pop(self, channel: int, tag: int) -> Request_State:
+  def _pending_pop(self, channel: int, tag: int) -> RequestState:
     ''' Retrieve and remove the state associated with `(channel,tag)`.
     '''
     pending = self._pending
@@ -636,7 +636,7 @@ class PacketConnection(MultiOpenMixin):
       R = Result(f'{self.name}:{tag}:{label}')
       R.fsm_callback('DONE', post_request_close)
       R.fsm_callback('CANCELLED', post_request_close)
-      self._pending_add(channel, tag, Request_State(decode_response, R))
+      self._pending_add(channel, tag, RequestState(decode_response, R))
       self._queue_packet(
           Packet(
               is_request=True,
