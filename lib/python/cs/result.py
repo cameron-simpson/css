@@ -282,6 +282,17 @@ class Result(FSM):
   def raise_(self, exc=None):
     ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
         If `exc` is omitted or `None`, uses `sys.exc_info()`.
+
+        Examples:
+
+            # complete the result using the current exception state
+            R.raise_()
+
+            # complete the result with an exception type
+            R.raise_(RuntimeError)
+
+            # complete the result with an exception
+            R.raise_(ValueError("bad value!"))
     '''
     if exc is None:
       self.exc_info = sys.exc_info()
