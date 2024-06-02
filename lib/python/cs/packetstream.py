@@ -34,14 +34,7 @@ from cs.threads import locked, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE, DECIMAL_SCALE
 from cs.upd import run_task
 
-def tick_fd_2(bs):
-  ''' A low level tick function to write a short binary tick
-      to the standard error file descriptor.
-
-      This may be called by the send and receive workers to give
-      an indication of activity type.
-  '''
-  os.write(2, bs)
+from cs.debug import trace, X, r, s
 
 __version__ = '20240412-post'
 
@@ -259,7 +252,6 @@ class PacketConnection(MultiOpenMixin):
       *,
       request_handler=None,
       packet_grace=None,
-      tick=None,
   ):
     ''' Initialise the `PacketConnection`.
 
@@ -282,10 +274,6 @@ class PacketConnection(MultiOpenMixin):
           * `(int, bytes)`: Specify flags and payload for response.
           An unsuccessful request should raise an exception, which
           will cause a failure response packet.
-        * `tick`: optional tick parameter, default `None`.
-          If `None`, do nothing.
-          If a Boolean, call `tick_fd_2` if true, otherwise do nothing.
-          Otherwise `tick` should be a callable accepting a byteslike value.
 
         The `recv_send` parameter is used to prepare the connection.
         It may take the following forms:
@@ -327,16 +315,8 @@ class PacketConnection(MultiOpenMixin):
     self.recv_send = recv_send
     if packet_grace is None:
       packet_grace = DEFAULT_PACKET_GRACE
-    if tick is None:
-      tick = lambda bs: None  # pylint: disable=unnecessary-lambda-assignment
-    elif isinstance(tick, bool):
-      if tick:
-        tick = tick_fd_2
-      else:
-        tick = lambda bs: None  # pylint: disable=unnecessary-lambda-assignment
     self.packet_grace = packet_grace
     self.request_handler = request_handler
-    self.tick = tick
     self._pending = None
     self._runstate = RunState(str(self))
     self._lock = Lock()
