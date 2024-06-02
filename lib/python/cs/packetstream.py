@@ -847,11 +847,11 @@ class PacketConnection(MultiOpenMixin):
             else:
               # fulfil by decoding the payload
               try:
-                result = decode_response(flags, payload)
-              except Exception:  # pylint: disable=broad-except
-                R.exc_info = sys.exc_info()
+                decoded = decode_response(flags, payload)
+              except Exception:
+                R.raise_()
               else:
-                R.result = (True, flags, result)
+                R.result = (True, flags, decoded)
           else:
             # unsuccessful: return (False, other-flags, payload-bytes)
             R.result = (False, flags, payload)
