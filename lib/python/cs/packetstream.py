@@ -15,7 +15,7 @@ import os
 import sys
 from time import sleep
 from threading import Lock
-from typing import Callable, Protocol, Tuple, Union, runtime_checkable
+from typing import Callable, List, Protocol, Tuple, Union, runtime_checkable
 
 from cs.binary import SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
@@ -472,8 +472,9 @@ class PacketConnection(MultiOpenMixin):
   def _new_tag(self, channel: int) -> int:
     return next(self._tag_seq[channel])
 
-  def _pending_states(self):
-    ''' Return a list of ( (channel, tag), Request_State ) for the currently pending requests.
+  def _pending_states(self) -> List[Tuple[Tuple[int, int], Request_State]]:
+    ''' Return a `list` of `( (channel,tag), Request_State )` 2-tuples
+        for the currently pending requests.
     '''
     states = []
     pending = self._pending
@@ -484,7 +485,7 @@ class PacketConnection(MultiOpenMixin):
     return states
 
   @locked
-  def _pending_add(self, channel, tag, state):
+  def _pending_add(self, channel: int, tag: int, state: Request_State):
     ''' Record some state against `(channel,tag)`.
     '''
     pending = self._pending
@@ -496,7 +497,7 @@ class PacketConnection(MultiOpenMixin):
     self._pending[channel][tag] = state
 
   @locked
-  def _pending_pop(self, channel, tag):
+  def _pending_pop(self, channel: int, tag: int) -> Request_State:
     ''' Retrieve and remove the state associated with `(channel,tag)`.
     '''
     pending = self._pending
@@ -524,7 +525,7 @@ class PacketConnection(MultiOpenMixin):
         _, result = self._pending_pop(channel, tag)
         result.cancel()
 
-  def _queue_packet(self, P):
+  def _queue_packet(self, P: Packet):
     if self._sendQ is None:
       raise EOFError("_sendQ is None")
     sig = (P.channel, P.tag, P.is_request)
@@ -578,9 +579,9 @@ class PacketConnection(MultiOpenMixin):
   # pylint: disable=too-many-arguments
   def request(
       self,
-      rq_type,
-      flags=0,
-      payload=b'',
+      rq_type: int,
+      flags: int = 0,
+      payload: bytes = b'',
       *,
       decode_response=None,
       channel=0,
@@ -840,10 +841,10 @@ class PacketConnection(MultiOpenMixin):
             # successful reply
             # return (True, flags, decoded-response)
             if decode_response is None:
-              # return payload bytes unchanged
+              # return the payload bytes unchanged
               R.result = (True, flags, payload)
             else:
-              # decode payload
+              # fulfil by decoding the payload
               try:
                 result = decode_response(flags, payload)
               except Exception:  # pylint: disable=broad-except
