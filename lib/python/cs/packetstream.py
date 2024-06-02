@@ -151,7 +151,34 @@ class Packet(SimpleBinary):
     yield BSUInt.transcribe_value(length)
     yield bss
 
-RequestState = namedtuple('RequestState', 'decode_response result')
+class RequestState(namedtuple('RequestState', 'decode_response result')):
+  ''' A state object tracking a particular request.
+  '''
+
+  def cancel(self):
+    ''' Cancel this request.
+    '''
+    self.result.cancel()
+
+  def complete(self, flags, payload):
+    ''' Complete the request from an "ok" `flags` and `payload`.
+    '''
+    if self.decode_response is None:
+      # return the payload bytes unchanged
+      self.result.result = (True, flags, payload)
+    else:
+      # fulfil by decoding the payload
+      try:
+        decoded = self.decode_response(flags, payload)
+      except Exception:
+        self.result.raise_()
+      else:
+        self.result.result = (True, flags, decoded)
+
+  def fail(self, flags, payload):
+    ''' Fail the request from a "not ok" `flags` and `payload`.
+    '''
+    self.result.result = (False, flags, payload)
 
 # type specifications for the recv_send parameter
 @runtime_checkable
@@ -523,8 +550,8 @@ class PacketConnection(MultiOpenMixin):
           report_print=True,
       ):
         channel, tag = chtag
-        _, result = self._pending_pop(channel, tag)
-        result.cancel()
+        rq_state = trace(self._pending_pop)(channel, tag)
+        rq_state.cancel()
 
   def _queue_packet(self, P: Packet):
     if self._sendQ is None:
@@ -833,28 +860,16 @@ class PacketConnection(MultiOpenMixin):
           error("%d.%d: response to unknown request: %s", channel, tag, e)
         else:
           rq_out_progress.position += 1  # note completion
-          decode_response, R = rq_state
-          # first flag is "ok"
+          # first flag is "ok", pop it off
           ok = (flags & 0x01) != 0
           flags >>= 1
           payload = packet.payload
           if ok:
             # successful reply
-            # return (True, flags, decoded-response)
-            if decode_response is None:
-              # return the payload bytes unchanged
-              R.result = (True, flags, payload)
-            else:
-              # fulfil by decoding the payload
-              try:
-                decoded = decode_response(flags, payload)
-              except Exception:
-                R.raise_()
-              else:
-                R.result = (True, flags, decoded)
+            rq_state.complete(flags, payload)
           else:
             # unsuccessful: return (False, other-flags, payload-bytes)
-            R.result = (False, flags, payload)
+            rq_state.fail(flags, payload)
 
     # process the packets from upstream
     for packet in progressbar(
