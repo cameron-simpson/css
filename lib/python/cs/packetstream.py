@@ -662,7 +662,7 @@ class PacketConnection(MultiOpenMixin):
         close()
 
   @not_closed
-  def do(
+  def __call__(
       self,
       rq_type,
       payload=b'',
@@ -672,7 +672,7 @@ class PacketConnection(MultiOpenMixin):
       channel=0,
       label=None,
   ):
-    ''' Synchronous request.
+    ''' Calling the `PacketConnection` performs a synchronous request.
         Submits the request, then calls the `Result` returned from the request.
     '''
     R = self.submit(
