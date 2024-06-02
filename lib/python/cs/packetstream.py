@@ -585,7 +585,7 @@ class PacketConnection(MultiOpenMixin):
 
   @not_closed
   # pylint: disable=too-many-arguments
-  def request(
+  def submit(
       self,
       rq_type: int,
       flags: int = 0,
@@ -674,7 +674,7 @@ class PacketConnection(MultiOpenMixin):
     ''' Synchronous request.
         Submits the request, then calls the `Result` returned from the request.
     '''
-    R = self.request(
+    R = self.submit(
         rq_type,
         flags=flags,
         payload=payload,
