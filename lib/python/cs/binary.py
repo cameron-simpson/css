@@ -657,6 +657,15 @@ class BinarySingleValue(AbstractBinary):
     instance, offset = cls.parse_bytes(bs, offset=offset, length=length, **kw)
     return instance.value, offset
 
+  @classmethod
+  def value_from_bytes(cls, bs, **from_bytes_kw):
+    ''' Decode an instance from `bs` using `.from_bytes`
+        and return the `.value` attribute.
+        Keyword arguments are passed to `cls.from_bytes`.
+    '''
+    instance = cls.from_bytes(bs, **from_bytes_kw)
+    return instance.value
+
   def transcribe(self):
     ''' Transcribe this instance as bytes.
 
