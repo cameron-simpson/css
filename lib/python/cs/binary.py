@@ -445,7 +445,7 @@ class BinaryMixin:
     return flatten(self.transcribe())
 
   @classmethod
-  def parse_bytes(cls, bs, offset=0, length=None, **kw):
+  def parse_bytes(cls, bs, offset=0, length=None, **parse_kw):
     ''' Factory to parse an instance from the
         bytes `bs` starting at `offset`.
         Returns `(instance,offset)` being the new instance and the post offset.
@@ -460,11 +460,11 @@ class BinaryMixin:
         This relies on the `cls.parse` method for the parse.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
-    instance = cls.parse(bfr, **kw)
+    instance = cls.parse(bfr, **parse_kw)
     return instance, bfr.offset
 
   @classmethod
-  def from_bytes(cls, bs, **kw):
+  def from_bytes(cls, bs, **parse_bytes_kw):
     ''' Factory to parse an instance from the
         bytes `bs` starting at `offset`.
         Returns the new instance.
@@ -476,7 +476,7 @@ class BinaryMixin:
 
         This relies on the `cls.parse` method for the parse.
     '''
-    instance, offset = cls.parse_bytes(bs, **kw)
+    instance, offset = cls.parse_bytes(bs, **parse_bytes_kw)
     if offset < len(bs):
       raise ValueError(
           "unparsed data at offset %d: %r" % (offset, bs[offset:])
