@@ -146,7 +146,6 @@ class StreamStore(StoreSyncBase):
         self.name,
         request_handler=self._handle_request,
         packet_grace=0,
-        tick=True,
     )
     self.on_demand = on_demand
     self._lock = Lock()
