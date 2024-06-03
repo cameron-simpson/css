@@ -180,7 +180,8 @@ class StreamStore(StoreSyncBase):
     '''
     with super().startup_shutdown():
       with contextif(self.local_store):
-        with contextif(not self.on_demand, self.conn):
+        # lambda shuffle because a PacketConnection is callable
+        with contextif(not self.on_demand, lambda: self.conn):
           try:
             yield
           finally:
