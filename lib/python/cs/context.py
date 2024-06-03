@@ -60,7 +60,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
 
       The signature is flexible, offering 2 basic modes of use.
 
-      Flagged use: `contextif(flag,cmgr,*a,**kw)`: if `flag` is a
+      *Flagged use*: `contextif(flag,cmgr,*a,**kw)`: if `flag` is a
       Boolean then it governs whether the context manager `cmgr`
       is used. Historically the driving use case was verbosity
       dependent status lines or progress bars. Example:
@@ -69,7 +69,14 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
           with contextif(verbose, run_task, ....) as proxy:
               ... do stuff, updating proxy if not None ...
 
-      Unflagged use: `contextif(cmgr,*a,**kw)`: use `cmgr` as the
+      In the `cs.upd` example above, `run_task` is a context manager
+      function which pops up an updatable status line, normally
+      used as:
+
+          with run_task("doing thing") as proxy:
+              ... do the thing, setting proxy.text as needed ...
+
+      *Unflagged use*: `contextif(cmgr,*a,**kw)`: use `cmgr` as the
       flag: if false (eg `None`) then `cmgr` is not used.
 
       Additionally, `cmgr` may be a callable, in which case the
@@ -78,12 +85,15 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
       to be a context manager already, and it is an error to provide
       `cmgr_args` or `cmgr_kwargs`.
 
-      In the `cs.upd` example above, `run_task` is a context manager
-      function which pops up an updatable status line, normally
-      used as:
+      This last mode can be a bit fiddly. If `cmgr` is a context
+      manager _but is also callable for other purposes_ you will
+      need to do a little shuffle to avoid the implied call:
 
-          with run_task("doing thing") as proxy:
-              ... do the thing, setting proxy.text as needed ...
+          with contexif(flag, lambda: cmgr):
+              ... do stuff ...
+
+      This provides a callable (the lambda) which returns the context
+      manager itself.
   '''
   if callable(cmgr):
     flag = True
