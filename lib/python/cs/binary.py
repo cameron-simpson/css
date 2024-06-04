@@ -45,8 +45,8 @@
       with custom `.parse` and `.transcribe` methods,
       for structures with variable fields
 
-    All the classes derived from the above inherit all the methods
-    of `BinaryMixin`.
+    Any the classes derived from the above inherit all the methods
+    of `AbstractBinary`.
     Amongst other things, this means that the binary transcription
     can be had simply from `bytes(instance)`,
     although there are more transcription methods provided
@@ -222,13 +222,47 @@ def pt_spec(pt, name=None):
   PTValue.__name__ += '_' + str(next(_pt_spec_seq))
   return PTValue
 
-class BinaryMixin:
-  ''' Presupplied helper methods for binary objects.
+class AbstractBinary(ABC):
+  ''' Abstract class for all `Binary`* implementations,
+      specifying the abstract `parse` and `transcribe` methods
+      and providing various helper methods.
 
       Naming conventions:
       - `parse`* methods parse a single instance from a buffer
       - `scan`* methods are generators yielding successive instances from a buffer
   '''
+
+  # pylint: disable=deprecated-decorator
+  @abstractclassmethod
+  def parse(cls, bfr: CornuCopyBuffer):
+    ''' Parse an instance of `cls` from the buffer `bfr`.
+    '''
+    raise NotImplementedError("parse")
+
+  @abstractmethod
+  def transcribe(self):
+    ''' Return or yield `bytes`, ASCII string, `None` or iterables
+        comprising the binary form of this instance.
+
+        This aims for maximum convenience when transcribing a data structure.
+
+        This may be implemented as a generator, yielding parts of the structure.
+
+        This may be implemented as a normal function, returning:
+        * `None`: no bytes of data,
+          for example for an omitted or empty structure
+        * a `bytes`-like object: the full data bytes for the structure
+        * an ASCII compatible string:
+          this will be encoded with the `'ascii'` encoding to make `bytes`
+        * an iterable:
+          the components of the structure,
+          including substranscriptions which themselves
+          adhere to this protocol - they may be `None`, `bytes`-like objects,
+          ASCII compatible strings or iterables.
+          This supports directly returning or yielding the result of a field's
+          `.transcribe` method.
+    '''
+    raise NotImplementedError("transcribe")
 
   @pfx_method
   def self_check(self):
@@ -396,7 +430,7 @@ class BinaryMixin:
       )
 
   @classmethod
-  @OBSOLETE(suggestion="BinaryMixin.scan")
+  @OBSOLETE(suggestion="AbstractBinary.scan")
   def scan_with_offsets(
       cls, bfr: CornuCopyBuffer, count=None, min_count=None, max_count=None
   ):
@@ -415,7 +449,7 @@ class BinaryMixin:
     )
 
   @classmethod
-  @OBSOLETE(suggestion="BinaryMixin.scan")
+  @OBSOLETE(suggestion="AbstractBinary.scan")
   def scan_fspath(cls, fspath: str, *, with_offsets=False, **kw):
     ''' Open the file with filesystenm path `fspath` for read
         and yield from `self.scan(..,**kw)` or
@@ -486,7 +520,7 @@ class BinaryMixin:
   @classmethod
   def load(cls, f):
     ''' Load an instance from the file `f`
-        which may be a filename or an open file as for `BinaryMixin.scan`.
+        which may be a filename or an open file as for `AbstractBinary.scan`.
         Return the instance or `None` if the file is empty.
     '''
     for instance in cls.scan(f):
@@ -529,44 +563,6 @@ class BinaryMixin:
     if flush:
       file.flush()
     return length
-
-class AbstractBinary(ABC, BinaryMixin):
-  ''' Abstract class for all `Binary`* implementations,
-      specifying the `parse` and `transcribe` methods
-      and providing the methods from `BinaryMixin`.
-  '''
-
-  # pylint: disable=deprecated-decorator
-  @abstractclassmethod
-  def parse(cls, bfr: CornuCopyBuffer):
-    ''' Parse an instance of `cls` from the buffer `bfr`.
-    '''
-    raise NotImplementedError("parse")
-
-  @abstractmethod
-  def transcribe(self):
-    ''' Return or yield `bytes`, ASCII string, `None` or iterables
-        comprising the binary form of this instance.
-
-        This aims for maximum convenience when transcribing a data structure.
-
-        This may be implemented as a generator, yielding parts of the structure.
-
-        This may be implemented as a normal function, returning:
-        * `None`: no bytes of data,
-          for example for an omitted or empty structure
-        * a `bytes`-like object: the full data bytes for the structure
-        * an ASCII compatible string:
-          this will be encoded with the `'ascii'` encoding to make `bytes`
-        * an iterable:
-          the components of the structure,
-          including substranscriptions which themselves
-          adhere to this protocol - they may be `None`, `bytes`-like objects,
-          ASCII compatible strings or iterables.
-          This supports directly returning or yielding the result of a field's
-          `.transcribe` method.
-    '''
-    raise NotImplementedError("transcribe")
 
 class SimpleBinary(SimpleNamespace, AbstractBinary):
   ''' Abstract binary class based on a `SimpleNamespace`,
@@ -1064,7 +1060,7 @@ class BSUInt(BinarySingleValue):
         This is the go for reading from a stream. If you already have
         a bare bytes instance then the `.decode_bytes` static method
         is probably most efficient;
-        there is of course the usual `BinaryMixin.parse_bytes`
+        there is of course the usual `AbstractBinary.parse_bytes`
         but that constructs a buffer to obtain the individual bytes.
     '''
     n = 0
@@ -1090,7 +1086,7 @@ class BSUInt(BinarySingleValue):
             >>> BSUInt.decode_bytes(b'\\0')
             (0, 1)
 
-        Note: there is of course the usual `BinaryMixin.parse_bytes`
+        Note: there is of course the usual `AbstractBinary.parse_bytes`
         but that constructs a buffer to obtain the individual bytes;
         this static method will be more performant
         if all you are doing is reading this serialisation
