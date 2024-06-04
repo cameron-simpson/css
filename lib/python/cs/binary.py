@@ -510,6 +510,26 @@ class BinaryMixin:
           break
     return length
 
+  def write(self, file, *, flush=False):
+    ''' Write this instance to `file`, a file-like object supporting
+        `.write(bytes)` and `.flush()`.
+        Return the number of bytes written.
+    '''
+    length = 0
+    for bs in self.transcribe_flat():
+      bslen = len(bs)
+      assert bslen > 0
+      offset = 0
+      while offset < bslen:
+        written = file.write(bs[offset:])
+        if written == 0:
+          raise RuntimeError(f'wrote 0 bytes to {file}')
+        offset += written
+      length += bslen
+    if flush:
+      file.flush()
+    return length
+
 class AbstractBinary(ABC, BinaryMixin):
   ''' Abstract class for all `Binary`* implementations,
       specifying the `parse` and `transcribe` methods
@@ -547,26 +567,6 @@ class AbstractBinary(ABC, BinaryMixin):
           `.transcribe` method.
     '''
     raise NotImplementedError("transcribe")
-
-  def write(self, file, *, flush=False):
-    ''' Write this instance to `file`, a file-like object supporting
-        `.write(bytes)` and `.flush()`.
-        Return the number of bytes written.
-    '''
-    length = 0
-    for bs in self.transcribe_flat():
-      bslen = len(bs)
-      assert bslen > 0
-      offset = 0
-      while offset < bslen:
-        written = file.write(bs[offset:])
-        if written == 0:
-          raise RuntimeError(f'wrote 0 bytes to {file}')
-        offset += written
-      length += bslen
-    if flush:
-      file.flush()
-    return length
 
 class SimpleBinary(SimpleNamespace, AbstractBinary):
   ''' Abstract binary class based on a `SimpleNamespace`,
