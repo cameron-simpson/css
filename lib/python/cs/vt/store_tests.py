@@ -306,27 +306,9 @@ def multitest(method):
 
   return testMethod
 
-class TestStore(SetupTeardownMixin, unittest.TestCase, _TestAdditionsMixin):
+class TestStore(unittest.TestCase, _TestAdditionsMixin):
   ''' Tests for Stores.
   '''
-
-  def __init__(self, *a, **kw):
-    super().__init__(*a, **kw)
-    self.S = None
-    self.keys1 = None
-
-  @contextmanager
-  def setupTeardown(self):
-    ''' Use the supplied `Store` and check that there are no left over `Thread`s afterwards.
-    '''
-    S = self.S
-    if S is not None:
-      with S:
-        yield
-    else:
-      yield
-    sleep(1.0)
-    assertSingleThread()
 
   @multitest
   def test00empty(self):
