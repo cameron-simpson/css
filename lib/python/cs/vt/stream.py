@@ -449,33 +449,25 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
     if capacity is None:
       capacity = STREAM_CAPACITY_DEFAULT
     StoreSyncBase.__init__(self, name, capacity=capacity, **syncstore_kw)
-    if True:
-      HasPacketConnection.__init__(
-          self,
-          recv_send,
-          name,
-          rq_type_map={
-              0: AddRequest,  # data->hashcode
-              1: GetRequest,  # hashcode->data
-              2: ContainsRequest,  # hashcode->bool
-              3: FlushRequest,  # flush local and remote servers
-              4: HashCodesRequest,  # (hashcode,length)->hashcodes
-              5:
-              HashOfHashCodesRequest,  # (hashcode,length)->hashcode of hashcodes
-              6: ArchiveLastRequest,  # archive_name->(when,E)
-              7: ArchiveUpdateRequest,  # (archive_name,when,E)
-              8: ArchiveListRequest,  # (count,archive_name)->(when,E)...
-              9: LengthRequest,  # ()->remote-store-length
-              10: ContainsIndirectRequest,  # hashcode->bool
-          },
-      )
-    else:
-      self.conn = PacketConnection(
-          recv_send,
-          self.name,
-          request_handler=self._handle_request,
-          ##packet_grace=0,
-      )
+    HasPacketConnection.__init__(
+        self,
+        recv_send,
+        name,
+        rq_type_map={
+            0: AddRequest,  # data->hashcode
+            1: GetRequest,  # hashcode->data
+            2: ContainsRequest,  # hashcode->bool
+            3: FlushRequest,  # flush local and remote servers
+            4: HashCodesRequest,  # (hashcode,length)->hashcodes
+            5:
+            HashOfHashCodesRequest,  # (hashcode,length)->hashcode of hashcodes
+            6: ArchiveLastRequest,  # archive_name->(when,E)
+            7: ArchiveUpdateRequest,  # (archive_name,when,E)
+            8: ArchiveListRequest,  # (count,archive_name)->(when,E)...
+            9: LengthRequest,  # ()->remote-store-length
+            10: ContainsIndirectRequest,  # hashcode->bool
+        },
+    )
     self.on_demand = on_demand
     self._lock = Lock()
     self.mode_addif = addif
