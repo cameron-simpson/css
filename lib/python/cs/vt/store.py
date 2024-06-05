@@ -463,7 +463,7 @@ class DataDirStore(MappingStore):
       rollover=None,
       lock=None,
       conv_cache=None,
-      **kw
+      **mapping_store_kw
   ):
     ''' Initialise the DataDirStore.
 
@@ -498,7 +498,7 @@ class DataDirStore(MappingStore):
         CachingMapping(self._datadir, missing_fallthrough=True),
         hashclass=hashclass,
         conv_cache=conv_cache,
-        **kw,
+        **mapping_store_kw,
     )
     self._modify_index_lock = Lock()
 
