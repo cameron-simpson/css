@@ -1322,18 +1322,23 @@ class _BinaryMultiValue_Base(SimpleBinary):
                 raise ValueError("unsupported version %d" % (self.version,))
               return self
     '''
-    self = cls()
+    field_values = {}
     for field_name in cls.FIELD_ORDER:
       with Pfx(field_name):
-        self.parse_field(field_name, bfr)
+        field = cls.FIELDS[field_name]
+        value = field.parse(bfr)
+        field_values[field_name] = value
+    self = cls(**field_values)
     return self
 
-  def parse_field(self, field_name: str, bfr: CornuCopyBuffer, **kw):
+  def parse_field(
+      self, field_name: str, bfr: CornuCopyBuffer, **field_parse_kw
+  ):
     ''' Parse `bfr` for the data for `field_name`
         and set the associated attribute.
     '''
     field = self.FIELDS[field_name]
-    value = field.parse(bfr, **kw)
+    value = field.parse(bfr, **field_parse_kw)
     setattr(self, field_name, value)
 
   def transcribe(self):
