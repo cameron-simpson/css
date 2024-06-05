@@ -15,9 +15,9 @@ from functools import lru_cache
 from subprocess import Popen, PIPE
 from threading import Lock
 import time
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
-from icontract import require
+from icontract import ensure, require
 from typeguard import typechecked
 
 from cs.binary import (
@@ -29,13 +29,19 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.context import contextif
-from cs.deco import fmtdoc
+from cs.deco import decorator, fmtdoc
 from cs.logutils import warning, error
-from cs.packetstream import PacketConnection, PacketConnectionRecvSend
+from cs.packetstream import (
+    BaseRequest,
+    PacketConnection,
+    PacketConnectionRecvSend,
+    HasPacketConnection,
+)
 from cs.pfx import Pfx, pfx_method
 from cs.resources import ClosedError
 from cs.result import CancellationError, Result
 
+from . import Store
 from .archive import BaseArchive, ArchiveEntry
 from .dir import _Dirent
 from .hash import (
@@ -49,23 +55,325 @@ from .store import StoreError, StoreSyncBase
 
 STREAM_CAPACITY_DEFAULT = 1024
 
-class RqType(IntEnum):
-  ''' Packet opcode values.
+@decorator
+def uses_local_store(method):
+  ''' A decorator for functions called as `method(self,local_stream,*a,**kw)`
+     which is called as `method(self,stream,*a,**kw)`.
+     The wrapper passes in `stream._local_store` which has been held open.
+     This raises `ValueError` if `stream._local_store` is `None`.
+
+     Example:
+
+         @uses_local_store
+         def fulfil(self, local_store):
+             ... fulfil this requests against local_store ...
   '''
-  ADD = 0  # data -> hashcode
-  GET = 1  # hashcode -> data
-  CONTAINS = 2  # hashcode->Boolean
-  FLUSH = 3  # flush local and remote servers
-  HASHCODES = 4  # (hashcode,length) -> hashcodes
-  HASHCODES_HASH = 5  # (hashcode,length) -> hashcode of hashcodes
-  ARCHIVE_LAST = 6  # archive_name -> (when,E)
-  ARCHIVE_UPDATE = 7  # (archive_name,when,E)
-  ARCHIVE_LIST = 8  # (count,archive_name) -> (when,E)...
-  LENGTH = 9  # () -> remote-store-length
-  CONTAINS_INDIRECT = 10  # hashcode->Boolean
+
+  def using_local_store(self, stream, *a, **kw):
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    with local_store:
+      return method(self, local_store, *a, **kw)
+
+  return using_local_store
+
+class AddRequest(
+    BaseRequest,
+    BinaryMultiValue('AddRequest', dict(hashenum=BSUInt, data=BSData)),
+):
+  ''' An add(bytes) request, returning the hashcode for the stored data.
+  '''
+
+  @property
+  def hashclass(self):
+    ''' The hash class derived from the hashenum.
+    '''
+    return HashCode.by_index(self.hashenum)
+
+  @hashclass.setter
+  def hashclass(self, hashcls):
+    ''' Setting the hashclass sets the `.hashenum` attribute.
+    '''
+    self.hashenum = hashcls.hashenum
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Add data to the local store, return serialised hashcode.
+    '''
+    if self.hashclass is not local_store.hashclass:
+      raise ValueError(
+          "request hashclass=%s but local store %s.hashclass=%s" %
+          (self.hashclass, local_store, local_store.hashclass)
+      )
+    # return the serialised hashcode of the added data
+    return local_store.add(self.data).encode()
+
+  @require(lambda flags: flags == 0)
+  @ensure(lambda self, result: isinstance(result, self.hashclass))
+  def decode_response_payload(self, flags: int, payload: bytes):
+    ''' We expect a serialised `HashCode`.
+    '''
+    return HashCodeField.value_from_bytes(payload)
+
+class GetRequest(BaseRequest, HashCodeField):
+  ''' A get(hashcode) request, returning the associated bytes.
+  '''
+
+  def __init__(self, hashcode: HashCode):
+    super().__init__(value=hashcode)
+
+  @property
+  def hashcode(self):
+    return self.value
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Return data from the local store by hashcode.
+    '''
+    hashcode = self.hashcode
+    data = local_store.get(hashcode)
+    if data is None:
+      return 0
+    return 1, data
+
+  @require(lambda flags: flags in (0x00, 0x01))
+  def decode_response_payload(self, flags: int, payload: bytes):
+    ''' Return `True` or `False`.
+    '''
+    return None if flags == 0 else payload
+
+class ContainsRequest(BaseRequest, HashCodeField):
+  ''' A request to test for the presence of a hashcode.
+  '''
+
+  def __init__(self, hashcode: HashCode):
+    super().__init__(value=hashcode)
+
+  @property
+  def hashcode(self):
+    return self.value
+
+  @uses_local_store
+  def fulfil(self, local_store: Store) -> int:
+    ''' Test for hashcode, return `1` for present, `0` otherwise.
+    '''
+    return int(self.hashcode in local_store)
+
+  @require(lambda flags: flags in (0x00, 0x01))
+  @require(lambda payload: payload == b'')
+  @typechecked
+  def decode_response_payload(self, flags: int, payload: bytes) -> bool:
+    return bool(flags)
+
+class ContainsIndirectRequest(BaseRequest, HashCodeField):
+  ''' A request to test for the presence all of the blocks
+      of an indirect block hashcode.
+  '''
+
+  def __init__(self, hashcode: HashCode):
+    super().__init__(value=hashcode)
+
+  @property
+  def hashcode(self):
+    return self.value
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Test for hashcode, return `1` for present, `0` otherwise.
+    '''
+    hashcode = self.hashcode
+    return int(local_store.is_complete_indirect(hashcode))
+
+  @require(lambda flags: flags in (0x00, 0x01))
+  @require(lambda payload: payload == b'')
+  @typechecked
+  def decode_response_payload(self, flags: int, payload: bytes) -> bool:
+    return bool(flags)
+
+class FlushRequest(BaseRequest, BinaryMultiValue('FlushRequest', {})):
+  ''' A flush request.
+  '''
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Flush the `local_store`.
+    '''
+    local_store.flush()
+
+class LengthRequest(BaseRequest, BinaryMultiValue('LengthRequest', {})):
+  ''' Request the length (number of indexed Blocks) of the remote Store.
+  '''
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Return the number of indexed blocks in `local_store`.
+    '''
+    return bytes(BSUInt(len(local_store)))
+
+  @require(lambda flags: flags == 0)
+  @typechecked
+  def decode_response_payload(self, flags: int, payload: bytes) -> int:
+    ''' We expect a serialised `HashCode`.
+    '''
+    return BSUInt.value_from_bytes(payload)
+
+class HashCodesRequest(BaseRequest, SimpleBinary, HasDotHashclassMixin):
+  ''' A request for remote hashcodes.
+  '''
+
+  @require(lambda hashclass: issubclass(hashclass, HashCode))
+  @require(
+      lambda after, start_hashcode: not after or start_hashcode is not None
+  )
+  @typechecked
+  def __init__(
+      self,
+      *,
+      after: bool = False,
+      hashclass,
+      start_hashcode=None,
+      length: Optional[int] = None,
+  ):
+    if length is None:
+      length = 0
+    self.after = after
+    SimpleBinary.__init__(
+        self,
+        hashclass=hashclass,
+        hashname=hashclass.hashname,
+        start_hashcode=start_hashcode,
+        length=length,
+    )
+
+  @classmethod
+  @require(lambda flags: flags < 0x04)
+  def from_request_payload(cls, flags: int, payload: bytes):
+    ''' Parse a HashCodesRequest from a buffer and construct.
+    '''
+    after = (flags & 0x01) != 0
+    has_start_hashcode = (flags & 0x02) != 0
+    bfr = CornuCopyBuffer([payload])
+    hashname = BSString.parse_value(bfr)
+    hashclass = HashCode.by_index(hashname)
+    if has_start_hashcode:
+      start_hashcode = HashCodeField.parse_value(bfr)
+      if type(start_hashcode) is not hashclass:  # pylint: disable=unidiomatic-typecheck
+        raise ValueError(
+            "request hashclass %s does not match start_hashcode class %s" %
+            (hashclass, type(start_hashcode))
+        )
+    else:
+      start_hashcode = None
+    length = BSUInt.parse_value(bfr)
+    return cls(
+        after=after,
+        hashclass=hashclass,
+        start_hashcode=start_hashcode,
+        length=length
+    )
+
+  @property
+  def flags(self):
+    ''' Compute the flags for the request packet envelope.
+    '''
+    return (
+        (0x01 if self.after else 0x00)
+        | (0x02 if self.start_hashcode is not None else 0x00)
+    )
+
+  def transcribe(self):
+    yield BSString.transcribe_value(self.hashclass.hashname)
+    start_hashcode = self.start_hashcode
+    if start_hashcode is not None:
+      yield HashCodeField.transcribe_value(start_hashcode)
+    yield BSUInt.transcribe_value(self.length)
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Return serialised hashcodes from the local store.
+    '''
+    # return joined encoded hashcodes
+    length = self.length
+    if length == 0:
+      length = None
+    return b''.join(
+        h.encode() for h in local_store.hashcodes(
+            start_hashcode=self.start_hashcode,
+            after=self.after,
+            length=length
+        )
+    )
+
+class HashOfHashCodesRequest(HashCodesRequest):
+  ''' A request for a hashcode of remote hashcodes.
+  '''
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Return a hash of hashcodes from the local store.
+    '''
+    over_hashcode, final_hashcode = local_store.hash_of_hashcodes(
+        start_hashcode=self.start_hashcode,
+        after=self.after,
+        length=self.length
+    )
+    payload = over_hashcode.encode()
+    if final_hashcode:
+      payload += final_hashcode.encode()
+    return payload
+
+class ArchiveLastRequest(
+    BaseRequest,
+    BinaryMultiValue('ArchiveLastRequest', dict(s=BSString,)),
+):
+  ''' Return the last entry in a remote Archive.
+  '''
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Return data from the local store by hashcode.
+    '''
+    archive = local_store.get_Archive(self.s)
+    entry = archive.last
+    if entry.dirent is None:
+      return 0
+    return (1, bytes(entry))
+
+class ArchiveListRequest(
+    BaseRequest,
+    BinaryMultiValue('ArchiveListRequest', dict(s=BSString)),
+):
+  ''' List the entries in a remote Archive.
+  '''
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Return ArchiveEntry transcriptions from the named Archive.
+    '''
+    archive = local_store.get_Archive(self.s)
+    return b''.join(bytes(entry) for entry in archive)
+
+class ArchiveUpdateRequest(
+    BaseRequest,
+    BinaryMultiValue(
+        'ArchiveUpdateRequest',
+        dict(archive_name=BSString, entry=ArchiveEntry),
+    ),
+):
+  ''' Add an entry to a remote Archive.
+  '''
+
+  @uses_local_store
+  def fulfil(self, local_store: Store):
+    ''' Return data from the local store by hashcode.
+    '''
+    archive = local_store.get_Archive(self.archive_name)
+    entry = self.entry
+    archive.update(entry.dirent, when=entry.when)
 
 # pylint: disable=too-many-ancestors
-class StreamStore(StoreSyncBase):
+class StreamStore(StoreSyncBase, HasPacketConnection):
   ''' A `Store` connected to a remote `Store` via a `PacketConnection`.
       Optionally accept a local store to facilitate bidirectional activities
       or simply to implement the server side.
@@ -140,13 +448,34 @@ class StreamStore(StoreSyncBase):
     '''
     if capacity is None:
       capacity = STREAM_CAPACITY_DEFAULT
-    super().__init__(name, capacity=capacity, **syncstore_kw)
-    self.conn = PacketConnection(
-        recv_send,
-        self.name,
-        request_handler=self._handle_request,
-        packet_grace=0,
-    )
+    StoreSyncBase.__init__(self, name, capacity=capacity, **syncstore_kw)
+    if True:
+      HasPacketConnection.__init__(
+          self,
+          recv_send,
+          name,
+          rq_type_map={
+              0: AddRequest,  # data->hashcode
+              1: GetRequest,  # hashcode->data
+              2: ContainsRequest,  # hashcode->bool
+              3: FlushRequest,  # flush local and remote servers
+              4: HashCodesRequest,  # (hashcode,length)->hashcodes
+              5:
+              HashOfHashCodesRequest,  # (hashcode,length)->hashcode of hashcodes
+              6: ArchiveLastRequest,  # archive_name->(when,E)
+              7: ArchiveUpdateRequest,  # (archive_name,when,E)
+              8: ArchiveListRequest,  # (count,archive_name)->(when,E)...
+              9: LengthRequest,  # ()->remote-store-length
+              10: ContainsIndirectRequest,  # hashcode->bool
+          },
+      )
+    else:
+      self.conn = PacketConnection(
+          recv_send,
+          self.name,
+          request_handler=self._handle_request,
+          ##packet_grace=0,
+      )
     self.on_demand = on_demand
     self._lock = Lock()
     self.mode_addif = addif
@@ -199,89 +528,12 @@ class StreamStore(StoreSyncBase):
     '''
     self.conn.join()
 
-  def do_bg(self, rq) -> Result:
-    ''' Wrapper for `self.conn.request` to catch and report failed autoconnection.
-        Raises `StoreError` on `ClosedError` or `CancellationError`.
-    '''
-    conn = self.conn
-    try:
-      submitted = conn.submit(
-          rq.RQTYPE,
-          getattr(rq, 'packet_flags', 0),
-          bytes(rq),
-      )
-    except ClosedError as e:
-      raise StoreError("connection closed: %s" % (e,), request=rq) from e
-    except CancellationError as e:
-      raise StoreError("request cancelled: %s" % (e,), request=rq) from e
-
-    def decode_response(response):
-      ''' Decode the response returned by from the connection.
-      '''
-      if response is None:
-        raise StoreError("NO RESPONSE", request=rq)
-      ok, flags, payload = response
-      if not ok:
-        raise StoreError(
-            "NOT OK response", request=rq, flags=flags, payload=payload
-        )
-      return flags, payload
-
-    return submitted.post_notify(decode_response)
+  @pfx_method
+  def __len__(self) -> int:
+    return self.conn_do_remote(LengthRequest())
 
   @typechecked
-  def do(self, rq) -> Tuple[int, bytes]:
-    ''' Synchronous interface to `self.conn.request`
-        In addition to the exceptions raised by `self.do_bg()`
-        this method raises `StoreError` if the response is not ok.
-        Otherwise it returns a `(flags,payload)` tuple
-        and the caller can assume the request was ok.
-    '''
-    with self.conn:
-      R = self.do_bg(rq)
-      result = R()
-      return result
-
-  @staticmethod
-  def decode_request(rq_type, flags, payload):
-    ''' Decode `(flags,payload)` into a request packet.
-    '''
-    with Pfx("decode_request(rq_type=%s, flags=0x%02x, payload=%d bytes)",
-             rq_type, flags, len(payload)):
-      request_class = RqType(rq_type).request_class
-      rq, offset = request_class.parse_bytes(payload, parse_flags=flags)
-      if offset < len(payload):
-        warning(
-            "%d unparsed bytes remaining in payload",
-            len(payload) - offset
-        )
-      return rq
-
-  def _handle_request(self, rq_type, flags, payload):
-    ''' Perform the action for a request packet.
-        Return as for the `request_handler` parameter to `PacketConnection`.
-    '''
-    local_store = self._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    rq = self.decode_request(rq_type, flags, payload)
-    with local_store:
-      return rq.do_local(self)
-
-  @pfx_method
-  def __len__(self):
-    try:
-      flags, payload = self.do(LengthRequest())
-    except StoreError as e:
-      error("connection: %s", e)
-      return None
-    assert flags == 0
-    length, offset = BSUInt.parse_value_from_bytes(payload)
-    if offset < len(payload):
-      warning("unparsed bytes after BSUInt(length): %r", payload[offset:])
-    return length
-
-  def add(self, data: bytes, *, sync=None):
+  def add(self, data: bytes, *, sync=None) -> HashCode:
     ''' Add `data` to the Store, return its hashcode.
 
         The optinal `sync` parameter may be used to control whether
@@ -302,66 +554,40 @@ class StreamStore(StoreSyncBase):
       if sync is None:
         sync = self.mode_sync
       if sync:
-        flags, payload = self.do(rq)
-        assert flags == 0
-        h2 = HashCode.decode(payload)
+        h2 = self.conn_do_remote(rq)
         assert h == h2
       else:
-        self.do_bg(rq)
+        # async: submit and return the hashcode immediately
+        self.conn_do_remote(rq)
       return h
 
-  def get(self, h, default=None):
-    try:
-      flags, payload = self.do(GetRequest(h))
-    except StoreError as e:
-      error("h=%s: %s", h, e)
-      return None
-    found = flags & 0x01
-    if found:
-      flags &= ~0x01
-    if flags:
-      raise StoreError("unexpected flags: 0x%02x" % (flags,))
-    if found:
-      return payload
-    if payload:
-      raise ValueError("not found, but payload=%r" % (payload,))
-    return default
+  @typechecked
+  def get(self, h: HashCode, default=None) -> Union[bytes, None]:
+    data = self.conn_do_remote(GetRequest(h))
+    if data is None:
+      return default
+    return data
 
-  def contains(self, h):
+  @typechecked
+  def contains(self, h) -> bool:
     ''' Dispatch a contains request, return a `Result` for collection.
     '''
     if h in self._contains_cache:
       return True
-    rq = ContainsRequest(h)
-    flags, payload = self.do(rq)
-    found = flags & 0x01
-    if found:
-      flags &= ~0x01
-    if flags:
-      raise StoreError("unexpected flags: 0x%02x" % (flags,))
-    if payload:
-      raise StoreError("unexpected payload: %r" % (payload,))
+    found = self.conn_do_remote(ContainsRequest(h))
     if found:
       self._contains_cache.add(h)
     return found
 
-  def is_complete_indirect(self, ih) -> bool:
+  @typechecked
+  def is_complete_indirect(self, ih: HashCode) -> bool:
     ''' Check whether `ih`, the hashcode of an indirect Block,
         has its data and all its implied data present in this Store.
     '''
-    rq = ContainsIndirectRequest(ih)
-    flags, payload = self.do(rq)
-    found = flags & 0x01
-    if found:
-      flags &= ~0x01
-    if flags:
-      raise StoreError("unexpected flags: 0x%02x" % (flags,))
-    if payload:
-      raise StoreError("unexpected payload: %r" % (payload,))
-    return bool(found)
+    return self.conn_do_remote(ContainsIndirectRequest(ih))
 
   def flush(self):
-    flags, payload = self.do(FlushRequest())
+    flags, payload = self.conn_do_remote(FlushRequest())
     assert flags == 0
     assert not payload
     local_store = self.local_store
@@ -399,7 +625,7 @@ class StreamStore(StoreSyncBase):
       raise ValueError(
           "after=%s but start_hashcode=%s" % (after, start_hashcode)
       )
-    flags, payload = self.do(
+    flags, payload = self.conn_do_remote(
         HashCodesRequest(
             start_hashcode=start_hashcode,
             hashclass=hashclass,
@@ -543,350 +769,6 @@ class StreamStoreArchive(BaseArchive):
       when = time.time()
     self.S.do(ArchiveUpdateRequest(self.archive_name, ArchiveEntry(when, E)))
     return str(E)
-
-####################################################################
-# Request packet definitions here.
-# The RqType enum is defined below these, associating the packet
-# classes with each RqType value.
-#
-
-class UnFlaggedPayloadMixin:
-  ''' Leading mixin for packets with no parse flags
-      from the `PacketStream` encapsualtion.
-
-      This provides `parse(bfr,parse_flags)`
-      and `parse_bytes(bs,parse_flags)`
-      which ensure that `parse_flags==0`
-      and then call the superclass method without flags.
-  '''
-
-  @classmethod
-  def parse(cls, bfr, *, parse_flags=0):
-    ''' Check that `parse_flags==0`
-        and then call the superclass `parse` without flags.
-    '''
-    assert parse_flags == 0
-    return super().parse(bfr)
-
-  @classmethod
-  def parse_bytes(cls, payload, *, parse_flags):
-    ''' Check that `parse_flags==0`
-        and then call the superclass `parse_bytes` without flags.
-    '''
-    assert parse_flags == 0
-    return super().parse_bytes(payload)
-
-class AddRequest(
-    UnFlaggedPayloadMixin,
-    BinaryMultiValue('AddRequest', dict(hashenum=BSUInt, data=BSData)),
-):
-  ''' An add(bytes) request, returning the hashcode for the stored data.
-  '''
-
-  RQTYPE = RqType.ADD
-
-  @property
-  def hashclass(self):
-    ''' The hash class derived from the hashenum.
-    '''
-    return HashCode.by_index(self.hashenum)
-
-  def do_local(self, stream):
-    ''' Add data to the local store, return serialised hashcode.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    if self.hashclass is not local_store.hashclass:
-      raise ValueError(
-          "request hashclass=%s but local store %s.hashclass=%s" %
-          (self.hashclass, local_store, local_store.hashclass)
-      )
-    # return the serialised hashcode of the added data
-    return local_store.add(self.data).encode()
-
-class GetRequest(UnFlaggedPayloadMixin, HashCodeField):
-  ''' A get(hashcode) request, returning the associated bytes.
-  '''
-
-  RQTYPE = RqType.GET
-
-  @property
-  def hashcode(self):
-    return self.value
-
-  def do_local(self, stream):
-    ''' Return data from the local store by hashcode.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    hashcode = self.hashcode
-    data = local_store.get(hashcode)
-    if data is None:
-      return 0
-    return 1, data
-
-class ContainsRequest(UnFlaggedPayloadMixin, HashCodeField):
-  ''' A request to test for the presence of a hashcode.
-  '''
-
-  RQTYPE = RqType.CONTAINS
-
-  @property
-  def hashcode(self):
-    return self.value
-
-  def do_local(self, stream):
-    ''' Test for hashcode, return `1` for present, `0` otherwise.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    hashcode = self.hashcode
-    return 1 if hashcode in local_store else 0
-
-class ContainsIndirectRequest(UnFlaggedPayloadMixin, HashCodeField):
-  ''' A request to test for the presence all of the blocks
-      of an indirect block hashcode.
-  '''
-
-  RQTYPE = RqType.CONTAINS_INDIRECT
-
-  @property
-  def hashcode(self):
-    return self.value
-
-  def do_local(self, stream):
-    ''' Test for hashcode, return `1` for present, `0` otherwise.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    hashcode = self.hashcode
-    return 1 if local_store.is_complete_indirect(hashcode) else 0
-
-class FlushRequest(
-    UnFlaggedPayloadMixin,
-    BinaryMultiValue('FlushRequest', {}),
-):
-  ''' A flush request.
-  '''
-
-  RQTYPE = RqType.FLUSH
-
-  @staticmethod
-  def do_local(stream):
-    ''' Flush the `local_store`.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    local_store.flush()
-
-class LengthRequest(
-    UnFlaggedPayloadMixin,
-    BinaryMultiValue('LengthRequest', {}),
-):
-  ''' Request the length (number of indexed Blocks) of the remote Store.
-  '''
-
-  RQTYPE = RqType.LENGTH
-
-  @staticmethod
-  def do_local(stream):
-    ''' Return the number of indexed blocks in `local_store`.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    return bytes(BSUInt(len(local_store)))
-
-class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
-  ''' A request for remote hashcodes.
-  '''
-
-  RQTYPE = RqType.HASHCODES
-
-  @require(lambda hashclass: issubclass(hashclass, HashCode))
-  @require(
-      lambda after, start_hashcode: not after or start_hashcode is not None
-  )
-  @typechecked
-  def __init__(
-      self,
-      *,
-      after: bool = False,
-      hashclass,
-      start_hashcode=None,
-      length: Optional[int] = None,
-  ):
-    if length is None:
-      length = 0
-    self.after = after
-    super().__init__(
-        hashclass=hashclass,
-        hashname=hashclass.hashname,
-        start_hashcode=start_hashcode,
-        length=length,
-    )
-
-  @classmethod
-  def parse(cls, bfr, *, parse_flags):
-    ''' Parse a HashCodesRequest from a buffer and construct.
-    '''
-    after = (parse_flags & 0x01) != 0
-    has_start_hashcode = (parse_flags & 0x02) != 0
-    extra_flags = parse_flags & ~0x03
-    if extra_flags:
-      raise ValueError("extra flags: 0x%02x" % (extra_flags,))
-    hashname = BSString.parse_value(bfr)
-    hashclass = HashCode.by_index(hashname)
-    if has_start_hashcode:
-      start_hashcode = HashCodeField.parse_value(bfr)
-      if type(start_hashcode) is not hashclass:  # pylint: disable=unidiomatic-typecheck
-        raise ValueError(
-            "request hashclass %s does not match start_hashcode class %s" %
-            (hashclass, type(start_hashcode))
-        )
-    else:
-      start_hashcode = None
-    length = BSUInt.parse_value(bfr)
-    return cls(
-        after=after,
-        hashclass=hashclass,
-        start_hashcode=start_hashcode,
-        length=length
-    )
-
-  @property
-  def packet_flags(self):
-    ''' Compute the flags for the request packet envelope.
-    '''
-    return (
-        (0x01 if self.after else 0x00)
-        | (0x02 if self.start_hashcode is not None else 0x00)
-    )
-
-  def transcribe(self):
-    yield BSString.transcribe_value(self.hashclass.hashname)
-    start_hashcode = self.start_hashcode
-    if start_hashcode is not None:
-      yield HashCodeField.transcribe_value(start_hashcode)
-    yield BSUInt.transcribe_value(self.length)
-
-  def do_local(self, stream):
-    ''' Return serialised hashcodes from the local store.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    # return joined encoded hashcodes
-    length = self.length
-    if length == 0:
-      length = None
-    return b''.join(
-        h.encode() for h in local_store.hashcodes(
-            start_hashcode=self.start_hashcode,
-            after=self.after,
-            length=length
-        )
-    )
-
-class HashOfHashCodesRequest(HashCodesRequest):
-  ''' A request for a hashcode of remote hashcodes.
-  '''
-
-  RQTYPE = RqType.HASHCODES_HASH
-
-  def do_local(self, stream):
-    ''' Return a hash of hashcodes from the local store.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    over_hashcode, final_hashcode = local_store.hash_of_hashcodes(
-        start_hashcode=self.start_hashcode,
-        after=self.after,
-        length=self.length
-    )
-    payload = over_hashcode.encode()
-    if final_hashcode:
-      payload += final_hashcode.encode()
-    return payload
-
-class ArchiveLastRequest(
-    UnFlaggedPayloadMixin,
-    BinaryMultiValue('ArchiveLastRequest', dict(s=BSString,)),
-):
-  ''' Return the last entry in a remote Archive.
-  '''
-
-  RQTYPE = RqType.ARCHIVE_LAST
-
-  def do_local(self, stream):
-    ''' Return data from the local store by hashcode.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    archive = local_store.get_Archive(self.s)
-    entry = archive.last
-    if entry.dirent is None:
-      return 0
-    return (1, bytes(entry))
-
-class ArchiveListRequest(
-    UnFlaggedPayloadMixin,
-    BinaryMultiValue('ArchiveListRequest', dict(s=BSString)),
-):
-  ''' List the entries in a remote Archive.
-  '''
-
-  RQTYPE = RqType.ARCHIVE_LIST
-
-  def do_local(self, stream):
-    ''' Return ArchiveEntry transcriptions from the named Archive.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    archive = local_store.get_Archive(self.s)
-    return b''.join(bytes(entry) for entry in archive)
-
-class ArchiveUpdateRequest(
-    UnFlaggedPayloadMixin,
-    BinaryMultiValue(
-        'ArchiveUpdateRequest',
-        dict(archive_name=BSString, entry=ArchiveEntry),
-    ),
-):
-  ''' Add an entry to a remote Archive.
-  '''
-
-  RQTYPE = RqType.ARCHIVE_UPDATE
-
-  def do_local(self, stream):
-    ''' Return data from the local store by hashcode.
-    '''
-    local_store = stream._local_store
-    if local_store is None:
-      raise ValueError("no local_store, request rejected")
-    archive = local_store.get_Archive(self.archive_name)
-    entry = self.entry
-    archive.update(entry.dirent, when=entry.when)
-
-RqType.ADD.request_class = AddRequest
-RqType.GET.request_class = GetRequest
-RqType.CONTAINS.request_class = ContainsRequest
-RqType.FLUSH.request_class = FlushRequest
-RqType.HASHCODES.request_class = HashCodesRequest
-RqType.HASHCODES_HASH.request_class = HashOfHashCodesRequest
-RqType.ARCHIVE_LAST.request_class = ArchiveLastRequest
-RqType.ARCHIVE_LIST.request_class = ArchiveListRequest
-RqType.ARCHIVE_UPDATE.request_class = ArchiveUpdateRequest
-RqType.LENGTH.request_class = LengthRequest
-RqType.CONTAINS_INDIRECT.request_class = ContainsIndirectRequest
 
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to a command.
