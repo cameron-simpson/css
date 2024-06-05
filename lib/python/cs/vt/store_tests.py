@@ -272,7 +272,7 @@ def multitest(method):
           with stackattrs(
               self,
               S=S,
-              supports_index_entry=type(self.S) in (DataDirStore,),
+              supports_index_entry=isinstance(S, (DataDirStore,)),
               hashclass=subtest['hashclass'],
           ):
             S.init()
