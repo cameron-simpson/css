@@ -1,3 +1,4 @@
+cs.binary: _BinaryMultiValue_Base.for_json: use jsonable?
 contextif: bypass the callable check if cmgr has .__enter__
 atomic_filename: use the O_EXCL tick for reliable rename-to-target stuff?
 RunState.notify_cancel: use the FSM notification system
