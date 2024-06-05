@@ -1281,6 +1281,8 @@ class _BinaryMultiValue_Base(SimpleBinary):
   ##__repr__ = _s
 
   def for_json(self) -> Mapping[str, Any]:
+    ''' Return a `dict` mapping field names to their values.
+    '''
     return {
         field_name: getattr(self, field_name)
         for field_name in self.FIELD_ORDER
