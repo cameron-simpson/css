@@ -299,6 +299,8 @@ def multitest(method):
             else:
               assert not secondT
             self.assertTrue(S.closed)
+      sleep(1.0)
+      assertSingleThread()
       ### run just the first combination
       ##break
 
