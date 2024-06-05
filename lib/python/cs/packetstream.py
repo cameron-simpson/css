@@ -7,6 +7,7 @@
 ''' A general purpose bidirectional packet stream connection.
 '''
 
+from abc import abstractmethod
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import errno
@@ -15,9 +16,9 @@ import os
 import sys
 from time import sleep
 from threading import Lock
-from typing import Callable, List, Protocol, Tuple, Union, runtime_checkable
+from typing import Callable, List, Mapping, Protocol, Tuple, Union, runtime_checkable
 
-from cs.binary import SimpleBinary, BSUInt, BSData
+from cs.binary import AbstractBinary, SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.context import closeall, stackattrs
 from cs.excutils import logexc
@@ -530,7 +531,7 @@ class PacketConnection(MultiOpenMixin):
           report_print=True,
       ):
         channel, tag = chtag
-        rq_state = trace(self._pending_pop)(channel, tag)
+        rq_state = self._pending_pop(channel, tag)
         rq_state.cancel()
 
   def _queue_packet(self, P: Packet):
@@ -956,6 +957,206 @@ class PacketConnection(MultiOpenMixin):
       except Exception as e:
         error("(_SEND) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
         raise
+
+class BaseRequest(AbstractBinary):
+  ''' A base class for request classes to use with `HasPacketConnection`.
+
+      This is a mixin aimed at `*Binary` classes representing the
+      request payload and supplies an `__init__` method which saves
+      the optional `flags` parameter as `.flags` and passes all
+      other parameters to the superclass' `__init__`
+      (the `*Binary` superclass).
+
+      As such, it is important to define the subclass like this:
+
+          class AddRequest(
+              BaseRequest,
+              BinaryMultiValue('AddRequest', dict(hashenum=BSUInt, data=BSData)),
+          ):
+
+      with `BaseRequest` _first_ if you wish to omit an `__init__` method.
+
+      Subclasses must implement the `fulfil` method to perform the
+      request operation.
+
+      Often a subclass will also implement the
+      `decode_response_payload(flags,payload)` method.
+      This provides the result of a request, returned by
+      `HasPacketConnection.conn_do_remote` or by the `Result`
+      returned from `HasPacketConnection.conn_submit`.
+      The default returns the response `flags` and `payload` directly.
+
+      This base class subclasses `AbstractBinary` to encode and
+      decode the request `payload` and has an additions `flags`
+      attribute for the `Packet.flags`.  As such, subclasses have
+      two main routes for implemetation:
+
+      1: Subclass an existing `AbstractBinary` subclass. For example,
+         the `cs.vt.stream.ContainsRequest` looks up a hash code, and
+         subclasses the `cs.vt.hash.HashField` class.
+
+      2: Provide a `parse(bfr)` factory method and `transcribe()`
+         method to parse and transcribe the request `payload` like any
+         other `AbstractBinary` subclass.
+
+      Approach 1 does not necessarily need a distinct class;
+      a binary class can often be constructed in the class header.
+      For example, the `cs.vt.stream.AddRequest` payload is an `int`
+      representing the hash class and the data to add. The class
+      header looks like this:
+
+          class AddRequest(
+              BaseRequest,
+              BinaryMultiValue('AddRequest', dict(hashenum=BSUInt, data=BSData)),
+          ):
+
+      much as one might subclass a `namedtuple` in other circumstances.
+  '''
+
+  _seq = Seq()
+
+  def __init__(self, flags=0, **binary_kw):
+    self.flags = flags
+    super().__init__(**binary_kw)
+
+  @abstractmethod
+  def fulfil(self, context) -> Union[None, int, bytes, str, Tuple[int, bytes]]:
+    ''' Fulfil this request at the receiving end of the connection using
+        `context`, some outer object using the connection.
+        Raise an exception if the request cannot be fulfilled.
+
+        Return values suitable for the response:
+        * `None`: equivalent to `(0,b'')`
+        * `int`: returned in the flags with `b''` for the payload
+        * `bytes`: returned as the payload with `0` as the flags
+        * `str`: return `encode(s,'ascii')` as the payload with `0` as the flags
+        * `(int,bytes)`: the flags and payload
+
+        A typical implementation looks like this:
+
+            def fulfil(self, context):
+                return context.come_method(params...)
+
+        where `params` come from the request attributes.
+    '''
+    raise NotImplementedError
+
+  @classmethod
+  def from_request_payload(cls, flags: int, payload: bytes) -> "BaseRequest":
+    ''' Decode a _request_ `flags` and `payload`, return a `BaseRequest` instance.
+
+        This is called with the correct `BaseRequest` subclass
+        derived from the received `Packet.rq_type`.
+        It decodes the 
+
+        This default implementation assumes that `flags==0`
+        and calls `cls.from_bytes(payload)`.
+    '''
+    assert cls is not BaseRequest and issubclass(cls, BaseRequest)
+    self = cls.from_bytes(payload)
+    assert isinstance(self, cls)
+    self.flags = flags
+    return self
+
+  def decode_response_payload(self, flags: int, payload: bytes):
+    ''' Decode a _response_ `flags` and `payload`.
+
+        This default implementation returns the `flags` and `payload` unchanged.
+    '''
+    return flags, payload
+
+class HasPacketConnection:
+  ''' This is a mixin class to aid writing classes which use a
+      `PacketConnection` to communicate with some service.
+
+      The supported request/response packet types are provided as
+      a mapping of `int` `Packet.rq_type` values to a class
+      implementing that request type, a subclass of `BaseRequest`.
+
+      For example, a `cs.vt.stream.StreamStore` subclasses `HasPacketConnection`
+      and initialises the mixin with this call:
+
+          HasPacketConnection.__init__(
+              self,
+              recv_send,
+              name,
+              { 0: AddRequest,  # add chunk, return hashcode
+                1: GetRequest,  # get chunk from hashcode
+                .......
+              },
+          )
+
+      See the `BaseRequest` class for details on how to implement
+      each request type.
+  '''
+
+  _conn_seq = Seq()
+
+  def __init__(
+      self,
+      recv_send: PacketConnectionRecvSend,
+      name: str = None,
+      *,
+      rq_type_map: Mapping[int, BaseRequest],
+  ):
+    ''' Initialise `self.conn` as a `PacketConnection`.
+
+        Parameters:
+        * `recv_send`: as for `PacketConnection`
+        * `name`: an optional name for the connection
+        * `rq_type_map`: a mapping of request types to `BaseRequest` subclasses
+    '''
+    self.conn = PacketConnection(
+        recv_send,
+        name,
+        request_handler=self.conn_handle_request,
+    )
+    self.conn_rq_class_by_type = rq_type_map
+    self.conn_type_by_rq_class = {
+        rq_class: rq_type
+        for rq_type, rq_class in rq_type_map.items()
+    }
+
+  def conn_submit(
+      self,
+      rq: BaseRequest,
+      *,
+      channel=0,
+      label=None,
+  ) -> Result:
+    ''' Submit this request to the connection, return a `Result`.
+    '''
+    if label is None:
+      label = f'{self.__class__.__name__}-{next(self.__class__._conn_seq)}'
+    return self.conn.submit(
+        self.conn_type_by_rq_class[type(rq)],
+        rq.flags,
+        bytes(rq),
+        channel=channel,
+        label=label,
+        ## done in conn_do_remote ## decode_response=rq.decode_response_payload,
+    )
+
+  def conn_do_remote(self, rq: BaseRequest, **submit_kw):
+    ''' Run `rq` remotely.
+        Raises `ValueError` if the response is not ok.
+        Otherwise returns `rq.decode_response(flags, payload)`.
+    '''
+    R = self.conn_submit(rq, **submit_kw)
+    ok, flags, payload = R()
+    if not ok:
+      raise ValueError(
+          f'"not ok" from remote: flags=0x{flags:02x}, payload={payload.decode("utf-8",errors="replace")!r}'
+      )
+    return rq.decode_response_payload(flags, payload)
+
+  def conn_handle_request(self, rq_type: int, flags: int, payload: bytes):
+    ''' Handle receipt of a request packet.
+        Decode the packet into a request `rq` and return `rq.fulfil(self)`.
+    '''
+    rq_class = self.conn_rq_class_by_type[rq_type]
+    rq = rq_class.from_request_payload(flags, payload)
+    return rq.fulfil(self)
 
 if __name__ == '__main__':
   from cs.debug import selftest
