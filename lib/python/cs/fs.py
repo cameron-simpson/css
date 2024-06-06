@@ -450,11 +450,10 @@ def shortpath(
         except OSError:
           i += 1
     parts = list(
-        (path_as[0].path if i == 0 else path_as[0].name
-         ) if path_as[1] is None else path_as[1]
+        (path_as[1] or (path_as[0].path if i == 0 else path_as[0].name))
         for i, path_as in enumerate(keep_as)
     )
-    parts.append(leaf.name)
+    parts.append(paths_as[-1][1] or leaf.name)
     fspath = os.sep.join(parts)
   # replace leading prefix
   for prefix, subst in prefixes:
