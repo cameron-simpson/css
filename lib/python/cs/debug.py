@@ -686,6 +686,42 @@ def trace(
             end_time - start_time,
             (pformat if use_pformat else repr)(result),
         )
+      if inspect.isgeneratorfunction(func):
+        iterator = result
+
+        def traced_generator():
+          while True:
+            next_time = time.time()
+            if call:
+              xlog(
+                  "%sNEXT %s %gs ...",
+                  _trace_state.indent,
+                  log_cite,
+                  next_time - start_time,
+              )
+            try:
+              item = next(iterator)
+            except StopIteration:
+              yield_time = time.time()
+              xlog(
+                  "%sDONE %s %gs ...",
+                  _trace_state.indent,
+                  log_cite,
+                  yield_time - next_time,
+              )
+              break
+            else:
+              yield_time = time.time()
+              xlog(
+                  "%sYIELD %gs %s <= %s",
+                  _trace_state.indent,
+                  yield_time - next_time,
+                  s(item),
+                  log_cite,
+              )
+              yield item
+
+        result = traced_generator()
       else:
         ##xlog("%sRETURN %s <= %s", _trace_state.indent, type(result), log_cite)
         xlog(
