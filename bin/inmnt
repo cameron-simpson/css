@@ -7,12 +7,16 @@
 set -ue
 
 : "${TMPDIR:=/tmp}"
+rtmp=/tmp
 
 cmd=$( basename "$0" )
 usage="Usage: $0 [options...] {sshhost:path|@rhost} [command [args...]]
   -F sshcfg Specify ssh config file, passed to mnt (for sshfs).
   -o opt    Passed to mnt (for sshfs).
   -q        Turn off tracing.
+  --rtmp tmppath
+            Bit of a hack to use something other than $rtmp at the
+            remote end.
   The default command is the user's shell (from \$SHELL).
   Modes:
     sshhost:path
@@ -37,6 +41,7 @@ do
     -F) mntopts="$mntopts -F $2"; shift ;;
     -o) mntopts="$mntopts -o $2"; shift ;;
     -q) trace= mntopts="$mntopts -q" inmntopts="$inmntopts -q" ;;
+    --rtmp) rtmp=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -65,8 +70,8 @@ case "$sshfspath" in
       rssh_host=reverse-$host
       local_ssh_endpoint=127.0.0.1:22
       localdir=$( pwd )
-      reverse_sock=/tmp/revssh-$host-$$
-      reverse_cfg=/tmp/revssh-$host-$$.cfg
+      reverse_sock=$rtmp/revssh-$host-$$
+      reverse_cfg=$rtmp/revssh-$host-$$.cfg
       $trace $ssh_exe $sshopts \
         -o ControlPath=none \
         -o ExitOnForwardFailure=yes \
