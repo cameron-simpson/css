@@ -10,6 +10,7 @@
 import os
 import errno
 import socket
+
 from cs.logutils import debug, warning
 from cs.pfx import Pfx
 
@@ -52,32 +53,33 @@ class OpenSocket(object):
   def __init__(self, sock, for_write):
     self._for_write = for_write
     self._sock = sock
-    self._fd0 = self._sock.fileno()
-    self._fd = os.dup(self._fd0)
-    self._fp = os.fdopen(self._fd, 'wb' if for_write else 'rb')
-    try:
-      read = self._fp.read1
-    except AttributeError:
-      read = self._fp.read
-    self.read = read
+    # this is used by the socket object
+    self._fp = os.fdopen(
+        self._sock.fileno(),
+        'wb' if for_write else 'rb',
+        closefd=False,
+    )
+    if for_write:
+      self.write = self._fp.write
+      self.flush = self._fp.flush
+    else:
+      try:
+        read = self._fp.read1
+      except AttributeError:
+        read = self._fp.read
+      self.read = read
 
   def __str__(self):
-    return "%s[fd=%d,fd0=%d]" % (type(self).__name__, self._fd, self._fd0)
+    return "%s[sock=%s,file=%s]" % (
+        self.__class__.__name__, self._sock, self._fp
+    )
+
+  __repr__ = __str__
 
   def isatty(self):
     ''' We are not a tty.
     '''
     return False
-
-  def write(self, data):
-    ''' Write to the socket.
-    '''
-    return self._fp.write(data)
-
-  def flush(self):
-    ''' Flush any buffered data to the socket.
-    '''
-    return self._fp.flush()
 
   def close(self):
     ''' Close the socket.
@@ -120,19 +122,9 @@ class OpenSocket(object):
           warning("%s: %s.close: %s", self, self._fp, e)
         else:
           raise
+      # forget the file and socket
       self._fp = None
       self._sock = None
-
-  def selfcheck(self):
-    ''' Perform an internal self check.
-    '''
-    st1 = os.fstat(self._fd)
-    st2 = os.fstat(self._fd0)
-    st3 = os.fstat(self._sock)
-    if st1 != st2:
-      raise ValueError("fstat mismatch st1!=st2 (%s, %s)" % (st1, st2))
-    if st1 != st3:
-      raise ValueError("fstat mismatch st1!=st3 (%s, %s)" % (st1, st3))
 
 if __name__ == '__main__':
   from cs.debug import selftest
