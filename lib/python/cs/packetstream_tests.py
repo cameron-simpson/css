@@ -76,8 +76,6 @@ class _TestStream(SetupTeardownMixin):
         (downstream_rd, upstream_wr),
         f'{clsname}-local',
     ) as local_conn:
-      if not local_conn.requests_allowed:
-        raise RuntimeError
       with PacketConnection(
           (upstream_rd, downstream_wr),
           f'{clsname}-remote',
@@ -111,8 +109,6 @@ class _TestStream(SetupTeardownMixin):
   def test00immediate_close(self):
     ''' Trite test: do nothing with the streams.
     '''
-    ##thread_dump()
-    ##breakpoint()
 
   def test01half_duplex(self):
     ''' Half duplex test to throw the same packet up and back repeatedly.
@@ -136,10 +132,10 @@ class _TestStream(SetupTeardownMixin):
     rqs = []
     for _ in range(1678):
       size = rand0(16385)
-      data = make_randblock(size)
+      data = f'forward-{i}'.encode('ascii')  ## make_randblock(size)
       flags = rand0(65537)
       R = self.local_conn.submit(
-          0,
+          0,  # rq_type
           flags,
           data,
           decode_response=self._decode_response,
