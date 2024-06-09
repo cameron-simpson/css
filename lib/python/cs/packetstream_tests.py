@@ -8,11 +8,12 @@ from contextlib import contextmanager
 import os
 import random
 import socket
-from threading import Thread
+from threading import Thread, enumerate as enumerate_threads, main_thread
 import unittest
 
 from cs.binary_tests import BaseTestBinaryClasses
 from cs.context import stackattrs
+from cs.debug import thread_dump
 from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.randutils import rand0, make_randblock
@@ -21,9 +22,6 @@ from cs.testutils import SetupTeardownMixin
 
 from . import packetstream
 from .packetstream import Packet, PacketConnection
-
-from cs.debug import thread_dump
-from threading import enumerate as enumerate_threads, main_thread
 
 class TestPacketStreamBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Test for all the `AbstractBinary` subclasses.
@@ -130,8 +128,8 @@ class _TestStream(SetupTeardownMixin):
     ''' Throw 16 packets up, collect responses after requests queued.
     '''
     rqs = []
-    for _ in range(1678):
-      size = rand0(16385)
+    for i in range(1678):
+      ##  size = rand0(16385)
       data = f'forward-{i}'.encode('ascii')  ## make_randblock(size)
       flags = rand0(65537)
       R = self.local_conn.submit(
@@ -254,7 +252,7 @@ class TestStreamTCP(_TestStream, unittest.TestCase):
             yield
 
   def _accept(self):
-    self.service_sock, _ = trace(self.listen_sock.accept)()
+    self.service_sock, _ = self.listen_sock.accept()
 
 if __name__ == '__main__':
   from cs.debug import selftest
