@@ -58,9 +58,10 @@ class ClosedError(Exception):
   ''' Exception for operations invalid when something is closed.
   '''
 
+@decorator
 def not_closed(func):
-  ''' Decorator to wrap methods of objects with a .closed property
-      which should raise when self.closed.
+  ''' A decorator to wrap methods of objects with a `.closed` property
+      which should raise when `self.closed`.
   '''
 
   def not_closed_wrapper(self, *a, **kw):
@@ -72,7 +73,6 @@ def not_closed(func):
       )
     return func(self, *a, **kw)
 
-  not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
