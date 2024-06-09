@@ -231,37 +231,35 @@ class TestStreamTCP(_TestStream, unittest.TestCase):
   def setupTeardown(self):
     ''' Set up streams using TCP connections.
     '''
-    self.listen_sock = socket.socket()
-    self.listen_port = bind_next_port(self.listen_sock, '127.0.0.1', 9999)
-    self.listen_sock.listen(1)
-    self.downstream_sock = None
-    accept_Thread = Thread(target=self._accept)
-    accept_Thread.start()
-    self.upstream_sock = socket.socket()
-    self.upstream_sock.connect(('127.0.0.1', self.listen_port))
-    try:
-      accept_Thread.join()
-      self.assertIsNotNone(self.downstream_sock)
-      try:
-        self.upstream_fp_rd = OpenSocket(self.upstream_sock, False)
-        self.upstream_fp_wr = OpenSocket(self.upstream_sock, True)
-        self.downstream_fp_rd = OpenSocket(self.downstream_sock, False)
-        self.downstream_fp_wr = OpenSocket(self.downstream_sock, True)
-        with super().setupTeardown(
-            self.upstream_fp_rd,
-            self.upstream_fp_wr,
-            self.downstream_fp_rd,
-            self.downstream_fp_wr,
-        ):
-          yield
-      finally:
-        self.downstream_sock.close()
-    finally:
-      self.upstream_sock.close()
+    with socket.socket() as listen_sock:
+      self.listen_sock = listen_sock
+      listen_port = bind_next_port(listen_sock, '127.0.0.1', 9999)
+      listen_sock.listen(1)
+      # this will be the server side accepted connection socket
+      self.service_sock = None
+      accept_Thread = Thread(target=self._accept)
+      accept_Thread.start()
+      with socket.socket() as client_sock:
+        client_sock.connect(('127.0.0.1', listen_port))
+        accept_Thread.join()
+        self.assertIsNotNone(self.service_sock)
+        service_sock = self.service_sock
+        with service_sock:
+          client_fp_rd = OpenSocket(client_sock, False)
+          client_fp_wr = OpenSocket(client_sock, True)
+          service_fp_rd = OpenSocket(service_sock, False)
+          service_fp_wr = OpenSocket(service_sock, True)
+          with super().setupTeardown(
+              # the channel to the service
+              service_fp_rd,
+              client_fp_wr,  # the channel from the service
+              client_fp_rd,
+              service_fp_wr,
+          ):
+            yield
 
   def _accept(self):
-    self.downstream_sock, _ = self.listen_sock.accept()
-    self.listen_sock.close()
+    self.service_sock, _ = trace(self.listen_sock.accept)()
 
 if __name__ == '__main__':
   from cs.debug import selftest
