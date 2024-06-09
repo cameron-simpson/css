@@ -365,7 +365,7 @@ class PacketConnection(MultiOpenMixin):
           # work queue for local requests
           _later=later,
           # dispatch queue of Packets to send
-          _sendQ=IterableQueue(16),
+          _sendQ=IterableQueue(16, f'sendQ[{self}]'),
           # debugging: check for reuse of (channel,tag) etc
           _sent=set(),
           _send_queued=set(),
