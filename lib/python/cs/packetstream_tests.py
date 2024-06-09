@@ -9,7 +9,10 @@ import os
 import random
 import socket
 from threading import Thread, enumerate as enumerate_threads, main_thread
+from typing import Callable
 import unittest
+
+from typeguard import typechecked
 
 from cs.binary_tests import BaseTestBinaryClasses
 from cs.context import stackattrs
@@ -55,6 +58,46 @@ class TestPacket(unittest.TestCase):
                 self.assertEqual(offset, len(bs))
                 self.assertEqual(P, P2)
 
+@contextmanager
+@typechecked
+def connection_pair(
+    name: str,
+    upstream_rd,
+    upstream_wr,
+    downstream_rd,
+    downstream_wr,
+    request_handler: Callable,
+):
+  ''' Create connection client and server `PacketConnection`s
+        and yield the client and server connections for testing.
+    '''
+  with trace(PacketConnection)(
+      (downstream_rd, upstream_wr),
+      f'{name}-local',
+  ) as local_conn:
+    if local_conn.requests_allowed:
+      raise RuntimeError
+    with trace(PacketConnection)(
+        (upstream_rd, downstream_wr),
+        f'{name}-remote',
+        request_handler=request_handler,
+    ) as remote_conn:
+      if not remote_conn.requests_allowed:
+        raise RuntimeError
+      try:
+        yield local_conn, remote_conn
+      finally:
+        # We explicitly send end of requests and end of file
+        # because we're running both local and remote.
+        # This is supposed to work automaticlly if we're only
+        # running the local end.
+        local_conn.end_requests()
+        local_conn.send_eof()
+        remote_conn.end_requests()
+        remote_conn.send_eof()
+    remote_conn.join()
+  local_conn.join()
+
 class _TestStream(SetupTeardownMixin):
   ''' Base class for stream tests.
   '''
@@ -70,31 +113,16 @@ class _TestStream(SetupTeardownMixin):
     ''' Set up: open the streams.
     '''
     clsname = self.__class__.__name__
-    with PacketConnection(
-        (downstream_rd, upstream_wr),
-        f'{clsname}-local',
-    ) as local_conn:
-      with PacketConnection(
-          (upstream_rd, downstream_wr),
-          f'{clsname}-remote',
-          request_handler=self._request_handler,
-      ) as remote_conn:
-        if not remote_conn.requests_allowed:
-          raise RuntimeError
-        with stackattrs(self, local_conn=local_conn, remote_conn=remote_conn):
-          try:
-            yield
-          finally:
-            # We explicitly send end of requests and end of file
-            # because we're running both local and remote.
-            # This is supposed to work automaticlly if we're only
-            # running the local end.
-            local_conn.end_requests()
-            local_conn.send_eof()
-            remote_conn.end_requests()
-            remote_conn.send_eof()
-      remote_conn.join()
-    local_conn.join()
+    with connection_pair(
+        clsname,
+        upstream_rd,
+        upstream_wr,
+        downstream_rd,
+        downstream_wr,
+        self._request_handler,
+    ) as (local_conn, remote_conn):
+      with stackattrs(self, local_conn=local_conn, remote_conn=remote_conn):
+        yield local_conn, remote_conn
 
   @staticmethod
   def _decode_response(flags, payload):
