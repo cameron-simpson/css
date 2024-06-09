@@ -75,7 +75,6 @@ class _TestStream(SetupTeardownMixin):
     with PacketConnection(
         (downstream_rd, upstream_wr),
         f'{clsname}-local',
-        request_handler=self._request_handler,  ## TODO remove this 
     ) as local_conn:
       if not local_conn.requests_allowed:
         raise RuntimeError
