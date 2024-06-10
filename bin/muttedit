@@ -171,7 +171,7 @@ case "$mode" in
     ;;
   pane)
     qsession_name=$( shqstr "$session_name" )
-    tmux split-window -v -p 80 "unset TMUX; exec tmux attach-session -t $qsession_name"
+    tmux split-window -v -l 80% "unset TMUX; exec tmux attach-session -t $qsession_name"
     ;;
   window)
     if [ $use_tmux ]
