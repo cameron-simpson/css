@@ -1,3 +1,4 @@
+bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
 cs.jsonutils: merge the various JSON utility functions?
 merge the variable jsonable functions?
 cs.binary: _BinaryMultiValue_Base.for_json: use jsonable?
