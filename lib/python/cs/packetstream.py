@@ -914,11 +914,8 @@ class PacketConnection(MultiOpenMixin):
           break
         sig = (P.channel, P.tag, P.is_request)
         if sig in self._sent:
-          if P == self.EOF_Packet:
-            warning("second send of EOF_Packet")
-          elif P == self.ERQ_Packet:
-            ##warning("second send of ERQ_Packet")
-            pass
+          if P == self.ERQ_Packet:
+            pass  ##warning("second send of ERQ_Packet")
           else:
             raise RuntimeError("second send of %s" % (P,))
         self._sent.add(sig)
