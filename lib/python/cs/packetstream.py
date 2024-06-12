@@ -902,12 +902,16 @@ class PacketConnection(MultiOpenMixin):
     with PrePfx("_SEND [%s]", self):
       Q = self._sendQ
       grace = self.packet_grace
+      # run until the _sendQ closes or we get an EOF_Packet
       for P in progressbar(
           Q,
           label=f'=> {self.name}',
           units_scale=BINARY_BYTES_SCALE,
           itemlenfunc=len,
       ):
+        if P == self.EOF_Packet:
+          warning("explicit send of EOF_Packet")
+          break
         sig = (P.channel, P.tag, P.is_request)
         if sig in self._sent:
           if P == self.EOF_Packet:
@@ -944,19 +948,7 @@ class PacketConnection(MultiOpenMixin):
             and not self.requests_in_progress):
           # not in use, all requests completed, no new ones allowed
           break
-      # send EOF packet to remote receiver
-      try:
-        self.EOF_Packet.write(sendf, flush=True)
-      except (OSError, IOError) as e:
-        if e.errno == errno.EPIPE:
-          debug("remote end closed: %s", e)
-        elif e.errno == errno.EBADF:
-          warning("local end closed: %s", e)
-        else:
-          raise
-      except Exception as e:
-        error("(_SEND) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
-        raise
+      self.EOF_Packet.write(sendf, flush=True)
 
 class BaseRequest(AbstractBinary):
   ''' A base class for request classes to use with `HasPacketConnection`.
