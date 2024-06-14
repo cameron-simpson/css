@@ -19,9 +19,10 @@ from cs.context import stackattrs
 from cs.debug import thread_dump
 from cs.logutils import warning
 from cs.pfx import pfx_call
-from cs.randutils import rand0, make_randblock
+from cs.randutils import rand0
 from cs.socketutils import bind_next_port, OpenSocket
 from cs.testutils import SetupTeardownMixin
+from cs.x import X
 
 from . import packetstream
 from .packetstream import Packet, PacketConnection
@@ -71,16 +72,16 @@ def connection_pair(
   ''' Create connection client and server `PacketConnection`s
         and yield the client and server connections for testing.
     '''
-  with trace(PacketConnection)(
+  with PacketConnection(
       (downstream_rd, upstream_wr),
-      f'{name}-local',
+      f'{name}-local',  ##trace_log=X,
   ) as local_conn:
     if local_conn.requests_allowed:
       raise RuntimeError
-    with trace(PacketConnection)(
+    with PacketConnection(
         (upstream_rd, downstream_wr),
         f'{name}-remote',
-        request_handler=request_handler,
+        request_handler=request_handler,  ##trace_log=X,
     ) as remote_conn:
       if not remote_conn.requests_allowed:
         raise RuntimeError
@@ -89,7 +90,7 @@ def connection_pair(
       finally:
         # We explicitly send end of requests and end of file
         # because we're running both local and remote.
-        # This is supposed to work automaticlly if we're only
+        # This is supposed to work automaticly if we're only
         # running the local end.
         local_conn.end_requests()
         local_conn.send_eof()
@@ -157,8 +158,7 @@ class _TestStream(SetupTeardownMixin):
     '''
     rqs = []
     for i in range(1678):
-      ##  size = rand0(16385)
-      data = f'forward-{i}'.encode('ascii')  ## make_randblock(size)
+      data = f'forward-{i}'.encode('ascii')
       flags = rand0(65537)
       R = self.local_conn.submit(
           0,  # rq_type
