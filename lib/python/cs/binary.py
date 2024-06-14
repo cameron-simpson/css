@@ -364,6 +364,7 @@ class AbstractBinary(ABC):
       min_count=None,
       max_count=None,
       with_offsets=False,
+      **parse_kw,
   ):
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
         until end of input and yield them.
@@ -377,6 +378,8 @@ class AbstractBinary(ABC):
         * `with_offsets`: optional flag, default `False`;
           if true yield `(pre_offset,obj,post_offset)`, otherwise just `obj`
         It is in error to specify both `count` and one of `min_count` or `max_count`.
+
+        Other keyword arguments are passed to `self.parse()`.
 
         Scanning stops after `max_count` instances (if specified).
         If fewer than `min_count` instances (if specified) are scanned
@@ -417,7 +420,7 @@ class AbstractBinary(ABC):
     scanned = 0
     while (max_count is None or scanned < max_count) and not bfr.at_eof():
       pre_offset = bfr.offset
-      obj = cls.parse(bfr)
+      obj = cls.parse(bfr, **parse_kw)
       if with_offsets:
         yield pre_offset, obj, bfr.offset
       else:
