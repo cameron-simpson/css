@@ -458,6 +458,24 @@ class PacketConnection(MultiOpenMixin):
                           report_print=True):
               self._sendQ.close(enforce_final_close=True)
               self._send_thread.join()
+            if not self._sendQ.empty():
+              warning(
+                  "%s: EXTRA unsent items in _sentQ %s:", self, self._sendQ
+              )
+              n_extra = 0
+              for item in self._sendQ:
+                n_extra += 1
+                warning(
+                    "  EXTRA %s:%s %s",
+                    type(item),
+                    item,
+                    (
+                        "EOF_Packet" if item == PacketConnection.EOF_Packet
+                        else "ERQ_Packet"
+                        if item == PacketConnection.ERQ_Packet else ""
+                    ),
+                )
+              assert n_extra > 0
             ##thread_dump()
             with run_task(
                 "%s: wait for _recv_thread %s" % (
