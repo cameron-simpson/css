@@ -10,21 +10,18 @@
 from abc import abstractmethod
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
-import errno
 from functools import partial
 import os
-import sys
 from time import sleep
 from threading import Lock
-from typing import Callable, List, Mapping, Protocol, Tuple, Union, runtime_checkable
+from typing import Callable, List, Mapping, Optional, Protocol, Tuple, Union, runtime_checkable
 
 from cs.binary import AbstractBinary, SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.context import closeall, stackattrs
 from cs.excutils import logexc
 from cs.later import Later
-from cs.lex import r
-from cs.logutils import debug, warning, error, exception
+from cs.logutils import warning, error, exception
 from cs.pfx import Pfx, PrePfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.queues import IterableQueue
@@ -34,8 +31,6 @@ from cs.seq import seq, Seq
 from cs.threads import locked, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE, DECIMAL_SCALE
 from cs.upd import run_task
-
-from cs.debug import trace, X, r, s
 
 __version__ = '20240412-post'
 
@@ -102,7 +97,7 @@ class Packet(SimpleBinary):
     )
 
   @classmethod
-  def parse(cls, bfr):
+  def parse(cls, bfr, log=None):
     ''' Parse a `Packet` from a buffer.
     '''
     raw_payload = BSData.parse_value(bfr)
@@ -122,6 +117,8 @@ class Packet(SimpleBinary):
     if self.is_request:
       self.rq_type = BSUInt.parse_value(payload_bfr)
     self.payload = b''.join(payload_bfr)
+    if log:
+      log("<== PARSE %-20s", self)
     return self
 
   def transcribe(self):
@@ -144,6 +141,13 @@ class Packet(SimpleBinary):
     # spit out a BSData manually to avoid pointless bytes.join
     yield BSUInt.transcribe_value(length)
     yield bss
+
+  def write(self, file, flush=False, log=None):
+    ''' Write the `Packet` to `file`.
+    '''
+    if log:
+      log("==> WRITE %-20s, flush=%s", self, flush)
+    return super().write(file, flush=flush)
 
 class RequestState(namedtuple('RequestState', 'decode_response result')):
   ''' A state object tracking a particular request.
@@ -253,6 +257,7 @@ class PacketConnection(MultiOpenMixin):
       *,
       request_handler=None,
       packet_grace=None,
+      trace_log: Optional[Callable] = None,
   ):
     ''' Initialise the `PacketConnection`.
 
@@ -318,6 +323,9 @@ class PacketConnection(MultiOpenMixin):
       packet_grace = DEFAULT_PACKET_GRACE
     self.packet_grace = packet_grace
     self.request_handler = request_handler
+    if trace_log is None:
+      trace_log = lambda msg, *a: None
+    self.trace_log = trace_log
     self._pending = None
     self._runstate = RunState(str(self))
     self._lock = Lock()
@@ -426,7 +434,7 @@ class PacketConnection(MultiOpenMixin):
                       yield
                     finally:
                       # announce end of requests to the remote end
-                      self.end_requests()
+                      self.send_erq()
               # runstate->STOPPED, should block new requests
               # complete accepted but incomplete requests
               if self.requests_in_progress:
@@ -450,6 +458,7 @@ class PacketConnection(MultiOpenMixin):
                           report_print=True):
               self._sendQ.close(enforce_final_close=True)
               self._send_thread.join()
+            ##thread_dump()
             with run_task(
                 "%s: wait for _recv_thread %s" % (
                     self,
@@ -541,6 +550,7 @@ class PacketConnection(MultiOpenMixin):
     if sig in self._send_queued:
       raise RuntimeError("requeue of %s: %s" % (sig, P))
     self._send_queued.add(sig)
+    self.trace_log("==> SENDQ %-20s %s", P, self)
     try:
       self._sendQ.put(P)
     except ClosedError as e:
@@ -703,6 +713,7 @@ class PacketConnection(MultiOpenMixin):
   ):
     ''' Run a request and queue a response packet.
     '''
+    self.trace_log("==> RUNRQ (%s,%s):%r %s", channel, tag, rq_type, self)
     with Pfx(
         "_run_request:%d:%d[rq_type=%d,flags=0x%02x,payload_len=%d]",
         channel,
@@ -717,7 +728,9 @@ class PacketConnection(MultiOpenMixin):
       result_flags = 0
       result_payload = b''
       try:
+        self.trace_log("==> HANDL (%s,%s):%r %s", channel, tag, rq_type, self)
         result = handler(rq_type, flags, payload)
+        self.trace_log("<== HANDL %s %s", result, self)
         if result is None:
           # no meaningful result - return the default (0,b'')
           pass
@@ -740,14 +753,16 @@ class PacketConnection(MultiOpenMixin):
       # release this tag, potentially available for reuse
       self._channel_request_tags[channel].remove(tag)
 
-  def end_requests(self):
+  def send_erq(self):
     ''' Queue the magic end-of-requests `Packet`.
     '''
+    self.trace_log("==> SENDQ send ERQ_Packet from %s", self)
     self._sendQ.put(self.ERQ_Packet)
 
   def send_eof(self):
     ''' Queue the magic EOF `Packet`.
     '''
+    self.trace_log("==> SENDQ send EOF_Packet from %s", self)
     self._sendQ.put(self.EOF_Packet)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
@@ -810,6 +825,7 @@ class PacketConnection(MultiOpenMixin):
             rq_type -= 1
             requests[channel].add(tag)
             # queue the work function and track it
+            self.trace_log("==> LATER %-20s %s %s", packet, self, self._later)
             LF = self._later.submit(
                 partial(
                     self._run_request,
@@ -822,6 +838,7 @@ class PacketConnection(MultiOpenMixin):
                 ),
                 name=f'{self}._recv_loop._run_request:{packet}',
             )
+            self.trace_log("<== LATER %-20s %s %s", packet, self, LF)
             # record the LateFunction and arrange its removal on completion
             self.requests_in_progress.add(LF)
             LF.notify(self.requests_in_progress.remove)
@@ -855,17 +872,18 @@ class PacketConnection(MultiOpenMixin):
 
     # process the packets from upstream
     for packet in progressbar(
-        Packet.scan(recv_bfr),
+        Packet.scan(recv_bfr, log=self.trace_log),
         label=f'<= {self.name}',
         units_scale=BINARY_BYTES_SCALE,
         itemlenfunc=recv_len_func,
     ):
+      self.trace_log("==> _RECV %-20s %s", packet, self)
       if packet == self.EOF_Packet:
+        self.trace_log("==> EOFDQ %-20s %s", packet, self)
         break
       if packet.is_request and packet.rq_type == 0:
         # magic EOF rq_type - must be malformed (!=EOF_Packet)
         error("malformed EOF packet received: %s", packet)
-        ##breakpoint()
         break
       if packet == self.ERQ_Packet:
         self.requests_allowed = False
@@ -874,6 +892,8 @@ class PacketConnection(MultiOpenMixin):
         recv_request(packet)
       else:
         recv_response(packet)
+    else:
+      self.trace_log("==> end of Packet.scan %s", self)
     # end of received packets: cancel any outstanding requests
     self._pending_cancel()
     # alert any listeners of receive EOF
@@ -923,29 +943,18 @@ class PacketConnection(MultiOpenMixin):
           rq_out_progress.total += 1  # note new sent rq
         else:
           rq_in_progress.position += 1  # note we completed a rq
-        try:
-          P.write(sendf)
-          if Q.empty():
-            # no immediately ready further packets: flush the output buffer
-            if grace > 0:
-              # allow a little time for further Packets to queue
-              sleep(grace)
-              if Q.empty():
-                # still nothing, flush
-                sendf.flush()
-            else:
-              # no grace period, flush immediately
+        P.write(sendf, log=self.trace_log)
+        if Q.empty():
+          # no immediately ready further packets: flush the output buffer
+          if grace > 0:
+            # allow a little time for further Packets to queue
+            sleep(grace)
+            if Q.empty():
+              # still nothing, flush
               sendf.flush()
-        except OSError as e:
-          if e.errno == errno.EPIPE:
-            warning("remote end closed")
-            break
-          raise
-        if (not self.is_open() and not self.requests_allowed
-            and not self.requests_in_progress):
-          # not in use, all requests completed, no new ones allowed
-          break
-      self.EOF_Packet.write(sendf, flush=True)
+          else:
+            # no grace period, flush immediately
+            sendf.flush()
 
 class BaseRequest(AbstractBinary):
   ''' A base class for request classes to use with `HasPacketConnection`.
