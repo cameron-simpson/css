@@ -284,6 +284,48 @@ class TestStreamTCP(_TestStream, unittest.TestCase):
   def _accept(self):
     self.service_sock, _ = self.listen_sock.accept()
 
+class TestReuse(unittest.TestCase):
+
+  @staticmethod
+  def _request_handler(rq_type, flags, payload):
+    return 0x11, bytes(reversed(payload))
+
+  @staticmethod
+  def _decode_response(flags, payload):
+    return payload
+
+  def test01reuse(self):
+    ''' Create some pipes and use them for multiple connections in sequence.
+    '''
+    for _ in range(1):
+      upstream_rd, upstream_wr = os.pipe()
+      downstream_rd, downstream_wr = os.pipe()
+      with connection_pair(
+          f'{self.__class__.__name__} pass {_}',
+          upstream_rd,
+          upstream_wr,
+          downstream_rd,
+          downstream_wr,
+          self._request_handler,
+      ) as (local_conn, remote_conn):
+        data = f'pass {_}'.encode('ascii')
+        R = local_conn.submit(
+            0,  # rq_type
+            0x11,
+            data,
+            decode_response=self._decode_response,
+            channel=0,
+        )
+        ok, flags, payload = R()
+        self.assertTrue(ok, "response status not ok")
+        self.assertEqual(flags, 0x11)
+        self.assertEqual(payload, bytes(reversed(data)))
+      os.close(upstream_rd)
+      os.close(upstream_wr)
+      os.close(downstream_rd)
+      os.close(downstream_wr)
+      ##thread_dump()
+
 if __name__ == '__main__':
   from cs.debug import selftest
   selftest('__main__')
