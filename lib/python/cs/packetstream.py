@@ -452,8 +452,6 @@ class PacketConnection(MultiOpenMixin):
                 with run_task(f'{self}: wait for outstanding LateFunctions',
                               report_print=True):
                   later.wait_outstanding()
-            # close the stream to the remote and wait
-            self.send_eof()
             with run_task("%s: close sendQ, wait for sender" % (self,),
                           report_print=True):
               self._sendQ.close(enforce_final_close=True)
@@ -899,13 +897,14 @@ class PacketConnection(MultiOpenMixin):
       if packet == self.EOF_Packet:
         self.trace_log("==> EOFDQ %-20s %s", packet, self)
         break
+      if packet == self.ERQ_Packet:
+        self.trace_log("==> ENDRQ %-20s %s", packet, self)
+        self.requests_allowed = False
+        continue
       if packet.is_request and packet.rq_type == 0:
         # magic EOF rq_type - must be malformed (!=EOF_Packet)
         error("malformed EOF packet received: %s", packet)
         break
-      if packet == self.ERQ_Packet:
-        self.requests_allowed = False
-        continue
       if packet.is_request:
         recv_request(packet)
       else:
@@ -973,6 +972,7 @@ class PacketConnection(MultiOpenMixin):
           else:
             # no grace period, flush immediately
             sendf.flush()
+      self.EOF_Packet.write(sendf, flush=True, log=self.trace_log)
 
 class BaseRequest(AbstractBinary):
   ''' A base class for request classes to use with `HasPacketConnection`.
