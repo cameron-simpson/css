@@ -92,11 +92,13 @@ def connection_pair(
         # because we're running both local and remote.
         # This is supposed to work automaticly if we're only
         # running the local end.
-        local_conn.end_requests()
+        local_conn.send_erq()
         local_conn.send_eof()
-        remote_conn.end_requests()
+        remote_conn.send_erq()
         remote_conn.send_eof()
+    assert remote_conn.closed, "remote_conn %s not closed" % (remote_conn,)
     remote_conn.join()
+  assert local_conn.closed, "local_conn %s not closed" % (local_conn,)
   local_conn.join()
 
 class _TestStream(SetupTeardownMixin):
