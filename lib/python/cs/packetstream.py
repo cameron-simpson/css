@@ -750,17 +750,16 @@ class PacketConnection(MultiOpenMixin):
         if result is None:
           # no meaningful result - return the default (0,b'')
           pass
+        elif isinstance(result, int):
+          result_flags = result
+        elif isinstance(result, bytes):
+          result_payload = result
+        elif isinstance(result, str):
+          result_payload = result.encode(
+              encoding='utf-8', errors='xmlcharrefreplace'
+          )
         else:
-          if isinstance(result, int):
-            result_flags = result
-          elif isinstance(result, bytes):
-            result_payload = result
-          elif isinstance(result, str):
-            result_payload = result.encode(
-                encoding='utf-8', errors='xmlcharrefreplace'
-            )
-          else:
-            result_flags, result_payload = result
+          result_flags, result_payload = result
       except Exception as e:  # pylint: disable=broad-except
         exception("exception: %s", e)
         self._reject(channel, tag, "exception during handler")
