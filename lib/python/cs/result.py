@@ -56,7 +56,7 @@ You can also collect multiple `Result`s in completion order using the `report()`
 from queue import Queue
 import sys
 from threading import Lock, RLock, Thread
-from typing import Callable
+from typing import Callable, Optional
 
 from cs.deco import OBSOLETE
 from cs.fsm import FSM, CancellationError
@@ -154,6 +154,10 @@ class Result(FSM):
     self._get_lock = Lock()
     self._get_lock.acquire()  # pylint: disable=consider-using-with
     self.__lock = lock
+    # internal fields
+    self._result = None
+    self._exc_info = None
+    self._cancel_msg = None
     if result is not None:
       self.result = result
 
@@ -197,6 +201,8 @@ class Result(FSM):
           (result, exc_info)
       )
     with self.__lock:
+      if self.ready:
+        raise RuntimeError(f'%s already completed')
       self._result = result  # pylint: disable=attribute-defined-outside-init
       self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
       self.fsm_event('complete')
@@ -229,9 +235,10 @@ class Result(FSM):
     '''
     return not self.ready
 
-  def cancel(self):
+  def cancel(self, msg: Optional[str] = None):
     ''' Cancel this `Result`.
     '''
+    self._cancel_msg = msg
     self.fsm_event('cancel')
 
   @property
@@ -246,7 +253,9 @@ class Result(FSM):
       return self._result
     if state == 'CANCELLED':
       self.collected = True
-      raise CancellationError(".result: cancelled", fsm=self)
+      raise CancellationError(
+          self._cancel_msg or ".result: cancelled", fsm=self
+      )
     raise AttributeError(f'.result: {self} not ready')
 
   @result.setter
