@@ -9,7 +9,7 @@ import threading
 import time
 import unittest
 
-from cs.result import Result, after, bg
+from cs.result import CancellationError, Result, after, bg
 
 class TestResult(unittest.TestCase):
   ''' Tests for `cs.result`.
@@ -105,6 +105,25 @@ class TestResult(unittest.TestCase):
     self.assertTrue(R.ready)
     self.assertEqual(R.result, 3)
 
+  def test03cancel(self):
+    '''Cancel a `Result`.'''
+    R = Result()
+    R.cancel()
+    self.assertRaises(CancellationError, R)
+
+  def test04cancel_running(self):
+    '''Cancel a `Result` while function running.'''
+
+    def f(n):
+      time.sleep(2)
+      return n
+
+    R = Result()
+    R.bg(f, 3, _daemon=True)
+    time.sleep(0.2)
+    R.cancel()
+    self.assertRaises(CancellationError, R)
+
   def test00join(self):
     '''Exercise `Result.join`.'''
     R = self.R
@@ -115,7 +134,7 @@ class TestResult(unittest.TestCase):
   def test01post_notify(self):
     '''Exercise `Result.post_notify`.'''
     R = self.R
-    R2 = R.post_notify(lambda r2: print("r2 =", r2))
+    R2 = R.post_notify(lambda _: None)
     R.result = 1
     time.sleep(0.1)
     self.assertTrue(R2.ready)
