@@ -515,6 +515,11 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
     with self.conn:
       yield
 
+  def serve(self):
+    ''' Serve the connection until the receive worker terminates.
+    '''
+    self.conn.join_recv()
+
   def join(self):
     ''' Wait for the `PacketConnection` to shut down.
     '''
