@@ -138,10 +138,7 @@ class _ClientConnectionHandler(StreamRequestHandler):
     self.S = self.store_server.S
     with StreamStore(
         "server-StreamStore(local=%s)" % self.S,
-        (
-            OpenSocket(self.request, False),
-            OpenSocket(self.request, True),
-        ),
+        (self.rfile, self.wfile),
         local_store=self.S,
         exports=self.exports,
     ) as client_S:
