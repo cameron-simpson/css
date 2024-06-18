@@ -264,5 +264,6 @@ class UNIXSocketClientStore(StreamStore):
     self.sock = socket(AF_UNIX)
     with Pfx("%s.sock.connect(%r)", self, self.socket_path):
       self.sock.connect(self.socket_path)
-    return OpenSocket(self.sock,
-                      False), OpenSocket(self.sock, True), self.sock.close
+    return self.sock.fileno(), self.sock.fileno(), self.sock.close
+
+  ##return OpenSocket(self.sock, False), OpenSocket(self.sock, True), self.sock.close
