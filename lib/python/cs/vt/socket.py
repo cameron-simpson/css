@@ -119,7 +119,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     self.socket_server_thread.join()
 
 class _ClientConnectionHandler(StreamRequestHandler):
-  ''' Handler for a connection to the server.
+  ''' Handler for a connection from a client to the server.
   '''
 
   def setup(self):
@@ -136,7 +136,7 @@ class _ClientConnectionHandler(StreamRequestHandler):
   def handle(self):
     # the local Store starts as the current default Store
     self.S = self.store_server.S
-    remoteS = StreamStore(
+    with StreamStore(
         "server-StreamStore(local=%s)" % self.S,
         (
             OpenSocket(self.request, False),
@@ -144,10 +144,8 @@ class _ClientConnectionHandler(StreamRequestHandler):
         ),
         local_store=self.S,
         exports=self.exports,
-    )
-    remoteS.open()
-    remoteS.join()
-    remoteS.close()
+    ) as client_S:
+      client_S.serve()
 
 class _TCPServer(ThreadingMixIn, TCPServer):
 
