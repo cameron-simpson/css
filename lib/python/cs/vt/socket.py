@@ -20,7 +20,7 @@ from icontract import require
 
 from cs.context import stackattrs
 from cs.excutils import logexc
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.queues import MultiOpenMixin
 from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
@@ -30,7 +30,7 @@ from . import Store, uses_Store
 from .stream import StreamStore
 
 class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
-  ''' The basis for TCPStoreServer and UNIXSocketStoreServer.
+  ''' The basis for `TCPStoreServer` and `UNIXSocketStoreServer`.
   '''
 
   # if exports supplied, may not contain '' if local_store supplied
@@ -45,6 +45,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     ''' Initialise the server.
 
         Parameters:
+        * `S`: optional `Store`, default the current `Store`
         * `exports`: optional mapping of str=>Store
         * `runstate`: option control RunState
         * `local_store`: optional default Store
@@ -192,16 +193,16 @@ class TCPClientStore(StreamStore):
         self, name, self._tcp_client_connect, **streamstore_kw
     )
 
-  def _tcp_client_connect(self) -> Tuple[OpenSocket, OpenSocket, Callable]:
+  @pfx_method
+  def _tcp_client_connect(self) -> Tuple[int, int, Callable]:
     ''' A method to connect to a `TCPStoreServer`.
-        It returns the receive socket, the send socket and the shutdown function.
+        It returns the receive socket file descriptor for send and receive
+        and the socket close method for shutdown.
     '''
     # TODO: IPv6 support
     self.sock = socket(AF_INET)
-    with Pfx("%s.sock.connect(%r)", self, self.sock_bind_addr):
-      self.sock.connect(self.sock_bind_addr)
-    return OpenSocket(self.sock,
-                      False), OpenSocket(self.sock, True), self.sock.close
+    pfx_call(self.sock.connect, self.sock_bind_addr)
+    return self.sock.fileno(), self.sock.fileno(), self.sock.close
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
