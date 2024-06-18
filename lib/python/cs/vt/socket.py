@@ -35,12 +35,12 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
 
   # if exports supplied, may not contain '' if local_store supplied
   @uses_Store
-  @require(
-      lambda exports, local_store:
-      (local_store is None or not exports or '' not in exports)
-  )
   def __init__(
-      self, *, S: Store, exports=None, runstate=None, local_store=None
+      self,
+      *,
+      S: Store,
+      exports=None,
+      runstate=None,
   ):
     ''' Initialise the server.
 
@@ -48,20 +48,12 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
         * `S`: optional `Store`, default the current `Store`
         * `exports`: optional mapping of str=>Store
         * `runstate`: option control RunState
-        * `local_store`: optional default Store
 
         `exports` is a mapping of Stores which this server may present;
         the default Store has key `''`.
-
-        If `local_store` is not None, `exports['']` is set to
-        `local_store` otherwise to `Store.defaults()`.
-        It is an error to provide both `local_store` and a prefilled
-        `exports['']`.
     '''
     if exports is None:
       exports = {}
-    if local_store is not None:
-      exports[''] = local_store
     if '' not in exports:
       exports[''] = S
     RunStateMixin.__init__(self, runstate=runstate)
