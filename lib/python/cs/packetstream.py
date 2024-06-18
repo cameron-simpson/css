@@ -496,6 +496,12 @@ class PacketConnection(MultiOpenMixin):
         if ps:
           warning("%d PENDING STATES AT SHUTDOWN", len(ps))
 
+  def join_recv(self):
+    ''' Wait for the end of the receive worker.
+        Servers should call this.
+    '''
+    self._recv_thread.join()
+
   def join(self):
     ''' Wait for the send and receive workers to terminate.
     '''
