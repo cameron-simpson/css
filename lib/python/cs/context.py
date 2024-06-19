@@ -18,6 +18,7 @@ from functools import partial
 import signal
 from typing import Callable, Iterable
 
+from cs.deco import decorator
 from cs.gimmicks import error
 
 __version__ = '20240412-post'
@@ -29,7 +30,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks'],
+    'install_requires': ['cs.deco', 'cs.gimmicks'],
 }
 
 @contextmanager
@@ -694,6 +695,19 @@ def withif(obj):
   if hasattr(obj, '__enter__'):
     return obj
   return nullcontext()
+
+@decorator
+def with_self(method, get_context_from_self=None):
+  ''' A decorator to run a method inside `with self:` for classes
+      which need to be "held open"/"marked as in use" while the
+      method runs.
+  '''
+
+  def with_self_wrapper(self, *a, **kw):
+    with get_context(self) if get_context else self:
+      return method(self, *a, **kw)
+
+  return with_self_wrapper
 
 def _withall(obj_it):
   ''' A generator to enter every object `obj` from the iterator
