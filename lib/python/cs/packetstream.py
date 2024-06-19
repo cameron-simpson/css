@@ -1170,21 +1170,23 @@ class HasPacketConnection:
         Raises `ValueError` if the response is not ok.
         Otherwise returns `rq.decode_response(flags, payload)`.
     '''
-    R = self.conn_submit(rq, **submit_kw)
-    ok, flags, payload = R()
-    if not ok:
-      raise ValueError(
-          f'"not ok" from remote: flags=0x{flags:02x}, payload={payload.decode("utf-8",errors="replace")!r}'
-      )
-    return rq.decode_response_payload(flags, payload)
+    with self.conn:
+      R = self.conn_submit(rq, **submit_kw)
+      ok, flags, payload = R()
+      if not ok:
+        raise ValueError(
+            f'"not ok" from remote: flags=0x{flags:02x}, payload={payload.decode("utf-8",errors="replace")!r}'
+        )
+      return rq.decode_response_payload(flags, payload)
 
   def conn_handle_request(self, rq_type: int, flags: int, payload: bytes):
     ''' Handle receipt of a request packet.
         Decode the packet into a request `rq` and return `rq.fulfil(self)`.
     '''
-    rq_class = self.conn_rq_class_by_type[rq_type]
-    rq = rq_class.from_request_payload(flags, payload)
-    return rq.fulfil(self)
+    with self.conn:
+      rq_class = self.conn_rq_class_by_type[rq_type]
+      rq = rq_class.from_request_payload(flags, payload)
+      return rq.fulfil(self)
 
 if __name__ == '__main__':
   from cs.debug import selftest
