@@ -392,6 +392,7 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
       capacity=None,
       sync: bool = False,
       on_demand=False,
+      trace_log=None,
       **syncstore_kw,
   ):
     ''' Initialise the `StreamStore`.
@@ -467,6 +468,7 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
             9: LengthRequest,  # ()->remote-store-length
             10: ContainsIndirectRequest,  # hashcode->bool
         },
+        trace_log=trace_log,
     )
     self.on_demand = on_demand
     self._lock = Lock()
