@@ -18,13 +18,14 @@ import errno
 import os
 from os.path import isfile
 import time
-from icontract import require
+
 from cs.binary import BinaryMultiValue, BSSFloat
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl, get_ini_clause_entryname
-from cs.logutils import warning, exception, debug
+from cs.logutils import warning, exception
 from cs.pfx import Pfx, pfx, pfx_call
+
 from .dir import _Dirent, DirentRecord
 from .meta import NOUSERID, NOGROUPID
 
