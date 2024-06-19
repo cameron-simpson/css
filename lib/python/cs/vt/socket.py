@@ -63,7 +63,9 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     self.socket_server_thread = None
 
   def __str__(self):
-    return "%s[%s](S=%s)" % (type(self).__name__, self.runstate.state, self.S)
+    return "%s[%s](S=%s)" % (
+        type(self).__name__, self.runstate.fsm_state, self.S
+    )
 
   @contextmanager
   def startup_shutdown(self):
