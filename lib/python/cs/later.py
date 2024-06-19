@@ -741,21 +741,28 @@ class Later(MultiOpenMixin, HasThreadState):
     '''
     # snapshot the arguments as supplied
     # note; a shallow snapshot
-    if a:
-      a = list(a)
+    a = list(a)
     if kw:
       kw = dict(kw)
-    params = {}
+    submit_kw = {}
     # pop off leading parameters before the function
     while not callable(func):
       if isinstance(func, str):
-        params['name'] = func
+        submit_kw['name'] = func
       else:
-        params.update(func)
+        # should be a mapping of submit parameters
+        submit_kw.update(func)
       func = a.pop(0)
+    # remaining arguments are glommed onto the function
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = self.submit(func, _force_submit=True, **params)  # pylint: disable=unexpected-keyword-arg
+    # The submittable check eats the _force_submit parameter
+    # so we supply it as True here to proceed with .submit().
+    LF = self.submit(
+        func,
+        _force_submit=True,
+        **submit_kw,
+    )  # pylint: disable=unexpected-keyword-arg
     return LF
 
   def with_result_of(self, callable1, func, *a, **kw):
