@@ -394,10 +394,10 @@ class Later(MultiOpenMixin, HasThreadState):
         # - dispatch a Thread to wait for completion and fire the
         #   finished_event Event
         # queue final action to mark activity completion
-        self.defer(
-            f'{self.__class__.__name__}:{self.name}:finished_event.set',
-            dict(daemon=True),
+        self.submit(
             self.finished_event.set,
+            f'{self.__class__.__name__}:{self.name}:finished_event.set',
+            daemon=True,
             _force_submit=True,
         )
         if self._timerQ:
