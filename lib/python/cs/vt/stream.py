@@ -376,7 +376,7 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
   '''
 
   @fmtdoc
-  @typechecked
+  ##@typechecked ## this fails the Protocol checks
   def __init__(
       self,
       name: str,
