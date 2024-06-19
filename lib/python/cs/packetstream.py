@@ -436,6 +436,8 @@ class PacketConnection(MultiOpenMixin):
                       # announce end of requests to the remote end
                       self.send_erq()
               # runstate->STOPPED, should block new requests
+              assert not runstate.is_running
+              assert runstate.is_stopped
               # complete accepted but incomplete requests
               if self.requests_in_progress:
                 with run_task(
@@ -474,11 +476,10 @@ class PacketConnection(MultiOpenMixin):
                     ),
                 )
               assert n_extra > 0
-            ##thread_dump()
             with run_task(
                 "%s: wait for _recv_thread %s" % (
                     self,
-                    self._recv_thread,
+                    self._recv_thread.name,
                 ),
                 report_print=True,
             ):
@@ -505,8 +506,8 @@ class PacketConnection(MultiOpenMixin):
   def join(self):
     ''' Wait for the send and receive workers to terminate.
     '''
-    self._send_thread.join()
     self._recv_thread.join()
+    self._send_thread.join()
 
   def _new_tag(self, channel: int) -> int:
     return next(self._tag_seq[channel])
@@ -576,7 +577,7 @@ class PacketConnection(MultiOpenMixin):
     try:
       self._sendQ.put(P)
     except ClosedError as e:
-      warning("%s: packet not sent: %s (P=%s)", self._sendQ, e, P)
+      warning("%s: packet not queued: %s (P=%s)", self._sendQ, e, P)
 
   def _reject(self, channel, tag, payload=b''):
     ''' Issue a rejection of the specified request.
@@ -916,6 +917,7 @@ class PacketConnection(MultiOpenMixin):
         recv_response(packet)
     else:
       self.trace_log("==> end of Packet.scan %s", self)
+    self.trace_log("::: END RECV LOOP %s", self)
     # end of received packets: cancel any outstanding requests
     self._pending_cancel()
     # alert any listeners of receive EOF
@@ -977,6 +979,7 @@ class PacketConnection(MultiOpenMixin):
           else:
             # no grace period, flush immediately
             sendf.flush()
+      self.trace_log("::: END SEND LOOP %s", self)
       self.EOF_Packet.write(sendf, flush=True, log=self.trace_log)
 
 class BaseRequest(AbstractBinary):
