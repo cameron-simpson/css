@@ -543,7 +543,7 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
         If not specified, use the `sync` mode supplied when the
         `StreamStore` was initialised.
     '''
-    with self.conn:
+    with self.connected():
       h = self.hash(data)
       if self.mode_addif:
         # lower bandwidth, higher latency
