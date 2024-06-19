@@ -241,19 +241,22 @@ def get_test_stores(prefix):
                     T = tempfile.TemporaryDirectory(prefix=prefix)
                     with T as tmpdirpath:
                       socket_path = joinpath(tmpdirpath, 'sock')
-                      remote_S = UNIXSocketStoreServer(
+                      remote = UNIXSocketStoreServer(
                           socket_path, S=local_store
                       )
-                      S = UNIXSocketClientStore(
-                          None,
-                          socket_path,
-                          on_demand=on_demand,
-                          addif=addif,
-                          sync=subtest['sync'],
-                          hashclass=hashclass,
-                          ##trace_log=X,
-                      )
-                      yield subtest, S, remote_S, None
+                      with remote:
+                        S = UNIXSocketClientStore(
+                            None,
+                            socket_path,
+                            on_demand=on_demand,
+                            addif=addif,
+                            sync=subtest['sync'],
+                            hashclass=hashclass,
+                            ##trace_log=X,
+                        )
+                        yield subtest, S, None, lambda T: T.name.endswith(
+                            ('.serve_forever', 'process_request_thread)')
+                        )
         elif store_type is ProxyStore:
           with stackkeys(subtest, storetype=ProxyStore):
             main1 = MappingStore("main1", {}, hashclass=hashclass)
