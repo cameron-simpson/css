@@ -180,7 +180,7 @@ def thread_dump(Ts=None, fp=None):
       except KeyError:
         warning("no frame for Thread.ident=%s", T.ident)
         continue
-      print("Thread", T.ident, T.name, file=fp)
+      print("Thread", T.ident, T.name, T, file=fp)
       traceback.print_stack(frame, None, fp)
       print(file=fp)
 
