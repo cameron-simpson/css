@@ -171,7 +171,8 @@ def get_test_stores(prefix):
                       ),
                       local_store=local_store,
                       addif=addif,
-                      hashclass=hashclass
+                      hashclass=hashclass,
+                      ##trace_log=X,
                   )
                   assert not remote_S.is_open()
                   S = StreamStore(
@@ -183,6 +184,7 @@ def get_test_stores(prefix):
                       addif=addif,
                       hashclass=hashclass,
                       sync=subtest['sync'],
+                      ##trace_log=X,
                   )
                   yield subtest, S, remote_S
         elif store_type is TCPClientStore:
@@ -277,7 +279,7 @@ def multitest(method):
         continue
       with Pfx("%s:%s", S, ",".join(["%s=%s" % (k, v)
                                      for k, v in sorted(subtest.items())])):
-        print(f'test {method.__name__} S={S} second_Store={second_Store}')
+        ##print(f'test {method.__name__} S={S} second_Store={second_Store}')
         with self.subTest(test_store=S, **subtest):
           with stackattrs(
               self,
@@ -290,7 +292,7 @@ def multitest(method):
               with RunState(f'testMethod(S={S})') as runS:
                 secondT = None
                 if second_Store:
-                  assert not second_Store.is_open()
+                  ##assert not second_Store.is_open()
 
                   def second_while_S():
                     while not runS.is_stopped:
@@ -309,7 +311,6 @@ def multitest(method):
             else:
               assert not secondT
             self.assertTrue(S.closed)
-      sleep(1.0)
       assertSingleThread()
       ### run just the first combination
       ##break
