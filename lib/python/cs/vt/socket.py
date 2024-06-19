@@ -178,13 +178,17 @@ class TCPClientStore(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
   '''
 
-  def __init__(self, name, bind_addr, **streamstore_kw):
+  def __init__(self, name, bind_addr, on_demand=True, **streamstore_kw):
     if name is None:
       name = "%s(bind_addr=%r)" % (self.__class__.__name__, bind_addr)
     self.sock_bind_addr = bind_addr
     self.sock = None
     StreamStore.__init__(
-        self, name, self._tcp_client_connect, **streamstore_kw
+        self,
+        name,
+        self._tcp_client_connect,
+        on_demand=on_demand,
+        **streamstore_kw,
     )
 
   @pfx_method
@@ -240,13 +244,20 @@ class UNIXSocketClientStore(StreamStore):
   ''' A Store attached to a remote Store at `socket_path`.
   '''
 
-  def __init__(self, name, socket_path, addif=False, **streamstore_kw):
+  def __init__(
+      self, name, socket_path, addif=False, on_demand=True, **streamstore_kw
+  ):
     if name is None:
       name = "%s(socket_path=%r)" % (self.__class__.__name__, socket_path)
     self.socket_path = socket_path
     self.sock = None
     StreamStore.__init__(
-        self, name, self._unixsock_connect, addif=addif, **streamstore_kw
+        self,
+        name,
+        self._unixsock_connect,
+        addif=addif,
+        on_demand=on_demand,
+        **streamstore_kw,
     )
 
   @contextmanager
