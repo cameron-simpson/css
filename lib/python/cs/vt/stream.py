@@ -501,10 +501,7 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
       with contextif(self.local_store):
         # lambda shuffle because a PacketConnection is callable
         with contextif(not self.on_demand, lambda: self.conn):
-          try:
-            yield
-          finally:
-            warning("%s: STREAM STORE SHUTDOWN", self)
+          yield
 
   @contextmanager
   def connected(self):
