@@ -7,40 +7,40 @@
 
     All Blocks derive from the base class `Block`.
 
-    The following Block types are provided:
+    The following `Block` types are provided:
 
-    HashCodeBlock: a reference to data by its hashcode.
+    `HashCodeBlock`: a reference to data by its hashcode.
 
-    LiteralBlock: a Block containing its literal data, used when
-      the serialisation of a HashCodeBlock exceeds the length of the
+    `LiteralBlock`: a `Block` containing its literal data, used when
+      the serialisation of a `HashCodeBlock` exceeds the length of the
       data.
 
-    RLEBlock: a run length encoded Block for repeated byte values,
-      particularly long runs of the NUL byte.
+    `RLEBlock`: a run length encoded `Block` for repeated byte values,
+      particularly long runs of the `NUL` byte.
 
-    SubBlock: a Block whose data is a subspan of another Block,
+    `SubBlock`: a `Block` whose data is a subspan of another `Block`,
       particularly used when new data are blockified from part of an
-      existing run of Blocks where the part does not start or end on
-      a Block boundary.
+      existing run of `Block`s where the part does not start or end on
+      a `Block` boundary.
 
-    IndirectBlock: a Block whose data is the concatenation of a
-      sequence of subsidiary Bloacks, which themselves may also be
-      IndirectBlocks. This is how larger files are composed of finite
-      sized Blocks. An IndirectBlock is internally constructed as
-      a wrapper for another Block whose data are the serialisation
+    `IndirectBlock`: a `Block` whose data is the concatenation of a
+      sequence of subsidiary `Bloack`s, which themselves may also be
+      `IndirectBlock`s. This is how larger files are composed of finite
+      sized `Block`s. An `IndirectBlock` is internally constructed as
+      a wrapper for another `Block` whose data are the serialisation
       of the subblock references.
 
-    All Blocks have a .span attribute, which is the length of the
+    All `Block`s have a `.span` attribute, which is the length of the
     data they encompass. For all "leaf" Blocks this value is same
-    same as the length of their "direct" data, but for IndirectBlocks
-    this is the sum of the .span values of their subblocks.
+    same as the length of their "direct" data, but for `IndirectBlock`s
+    this is the sum of the `.span` values of their subblocks.
 '''
 
 from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
 import sys
 from threading import RLock
-from typing import Optional, Union
+from typing import Iterable, Optional, Tuple, Union
 
 from icontract import require
 from typeguard import typechecked
@@ -723,7 +723,7 @@ class HashCodeBlock(Block, prefix='B'):
     Rs.wait()
 
   @property
-  def span(self):  # pylint: disable=method-hidden
+  def span(self) -> int:  # pylint: disable=method-hidden
     ''' Return the data length, computing it from the data if required.
     '''
     _span = self._span
@@ -742,7 +742,7 @@ class HashCodeBlock(Block, prefix='B'):
 
   @span.setter
   def span(self, newspan):
-    ''' Set the span of the data encompassed by this HashCodeBlock.
+    ''' Set the span of the data encompassed by this `HashCodeBlock`.
     '''
     if newspan is not None and newspan < 0:
       raise ValueError("%s: set .span: invalid newspan=%s" % (self, newspan))
@@ -756,7 +756,7 @@ class HashCodeBlock(Block, prefix='B'):
             (self, self._span, newspan)
         )
 
-  def datafrom(self, start=0, end=None):
+  def datafrom(self, start=0, end=None) -> Iterable[bytes]:
     ''' Generator yielding data from `start:end`.
     '''
     if start < 0:
@@ -777,6 +777,8 @@ class HashCodeBlock(Block, prefix='B'):
       yield bs[start:end]
 
   def transcribe_inner(self) -> str:
+    ''' Transcribe this `HashCodeBlock` as text.
+    '''
     m = {'hash': self.hashcode}
     if self._span is not None:
       m['span'] = self._span
@@ -784,7 +786,11 @@ class HashCodeBlock(Block, prefix='B'):
 
   @classmethod
   # pylint: disable=too-many-arguments
-  def parse_inner(cls, s, offset, stopchar, prefix):
+  def parse_inner(cls, s, offset, stopchar,
+                  prefix) -> Tuple["HashCodeBlock", int]:
+    ''' Parse the inner fields of a `HashCodeBlock` transcription.
+        Return the `Block` and the post parse offset.
+    '''
     m, offset = cls.parse_mapping(s, offset, stopchar)
     span = m.pop('span', None)
     hashcode = m.pop('hash')
@@ -829,7 +835,7 @@ class HashCodeBlock(Block, prefix='B'):
 
 class IndirectBlock(Block, prefix='I'):
   ''' An indirect block,
-      whose direct data consists of references to subsidiary Blocks.
+      whose direct data consists of references to subsidiary `Block`s.
   '''
 
   def __init__(self, superblock, span=None):
@@ -849,11 +855,11 @@ class IndirectBlock(Block, prefix='I'):
 
   @property
   def data(self):
-    ''' Prevent use of `.data` on IndirectBlock` instances.
+    ''' Prevent use of `.data` on `IndirectBlock` instances.
         Use `get_spanned_data()` if you really need a flat `bytes` instance.
     '''
     raise RuntimeError(
-        "no .data on %s, likely to be expensive; it truly required, call get_spanned_data()"
+        "no .data on %s, likely to be expensive; if truly required, call get_spanned_data()"
         % (type(self),)
     )
 
@@ -900,7 +906,8 @@ class IndirectBlock(Block, prefix='I'):
 
   @classmethod
   def decode_subblocks(cls, subblocks_data: bytes):
-    ''' Return a tuple of Blocks decoded from the raw indirect block data. '''
+    ''' Return a tuple of `Block`s decoded from the raw indirect block data.
+    '''
     return tuple(map(lambda BR: BR.block, BlockRecord.scan(subblocks_data)))
 
   @property
