@@ -164,7 +164,8 @@ def get_test_stores(prefix):
                   local_to_remote_rd, local_to_remote_wr = os.pipe()
                   remote_to_local_rd, remote_to_local_wr = os.pipe()
                   remote_S = StreamStore(
-                      "remote_S", (
+                      "remote_S",
+                      (
                           local_to_remote_rd,
                           remote_to_local_wr,
                       ),
@@ -186,59 +187,68 @@ def get_test_stores(prefix):
                   yield subtest, S, remote_S
         elif store_type is TCPClientStore:
           with stackkeys(subtest, storetype=TCPClientStore):
-            for addif in False, True:
-              with stackkeys(subtest, addif=addif, sync=True):
-                local_store = MappingStore(
-                    "MappingStore", {}, hashclass=hashclass
-                )
-                with local_store:
-                  for _ in range(4):
-                    base_port = random.randint(9999, 52000)
-                    bind_addr = ('127.0.0.1', base_port)
-                    remote_S = TCPStoreServer(
-                        bind_addr,
-                        local_store=local_store,
-                    )
-                    try:
-                      S = TCPClientStore(
-                          None,
+            for on_demand in False, True:
+              for addif in False, True:
+                with stackkeys(subtest, on_demand=on_demand, addif=addif,
+                               sync=True):
+                  remote_S = MappingStore(
+                      "MappingStore", {}, hashclass=hashclass
+                  )
+                  with remote_S:
+                    for _ in range(4):
+                      base_port = random.randint(9999, 52000)
+                      bind_addr = ('127.0.0.1', base_port)
+                      remote = TCPStoreServer(
                           bind_addr,
-                          addif=addif,
-                          hashclass=hashclass,
-                          sync=subtest['sync'],
+                          S=remote_S,
                       )
-                      yield subtest, S, remote_S
-                      break
-                    except OSError as e:
-                      if e.errno == errno.EADDRINUSE:
-                        warning("OSError: %s", e)
-                        continue
-                      raise
-                  else:
-                    raise RuntimeError("no available ports found")
+                      with remote:
+                        try:
+                          S = TCPClientStore(
+                              None,
+                              bind_addr,
+                              on_demand=on_demand,
+                              addif=addif,
+                              hashclass=hashclass,
+                              sync=subtest['sync'],
+                              ##trace_log=X,
+                          )
+                          yield subtest, S, None
+                          break
+                        except OSError as e:
+                          if e.errno == errno.EADDRINUSE:
+                            warning("OSError: %s", e)
+                            continue
+                          raise
+                    else:
+                      raise RuntimeError("no available ports found")
 
         elif store_type is UNIXSocketClientStore:
           with stackkeys(subtest, storetype=UNIXSocketClientStore):
-            for addif in False, True:
-              with stackkeys(subtest, addif=addif, sync=True):
-                local_store = MappingStore(
-                    "MappingStore", {}, hashclass=hashclass
-                )
-                with local_store:
-                  T = tempfile.TemporaryDirectory(prefix=prefix)
-                  with T as tmpdirpath:
-                    socket_path = joinpath(tmpdirpath, 'sock')
-                    remote_S = UNIXSocketStoreServer(
-                        socket_path, local_store=local_store
-                    )
-                    S = UNIXSocketClientStore(
-                        None,
-                        socket_path,
-                        addif=addif,
-                        sync=subtest['sync'],
-                        hashclass=hashclass,
-                    )
-                    yield subtest, S, remote_S
+            for on_demand in False, True:
+              for addif in False, True:
+                with stackkeys(subtest, on_demand=on_demand, addif=addif,
+                               sync=True):
+                  local_store = MappingStore(
+                      "MappingStore", {}, hashclass=hashclass
+                  )
+                  with local_store:
+                    T = tempfile.TemporaryDirectory(prefix=prefix)
+                    with T as tmpdirpath:
+                      socket_path = joinpath(tmpdirpath, 'sock')
+                      remote_S = UNIXSocketStoreServer(
+                          socket_path, S=local_store
+                      )
+                      S = UNIXSocketClientStore(
+                          None,
+                          socket_path,
+                          on_demand=on_demand,
+                          addif=addif,
+                          sync=subtest['sync'],
+                          hashclass=hashclass,
+                          ##trace_log=X,
+                      )
+                      yield subtest, S, remote_S
         elif store_type is ProxyStore:
           with stackkeys(subtest, storetype=ProxyStore):
             main1 = MappingStore("main1", {}, hashclass=hashclass)
