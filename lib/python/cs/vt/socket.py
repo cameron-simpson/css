@@ -259,7 +259,6 @@ class UNIXSocketClientStore(StreamStore):
         **streamstore_kw,
     )
 
-  @contextmanager
   @require(lambda self: not self.sock)
   def _unixsock_connect(self):
     ''' A method to connect to a `UNIXSocketStoreServer`.
