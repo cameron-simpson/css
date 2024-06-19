@@ -82,8 +82,8 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
           socket_server_thread=bg_thread(
               self.socket_server.serve_forever,
               kwargs={'poll_interval': 0.5},
-              name=
-              f'{self.__class__.__name__}({self.S})[server-thread]{self.socket_server}.serve_forever',
+              name=(f'{self.__class__.__name__}({self.S})'
+                    f'[server-thread]{self.socket_server}.serve_forever'),
               daemon=False,
           ),
       ):
