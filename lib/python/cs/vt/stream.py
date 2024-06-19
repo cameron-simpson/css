@@ -10,12 +10,11 @@
 '''
 
 from contextlib import contextmanager
-from enum import IntEnum
 from functools import lru_cache
 from subprocess import Popen, PIPE
 from threading import Lock
 import time
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 from icontract import ensure, require
 from typeguard import typechecked
@@ -30,16 +29,13 @@ from cs.binary import (
 from cs.buffer import CornuCopyBuffer
 from cs.context import contextif
 from cs.deco import decorator, fmtdoc
-from cs.logutils import warning, error
+from cs.logutils import warning
 from cs.packetstream import (
     BaseRequest,
-    PacketConnection,
     PacketConnectionRecvSend,
     HasPacketConnection,
 )
 from cs.pfx import Pfx, pfx_method
-from cs.resources import ClosedError
-from cs.result import CancellationError, Result
 
 from . import Store
 from .archive import BaseArchive, ArchiveEntry
