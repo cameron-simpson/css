@@ -23,7 +23,6 @@ from cs.excutils import logexc
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.queues import MultiOpenMixin
 from cs.resources import RunStateMixin
-from cs.socketutils import OpenSocket
 from cs.threads import bg as bg_thread
 
 from . import Store, uses_Store
