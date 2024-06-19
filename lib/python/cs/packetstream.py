@@ -1122,6 +1122,7 @@ class HasPacketConnection:
       name: str = None,
       *,
       rq_type_map: Mapping[int, BaseRequest],
+      **packet_kw,
   ):
     ''' Initialise `self.conn` as a `PacketConnection`.
 
@@ -1129,11 +1130,14 @@ class HasPacketConnection:
         * `recv_send`: as for `PacketConnection`
         * `name`: an optional name for the connection
         * `rq_type_map`: a mapping of request types to `BaseRequest` subclasses
+
+        Other keyword arguments are passed to `PacketConnection()`.
     '''
     self.conn = PacketConnection(
         recv_send,
         name,
         request_handler=self.conn_handle_request,
+        **packet_kw,
     )
     self.conn_rq_class_by_type = rq_type_map
     self.conn_type_by_rq_class = {
