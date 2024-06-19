@@ -181,7 +181,6 @@ class TCPClientStore(StreamStore):
     if name is None:
       name = "%s(bind_addr=%r)" % (self.__class__.__name__, bind_addr)
     self.sock_bind_addr = bind_addr
-    self.sock = None
     StreamStore.__init__(
         self,
         name,
@@ -197,9 +196,9 @@ class TCPClientStore(StreamStore):
         and the socket close method for shutdown.
     '''
     # TODO: IPv6 support
-    self.sock = socket(AF_INET)
-    pfx_call(self.sock.connect, self.sock_bind_addr)
-    return self.sock.fileno(), self.sock.fileno(), self.sock.close
+    sock = socket(AF_INET)
+    pfx_call(sock.connect, self.sock_bind_addr)
+    return sock.fileno(), sock.fileno(), sock.close
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
@@ -249,7 +248,6 @@ class UNIXSocketClientStore(StreamStore):
     if name is None:
       name = "%s(socket_path=%r)" % (self.__class__.__name__, socket_path)
     self.socket_path = socket_path
-    self.sock = None
     StreamStore.__init__(
         self,
         name,
@@ -259,14 +257,12 @@ class UNIXSocketClientStore(StreamStore):
         **streamstore_kw,
     )
 
-  @require(lambda self: not self.sock)
   def _unixsock_connect(self):
     ''' A method to connect to a `UNIXSocketStoreServer`.
         It returns the receive socket, the send socket and the shutdown function.
     '''
-    self.sock = socket(AF_UNIX)
-    with Pfx("%s.sock.connect(%r)", self, self.socket_path):
-      self.sock.connect(self.socket_path)
-    return self.sock.fileno(), self.sock.fileno(), self.sock.close
+    sock = socket(AF_UNIX)
+    pfx_call(sock.connect, self.socket_path)
+    return sock.fileno(), sock.fileno(), sock.close
 
   ##return OpenSocket(self.sock, False), OpenSocket(self.sock, True), self.sock.close
