@@ -218,6 +218,7 @@ def get_test_stores(prefix):
                           yield subtest, S, None, lambda T: T.name.endswith(
                               ('.serve_forever', 'process_request_thread)')
                           )
+                          # found an available port, exit the loop
                           break
                         except OSError as e:
                           if e.errno == errno.EADDRINUSE:
@@ -314,8 +315,6 @@ def multitest(method):
               assert not secondT
             self.assertTrue(S.closed)
       assertSingleThread(exclude=exclude_thread)
-      ### run just the first combination
-      ##break
 
   return testMethod
 
