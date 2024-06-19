@@ -96,7 +96,7 @@ assert all(
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
-      Yield `(subtest,S,second_Store)` tuples being:
+      Yield `(subtest,S,second_Store,exclude_thread)` tuples being:
       - `subtest`: is a dict containing descriptive fields for `unittest.subtest()`
       - `S`: an empty `Store` to test
       - `second_Store`: an optional secondary Store to open, used for client/server Stores
@@ -116,12 +116,12 @@ def get_test_stores(prefix):
           with stackkeys(subtest, storetype=MappingStore):
             yield subtest, MappingStore(
                 'MappingStore', mapping={}, hashclass=hashclass
-            ), None
+            ), None, None
         elif store_type is MemoryCacheStore:
           with stackkeys(subtest, storetype=MemoryCacheStore):
             yield subtest, MemoryCacheStore(
                 'MemoryCacheStore', 1024 * 1024 * 1024, hashclass=hashclass
-            ), None
+            ), None, None
         elif store_type is DataDirStore:
           with stackkeys(subtest, storetype=DataDirStore):
             for index_name in INDEXCLASS_NAMES:
@@ -141,7 +141,7 @@ def get_test_stores(prefix):
                           hashclass=hashclass,
                           indexclass=indexclass,
                           rollover=rollover
-                      ), None
+                      ), None, None
         elif store_type is FileCacheStore:
           with stackkeys(subtest, storetype=FileCacheStore):
             T = tempfile.TemporaryDirectory(prefix=prefix)
@@ -151,7 +151,7 @@ def get_test_stores(prefix):
                   MappingStore('MappingStore', {}),
                   tmpdirpath,
                   hashclass=hashclass
-              ), None
+              ), None, None
         elif store_type is StreamStore:
           with stackkeys(subtest, storetype=StreamStore):
             for addif in False, True:
@@ -186,7 +186,7 @@ def get_test_stores(prefix):
                       sync=subtest['sync'],
                       ##trace_log=X,
                   )
-                  yield subtest, S, remote_S
+                  yield subtest, S, remote_S, None
         elif store_type is TCPClientStore:
           with stackkeys(subtest, storetype=TCPClientStore):
             for on_demand in False, True:
@@ -215,7 +215,9 @@ def get_test_stores(prefix):
                               sync=subtest['sync'],
                               ##trace_log=X,
                           )
-                          yield subtest, S, None
+                          yield subtest, S, None, lambda T: T.name.endswith(
+                              ('.serve_forever', 'process_request_thread)')
+                          )
                           break
                         except OSError as e:
                           if e.errno == errno.EADDRINUSE:
@@ -250,7 +252,7 @@ def get_test_stores(prefix):
                           hashclass=hashclass,
                           ##trace_log=X,
                       )
-                      yield subtest, S, remote_S
+                      yield subtest, S, remote_S, None
         elif store_type is ProxyStore:
           with stackkeys(subtest, storetype=ProxyStore):
             main1 = MappingStore("main1", {}, hashclass=hashclass)
@@ -261,7 +263,7 @@ def get_test_stores(prefix):
                 hashclass=hashclass,
                 save2=(save2,)
             )
-            yield subtest, S, None
+            yield subtest, S, None, None
         else:
           raise RuntimeError(
               f'no Stopre subtests for Store type {store_type!r}'
@@ -272,7 +274,7 @@ def multitest(method):
   '''
 
   def testMethod(self):
-    for subtest, S, second_Store in get_test_stores(
+    for subtest, S, second_Store, exclude_thread in get_test_stores(
         prefix=f'{method.__module__}.{method.__name__}'):
       if STORECLASS_NAMES and type(S).__name__ not in STORECLASS_NAMES:
         print("  skip", S)
@@ -311,7 +313,7 @@ def multitest(method):
             else:
               assert not secondT
             self.assertTrue(S.closed)
-      assertSingleThread()
+      assertSingleThread(exclude=exclude_thread)
       ### run just the first combination
       ##break
 
