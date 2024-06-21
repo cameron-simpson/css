@@ -1,3 +1,4 @@
+rename Store.connected to Store.active T v
 StreamStore,TCPStore etc: use the new "on demand" PacketConnection mode
 RunState.notify_cancel: use the FSM notification system
 cs.fsm: why is the default state a per-thread perthread_state.initial_state d
