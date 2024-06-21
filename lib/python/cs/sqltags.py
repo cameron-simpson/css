@@ -667,7 +667,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         )
         constraint = constraint_fn and constraint_fn(alias, timestamp)
       else:
-        raise RuntimeError("unhandled non-tag field %r" % (tag_name,))
+        raise NotImplementedError("unhandled non-tag field %r" % (tag_name,))
       sqlp = SQLParameters(
           criterion=self,
           alias=alias,
@@ -2080,7 +2080,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
             )
         )
     else:
-      raise RuntimeError("unimplemented export format %r" % (export_format,))
+      raise NotImplementedError("unimplemented export format %r" % (export_format,))
 
   # pylint: disable=too-many-locals
   def cmd_find(self, argv):
@@ -2148,7 +2148,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         if option in ('-u', '--update'):
           update_mode = True
         else:
-          raise RuntimeError("unsupported option")
+          raise NotImplementedError("unsupported option")
     if not argv:
       warning("missing srcpaths")
       badopts = True
@@ -2210,7 +2210,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         elif opt == '-D':
           strptime_format = val
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if dt is not None and strptime_format is not None:
       warning("-d and -D are mutually exclusive")
       badopts = True

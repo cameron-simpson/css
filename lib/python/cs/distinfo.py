@@ -169,7 +169,7 @@ class CSReleaseCommand(BaseCommand):
       elif opt == '-v':
         options.verbose = True
       else:
-        raise RuntimeError("unhandled option: %s" % (opt,))
+        raise NotImplementedError("unhandled option: %s" % (opt,))
 
   @contextmanager
   def run_context(self):

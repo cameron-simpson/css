@@ -879,7 +879,7 @@ class BaseCommand:
         and would imply that a `GETOPT_SPEC` was supplied
         without an `apply_opt` or `apply_opts` method to implement the options.
     '''
-    raise RuntimeError("unhandled option %r" % (opt,))
+    raise NotImplementedError("unhandled option %r" % (opt,))
 
   def apply_opts(self, opts):
     ''' Apply command line options.

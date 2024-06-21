@@ -219,7 +219,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     elif opt == '-P':
       options.physical = True
     else:
-      raise RuntimeError("unhandled option")
+      raise NotImplementedError("unhandled option")
 
   @contextmanager
   def run_context(self):
@@ -319,7 +319,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         elif opt == '-d':
           directories_like_files = True
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if not argv:
       path = '.'
     else:
@@ -362,7 +362,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         elif opt == '--direct':
           use_direct_tags = True
         else:
-          raise RuntimeError("unimplemented option")
+          raise NotImplementedError("unimplemented option")
     if not argv:
       warning("missing path")
       badopts = True
@@ -419,7 +419,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         elif opt == '-o':
           output_format = fstags.resolve_format_string(value)
         else:
-          raise RuntimeError("unsupported option")
+          raise NotImplementedError("unsupported option")
     if not argv:
       warning("missing path")
       badopts = True
@@ -537,7 +537,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         if opt == '--prefix':
           tag_prefix = value
         else:
-          raise RuntimeError("unimplemented option")
+          raise NotImplementedError("unimplemented option")
     if tag_prefix is None:
       warning("missing required --prefix option")
       badopts = True
@@ -696,7 +696,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       elif subopt == '-v':
         cmd_verbose = True
       else:
-        raise RuntimeError("unhandled subopt: %r" % (subopt,))
+        raise NotImplementedError("unhandled subopt: %r" % (subopt,))
     if len(argv) < 2:
       raise GetoptError("missing paths or targetdir")
     endpath = argv[-1]
@@ -752,7 +752,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         elif opt == '--direct':
           use_direct_tags = True
         else:
-          raise RuntimeError("unsupported option")
+          raise NotImplementedError("unsupported option")
     xit = 0
     paths = argv or ['.']
     for path in paths:
@@ -804,7 +804,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       if subopt == '-o':
         name_format = fstags.resolve_format_string(value)
       else:
-        raise RuntimeError("unhandled subopt: %r" % (subopt,))
+        raise NotImplementedError("unhandled subopt: %r" % (subopt,))
     if name_format is None:
       raise GetoptError("missing -o option")
     if not argv:
@@ -995,7 +995,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         if opt == '--direct':
           use_direct_tags = True
         else:
-          raise RuntimeError("unsupported option")
+          raise NotImplementedError("unsupported option")
     if not argv:
       warning("missing path")
       badopts = True

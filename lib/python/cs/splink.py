@@ -722,7 +722,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     elif opt == '-n':
       options.doit = False
     else:
-      raise RuntimeError("unhandled pre-option")
+      raise NotImplementedError("unhandled pre-option")
 
   def print_known_datasets(self, file=None):
     ''' Print the known datasets and their fields to `file`.

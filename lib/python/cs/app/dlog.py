@@ -412,7 +412,7 @@ class DLogCommand(BaseCommand):
             raise GetoptError("unparsed date: %s" % (e,))
           options.when = datetime2unixtime(dt)
         else:
-          raise RuntimeError("unimplemented option")
+          raise NotImplementedError("unimplemented option")
     if dt is None:
       dt = datetime.fromtimestamp(options.when)
     if badopts:

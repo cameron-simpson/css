@@ -403,7 +403,7 @@ class Rule(Promotable):
                 case TagChange() as tag_change:
                   result.tag_changes.append(tag_change)
                 case _:
-                  raise RuntimeError(f'unhandled side effect {r(side_effect)}')
+                  raise NotImplementedError(f'unsupported side effect {r(side_effect)}')
     return result
 
   @typechecked

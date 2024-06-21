@@ -254,7 +254,7 @@ class SvcDCommand(BaseCommand):
         elif opt == '-x':
           trace = True
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if not argv:
       warning("missing command")
     if name is None:

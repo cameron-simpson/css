@@ -75,7 +75,7 @@ class DeDRMCommand(BaseCommand):
     if opt == '-D':
       self.options.dedrm_package_path = val
     else:
-      raise RuntimeError("unhandled option")
+      raise NotImplementedError("unhandled option")
     if badopt:
       raise GetoptError("bad option value")
 
