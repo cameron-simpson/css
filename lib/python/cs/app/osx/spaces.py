@@ -335,7 +335,7 @@ class SpacesCommand(BaseCommand):
                   ##ImageFilePath=imagepath,
                   ##NewImageFilePath=imagepath,
                   LastName=lastname,
-                  Placement='Crop',
+                  Placement='SizeToFit',
                   Random=True,
               )  # pylint: disable=use-dict-literal
           else:
