@@ -25,7 +25,7 @@ from cs.pfx import Pfx, pfx_call
 
 ##from cs.x import X
 
-__version__ = '20240622'
+__version__ = '20240622-post'
 
 DISTINFO = {
     'keywords': ["python3"],
