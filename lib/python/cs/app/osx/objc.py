@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 #
-# MacOSX Objective C facilities.
-# Requires the PyObjC package from PyPI.
-# Tweaks sys.path if necessary.
-# Includes some type conversion.
-# See also: https://pyobjc.readthedocs.io/en/latest/index.html
-# - Cameron Simpson <cs@cskk.id.au> 29jun2011
-#
+
+''' Convenience facilities for working with pyobjc (MacOSX Objective C facilities).
+    See also: https://pyobjc.readthedocs.io/en/latest/index.html
+'''
 
 from collections import defaultdict
 from datetime import datetime
@@ -169,7 +166,7 @@ class Bundle(SingletonMixin):
     except KeyError:
       raise AttributeError(
           f'{self.__class__.__name__}:{self._bundle_id}.{attr}'
-      )
+      ) from None
 
 @fmtdoc
 class AutoBundles:
