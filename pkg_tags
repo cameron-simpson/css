@@ -13,6 +13,7 @@ cs.app.myke ok_revision="1027faacf36b6c49eaa58dae48345ddf7db6558a" pypi.release=
 cs.app.osx.defaults ok_revision=e3fe3ab7e2f06202c3e8ea8760ae3207b89ab05b pypi.release="20240316"
 cs.app.osx.defaults.plist
 cs.app.osx.misc ok_revision=a8db5e27f6d608f7bad1854b0c06aa31338fa544 features={"20240622":["macos_version"]} pypi.release="20240622.1"
+cs.app.osx.objc
 cs.app.osx.plist ok_revision="599e3e37c0af4e7ba92c2134c0a90d17effcfc39" pypi.release="20221228"
 cs.app.osx.spaces
 cs.app.osx.spaces.misc
@@ -28,7 +29,7 @@ cs.buffer pypi.release="20240412" ok_revision=ef83ded9892741e8148a0f5d77ce631fab
 cs.cache pypi.release="20240422.1" ok_revision=ebef822958c2068e4da287512e864d50c6efe481 features={"20240412":["CachingMapping"],"20240422":["ConvCache","convof"]}
 cs.cdutils
 cs.clockutils pypi.release=20190101
-cs.cmdutils pypi.release="20240519" ok_revision="2195cd980a73506658d94fc8dcedb63083433a90" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"]}
+cs.cmdutils pypi.release="20240519" ok_revision="3fe6ebd0d29540930409f286e63b7d87412084bd" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"]}
 cs.configutils pypi.release="20220606" ok_revision="646d06810607e97ae0aaefbcce18806fb0ded874" features={"20220430":["HasConfigIni"],"20220606":["info_dict"]}
 cs.context pypi.release="20240412" ok_revision=f18985cfeda207953c39436e31d3ff1cd5bdb7bf features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"],"20230109":["contextif"],"20230125":["ContextManagerMixin_as_contextmanager"],"20230212":["stackset"],"20240212":["reconfigure_file"],"20240412":["withall","withif"]}
 cs.convcache
