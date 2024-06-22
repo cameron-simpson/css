@@ -895,6 +895,8 @@ class Module:
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.name)
 
+  __repr__ = __str__
+
   @property
   def vcs(self):
     ''' The VCS from `self.modules.vcs`.
