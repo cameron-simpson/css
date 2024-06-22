@@ -7,7 +7,7 @@
 
 import platform
 
-__version__ = '20240622-post'
+__version__ = '20240622.1'
 
 DISTINFO = {
     'keywords': ["python3"],
