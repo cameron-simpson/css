@@ -40,6 +40,7 @@ DISTINFO = {
         "Topic :: Desktop Environment",
     ],
     'install_requires': [
+        'cs.app.osx.misc',
         'cs.app.osx.objc',
         'cs.cmdutils',
         'cs.context',
@@ -47,6 +48,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'pyobjc[allbindings]',
+        'typeguard',
     ],
     'entry_points': {
         'console_scripts': {
