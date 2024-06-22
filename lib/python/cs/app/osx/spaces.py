@@ -33,7 +33,7 @@ from .objc import apple, cg
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
-        "Development Status :: 3 - Beta",
+        "Development Status :: 4 - Beta",
         "Environment :: MacOS X",
         "Intended Audience :: End Users/Desktop",
         "Programming Language :: Python :: 3",
