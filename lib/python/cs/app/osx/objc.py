@@ -20,12 +20,13 @@ import objc
 from AddressBook import NSDate, ABMultiValueCoreDataWrapper, NSCFDictionary, NSDateComponents
 from Foundation import NSBundle
 
-##from cs.x import X
 from cs.dateutils import tzinfoHHMM
 from cs.deco import fmtdoc, default_params
 from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
+
+##from cs.x import X
 
 DEFAULT_BUNDLE_ID_PREFIX = 'com.apple.'
 
@@ -178,6 +179,18 @@ class AutoBundles:
 apple = AutoBundles()
 
 def convertObjCtype(o):
+  ''' Convert an object containing an ObjC object
+      into the equivalent Python type.
+
+      Current conversions:
+      * `None` -> `None`
+      * `NSDate`, `NSDateComponents` -> `datetime`
+      * `ABMultiValueCoreDataWrapper` -> `list` with members converted
+      * `int` -> `int`
+      * `objc._pythonify.OC_PythonInt` -> `int`
+      * `objc._pythonify.OC_PythonFloat` -> float
+      * dictionries with `.keys()` -> `dict`
+  '''
   if o is None:
     return o
   # more specialised types first
@@ -202,14 +215,18 @@ def convertObjCtype(o):
     return dict([(k, o[k]) for k in o.keys()])
   raise TypeError("convertObjCtype: o = %s %r", t, o)
 
-def convertNSDate(d):
+def convertNSDate(d: NSDate) -> datetime:
+  ''' Convert an `NSDate` into a `datetime`.
+  '''
   d_date, d_time, d_zone = d.description().split()
   year, month, day = [int(d_d) for d_d in d_date.split('-')]
   hour, minute, second = [int(d_t) for d_t in d_time.split(':')]
   tz = tzinfoHHMM(d_zone)
   return datetime(year, month, day, hour, minute, second, 0, tz)
 
-def convertNSDateComponents(d):
+def convertNSDateComponents(d: NSDateComponents) -> datetime:
+  ''' Convert an `NSDateComponents` into a `datetime`.
+  '''
   desc = d.description()
   year = convertObjCtype(d.year())
   month = convertObjCtype(d.month())
@@ -217,6 +234,15 @@ def convertNSDateComponents(d):
   return datetime(year, month, day)
 
 def cg(func):
+  ''' A decorator to provide a `cg_conn` keyword argument if missing,
+      containing the default Core graphics connection.
+
+      Example:
+
+          @cg
+          def do_some_graphics(blah, *, cg_conn, ...):
+              ...
+  '''
   return default_params(func, cg_conn=apple.CoreGraphics._CGSDefaultConnection)
 
 if __name__ == '__main__':
