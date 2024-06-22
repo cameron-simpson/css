@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from fnmatch import fnmatch
-from functools import cached_property
+from functools import cache, cached_property
 from getopt import GetoptError
 from glob import glob
 import importlib
@@ -1502,6 +1502,7 @@ class Module:
       return joinpath(basepath, '__init__.py')
     return basepath + '.py'
 
+  @cache
   @pfx_method(use_str=True)
   def paths(self, top_dirpath='.'):
     ''' Return a list of the paths associated with this package
@@ -1680,6 +1681,7 @@ class Module:
     return self.DISTINFO.get('install_requires', [])
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  @cache
   @uses_runstate
   @pfx_method(use_str=True)
   def problems(self, *, runstate=RunState):
