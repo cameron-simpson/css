@@ -28,6 +28,24 @@ from cs.pfx import Pfx, pfx_call
 
 ##from cs.x import X
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 5 - Production/Stable",
+        "Environment :: MacOS X",
+        "Intended Audience :: Developers",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.dateutils',
+        'cs.deco',
+        'cs.logutils',
+        'cs.obj',
+        'cs.pfx',
+        'pyobjc[allbindings]',
+    ],
+}
+
 DEFAULT_BUNDLE_ID_PREFIX = 'com.apple.'
 
 class _BundlesDict(defaultdict):
