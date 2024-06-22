@@ -30,6 +30,8 @@ from cs.pfx import Pfx, pfx_call
 from .misc import macos_version
 from .objc import apple, cg
 
+__version__ = '20240622'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
