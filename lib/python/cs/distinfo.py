@@ -44,7 +44,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.fs import atomic_directory, rpaths
+from cs.fs import atomic_directory, rpaths, scandirpaths
 from cs.lex import (
     cutsuffix,
     get_identifier,
@@ -1512,28 +1512,29 @@ class Module:
         of some revision because "hg archive" complains if globs
         match no paths, and aborts.
     '''
-    skip_suffixes = '.pyc', '.o', '.orig', '.so'
+    skip_suffixes = 'pyc', 'o', 'orig', 'so'
     basepath = self.basepath
     if top_dirpath:
       basepath = normpath(joinpath(top_dirpath, basepath))
     if isdirpath(basepath):
-      pathlist = [
-          joinpath(basepath, rpath) for rpath in
-          rpaths(basepath, skip_suffixes=skip_suffixes, sort_names=True)
-      ]
+      pathlist = list(
+          scandirpaths(
+              basepath,
+              skip_suffixes=skip_suffixes,
+              sort_names=True,
+          )
+      )
     else:
       updir = dirname(basepath)
       base_ = basename(basepath) + '.'
-      pathlist = []
-      for dirent in sorted(pfx_call(os.scandir, updir), key=lambda d: d.name):
-        if not dirent.is_file(follow_symlinks=False):
-          continue
-        filename = dirent.name
-        if not filename.startswith(base_):
-          continue
-        if filename.endswith(skip_suffixes):
-          continue
-        pathlist.append(relpath(joinpath(updir, filename), top_dirpath))
+      pathlist = list(
+          scandirpaths(
+              updir,
+              skip_suffixes=skip_suffixes,
+              name_selector=lambda name: name.startswith(base_),
+              sort_names=True,
+          )
+      )
     if not pathlist:
       raise ValueError("no paths for %s" % (self,))
     return pathlist
