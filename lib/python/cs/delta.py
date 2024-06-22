@@ -10,7 +10,7 @@ from icontract import require
 from cs.obj import Sentinel
 from cs.resources import RunState, uses_runstate
 
-__version__ = '20240316-post'
+__version__ = '20240622'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
