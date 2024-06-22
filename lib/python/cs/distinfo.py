@@ -703,6 +703,10 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
       )
       if not module_name:
         raise ValueError('module_name is not a dotted identifier')
+      if requirement_spec.startswith('[', offset):
+        close_pos = requirement_spec.find(']', offset + 1)
+        if close_pos > offset:
+          offset = close_pos + 1
       if offset == len(requirement_spec):
         op = None
       else:
