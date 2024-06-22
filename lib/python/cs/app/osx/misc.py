@@ -7,6 +7,8 @@
 
 import platform
 
+__version__ = '20240622'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [

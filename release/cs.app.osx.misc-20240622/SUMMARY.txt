@@ -1,0 +1,1 @@
+Initial release with just macos_version as a tuple of ints, eg (14,5); cs.app.osx is just a namespace package, with no __init__.py.
