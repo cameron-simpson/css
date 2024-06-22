@@ -155,7 +155,7 @@ def direct_imports(src_filename, module_name=None):
                 subimport = module_name
               else:
                 # resolve relative import name
-                preparts = module_name.split('.')
+                preparts = module_name.split('.')[:-1]
                 subimport = subimport[1:]
                 while subimport.startswith('.'):
                   preparts.pop(-1)
