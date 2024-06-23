@@ -127,6 +127,9 @@ def direct_imports(src_filename, module_name=None):
 
       This is a very simple minded source parse.
   '''
+  if module_name is not None:
+    assert module_name
+    module_preparts = module_name.split('.')
   subnames = set()
   with Pfx(src_filename):
     with open(src_filename, encoding='utf-8') as codefp:
@@ -155,8 +158,8 @@ def direct_imports(src_filename, module_name=None):
                 subimport = module_name
               else:
                 # resolve relative import name
-                preparts = module_name.split('.')[:-1]
                 subimport = subimport[1:]
+                preparts = list(module_preparts)
                 while subimport.startswith('.'):
                   preparts.pop(-1)
                   subimport = subimport[1:]
