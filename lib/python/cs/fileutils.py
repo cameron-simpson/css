@@ -626,6 +626,7 @@ def makelockfile(
     timeout=None,
     runstate: RunState,
     keepopen=False,
+    max_interval=37,
 ):
   ''' Create a lockfile and return its path.
 
@@ -686,7 +687,7 @@ def makelockfile(
           if now - complaint_last >= complaint_interval:
             warning("pid %d waited %ds", os.getpid(), now - start)
             complaint_last = now
-            complaint_interval *= 2
+            complaint_interval = mint(complaint_interval * 2, max_interval)
         # post: start is set
         if timeout is None:
           sleep_for = poll_interval
@@ -734,7 +735,10 @@ def lockfile(
   try:
     yield lockpath
   finally:
-    pfx_call(os.remove, lockpath)
+    try:
+      pfx_call(os.remove, lockpath)
+    except FileNotFoundError as e:
+      warning("lock file already removed: %s", e)
     pfx_call(os.close, lockfd)
 
 def crop_name(name, ext=None, name_max=255):
