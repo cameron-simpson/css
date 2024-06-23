@@ -687,7 +687,7 @@ def makelockfile(
           if now - complaint_last >= complaint_interval:
             warning("pid %d waited %ds", os.getpid(), now - start)
             complaint_last = now
-            complaint_interval = mint(complaint_interval * 2, max_interval)
+            complaint_interval = min(complaint_interval * 2, max_interval)
         # post: start is set
         if timeout is None:
           sleep_for = poll_interval
