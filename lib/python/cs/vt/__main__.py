@@ -375,7 +375,8 @@ class VTCmd(BaseCommand):
                 )
                 with S:
                   with stackattrs(options, S=S):
-                    yield
+                    with S.connected():
+                      yield
       if ifdebug():
         dump_debug_threads()
 
