@@ -508,7 +508,8 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
     ''' A context manager ensuring that the `PacketConnection` is open.
     '''
     with self.conn:
-      yield
+      with super().connected():
+        yield
 
   def serve(self):
     ''' Serve the connection until the receive worker terminates.
