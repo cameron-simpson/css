@@ -14,7 +14,7 @@ from cs.context import push_cmgr, pop_cmgr
 from cs.debug import thread_dump
 from cs.deco import decorator
 
-__version__ = '20230109-post'
+__version__ = '20240623'
 
 DISTINFO = {
     'keywords': ["python3"],
