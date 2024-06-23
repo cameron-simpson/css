@@ -549,9 +549,13 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
       if sync:
         h2 = self.conn_do_remote(rq)
         assert h == h2
+        self._contains_cache.add(h)
       else:
         # async: submit and return the hashcode immediately
-        self.conn_do_remote(rq)
+        R = self.conn_submit(rq)
+        R.fsm_callback(
+            'DONE', lambda fsm, fsm_trans: self._contains_cache.add(h)
+        )
       return h
 
   @typechecked
@@ -559,6 +563,7 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
     data = self.conn_do_remote(GetRequest(h))
     if data is None:
       return default
+    self._contains_cache.add(h)
     return data
 
   @typechecked
@@ -641,6 +646,7 @@ class StreamStore(StoreSyncBase, HasPacketConnection):
           "expected hashcodes of type %s, got %d mismatches of of type %s" %
           (hashclass.__name__, len(mismatches), sorted(mismatches))
       )
+    self._contains_cache.update(hashary)
     return hashary
 
   @require(
