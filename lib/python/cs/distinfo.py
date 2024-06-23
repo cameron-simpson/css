@@ -44,7 +44,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.fs import atomic_directory, rpaths, scandirpaths
+from cs.fs import atomic_directory, scandirpaths
 from cs.lex import (
     cutsuffix,
     get_identifier,
@@ -52,7 +52,7 @@ from cs.lex import (
     is_dotted_identifier,
     is_identifier,
 )
-from cs.logutils import error, warning, info, status, trace
+from cs.logutils import error, warning, info, status
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
@@ -1955,7 +1955,6 @@ class Module:
   def prepare_dist(self, pkg_dir, vcs_version):
     ''' Run "python3 -m build ." inside `pkg_dir`, making files in `dist/`.
     '''
-    distdir = joinpath(pkg_dir, 'dist')
     sdist_rpath = f'dist/{vcs_version}.tar.gz'
     wheel_rpath = f'dist/{vcs_version}-py3-none-any.whl'
     cd_run(
