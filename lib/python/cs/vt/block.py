@@ -666,14 +666,17 @@ class HashCodeBlock(Block, prefix='B'):
           raise ValueError("added=%s but no hashcode supplied" % (added,))
       else:
         from . import Store
-        h = Store.default().add(data)
+        S = Store.default()
         if hashcode is None:
-          hashcode = h
-        elif h != hashcode:
-          raise ValueError(
-              "supplied hashcode %r != saved hash for data (%r : %r)" %
-              (hashcode, h, data)
-          )
+          hashcode = S.hash(data)
+        else:
+          if not isinstance(hashcode, S.hashclass):
+            raise TypeError(
+                f'HashCodeBlock(hashcode={hashcode},...):'
+                f' does not match S:{S} hashclass {S.hashclass}'
+            )
+          assert hashcode == S.hash(data)
+        S.add_bg(data)
     self._data = data
     self._span = span
     Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
