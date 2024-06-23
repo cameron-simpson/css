@@ -35,7 +35,9 @@ import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
+
 from cs.buffer import CornuCopyBuffer
+from cs.context import stackattrs
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
@@ -62,6 +64,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.buffer',
+        'cs.context',
         'cs.deco',
         'cs.filestate',
         'cs.fs>=shortpath',
@@ -1515,8 +1518,10 @@ class Tee(object):
 
 @contextmanager
 def tee(fp, fp2):
-  ''' Context manager duplicating .write and .flush from fp to fp2.
+  ''' Context manager duplicating `.write` and `.flush` from `fp` to `fp2`.
   '''
+  old_write = fp.write
+  old_flush = fp.flush
 
   def _write(*a, **kw):
     fp2.write(*a, **kw)
@@ -1526,15 +1531,8 @@ def tee(fp, fp2):
     fp2.flush(*a, **kw)
     return old_flush(*a, **kw)
 
-  old_write = getattr(fp, 'write')
-  old_flush = getattr(fp, 'flush')
-  fp.write = _write
-  fp.flush = _flush
-  try:
+  with stackattrs(fp, write=_write, flush=_flush):
     yield
-  finally:
-    fp.write = old_write
-    fp.flush = old_flush
 
 class NullFile(object):
   ''' Writable file that discards its input.
