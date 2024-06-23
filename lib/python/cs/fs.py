@@ -169,7 +169,7 @@ def scandirtree(
       if not name_selector(name):
         continue
       if only_suffixes or skip_suffixes:
-        base, ext = splitext(name)
+        _, ext = splitext(name)
         if only_suffixes and ext[1:] not in only_suffixes:
           continue
         if skip_suffixes and ext[1:] in skip_suffixes:
