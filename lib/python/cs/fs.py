@@ -160,13 +160,11 @@ def scandirtree(
     except NotADirectoryError:
       yield False, path
       continue
-    if include_dirs:
+    if not recurse and include_dirs:
       yield True, path
     if sort_names:
       dirents = sorted(dirents, key=lambda entry: entry.name)
     for entry in dirents:
-      if recurse and entry.is_dir(follow_symlinks=follow_symlinks):
-        pending.append(entry.path)
       name = entry.name
       if not name_selector(name):
         continue
@@ -176,7 +174,13 @@ def scandirtree(
           continue
         if skip_suffixes and ext[1:] in skip_suffixes:
           continue
-      if include_dirs or not entry.is_dir(follow_symlinks=follow_symlinks):
+      is_dir = entry.is_dir(follow_symlinks=follow_symlinks)
+      if is_dir:
+        if recurse:
+          pending.append(entry.path)
+        if include_dirs:
+          yield True, entry.path
+      else:
         yield False, entry.path
 
 def scandirpaths(dirpath='.', **scan_kw):
