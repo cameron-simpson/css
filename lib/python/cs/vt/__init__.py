@@ -465,6 +465,19 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
               self.runstate.cancel()
       L.wait()
 
+  @contextmanager
+  def connected(self):
+    ''' The `connectioned()` context manager method establishes an
+        active connect to the `Store`'s backend resource, if any.
+        This base class implementation does nothing but `Stroe`s
+        like `TCPClientStore` activate the TCP connection to their server
+        for the duration of this method.
+
+        Functions performing multiple `Store` operations should run
+        them inside this context manager.
+    '''
+    yield
+
   #############################
   ## Function dispatch methods.
   ##
