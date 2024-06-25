@@ -13,24 +13,18 @@ from io import StringIO
 import os
 from os.path import (
     abspath,
-    basename,
     exists as existspath,
     expanduser,
     isabs as isabspath,
-    isfile as isfilepath,
-    join as joinpath,
-    realpath,
-    splitext,
 )
-from typing import Mapping, Optional, Union
+from typing import List, Mapping, Optional, Union
 
 from icontract import require
 from typeguard import typechecked
 
-from cs.deco import fmtdoc, promote, Promotable
+from cs.deco import fmtdoc, default_params, promote, Promotable
 from cs.fs import shortpath, longpath, HasFSPath
-from cs.lex import get_ini_clausename, get_ini_clause_entryname
-from cs.logutils import debug, warning
+from cs.logutils import debug
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.resources import RunState, uses_runstate
@@ -45,7 +39,7 @@ from . import (
     DEFAULT_CONFIG_MAP,
     DEFAULT_CONFIG_PATH,
 )
-from .archive import Archive, FilePathArchive
+from .archive import Archive
 from .compose import (
     parse_store_specs,
     get_archive_path,
@@ -55,7 +49,6 @@ from .convert import (
     get_integer,
     scaled_value,
 )
-from .dir import Dir
 
 # pylint: disable=too-many-public-methods
 class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
@@ -245,73 +238,12 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
 
   # pylint: disable=too-many-branches
   @pfx_method
-  def parse_special(self, special, readonly):
-    ''' Parse the mount command's special device from `special`.
-        Return `(fsname,readonly,Store,Dir,basename,archive)`.
-
-        Supported formats:
-        * `D{...}`: a raw `Dir` transcription.
-        * `[`*clause*`]`: a config clause name.
-        * `[`*clause*`]`*archive*: a config clause name
-        and a reference to a named archive associates with that clause.
-        * *archive_file*`.vt`: a path to a `.vt` archive file.
+  def parse_special(self, special, readonly) -> "MountSpec":
+    ''' Parse the mount command's special device from `special`
+        using `MountSpec.from_str`, return the resulting `MountSpec`.
     '''
-    fsname = special
-    specialD = None
-    special_store = None
-    archive = None
-    if special.startswith('D{') and special.endswith('}'):
-      # D{dir}
-      specialD, offset = Dir.parse(special)
-      if offset != len(special):
-        raise ValueError("unparsed text: %r" % (special[offset:],))
-      if not isinstance(specialD, Dir):
-        raise ValueError(
-            "does not seem to be a Dir transcription, looks like a %s" %
-            (type(specialD),)
-        )
-      special_basename = specialD.name
-      if not readonly:
-        warning("setting readonly")
-        readonly = True
-    elif special.startswith('['):
-      if special.endswith(']'):
-        # expect "[clause]"
-        clause_name, offset = get_ini_clausename(special)
-        archive_name = ''
-        special_basename = clause_name
-      else:
-        # expect "[clause]archive"
-        # TODO: just pass to Archive(special,config=self)?
-        # what about special_basename then?
-        clause_name, archive_name, offset = get_ini_clause_entryname(special)
-        special_basename = archive_name
-      if offset < len(special):
-        raise ValueError("unparsed text: %r" % (special[offset:],))
-      fsname = str(self) + special
-      try:
-        special_store = self[clause_name]
-      except KeyError:
-        # pylint: disable=raise-missing-from
-        raise ValueError("unknown config clause [%s]" % (clause_name,))
-      if archive_name is None or not archive_name:
-        special_basename = clause_name
-      else:
-        special_basename = archive_name
-      archive = special_store.get_Archive(archive_name)
-    else:
-      # pathname to archive file
-      arpath = special
-      if not isfilepath(arpath):
-        raise ValueError("not a file")
-      fsname = shortpath(realpath(arpath))
-      spfx, sext = splitext(basename(arpath))
-      if spfx and sext == '.vt':
-        special_basename = spfx
-      else:
-        special_basename = special
-      archive = FilePathArchive(arpath)
-    return fsname, readonly, special_store, specialD, special_basename, archive
+    from .fs import MountSpec
+    return MountSPec.from_str(special, config=self, readonly=readonly)
 
   @pfx
   @uses_runstate
@@ -682,3 +614,5 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
       socket_path = clause_name
     socket_path = expand_path(socket_path)
     return UNIXSocketClientStore(store_name, socket_path, hashclass=hashclass)
+
+uses_Config = default_params(config=Config.default)
