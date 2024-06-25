@@ -844,7 +844,4 @@ class StoreAsyncBase(Store):
   def flush(self):
     return self.flush_bg()()
 
-def uses_Store(func):
-  ''' Decorator to provide the default Store as the parameter `S`.
-  '''
-  return default_params(func, S=Store.default)
+uses_Store = default_params(S=Store.default)
