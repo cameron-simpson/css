@@ -7,25 +7,23 @@
 ''' cs.vt command line utility.
 '''
 
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 import errno
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import logging
 import os
 from os.path import (
     basename,
     splitext,
-    exists as existspath,
     exists as pathexists,
     join as joinpath,
     isdir as isdirpath,
     isfile as isfilepath,
 )
 import shutil
-from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM, SIGUSR1
-from stat import S_ISREG
+from signal import SIGQUIT, SIGUSR1
 import sys
 from typing import Mapping, Optional, Union
 
@@ -35,7 +33,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
-from cs.fileutils import atomic_filename, file_data, shortpath
+from cs.fileutils import file_data, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import hexify, get_identifier, s
 from cs.logutils import (exception, error, warning, track, info, debug, logTo)
@@ -45,7 +43,7 @@ from cs.py.modules import import_extra
 from cs.resources import RunState, uses_runstate, CancellationError
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE, transcribe_bytes_geek
-from cs.upd import print, run_task  # pylint: disable=redefined-builtin
+from cs.upd import print  # pylint: disable=redefined-builtin
 
 from . import (
     DISTINFO,
@@ -61,10 +59,9 @@ from . import (
     VT_STORE_DEFAULT,
     VT_STORE_ENVVAR,
 )
-from .archive import Archive, FilePathArchive, FileOutputArchive, CopyModes
+from .archive import Archive, FilePathArchive, FileOutputArchive
 from .blockify import (
     blocked_chunks_of,
-    top_block_for,
     blockify,
     block_for,
 )
@@ -75,6 +72,7 @@ from .datadir import DataDir
 from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
 from .dir import _Dirent, Dir, FileDirent
+from .fs import MountSpec
 from .hash import HashCode
 from .index import LMDBIndex
 from .merge import merge
@@ -89,7 +87,7 @@ from .scan import (
     scan_reblock,
 )
 from .server import serve_tcp, serve_socket
-from .store import ProxyStore, DataDirStore, ProgressStore
+from .store import DataDirStore
 from .transcribe import Transcriber
 from .uri import VTURI
 
@@ -822,30 +820,31 @@ class VTCmd(BaseCommand):
       error("FUSE support not configured: %s", e)
       return 1
     badopts = False
-    all_dates = False
-    append_only = False
-    readonly = None
-    opts, argv = getopt(argv, 'ao:r')
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-a':
-          all_dates = True
-        elif opt == '-o':
-          for option in val.split(','):
-            with Pfx(option):
-              if option == '':
-                pass
-              elif option == 'append':
-                append_only = True
-              elif option == 'readonly':
-                readonly = True
-              else:
-                warning("unrecognised option")
-                badopts = True
-        elif opt == '-r':
-          readonly = True
-        else:
-          raise RuntimeError("unhandled option: %r" % (opt,))
+    options.update(
+        all_dates=False,
+        append_only=False,
+        readonly=False,
+        mount_options=None,
+    )
+    options.popopts(
+        argv,
+        a=('all_dates', 'present every archive date as a top level directory'),
+        r=('readonly', 'mount the filesystem readonly'),
+        o_=('mount_options', 'comma separates list of "append", "readonly"'),
+    )
+    if options.mount_options:
+      with Pfx("mount_options=%s", options.mount_options):
+        for option in options.mount_options.split(','):
+          with Pfx(option):
+            if option == '':
+              pass
+            elif option == 'append':
+              append_only = True
+            elif option == 'readonly':
+              readonly = True
+            else:
+              warning("unrecognised option")
+              badopts = True
     # special is either a D{dir} or [clause] or an archive pathname
     mount_store = Store.default()
     special_basename = None
@@ -859,8 +858,11 @@ class VTCmd(BaseCommand):
     else:
       with Pfx("special %r", special):
         try:
-          fsname, readonly, special_store, specialD, special_basename, archive = \
-              options.config.parse_special(special, readonly)
+          mount_spec = MountSpec.from_str(
+              special,
+              config=options.config,
+              readonly=options.readonly,
+          )
         except ValueError as e:
           error("invalid: %s", e)
           badopts = True
@@ -870,24 +872,24 @@ class VTCmd(BaseCommand):
             # no path components, no dots (thus no leading dots).
             special_basename = \
                 special_basename.replace(os.sep, '_').replace('.', '_')
-          if special_store is not None and special_store is not mount_store:
+          if mount_spec.S is None:
+            mount_spec.S = mount_store
+          elif mount_spec.S is not mount_store:
             warning(
                 "replacing default Store with Store from special %s ==> %s",
-                mount_store, special_store
+                mount_store, mount_spec.S
             )
-            mount_store = special_store
     if argv:
       mountpoint = argv.pop(0)
+    elif special_basename is None:
+      if not badopts:
+        error(
+            'missing mountpoint, and cannot infer mountpoint from special: %r',
+            special
+        )
+        badopts = True
     else:
-      if special_basename is None:
-        if not badopts:
-          error(
-              'missing mountpoint, and cannot infer mountpoint from special: %r',
-              special
-          )
-          badopts = True
-      else:
-        mountpoint = special_basename
+      mountpoint = special_basename
     if argv:
       subpath = argv.pop(0)
     else:
@@ -897,26 +899,23 @@ class VTCmd(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    if all_dates:
+    if options.all_dates:
       readonly = True
     xit = 0
     mount_base = basename(mountpoint)
     with Pfx(special):
-      if specialD is not None:
-        # D{dir}
-        E = specialD
-      else:
+      if mount_spec.D is None:
         # pathname or Archive obtained from Store
-        if archive is None:
-          warning("no Archive, writing to stdout")
-          archive = FileOutputArchive(sys.stdout)
-        if all_dates:
+        if mount_spec.archive is None:
+          warning("no Archive, writing checkpoints to stdout")
+          mount_spec.archive = FileOutputArchive(sys.stdout)
+        if options.all_dates:
           E = Dir(mount_base)
-          for when, subD in archive:
+          for when, subD in mount_spec.archive:
             E[datetime.fromtimestamp(when).isoformat()] = subD
         else:
           try:
-            entry = archive.last
+            entry = mount_spec.archive.last
           except OSError as e:
             error("can't access special: %s", e)
             return 1
@@ -928,11 +927,13 @@ class VTCmd(BaseCommand):
           E = entry.dirent
           if E is None:
             E = Dir(mount_base)
-          else:
-            ##dump_Dirent(E, recurse=True)
-            if not E.isdir:
-              error("expected directory, not file: %s", E)
-              return 1
+          elif not E.isdir:
+            error("expected directory, not file: %s", E)
+            return 1
+        mount_spec.D = E
+      else:
+        E = mount_spec.D
+      assert mount_spec.D is E
       if E.name == '.':
         info("rename %s from %r to %r", E, E.name, mount_base)
         E.name = mount_base
@@ -957,15 +958,10 @@ class VTCmd(BaseCommand):
               call_previous=False,
               handle_signal=lambda *_: runstate.cancel(),
           ):
-            T = mount(
+            T = mount_spec.mount(
                 mountpoint,
-                E,
-                S=mount_store,
-                archive=archive,
                 subpath=subpath,
-                readonly=readonly,
-                append_only=append_only,
-                fsname=fsname,
+                append_only=options.append_only,
             )
         except KeyboardInterrupt:
           error("keyboard interrupt, unmounting %r", mountpoint)
