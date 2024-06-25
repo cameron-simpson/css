@@ -540,11 +540,10 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
       read_stores = read
     if save2 is None:
       save2_stores = []
+    elif isinstance(save2, str):
+      save2_stores = self.Stores_from_spec(save2, hashclass=hashclass)
     else:
-      if isinstance(save2, str):
-        save2_stores = self.Stores_from_spec(save2, hashclass=hashclass)
-      else:
-        save2_stores = save2
+      save2_stores = save2
     if read2 is None:
       read2_stores = []
     elif isinstance(read2, str):
