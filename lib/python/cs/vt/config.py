@@ -226,7 +226,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
   def mountdir(self) -> str:
     ''' The default directory for mount points.
     '''
-    return longpath(self.get_global('mountdir'))
+    return longpath(self.get_global('mountdir'), self.pathto('mnt'))
 
   def archive(self, archivename) -> Archive:
     ''' Return the Archive named `archivename`.
