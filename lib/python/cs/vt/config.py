@@ -137,12 +137,12 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     return "Config(%s)" % (shortpath(self.path),)
 
   @classmethod
-  def from_str(cls, spec: str):
+  def from_str(cls, spec: str) -> "Config":
     ''' Promote a config spec to a `Config`.
     '''
     return cls(config_spec=spec)
 
-  def as_text(self):
+  def as_text(self) -> str:
     ''' Return a text transcription of the config.
     '''
     with StringIO() as S:
@@ -154,7 +154,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     '''
     self.map.write(f)
 
-  def __getitem__(self, clause_name):
+  def __getitem__(self, clause_name: str) -> Store:
     ''' Return the `Store` defined by the named clause.
     '''
     with self._lock:
@@ -168,7 +168,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     return R()
 
   @pfx_method
-  def _make_clause_store(self, clause_name):
+  def _make_clause_store(self, clause_name: str) -> Store:
     ''' Instantiate the `Store` associated with `clause_name`.
     '''
     try:
@@ -190,7 +190,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     )
     return S
 
-  def get_global(self, param, default=None):
+  def get_global(self, param: str, default=None):
     ''' Fetch a default parameter from the [GLOBALS] clause.
     '''
     G = self.map['GLOBAL']
@@ -198,37 +198,37 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
       return default
     return G.get(param, default)
 
-  def get_clause(self, clause_name):
+  def get_clause(self, clause_name) -> Mapping:
     ''' Return the clause without opening it as a Store.
     '''
     return self.map[clause_name]
 
   @property
-  def basedir(self):
+  def basedir(self) -> str:
     ''' The default location for local archives and stores.
     '''
     return longpath(self.get_global('basedir', DEFAULT_BASEDIR))
 
   @property
-  def fspath(self):
+  def fspath(self) -> str:
     ''' The `.fspath` is the basedir.
     '''
     return self.basedir
 
   @property
-  def blockmapdir(self):
+  def blockmapdir(self) -> str:
     ''' The global blockmapdir.
         Falls back to `{self.basedir}/blockmaps`.
     '''
     return longpath(self.get_global('blockmapdir', self.pathto('blockmaps')))
 
   @property
-  def mountdir(self):
+  def mountdir(self) -> str:
     ''' The default directory for mount points.
     '''
     return longpath(self.get_global('mountdir'))
 
-  def archive(self, archivename):
+  def archive(self, archivename) -> Archive:
     ''' Return the Archive named `archivename`.
     '''
     if (not archivename or '.' in archivename or '/' in archivename):
@@ -249,8 +249,8 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
   @uses_runstate
   def Store_from_spec(
       self, store_spec: str, runstate: RunState, hashclass=None
-  ):
-    ''' Factory function to return an appropriate `BasicStore`* subclass
+  ) -> Store:
+    ''' Factory function to return an appropriate `Store` instance
         based on its argument:
 
           store:...       A sequence of stores. Save new data to the
@@ -281,7 +281,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     S.runstate = runstate
     return S
 
-  def Stores_from_spec(self, store_spec, hashclass=None):
+  def Stores_from_spec(self, store_spec, hashclass=None) -> List[Store]:
     ''' Parse a colon separated list of Store specifications,
         return a list of Stores.
     '''
@@ -303,8 +303,14 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     return stores
 
   def new_Store(
-      self, store_name, store_type, *, clause_name, hashclass=None, **params
-  ):
+      self,
+      store_name,
+      store_type,
+      *,
+      clause_name,
+      hashclass=None,
+      **params
+  ) -> Store:
     ''' Construct a store given its specification.
     '''
     if hashclass is not None:
@@ -333,7 +339,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
       _,  # store_name, unused
       clause_name,
   ):
-    ''' Construct a Store from a reference to a configuration clause.
+    ''' Construct a `Store` from a reference to a configuration clause.
     '''
     return self[clause_name]
 
