@@ -17,7 +17,7 @@ import os
 from os.path import (
     basename,
     splitext,
-    exists as pathexists,
+    exists as existspath,
     join as joinpath,
     isdir as isdirpath,
     isfile as isfilepath,
@@ -740,7 +740,7 @@ class VTCmd(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     config = self.options.config
     config_path = config.path
-    if not pathexists(config_path):
+    if not existspath(config_path):
       info("write %r", config_path)
       with Pfx(config_path):
         with open(config_path, 'w') as cfgf:
@@ -991,7 +991,7 @@ class VTCmd(BaseCommand):
     if argv:
       raise GetoptError("extra arguments after path: %r" % (argv,))
     with Pfx(fspath):
-      if not pathexists(fspath):
+      if not existspath(fspath):
         error("missing")
         return 1
       arpath = fspath + '.vt'
@@ -1386,7 +1386,7 @@ class VTCmd(BaseCommand):
               argv,
           )
       )
-    if pathexists(targetpath):
+    if existspath(targetpath):
       error("unpacked %r already exists", targetpath)
       return 1
     with Pfx(arpath):
