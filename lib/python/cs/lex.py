@@ -31,6 +31,7 @@ from string import (
 import sys
 from textwrap import dedent
 from threading import Lock
+from typing import Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
@@ -43,7 +44,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20231018-post'
+__version__ = '20240519-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -180,7 +181,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
 # convenience alias
 s = typed_str
 
-def typed_repr(o, use_cls=False, max_length=None):
+def typed_repr(o, max_length=None, *, use_cls=False):
   ''' Like `typed_str` but using `repr` instead of `str`.
       This is available as both `typed_repr` and `r`.
   '''
@@ -490,6 +491,81 @@ def get_prefix_n(s, prefix, n=None, *, offset=0):
   if n is not None and gn != n:
     return no_match
   return matched, gn, offset
+
+NUMERAL_NAMES = {
+    'en': {
+        # all the single word numbers
+        'zero': 0,
+        'nought': 0,
+        'one': 1,
+        'two': 2,
+        'three': 3,
+        'four': 4,
+        'five': 5,
+        'six': 6,
+        'seven': 7,
+        'eight': 8,
+        'nine': 9,
+        'ten': 10,
+        'eleven': 11,
+        'twelve': 12,
+        'thirteen': 13,
+        'fourteen': 14,
+        'fifteen': 15,
+        'sixteen': 16,
+        'seventeen': 17,
+        'eighteen': 18,
+        'nineteen': 19,
+        'twenty': 20,
+    },
+}
+
+def get_suffix_part(s, *, keywords=('part',), numeral_map=None):
+  ''' Strip a trailing "part N" suffix from the string `s`.
+      Return the matched suffix and the number part number.
+      Retrn `(None,None)` on no match.
+
+      Parameters:
+      * `s`: the string
+      * `keywords`: an iterable of `str` to match, or a single `str`;
+        default `'part'`
+      * `numeral_map`: an optional mapping of numeral names to numeric values;
+        default `NUMERAL_NAMES['en']`, the English numerals
+
+      Exanmple:
+
+          >>> get_suffix_part('s09e10 - A New World: Part One')
+          (': Part One', 1)
+  '''
+  if isinstance(keywords, str):
+    keywords = (keywords,)
+  if numeral_map is None:
+    numeral_map = NUMERAL_NAMES['en']
+  regexp_s = ''.join(
+      (
+          r'\W+(',
+          r'|'.join(keywords),
+          r')\s+(?P<numeral>\d+|',
+          r'|'.join(numeral_map.keys()),
+          r')\s*$',
+      )
+  )
+  regexp = re.compile(regexp_s, re.I)
+  m = regexp.search(s)
+  if not m:
+    return None, None
+  numeral = m.group('numeral')
+  try:
+    part_n = int(numeral)
+  except ValueError:
+    try:
+      part_n = numeral_map[numeral]
+    except KeyError:
+      try:
+        part_n = numeral_map[numeral.lower()]
+      except KeyError:
+        return None, None
+  return m.group(0), part_n
 
 # pylint: disable=redefined-outer-name
 def get_nonwhite(s, offset=0):
@@ -970,11 +1046,9 @@ def match_tokens(s, offset, getters):
       and returns `(None,offset)`.
   '''
   try:
-    tokens, offset2 = get_tokens(s, offset, getters)
+    return get_tokens(s, offset, getters)
   except ValueError:
     return None, offset
-  else:
-    return tokens, offset2
 
 def isUC_(s):
   ''' Check that a string matches the regular expression `^[A-Z][A-Z_0-9]*$`.
@@ -1248,6 +1322,24 @@ def snakecase(camelcased):
       was_lower = True
     strs.append(c)
   return ''.join(strs)
+
+def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
+  ''' Split a path with an optional leading `[user@]rhost:` prefix
+      into the prefix and the remaining path.
+      `None` is returned for the prefix is there is none.
+      This is useful for things like `rsync` targets etc.
+  '''
+  ssh_target = None
+  # check for [user@]rhost
+  try:
+    prefix, suffix = remotepath.split(':', 1)
+  except ValueError:
+    pass
+  else:
+    if prefix and '/' not in prefix:
+      ssh_target = prefix
+      remotepath = suffix
+  return ssh_target, remotepath
 
 # pylint: disable=redefined-outer-name
 def format_escape(s):

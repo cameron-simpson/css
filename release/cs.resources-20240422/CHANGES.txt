@@ -1,0 +1,1 @@
+lib/python/cs/resources.py: cs.resources: dataclass backport for Python < 3.10

@@ -1402,7 +1402,7 @@ def parse_action(action, do_trace):
     elif name == 'pipe':
       return ActionPipeTo(action0, pipe_name)
     else:
-      raise RuntimeError("unhandled action %r" % (name,))
+      raise NotImplementedError("unhandled action %r" % (name,))
 
   if name == 'grok' or name == 'grokall':
     # grok:a.b.c.d[:args...]
@@ -1485,7 +1485,7 @@ def parse_action(action, do_trace):
 
       return StageType.ONE_TO_MANY, grokall
     else:
-      raise RuntimeError("unhandled action %r", name)
+      raise NotImplementedError("unhandled action %r", name)
 
   if name == 'for':
     # for:varname=value,...
@@ -1574,7 +1574,7 @@ def parse_action(action, do_trace):
         return not any([P.seen(see_value, seenset) for seenset in seensets])
 
       return StageType.SELECTOR, unseen
-    raise RuntimeError("unsupported action %r", name)
+    raise NotImplementedError("unsupported action %r", name)
 
   if name == 'unique':
     # unique

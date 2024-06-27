@@ -8,5 +8,19 @@
 
 from __future__ import print_function
 import sys
-from cs.xml import pprint
+try:
+  from lxml import etree
+except ImportError:
+  import xml.etree.ElementTree as etree
+
+def pprint(xml, f=None):
+  ''' Directly derived from the suggestion at:
+       http://stackoverflow.com/questions/749796/pretty-printing-xml-in-python
+  '''
+  if f is None:
+    f = sys.stdout
+  if isinstance(xml, str):
+    xml = etree.fromstring(xml)
+  print(etree.tostring(xml, pretty_print=True).decode(), file=f)
+
 pprint(sys.stdin.read())

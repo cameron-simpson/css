@@ -1,0 +1,24 @@
+lib/python/cs/app/osx/objc.py: cs.app.osx: add addressbook and objc modules, based on article at http://www.programmish.com/?p=26
+lib/python/cs/app/osx/objc.py: cs.app.osx.{objc,addressbook}: make .objc adjust sys.path if necessary, then import .objc first in .addressbook
+lib/python/cs/app/osx/objc.py: cs/**.py: trim other trailing whitespace
+lib/python/cs/app/osx/objc.py: cs.app.osx: objc.convertObjCtype raises TypeError instead of ValueError
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: beef up the _offsetTZInfo class
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: move _offsetTZInfo to cs.dateutils.tzinfoHHMM for general use
+lib/python/cs/app/osx/objc.py: merge
+lib/python/cs/app/osx/objc.py: cs.*: lots of print, import and exception fixes for python3 compatibility
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: rearrange and tweak type checking in convertObjCtype
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: convertObjCtype: objc._pythonify.OC_PythonFloat -> float
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: add URL to opening comment
+lib/python/cs/app/osx/objc.py: my email address has changed - update Python code
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: modern PyObjc usage
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: new DEFAULT_BUNDLE_ID_PREFIX='com.apple.', new _BundlesDict(defaultdict) to autoload bundles by path or id
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: new Bundle wrapper singleton class for an NSBundle, autoloads functions, provides some additional ad hoc signatures
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: new AutoBundle class which looks up Bundles by id, new "apple" to level with an AutoBundles with the prefix "com.apple." allowing eg apple.CoreGraphics
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: autoformat, strip debug, add __main__ exercising whatever I'm testing at the moment
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: new @cg decorator for functions working with a Coregraphics connection
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: Bundle._additional_functions: fix spelling of 'com.apple.CoreGraphics'
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: Bundle.__getattr__: improve exception message to include bundle identifier
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: update imports, drop some unused code
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: add some docstrings and typ annotations
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: DISTINFO
+lib/python/cs/app/osx/objc.py: cs.app.osx.objc: module docstring, tweak raise

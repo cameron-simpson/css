@@ -35,7 +35,9 @@ import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
+
 from cs.buffer import CornuCopyBuffer
+from cs.context import stackattrs
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
@@ -46,12 +48,12 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
-from cs.resources import uses_runstate
+from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20230421-post'
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -62,6 +64,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.buffer',
+        'cs.context',
         'cs.deco',
         'cs.filestate',
         'cs.fs>=shortpath',
@@ -72,6 +75,7 @@ DISTINFO = {
         'cs.progress',
         'cs.py3',
         'cs.range',
+        'cs.resources',
         'cs.result',
         'cs.threads',
         'cs.units',
@@ -618,7 +622,14 @@ def make_files_property(
 @uses_runstate
 @pfx
 def makelockfile(
-    path, ext=None, poll_interval=None, timeout=None, runstate=None
+    path,
+    *,
+    ext=None,
+    poll_interval=None,
+    timeout=None,
+    runstate: RunState,
+    keepopen=False,
+    max_interval=37,
 ):
   ''' Create a lockfile and return its path.
 
@@ -639,6 +650,9 @@ def makelockfile(
       * `runstate`: optional `RunState` duck instance supporting cancellation.
         Note that if a cancelled `RunState` is provided
         no attempt will be made to make the lockfile.
+      * `keepopen`: optional flag, default `False`:
+        if true, do not close the lockfile and return `(lockpath,lockfd)`
+        being the lock file path and the open file descriptor
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
@@ -676,7 +690,7 @@ def makelockfile(
           if now - complaint_last >= complaint_interval:
             warning("pid %d waited %ds", os.getpid(), now - start)
             complaint_last = now
-            complaint_interval *= 2
+            complaint_interval = min(complaint_interval * 2, max_interval)
         # post: start is set
         if timeout is None:
           sleep_for = poll_interval
@@ -690,13 +704,19 @@ def makelockfile(
         continue
       else:
         break
+    if keepopen:
+      return lockpath, lockfd
     os.close(lockfd)
     return lockpath
 
 @contextmanager
 @uses_runstate
-def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
+def lockfile(
+    path, *, ext=None, poll_interval=None, timeout=None, runstate: RunState
+):
   ''' A context manager which takes and holds a lock file.
+      An open file descriptor is kept for the lock file as well
+      to aid locating the process holding the lock file using eg `lsof`.
 
       Parameters:
       * `path`: the base associated with the lock file.
@@ -707,17 +727,22 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
       * `poll_interval`: polling frequency when timeout is not `0`.
       * `runstate`: optional `RunState` duck instance supporting cancellation.
   '''
-  lockpath = makelockfile(
+  lockpath, lockfd = makelockfile(
       path,
       ext=ext,
       poll_interval=poll_interval,
       timeout=timeout,
-      runstate=runstate
+      runstate=runstate,
+      keepopen=True,
   )
   try:
     yield lockpath
   finally:
-    pfx_call(os.remove, lockpath)
+    try:
+      pfx_call(os.remove, lockpath)
+    except FileNotFoundError as e:
+      warning("lock file already removed: %s", e)
+    pfx_call(os.close, lockfd)
 
 def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.
@@ -1493,8 +1518,10 @@ class Tee(object):
 
 @contextmanager
 def tee(fp, fp2):
-  ''' Context manager duplicating .write and .flush from fp to fp2.
+  ''' Context manager duplicating `.write` and `.flush` from `fp` to `fp2`.
   '''
+  old_write = fp.write
+  old_flush = fp.flush
 
   def _write(*a, **kw):
     fp2.write(*a, **kw)
@@ -1504,15 +1531,8 @@ def tee(fp, fp2):
     fp2.flush(*a, **kw)
     return old_flush(*a, **kw)
 
-  old_write = getattr(fp, 'write')
-  old_flush = getattr(fp, 'flush')
-  fp.write = _write
-  fp.flush = _flush
-  try:
+  with stackattrs(fp, write=_write, flush=_flush):
     yield
-  finally:
-    fp.write = old_write
-    fp.flush = old_flush
 
 class NullFile(object):
   ''' Writable file that discards its input.
@@ -1690,13 +1710,12 @@ def atomic_filename(
     dir = dirname(filename)
   fprefix, fsuffix = splitext(basename(filename))
   if prefix is None:
-    prefix = '.' + fprefix
+    prefix = '.' + fprefix + '-'
   if suffix is None:
     suffix = fsuffix
   if not exists_ok and existspath(filename):
     raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), filename)
-  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, delete=False,
-                          **kw) as T:
+  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, **kw) as T:
     if placeholder:
       # create a placeholder file
       with open(filename, 'ab' if exists_ok else 'xb'):
@@ -1719,6 +1738,9 @@ def atomic_filename(
         atime = mtime
       pfx_call(os.utime, T.name, (atime, mtime))
     pfx_call(rename_func, T.name, filename)
+    # recreate the temp file so that it can be cleaned up
+    with pfx_call(open, T.name, 'xb'):
+      pass
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.

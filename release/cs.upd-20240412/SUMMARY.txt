@@ -1,0 +1,5 @@
+Upd.run_task: provide the label as the new UpdProxy prefix.
+Upd.insert: the supplied txt is the proxy.text, not the prefix.
+UpdProxy.text: setting to None sets to self._text_auto() if present or makes no change.
+New @without decorator to withdraw the Upd during a function.
+print: use the builtin print directly if the Upd is disabled.

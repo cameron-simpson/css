@@ -1,0 +1,3 @@
+lib/python/cs/tagset.py: cs.tagset: TagFile.parse_tag_line: recognise dotted_identifiers directly, avoids misparsing bare "nan" as float NaN
+lib/python/cs/tagset.py: cs.tagset: parse_tags_line: type annotation
+lib/python/cs/tagset.py: cs.tagset: Tag.parse_value: BUGFIX parse - always to the primary types first (int, float) before trying any funny extra types

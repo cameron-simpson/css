@@ -40,8 +40,10 @@ import logging
 from os.path import splitext
 import sys
 from threading import RLock, Semaphore
+
 from youtube_dl import YoutubeDL
 from youtube_dl.utils import DownloadError
+
 from cs.cmdutils import BaseCommand
 from cs.excutils import logexc
 from cs.fstags import FSTags
@@ -137,7 +139,7 @@ class YDLCommand(BaseCommand):
               if options.parallel < 1:
                 raise GetoptError("must be >= 1")
         else:
-          raise RuntimeError("unhandled option: %s=%s" % (opt, val))
+          raise NotImplementedError("unhandled option: %s=%s" % (opt, val))
 
   def main(self, argv):
     ''' Command line main programme.

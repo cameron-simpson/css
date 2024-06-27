@@ -1,0 +1,1 @@
+New get_batch(q) to fetch closely spaced batches from a Queue.

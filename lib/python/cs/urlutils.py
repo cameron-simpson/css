@@ -4,6 +4,8 @@
 # - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
 
+__version__ = '20231129-post'
+
 DISTINFO = {
     'description':
     "convenience functions for working with URLs",
@@ -16,13 +18,11 @@ DISTINFO = {
         'html5lib',
         'lxml',
         'beautifulsoup4',
-        'cs.excutils',
         'cs.lex',
         'cs.logutils',
         'cs.rfc2616',
         'cs.threads',
         'cs.obj',
-        'cs.xml',
     ],
 }
 
@@ -46,7 +46,20 @@ from urllib.request import Request, HTTPError, URLError, \
 from urllib.parse import urlparse, urljoin, quote as urlquote
 
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
-import lxml
+try:
+  try:
+    from lxml import etree
+  except ImportError:
+    import xml.etree.ElementTree as etree
+except ImportError:
+  try:
+    if sys.stderr.isatty():
+      print(
+          "%s: warning: cannot import lxml for use with bs4" % (__file__,),
+          file=sys.stderr
+      )
+  except AttributeError:
+    pass
 import requests
 from typeguard import typechecked
 
@@ -58,7 +71,6 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_iter
 from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked
-from cs.xml import etree  # ElementTree
 from cs.threads import locked_property, State as ThreadState
 
 ##from http.client import HTTPConnection

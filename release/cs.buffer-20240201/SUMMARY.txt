@@ -1,0 +1,1 @@
+CornuCopyBuffer: read1() method shorthand for read(..,one_fetch=True).

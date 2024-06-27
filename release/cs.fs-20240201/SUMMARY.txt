@@ -1,0 +1,2 @@
+FSPathBasedSingleton: drop the default_factory parameter/attribute, let default_attr specify a callable.
+Singleton._resolve_fspath: fix reference to class name.

@@ -16,20 +16,30 @@ spaces=.
 trace= ## set-x
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [spaces] words...
-    Select up to ${nwp} wallpapers from the directories in \$WPPATH,
+usage="Usage: $cmd [-nwp] [-x] [--] [spaces] words...
+    Select up to nwp (${nwp}) wallpapers from the directories in \$WPPATH,
     default from \$WPDIR:\$SSV_DIR: $WPPATH
     at random matching the sed-regexps \"words\".
     Construct a scratch directoy in \$WPLINKDIR: $WPLINKDIR
     and symlink the selected images into it, then set that directory
-    as the wallpaper directory for the current space."
+    as the wallpaper directory for the current (or specified) space."
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -*) echo "$cmd: unrecognised option: $1" >&2
+    -[1-9]*)
+        _nwp=$1; shift
+        nwp=$( expr "x$_nwp" : 'x-\([1-9][0-9]*\)' ) || {
+          echo "$cmd: -nwp \"$1\": invalid number" >&2
+          badopts=1
+        }
+        ;;
+    -x) trace=set-x
+        ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
         ;;
     *)  break ;;
@@ -62,9 +72,9 @@ cd "$rd"
 (
   for wpsrcdir in $( echo "$WPPATH" | tr : ' ' )
   do
-    find "$wpsrcdir"/* -type f \( -name \*.png -o -name \*.jpg \) || :
+    $trace find -L "$wpsrcdir"/* -type f \( -name \*.png -o -name \*.jpg \) || :
   done \
-  | grepall -- "$@" \
+  | $trace grepall -- "$@" \
   | shuffle \
   | sed "${nwp}q"
 ) \
@@ -76,7 +86,7 @@ cd "$rd"
     ln -s -- "$img" .
     first=
   done
-  [ -t 1 ] && ls "$rd/"
+  [ -t 1 ] && $trace ls "$rd/"
   [ $first ] && { echo "$cmd: nothing found" >&2; exit 1; }
   $trace spaces wp "$spaces" "$rd"
 }

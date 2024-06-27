@@ -1,0 +1,1 @@
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct.parse: promote the buffer arguments to a CornuCopyBuffer

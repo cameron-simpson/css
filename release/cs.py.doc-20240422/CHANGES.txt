@@ -1,0 +1,1 @@
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: only list things in __all__ if provided; comment out a noisy print()

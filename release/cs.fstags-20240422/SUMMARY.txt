@@ -1,0 +1,2 @@
+Bugfix: .fstags files should no longer get Python repr() output for weirdly typed tag values.
+Some other minor internal updates.

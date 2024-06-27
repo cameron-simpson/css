@@ -19,20 +19,19 @@ from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import exception, error, warning, info, debug
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.range import Range
 from cs.threads import locked, HasThreadState, State as ThreadState
 from cs.x import X
 
 from . import Lock, RLock, uses_Store
-from .block import isBlock
 from .cache import BlockCache
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
 from .meta import Meta
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
-from .transcribe import Transcriber, mapping_transcriber, parse
+from .transcribe import Transcriber
 
 XATTR_VT_PREFIX = 'x-vt-'
 
@@ -125,15 +124,16 @@ class FileHandle:
     '''
     R = self.E.flush()
     self.E.parent.changed = True
-    S.open()
-    # NB: additional S.open/close around self.E.close
-    @logexc
-    def withR(R):
-      with stackattrs(defaults, S=S):
-        self.E.close()
-      S.close()
+    if R is not None:
+      S.open()
+      # NB: additional S.open/close around self.E.close
+      @logexc
+      def withR(R):
+        with S:
+          self.E.close()
+        S.close()
 
-    R.notify(withR)
+      R.notify(withR)
 
   def write(self, data, offset):
     ''' Write data to the file.
@@ -178,16 +178,7 @@ class FileHandle:
     self.E.flush(scanner, dispatch=self.bg)
     ## no touch, already done by any writes
 
-@mapping_transcriber(
-    prefix="Ino",
-    transcription_mapping=lambda self: {
-        'refcount': self.refcount,
-        'E': self.E,
-    },
-    required=('refcount', 'E'),
-    optional=(),
-)
-class Inode(Transcriber, NS):
+class Inode(Transcriber, NS, prefix='Ino'):
   ''' An Inode associates an inode number and a Dirent.
 
       Attributes:
@@ -210,16 +201,16 @@ class Inode(Transcriber, NS):
         )
     )
 
-  def transcribe_inner(self, T, fp):
-    return T.transcribe_mapping(
+  def transcribe_inner(self) -> str:
+    return self.transcribe_mapping_inner(
         {
             'refcount': self.refcount,
             'E': self.E,
-        }, fp, T=T
+        }
     )
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar, prefix):
+  def parse_inner(cls, s, offset, stopchar, prefix):
     if prefix != cls.transcribe_prefix:
       raise ValueError(
           "expected prefix=%r, got: %r" % (
@@ -227,7 +218,7 @@ class Inode(Transcriber, NS):
               prefix,
           )
       )
-    m, offset = T.parse_mapping(s, offset, stopchar=stopchar, T=T)
+    m, offset = cls.parse_mapping(s, offset, stopchar=stopchar)
     return cls(None, m['E'], m['refcount']), offset
 
 class Inodes:
@@ -258,16 +249,13 @@ class Inodes:
   def load_fs_inode_dirents(self, D):
     ''' Load entries from an `fs_inode_dirents` Dir into the Inode table.
     '''
-    X("LOAD FS INODE DIRENTS:")
-    dump_Dirent(D)
+    ##dump_Dirent(D)
     for name, E in D.entries.items():
-      X("  name=%r, E=%r", name, E)
       with Pfx(name):
         # get the refcount from the :uuid:refcount" name
         _, refcount_s = name.split(':')[:2]
         I = self.add(E)
         I.refcount = int(refcount_s)
-        X("  I=%s", I)
 
   def get_fs_inode_dirents(self):
     ''' Create an `fs_inode_dirents` Dir containing Inodes which
@@ -279,8 +267,7 @@ class Inodes:
         D["%s:%d" % (uuid, I.refcount)] = I.E
       else:
         warning("refcount=%s, SKIP %s", I.refcount, I.E)
-    X("GET FS INODE DIRENTS:")
-    dump_Dirent(D)
+    ##dump_Dirent(D)
     return D
 
   def _new_inum(self):
@@ -295,47 +282,47 @@ class Inodes:
     allocated.add(inum)
     return inum
 
+  @pfx_method
   def add(self, E, inum=None):
     ''' Add the Dirent `E` to the Inodes, return the new Inode.
         It is not an error to add the same Dirent more than once.
     '''
-    with Pfx("Inodes.add(E=%s)", E):
-      if E.isindirect:
-        raise ValueError("indirect Dirents may not become Inodes")
-      if inum is not None and inum < 1:
-        raise ValueError("inum must be >= 1, got: %d" % (inum,))
-      uu = E.uuid
-      I = self._by_dirent.get(E)
-      if I:
-        assert I.E is E
-        if inum is not None and I.inum != inum:
-          raise ValueError(
-              "inum=%d: Dirent already has an Inode with a different inum: %s"
-              % (inum, I)
-          )
-        if uu:
-          # opportunisticly update UUID mapping
-          # in case the Dirent has acquired a UUID
-          I2 = self._by_uuid.get(uu)
-          if I2:
-            assert I2.E is E
-          else:
-            self._by_uuid[uu] = I
-        return I
-      # unknown Dirent, create new Inode
-      if inum is None:
-        inum = self._new_inum()
-      else:
-        I = self._by_inum.get(inum)
-        if I:
-          raise ValueError("inum %d already allocated: %s" % (inum, I))
-        self._allocated.add(inum)
-      I = Inode(inum, E)
-      self._by_dirent[E] = I
-      self._by_inum[inum] = I
+    if E.isindirect:
+      raise ValueError("indirect Dirents may not become Inodes")
+    if inum is not None and inum < 1:
+      raise ValueError("inum must be >= 1, got: %d" % (inum,))
+    uu = E.uuid
+    I = self._by_dirent.get(E)
+    if I:
+      assert I.E is E
+      if inum is not None and I.inum != inum:
+        raise ValueError(
+            "inum=%d: Dirent already has an Inode with a different inum: %s" %
+            (inum, I)
+        )
       if uu:
-        self._by_uuid[uu] = I
+        # opportunisticly update UUID mapping
+        # in case the Dirent has acquired a UUID
+        I2 = self._by_uuid.get(uu)
+        if I2:
+          assert I2.E is E
+        else:
+          self._by_uuid[uu] = I
       return I
+    # unknown Dirent, create new Inode
+    if inum is None:
+      inum = self._new_inum()
+    else:
+      I = self._by_inum.get(inum)
+      if I:
+        raise ValueError("inum %d already allocated: %s" % (inum, I))
+      self._allocated.add(inum)
+    I = Inode(inum, E)
+    self._by_dirent[E] = I
+    self._by_inum[inum] = I
+    if uu:
+      self._by_uuid[uu] = I
+    return I
 
   def __getitem__(self, ndx):
     if isinstance(ndx, int):
@@ -444,21 +431,12 @@ class FileSystem(HasThreadState):
     try:
       with Pfx("fs_inode_dirents"):
         fs_inode_dirents = E.meta.get("fs_inode_dirents")
-        X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
         if fs_inode_dirents:
-          inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
-          if offset < len(fs_inode_dirents):
-            warning(
-                "unparsed text after Dirent: %r", fs_inode_dirents[offset:]
-            )
-          X("IMPORT INODES:")
+          inode_dir = _Dirent.from_str(fs_inode_dirents)
           dump_Dirent(inode_dir)
           inodes.load_fs_inode_dirents(inode_dir)
-        else:
-          X("NO INODE IMPORT")
-        X("FileSystem mntE:")
       with self.S:
-        with stackattrs(defaults, fs=self):
+        with self:
           dump_Dirent(mntE)
     except Exception as e:
       exception("exception during initial report: %s", e)
@@ -495,20 +473,14 @@ class FileSystem(HasThreadState):
   @logexc
   def _sync(self):
     with Pfx("_sync"):
-      if Store.defaults() is None:
-        raise RuntimeError("RUNTIME: Store.defaults() is None!")
       archive = self.archive
       if not self.readonly and archive is not None:
         with self._lock:
           E = self.E
           updated = False
-          X("snapshot %r  ...", E)
           E.snapshot()
-          X("snapshot: afterwards E=%r", E)
           fs_inode_dirents = self._inodes.get_fs_inode_dirents()
-          X("_SYNC: FS_INODE_DIRENTS:")
           dump_Dirent(fs_inode_dirents)
-          X("set meta.fs_inode_dirents")
           if fs_inode_dirents.size > 0:
             E.meta['fs_inode_dirents'] = str(fs_inode_dirents)
           else:
@@ -716,7 +688,7 @@ class FileSystem(HasThreadState):
           B, offset = parse(block_s)
           if offset < len(block_s):
             OS_EINVAL("unparsed text after trancription: %r", block_s[offset:])
-          if not isBlock(B):
+          if not isinstance(B, Block):
             OS_EINVAL("not a Block transcription")
           info("%s: update .block directly to %r", E, str(B))
           E.block = B

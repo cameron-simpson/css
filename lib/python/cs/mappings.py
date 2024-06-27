@@ -31,7 +31,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20230612-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'description':
@@ -129,6 +129,7 @@ def named_row_tuple(
     attr_seq = Seq(start=1)
     mapping = column_map
 
+    # pylint: disable=function-redefined
     def column_map(raw_column_name):
       ''' Function to map raw column names to the values in the
           supplied mapping.
@@ -1022,8 +1023,9 @@ class AttrableMappingMixin(object):
     try:
       return self[attr]
     except KeyError:
+      cls = type(self)
       try:
-        return self.ATTRABLE_MAPPING_DEFAULT
+        return cls.ATTRABLE_MAPPING_DEFAULT
       except AttributeError:
         names_msgs = []
         ks = list(self.keys())
@@ -1380,7 +1382,6 @@ class RemappedMappingProxy:
   def key(self, subk):
     ''' Return the external key for `subk`.
     '''
-    X("%s.key(subk=%r)...", self.__class__.__name__, subk)
     try:
       k = self._mapped_subkeys[subk]
     except KeyError:

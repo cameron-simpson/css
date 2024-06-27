@@ -1,0 +1,1 @@
+lib/python/cs/timeseries.py: cs.*: fix a common typo

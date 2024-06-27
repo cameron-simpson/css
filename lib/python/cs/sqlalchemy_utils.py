@@ -30,7 +30,7 @@ from cs.threads import ThreadState
 
 ##def CHECK():
 ##  ''' Debug function to check for open sqltags.sqlite files,
-##      called when there should be done.
+##      called when there should be none.
 ##  '''
 ##  X("CHECK")
 ##  if os.system(

@@ -1,0 +1,1 @@
+lib/python/cs/app/osx/misc.py: cs.app.osx.misc: fix trove classifier

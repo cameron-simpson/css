@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+import signal
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
@@ -14,7 +15,9 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20230331-post'
+from cs.gimmicks import error
+
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -23,29 +26,88 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.gimmicks'],
 }
 
 @contextmanager
-def contextif(flag, cmgr_func, *cmgr_args, **cmgr_kwargs):
-  ''' A context manager to call call `cmgr_func(*cmgr_args,**cmgr_kwargs)`
-      if `flag` is true or `nullcontext()` otherwise.
+def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
+  ''' A context manager to use `cmgr` conditionally,
+      with a flexible call signature.
+      This yields the context manager if `cmgr` is used or `None`
+      if it is not used, allowing the enclosed code to test whether
+      the context is active.
 
-      The driving use case in verbosity dependent status lines or
-      progress bars, eg:
+      This is to ease uses where the context object is optional
+      i.e. `None` if not present. Example from `cs.vt.stream`:
+
+          @contextmanager
+          def startup_shutdown(self):
+            """ Open/close `self.local_store` if not `None`.
+            """
+            with super().startup_shutdown():
+              with contextif(self.local_store):
+                with self._packet_connection(self.recv, self.send) as conn:
+                  with stackattrs(self, _conn=conn):
+                    yield
+
+      Here `self.local_store` might be `None` if there's no local
+      store to present. We still want a nice nested `with` statement
+      during the setup. By using `contextif` we run a context manager
+      which behaves correctly when `self.local_store=None`.
+
+      The signature is flexible, offering 2 basic modes of use.
+
+      Flagged use: `contextif(flag,cmgr,*a,**kw)`: if `flag` is a
+      Boolean then it governs whether the context manager `cmgr`
+      is used. Historically the driving use case was verbosity
+      dependent status lines or progress bars. Example:
 
           from cs.upd import run_task
-          with contextif(run_task(....)) as proxy:
-            ... do stuff, updating proxy if not None ...
+          with contextif(verbose, run_task, ....) as proxy:
+              ... do stuff, updating proxy if not None ...
+
+      Unflagged use: `contextif(cmgr,*a,**kw)`: use `cmgr` as the
+      flag: if false (eg `None`) then `cmgr` is not used.
+
+      Additionally, `cmgr` may be a callable, in which case the
+      context manager itself is obtained by calling
+      `cmgr,*cmgr_args,**cmgr_kwargs)`. Otherwise `cmgr` is assumed
+      to be a context manager already, and it is an error to provide
+      `cmgr_args` or `cmgr_kwargs`.
+
+      In the `cs.upd` example above, `run_task` is a context manager
+      function which pops up an updatable status line, normally
+      used as:
+
+          with run_task("doing thing") as proxy:
+              ... do the thing, setting proxy.text as needed ...
   '''
-  cmgr = cmgr_func(*cmgr_args, **cmgr_kwargs) if flag else nullcontext()
-  with cmgr as ctxt:
-    yield ctxt
+  if callable(cmgr):
+    flag = True
+  else:
+    if isinstance(cmgr, bool):
+      flag = cmgr
+      cmgr = cmgr_args[0]
+      cmgr_args = cmgr_args[1:]
+    else:
+      flag = bool(cmgr)
+  if flag:
+    if callable(cmgr):
+      cmgr = cmgr(*cmgr_args, **cmgr_kwargs)
+    elif cmgr_args or cmgr_kwargs:
+      raise ValueError(
+          "cmgr %s:%r is not callable but arguments were provided: cmgr_args=%r, cmgr_kwargs=%r"
+          % (cmgr.__class__.__name__, cmgr, cmgr_args, cmgr_kwargs)
+      )
+    with cmgr as ctxt:
+      yield ctxt
+  else:
+    yield
 
 def pushattrs(o, **attr_values):
   ''' The "push" part of `stackattrs`.
       Push `attr_values` onto `o` as attributes,
-      return the previous attribute values in a dict.
+      return the previous attribute values in a `dict`.
 
       This can be useful in hooks/signals/callbacks,
       where you cannot inline a context manager.
@@ -85,7 +147,7 @@ def stackattrs(o, **attr_values):
   ''' Context manager to push new values for the attributes of `o`
       and to restore them afterward.
       Returns a `dict` containing a mapping of the previous attribute values.
-      Attributes not present are not present in returned mapping.
+      Attributes not present are not present in the returned mapping.
 
       Restoration includes deleting attributes which were not present
       initially.
@@ -95,7 +157,7 @@ def stackattrs(o, **attr_values):
 
       See `stackkeys` for a flavour of this for mappings.
 
-      See `cs.threads.State` for a convenient wrapper class.
+      See `cs.threads.ThreadState` for a convenient wrapper class.
 
       Example of fiddling a programme's "verbose" mode:
 
@@ -152,16 +214,20 @@ def stackattrs(o, **attr_values):
   finally:
     popattrs(o, attr_values.keys(), old_values)
 
-def pushkeys(d, **key_values):
+def pushkeys(d, kv=None, **kw):
   ''' The "push" part of `stackkeys`.
-      Push `key_values` onto `d` as key values.
-      return the previous key values in a dict.
+      Use the mapping provided as `kv` or `kw` to update `d`.
+      Return the previous key values in a `dict`.
 
       This can be useful in hooks/signals/callbacks,
-      where you cannot inline a context manager.
+      where you cannot inline a context manager using `stackkeys`.
   '''
+  if kv is None:
+    kv = kw
+  elif kw:
+    raise ValueError("pushkeys: only one of kv or kw may be provided")
   old_values = {}
-  for key, value in key_values.items():
+  for key, value in kv.items():
     try:
       old_value = d[key]
     except KeyError:
@@ -191,9 +257,10 @@ def popkeys(d, key_names, old_values):
       d[key] = old_value
 
 @contextmanager
-def stackkeys(d, **key_values):
-  ''' Context manager to push new values for the key values of `d`
+def stackkeys(d, kv=None, **kw):
+  ''' A context manager to push new values for the key values of `d`
       and to restore them afterward.
+      The new values are provided as `kv` or `kw` as convenient.
       Returns a `dict` containing a mapping of the previous key values.
       Keys not present are not present in the mapping.
 
@@ -235,11 +302,12 @@ def stackkeys(d, **key_values):
           log_entry: global_context = {'parent': None}
           {'parent': None, 'desc': 'another standalone entry', 'when': ...}
   '''
-  old_values = pushkeys(d, **key_values)
+  old_values = pushkeys(d, kv, **kw)
+  kv = kv or kw
   try:
     yield old_values
   finally:
-    popkeys(d, key_values.keys(), old_values)
+    popkeys(d, kv.keys(), old_values)
 
 @contextmanager
 def stackset(s, element, lock=None):
@@ -292,9 +360,12 @@ def twostep(cmgr):
               yield
               ...
 
-      then the correct use of `twostep()` is:
+      then `my_cmgr_func(...)` returns a context manager instance
+      and so the correct use of `twostep()` is like this:
 
-          cmgr_iter = twostep(my_cmgr_func(...))
+          # steps broken out for clarity
+          cmgr = my_cmgr_func(...)
+          cmgr_iter = twostep(cmgr)
           next(cmgr_iter)   # set up
           next(cmgr_iter)   # tear down
 
@@ -435,6 +506,36 @@ def pop_cmgr(o, attr):
   pop_func = getattr(o, '_push_cmgr__popfunc__' + attr)
   return pop_func()
 
+@contextmanager
+def stack_signals(signums, handler, additional=False):
+  ''' Context manager to apply a handler function to `signums`
+      using `signal.signal`.
+      The old handlers are restored on exit from the context manager.
+
+      If the optional `additional` argument is true,
+      apply a handler which calls both the new handler and the old handler.
+  '''
+  stacked_signals = {}
+  if additional:
+    new_handler = handler
+
+    # pylint: disable=function-redefined
+    def handler(sig, frame):
+      old_handler = stacked_signals[sig]
+      new_handler(sig, frame)
+      if old_handler:
+        old_handler(sig, frame)
+
+  if isinstance(signums, int):
+    signums = [signums]
+  try:
+    for signum in signums:
+      stacked_signals[signum] = signal.signal(signum, handler)
+    yield
+  finally:
+    for signum, old_handler in stacked_signals.items():
+      signal.signal(signum, old_handler)
+
 class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods
       running the first and second steps of a single `__enter_exit__` generator method.
@@ -550,10 +651,14 @@ class ContextManagerMixin:
         around the main `RunState` context manager.
     '''
     eegen = cls.__enter_exit__(self)
-    entered = next(eegen)
+    try:
+      entered = next(eegen)
+    except StopIteration as e:
+      error("expected enter value from next(eegen): %s", e)
+      return
     try:
       yield entered
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
       exit_result = eegen.throw(type(e), e, e.__traceback__)
       if not exit_result:
         raise
@@ -562,3 +667,47 @@ class ContextManagerMixin:
         exit_result = next(eegen)
       except StopIteration:
         pass
+
+def withif(obj):
+  ''' Return a context manager for `obj`.
+      If `obj` has an `__enter__` attribute, return `obj`
+      otherwise return `nullcontext()`.
+
+      Example:
+
+          with withif(inner_mapping):
+            ... work with inner_mapping ...
+  '''
+  if hasattr(obj, '__enter__'):
+    return obj
+  return nullcontext()
+
+def _withall(obj_it):
+  ''' A generator to enter every object `obj` from the iterator
+      `obj_it` using `with obj:`, then yield.
+  '''
+  try:
+    obj = next(obj_it)
+  except StopIteration:
+    yield
+  else:
+    with obj:
+      yield from _withall(obj_it)
+
+@contextmanager
+def withall(objs):
+  ''' Enter every object `obj` in `obj_list` except those which are `None`
+      using `with obj:`, then yield.
+  '''
+  yield from _withall(obj for obj in objs if obj is not None)
+
+@contextmanager
+def reconfigure_file(f, **kw):
+  ''' Context manager flavour of `TextIOBase.reconfigure`.
+  '''
+  old = {k: getattr(f, k) for k in kw}
+  try:
+    f.reconfigure(**kw)
+    yield
+  finally:
+    f.reconfigure(**old)

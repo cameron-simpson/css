@@ -89,7 +89,9 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': ['svcd = cs.app.svcd:main'],
+        'console_scripts': {
+            'svcd': 'cs.app.svcd:main'
+        },
     },
 }
 
@@ -252,7 +254,7 @@ class SvcDCommand(BaseCommand):
         elif opt == '-x':
           trace = True
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if not argv:
       warning("missing command")
     if name is None:
