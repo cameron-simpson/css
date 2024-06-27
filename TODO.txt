@@ -1,3 +1,4 @@
+subcommand to dump HTML tags and classes to aid in writing scrapers and recipe decoders etc
 setvar: not expanding leading $MANPATH etc
 bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
 cs.jsonutils: merge the various JSON utility functions?
