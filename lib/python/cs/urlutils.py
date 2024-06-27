@@ -70,8 +70,8 @@ from cs.logutils import debug, error, warning, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_iter
 from cs.rfc2616 import datetime_from_http_date
-from cs.threads import locked
-from cs.threads import locked_property, State as ThreadState
+from cs.threads import locked, ThreadState, HasThreadState
+from cs.xml import etree  # ElementTree
 
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader
@@ -142,7 +142,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
   @contextmanager
-  def session(session=None):
+  def session(self, session=None):
     ''' Context manager yielding a `requests.Session`.
     '''
     if session is None:
