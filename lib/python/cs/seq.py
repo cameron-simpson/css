@@ -15,6 +15,7 @@ in the course of its function.
 import heapq
 import itertools
 from threading import Lock, Condition, Thread
+
 from cs.deco import decorator
 from cs.gimmicks import warning
 
@@ -627,6 +628,24 @@ def greedy(g=None, queue_depth=0):
 
   Thread(target=run_generator).start()
   return iter(q)
+
+def skip_map(func, *iterables, except_types, quiet=False):
+  ''' A version of `map()` which will skip items where `func(item)`
+      raises an exception in `except_types`, a tuple of exception types.
+      If a skipped exception occurs a warning will be issued unless
+      `quiet` is true (default `False`).
+  '''
+  if not isinstance(except_types, tuple):
+    raise TypeError(
+        "except types must be a tuple of exception types but has type %s" %
+        (type(except_types),)
+    )
+  for iterable in iterables:
+    for item in iterable:
+      try:
+        yield func(item)
+      except except_types as e:
+        quiet or warning("skip_map(func=%s): item=%s: skip exception: %s", func, item,e)
 
 if __name__ == '__main__':
   import sys
