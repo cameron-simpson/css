@@ -863,7 +863,7 @@ class BaseCommand:
         mapping.update(usage_format_mapping)
       mapping.update(cmd=subcmd)
       subusage = subusage_format.format_map(mapping)
-    return subusage or None
+    return subusage.replace('\n', '\n  ')
 
   @pfx_method
   # pylint: disable=no-self-use
@@ -1384,7 +1384,10 @@ class BaseCommand:
       short = True
     argv = argv or sorted(subcmds)
     xit = 0
-    print("help:")
+    if short:
+      print("help (use -l for longer help):")
+    else:
+      print("help:")
     unknown = False
     for subcmd in argv:
       with Pfx(subcmd):
