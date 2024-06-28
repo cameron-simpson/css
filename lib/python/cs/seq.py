@@ -114,8 +114,7 @@ def get0(iterable, default=None):
     i = first(iterable)
   except IndexError:
     return default
-  else:
-    return i
+  return i
 
 def tee(iterable, *Qs):
   ''' A generator yielding the items from an iterable
@@ -645,7 +644,9 @@ def skip_map(func, *iterables, except_types, quiet=False):
       try:
         yield func(item)
       except except_types as e:
-        quiet or warning("skip_map(func=%s): item=%s: skip exception: %s", func, item,e)
+        quiet or warning(
+            "skip_map(func=%s): item=%s: skip exception: %s", func, item, e
+        )
 
 if __name__ == '__main__':
   import sys
