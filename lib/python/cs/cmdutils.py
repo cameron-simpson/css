@@ -1272,12 +1272,14 @@ class BaseCommand:
         return 2
       raise
 
-  @classmethod
-  def cmdloop(cls, intro=None):
+  def cmdloop(self, intro=None):
     ''' Use `cmd.Cmd` to run a command loop which calls the `cmd_`* methods.
     '''
+    if not sys.stdin.isatty():
+      raise GetoptError("input is not a tty")
     # TODO: get intro from usage/help
-    cmdobj = BaseCommandCmd(cls)
+    cmdobj = BaseCommandCmd(self)
+    cmdobj.prompt = f'{self.cmd}> '
     cmdobj.cmdloop(intro)
 
   # pylint: disable=unused-argument
@@ -1473,41 +1475,39 @@ class BaseCommandCmd(Cmd):
       i.e. `cmd.Cmd.cmdloop`.
   '''
 
-  def __init__(self, command_class: BaseCommandSubType):
-    super().__init__()
-    self.command_class = command_class
-
   @typechecked
-  def _doarg(self, subcmd: str, arg: str):
-    cls = self.command_class
-    argv = shlex.split(arg)
-    command = cls([cls.__name__, subcmd] + argv)
-    with stackattrs(command, _subcmd=subcmd):
-      command.run()
+  def __init__(self, command: BaseCommandSubType):
+    super().__init__()
+    self.__command = command
 
   def get_names(self):
-    cls = self.command_class
+    cmdcls = type(self.__command)
     names = []
-    for method_name in dir(cls):
-      if method_name.startswith(cls.SUBCOMMAND_METHOD_PREFIX):
-        subcmd = cutprefix(method_name, cls.SUBCOMMAND_METHOD_PREFIX)
+    for method_name in dir(cmdcls):
+      if method_name.startswith(cmdcls.SUBCOMMAND_METHOD_PREFIX):
+        subcmd = cutprefix(method_name, cmdcls.SUBCOMMAND_METHOD_PREFIX)
         names.append('do_' + subcmd)
         ##names.append('help_' + subcmd)
     return names
 
   def __getattr__(self, attr):
-    cls = self.command_class
+    command = self.__command
+    cmdcls = type(command)
     subcmd = cutprefix(attr, 'do_')
     if subcmd is not attr:
-      method_name = cls.SUBCOMMAND_METHOD_PREFIX + subcmd
+      method_name = command.SUBCOMMAND_METHOD_PREFIX + subcmd
       try:
-        method = getattr(cls, method_name)
+        method = getattr(command, method_name)
       except AttributeError:
         pass
       else:
-        do_subcmd = lambda arg: self._doarg(subcmd, arg)
+
+        def do_subcmd(arg: str):
+          argv = shlex.split(arg)
+          method(argv)
+
         do_subcmd.__name__ = attr
-        do_subcmd.__doc__ = method.__doc__.format(cmd=subcmd)
+        do_subcmd.__doc__ = command.subcommand_usage_text(subcmd)
         return do_subcmd
       if subcmd in ('EOF', 'exit', 'quit'):
         return lambda _: True
