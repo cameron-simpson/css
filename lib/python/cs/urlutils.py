@@ -70,6 +70,7 @@ from cs.logutils import debug, error, warning, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_iter
 from cs.rfc2616 import datetime_from_http_date
+from cs.seq import skip_map
 from cs.threads import locked, ThreadState, HasThreadState
 from cs.xml import etree  # ElementTree
 
@@ -627,35 +628,12 @@ def strip_whitespace(s):
   '''
   return ''.join([ch for ch in s if ch not in whitespace])
 
-def skip_errs(iterable):
-  ''' Iterate over `iterable` and yield its values.
-      If it raises URLError or HTTPError, report the error and skip the result.
+def skip_url_errs(func, *iterables, **skip_map_kw):
+  ''' A version of `cs.seq.skip_map` which skips `URLError` and `HTTPError`.
   '''
-  debug("skip_errs...")
-  it = iter(iterable)
-  while True:
-    try:
-      i = next(it)
-    except StopIteration:
-      break
-    except (URLError, HTTPError) as e:
-      warning("%s", e)
-    else:
-      debug("skip_errs: yield %r", i)
-      yield i
-
-def can_skip_url_errs(func):
-
-  def wrapped(self, *args, **kwargs):
-    mode = kwargs.pop('mode', self.mode)
-    if mode == URLs.MODE_SKIP:
-      return URLs(
-          skip_errs(func(self, *args, mode=URLs.MODE_RAISE, **kwargs)),
-          self.context, self.mode
-      )
-    return func(self, *args, mode=mode, **kwargs)
-
-  return wrapped
+  return skip_map(
+      func, *iterables, except_types=(URLError, HTTPError), **skip_map_kw
+  )
 
 class URLs(object):
 
@@ -696,34 +674,24 @@ class URLs(object):
       self.urls = list(self.urls)
     return self
 
-  @can_skip_url_errs
-  def map(self, func, mode=None):
-    return URLs([func(url) for url in self.urls], self.context, mode)
+  def map(self, func, mode=None) -> "URLs":
+    return URLs(skip_url_errs(func, self.urls), self.context, mode)
 
-  @can_skip_url_errs
   def hrefs(self, absolute=True, mode=None):
-    ''' Return an iterable of the `hrefs=` URLs from the content.
-    '''
     return URLs(
-        chain(
-            *[
-                pfx_iter(url,
-                         URL(url).hrefs(absolute=absolute))
-                for url in self.urls
-            ]
+        skip_url_errs(
+            lambda url: URL(url).hrefs(absolute=absolute),
+            self.urls,
         ), self.context, mode
     )
 
-  @can_skip_url_errs
   def srcs(self, absolute=True, mode=None):
     ''' Return an iterable of the `src=` URLs from the content.
     '''
     return URLs(
-        chain(
-            *[
-                pfx_iter(url,
-                         URL(url).srcs(absolute=absolute)) for url in self.urls
-            ]
+        skip_url_errs(
+            lambda url: URL(url).srcs(absolute=absolute),
+            self.urls,
         ), self.context, mode
     )
 
