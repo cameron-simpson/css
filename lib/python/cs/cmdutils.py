@@ -550,7 +550,7 @@ class BaseCommand:
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
-  SUBCOMMAND_ARGV_DEFAULT = None
+  SUBCOMMAND_ARGV_DEFAULT = 'shell'
   Options = BaseCommandOptions
 
   def __init_subclass__(cls):
@@ -690,7 +690,7 @@ class BaseCommand:
       else:
         # expect a subcommand on the command line
         if not argv:
-          default_argv = getattr(self, 'SUBCOMMAND_ARGV_DEFAULT', None)
+          default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
             short_usage = True
             raise GetoptError(
@@ -762,7 +762,7 @@ class BaseCommand:
       format_mapping = {}
     format_mapping.setdefault('cmd', cmd)
     subcmds = cls.subcommands()
-    has_subcmds = subcmds and list(subcmds) != ['help']
+    has_subcmds = subcmds and sorted(subcmds) != ['help', 'shell']
     usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     usage_format_mapping.update(format_mapping)
     usage_format = getattr(
