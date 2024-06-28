@@ -299,7 +299,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_edit(self, argv):
     ''' Usage: {cmd} [-ad] [path]
-          Edit the direct tagsets of path, default: '.'
+          Edit the direct tagsets of path, default: '.'.
           If path is a directory, provide the tags of its entries.
           Otherwise edit just the tags for path.
           -a    List all names in directory edit mode; normally
@@ -646,8 +646,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_cp(self, argv):
     ''' Usage: {cmd} [-finv] srcpath dstpath, {cmd} [-finv] srcpaths... dstdirpath
-          POSIX cp(1) equivalent, but also copying tags:
-          copy files and their tags into targetdir.
+          POSIX cp(1) equivalent, but also copying tags: copy files and their tags into targetdir.
           -f  Force: remove destination if it exists.
           -i  Interactive: fail if the destination exists.
           -n  No remove: fail if the destination exists.
@@ -657,8 +656,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_ln(self, argv):
     ''' Usage: {cmd} [-finv] srcpath dstpath, {cmd} [-finv] srcpaths... dstdirpath
-          POSIX ln(1) equivalent, but also copying the tags:
-          link files and their tags into targetdir.
+          POSIX ln(1) equivalent, but also copying the tags: link files and their tags into targetdir.
           -f  Force: remove destination if it exists.
           -i  Interactive: fail if the destination exists.
           -n  No remove: fail if the destination exists.
@@ -668,8 +666,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_mv(self, argv):
     ''' Usage: {cmd} [-finv] srcpath dstpath, {cmd} [-finv] srcpaths... dstdirpath
-          POSIX mv(1) equivalent, but also copying the tags:
-          move files and their tags into targetdir.
+          POSIX mv(1) equivalent, but also copying the tags: move files and their tags into targetdir.
           -f  Force: remove destination if it exists.
           -i  Interactive: fail if the destination exists.
           -n  No remove: fail if the destination exists.
@@ -900,6 +897,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_tagfile(self, argv):
     ''' Usage: {cmd} tagfile_path [subcommand ...]
+          Perform operations on a tag file.
           Subcommands:
             tag tagset_name {{tag[=value]|-tag}}...
               Directly modify tag_name within the tag file tagfile_path.
@@ -946,10 +944,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_tagpaths(self, argv):
     ''' Usage: {cmd} {{tag[=value]|-tag}} {{-|paths...}}
-        Tag multiple paths.
-        With the form "-tag", remove the tag from the immediate tags.
-        A single path named "-" indicates that paths should be read
-        from the standard input.
+          Tag multiple paths.
+          With the form "-tag", remove the tag from the immediate tags.
+          A single path named "-" indicates that paths should be read
+          from the standard input.
     '''
     badopts = False
     if not argv:
