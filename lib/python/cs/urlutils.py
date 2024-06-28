@@ -65,14 +65,13 @@ from typeguard import typechecked
 
 from cs.deco import cachedmethod, promote, Promotable
 from cs.excutils import logexc, safe_property
-from cs.lex import parseUC_sAttr
+from cs.lex import parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_iter
 from cs.rfc2616 import datetime_from_http_date
 from cs.seq import skip_map
 from cs.threads import locked, ThreadState, HasThreadState
-from cs.xml import etree  # ElementTree
 
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader
