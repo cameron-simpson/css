@@ -506,9 +506,8 @@ class BaseCommand:
           cmd_subthing = SubThingCommand
 
       Returning to methods, if there is a paragraph in the method docstring
-      commencing with `Usage:`
-      then that paragraph is incorporated automatically
-      into the main usage message.
+      commencing with `Usage:` then that paragraph is incorporated
+      into the main usage message automatically.
       Example:
 
           def cmd_ls(self, argv):
@@ -528,6 +527,10 @@ class BaseCommand:
         `opts` is an `(option,value)` sequence
         as returned by `getopot.getopt`.
         The default implementation iterates over these and calls `apply_opt`.
+      * `run_context()`:
+        a context manager to provide setup or teardown actions
+        to occur before and after the command implementation respectively,
+        such as to open and close a database.
       * `cmd_`*subcmd*`(argv)`:
         if the command line options are followed by an argument
         whose value is *subcmd*,
@@ -535,15 +538,8 @@ class BaseCommand:
         will be called where `subcmd_argv` contains the command line arguments
         following *subcmd*.
       * `main(argv)`:
-        if there are no command line arguments after the options
-        or the first argument does not have a corresponding
-        `cmd_`*subcmd* method
-        then method `main(argv)`
+        if there are no `cmd_`*subcmd*` methods then method `main(argv)`
         will be called where `argv` contains the command line arguments.
-      * `run_context()`:
-        a context manager to provide setup or teardown actions
-        to occur before and after the command implementation respectively,
-        such as to open and close a database.
 
       Editorial: why not arparse?
       Primarily because when incorrectly invoked
