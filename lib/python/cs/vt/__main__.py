@@ -1022,13 +1022,13 @@ class VTCmd(BaseCommand):
     except ImportError:
       import profile
     if not argv:
-      cmd_method = None
+      subcmd = 'shell'
     else:
       subcmd = argv.pop(0)
-      try:
-        cmd_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
-      except AttributeError:
-        raise GetoptError("no subcommand %r" % (subcmd,))
+    try:
+      cmd_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
+    except AttributeError:
+      raise GetoptError("no subcommand %r" % (subcmd,))
     P = profile.Profile()
     P.enable()
     try:
