@@ -24,7 +24,6 @@ from types import SimpleNamespace as NS
 from typing import Optional
 from uuid import UUID
 
-from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.fs import shortpath
 from cs.later import Later
