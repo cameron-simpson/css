@@ -740,13 +740,14 @@ def trace(
         result = traced_generator()
       else:
         ##xlog("%sRETURN %s <= %s", _trace_state.indent, type(result), log_cite)
-        xlog(
-            "%sRETURN %gs %s <= %s",
-            _trace_state.indent,
-            end_time - start_time,
-            s(result),
-            log_cite,
-        )
+        if retval:
+          xlog(
+              "%sRETURN %gs %s <= %s",
+              _trace_state.indent,
+              end_time - start_time,
+              s(result),
+              log_cite,
+          )
       _trace_state.indent = old_indent
       return result
 
