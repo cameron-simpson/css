@@ -300,7 +300,7 @@ class PlayOnCommand(BaseCommand):
         elif opt == '-n':
           no_download = True
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if not argv:
       argv = ['pending']
     api = options.api
@@ -404,7 +404,7 @@ class PlayOnCommand(BaseCommand):
       elif opt == '-o':
         listing_format = val
       else:
-        raise RuntimeError("unhandled option: %r" % (opt,))
+        raise NotImplementedError("unhandled option: %r" % (opt,))
     if not argv:
       argv = list(default_argv)
     xit = 0

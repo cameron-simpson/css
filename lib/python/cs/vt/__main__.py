@@ -324,7 +324,7 @@ class VTCmd(BaseCommand):
         # verbose: not quiet
         options.verbose = True
       else:
-        raise RuntimeError("unhandled option: %s" % (opt,))
+        raise NotImplementedError("unhandled option: %s" % (opt,))
     if options.verbose:
       self.loginfo.level = logging.INFO
     if options.dflt_log is not None:

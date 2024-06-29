@@ -469,7 +469,7 @@ class TimeSeriesBaseCommand(BaseCommand, ABC):
       )  # pylint: too-many-function-args.disable=missing-kwoa
       figure = (ax[0] if options.multi else ax).figure
     else:
-      raise RuntimeError("unhandled type %s" % (s(ts),))
+      raise NotImplementedError("unhandled type %s" % (s(ts),))
     if runstate.cancelled:
       return 1
     if bare:
@@ -520,7 +520,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
         raise GetoptError("ts-step must be >0, got %s" % (ts_step,))
       self.options.ts_step = ts_step
     else:
-      raise RuntimeError("unhandled option")
+      raise NotImplementedError("unhandled option")
 
   def apply_preargv(self, argv):
     ''' Parse a leading time series filesystem path from `argv`,

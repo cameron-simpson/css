@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from fnmatch import fnmatch
-from functools import cached_property
+from functools import cache, cached_property
 from getopt import GetoptError
 from glob import glob
 import importlib
@@ -44,7 +44,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.fs import atomic_directory, rpaths
+from cs.fs import atomic_directory, scandirpaths
 from cs.lex import (
     cutsuffix,
     get_identifier,
@@ -52,7 +52,7 @@ from cs.lex import (
     is_dotted_identifier,
     is_identifier,
 )
-from cs.logutils import error, warning, info, status, trace
+from cs.logutils import error, warning, info, status
 from cs.numeric import intif
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
@@ -169,7 +169,7 @@ class CSReleaseCommand(BaseCommand):
       elif opt == '-v':
         options.verbose = True
       else:
-        raise RuntimeError("unhandled option: %s" % (opt,))
+        raise NotImplementedError("unhandled option: %s" % (opt,))
 
   @contextmanager
   def run_context(self):
@@ -703,6 +703,10 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
       )
       if not module_name:
         raise ValueError('module_name is not a dotted identifier')
+      if requirement_spec.startswith('[', offset):
+        close_pos = requirement_spec.find(']', offset + 1)
+        if close_pos > offset:
+          offset = close_pos + 1
       if offset == len(requirement_spec):
         op = None
       else:
@@ -890,6 +894,8 @@ class Module:
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.name)
+
+  __repr__ = __str__
 
   @property
   def vcs(self):
@@ -1498,6 +1504,7 @@ class Module:
       return joinpath(basepath, '__init__.py')
     return basepath + '.py'
 
+  @cache
   @pfx_method(use_str=True)
   def paths(self, top_dirpath='.'):
     ''' Return a list of the paths associated with this package
@@ -1507,28 +1514,29 @@ class Module:
         of some revision because "hg archive" complains if globs
         match no paths, and aborts.
     '''
-    skip_suffixes = '.pyc', '.o', '.orig', '.so'
+    skip_suffixes = 'pyc', 'o', 'orig', 'so'
     basepath = self.basepath
     if top_dirpath:
       basepath = normpath(joinpath(top_dirpath, basepath))
     if isdirpath(basepath):
-      pathlist = [
-          joinpath(basepath, rpath) for rpath in
-          rpaths(basepath, skip_suffixes=skip_suffixes, sort_names=True)
-      ]
+      pathlist = list(
+          scandirpaths(
+              basepath,
+              skip_suffixes=skip_suffixes,
+              sort_names=True,
+          )
+      )
     else:
       updir = dirname(basepath)
       base_ = basename(basepath) + '.'
-      pathlist = []
-      for dirent in sorted(pfx_call(os.scandir, updir), key=lambda d: d.name):
-        if not dirent.is_file(follow_symlinks=False):
-          continue
-        filename = dirent.name
-        if not filename.startswith(base_):
-          continue
-        if filename.endswith(skip_suffixes):
-          continue
-        pathlist.append(relpath(joinpath(updir, filename), top_dirpath))
+      pathlist = list(
+          scandirpaths(
+              updir,
+              skip_suffixes=skip_suffixes,
+              name_selector=lambda name: name.startswith(base_),
+              sort_names=True,
+          )
+      )
     if not pathlist:
       raise ValueError("no paths for %s" % (self,))
     return pathlist
@@ -1676,6 +1684,7 @@ class Module:
     return self.DISTINFO.get('install_requires', [])
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  @cache
   @uses_runstate
   @pfx_method(use_str=True)
   def problems(self, *, runstate=RunState):
@@ -1946,7 +1955,6 @@ class Module:
   def prepare_dist(self, pkg_dir, vcs_version):
     ''' Run "python3 -m build ." inside `pkg_dir`, making files in `dist/`.
     '''
-    distdir = joinpath(pkg_dir, 'dist')
     sdist_rpath = f'dist/{vcs_version}.tar.gz'
     wheel_rpath = f'dist/{vcs_version}-py3-none-any.whl'
     cd_run(

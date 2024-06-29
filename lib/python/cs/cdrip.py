@@ -286,7 +286,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         elif opt == '-R':
           do_refresh = True
         else:
-          raise RuntimeError("unimplemented option")
+          raise NotImplementedError("unimplemented option")
     if not argv:
       if mbdb.dev_info:
         argv = ['disc.' + mbdb.dev_info.id]

@@ -1,5 +1,10 @@
-rename Store.connected to Store.active T v
-StreamStore,TCPStore etc: use the new "on demand" PacketConnection mode
+setvar: not expanding leading $MANPATH etc
+bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
+cs.jsonutils: merge the various JSON utility functions?
+merge the variable jsonable functions?
+cs.binary: _BinaryMultiValue_Base.for_json: use jsonable?
+contextif: bypass the callable check if cmgr has .__enter__
+atomic_filename: use the O_EXCL tick for reliable rename-to-target stuff?
 RunState.notify_cancel: use the FSM notification system
 cs.fsm: why is the default state a per-thread perthread_state.initial_state d
 cs.cmdutils: solidify the thread wide runstate setup in run_context after merging the playon branch

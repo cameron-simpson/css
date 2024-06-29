@@ -1,0 +1,1 @@
+lib/python/cs/delta.py: cs.*: changes to accomodate dropping BaseCommandOptions.runstate

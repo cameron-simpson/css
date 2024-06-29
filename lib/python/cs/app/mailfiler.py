@@ -164,7 +164,7 @@ class MailFilerCommand(BaseCommand):
     if opt == '-R':
       self.options.rules_pattern = val
     else:
-      raise RuntimeError("unhandled option: %s %r" % (opt, val))
+      raise NotImplementedError("unhandled option: %s %r" % (opt, val))
 
   def cmd_monitor(self, argv):
     ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]

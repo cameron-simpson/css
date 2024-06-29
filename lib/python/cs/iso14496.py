@@ -282,7 +282,7 @@ class MP4Command(BaseCommand):
         if option in ('-p', '--prefix'):
           tag_prefix = value
         else:
-          raise RuntimeError("unsupported option")
+          raise NotImplementedError("unsupported option")
     if not argv:
       raise GetoptError("missing path")
     path = argv.pop(0)
@@ -1542,7 +1542,7 @@ class MDHDBoxBody(FullBoxBody):
       self.parse_field('timescale', bfr, UInt32BE)
       self.parse_field('duration', bfr, UInt64BE)
     else:
-      raise RuntimeError("unsupported version %d" % (self.version,))
+      raise NotImplementedError("unsupported version %d" % (self.version,))
     self.parse_field('language_short', bfr, UInt16BE)
     self.parse_field('pre_defined', bfr, UInt16BE)
 
