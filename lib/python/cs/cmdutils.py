@@ -46,7 +46,7 @@ from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
 from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
-from cs.upd import Upd, uses_upd
+from cs.upd import Upd, uses_upd, print
 
 __version__ = '20240519-post'
 
@@ -1445,11 +1445,13 @@ class BaseCommand:
         self.usage_text(short=short, show_subcmds=show_subcmds or None)
     )
 
-  def cmd_shell(self, argv):
+  @uses_upd
+  def cmd_shell(self, argv, *, upd: Upd):
     ''' Usage: {cmd}
           Run a command prompt via cmd.Cmd using this command's subcommands.
     '''
-    self.cmdloop()
+    with upd.without():
+      self.cmdloop()
 
   def repl(self, *argv, banner=None, local=None):
     ''' Run an interactive Python prompt with some predefined local names.
