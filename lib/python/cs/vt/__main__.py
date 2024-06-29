@@ -466,7 +466,7 @@ class VTCmd(BaseCommand):
       elif mode == 'read':
         if argv:
           raise GetoptError(f'extra arguments: {argv!r}')
-        for chunk in progressbar(
+        for _ in progressbar(
             inbfr,
             label=mode,
             itemlenfunc=len,
@@ -479,10 +479,14 @@ class VTCmd(BaseCommand):
         if argv:
           raise GetoptError(f'extra arguments: {argv!r}')
         last_offset = 0
+
+        def itemlenfunc(scan_offset):
+          return scan_offset - last_offset
+
         for offset in progressbar(
             scan_offsets(inbfr),
             label=mode,
-            itemlenfunc=lambda scan_offset: scan_offset - last_offset,
+            itemlenfunc=itemlenfunc,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
             report_print=True,
