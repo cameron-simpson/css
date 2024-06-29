@@ -105,7 +105,7 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
           if subspan == 0:
             block_type = BlockType.BT_LITERAL
         else:
-          raise ValueError("unknow block type")
+          raise ValueError("unknown block type")
         self.assertEqual(
             B.type, block_type, "new Block is wrong type: %r, should be %r" % (
                 B.type,
