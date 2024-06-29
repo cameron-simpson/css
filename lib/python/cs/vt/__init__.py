@@ -708,9 +708,14 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       # missing hash, incomplete
       return False
     from .block import IndirectBlock  # pylint:disable=import-outside-toplevel
-    IB = IndirectBlock.from_subblocks_data(subblocks_data)
+    IB = IndirectBlock.from_subblocks_data(subblocks_data, force=True)
     for subblock in IB.subblocks:
-      h = subblock.hashcode
+      try:
+        h = subblock.hashcode
+      except AttributeError:
+        # no hashcode, so data are present in the Block directly
+        # thus complete
+        continue
       if h not in self:
         # missing hash, incomplete
         return False
