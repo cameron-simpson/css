@@ -667,16 +667,26 @@ class HashCodeBlock(Block, prefix='B'):
       else:
         from . import Store
         S = Store.default()
-        if hashcode is None:
-          hashcode = S.hash(data)
+        if True:
+          # Synchronous add:
+          # The async add below was breaking some tests which checked
+          # for the presence of the new Block.
+          add_h = S.add(data)
+          if hashcode is None:
+            hashcode = add_h
+          else:
+            assert hashcode == add_h
         else:
-          if not isinstance(hashcode, S.hashclass):
-            raise TypeError(
-                f'HashCodeBlock(hashcode={hashcode},...):'
-                f' does not match S:{S} hashclass {S.hashclass}'
-            )
-          assert hashcode == S.hash(data)
-        S.add_bg(data)
+          if hashcode is None:
+            hashcode = S.hash(data)
+          else:
+            if not isinstance(hashcode, S.hashclass):
+              raise TypeError(
+                  f'HashCodeBlock(hashcode={hashcode},...):'
+                  f' does not match S:{S} hashclass {S.hashclass}'
+              )
+            assert hashcode == S.hash(data)
+          S.add_bg(data)
     self._data = data
     self._span = span
     Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
