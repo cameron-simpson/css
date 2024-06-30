@@ -30,7 +30,7 @@ from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20240522-post'
+__version__ = '20240630'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
