@@ -7,10 +7,11 @@
 r'''
 Assorted debugging facilities.
 
-If the environment variable $CS_DEBUG_BUILTINS is set to a comma
+If the environment variable `$CS_DEBUG_BUILTINS` is set to a comma
 separated list of names then the `builtins` module will be monkey
 patched with those names, enabling trite debug use of those names
 anywhere in the code provided this module has been imported somewhere.
+
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
 * `breakpoint`: `cs.upd.breakpoint`
