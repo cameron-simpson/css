@@ -6,7 +6,7 @@ line-length = 78
 indent-width = 2
 
 [lint]
-select = ["E4", "E7", "E9", "F", "B", "Q", "C90"]
+select = ["E4", "E7", "E9", "F", "B", "PL", "Q", "C90"]
 ignore = [ "B904", "E731", "Q000", "Q002" ]
 flake8-quotes.docstring-quotes = "single"
 flake8-quotes.inline-quotes = "double"

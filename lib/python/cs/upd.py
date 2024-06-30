@@ -75,7 +75,7 @@ from threading import RLock, Thread
 import time
 from typing import Optional, Union
 
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.deco import decorator, default_params, fmtdoc
 from cs.gimmicks import open_append, warning
 from cs.lex import unctrl
@@ -944,7 +944,6 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           (label, tick_delay)
       )
     with self.insert(1, prefix=label + ' ') as proxy:
-      ticker_runstate = None
       if tick_delay > 0:
         cancel_ticker = False
 
@@ -995,16 +994,36 @@ def out(msg, *a, upd, **outkw):
 @decorator
 def without(func):
   ''' A decorator to withdraw the current `Upd` (if any) while running `func`.
+
+      Example:
+
+          @without
+          def run_shcmd(shcmd):
+            print("running shell command", repr(shcmd))
+            return os.system(shcmd)
   '''
 
   def _without_upd_wrapper(*a, **kw):
     upd = Upd.default()
-    if upd is None or upd.disabled:
+    if upd is None:
       return func(*a, **kw)
     with upd.above():
       return func(*a, **kw)
 
   return _without_upd_wrapper
+
+@uses_upd
+def above(*, upd: Upd):
+  ''' Context manager withdraw the `Upd` while something runs.
+
+      Example:
+
+          from cs.upd import above as above_upd
+          ...
+          with above_upd():
+              os.system('ls -la')
+  '''
+  return contextif(None if upd is None else upd.above())
 
 # pylint: disable=redefined-builtin
 breakpoint = without(builtin_breakpoint)
@@ -1290,21 +1309,6 @@ def with_upd_proxy(func, prefix=None, insert_at=1):
         return func(*a, upd_proxy=proxy, **kw)
 
   return upd_with_proxy_wrapper
-
-@contextmanager
-@uses_upd
-def without(*, upd: Upd):
-  ''' Context manager withdraw the `Upd` while something runs.
-
-      Example:
-
-          from cs.upd import without
-          ...
-          with without():
-              os.system('ls -la')
-  '''
-  with upd.above():
-    yield upd
 
 # Always create a default Upd() in open state.
 # Keep a module level name, which avoids the singleton weakref array

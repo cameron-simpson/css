@@ -643,12 +643,15 @@ class Progress(BaseProgress):
     self._flushed = True
 
   def __repr__(self):
-    return "%s(name=%r,start=%s,position=%s,start_time=%s,throughput_window=%s,total=%s):%r" \
-        % (
-            type(self).__name__, self.name,
-            self.start, self.position, self.start_time,
-            self.throughput_window, self.total,
-            self._positions)
+    return "%s(name=%r,start=%s,position=%s,start_time=%s,throughput_window=%s,total=%s)" % (
+        type(self).__name__,
+        self.name,
+        self.start,
+        self.position,
+        self.start_time,
+        self.throughput_window,
+        self.total,
+    )
 
   def _updated(self):
     datum = self.latest

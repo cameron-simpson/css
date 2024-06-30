@@ -332,13 +332,12 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
 
     '''
     if '_lock' in self.__dict__:
-      return False
+      return
     fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
     if lock is None:
       lock = Lock()
     self._lock = lock
-    return True
 
 SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 

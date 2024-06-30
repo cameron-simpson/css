@@ -6,7 +6,6 @@
 from collections.abc import Mapping, MutableMapping
 from contextlib import contextmanager
 from os import SEEK_END, lseek, write, pread, close as closefd
-from os.path import isfile as isfilepath, splitext
 from threading import RLock
 from zlib import compress, decompress
 
@@ -19,12 +18,10 @@ from cs.binary import (
 )
 from cs.fileutils import shortpath
 from cs.lex import cropped_repr
-from cs.logutils import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import pfx_method
 from cs.resources import MultiOpenMixin, openif
 
-from .hash import HashCode, HashCodeUtilsMixin, DEFAULT_HASHCLASS
-from .index import choose as choose_indexclass
+from .hash import HashCode, HashCodeUtilsMixin
 from .util import openfd_append, openfd_read
 
 class BackingFileIndexEntry(BinaryMultiValue('BackingFileIndexEntry',

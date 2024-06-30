@@ -5,7 +5,7 @@
 
 from collections import defaultdict, namedtuple
 from itertools import chain
-from threading import Lock
+from threading import Lock, Thread
 import time
 from typing import Optional, TypeVar
 
@@ -48,6 +48,30 @@ class FSMError(Exception):
   def __init__(self, msg: str, fsm: Optional[FSMSubType] = None):
     super().__init__(msg)
     self.fsm = fsm
+
+class CancellationError(FSMError):
+  ''' Subclass of `FSMError` Raised when trying to make use of an
+      `FSM` which is cancelled.
+
+      For example, this is raised by a `cs.result.Result`
+      when accessing `.result` or `.exc_info` after cancellation.
+  '''
+
+  def __init__(self, message=None, *, fsm=None, **kw):
+    ''' Initialise the `CancellationError`.
+
+        The optional `message` parameter (default `"cancelled"`)
+        is set as the `message` attribute.
+        Other keyword parameters set their matching attributes.
+    '''
+    if message is None:
+      message = "cancelled"
+    elif not isinstance(message, str):
+      message = 'cancelled: ' + str(message)
+    super().__init__(message, fsm=fsm)
+    self.message = message
+    for k, v in kw.items():
+      setattr(self, k, v)
 
 FSMTransitionEvent = namedtuple(
     'FSMTransitionEvent', 'old_state new_state event when extra'
@@ -209,10 +233,17 @@ class FSM(DOTNodeMixin):
         * `event`: the `event`
         * `when`: a UNIX timestamp from `time.time()`
         * `extra`: a `dict` with the `extra` information
+
         If `self.fsm_history` is not `None`,
         `transition` is appended to it.
+
         If there are callbacks for `new_state` or `FSM.FSM_ANY_STATE`,
         call each callback as `callback(self,transition)`.
+
+        *Important note*: the callbacks are run in series in the
+        current `Thread`.  If you need to dispatch a long running
+        activity from a state transtion, the callback should still
+        return promptly.
     '''
     with self.__lock:
       old_state = self.fsm_state
@@ -232,11 +263,19 @@ class FSM(DOTNodeMixin):
       )
       if self.fsm_history is not None:
         self.fsm_history.append(transition)
-    with Pfx("%s->%s", old_state, new_state):
+    with Pfx(
+        "fsm_event: run callbacks %s->%s->%s",
+        old_state,
+        event,
+        new_state,
+    ):
       for callback in (self.__callbacks[FSM.FSM_ANY_STATE] +
                        self.__callbacks[new_state]):
         try:
           pfx_call(callback, self, transition)
+        except CancellationError:
+          # ignore cancelled callbacks, eg an FSM instance in cancelled state
+          pass
         except Exception as e:  # pylint: disable=broad-except
           exception("exception from callback %s: %s", callback, e)
     return new_state
@@ -285,7 +324,7 @@ class FSM(DOTNodeMixin):
       sep='\n',
       graph_name=None,
       history_style=None
-  ):
+  ) -> str:
     ''' Compute a DOT syntax graph description from a transitions dictionary.
 
         Parameters:
@@ -338,7 +377,7 @@ class FSM(DOTNodeMixin):
     return sep.join(dot)
 
   @property
-  def fsm_dot(self):
+  def fsm_dot(self) -> str:
     ''' A DOT syntax description of `self.FSM_TRANSITIONS`.
     '''
     return self.fsm_transitions_as_dot(self.FSM_TRANSITIONS)
@@ -357,7 +396,7 @@ class FSM(DOTNodeMixin):
     '''
     return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
 
-  def fsm_as_svg(self, layout=None, history_style=None, **dot_kw):
+  def fsm_as_svg(self, layout=None, history_style=None, **dot_kw) -> str:
     ''' Render the state transition diagram as SVG. '''
     return gvsvg(
         self.fsm_transitions_as_dot(history_style=history_style),
@@ -366,7 +405,7 @@ class FSM(DOTNodeMixin):
     )
 
   @property
-  def fsm_svg(self):
+  def fsm_svg(self) -> str:
     ''' The state transition diagram as SVG. '''
     return self.fsm_as_svg()
 

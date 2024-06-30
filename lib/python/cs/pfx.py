@@ -42,7 +42,7 @@ but used with a little discretion produces far more debuggable results.
 from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
-from inspect import isgeneratorfunction
+from inspect import isclass, isgeneratorfunction
 import logging
 import sys
 import threading
@@ -703,7 +703,10 @@ def pfx_method(method, use_str=False, with_args=False):
   def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
-    classref = self if use_str else type(self).__name__
+    classref = (
+        self
+        if use_str else self.__name__ if isclass(self) else type(self).__name__
+    )
     pfxfmt, pfxargs = func_a_kw_fmt(method, *a, **kw)
     with Pfx("%s." + pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)

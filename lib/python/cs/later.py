@@ -37,7 +37,7 @@ from heapq import heappush, heappop
 from itertools import zip_longest
 import logging
 import sys
-from threading import Lock, Event
+from threading import Lock, Event, current_thread
 import time
 from typing import Callable, Iterable, Optional
 
@@ -88,7 +88,7 @@ DEFAULT_RETRY_DELAY = 0.1
 uses_later = default_params(later=lambda: Later.default())
 
 def defer(func, *a, **kw):
-  ''' Queue a function using the current default Later.
+  ''' Queue a function using the current default `Later`.
       Return the `LateFunction`.
   '''
   return Later.default().defer(func, *a, **kw)  # pylint: disable=no-member
@@ -221,19 +221,22 @@ class LateFunction(Result):
       TODO: .cancel(), timeout for wait().
   '''
 
-  def __init__(self, func, name=None, retry_delay=None):
+  def __init__(self, func, name=None, *, daemon=None, retry_delay=None):
     ''' Initialise a `LateFunction`.
 
         Parameters:
-        * `func` is the callable for later execution.
-        * `name`, if supplied, specifies an identifying name for the `LateFunction`.
-        * `retry_local`: time delay before retry of this function on RetryError.
-          Default from `later.retry_delay`.
+        * `func`: the callable for later execution.
+        * `name`: optional identifying name for the `LateFunction`.
+        * `daemon`: optional daemon mode for the `Thread`
+        * `retry_local`: optional time delay before retry of this
+          function on `RetryError`.  Default from `later.retry_delay`.
     '''
-    Result.__init__(self)
+    super().__init__()
     self.func = func
     if name is None:
       name = "LF-%d[%s]" % (seq(), funcname(func))
+    if daemon is None:
+      daemon = current_thread().daemon
     if retry_delay is None:
       retry_delay = DEFAULT_RETRY_DELAY
     self.name = name
@@ -242,6 +245,7 @@ class LateFunction(Result):
     self.thread = HasThreadState.Thread(
         name=name,
         target=partial(self.run_func, func),
+        daemon=daemon,
     )
 
   def __str__(self):
@@ -390,8 +394,10 @@ class Later(MultiOpenMixin, HasThreadState):
         # - dispatch a Thread to wait for completion and fire the
         #   finished_event Event
         # queue final action to mark activity completion
-        self.defer(
+        self.submit(
             self.finished_event.set,
+            f'{self.__class__.__name__}:{self.name}:finished_event.set',
+            daemon=True,
             _force_submit=True,
         )
         if self._timerQ:
@@ -424,7 +430,7 @@ class Later(MultiOpenMixin, HasThreadState):
     return LF
 
   def _complete_LF(self, LF):
-    ''' Process a completed `LateFunction`: remove from .running,
+    ''' Process a completed `LateFunction`: remove from `.running`,
         try to dispatch another function.
     '''
     with self._lock:
@@ -612,34 +618,29 @@ class Later(MultiOpenMixin, HasThreadState):
   def submit(
       self,
       func,
+      name: Optional[str] = None,
+      *,
+      daemon=None,
       priority=None,
       delay=None,
       when=None,
-      name=None,
       pfx=None,  # pylint: disable=redefined-outer-name
       LF=None,
       retry_delay=None,
-  ):
+  ) -> LateFunction:
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding `LateFunction` for result collection.
 
-        If the parameter `priority` is not None then use it as the priority
-        otherwise use the default priority.
-
-        If the parameter `delay` is not None, delay consideration of
-        this function until `delay` seconds from now.
-
-        If the parameter `when` is not None, delay consideration of
-        this function until the time `when`.
+        Parameters:
+        * `func`: the callable to submit
+        * `name`: an optional name for the resulting `LateFunction`
+        * `daemon`: optional daemon mode for the `Thread`
+        * `priority`: optional priority
+        * `delay`: optional delay in seconds before the function is dispatchable
+        * `when`: optional UNIX time when the function becomes dispatchable
+        * `pfx`: optional `Pfx` prefix
+        * `LF`: optional `LateFunction` to associate with `func`
         It is an error to specify both `when` and `delay`.
-
-        If the parameter `name` is not None, use it to name the `LateFunction`.
-
-        If the parameter `pfx` is not None, submit pfx.partial(func);
-          see the cs.logutils.Pfx.partial method for details.
-
-        If the parameter `LF` is not None, construct a new `LateFunction` to
-          track function completion.
     '''
     if delay is not None and when is not None:
       raise ValueError(
@@ -655,6 +656,7 @@ class Later(MultiOpenMixin, HasThreadState):
       LF = LateFunction(
           func,
           name=name,
+          daemon=daemon,
           retry_delay=retry_delay,
       )
     pri_entry = list(priority)
@@ -739,21 +741,28 @@ class Later(MultiOpenMixin, HasThreadState):
     '''
     # snapshot the arguments as supplied
     # note; a shallow snapshot
-    if a:
-      a = list(a)
+    a = list(a)
     if kw:
       kw = dict(kw)
-    params = {}
+    submit_kw = {}
     # pop off leading parameters before the function
     while not callable(func):
       if isinstance(func, str):
-        params['name'] = func
+        submit_kw['name'] = func
       else:
-        params.update(func)
+        # should be a mapping of submit parameters
+        submit_kw.update(func)
       func = a.pop(0)
+    # remaining arguments are glommed onto the function
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = self.submit(func, _force_submit=True, **params)  # pylint: disable=unexpected-keyword-arg
+    # The submittable check eats the _force_submit parameter
+    # so we supply it as True here to proceed with .submit().
+    LF = self.submit(
+        func,
+        _force_submit=True,
+        **submit_kw,
+    )  # pylint: disable=unexpected-keyword-arg
     return LF
 
   def with_result_of(self, callable1, func, *a, **kw):

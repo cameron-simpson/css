@@ -26,7 +26,7 @@ from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import funccite
-from cs.py.stack import caller, frames as stack_frames, StackSummary
+from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
 
@@ -58,9 +58,10 @@ class ClosedError(Exception):
   ''' Exception for operations invalid when something is closed.
   '''
 
+@decorator
 def not_closed(func):
-  ''' Decorator to wrap methods of objects with a .closed property
-      which should raise when self.closed.
+  ''' A decorator to wrap methods of objects with a `.closed` property
+      which should raise when `self.closed`.
   '''
 
   def not_closed_wrapper(self, *a, **kw):
@@ -72,7 +73,6 @@ def not_closed(func):
       )
     return func(self, *a, **kw)
 
-  not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
@@ -136,7 +136,11 @@ class _MultiOpenMixinOpenCloseState:
       opens = self.opens
       if opens < 1:
         error("%s: UNDERFLOW CLOSE from %s", self, caller())
-        error("  final close was from %s", self.final_close_from)
+        final_close_from = self.final_close_from
+        if not final_close_from:
+          warning("  no self.final_close_from recorded")
+        else:
+          error("  final close was from %s", self.final_close_from)
         for frame_key in sorted(self.opens_from.keys()):
           error(
               "  opened from %s %d times", frame_key,
@@ -147,7 +151,7 @@ class _MultiOpenMixinOpenCloseState:
       self.opens = opens
       if opens == 0:
         ##INACTIVE##self.tcm_dump(MultiOpenMixin)
-        self.final_close_from = caller_frame
+        self.final_close_from = caller_frame or caller()
         teardown, self._teardown = self._teardown, None
         retval = teardown()
         self.join_lock.release()
@@ -575,6 +579,7 @@ class RunState(FSM, HasThreadState):
   FSM_TRANSITIONS = {
       'IDLE': {
           'start': 'RUNNING',
+          'cancel': 'IDLE',
       },
       'RUNNING': {
           'cancel': 'STOPPING',
@@ -586,6 +591,7 @@ class RunState(FSM, HasThreadState):
       },
       'STOPPED': {
           'start': 'RUNNING',
+          'cancel': 'STOPPED',
       },
   }
 

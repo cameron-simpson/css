@@ -10,6 +10,7 @@ from inspect import (
     signature
 )
 from itertools import chain
+
 from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx
@@ -23,7 +24,13 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py.modules'],
+    'install_requires': [
+        'cs.cmdutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.modules',
+    ],
 }
 
 def is_dunder(name):
@@ -54,7 +61,7 @@ def module_doc(
     module_name = module
     with Pfx("import_module(%r)", module_name):
       module = importlib.import_module(module_name)
-  full_doc = obj_docstring(module)
+  full_docs = [obj_docstring(module)]
   ALL = getattr(module, '__all__', None)
   for Mname, obj in sorted(module_attributes(module), key=sort_key):
     with Pfx(Mname):
@@ -69,14 +76,15 @@ def module_doc(
       obj_doc = obj_docstring(obj) if obj_module else ''
       if not callable(obj):
         if obj_doc:
-          full_doc += f'\n\n## `{Mname} = {obj!r}`\n\n{obj_doc}'
+          full_docs.append(f'\n\n## `{Mname} = {obj!r}`\n\n{obj_doc}')
         continue
       if not obj_doc:
         continue
       if isfunction(obj):
         sig = signature(obj)
-        full_doc += f'\n\n## Function `{Mname}{sig}`\n\n{obj_doc}'
+        full_docs.append(f'\n\n## Function `{Mname}{sig}`\n\n{obj_doc}')
       elif isclass(obj):
+        from cs.cmdutils import BaseCommand
         classname_etc = Mname
         mro_names = []
         mro_set = set(obj.__mro__)
@@ -94,6 +102,10 @@ def module_doc(
         if mro_names:
           classname_etc += '(' + ', '.join(mro_names) + ')'
           ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
+        full_docs.append(f'\n\n## Class `{classname_etc}`\n\n{obj_doc}')
+        if issubclass(obj, BaseCommand):
+          full_docs.append("\n\nUsage summary:\n\n    ")
+          full_docs.append("\n    ".join(obj.usage_text().split("\n")))
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order
@@ -134,20 +146,22 @@ def module_doc(
           # Class.name is a function, not a method
           if ismethod(attr) or isfunction(attr):
             method_sig = signature(attr)
-            obj_doc += f'\n\n*Method `{Mname}.{attr_name}{method_sig}`*:\n{attr_doc}'
+            full_docs.append(
+                f'\n\n*Method `{Mname}.{attr_name}{method_sig}`*:\n{attr_doc}'
+            )
           elif isdatadescriptor(attr):
-            obj_doc += f'\n\n*Property `{Mname}.{attr_name}`*:\n{attr_doc}'
+            full_docs.append(
+                f'\n\n*Property `{Mname}.{attr_name}`*:\n{attr_doc}'
+            )
           elif not callable(attr):
-            ##obj_doc += f'\n\n*`{Mname}.{attr_name} = {repr(attr)}`*:\n{attr_doc}'
             pass
           elif isinstance(attr, property):
-            obj_doc += f'\n\n*`{Mname}.{attr_name}`*:\n{attr_doc}'
+            full_docs.append(f'\n\n*`{Mname}.{attr_name}`*:\n{attr_doc}')
           else:
-            obj_doc += f'\n\n*`{Mname}.{attr_name}`*'
-        full_doc += f'\n\n## Class `{classname_etc}`\n\n{obj_doc}'
+            full_docs.append(f'\n\n*`{Mname}.{attr_name}`*')
       else:
         warning("UNHANDLED %r, neither function nor class", Mname)
-  return full_doc
+  return ''.join(full_docs)
 
 def obj_docstring(obj):
   ''' Return a docstring for `obj` which has been passed through `stripped_dedent`.
