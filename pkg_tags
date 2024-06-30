@@ -91,7 +91,7 @@ cs.node
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release="20220606" ok_revision=b55e44581d06b3015d0203ca7fea5c063124469c features={"20220606":["intif"]}
 cs.obj pypi.release="20220918" ok_revision=dd0916cd678327c815e379bf8ed00c9ce4332874 features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"]}
-cs.packetstream pypi.release="20240412" ok_revision="1bc8c692373663edd0678222e3a7c30fd5292116"
+cs.packetstream pypi.release="20240412" ok_revision="1bc8c692373663edd0678222e3a7c30fd5292116" features={"20240630":["BaseRequest"]}
 cs.pdf
 cs.pfx pypi.release="20240630" ok_revision="0196eb4cba23c39b370d7f4f2f09996171216c39" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
 cs.pipeline pypi.release="20191007.1" ok_revision="2a26b6f06610394b6c7e6fb6f9a5228e50367db9"
