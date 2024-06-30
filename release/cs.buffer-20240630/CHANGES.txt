@@ -1,0 +1,10 @@
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: new optional .final_offset attribute indicating the anticipated largest offset, automatcially set for regular files - aids progress bars etc
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.promote: logic fix using early return, tweak __str__
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.extend: shuffle the progress bump, no semantic changes
+lib/python/cs/buffer.py: cs.buffer: drop cs.py3, get pread from os.pread, require python>=3.3
+lib/python/cs/buffer.py: cs.buffer: rename _Iterator to _FetchIterator for clarity
+lib/python/cs/buffer.py: cs.buffer: docstring updates, close a stray mmap
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.close: set self.bufs = None to release memory and prevent accidental late use
+lib/python/cs/buffer.py: cs.buffer: _FetchIterator: provide a mutex; SeekableIteratorMixin.seek, FDIterator.read,close: take the mutex
+lib/python/cs/buffer.py: cs.buffer: add missing import, add docstring
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.readline: se a raw string for the docstring because there is a literal \n in it
