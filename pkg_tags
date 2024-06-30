@@ -78,7 +78,7 @@ cs.kindle
 cs.kobo
 cs.later pypi.release="20240412" ok_revision="07da8e9970585aabc5f2c0779be26b2684edb3e5" features={"20240305":["Later__thread_states"]}
 cs.lex pypi.release="20240630" ok_revision=fe5c40c479ead8c4ad3ec12d970cedb46f00f997 features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"]}
-cs.logutils pypi.release="20230212" ok_revision="25c87f7972a7e2bbf45b0966da9a8b7a8c49fe53" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"]}
+cs.logutils pypi.release="20230212" ok_revision="25c87f7972a7e2bbf45b0966da9a8b7a8c49fe53" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"],"20240630":["LoggingState"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
 cs.mappingdb
 cs.mappings pypi.release="20231129" ok_revision=f149841cbe3f9e060ebe454155fb0b54215335e3 features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"]}
