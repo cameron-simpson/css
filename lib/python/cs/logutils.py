@@ -86,7 +86,7 @@ DISTINFO = {
         'cs.lex',
         'cs.pfx',
         'cs.py.func',
-        'cs.upd',
+        'cs.upd',  # done as a late import
     ],
 }
 
