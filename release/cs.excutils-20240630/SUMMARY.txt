@@ -1,0 +1,2 @@
+LogExceptions: new optinal `log` param for the lgging call.
+@logexc: use @decorator like other civilised decorators, pass decorator params to LogExceptions.
