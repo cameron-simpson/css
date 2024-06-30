@@ -1,4 +1,7 @@
+# architecture eg apple.x86_64.darwin
 :import ARCH
+# full path to python executable from a venv
+:import PYTHON_EXE
 
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
@@ -17,12 +20,13 @@ target  = bin
 
 dev = env-dev -d $. -x
 trace = set-x
-base_python = "$${PYTHON_EXE:-python3}"
-venv_dir = "$${VIRTUAL_ENV:-$./venv-$$ARCH}"
+base_python = $(PYTHON_EXE)
+base_pip = $(PYTHON_EXE) -m pip
+venv_dir = "$${TMPDIR:-/tmp}/venv--$(.F)--$(ARCH)"
 venv_requirements = $./venv-requirements.txt
 venv_pip = $(trace) $(venv_python) -m pip
 venv_python = $(trace) $(venv_dir)/bin/python
-uv = VIRTUAL_ENV=$(venv_dir) $(trace) uv
+uv = $(trace) env VIRTUAL_ENV=$(venv_dir) $(base_python) -m uv
 
 rewrite = rewriteif -0 -v
 
@@ -97,7 +101,13 @@ _setup:
     :make _tags _venv
 
 _venv:
-    [ -d $(venv_dir) ] || $(uv) venv --seed $(venv_dir)
+    set -x \
+    [ -d $(venv_dir) ] || { \
+        set -x \
+        $(base_python) -m ensurepip \
+        $(base_pip) install -U uv \
+        $(uv) venv --python $(base_python) --seed $(venv_dir) \
+    }
     uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
     if grep -i '^ *[a-z]' $(venv_requirements) >"$$uv_reqs" \
     then  $(uv) pip install -r "$$uv_reqs" \
