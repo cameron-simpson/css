@@ -31,7 +31,7 @@ cs.apple
 cs.asynchron pypi.release=20160828
 cs.backend
 cs.binary pypi.release="20240422" ok_revision=a332a3f312f9667a42200e2c7e07a1c8b3613868 features={"20230212":["BinaryMixin_load","BinaryMixin_save"]}
-cs.buffer pypi.release="20240412" ok_revision=ef83ded9892741e8148a0f5d77ce631fabacf9d9 features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"]}
+cs.buffer pypi.release="20240412" ok_revision="47f11786e9d8baf9c04333552ddf7250681eae42" features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"]}
 cs.cache pypi.release="20240422.1" ok_revision=ebef822958c2068e4da287512e864d50c6efe481 features={"20240412":["CachingMapping"],"20240422":["ConvCache","convof"]}
 cs.calibre
 cs.cbz
