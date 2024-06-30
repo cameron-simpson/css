@@ -97,7 +97,7 @@ _setup:
     :make _tags _venv
 
 _venv:
-    $(uv) venv --seed $(venv_dir)
+    [ -d $(venv_dir) ] || $(uv) venv --seed $(venv_dir)
     uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
     if grep -i '^ *[a-z]' $(venv_requirements) >"$$uv_reqs" \
     then  $(uv) pip install -r "$$uv_reqs" \
