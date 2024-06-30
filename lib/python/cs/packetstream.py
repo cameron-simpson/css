@@ -32,7 +32,7 @@ from cs.threads import locked, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE, DECIMAL_SCALE
 from cs.upd import run_task
 
-__version__ = '20240412-post'
+__version__ = '20240630'
 
 DISTINFO = {
     'description':
