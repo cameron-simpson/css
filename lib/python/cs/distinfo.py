@@ -107,7 +107,7 @@ DISTINFO_DEFAULTS = {
         'Monorepo Git Mirror':
         'https://github.com/cameron-simpson/css',
         'MonoRepo Commits':
-        'https://bitbucket.org/cameron_simpson/css/commits/all',
+        'https://bitbucket.org/cameron_simpson/css/commits/branch/main',
     },
 }
 
