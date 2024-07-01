@@ -142,17 +142,17 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     '''
     return cls(config_spec=spec)
 
-  def as_text(self) -> str:
-    ''' Return a text transcription of the config.
-    '''
-    with StringIO() as S:
-      self.map.write(S)
-      return S.getvalue()
-
   def write(self, f):
     ''' Write the config to a file.
     '''
     self.map.write(f)
+
+  def as_text(self) -> str:
+    ''' Return a text transcription of the config.
+    '''
+    with StringIO() as f:
+      self.write(f)
+      return f.getvalue()
 
   def __getitem__(self, clause_name: str) -> Store:
     ''' Return the `Store` defined by the named clause.
