@@ -1,6 +1,6 @@
 # architecture eg apple.x86_64.darwin
 :import ARCH
-# full path to python executable from a venv
+# full path to the base python executable from a venv
 :import PYTHON_EXE
 
 PREFIX          = /opt/css
@@ -18,15 +18,18 @@ RSYNC_TARGET_PYTHON_ENVVAR = RSYNC_TARGET_PYTHON
 
 target  = bin
 
-dev = env-dev -d $. -x
 trace = set-x
 base_python = $(PYTHON_EXE)
 base_pip = $(PYTHON_EXE) -m pip
-venv_dir = "$${TMPDIR:-/tmp}/venv--$(.F)--$(ARCH)"
+# this is parallels $VIRTUAL_ENV in .env.sh
+venv_dir = $(TMPDIR)/venv--$(.F)--$(ARCH)
 venv_requirements = $./venv-requirements.txt
-venv_pip = $(trace) $(venv_python) -m pip
-venv_python = $(trace) $(venv_dir)/bin/python
-uv = $(trace) env VIRTUAL_ENV=$(venv_dir) $(base_python) -m uv
+venv_python = $(venv_dir)/bin/python
+venv_pip = $(venv_python) -m pip
+uv = env 'VIRTUAL_ENV=$(venv_dir)' $(base_python) -m uv
+
+srcdev = export 'ENV_DEV_DIR=$.'; . "$ENV_DEV_DIR/.env.sh"
+dev = env-dev -d $. -x
 
 rewrite = rewriteif -0 -v
 
@@ -101,20 +104,20 @@ _setup:
     :make _tags _venv
 
 _venv:
-    set -x \
+    set -uex \
     [ -d $(venv_dir) ] || { \
-        set -x \
         $(base_python) -m ensurepip \
+        $(base_pip) install -U pip \
         $(base_pip) install -U uv \
         $(uv) venv --python $(base_python) --seed $(venv_dir) \
     }
     uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
     if grep -i '^ *[a-z]' $(venv_requirements) >"$$uv_reqs" \
-    then  $(uv) pip install -r "$$uv_reqs" \
+    then  $(trace) $(uv) pip install -p '$(venv_python)' -r "$$uv_reqs" \
     fi
     pip_reqs=$$TMPDIR/reqs-pip-$$$$.txt \
     if grep -i '^ *[^a-z#]' $(venv_requirements) >"$$pip_reqs" \
-    then  $(venv_pip) install -r "$$pip_reqs" \
+    then  $(trace) $(venv_pip) install -r "$$pip_reqs" \
     fi
 
 _tags:  tags
