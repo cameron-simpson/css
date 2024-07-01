@@ -207,6 +207,11 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   -P            Physical. Resolve pathnames through symlinks.
                 Default ~/.fstagsrc[general]physical or False.'''
 
+  USAGE_KEYWORDS = {
+      'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
+      'LS_OUTPUT_FORMAT_DEFAULT': LS_OUTPUT_FORMAT_DEFAULT,
+  }
+
   @dataclass
   class Options(BaseCommand.Options):
     ontology_path: Optional[str] = os.environ.get('FSTAGS_ONTOLOGY')

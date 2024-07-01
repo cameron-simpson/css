@@ -1,0 +1,5 @@
+lib/python/cs/py/stack.py: cs.py.stack: fallback StackSummary: add format_frame_summary(frame) static method
+lib/python/cs/py/stack.py: cs.py.stack: stack_dump: updates to avoid a name conflict, expect to work off a StackSummary or a list of frames
+lib/python/cs/py/stack.py: cs.py.stack: docstrings
+lib/python/cs/py/stack.py: cs.py.stack: remove defunct print()
+lib/python/cs/py/stack.py: merge default ==> vt

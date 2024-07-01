@@ -70,7 +70,7 @@ import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 
-__version__ = '20230212-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -86,7 +86,7 @@ DISTINFO = {
         'cs.lex',
         'cs.pfx',
         'cs.py.func',
-        'cs.upd',
+        'cs.upd',  # done as a late import
     ],
 }
 

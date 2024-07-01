@@ -48,7 +48,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print
 
-__version__ = '20240519-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -762,8 +762,15 @@ class BaseCommand:
       if method_name.startswith(prefix):
         method = getattr(self, method_name)
         subcmd = cutprefix(method_name, prefix)
+        subusage_mapping = dict(usage_mapping)
+        method_keywords = getattr(method, 'USAGE_KEYWORDS', {})
+        subusage_mapping.update(method_keywords)
+        subusage_mapping.update(cmd=subcmd)
         mapping[subcmd] = SubCommand(
-            self, method, cmd=subcmd, usage_mapping=usage_mapping
+            self,
+            method,
+            cmd=subcmd,
+            usage_mapping=subusage_mapping,
         )
     return mapping
 
@@ -797,77 +804,16 @@ class BaseCommand:
         * `cmd`: optional command name, default derived from the class name
         * `format_mapping`: an optional format mapping for filling
           in format strings in the usage text
-        * `subcmd`: constrain the usage to a particular subcommand named `subcmd`;
-          this is used to produce a shorter usage for subcommand usage failures
+        * `short`: default `False`; if true then just provide the opening sentence
+        * `show_subcmds`: constrain the usage to particular subcommands
+          named in `show_subcmds`; this is used to produce a shorter
+          usage for subcommand usage failures
     '''
     return SubCommand(
         self, method=type(self)
     ).usage_text(
         short=short, show_subcmds=show_subcmds
     )
-
-##=======
-##    if cmd is None:
-##      cmd = cutsuffix(cls.__name__, 'Command').lower()
-##    if format_mapping is None:
-##      format_mapping = {}
-##    format_mapping.setdefault('cmd', cmd)
-##    subcmds = cls.subcommands()
-##    has_subcmds = subcmds and sorted(subcmds) != ['help', 'shell']
-##    usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
-##    usage_format_mapping.update(format_mapping)
-##    usage_format = getattr(
-##        cls,
-##        'USAGE_FORMAT',
-##        (
-##            'Usage: {cmd} subcommand [...]'
-##            if has_subcmds else 'Usage: {cmd} [...]'
-##        ),
-##>>>>>>> merge rev
-##    )
-##<<<<<<< working copy
-##=======
-##    usage_message = usage_format.format_map(usage_format_mapping)
-##    if subcmd:
-##      if not has_subcmds:
-##        raise ValueError("subcmd=%r: no subcommands!" % (subcmd,))
-##      subcmd_ = subcmd.replace('-', '_').replace('.', '_')
-##      try:
-##        subcmds[subcmd_]
-##      except KeyError:
-##        # pylint: disable=raise-missing-from
-##        raise ValueError(
-##            "subcmd=%r: unknown subcommand, I know %r" %
-##            (subcmd, sorted(subcmds.keys()))
-##        )
-##      subcmd = subcmd_
-##    if has_subcmds:
-##      subusages = []
-##      for attr, subcmd_spec in (sorted(subcmds.items()) if subcmd is None else
-##                                ((subcmd, subcmds[subcmd]),)):
-##        with Pfx(attr):
-##          subusage = subcmd_spec.usage_text(
-##              short=short, usage_format_mapping=usage_format_mapping
-##          )
-##          cls.subcommand_usage_text(
-##              attr, usage_format_mapping=usage_format_mapping, short=short
-##          )
-##          if subusage:
-##            subusages.append(subusage.replace('\n', '\n  '))
-##      if subusages:
-##        subcmds_header = 'Subcommands' if subcmd is None else 'Subcommand'
-##        if short:
-##          subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
-##        usage_message = '\n'.join(
-##            [
-##                usage_message,
-##                '  ' + subcmds_header + ':',
-##            ] + [
-##                '    ' + subusage.replace('\n', '\n    ')
-##                for subusage in subusages
-##            ]
-##        )
-##    return usage_message
 
   def subcommand_usage_text(
       self, subcmd, usage_format_mapping=None, short=False
@@ -1450,6 +1396,8 @@ class BaseCommand:
     ''' Usage: {cmd}
           Run a command prompt via cmd.Cmd using this command's subcommands.
     '''
+    if argv:
+      raise GetoptError("extra arguments")
     with upd.without():
       self.cmdloop()
 

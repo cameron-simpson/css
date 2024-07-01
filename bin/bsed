@@ -170,7 +170,7 @@ do
 
 
         fi
-        [ $silent ] || $diff $DIFFOPTS "$file" "$tmp"
+        [ $silent ] || $diff $DIFFOPTS "$file" "$tmp" || :
 
         # ensure we have a backup
         if [ -n "$bakfile" ]

@@ -16,7 +16,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.modules import module_attributes
 
-__version__ = '20240422-post'
+__version__ = '20240630.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -104,8 +104,9 @@ def module_doc(
           ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
         full_docs.append(f'\n\n## Class `{classname_etc}`\n\n{obj_doc}')
         if issubclass(obj, BaseCommand):
+          instance = obj([obj.__name__])
           full_docs.append("\n\nUsage summary:\n\n    ")
-          full_docs.append("\n    ".join(obj.usage_text().split("\n")))
+          full_docs.append("\n    ".join(instance.usage_text().split("\n")))
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order
