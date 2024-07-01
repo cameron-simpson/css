@@ -64,7 +64,7 @@ fi
 case "$sshfspath" in
   @*) # connect to remote host and sshfs to here
       rhost=$( expr "$sshfspath" : '@\(.*\)' )
-      host=$( hostname | sed 's/\..*//' )
+      host=${HOST:-$( hostname | sed 's/\..*//' )}
       ssh_exe=ssh
       rssh_exe=ssh
       rssh_host=reverse-$host
