@@ -319,12 +319,12 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     # blockmapdir: location to store persistent blockmaps
     blockmapdir = params.pop('blockmapdir', None)
     if store_name is None:
-      store_name = str(self) + '[' + clause_name + ']'
-    constructor_name = store_type + '_Store'
+      store_name = f'{self}[{clause_name}]'
+    constructor_name = f'{store_type}_Store'
     constructor = getattr(self, constructor_name, None)
     if not constructor:
       raise ValueError(
-          "unsupported Store type (no .%s method)" % (constructor_name,)
+          f'unsupported Store type (no .{constructor_name} method)'
       )
     S = constructor(store_name, clause_name, **params)
     if S.config is None:
