@@ -1,3 +1,4 @@
+Upd: keep a set of dirty slots, update+clean method
 cs.cmdutils: getopt from a called subcommand should only produce the usage for the subcommand
 Result: embed state diagram in the PyPI README.md
 RunState: include state diagram in README.md
