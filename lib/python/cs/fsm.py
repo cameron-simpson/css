@@ -5,7 +5,7 @@
 
 from collections import defaultdict, namedtuple
 from itertools import chain
-from threading import Lock, Thread
+from threading import Lock
 import time
 from typing import Optional, TypeVar
 
@@ -317,32 +317,34 @@ class FSM(DOTNodeMixin):
           cb for cb in self.__callbacks[state] if cb != callback
       ]
 
+  @classmethod
   def fsm_transitions_as_dot(
-      self,
+      cls,
       fsm_transitions=None,
       *,
       sep='\n',
       graph_name=None,
-      history_style=None
+      history_style=None,
+      obj=None,
   ) -> str:
     ''' Compute a DOT syntax graph description from a transitions dictionary.
 
         Parameters:
         * `fsm_transitions`: optional mapping of *state*->*event*->*state*,
-          default `self.FSM_TRANSITIONS`
+          default `cls.FSM_TRANSITIONS`
         * `sep`: optional separator between "lines", default `'\n'`
         * `graph_name`: optional name for the graph, default the class name
         * `history_style`: optional style mapping for event transition history,
           used to style edges which have been traversed
     '''
     if fsm_transitions is None:
-      fsm_transitions = self.FSM_TRANSITIONS
+      fsm_transitions = cls.FSM_TRANSITIONS
     if graph_name is None:
-      graph_name = self.__class__.__name__
+      graph_name = cls.__name__
     traversed_edges = defaultdict(list)
     if history_style:
       # fill in the mapping of (old,event,new) -> count
-      for transition in self.fsm_history:
+      for transition in obj.fsm_history if obj else ():
         # particular types of transitions
         traversed_edges[transition.old_state, transition.event,
                         transition.new_state].append(transition)
@@ -357,11 +359,11 @@ class FSM(DOTNodeMixin):
     # describing the transitions in the natural order in which they
     # occur typically produces a nicer graph diagram.
     for src_state, transitions in fsm_transitions.items():
-      if src_state == self.fsm_state:
+      if obj and src_state == obj.fsm_state:
         # colour the current state
-        fillcolor = self.DOT_NODE_FILLCOLOR_PALETTE.get(src_state)
+        fillcolor = cls.DOT_NODE_FILLCOLOR_PALETTE.get(src_state)
         if fillcolor:
-          attrs_s = self.dot_node_attrs_str(
+          attrs_s = cls.dot_node_attrs_str(
               dict(style='filled', fillcolor=fillcolor)
           )
           dot.append(f'  {gvq(src_state)}[{attrs_s}];')
@@ -389,15 +391,18 @@ class FSM(DOTNodeMixin):
     '''
     return self.fsm_state
 
-  def fsm_print(self, file=None, fmt=None, layout=None, **dot_kw):
+  @classmethod
+  def fsm_print(cls, file=None, fmt=None, layout=None, **dot_kw):
     ''' Print the state transition diagram to `file`, default `sys.stdout`,
         in format `fmt` using the engine specified by `layout`, default `'dot'`.
         This is a wrapper for `cs.gvutils.gvprint`.
     '''
-    return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
+    dot_s = cls.fsm_transitions_as_dot(cls.FSM_TRANSITIONS)
+    return gvprint(dot_s, file=file, fmt=fmt, layout=layout, **dot_kw)
 
   def fsm_as_svg(self, layout=None, history_style=None, **dot_kw) -> str:
-    ''' Render the state transition diagram as SVG. '''
+    ''' Render the state transition diagram as SVG.
+    '''
     return gvsvg(
         self.fsm_transitions_as_dot(history_style=history_style),
         layout=layout,
