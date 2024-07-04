@@ -1,3 +1,4 @@
+Upd: try the hide-the cursor stuff again, maybe in the update+clean method
 Upd: keep a set of dirty slots, update+clean method
 cs.cmdutils: getopt from a called subcommand should only produce the usage for the subcommand
 Result: embed state diagram in the PyPI README.md
