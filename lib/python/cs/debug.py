@@ -776,7 +776,7 @@ def trace_DEBUG(debug_spec=None):
       for spec in debug_spec:
         with Pfx(spec):
           if is_dotted_identifier(spec):
-            module_names.sppend(spec)
+            module_names.append(spec)
           elif ':' in spec:
             # module:funcname
             module_name, func_name = spec.split(':', 1)
