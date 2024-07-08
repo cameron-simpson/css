@@ -267,6 +267,7 @@ def rewrite(
     overwrite_anyway=False
 ):
   ''' Rewrite the file `filepath` with data from the file object `srcf`.
+      Return `True` if the content was changed, `False` if unchanged.
 
       Parameters:
       * `filepath`: the name of the file to rewrite.
@@ -298,7 +299,7 @@ def rewrite(
         # need to compare data
         if compare(T.name, filepath):
           # data the same, do nothing
-          return
+          return False
         if do_diff:
           # call the supplied differ
           do_diff(filepath, T.name)
@@ -314,6 +315,7 @@ def rewrite(
         if backup_ext:
           shutil.copy2(filepath, filepath + backup_ext)
         shutil.copyfile(T.name, filepath)
+  return True
 
 @contextmanager
 def rewrite_cmgr(filepath, mode='w', **kw):
@@ -333,7 +335,7 @@ def rewrite_cmgr(filepath, mode='w', **kw):
     yield T
     T.flush()
     with open(T.name, 'rb') as f:
-      rewrite(filepath, mode='wb', srcf=f, **kw)
+      return rewrite(filepath, mode='wb', srcf=f, **kw)
 
 def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
