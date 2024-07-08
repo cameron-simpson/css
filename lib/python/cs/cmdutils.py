@@ -179,6 +179,7 @@ class SubCommand:
 
   def get_usage_format(self) -> str:
     ''' Return the usage format string for this subcommand.
+        *Note*: no leading "Usage:" prefix.
 
         This first tries `self.method.USAGE_FORMAT`, falling back
         to deriving it from `obj_docstring(self.method)`.
@@ -191,19 +192,22 @@ class SubCommand:
         to its first parapgraph.
     '''
     method = self.method
+    method_name = method.__name__
+    subcmd = self.command.method_cmdname(method_name)
     try:
       usage_format = method.USAGE_FORMAT
     except AttributeError:
+      # derive from the dcostring or from self.default_usage()
       doc = obj_docstring(self.method)
       if doc:
         try:
           _, post_usage = doc.split('Usage:', 1)
         except ValueError:
-          # default usage line and first paragraph
+          # No "Usage:" paragraph - use default usage line and first paragraph.
           usage_format = self.default_usage()
           paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
           if paragraph1:
-            usage_format = f'{usage_format}\n{indent(paragraph1)}'
+            usage_format += "\n" + indent(paragraph1)
         else:
           # extract the Usage: paragraph
           usage_format, *_ = post_usage.strip().split('\n\n', 1)
@@ -213,7 +217,7 @@ class SubCommand:
             # single line usage only
             pass
           else:
-            usage_format = f'{top_line}\n{indent(post_lines)}'
+            usage_format = f'Usage: {subcmd} ...\n  {top_line}\n{indent(post_lines)}'
       else:
         # default usage text
         usage_format = self.default_usage()
