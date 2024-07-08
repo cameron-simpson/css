@@ -598,6 +598,17 @@ class BaseCommand:
   SUBCOMMAND_ARGV_DEFAULT = 'shell'
   Options = BaseCommandOptions
 
+  def __init_subclass__(cls, **super_kw):
+    super().__init_subclass__(**super_kw)
+    instance = cls([cls.__name__])
+    from cs.py.doc import obj_docstring
+    docv = [
+        obj_docstring(cls),
+        "\n\nUsage summary:\n\n",
+        indent("Usage: " + instance.usage_text(), "    "),
+    ]
+    cls.__doc__ = ''.join(docv)
+
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
     ''' Initialise the command line.
