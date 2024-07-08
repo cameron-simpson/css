@@ -118,6 +118,36 @@ def docmd(dofunc):
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
 
+def extract_usage_from_doc(doc: str | None,
+                           usage_marker="Usage:") -> Tuple[str, str]:
+  ''' Extract a `"Usage:"`paragraph from a docstring
+          and return the unindented usage and the docstring with that paragraph elided.
+
+          If the usage paragraph is not present, return `(None,doc)`.
+      '''
+  if not doc:
+    # no doc, return unchanged
+    return None, doc
+  try:
+    pre_usage, usage_onward = doc.split(usage_marker, 1)
+  except ValueError:
+    # no usage: paragraph
+    return None, doc
+  try:
+    usage_format, post_usage = usage_onward.split("\n\n", 1)
+  except ValueError:
+    usage_format, post_usage = usage_onward.rstrip(), ''
+  usage_format = stripped_dedent(usage_format)
+  # indent the second and following lines
+  try:
+    top_line, post_lines = usage_format.split("\n", 1)
+  except ValueError:
+    # single line usage only
+    pass
+  else:
+    usage_format = f'{top_line}\n{indent(post_lines)}'
+  return usage_format, pre_usage + post_usage
+
 @dataclass
 class SubCommand:
   ''' An implementation for a subcommand.
