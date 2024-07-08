@@ -2088,7 +2088,9 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
             )
         )
     else:
-      raise NotImplementedError("unimplemented export format %r" % (export_format,))
+      raise NotImplementedError(
+          "unimplemented export format %r" % (export_format,)
+      )
 
   # pylint: disable=too-many-locals
   def cmd_find(self, argv):
