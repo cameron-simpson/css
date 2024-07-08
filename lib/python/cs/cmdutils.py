@@ -748,6 +748,12 @@ class BaseCommand:
         return
       raise
 
+  @classmethod
+  def method_cmdname(cls, method_name: str):
+    ''' The `cmd` value from a method name.
+    '''
+    return cutprefix(method_name, cls.SUBCOMMAND_METHOD_PREFIX)
+
   @cache
   def subcommands(self):
     ''' Return a mapping of subcommand names to subcommand specifications
@@ -760,8 +766,8 @@ class BaseCommand:
     mapping = {}
     for method_name in dir(cls):
       if method_name.startswith(prefix):
+        subcmd = self.method_cmdname(method_name)
         method = getattr(self, method_name)
-        subcmd = cutprefix(method_name, prefix)
         subusage_mapping = dict(usage_mapping)
         method_keywords = getattr(method, 'USAGE_KEYWORDS', {})
         subusage_mapping.update(method_keywords)
