@@ -2400,9 +2400,7 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
 
   @dataclass
   class Options(BaseCommand.Options):
-    db_url: str = field(
-        default_factory=lambda: BaseSQLTagsCommand.TAGSETS_CLASS.infer_db_url()
-    )
+    db_url: str = None
     sqltags: Optional[SQLTags] = None
 
   def apply_opt(self, opt, val):
@@ -2421,6 +2419,8 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
     with super().run_context():
       options = self.options
       db_url = options.db_url
+      if db_url is None:
+        db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
       sqltags = self.TAGSETS_CLASS(db_url)
       with sqltags:
         with stackattrs(options, sqltags=sqltags, verbose=True):
