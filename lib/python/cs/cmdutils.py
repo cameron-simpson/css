@@ -217,7 +217,7 @@ class SubCommand:
             # single line usage only
             pass
           else:
-            usage_format = f'{subcmd} ...\n  {top_line}\n{indent(post_lines)}'
+            usage_format = f'{top_line}\n{indent(post_lines)}'
       else:
         # default usage text
         usage_format = self.default_usage()
