@@ -616,11 +616,19 @@ class BaseCommand:
   def __init_subclass__(cls, **super_kw):
     super().__init_subclass__(**super_kw)
     instance = cls([cls.__name__])
-    from cs.py.doc import obj_docstring
+    usage_format, doc_without_usage = extract_usage_from_doc(
+        obj_docstring(cls)
+    )
+    # This little shuffle is so that instance.usage_text()
+    # does not process format strings twice.
+    cls.__doc__ = doc_without_usage
+    if usage_format and not hasattr(cls, 'USAGE_FORMAT'):
+      cls.USAGE_FORMAT = usage_format
+    usage_text = instance.usage_text()
     docv = [
-        obj_docstring(cls),
+        doc_without_usage,
         "\n\nUsage summary:\n\n",
-        indent("Usage: " + instance.usage_text(), "    "),
+        indent("Usage: " + usage_text, "    "),
     ]
     cls.__doc__ = ''.join(docv)
 
