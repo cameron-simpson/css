@@ -1994,6 +1994,14 @@ class SQLTags(BaseTagSets, Promotable):
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
+  TAGSETS_CLASS = SQLTags
+
+  TAGSET_CRITERION_CLASS = SQTCriterion
+
+  TAG_BASED_TEST_CLASS = SQLTagBasedTest
+
+  GETOPT_SPEC = 'f:'
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database shell.
@@ -2372,14 +2380,6 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
   ''' Common features for commands oriented around an `SQLTags` database.
   '''
 
-  TAGSETS_CLASS = SQLTags
-
-  TAGSET_CRITERION_CLASS = SQTCriterion
-
-  TAG_BASED_TEST_CLASS = SQLTagBasedTest
-
-  GETOPT_SPEC = 'f:'
-
   # TODO:
   # export_csv [criteria...] >csv_data
   #   Export selected items to CSV data.
@@ -2395,6 +2395,7 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
   USAGE_KEYWORDS = {
       'DBURL_DEFAULT': DBURL_DEFAULT,
       'DBURL_ENVVAR': DBURL_ENVVAR,
+      'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
   }
 
   @dataclass
