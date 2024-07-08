@@ -1667,7 +1667,7 @@ def atomic_filename(
     prefix=None,
     suffix=None,
     rename_func=rename,
-    **kw
+    **tempfile_kw
 ):
   ''' A context manager to create `filename` atomicly on completion.
       This returns a `NamedTemporaryFile` to use to create the file contents.
@@ -1717,7 +1717,12 @@ def atomic_filename(
     suffix = fsuffix
   if not exists_ok and existspath(filename):
     raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), filename)
-  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, **kw) as T:
+  with NamedTemporaryFile(
+      dir=dir,
+      prefix=prefix,
+      suffix=suffix,
+      **tempfile_kw,
+  ) as T:
     if placeholder:
       # create a placeholder file
       with open(filename, 'ab' if exists_ok else 'xb'):
