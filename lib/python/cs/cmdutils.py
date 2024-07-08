@@ -229,28 +229,13 @@ class SubCommand:
     except AttributeError:
       # derive from the docstring or from self.default_usage()
       doc = obj_docstring(self.method)
-      if doc:
-        try:
-          _, post_usage = doc.split('Usage:', 1)
-        except ValueError:
-          # No "Usage:" paragraph - use default usage line and first paragraph.
-          usage_format = self.default_usage()
-          paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
-          if paragraph1:
-            usage_format += "\n" + indent(paragraph1)
-        else:
-          # extract the Usage: paragraph
-          usage_format, *_ = post_usage.strip().split('\n\n', 1)
-          try:
-            top_line, post_lines = usage_format.split("\n", 1)
-          except ValueError:
-            # single line usage only
-            pass
-          else:
-            usage_format = f'{top_line}\n{indent(post_lines)}'
-      else:
-        # default usage text
+      usage_format, doc = extract_usage_from_doc(doc)
+      if not usage_format:
+        # No "Usage:" paragraph - use default usage line and first paragraph.
         usage_format = self.default_usage()
+        paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
+        if paragraph1:
+          usage_format += "\n" + indent(paragraph1)
     # The existing USAGE_FORMAT based usages have the word "Usage:"
     # at the front but this is supplied at print time now.
     return cutprefix(usage_format, 'Usage:').lstrip()
