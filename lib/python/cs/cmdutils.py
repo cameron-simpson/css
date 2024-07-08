@@ -197,7 +197,7 @@ class SubCommand:
     try:
       usage_format = method.USAGE_FORMAT
     except AttributeError:
-      # derive from the dcostring or from self.default_usage()
+      # derive from the docstring or from self.default_usage()
       doc = obj_docstring(self.method)
       if doc:
         try:
@@ -217,7 +217,7 @@ class SubCommand:
             # single line usage only
             pass
           else:
-            usage_format = f'Usage: {subcmd} ...\n  {top_line}\n{indent(post_lines)}'
+            usage_format = f'{subcmd} ...\n  {top_line}\n{indent(post_lines)}'
       else:
         # default usage text
         usage_format = self.default_usage()
