@@ -804,9 +804,9 @@ def default_params(func, _strict=False, **param_defaults):
   )
   sig0 = signature(func)
   sig = sig0
-  new_params = []
   modified_params = []
   for param in sig0.parameters.values():
+    modified_param = None
     try:
       param_default = param_defaults[param.name]
     except KeyError:
@@ -816,7 +816,10 @@ def default_params(func, _strict=False, **param_defaults):
           annotation=typing.Optional[param.annotation],
           default=None if param_default is param.empty else param_default,
       )
-      sig = sig.replace(parameters=[modified_param])
+    if modified_param is None:
+      modified_param = param.replace()
+    modified_params.append(modified_param)
+  sig = sig.replace(parameters=modified_params)
   defaulted_func.__signature__ = sig
   return defaulted_func
 
