@@ -402,7 +402,7 @@ def skipwhite(s, offset=0):
   return offset
 
 def indent(paragraph, line_indent="  "):
-  ''' Return the `paragraph` indents by `line_indent` (default `"  "`).
+  ''' Return the `paragraph` indented by `line_indent` (default `"  "`).
   '''
   return "\n".join(
       line and line_indent + line for line in paragraph.split("\n")
