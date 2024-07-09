@@ -1,0 +1,8 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: put the remove-"cmd_" code into a method_cmdname class name for reuse
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_format: use BaseCommand.method_cmdname, other small changes
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_format: remove spurious "Usage:", fix comment typo
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new __init_subclass__ which appends the usage message to the class docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_format: remove spurious line
+lib/python/cs/cmdutils.py: cs.cmdutils: new extract_usage_from_doc(docstring)->(usage_format,docstring_without_usage) function
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_format: use core parse form extract_usage_from_doc()
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init_subclass__: extract the usage from the docstring if present, use for cls.USAGE_FORMAT, adjust doc computation
