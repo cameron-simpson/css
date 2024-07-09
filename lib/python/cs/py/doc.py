@@ -25,7 +25,6 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.cmdutils',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
