@@ -198,14 +198,15 @@ def verbose(msg, *a):
 # pylint: disable=too-many-public-methods
 class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
+
+      Usage: {cmd} [-o ontology] [-P] subcommand [...]
+        -o ontology   Specify the path to an ontology file.
+        -P            Physical. Resolve pathnames through symlinks.
+                      Default ~/.fstagsrc[general]physical or False.
   '''
 
   GETOPT_SPEC = 'o:P'
 
-  USAGE_FORMAT = '''Usage: {cmd} [-o ontology] [-P] subcommand [...]
-  -o ontology   Specify the path to an ontology file.
-  -P            Physical. Resolve pathnames through symlinks.
-                Default ~/.fstagsrc[general]physical or False.'''
 
   USAGE_KEYWORDS = {
       'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
