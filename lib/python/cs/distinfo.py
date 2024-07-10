@@ -1023,6 +1023,7 @@ class Module:
       )
     if not pathlist:
       raise ValueError("no paths for %s" % (self,))
+    pathlist = [relpath(path, top_dirpath) for path in pathlist]
     return pathlist
 
   def resolve_requirements(self, requirement_specs):
