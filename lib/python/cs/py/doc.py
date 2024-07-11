@@ -100,22 +100,17 @@ def module_doc(
         if mro_names:
           classname_etc += '(' + ', '.join(mro_names) + ')'
           ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
-        if issubclass(obj, FSM):
-          try:
-            transitions = obj.FSM_TRANSITIONS
-          except AttributeError:
-            pass
-          else:
-            obj_doc += (
-                f'\n\nState diagram:\n![{Mname} State Diagram](' + gvdataurl(
-                    obj.fsm_state_diagram_as_dot(
-                        graph_name=f'{Mname} State Diagram',
-                        sep='',
-                    ),
-                    fmt='svg',
-                    dataurl_encoding='base64',
-                ) + f' "{Mname} State Diagram")\n'
-            )
+        if issubclass(obj, FSM) and hasattr(obj, 'FSM_TRANSITIONS'):
+          obj_doc += (
+              f'\n\nState diagram:\n![{Mname} State Diagram](' + gvdataurl(
+                  obj.fsm_state_diagram_as_dot(
+                      graph_name=f'{Mname} State Diagram',
+                      sep='',
+                  ),
+                  fmt='svg',
+                  dataurl_encoding='base64',
+              ) + f' "{Mname} State Diagram")\n'
+          )
         full_docs.append(f'\n\n## Class `{classname_etc}`\n\n{obj_doc}')
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
