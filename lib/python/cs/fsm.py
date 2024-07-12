@@ -318,7 +318,7 @@ class FSM(DOTNodeMixin):
       ]
 
   def fsm_transitions_as_dot(self, transitions=None, **diagram_kw) -> str:
-    ''' Compute a DOT syntax graph description of the state diagram.
+    r'''Compute a DOT syntax graph description of the state diagram.
 
         Parameters:
         * `transitions`: optional mapping of *state*->*event*->*state*,
@@ -346,7 +346,7 @@ class FSM(DOTNodeMixin):
       history=None,
       history_style=None,
   ) -> str:
-    ''' Compute a DOT syntax graph description of the state diagram.
+    r'''Compute a DOT syntax graph description of the state diagram.
 
         Parameters:
         * `transitions`: optional mapping of *state*->*event*->*state*,
