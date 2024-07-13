@@ -93,6 +93,7 @@ PKG_TAGS = 'pkg_tags'
 
 # the path from the top level to the package files
 PYLIBTOP = 'lib/python'
+SVGLIBTOP = 'lib/svg'
 
 # the prefix of interesting packages
 MODULE_PREFIX = 'cs.'
@@ -270,15 +271,15 @@ def cd_run(
     check: bool = True,
     stdin=DEVNULL,
     quiet=False,
-    **kw,
+    **run_kw,
 ):
   ''' Run the command `argv` in the directory `cwd`.
       Return its exit status.
   '''
   if not isdirpath(cwd):
     raise ValueError("not a directory: %r" % (cwd,))
-  kw.update(cwd=cwd, check=check, stdin=stdin, quiet=quiet)
-  return run(argv, **kw).returncode
+  run_kw.update(cwd=cwd, check=check, stdin=stdin, quiet=quiet)
+  return run(argv, **run_kw).returncode
 
 def release_tags(vcs):
   ''' Generator yielding the current release tags.
