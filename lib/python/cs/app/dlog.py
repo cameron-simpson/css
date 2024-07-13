@@ -325,7 +325,7 @@ class DLog:
             lines = get_batch(q)
           if not lines:
             break
-          sqltags = trace(SQLTags.promote, retval=True)(sqltags)
+          sqltags = SQLTags.promote(sqltags)
           # open the db once around the whole batch
           with sqltags:
             for lineno, line in lines:
