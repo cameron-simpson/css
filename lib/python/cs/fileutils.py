@@ -712,31 +712,14 @@ def makelockfile(
     return lockpath
 
 @contextmanager
-@uses_runstate
-def lockfile(
-    path, *, ext=None, poll_interval=None, timeout=None, runstate: RunState
-):
+def lockfile(path, **lock_kw):
   ''' A context manager which takes and holds a lock file.
       An open file descriptor is kept for the lock file as well
       to aid locating the process holding the lock file using eg `lsof`.
-
-      Parameters:
-      * `path`: the base associated with the lock file.
-      * `ext`: the extension to the base used to construct the lock file name.
-        Default: `'.lock'`
-      * `timeout`: maximum time to wait before failing.
-        Default: `None` (wait forever).
-      * `poll_interval`: polling frequency when timeout is not `0`.
-      * `runstate`: optional `RunState` duck instance supporting cancellation.
+      This is just a context manager shim for `makelockfile`
+      and all arguments are plumbed through.
   '''
-  lockpath, lockfd = makelockfile(
-      path,
-      ext=ext,
-      poll_interval=poll_interval,
-      timeout=timeout,
-      runstate=runstate,
-      keepopen=True,
-  )
+  lockpath, lockfd = makelockfile(path, keepopen=True, **lock_kw)
   try:
     yield lockpath
   finally:
