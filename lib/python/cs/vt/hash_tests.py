@@ -14,7 +14,7 @@ import unittest
 from cs.binary_tests import BaseTestBinaryClasses
 
 from . import hash as hash_module
-from .hash import HASHCLASS_BY_NAME, decode as decode_hash
+from .hash import HashCode, decode as decode_hash
 from .transcribe import Transcriber
 
 class TestHashBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
@@ -34,7 +34,7 @@ class TestHashing(unittest.TestCase):
   def testSHA1(self):
     ''' Test the various hash function.
     '''
-    for hash_name, cls in sorted(HASHCLASS_BY_NAME.items()):
+    for hash_name, cls in sorted(HashCode.by_hashname.items()):
       with self.subTest(hash_name=hash_name):
         for _ in range(10):
           rs = bytes(random.randint(0, 255) for _ in range(100))

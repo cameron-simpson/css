@@ -1,0 +1,4 @@
+lib/python/cs/context.py: cs.context: fix docstring typo
+lib/python/cs/context.py: cs.context: new closeall(Iterable) wrapping withall() and returning the close step as a callable
+lib/python/cs/context.py: cs.context: contextif: document the lambda shuffle needed if cmgr is callable
+lib/python/cs/context.py: cs.context: new @with_self decorator fr methods which should `with(self)` while the method runs - unused as yet :-)

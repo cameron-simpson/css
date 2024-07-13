@@ -123,7 +123,7 @@ DEFAULT_PLOT_EVENT_LABELS = (
 pfx_listdir = partial(pfx_call, os.listdir)
 
 def main(argv=None):
-  ''' SP-Link command line mode.
+  ''' SP-Link command line mode using the `SPLinkCommand` class.
   '''
   return SPLinkCommand(argv).run()
 
@@ -722,7 +722,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     elif opt == '-n':
       options.doit = False
     else:
-      raise RuntimeError("unhandled pre-option")
+      raise NotImplementedError("unhandled pre-option")
 
   def print_known_datasets(self, file=None):
     ''' Print the known datasets and their fields to `file`.

@@ -7,19 +7,23 @@
 set -ue
 
 : "${TMPDIR:=/tmp}"
+rtmp=/tmp
 
 cmd=$( basename "$0" )
 usage="Usage: $0 [options...] {sshhost:path|@rhost} [command [args...]]
   -F sshcfg Specify ssh config file, passed to mnt (for sshfs).
   -o opt    Passed to mnt (for sshfs).
   -q        Turn off tracing.
+  --rtmp tmppath
+            Bit of a hack to use something other than $rtmp at the
+            remote end.
   The default command is the user's shell (from \$SHELL).
   Modes:
     sshhost:path
             Use a remote directory locally.
             Mount path from sshhost and run the command in it.
     @rhost  Use the current directory remotely.
-            Ssh to rhost and run \"mnt thishost:pwd command\"."
+            Ssh to rhost and run \"inmnt thishost:pwd command\"."
 
 trace=
 [ -t 2 ] && trace=set-x
@@ -37,6 +41,7 @@ do
     -F) mntopts="$mntopts -F $2"; shift ;;
     -o) mntopts="$mntopts -o $2"; shift ;;
     -q) trace= mntopts="$mntopts -q" inmntopts="$inmntopts -q" ;;
+    --rtmp) rtmp=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -59,14 +64,14 @@ fi
 case "$sshfspath" in
   @*) # connect to remote host and sshfs to here
       rhost=$( expr "$sshfspath" : '@\(.*\)' )
-      host=$( hostname | sed 's/\..*//' )
+      host=${HOST:-$( hostname | sed 's/\..*//' )}
       ssh_exe=ssh
       rssh_exe=ssh
       rssh_host=reverse-$host
       local_ssh_endpoint=127.0.0.1:22
       localdir=$( pwd )
-      reverse_sock=/tmp/revssh-$host-$$
-      reverse_cfg=/tmp/revssh-$host-$$.cfg
+      reverse_sock=$rtmp/revssh-$host-$$
+      reverse_cfg=$rtmp/revssh-$host-$$.cfg
       $trace $ssh_exe $sshopts \
         -o ControlPath=none \
         -o ExitOnForwardFailure=yes \
@@ -96,7 +101,7 @@ case "$sshfspath" in
       [ $# = 0 ] && set -- "$SHELL"
       mntdir=$TMPDIR/sshfs-mnt
       [ -d "$mntdir" ] || $trace mkdir -- "$mntdir"
-      mntpath=$mntdir/mnt-$$-$( echo "$sshfspath" | tr / _ )
+      mntpath=$mntdir/mnt-$$-$( echo "$sshfspath" | tr /: __ )
       $trace mnt -d -X $mntopts -- "$sshfspath" "$mntpath"
       xit=0
       ( cd "$mntpath" && $trace "$@" ) || xit=$?

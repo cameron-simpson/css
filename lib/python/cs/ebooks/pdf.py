@@ -14,10 +14,12 @@ from getopt import GetoptError
 from io import BytesIO
 from itertools import chain
 from math import floor
+from mmap import mmap, MAP_PRIVATE, PROT_READ
 import os
 from os.path import (
     basename, exists as existspath, join as joinpath, splitext
 )
+from pathlib import Path
 from pprint import pprint
 import re
 import sys
@@ -26,6 +28,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from zipfile import ZipFile, ZIP_STORED
 import zlib
 
+from icontract import ensure, require
 from PIL import Image
 from typeguard import typechecked
 
@@ -35,7 +38,7 @@ from cs.cmdutils import BaseCommand
 from cs.deco import promote
 from cs.lex import r
 from cs.logutils import debug, error, warning
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import pfx, Pfx, pfx_call, pfx_method
 from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
 from cs.threads import bg
@@ -76,7 +79,7 @@ class PDFCommand(BaseCommand):
           width, height = im.size
           with Pfx("page %d, image %d, %dx%d", pagenum, imgnum, width, height):
             imgpath = f'{base}--{pagenum:02}--{imgnum:02}.png'
-            print("{width}x{height}", imgpath)
+            print(f"{width}x{height}", imgpath)
             pfx_call(im.save, imgpath)
 
   cmd_xi = cmd_extract_images
@@ -98,6 +101,11 @@ class PDFCommand(BaseCommand):
         cbzpath = f'{base}.cbz'
         pdf.make_cbz(cbzpath)
 
+  def cmd_mmap(self, argv):
+    pdfpath, = argv
+    pdfdoc = pfx_call(mmap_pdf, pdfpath)
+    print(pdfdoc)
+
   @uses_runstate
   def cmd_scan(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} pdf-files...
@@ -112,35 +120,43 @@ class PDFCommand(BaseCommand):
         print(' ', pdf.catalog)
         print(' ', pdf.pages)
         for pagenum, page in enumerate(pdf.pages, 1):
-          print(pagenum, '=============')
-          print(s(page))
-          print(dict(page.object))
-          ##print("I15 =>", page['I15'])
-          ##image_15 = page['I15']
-          ##print(
-          ##    "image 15 is_image", image_15.is_image(), "size",
-          ##    image_15.image.size
-          ##)
-          ##image_15.image.show()
-          content_obj = page.Contents.object
-          print(content_obj)
-          pprint(content_obj.context_dict)
-          page_content_bs = content_obj.decoded_payload
-          print("contents:", page_content_bs)
-          resources = page.Resources
-          print(s(resources))
-          print(s(resources.object))
-          print(dict(resources.object))
+          with Pfx("page %d", pagenum):
+            print('    Page', pagenum)
+            print('     ', s(page))
+            print('     ', dict(page.object))
+            ##print("I15 =>", page['I15'])
+            ##image_15 = page['I15']
+            ##print(
+            ##    "image 15 is_image", image_15.is_image(), "size",
+            ##    image_15.image.size
+            ##)
+            ##image_15.image.show()
+            content_obj = page.Contents.object
+            print('     ', content_obj)
+            pprint(content_obj.context_dict)
+            page_content_bs = content_obj.decoded_payload
+            print("contents:", page_content_bs)
+            resources = page.Resources
+            print("page.Resources", s(resources))
+            print(" ", repr(resources))
+            print(s(resources))
+            try:
+              obj = resources.object
+            except AttributeError as e:
+              warning("no Page.resources.object: %s", e)
+            else:
+              print(s(resources.object))
+              print(dict(resources.object))
 
-          def on_draw_object(obj):
-            X("page %d: obj %s", pagenum, s(obj))
-            X("  context dict %r", obj.context_dict)
-            if obj.is_image():
-              X("  width %r height %r", obj.Width, obj.Height)
+            def on_draw_object(obj):
+              X("page %d: obj %s", pagenum, s(obj))
+              X("  context dict %r", obj.context_dict)
+              if obj.is_image():
+                X("  width %r height %r", obj.Width, obj.Height)
 
-          page.render(on_draw_object=on_draw_object)
-          break
-        break
+            page.render(on_draw_object=on_draw_object)
+            ##break
+        ##break
         for (objnum, objgen), iobj in sorted(pdf.objmap.items()):
           runstate.raiseif()
           print(
@@ -154,29 +170,6 @@ class PDFCommand(BaseCommand):
           if isinstance(obj, Stream) and obj.is_image():
             print("   ", obj.image)
         break
-        for token in pdf.tokens:
-          runstate.raiseif()
-          if isinstance(token, Comment):
-            print('=>', r(token))
-          elif isinstance(token, Stream):
-            ##print('stream', len(token.payload))
-            ##pprint(token.context_dict)
-            decoded_bs = token.decoded_payload
-            ##print('  =>', len(decoded_bs), 'bytes decoded')
-            subtype = token.context_dict.get(b'Subtype')
-            ##print("  subtype", subtype)
-            if (subtype == b'Image' and (1 or token.filters)
-                and (1 or token.filters[-1] == b'DCTDecode')
-                and (1 or b'SMask' not in token.context_dict)):
-              print("Image:")
-              pprint(token.context_dict)
-              im = token.image
-              ##im.show()
-              ##exit(1)
-            else:
-              print("skip stream subtype", repr(subtype))
-              pprint(token.context_dict)
-          ##break
 
 # Binary regexps for PDF tokens.
 # Most of these consist of a pair:
@@ -271,12 +264,6 @@ class Reaction:
         where `m` is the `re.Match` object.
         Returns `None` if the leadin pattern does not match
         or the pattern cannot be matched before EOF.
-
-        The optional parameter `preious_object` may be supplied
-        as the previous semantic object from the PDF token stream.
-        This intended is to support parsing `stream` objects
-        which require access to a preceeding dictionary
-        in order to know the payload length.
 
         This requires a match followed by at least one byte post
         the token or followed by EOF. The buffer is extended until
@@ -443,32 +430,33 @@ class ArrayObject(list):
   '''
 
   def __bytes__(self):
-    return b''.join(
+    return b''.join((
         b'[ ',
         *map(bytes, self),
         b' ]',
-    )
+    ))
 
 class DictObject(dict):
   ''' A PDF dictionary.
   '''
 
   def __bytes__(self):
-    return b''.join(
+    bss = [
         b'<<\r\n',
-        *chain(
-            (b'  ', bytes(k), b'\r\n    ', bytes(v), b'\r\n')
-            for k, v in sorted(self.items())
-        ),
-        b'>>',
-    )
+    ]
+    for kvbss in ((b'  ', bytes(k), b'\r\n    ', bytes(v), b'\r\n')
+                  for k, v in sorted(self.items())):
+      bss.extend(kvbss)
+    bss.append(b'>>',)
+    return b''.join(bss)
 
   @typechecked
   def __getattr__(self, key: str):
     ''' Provide access to the entries by name.
     '''
+    name = Name.promote(key)
     try:
-      return self[Name.promote(key)]
+      return self[name]
     except KeyError:
       raise AttributeError(
           f'{self.__class__.__name__}.{key}: keys={sorted(self.keys())}'
@@ -519,9 +507,11 @@ class ObjectRef:
 
   def __bytes__(self):
     return b' '.join(
-        str(self.number).encode('ascii'),
-        str(self.generation).encode('ascii'),
-        b'R',
+        (
+            str(self.number).encode('ascii'),
+            str(self.generation).encode('ascii'),
+            b'R',
+        )
     )
 
   @property
@@ -924,6 +914,7 @@ def tokenise(buf: CornuCopyBuffer, debug_matches=False):
             debug("matched %s", r(token))
           break
       else:
+        # no reactions match
         if buf.at_eof():
           # end parse loop
           if debug_matches:
@@ -936,7 +927,6 @@ def tokenise(buf: CornuCopyBuffer, debug_matches=False):
             buf.peek(8, short_ok=True),
         )
         token = buf.take(1)
-        break  ## debug
       if isinstance(token, StringOpen):
         in_str_stack.append(in_str)
         in_str = StringParts([token[1:]])
@@ -947,8 +937,9 @@ def tokenise(buf: CornuCopyBuffer, debug_matches=False):
           in_str = in_str_stack.pop()
         else:
           warning("unexpected %r, in_str is %r", token, in_str)
-      if in_str is None:
-        yield token
+    # NB: _outside_ the Pfx() context because this is a generator function
+    if in_str is None:
+      yield token
   while in_str is not None:
     warning("tokenise(%s): unclosed %s at EOF", buf, r(in_str))
     try:
@@ -956,24 +947,60 @@ def tokenise(buf: CornuCopyBuffer, debug_matches=False):
     except IndexError:
       break
 
+class PDFObjectMapping(dict):
+  ''' A mapping of `(number,generation)`->`IndirectObject`
+      Which can use the xref table to fetch missing objects on demand.
+  '''
+
+  @typechecked
+  def __init__(self, pdfdoc: Optional["PDFDocument"] = None):
+    self.pdfdoc = pdfdoc
+    super().__init__()
+
+  @typechecked
+  def __missing__(self, key: Tuple[int, int]) -> IndirectObject:
+    pdfdoc = self.pdfdoc
+    obj_xrefs = pdfdoc.obj_xrefs
+    if obj_xrefs is None:
+      raise KeyError(key)
+    obj_xref = obj_xrefs[key]
+    if obj_xref.free:
+      raise KeyError("object %r is marked as free", key)
+    assert obj_xref.offset > 0
+    buf = CornuCopyBuffer([pdfdoc.mmv[obj_xref.offset:]])
+    obj = pdfdoc.scan_obj(buf)
+    self[key] = obj
+    return self
+
 @dataclass
 class PDFDocument(AbstractBinary):
   ''' A PDF document.
   '''
 
-  objmap: Mapping[Tuple[int, int], Any] = field(default_factory=dict)
-  tokens: List = field(default_factory=list)
-  values: List = field(default_factory=list)
+  objmap: PDFObjectMapping = field(default_factory=PDFObjectMapping)
+  # object number xref table if loaded
+  obj_xrefs: Optional[List["ObjectXref"]] = None
   # mapping of object types to a list of objects
   by_obj_type: Mapping[bytes, List[Any]] = field(
       default_factory=lambda: defaultdict(list)
   )
 
+  def __init__(
+      self,
+      *,
+      objmap: PDFObjectMapping,
+      obj_xrefs: Optional[List["ObjectXref"]] = None,
+  ):
+    self.objmap = objmap
+    self.obj_xrefs = obj_xrefs
+    if obj_xrefs is not None:
+      obj_xrefs.pdfdoc = self
+    self.by_obj_type: Mapping[bytes, List[Any]] = defaultdict(list)
+
   def __str__(self):
     return (
         f'{self.__class__.__name__}('
-        f'objects[{len(self.objmap)}],t'
-        f'okens[{len(self.tokens)}],'
+        f'objects[{len(self.objmap)}],'
         f'values[{len(self.values)}]'
         ')'
     )
@@ -992,7 +1019,10 @@ class PDFDocument(AbstractBinary):
     '''
     catalogs = self.by_obj_type[Name(b'Catalog')]
     if not catalogs:
-      warning("no catalogs in document")
+      warning(
+          "no catalogs in document; existing obj types: %r",
+          sorted(self.by_obj_type.keys())
+      )
       return None
     if len(catalogs) > 1:
       warning("%d catalogs in document", len(catalogs))
@@ -1056,6 +1086,9 @@ class PDFDocument(AbstractBinary):
   @uses_runstate
   def make_cbz_images(self, base: str, *, runstate: RunState):
     ''' A generator for the `images` parameter for `cs.ebooks.cbs.make_cbz`.
+       This yields a temporary filesystem path to the image
+       and the desired filename for use in the CBZ file.
+       The temporary file exists only for the duration of the yield.
     '''
     for pagenum, imgnum, im in self.page_images():
       runstate.raiseif()
@@ -1066,24 +1099,53 @@ class PDFDocument(AbstractBinary):
           pfx_call(im.save, T.name)
           yield T.name, basename(imgpath)
 
+  @typechecked
+  def scan_obj(self, buf: CornuCopyBuffer) -> IndirectObject:
+    ''' Scan `buf` for the definition of an object (`obj`..`endobj`).
+        Return the resulting `IndirectObject`.
+    '''
+    return type(self).parse(buf, pdfdoc=self, first_obj=True)
+
   @classmethod
   @promote
-  def parse(cls, buf: CornuCopyBuffer) -> 'PDFDocument':
+  @require(lambda pdfdoc, first_obj: not first_obj or pdfdoc is not None)
+  @ensure(
+      lambda first_obj, result:
+      isinstance(result, (IndirectObject if first_obj else PDFDocument))
+  )
+  @typechecked
+  def parse(
+      cls,
+      buf: CornuCopyBuffer,
+      *,
+      pdfdoc: Optional["PDFDocument"] = None,
+      first_obj=False,
+  ) -> Union['PDFDocument', IndirectObject]:
     ''' Scan `buf`, return a `PDFDocument`.
+
+        An existing `PDFDocument` may be supplied as the optional
+        `pdfdoc` argument in which case the parse will update that
+        document instead of created a new empty document.
+
+        If the optional parameter `first_obj` is true the parse
+        will complete on the definition of the first `obj`..`endobj`
+        indirect object definition and the resulting `IndirectObject`
+        will be returned.
+        This requires a preexisting `PDFDocument` to be supplied as `pdfdoc`.
     '''
-    tokens = []
-    objmap: Mapping[Tuple[int, int], IndirectObject] = {}
+    if pdfdoc is None:
+      objmap: Mapping[Tuple[int, int], IndirectObject] = {}
+      by_obj_type = defaultdict(list)
+      pdfdoc = cls(objmap=objmap, by_obj_type=by_obj_type)
+    else:
+      objmap = pdfdoc.objmap
+      by_obj_type = pdfdoc.by_obj_type
     values = []
-    by_obj_type = defaultdict(list)
-    pdfdoc = cls(
-        tokens=tokens, objmap=objmap, values=values, by_obj_type=by_obj_type
-    )
     values_stack = []
     in_obj = None
     in_obj_stack = []
     tokens_it = tokenise(buf)
     for token in tokens_it:
-      tokens.append(token)
       if not isinstance(token, (
           Comment,
           WhiteSpace,
@@ -1123,7 +1185,17 @@ class PDFDocument(AbstractBinary):
             pass
         if objtype is not None:
           by_obj_type[objtype].append(objvalue)
-        continue
+        if not first_obj:
+          # conventional parse, proceed as normal
+          continue
+        # we will return the new IndirectObject
+        # we should really only have the IndirectObject left on the stack
+        if len(values) != 1:
+          warning(
+              "%d spurious objects left on the stack: %r",
+              len(values) - 1, values[:-1]
+          )
+        return iobj
       # number generation "R"
       if isinstance(token, Keyword) and token == b'R':
         # an object reference
@@ -1134,7 +1206,6 @@ class PDFDocument(AbstractBinary):
         objref = ObjectRef(objmap, number, generation)
         # replace the last 3 values
         values[-3:] = [objref]
-        generation = tokens.pop()
         continue
       if isinstance(token, ArrayOpen):
         in_obj_stack.append(in_obj)
@@ -1197,7 +1268,11 @@ class PDFDocument(AbstractBinary):
                 "could not resolve stream length, falling back to looking for endstream"
             )
             peeklen = 24
-            end_re = re.compile(b'\r?\nendstream[\r\n]')
+            # endstream is _supposed_ to be preceeded by an end of line
+            # but some real world PDFs... don't
+            # I might be looking at you, "GPL Ghostscript 10.01.2" grr
+            ##end_re = re.compile(b'\r?\nendstream[\r\n]')
+            end_re = re.compile(b'endstream[\r\n]')
             while True:
               bs = buf.peek(peeklen)
               m = end_re.search(bs)
@@ -1227,9 +1302,7 @@ class PDFDocument(AbstractBinary):
             warning("expected EOL after payload")
           endstream = next(tokens_it)
           assert isinstance(endstream, Keyword) and endstream == b'endstream'
-          assert tokens[-1] is token
           stream = Stream(context_dict, payload)
-          tokens[-2:] = [stream]
           values[-2:] = [stream]
           continue
     return pdfdoc
@@ -1237,7 +1310,195 @@ class PDFDocument(AbstractBinary):
   def transcribe(self):
     ''' Yield `bytes` instances transcribing the PDF document.
     '''
-    yield from iter(self.tokens)
+    raise RuntimeError(
+        "no transcribe, probably best to write a whole clean PDFDocument"
+    )
+
+@pfx
+@typechecked
+def mmap_pdf(f) -> PDFDocument:
+  ''' Map the file `f` and return a `PDFDocument` whose raw payloads
+      are memoryviews of the `mmap`.
+      This requires a regular file and a conforming PDF document
+      with the standard trailer section (7.5.5).
+  '''
+  if isinstance(f, int):
+    fd = os.dup(f)
+  else:
+    fd = pfx_call(os.open, f, os.O_RDONLY)
+  mmv = memoryview(pfx_call(mmap, fd, 0, flags=MAP_PRIVATE, prot=PROT_READ))
+  startxref_offset, xref_offset = mmv_read_startxref(mmv)
+  trailer = mmv_read_trailer_dict(mmv, startxref_offset)
+  nobjs = trailer.Size
+  assert nobjs > 0
+  obj_xrefs = mmv_read_xrefs(mmv, xref_offset, nobjs)
+  pdf = PDFDocument(obj_xrefs=obj_xrefs)
+  return pdf
+
+@ensure(lambda result: result[0] > result[1] > 0)
+@typechecked
+def mmv_read_startxref(mmv: memoryview) -> Tuple[int, int]:
+  ''' Read the `startxref`..`%%EOF` lines at the end of `mmv`.
+      Return a 2-tuple `(startxref_offset,xref_offset)`
+      where `startxref_offset` is the offset of the `startxref` keyword
+      and `xref_offset` is the offset of the `xref` cross reference section.
+  '''
+  # locate the startxref
+  startxref_re = re.compile(br'\nstartxref\r?\n(\d+)\r?\n%%EOF\r?\n')
+  m = None
+  mmvlen = len(mmv)
+  for i, b in enumerate(mmv[:-19:-1], 20):
+    if b == 10:  # LF
+      offset = mmvlen - i
+      m = startxref_re.match(mmv, offset)
+      if m is not None:
+        print("pos", m.start(), bytes(mmv[offset:]))
+        break
+  if m is None:
+    raise ValueError('no startxref found')
+  assert m.end() == len(mmv)
+  startxref_offset = m.start() + 1
+  xref_offset = int(m.group(1))
+  return startxref_offset, xref_offset
+
+@dataclass
+class InUseObjectXref:
+  ''' A record for an in-use entry in the object cross reference table.
+  '''
+  number: int
+  generation: int
+  offset: Optional[int] = None
+
+  @property
+  def free(self):
+    return False
+
+@dataclass
+class FreeObjectXref:
+  ''' A record for a free entry in the object cross reference table.
+  '''
+  number: int
+  generation: int
+  next_free: int
+
+  @property
+  def free(self):
+    return True
+
+ObjectXref = Union[FreeObjectXref, InUseObjectXref]
+
+@require(lambda mmv, xref_offset: xref_offset >= 0 and xref_offset < len(mmv))
+@require(lambda nobj: nobj >= 1)
+@typechecked
+def mmv_read_xrefs(
+    mmv: memoryview,
+    xref_offset: int,
+    nobjs: int,
+) -> List[ObjectXref]:
+  ''' Read the object cross reference section from `mmv` at `xref_offset`.
+      The `nobjs` parameter specifies the number of objects defined by the table.
+  '''
+  OBJSPEC_LINE_ENDINGS = b' \r', b' \n', b'\r\n'
+  assert all(len(bs) == 2 for bs in OBJSPEC_LINE_ENDINGS)
+  buf = CornuCopyBuffer.from_bytes(mmv[xref_offset:], offset=xref_offset)
+  with Pfx("offset %d", buf.offset):
+    xref_line = buf.readline()
+    if xref_line.rstrip() != 'xref':
+      raise ValueError("missing 'xref' header line")
+  obj_xrefs = [None] * nobjs
+  n = 0
+  while n < nobjs:
+    with Pfx("offset %d", buf.offset):
+      start, count = [int(bs) for bs in buf.readline().rstrip().split()]
+      if start < 0 or start >= nobjs:
+        raise ValueError(f'start out of range, expected 0<={start=}<{nobjs=}')
+      if count < 1 or start + count > nobjs:
+        raise ValueError(
+            f'count out of range, expected {count=}>0 and {start=}+{count=}<={objs=}'
+        )
+      assert 0 <= start < start + count <= nobjs
+    for idx in range(start, start + count):
+      with Pfx("offset %d, obj index %d", buf.offset, idx):
+        obj_line = buf.take(20)
+        n += 1
+        if obj_xrefs[idx] != None:
+          warning(
+              "SKIP, existing record for object %d exists: %s", idx,
+              obj_xrefs[idx]
+          )
+          continue
+        with Pfx("line %r", obj_line):
+          if not obj_line.endswith(OBJSPEC_LINE_ENDINGS):
+            raise ValueError(
+                'invalid line ending, should be one of %r',
+                OBJSPEC_LINE_ENDINGS
+            )
+          nnnnnnnnnn, ggggg, fn_bs = obj_line[:-2].split()
+          if fn_bs == b'n':
+            if len(nnnnnnnnnn) != 10:
+              warning(
+                  "invalid nnnnnnnnnn field, should be 10 bytes: %r",
+                  nnnnnnnnnn
+              )
+            if len(ggggg) != 10:
+              warning("invalid ggggg field, should be 5 bytes: %r", ggggg)
+            obj_xrefs[idx] = InUseObjectXref(
+                number=idx, generation=int(ggggg), offset=int(nnnnnnnnnn)
+            )
+          elif fn_bs == b'f':
+            if len(nnnnnnnnnn) != 10:
+              warning(
+                  "invalid nnnnnnnnnn field, should be 10 bytes: %r",
+                  nnnnnnnnnn
+              )
+            if len(ggggg) != 10:
+              warning("invalid ggggg field, should be 5 bytes: %r", ggggg)
+            obj_xrefs[idx] = FreeObjectXref(
+                number=idx, generation=int(ggggg), next_free=int(nnnnnnnnnn)
+            )
+          else:
+            warning("ignoring invalid n/f field %r", fn_bs)
+            continue
+  assert all(xref is not None for xref in obj_xrefs)
+  return obj_xrefs
+
+@require(
+    lambda mmv, startxref_offset: startxref_offset > 0 and startxref_offset <
+    len(mmv)
+)
+@require(
+    lambda mmv, startxref_offset:
+    (mmv[startxref_offset:startxref_offset + 9] == b'startxref')
+)
+@typechecked
+def mmv_read_trailer_dict(
+    mmv: memoryview, startxref_offset: int
+) -> DictObject:
+  ''' Read the trailer dictionary from `mmv` preceeding the `startxref` line
+      which is at offset `startxref_offset`.
+
+      Section 7.5.5 is annoying vague about the allowed syntax here.
+      It looks like there are no inline dicts within the trailer dict,
+      just indirect dict references.
+  '''
+  # scan for the "trailer" line and dict
+  mmvlen = len(mmv)
+  # for now, start at the LF before starxref
+  for i, b in enumerate(reversed(mmv[:startxref_offset]), 1):
+    if b == 10:  # LF
+      # offset of byte after the LF
+      offset1 = startxref_offset - i + 1
+      if mmv[offset1:offset1 + 7] == b'trailer':
+        # scan for "trailer" then a dictionary
+        buf = CornuCopyBuffer([mmv[offset1:startxref_offset]], offset=offset1)
+        tokens = tokenise(buf)
+        trailer_kw = next(tokens)
+        if trailer_kw != Keyword(b'trailer'):
+          continue
+        assert False
+      breakpoint()
+  # now locate the trailer dict,
+  raise RuntimeError
 
 @dataclass
 class PDFCatalog:
@@ -1300,7 +1561,7 @@ class PDFPage:
   def __getitem__(self, resource: Name):
     ''' Indexing returns the named resources `XObject` entry.
     '''
-    xobjs = self.resources.XObject
+    xobjs = self.Resources.XObject.object
     try:
       ref = xobjs[resource]
     except KeyError:

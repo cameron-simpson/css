@@ -1,0 +1,55 @@
+lib/python/cs/cmdutils.py: replace many raises of RuntimeError with NotImplementedError, suggestion by @dimaqq on disucss.python.org
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: update the docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: make SUBCOMMAND_ARGV_DEFAULT be 'shell' for an interactive prompt
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_shell, BaseCommandCmd: pass self to the Cmd instance, various related fixes and updates
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.subcommand_usage_text: indent the second and following lines; BaseCommand.cmd_help: mention -l (long) in short mode
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: drop __init_subclass__, now done in cs.py.doc for presentation purposes
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions: new as_dict() method
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new hash_subcommands() class method
+lib/python/cs/cmdutils.py: cs.cmdutils: fix docstring typo
+lib/python/cs/cmdutils.py: cs.cmdutils: fiddle with indents for subusages from BaseCommand subcommands
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand is now a data class
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.__call__: directly handle classes vs methods, removes need for subclasses
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.subcommands: use @functools.cache, just make a subcmd->SubCommand mapping directly here
+lib/python/cs/cmdutils.py: cs.cmdutils: drop SubCommand.from_class, obsoleted by new BaseCommand.subcommands
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: new default_usage() method returning the appropriate default top usage line
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: make .cmd optional
+lib/python/cs/cmdutils.py: cs.cmdutils: new SubCommand.get_cmd() to return the cmd or make one based on the method
+lib/python/cs/cmdutils.py: cs.cmdutils: call ubCommand.get_cmd()
+lib/python/cs/cmdutils.py: cs.cmdutils: new SubCommand.get_usage_format to return a format string for rendering the usage message
+lib/python/cs/cmdutils.py: cs.cmdutils: new SubCommand.get_usage_keywords() to return a keyword mapping for use with the usage format string
+lib/python/cs/cmdutils.py: cs.cmdutils: new SubCommand .get_subcmds()->List[str] and .get_subcommands()->Mapping[str,SubCommand] methods for enquiring about the subcommands of this SubCommand
+lib/python/cs/cmdutils.py: cs.cmdutils: new SubCommand.usage_text() to compose the full usage text for this SubCommand
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: drop the old .usage_format() implementation and the old subclasses
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: a zillion minor changes stemming from recent changes
+lib/python/cs/cmdutils.py: cs.cmdutils: new BaseCommand.subcommand(subcmd) returning its SubCommand instance
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.usage_text(): now just a shim for SubCommand.usage_text()
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_help: modernise access to a SubCommand
+lib/python/cs/cmdutils.py: cscmdutils: remove BaseCommand.subcommand_usage_text, no longer used
+lib/python/cs/cmdutils.py: cs.cmdutils: update imports, drop unused variable
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: require a .command:BaseCommand instance
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: new .instance property, being a dummy BaseCommand instance of self.method if it is a class, otherwise the instance bound to self.method
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.__call__: drop subcmd parameter, get from self.get_cmd()
+lib/python/cs/cmdutils.py: cs.cmdutils: SubComand.default_usage: handle self.method being a class
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_format: fix access to USAGE_FORMAT, strip leading "Usage: " from legacy format strings
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_subcmds: derive from self.get_subcommands().keys()
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: get the initial mapping via lf.gself.get_usage_keywords()
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: accept Ellipsis for argv for the dummy instances used by SubCommand, split the prep needs to actually run into a ._prerun_setup, other small changes
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_subcommands: promote self.method from class to instance
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.subcommands: back to being an instance method so that we can supplied the instance to SubCommand
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: drop the .command field
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.has_subcommands: an instance method, like the subcommands() method
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.subcommand(subcmd): instance method which does the normalisation itself
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.usage_text: drop the subcmd parameter, replace with show_subcmds
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: call self._prerun_setup(), drop use of ._printed_usage, insert "Usage: " at the front of the text
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: we no longer need to push .cmd onto self
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_help: back to being an instance method, most logic now inside SubCommand.usage_text()
+lib/python/cs/cmdutils.py: cs.cmdutils: remove unused imports
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: put the .command field back, used in __call__
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: show_subcmds=None becomes True
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: default self._run to return 2 (bad usage)
+lib/python/cs/cmdutils.py: merge default ==> vt
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: the is on self._subcmd
+lib/python/cs/cmdutils.py: merge default -> vt
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_shell: run the command loop inside Upd.without()
+lib/python/cs/cmdutils.py: cs.cmdutils: resolve merge conflict from merging the vt branch

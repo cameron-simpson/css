@@ -647,7 +647,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       for tag in inferred_tags.as_tags():
         tagged.add(tag)
     else:
-      raise RuntimeError("unhandled mode %r" % (mode,))
+      raise NotImplementedError("unhandled mode %r" % (mode,))
     return inferred_tags
 
 uses_tagger = default_params(tagger=Tagger.default)

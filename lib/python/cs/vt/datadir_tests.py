@@ -16,7 +16,7 @@ from cs.randutils import randomish_chunks
 from cs.testutils import product_test
 
 from .datadir import DataDir, FileDataIndexEntry
-from .hash import HASHCLASS_BY_NAME
+from .hash import HashCode
 from .index import (
     class_names as indexclass_names,
     class_by_name as indexclass_by_name,
@@ -47,8 +47,8 @@ def multitest(test_method):
           for indexname in sorted(indexclass_names())
       ],
       hashclass=[
-          HASHCLASS_BY_NAME[hashname]
-          for hashname in sorted(HASHCLASS_BY_NAME.keys())
+          HashCode.by_hashname[hashname]
+          for hashname in sorted(HashCode.by_hashname.keys())
       ],
   )
 

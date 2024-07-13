@@ -55,7 +55,7 @@ import sys
 from cs.ansi_colour import colourise
 from cs.gimmicks import open_append
 
-__version__ = '20240316-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -114,7 +114,11 @@ def X(msg, *args, **kw):
     raise ValueError("unexpected keyword arguments: %r" % (kw,))
   msg = str(msg)
   if args:
-    msg = msg % args
+    try:
+      msg = msg % args
+    except TypeError as e:
+      X("X(%r, *%r): %s", msg, args, e, colour='red', file=fp, **kw)
+      msg = "%s %% %r" % (msg, args)
   if colour:
     msg = colourise(msg, colour=colour)
   close_fp = None

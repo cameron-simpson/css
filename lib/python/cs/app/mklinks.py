@@ -85,7 +85,7 @@ class MKLinksCmd(BaseCommand):
     if opt == '-n':
       self.options.dry_run = True
     else:
-      raise RuntimeError("unhandled option")
+      raise NotImplementedError("unhandled option")
 
   @uses_runstate
   def main(self, argv, *, runstate: RunState):

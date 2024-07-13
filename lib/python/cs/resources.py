@@ -19,17 +19,18 @@ from typing import Any, Callable, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import contextif, stackattrs, setup_cmgr, ContextManagerMixin
-from cs.deco import default_params, OBSOLETE
+from cs.deco import decorator, default_params, OBSOLETE
 from cs.fsm import FSM
 from cs.gimmicks import error, warning, nullcontext
 from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
-from cs.py.stack import caller, frames as stack_frames, StackSummary
+from cs.py.func import funccite
+from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20240519-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -45,6 +46,7 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'cs.psutils',
+        'cs.py.func',
         'cs.py.stack',
         'cs.result',
         'cs.threads',
@@ -56,9 +58,10 @@ class ClosedError(Exception):
   ''' Exception for operations invalid when something is closed.
   '''
 
+@decorator
 def not_closed(func):
-  ''' Decorator to wrap methods of objects with a .closed property
-      which should raise when self.closed.
+  ''' A decorator to wrap methods of objects with a `.closed` property
+      which should raise when `self.closed`.
   '''
 
   def not_closed_wrapper(self, *a, **kw):
@@ -70,7 +73,6 @@ def not_closed(func):
       )
     return func(self, *a, **kw)
 
-  not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
@@ -134,7 +136,11 @@ class _MultiOpenMixinOpenCloseState:
       opens = self.opens
       if opens < 1:
         error("%s: UNDERFLOW CLOSE from %s", self, caller())
-        error("  final close was from %s", self.final_close_from)
+        final_close_from = self.final_close_from
+        if not final_close_from:
+          warning("  no self.final_close_from recorded")
+        else:
+          error("  final close was from %s", self.final_close_from)
         for frame_key in sorted(self.opens_from.keys()):
           error(
               "  opened from %s %d times", frame_key,
@@ -145,7 +151,7 @@ class _MultiOpenMixinOpenCloseState:
       self.opens = opens
       if opens == 0:
         ##INACTIVE##self.tcm_dump(MultiOpenMixin)
-        self.final_close_from = caller_frame
+        self.final_close_from = caller_frame or caller()
         teardown, self._teardown = self._teardown, None
         retval = teardown()
         self.join_lock.release()
@@ -573,6 +579,7 @@ class RunState(FSM, HasThreadState):
   FSM_TRANSITIONS = {
       'IDLE': {
           'start': 'RUNNING',
+          'cancel': 'IDLE',
       },
       'RUNNING': {
           'cancel': 'STOPPING',
@@ -584,6 +591,7 @@ class RunState(FSM, HasThreadState):
       },
       'STOPPED': {
           'start': 'RUNNING',
+          'cancel': 'STOPPED',
       },
   }
 
@@ -691,7 +699,10 @@ class RunState(FSM, HasThreadState):
     '''
     new_state = super().fsm_event(event, **extra)
     if event == 'cancel':
-      self._canceled = True
+      self._cancelled = True
+      # TODO: use the main FSM callback mechanism
+      for notify in self.notify_cancel:
+        notify(self)
     elif event == 'start':
       self._cancelled = False
       self.start_time = time.time()
@@ -746,12 +757,6 @@ class RunState(FSM, HasThreadState):
         return True
     return False
 
-  @cancelled.setter
-  def cancelled(self, cancel_status):
-    ''' Set the .cancelled attribute.
-    '''
-    self._cancelled = cancel_status
-
   def raiseif(self, msg=None, *a):
     ''' Raise `CancellationError` if cancelled.
         This is the concise way to terminate an operation which honour
@@ -787,8 +792,6 @@ class RunState(FSM, HasThreadState):
     ''' Set the cancelled flag; the associated process should notice and stop.
     '''
     self.fsm_event('cancel')
-    for notify in self.notify_cancel:
-      notify(self)
 
   @property
   def run_time(self):
@@ -799,7 +802,7 @@ class RunState(FSM, HasThreadState):
     start_time = self.start_time
     if start_time is None:
       return 0.0
-    if self.is_running:
+    if self.is_running or self.stop_time is None:
       stop_time = time.time()
     else:
       stop_time = self.stop_time
@@ -851,11 +854,29 @@ class RunState(FSM, HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
-# default to the current RunState or make one
-uses_runstate = default_params(
-    runstate=lambda:
-    (RunState.default(factory=partial(RunState, thread_wide=True)))
-)
+@decorator
+def uses_runstate(func, name=None):
+  ''' A wrapper for `@default_params` which makes a new thread wide
+      `RunState` parameter `runstate` if missing.
+      The optional decorator parameter `name` may be used to specify
+      a name for the new `RunState` if one is made. The default
+      comes from the wrapped function's name.
+
+      Example:
+
+          @uses_runstate
+          def do_something(blah, *, runstate:RunState):
+              ... do something, polling the runstate as approriate ...
+  '''
+  if name is None:
+    name = funccite(func)
+  return default_params(
+      func,
+      runstate=lambda: (
+          RunState.
+          default(factory=partial(RunState, name=name, thread_wide=True))
+      )
+  )
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.

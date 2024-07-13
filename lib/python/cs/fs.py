@@ -32,7 +32,7 @@ from cs.deco import decorator, fmtdoc
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20240422-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -140,7 +140,7 @@ def scandirtree(
       * `dirpath`: the directory to scan, default `'.'`
       * `include_dirs`: if true yield directories; default `False`
       * `name_selector`: optional callable to select particular names;
-        the default is to select names no starting with a dot (`'.'`)
+        the default is to select names not starting with a dot (`'.'`)
       * `only_suffixes`: if supplied, skip entries whose extension
         is not in `only_suffixes`
       * `skip_suffixes`: if supplied, skip entries whose extension
@@ -160,23 +160,27 @@ def scandirtree(
     except NotADirectoryError:
       yield False, path
       continue
-    if include_dirs:
+    if not recurse and include_dirs:
       yield True, path
     if sort_names:
       dirents = sorted(dirents, key=lambda entry: entry.name)
     for entry in dirents:
-      if recurse and entry.is_dir(follow_symlinks=follow_symlinks):
-        pending.append(entry.path)
       name = entry.name
       if not name_selector(name):
         continue
       if only_suffixes or skip_suffixes:
-        base, ext = splitext(name)
+        _, ext = splitext(name)
         if only_suffixes and ext[1:] not in only_suffixes:
           continue
         if skip_suffixes and ext[1:] in skip_suffixes:
           continue
-      if include_dirs or not entry.is_dir(follow_symlinks=follow_symlinks):
+      is_dir = entry.is_dir(follow_symlinks=follow_symlinks)
+      if is_dir:
+        if recurse:
+          pending.append(entry.path)
+        if include_dirs:
+          yield True, entry.path
+      else:
         yield False, entry.path
 
 def scandirpaths(dirpath='.', **scan_kw):
@@ -328,13 +332,12 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
 
     '''
     if '_lock' in self.__dict__:
-      return False
+      return
     fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
     if lock is None:
       lock = Lock()
     self._lock = lock
-    return True
 
 SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 
@@ -368,15 +371,20 @@ def shortpath(
     parents = list(leaf.parents)
     paths = [leaf] + parents
 
-    def statkey(P):
+    def statkey(S):
+      ''' A 2-tuple of `(S.st_dev,Sst_info)`.
+      '''
+      return S.st_dev, S.st_ino
+
+    def pathkey(P):
       ''' A 2-tuple of `(st_dev,st_info)` from `P.stat()`
-            or `None` if the `stat` fails.
-        '''
+          or `None` if the `stat` fails.
+      '''
       try:
         S = P.stat()
       except OSError:
         return None
-      return S.st_dev, S.st_ino
+      return statkey(S)
 
     base_s = None
     if collapseuser:
@@ -407,7 +415,7 @@ def shortpath(
       pathindex_by_key = {
           sk: i
           for sk, i in
-          ((statkey(path_as[0]), i) for i, path_as in enumerate(paths_as))
+          ((pathkey(path_as[0]), i) for i, path_as in enumerate(paths_as))
           if sk is not None
       }
       # scan from the base towards the leaf, excluding the leaf
@@ -422,31 +430,33 @@ def shortpath(
           for entry in os.scandir(path):
             if not entry.name.isalpha():
               continue
-            ep = Path(entry.path)
             try:
-              if not ep.is_symlink():
+              if not entry.is_symlink():
                 continue
+              sympath = os.readlink(entry.path)
             except OSError:
+              continue
+            # only consider clean subpaths
+            if not is_valid_rpath(sympath):
               continue
             # see the the symlink resolves to a path entry
             try:
-              pathndx = pathindex_by_key[statkey(ep)]
+              pathndx = pathindex_by_key[statkey(entry.stat())]
             except KeyError:
               continue
             if skip_to_i is None or pathndx > skip_to_i:
               # we will advance to skip_to_i
               skip_to_i = pathndx
               # note the symlink name for this component
-              paths_as[skip_to_i][1] = ep.name
+              paths_as[skip_to_i][1] = entry.name
           i = i + 1 if skip_to_i is None else skip_to_i
         except OSError:
           i += 1
     parts = list(
-        (path_as[0].path if i == 0 else path_as[0].name
-         ) if path_as[1] is None else path_as[1]
+        (path_as[1] or (path_as[0].path if i == 0 else path_as[0].name))
         for i, path_as in enumerate(keep_as)
     )
-    parts.append(leaf.name)
+    parts.append(paths_as[-1][1] or leaf.name)
     fspath = os.sep.join(parts)
   # replace leading prefix
   for prefix, subst in prefixes:

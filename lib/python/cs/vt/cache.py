@@ -139,6 +139,14 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
       return h in backend
     return False
 
+  def __len__(self):
+    ''' Count the number of keys by iterating through them all.
+    '''
+    length = 0
+    for _ in self.keys():
+      length += 1
+    return length
+
   def keys(self):
     ''' Mapping method for .keys.
     '''
