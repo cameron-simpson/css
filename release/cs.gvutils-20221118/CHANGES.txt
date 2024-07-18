@@ -1,0 +1,8 @@
+lib/python/cs/gvutils.py: cs.gvutils: comment out the data URL rendering, as nothing presents it
+lib/python/cs/gvutils.py: cs.gvutils: provide stub DISTINFO[install_requires] to happy my release script
+lib/python/cs/gvutils.py: cs.gvutils: quote: provide escape sequence for newline
+lib/python/cs/gvutils.py: cs.gvutils: DOTNodeMixin: provide .dot_node_id property, default `str(id(self))`
+lib/python/cs/gvutils.py: cs.gvutils: DOTNodeMixin.dot_node: omit [attrs] if they are empty
+lib/python/cs/gvutils.py: cs.gvutils: DOTNodeMixin: new .dot_node_palette_key property, new __getattr__ for .dot_node_*color attributes, new empty default DOT_NODE_COLOR_PALETTE and DOT_NODE_FILLCOLOR_PALETTE class attributes
+lib/python/cs/gvutils.py: cs.gvutils: DOTNodeMixin.dot_node: include the node label in the attributes
+lib/python/cs/gvutils.py: cs.fsm,cs.gvutils: from FSM.dot_node_attrs, add colours to DOTNodeMixin.dot_node_attrs and fix "fontcolor"

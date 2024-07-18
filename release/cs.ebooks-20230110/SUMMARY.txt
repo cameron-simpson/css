@@ -1,0 +1,3 @@
+cs.ebooks.dedrm: new experimental module to use DeDRM/noDRM outside the Calibre plugin environment.
+Use the dedrm stuff in "kindle export" and "calibre add".
+Set $DEDRM_PACKAGE_PATH to the path to the DeDRM_plugin subdirectory of a checkout of git@github.com:noDRM/DeDRM_tools.git.

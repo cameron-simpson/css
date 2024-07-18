@@ -1,0 +1,4 @@
+lib/python/cs/mappings.py: cs.mappings; improve some assert messages
+lib/python/cs/mappings.py: merge default ==> tagger
+lib/python/cs/mappings.py: AttrableMappingMixin.__getattr__: fast path the check for "ATTRABLE_MAPPING_DEFAULT", fixes unbound recursion
+lib/python/cs/mappings.py: cs.mappings: new attrable() function returning an object with dicts transmuted to AttrableMapping instances

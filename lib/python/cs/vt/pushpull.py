@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 
 ''' Processes for pushing or pulling blocks between Stores.

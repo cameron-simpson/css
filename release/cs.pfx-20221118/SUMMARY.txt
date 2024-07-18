@@ -1,0 +1,2 @@
+REMOVE WorkerThreadPool, pulls in too many other things and was never used.
+Pfx.prefixify_exception: copy if value0 is not a string.

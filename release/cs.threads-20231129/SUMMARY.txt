@@ -1,0 +1,2 @@
+HasThreadState.thread_states: *policy change*: the default now makes a mapping only for this class, not for all HasThreadState subclasses, on the premise that this class can manage use of other classes if required.
+HasThreadState: new bg() class method like Thread() but also starting the Thread.

@@ -1,0 +1,6 @@
+FSM.__init__: make state optional, default from self.FSM_DEFAULT_STATE - now all args are optional.
+FSM.__init__: if the state is None or not supplied, do not set .fsm_state at all; add explaination for this weird design choice.
+FSM.__getattr__: only generate event methods for events with public names (no leading underscore).
+FSM: new .fsm_history property, aiding subclassing elsewhere.
+FSM: drop dot_node_fillcolor, now provided by DOTNodeMixin.__getattr__, provide dot_node_palette_key using self.fsm_state.
+FSM.dot_node_attrs: color from self.dot_node_color.

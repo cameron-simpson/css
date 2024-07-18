@@ -1,0 +1,2 @@
+Rename edit_many to edit_tagsets for clarity.
+FSTags.edit_dirpath: include realpath(dirpath) at the top of the edit list.

@@ -1,0 +1,71 @@
+lib/python/cs/timeseries.py: cs.timeseries: new TypeCode(str) representing an array type code with associated properties and methods
+lib/python/cs/timeseries.py: cs.timeseries: docstring updates
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.slice,offset_slice: implement and plumb the pad and prepad parameters
+lib/python/cs/timeseries.py: merge timeseries ==> default
+lib/python/cs/timeseries.py: cs.timeseries: new DT64_0 (datetime64 epoch 0), TD_1S (timedelta64 1 second) and datetime64_as_timestamp conversion function; rename _dt64 to public as_datetime64s
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned: new update_tag(tag_name,new_tag_name) function
+lib/python/cs/timeseries.py: cs.timeseries: autoformat
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.__setitem__: include np.int64 in the allow types for when, it is what pd.Series uses for ints
+lib/python/cs/timeseries.py: cs.timeseries: update imports, add sanity check
+lib/python/cs/timeseries.py: cs.timeseries: new TimeSeriesMapping.read-csv wrapper for pandas.read_csv to import a CSV file into a TimeSeriesMapping
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.__setitem__: drop type check on the value, let the array/mmap complain if necessary
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.save,save_to: open the file for overwrite, not truncate, by default; improve the docstrings
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping: abstract methods shortname() and make_ts(key); tweak imports
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile._mmap_poke_offset: bugfix append mode
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile._mmap_poke_offset: "append" pokes now pad to mmap.ALLOCATIONGRANULARITY for greater I/O efficiency with incremental mmap mode pokes
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: fill out the docstring with implementation information
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: docstring tweaks
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile._mmap_poke_offset: open the file for truncate/create if it does not yet exist
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.save_to: open the file for truncate/create if it does not yet exist
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.save_to: do not save empty data; some debug and docstring updates
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.plot: keep the key name in the legend
+lib/python/cs/timeseries.py: merge timeseries ==> default
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: update docstring, streamline the header vs parameters check
+lib/python/cs/timeseries.py: cs.timeseries: add some type annotations and pfx context, drop redundant assertions from busy path
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.array: close the mmap a bit earlier
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile.__setitem__: drop obsolete pad_to, now automatic with poke_offset
+lib/python/cs/timeseries.py: cs.timeseries: improve exception message
+lib/python/cs/timeseries.py: cs.timeseries: add TODO
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesFile: new setitems(whens,values) method for fast batch updates - pleasantly surprised by just how much this improved things
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.setitems: group (whens,values) by partition and call the partition TimeSeriesFile's setitems() method
+lib/python/cs/timeseries.py: cs.timeseries: TypeCode: new .default_fill property for the default fill value
+lib/python/cs/timeseries.py: cs.timeseries: move slice and offset_slice from TimeSeriesFile to TimeSeries
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesPartitioned.__getitems__(slice): pad slice from subseries because it can be short
+lib/python/cs/timeseries.py: cs.timeseries: remove debug
+lib/python/cs/timeseries.py: cs.timeseries: TimePartition: store start_offset and end_offset, renaming offset0 and dropping steps
+lib/python/cs/timeseries.py: cs.timeseries: as_datetime64s: accept optional units parameter to trade off range versus precision
+lib/python/cs/timeseries.py: cs.timeseries: @plotrange: accept new optional tz/utcoffset parameters and pass the resulting utcoffset to the wrapped function along with a huge disclaimer about timezones and plots
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.plot: plumb the utcoffset parameter through to as_pd_dataframe
+lib/python/cs/timeseries.py: cs.timeseries: new tzfor(tzspec) to return a tzinfo object from dateutil.tz.gettz, accepts 'local' for the system local default timezone
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesBaseCommand.cmd_plot: plumb a new --tz command line option to control the graph presentation
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.as_pd_dataframe: accept optional utcoffset to skew the index fo the DataFrame
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.plot: we get a utcoffset from @plotrange, use it to skew the plot index (x-axis)
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.as_pd_series: q
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.as_pd_series: fix up utcoffset default
+lib/python/cs/timeseries.py: cs.timeseries: update imports
+lib/python/cs/timeseries.py: cs.timeseries: remove debug
+lib/python/cs/timeseries.py: cs.timeseries: clean a little lint
+lib/python/cs/timeseries.py: cs.timeseries: move update_tag from TimeSeriesPartitioned to TimeSeries and bugfix it
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries: new csv_header property, retrieving the CSV header title for this TimeSeries from the csv.header tag
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.as_pd_dataframe: new key_map mapping parameter to rename DataFrame columns from the TimeSeriesMapping key name
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping: new csv_header(key) method returning the csv_header property of the TimeSeries associated with key, or the key itself unchanged if that isn't available
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.as_pd_dataframe: drop columns parameter from the DataFrame construction, as the source data already have the specified keys, already renamed by key_map if supplied
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping: new to_csv(start,stop,f) method to write CSV data to f for the data between start and stop, via DataFrame.to_csv
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.read_csv: record the CSV header via the TimeSeries.csv_header property
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.plot: tweak the legend based on the csv_header property instead of overtly using the csv.header tag
+lib/python/cs/timeseries.py: cs.timeseries: @plotrange: elaborate on the tz/utcoffset parameters, simply tz handling
+lib/python/cs/timeseries.py: cs.timeseries: tzfor: accept tzinfo instances, return unchanged
+lib/python/cs/timeseries.py: cs.timeseries: rename tzinfo params/variables to tz like pandas for consistency
+lib/python/cs/timeseries.py: cs.timeseries: TimespanPolicy.promote: plumb policy_kw through
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.to_csv: drop index=False, used by splink instead
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesDataDir.__init__: redo init: new dir from scratch, or vet params against config and infill config
+lib/python/cs/timeseries.py: cs.timeseries: minor tweaks
+lib/python/cs/timeseries.py: cs.timeseries: move fill from TimeSeriesFile to TimeSeries
+lib/python/cs/timeseries.py: cs.timeseries: fix exception, drop unused variable
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeries.__init__: add missing fill parameter
+lib/python/cs/timeseries.py: cs.timeseries: fix type annotation
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesBaseCommand: new parsetime and poptime methods; cmd_plot: update to expect start-time and optional stop-time
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesBaseCommand.cmd_plot: shuffle assignment statements
+lib/python/cs/timeseries.py: cs.timeseries: tzfor: accept tzspec as str or tzinfo
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesBaseCommand.cmd_plot: update the usage for the --tz option
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesBaseCommand.parsetime: return a UNIX timestamp instead of a datetime, allows float->unixtime

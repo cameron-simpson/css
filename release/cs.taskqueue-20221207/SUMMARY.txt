@@ -1,0 +1,4 @@
+Pull out core stuff from Task into BaseTask, aids subclassing.
+BaseTask: explainatory docustring about unusual FSM_DEFAULT_STATE design choice.
+BaseTask.tasks_as_dot: express the edges using the node ids instead of their labels.
+BaseTask: new tasks_as_svg() method like tasks_as_dot() but returning SVG.

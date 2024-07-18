@@ -1,0 +1,18 @@
+lib/python/cs/threads.py: cs.threads: HasThreadState: mutex around core operations
+lib/python/cs/threads.py: cs.threads: HasThreadState: make the class set private
+lib/python/cs/threads.py: cs.threads: HasThreadState: make a note about needing to address overlapping HasThreadState usage
+lib/python/cs/threads.py: cs.threads: HasThreadState: new thread_states() method to snapshot the current states; new with_thread_states() context manager to apply a set of states; Thread and the bg function now accept an optional thead_states parameter; drop Python 2 support from DISTINFO
+lib/python/cs/threads.py: HasThreadState.default: new optional `ifNone` factory parameter for use if .current is missing/None, raise RuntimeError otherwise; docstring improvement
+lib/python/cs/threads.py: cs.threads: HasThreadState.with_thread_states: simplify the with_thread_states_pusher()
+lib/python/cs/threads.py: merge default => vt
+lib/python/cs/threads.py: cs.threads: HasThreadState.default: drop ifNone parameter, replace with raise_on_None=False
+lib/python/cs/threads.py: cs.threads: HasThreadState.default: new factory=None parameter to pass an optional factory for when the default is None (True may be passed to use cls as the factory)
+lib/python/cs/threads.py: cs.threads: HasThreadState: rename the default state from .state to .perthread_state
+lib/python/cs/threads.py: cs.threads: HasThreadState.with_thread_states: handle classes with no current .context (which _is_ a bit weird)
+lib/python/cs/threads.py: cs.threads: HasThreadState.__enter_exit__: pass cls._HasThreadState_lock to stackset as the modification guard lock, prevents race in thread_states
+lib/python/cs/threads.py: cs.threads: HasThreadState: update docstring mentions of the .perthread_state attribute
+lib/python/cs/threads.py: cs.threads: rename State to ThreadState, which how I always use it anyway, and leave a compatibility name behind
+lib/python/cs/threads.py: BaseCommand dropping apply_defaults in favour of Options data class
+lib/python/cs/threads.py: cs.threads: new joinif(Thread) method to join a Thread unless we are that Thread - this is because MultiOpenMixin.startup_shutdown stuff may run the shutdown in a differ Thread from that which ran the startup
+lib/python/cs/threads.py: cs.threads: monitor: update docstring
+lib/python/cs/threads.py: cs.resources: @uses_runstate: use the prevailing RunState or create one; cs.threads: update a docstring

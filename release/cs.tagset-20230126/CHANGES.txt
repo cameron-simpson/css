@@ -1,0 +1,4 @@
+lib/python/cs/tagset.py: cs.tagset: docstring tweaks
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: fix docstring punctuation
+lib/python/cs/tagset.py: cs.tagset,cs.app.playon: move core Recording.is_stale() method to TagSet.is_stale(), leave override method behind
+lib/python/cs/tagset.py: merge playon ==> default

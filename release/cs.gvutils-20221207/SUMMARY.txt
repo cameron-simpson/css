@@ -1,0 +1,1 @@
+New gvsvg() convenience function to return SVG.

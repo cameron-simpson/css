@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+#
+# Command line mode of cs.distinfo. - Cameron Simpson <cs@cskk.id.au>
+#
+
 import sys
 sys.path[:] = [ path for path in sys.path if path ]
 from cs.distinfo import main

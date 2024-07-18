@@ -1,0 +1,1 @@
+RunState: new catch_signal(sig,verbose=False) context manager method to cancel the RunState on receipt of a signal.

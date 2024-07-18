@@ -1,0 +1,2 @@
+lib/python/cs/iso14496.py: cs.iso14496: drop cs.context.StackableState in favour of cs.threads.State, clean some lint
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_autotag: use @uses_fstags for the fstags parameter

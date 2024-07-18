@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: expand default signals to include SIGHUP, expose as BaseCommand.DEFAULT_SIGNALS
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: pass in the subclass handle_signal method if present; drop obsolete runstate with shadowed the default

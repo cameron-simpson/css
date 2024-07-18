@@ -1,0 +1,220 @@
+lib/python/cs/ebooks/__init__.py lib/python/cs/ebooks/__main__.py lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/kindle.py lib/python/cs/ebooks/mobi.py: cs.ebooks: break out into a package
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: provide stub startup_shutdown method
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: new .pathto(subpath) method
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: make Authors and Books orderable
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: make Authors and Books hashable
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: @total_ordering for Books, missing in previous commit
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: fill out the CalibreMetadataDB ORM some more
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: clean lint
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: new Books.formats_as_dict() method returning a mapping of formats to filesystem paths
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand command line mode
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: drop obsolete relationship
+lib/python/cs/ebooks/__main__.py: cs.ebooks.__main__: EBooksCommand: attach the calibre subcommand
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB._run: accept optional subprocess.run options, set subprocess.run(check-True) by default, report CalledProcessError and reraise
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.calibredb: accept optional subprocess.run options
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.add: parse the "calibredb add" output, return the new dbid
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_calibre_export: record the added calibre dbid in the book tags so that we know it has been exported
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand: new cmd_ls method to list books and tags, make it the default subcommand
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand: honour the -C option
+lib/python/cs/ebooks/kindle.py: cs.ebooks.calibre: KindleCommand: more meaningful (if wordier) subcommand names
+lib/python/cs/ebooks/__main__.py: cs.ebooks.__main__: EBooksCommand: hook in MobiCommand as cmd_mobi
+lib/python/cs/ebooks/mobi.py: cs.ebooks.mobi: rename Mobi2CBZCommand to MobiCommand, main as cmd_make_cbz, add cmd_extract
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree._run: improve CalledProcessError error to provide a more rusable command line recitation
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: new CalibreBook class to conceal the database access mechanics
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibrew: CalibreTree: new book_by_dbid(dbid) returning a cached CalibreBook instance; __getitem__ calls book_by_dbid; __iter__ iterates over CalibreBooks
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: accept optional book db row, plumb through CalibreTree.book_by_dbid, use during __iter__
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: import and docstring updates
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB.__init__: if tree is a str, turn into a CalibreTree
+lib/python/cs/ebooks/__init__.py: cs.ebboks.__init__: new HasFSPath base class for things with a .fspath and providing .pathto(subpath)
+lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/kindle.py: cs.ebooks: CalibreTree and KindleTree now subclass HasFSPath
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: another HasFSPath adjustment
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: import for HasFSPath
+lib/python/cs/ebooks/kindle.py: cs.ebooks.calibre: KindleCommand: update cmd_export_to_calibre, add cmd_import_calibre_dbids
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: new .by_identifier(type,value) and by_asin(asin) generator methods
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: new add_format(bookpath,dbid[,force=False) method, little tested
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB: add the Identifiers mapping as .identifiers
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: refactor using iter(calibre)
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: update imports
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: new CalibreBook.make_cbz method to make a CBZ format from the AZW3 Mobi format
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_export_to_calibre: move the logic to new KindleTree.export_to_calibre method
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_import_calibre_dbids: bugfix calibre.dbid tag update
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleTree.export_to_calibre: do not add AZW3 if CBZ present, replace callif() with if-doit:, drop some debug
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: new "-l" (long) option
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: move KindleTree.export_to_calibre to KindleBook.export_to_calibre
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_export_to_calibre: call kbook.export_to_calibre per previous commit
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleBookAssetDB.db_path: use Kindletree.pathto
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: new CalibreBook.mobi_subpath property returning the subpath of a Mobi format book file
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook.make_cbz: look up the Mobi format using mobi_subpath, raise ValueError if none present
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: new "make_cbz dbids..." subcommand
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook.make_cbz: tweak temp CBZ filename
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: clean imports, lint
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: clean imports
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: formalise the possible subdir suffixes
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_export_to_calibre: print Calibre title and dbid
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleTree.is_book_subdir: consult KindleTree.SUBDIR_SUFFIXES
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB._linktable: set back_populates on the link relationships
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB: start hooking up the languages/books
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kidnle: KindleBook.phl_xml: tweak open call
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: make into a singleton keyed on realpath(calibre_library)
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: new cmd_import_from_calibre for importing books from another Calibre library, not yet functional
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: remove fleck of lint
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: new CalibreBook.__str__ returning "title (dbid)" like the subdirectories
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB: comment out problematic table, to debug later
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_import_from_calibre: start filling out the import logic
+lib/python/cs/ebooks/apple.py: cs.ebooks.apple: initial sketch of Apple Books access
+lib/python/cs/ebooks/__init__.py: cs.ebooks__init__: new FSPathBasedSingleton to support CalibreTree, KindleTree etc
+lib/python/cs/ebooks/__main__.py: cs.ebooks.__main__: EBooksCommand: add cmd_apple = AppleBooksCommand
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: subclass FSPathBasedSingleton
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleTree: subclass FSPathBasedSingleton
+lib/python/cs/ebooks/apple.py: cs.ebooks.apple: initial ORM definition, new AppleBooksCommand "dbshell" and "ls" commands
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: new cmd_dbshell, reorder cmd_ls into lexical position
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: plumb the cmd_dbshell through
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: update KindleTree instantiation
+lib/python/cs/ebooks/apple.py: cs.ebooks.apple: new AppleBooksCommand.cmd_md to dump the metadata, which isn't what I'd hoped
+lib/python/cs/ebooks/apple.py: cs.ebooks.apple: AppleBooksCommand.cmd_ls: new "-l" (long) option to print more book information
+lib/python/cs/ebooks/__init__.py: cs.ebooks.__init__: initial DISTINFO
+lib/python/cs/ebooks/apple.py: cs.ebooks.apple: clean some lint
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: clean lint, fix small bugs
+lib/python/cs/ebooks/__init__.py: cs.fs,cs.ebooks: move HasFSPath and FSPathBasedSingleton to cs.fs
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_ls: update docstring, make listing more compact
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.run_context: update CalibreTree construction
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleTree.by_asin: accept an ASIN ending in _EBOK, handy for copy/paste from a listing
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: reorder cmd_* methods
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: new .authors property with the author records
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_import_calibre_dbids: also import the title and authors
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: add preferences table and "prefs" command to list them
+lib/python/cs/ebooks/apple.py lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/kindle.py: cs.ebooks: get FSPathBasedSingleton from cs.fs
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_make_cbz: add the description to the usage
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: rename cmd_import_from_calibre to cmd_pull
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: new cmd_info summary command
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_info: usage message
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand: new cmd_info subcommand
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: make into an attribute of CalibreTree, initialised as a RelationProxy
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.db: make the property overt
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.book_by_dbid: adjust CalibreBook instantiation
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: plumb a doit=True to support new CalibreCommand.cmd_pull -n (no action) option
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB: link relations to the ORM, required for use by RelationProxy
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB: drop CalibreBook.formats_as_dict(), now .formats attribute; identifiers_as_dict() also replaced by .identifiers attribute
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: implement the format import, was just an empty sketch before
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: rename "book" to "cbook" for consistency
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: rename .db_session to .session, matches use from the cs.sqlalchemy module
+lib/python/cs/ebooks/calibre.py: cs.ebooks.sqlalchemy: CalibreCommand.run_context: do not establish a default session, subcommands which invoke calibre command line tools need to not have their fingers in the database
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: update imports, clean lint
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: replace some info and print calls with pfxprint
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: replace an info() call with pfxprint()
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: tweak __str__, add .asin property, adjust reference to .identifiers
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: add "dbshell" command
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand: rename cmd_export_to_calibre to cmd_export
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleBook.asin: normalise to upper case
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleBook.export_to_cablibre: no longer rely on the calibre.dbid tag, new quiet=False optional parameter, docstring update, clean up export logic
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_export: exit the export loop if runstate.cancelled
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand: drop cmd_import_calibre_dbids; cmd_export: remove use of the calibre.dbid tag, return exit code 1 if an export fails, clean up logic
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: drop CBZ support, we'll do this on the Calibre side; update imports, clean some unused variables
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.__str__
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: default pull list from identifier_value->obook mapping
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: specifying "?" for the identifier-name lists the identifiers in other-library
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: docstring update
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: honour SIGINT, add sanity check
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: new .formatpath(fmtk) and add_format(fmtk,fmtpath) methods
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CablibeBook.mobi_subpath: rename to mobipath, return full path instead of subpath; adjust callers
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.__iter__: do not mention books with multiple authors multiple times
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calobre: CalibreTree: Pfx context for .add() and .add_format()
+lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/kindle.py: cs.ebooks.calibre,kindle: command line: make the default subcommand "info" instead of "ls"
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: abort on SIGINT via the runstate
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: big reworking, progress bar, etc
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: update imports, update some calls, clean lint
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: streamline logic
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleBook.export_to_calibre: rework the logic, clean up the output
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: withdrawn Upd around dbshell, progress bar for cmd_export
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleBook now subclasses HasFSPath
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: update imports, clean lint
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree._run: return a CompletedProcess, do not explode on nonzero exit
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: drop debug
+lib/python/cs/ebooks/kindle.py: cs.ebooks.calibre: rework export process
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: kindle export: add -q (quiet) and -v (verbose) options fo rthe export
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: order default identifiers by book title etc
+lib/python/cs/ebooks/__init__.py lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: move core of CalibreTree._run into cs.ebooks.__init__ for reuse - probably to go to cs.psutils later
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre; CalibreCommand.cmd_pull: plumb new "quiet" mode
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree._run: pick off the calibre command name more directly
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: better status line information
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree._run: bugfix calcmd use
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: move CalibreTree.add_format to CalibreBook.add_format
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: new CalibreBook.pull(other_book) method
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: new CalibreTree.identifier_names() method returning an iterable of the identifier names in use in this library
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: new -f (force), -q (quiet), -v (verbose) options, improve sanity checks and warnings, streamline logic, use common CalibreBook.pull() method
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook.pull(other_book): split out the per format pull into new CalibreBook.pull_format() for reuse
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook.pull_format: special logic for AZW/AZW3
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleBook.export_to_calibre: plumb force and quiet parameters, offload main merge logic to CalibreBook.pull_format
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: drop invalid parameter
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: do option processing using popopts
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: add Calibre book tags support, show in cmd_ls
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCOmmand.cmd_ls: more readable tags display
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: sort the tag display
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: drop options.* setup, prefilled by BaseCommand now
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: clean some lint
+lib/python/cs/ebooks/calibre.py: cs.cmdutils: CalibreCommand.cmd_ls: implement -l option using options.popopts()
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: new __contains__; CalibreCommand.cmd_ls: accept database ids on the command line
+lib/python/cs/ebooks/kindle.py: cs.ebook.calibre: KindleCommand.cmd_export: update the option parse for recent cs.cmdutils updates
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook now a singleton
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: new preload() method to prefetch all the books
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: bugfix new book when doit=False
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: UI polish, one logic fix
+lib/python/cs/ebooks/calibre.py: cs.cmdutils: rename BaseCommand.popargv to poparg; adjust callers elsewhere
+lib/python/cs/ebooks/__init__.py: cs.ebooks.__init__: run: accept new doit=True parameter
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: pass doit through to run
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook.add_format: plumb **sibp_options through, update docstring, return True on success
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.calibredb: get subp_options as the remaining keyword parameters, update docstring
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.add: accept subp_options as the remaining keyword parameters
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: new .popbooks method to process command line book specifiers, currently dbids
+lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/kindle.py: cs.*: replace Pfx("%s",foo) with Pfx(foo)
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: new CalibreCommand.cmd_convert command and associated methods
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: clean some lint
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: make .authors, .formats, .identifiers and .tags into on demand properties
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: make the format key column more fixed width
+lib/python/cs/ebooks/__init__.py: cs.ebooks: docstring update
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleBook: drop .path (redundant with .fspath) and .pathto (in HasFSPath already)
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: subprocess related fixes
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook.pull_format: consider any AZW3, AZW or MOBI to mean a .azw file does not need pulling
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: add a main() function
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: make KindleBook a RelationProxy to make use of the Book database table
+lib/python/cs/ebooks/kindle.py: cs.ebook.kindle: rename db_session to session
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.run_context: remove provision of options.verbose=True, overwrites value now supplied by cs.cmdutils
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_ls: print a few db values where they are not the common default
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand: new cmd_import_tags to import Calibre information into the KindleBook fstags, available as KinbleBook.tags
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: clean lint
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_ls: add -l (long) mode to print tags etc etc
+lib/python/cs/ebooks/__init__.py: cs.ebooks.__init__: run: use print_argv to print the command to be executed
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: recognise failed command execution
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: minor typing tweak
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: special class for self.options, add options.calibre_path_other as the alternate Calibre library
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: new cmd_shell providing an interactive Python prompt
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: add some missing imports
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_make_cbz: move into alphabetic order with other methods
+lib/python/cs/ebooks/__init__.py: cs.ebooks: new intif() function returning int(f) if int(f)==f, otherwise f
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: new .author_names property
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: .formats is now a property
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB._linktable: accept optional tablename parameter
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB._linktable: debugging hooks
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreMetadataDB: reorder Books attribute settings
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook,CalibreMetadataDB: book series support
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.popbooks: rework to just return the list of books or raise ValueError, also accept optional sortkey parameter
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: output changes
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: make other-library optional, default from self.options.calibre_path_other, general rework
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: replace dbids wioth book_specs in usage messages
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.apply_defaults: use KindleTree._resolve_fspath and CalibreTree._resolve_fspath to get the default kindle and calibre paths
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: update imports, clean lint
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.OPTIONS_CLASS: initialise default options here, and in an improved way
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.books_from_spec: bugfix; CalibreCommand.popbooks: implement the "once" parameter; rename "spec" to "book_spec", rename 'r" to "regexp"
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: clean out some noise
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.book_by_dbid: CalibreBooks are singletons, no need for the cache
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: extract the default sortkey from popbooks for reuse
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: pack more stuff onto the single book line if not longmode
+lib/python/cs/ebooks/mobi.py: cs.ebook.mobi: Mobi.make_cbz: fallback alternative to the primary images location
+lib/python/cs/ebooks/mobi.py: cs.ebooks.mobi: clean some lint
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_make_cbz: warn about ValueError from make_cbz() instead of aborting
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: clean some lint
+lib/python/cs/ebooks/__init__.py lib/python/cs/ebooks/apple.py lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/kindle.py: cs.ebooks: run() now comes from cs.psutils
+lib/python/cs/ebooks/calibre.py: merge default ==> timeseries
+lib/python/cs/ebooks/__init__.py lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre,cs.numeric: move intif into cs.numeric
+lib/python/cs/ebooks/__init__.py: cs.ebooks: DISTINFO: require cs.numeric>=intif
+lib/python/cs/ebooks/__init__.py: cs.ebooks.__init__: DISTINFO: update requirements

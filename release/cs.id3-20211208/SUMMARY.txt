@@ -1,0 +1,4 @@
+ID3V1 and ID3V2 support.
+ID3V1Frame,ID3V2Frame: new .tagset() method to return a TagSet.
+ID3V1Frame.parse: trim trailing NULs from the comment field.
+Assorted other small changes.

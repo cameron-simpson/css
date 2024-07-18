@@ -1,0 +1,1 @@
+lib/python/cs/pop3.py: cs.pop3: POP3Command.cmd_dl: cmd_* methods must be instance methods now

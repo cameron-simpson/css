@@ -1,0 +1,3 @@
+New TerminalColors class parsing /etc/terminal-colors.d and honouring $*_COLORS.
+New colour_escape(code) to make the escape sequence for a colour code.
+New COLOUR_CODES mapping of known colour names.

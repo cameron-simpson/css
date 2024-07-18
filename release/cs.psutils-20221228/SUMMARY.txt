@@ -1,0 +1,3 @@
+signal_handlers: bugfix iteration of sig_hnds.
+Use cs.gimmicks instead of cs.logutils.
+Drop use of cs.upd, fixes circular import; users of run() may need to call "with Upd().above()" themselves.

@@ -1,0 +1,7 @@
+lib/python/cs/py/func.py: cs.py.func: late import of cs.fs.shortpath to avoid import loop
+lib/python/cs/py/func.py: cs.py.func: @trace: trace exceptions by default, previously false
+lib/python/cs/py/func.py: cs.py.func: new func_a_kw(func,*a,**kw) returning the formatted form of func_a_kw_fmt(func,*a,**kw)
+lib/python/cs/py/func.py: cs.py.func: remove debug, autoformat
+lib/python/cs/py/func.py: cs.py.func: func_a_kw: fix use of % operator, mention in func_a_kw_fmt docstring
+lib/python/cs/py/func.py: cs.py.func: DISTINFO-cs.x
+lib/python/cs/py/func.py: cs.py.func: clean lint, put cs.x back

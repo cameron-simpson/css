@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: @cachedmethod: more paranoid access to the revision attribute
+lib/python/cs/deco.py: cs.deco: update docstring for @decorator, small logic tweak for clarity, small comment updates

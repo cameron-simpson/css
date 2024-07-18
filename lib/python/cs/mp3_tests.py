@@ -26,14 +26,14 @@ class Test_MP3(unittest.TestCase):
       bfr = CornuCopyBuffer.from_filename(TESTFILE)
       count = 16
       while not bfr.at_eof() and count > 0:
-        bs=b''.join(MP3AudioFrame.scan_for_sync(bfr))
         X("AUDIO at %d after %d bytes",bfr.offset,len(bs))
+        bs = b''.join(MP3AudioFrame.scan_for_sync(bfr))
         bfr.take(1)
         count -= 1
     S = os.stat(TESTFILE)
     mp3_size = S.st_size
     bfr = CornuCopyBuffer.from_filename(TESTFILE)
-    for offset, frame, post_offset in MP3Frame.scan_with_offsets(bfr):
+    for offset, frame, post_offset in MP3Frame.scan(bfr, with_offsets=True):
       frame_size = post_offset - offset
       frame_bs = bytes(frame)
       ##frame2 = MP3Frame.from_bytes(frame_bs)

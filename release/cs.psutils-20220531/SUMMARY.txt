@@ -1,0 +1,2 @@
+New print_argv function for writing shell command lines out nicely.
+Bump requirements for cs.gimmicks.

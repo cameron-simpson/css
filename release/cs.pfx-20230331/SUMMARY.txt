@@ -1,0 +1,1 @@
+PfxThread: use HasThreadState.Thread, make target mandatory.

@@ -1,0 +1,1 @@
+@cachedmethod: more paranoid access to the revision attribute.

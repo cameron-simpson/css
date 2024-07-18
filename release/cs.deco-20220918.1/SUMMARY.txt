@@ -1,0 +1,1 @@
+@default_param: append parameter descriptions to the docstring of the decorated function, bugfix __name__ setting.

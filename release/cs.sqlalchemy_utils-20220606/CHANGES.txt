@@ -1,0 +1,12 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: BasicTableMixin: provide DEFAULT_ID_COLUMN='id', by_id() has new optional id_column parameter
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemyutils: new RelationProxy factory to make base classes which proxy a relation
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: RelationProxy.__getattr__: add Pfx context
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: RelationProxy: accept options id_column='id' keyword parameter
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: RelationProxy: RelProxy: new db_row_and_session() context manager method yielding (db_row,session) for use by on demand fields
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: new @proxy_on_demand_field decorator for on demand properties in RelationProxy classes
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: @proxy_on_demand_field: fix docstring spelling error
+lib/python/cs/sqlalchemy_utils.py: cs.ebooks.kindle: fixes around id_column for RelationProxy
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: RelationProxy.__getattr__: fix sanity check
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: RelationProxy: accept optional ORM, default from relation.orm; annotate RelProxy instances with .relation and .orm
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM.engine_keywords: turn on echo mode only if "SQL" in $DEBUG
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: remove debug

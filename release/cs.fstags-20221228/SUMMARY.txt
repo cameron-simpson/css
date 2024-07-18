@@ -1,0 +1,1 @@
+TaggedPath.save: new options prune=True parameter to drop empty top level dict/lists.

@@ -1,0 +1,2 @@
+BaseCommand.cmdloop: fix intro parameter.
+Other small fixes.

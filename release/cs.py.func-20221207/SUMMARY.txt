@@ -1,0 +1,3 @@
+@trace: trace exceptions by default, previously false.
+Late import of cs.fs.shortpath to avoid import loop.
+New func_a_kw(func,*a,**kw) returning the formatted form of func_a_kw_fmt(func,*a,**kw).

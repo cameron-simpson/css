@@ -1,0 +1,2 @@
+TagFile.save_tagsets: catch and warn about exceptions from update_mapping[key].update, something is wrong with my SQLTags usage.
+TagFile.save_tagsets: update_mapping: do not swallow AttributeError.

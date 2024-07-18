@@ -1,0 +1,5 @@
+BREAKING: replace @upd_proxy (which fiddled upd.state) with @with_upd_proxy which supplies an upd_proxy parameter.
+UpdProxy.text: bugfix spelling of _text_auto.
+Upd now subclasses HasThreadState, replace global "state" with "Upd.state", related adjustments.
+UpdProxy: new optional update_period parameter to limit the update frequency based on the time since last update.
+Upd.insert: support keyword parameters for the created UpdProxy.

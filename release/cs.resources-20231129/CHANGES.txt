@@ -1,0 +1,2 @@
+lib/python/cs/resources.py: cs.runstate: RunStateMixin: runstate parameter may be None, str, RunState
+lib/python/cs/resources.py: MultiOpenMixin.__enter_exit__: do not pass caller frame to self.close(), uninformative

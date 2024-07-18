@@ -1,0 +1,5 @@
+Move some core stuff off into cs.service_api.HTTPServiceAPI.
+Move core Recording.is_stale() method to TagSet.is_stale(), leave override method behind.
+Persist login tokens in a db for reuse while still fresh.
+"playon dl": allow interrupting downloads.
+Cleaner handling of playon.Name having a leading SNNeNN prefix.

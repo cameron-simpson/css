@@ -1,0 +1,4 @@
+lib/python/cs/later.py: cs.later: Later.wait: new optional timeout, replaces hardwired 5s timeout; return the Event.finished return
+lib/python/cs/later.py: cs.later: Later.startup_shutdown: call super().startup_shutdown(), fix small logic gap in finished.set action
+lib/python/cs/later.py: cs.later: Later: expose the finished Event as .finished_event, bugfix shutdown finished.set call
+lib/python/cs/later.py: cs.later: Later: startup_shutdown,wait,finished: bugfix handling of self.finished_event

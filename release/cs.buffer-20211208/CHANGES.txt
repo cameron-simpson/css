@@ -1,0 +1,2 @@
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.__init__: bugfix for self.input_data when copy_chunks is not None
+lib/python/cs/buffer.py: cs.buffer: fix docstring typo

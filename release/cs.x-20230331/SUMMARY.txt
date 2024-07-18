@@ -1,0 +1,1 @@
+Move the open-tty-for-append hacks into cs.gimmicks.open_append, fix unclosed file handle.

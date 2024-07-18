@@ -1,0 +1,7 @@
+CalibreCommand.popbooks: do not require argv to be empty at the end.
+KindleBook: new amazon_url property returning an Amazon web page URL based on the ASIN.
+New default_kindle_library() function consulting the envvar and app defaults; adjust KindleTree to use this.
+New kindle_content_path_default() and kindle_content_path() functions; use these in default_kindle_library().
+KindleCommand: new "app-path" subcommand to report or set the Kindle application content path.
+CalibreCommand.cmd_ls: new -r (reverse) and -t (timestamp) sorting options.
+Assorted minor updates.

@@ -1,0 +1,6 @@
+Lots of updates to the import process.
+SPLinkCommand: new cmd_pull, combining fetch and import.
+SPLinkData.plot: rework the key matching and plot data gathering, pass the utcoffset to the subsidiary timeseries plot call.
+SPLinkDataDir.to_csv: shim TimeSeriesDataDir,to_csv to reproduce the SP-Link download CSV format.
+SPLinkCommand.cmd_export: new "splink export" command to export data in SP-Link CSV format.
+Many minor updates.

@@ -1,0 +1,2 @@
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton._resolve_fspath: add some type annotations
+lib/python/cs/fs.py: cs.fs: HasFSPath.shortpath: hand call before .fspath set

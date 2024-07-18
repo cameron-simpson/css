@@ -1,0 +1,4 @@
+lib/python/cs/queues.py: cs.queues: _QueueIterator: per-queue sentinel using cs.obj.Sentinel
+lib/python/cs/queues.py: cs.*: unparameterised exceptions can be raised with just the class
+lib/python/cs/queues.py: cs.queues: expose formerly private _QueueIterator as QueueIterator
+lib/python/cs/queues.py: merge default ==> vt

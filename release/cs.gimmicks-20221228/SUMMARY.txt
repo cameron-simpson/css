@@ -1,0 +1,1 @@
+Generalise the logging function map, add trace function, bugfix logging call lookup.

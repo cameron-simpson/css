@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Link CBZ files from Calibre to my media/comics folder with nice
+# names, which is where my comic reader looks for comics.
+# - Cameron Simpson <cs@cskk.id.au> 06jan2023
+#
+
+set -uex
+
+exec ebooks calibre linkto -d "$HOME/media/comics" -F CBZ -1 CBZ

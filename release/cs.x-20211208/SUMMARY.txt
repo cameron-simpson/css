@@ -1,0 +1,1 @@
+X_via_tty: now accept full path to a tty in $CS_X_VIA_TTY to aid messaging to other terminals.

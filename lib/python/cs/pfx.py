@@ -14,16 +14,13 @@ This stack is used to prefix logging messages and exception text with context.
 
 Usage is like this:
 
-    from cs.logutils import setup_logging, info
     from cs.pfx import Pfx
-    ...
-    setup_logging()
     ...
     def parser(filename):
       with Pfx(filename):
         with open(filename) as f:
           for lineno, line in enumerate(f, 1):
-            with Pfx(lineno) as P:
+            with Pfx(lineno):
               if line_is_invalid(line):
                 raise ValueError("problem!")
               info("line = %r", line)
@@ -45,17 +42,19 @@ but used with a little discretion produces far more debuggable results.
 from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
-from inspect import isgeneratorfunction
+from inspect import isclass, isgeneratorfunction
 import logging
 import sys
 import threading
 import traceback
+
 from cs.deco import decorator, contextdecorator, fmtdoc, logging_wrapper
 from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
+
 from cs.x import X
 
-__version__ = '20211031-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'description':
@@ -85,7 +84,7 @@ def unpfx(s, sep=None):
       (default from `DEFAULT_SEPARATOR`: `{DEFAULT_SEPARATOR!r}`).
 
       This is a simple hack to support reporting error messages
-      which have had a preifx applied,
+      which have had a prefix applied,
       and fails accordingly if the base message itself contains the separator.
   '''
   if sep is None:
@@ -124,7 +123,6 @@ class _PfxThreadState(threading.local):
 
   def __init__(self):
     threading.local.__init__(self)
-    self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
     self.trace = None
@@ -185,7 +183,7 @@ class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
 
-  # instantiate the thread-local state object
+  # instantiate the thread-local class state object
   _state = _PfxThreadState()
 
   def __init__(self, mark, *args, **kwargs):
@@ -246,6 +244,7 @@ class Pfx(object):
 
   def __enter__(self):
     # push this Pfx onto the per-Thread stack
+    self._push(self)
     print_func = self.print_func
     if print_func:
       mark = self.mark
@@ -253,23 +252,37 @@ class Pfx(object):
       if mark_args:
         mark = mark % mark_args
       print_func(mark)
-    _state = self._state
-    _state.append(self)
-    _state.raise_needs_prefix = True
-    if _state.trace:
-      _state.trace(_state.prefix)
+
+  @classmethod
+  def _push(cls, P):
+    ''' Push this `Pfx` instance onto the current `Thread`'s stack.
+    '''
+    state = cls._state
+    state.append(P)
+    if state.trace:
+      state.trace(state.prefix)
+
+  @classmethod
+  def push(cls, msg, *a):
+    ''' A new `Pfx(msg,*a)` onto the `Thread` stack.
+    '''
+    cls._push(cls(msg, *a))
 
   def __exit__(self, exc_type, exc_value, _):
     _state = self._state
     if exc_value is not None:
-      if _state.raise_needs_prefix:
+      try:
+        exc_value._pfx_prefix  # noqa: B018
+      except AttributeError:
+        exc_value._pfx_prefix = self._state.prefix
         # prevent outer Pfx wrappers from hacking stuff as well
-        _state.raise_needs_prefix = False
         # now hack the exception attributes
         if not self.prefixify_exception(exc_value):
           True or print(
-              "warning: %s: %s:%s: message not prefixed" %
-              (self._state.prefix, type(exc_value).__name__, exc_value),
+              "warning: %s: %s:%s: message not prefixed: dir=%r" % (
+                  self._state.prefix, type(exc_value).__name__, exc_value,
+                  dir(exc_value)
+              ),
               file=sys.stderr
           )
     try:
@@ -290,13 +303,7 @@ class Pfx(object):
     '''
     u = self._umark
     if u is None:
-      mark = ustr(self.mark)
-      if not isinstance(mark, unicode):
-        if isinstance(mark, str):
-          mark = unicode(mark, errors='replace')
-        else:
-          mark = unicode(mark)
-      u = mark
+      u = ustr(self.mark)
       if self.mark_args:
         try:
           u = u % self.mark_args
@@ -329,7 +336,7 @@ class Pfx(object):
     )
 
   @classmethod
-  def prefixify_exception(cls, e):
+  def prefixify_exception(cls, e):  # noqa: C901
     ''' Modify the supplied exception `e` with the current prefix.
         Return `True` if modified, `False` if unable to modify.
     '''
@@ -342,28 +349,30 @@ class Pfx(object):
         continue
       if value is None:
         continue
+      ovalue = value
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
-        try:
-          value0, value1 = value
-        except ValueError as args_e:
-          X(
-              "prefixify_exception OSError.args: %s(%s) %s: args=%r: %s",
-              type(e).__name__,
-              ','.join(
-                  cls.__name__
-                  for cls in type(e).__mro__
-                  if cls is not type(e) and cls is not object
-              ),
-              e,
-              value,
-              args_e,
-          )
-          continue
-        else:
-          value = (value0, cls.prefixify(value1))
+        # prefixify the first string
+        value = list(value)
+        for i, v in enumerate(value):
+          if isinstance(v, str):
+            value[i] = cls.prefixify(v)
+            did_prefix = True
+            break
+        value = tuple(value)
       elif attr == 'args' and isinstance(e, LookupError):
-        # args[0] is the key, do not fiddle with it
+        if (isinstance(value, tuple) and value):
+          value0 = value[0]
+          if (isinstance(value0, str) and value0.startswith("'")
+              and value0.endswith("'")):
+            # args[0] is the key, do not fiddle with it
+            continue
+          value = (cls.prefixify(value0), *value[1:])
+        else:
+          continue
+      elif attr == 'message' and not isinstance(value, StringTypes):
+        # saw django.core.exceptions.ValidationError.message
+        # is not a string but some kind of proxy object
         continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
@@ -388,6 +397,19 @@ class Pfx(object):
             value = [cls.prefixify(repr(value))]
           else:
             value = [cls.prefixify(value[0])] + list(value[1:])
+      t0 = type(ovalue)
+      t1 = type(value)
+      if t0 is not t1:
+        if set((t0, t1)) == set((list, tuple)):
+          # convert list back to tuple or tuple back to list
+          value = t0(value)
+        else:
+          X(
+              "prefixify_exception: %s.%s.%s:%s.%s:%r is a different type from the new value:%s:%r",
+              e.__class__.__module__, e.__class__.__name__, attr,
+              ovalue.__class__.__module__, ovalue.__class__.__name__, ovalue,
+              value.__class__.__name__, value
+          )
       try:
         setattr(e, attr, value)
       except AttributeError as e2:
@@ -407,10 +429,10 @@ class Pfx(object):
 
   def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
-        within a surrounding Pfx context with the current mark string.
+        within a surrounding `Pfx` context with the current mark string.
 
         This is intended for deferred call facilities like
-        WorkerThreadPool, Later, and futures.
+        `Later` and `futures`.
     '''
     pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
 
@@ -436,6 +458,37 @@ class Pfx(object):
 
   enter = __enter__
   exit = __exit__
+
+  @classmethod
+  def scope(cls, msg=None, *a):
+    ''' Context manager to save the current `Thread`'s stack state
+        and to restore it on exit.
+
+        This is to aid long suites which progressively add `Pfx` context
+        as the suite progresses, example:
+
+            for item in items:
+                with Pfx.scope("item %s", item):
+                    db_row = db.get(item)
+                    Pfx.push("db_row = %r", db_row)
+                    matches = db.lookup(db_row.category)
+                    if not matches:
+                        continue
+                    Pfx.push("%d matches", len(matches):
+                    ... etc etc ...
+    '''
+
+    @contextmanager
+    def scope_cmgr():
+      old_stack = list(cls._state.stack)
+      try:
+        if msg is not None:
+          cls.push(msg, *a)
+        yield
+      finally:
+        cls._state.stack[:] = old_stack
+
+    return scope_cmgr()
 
   # Logger methods
   @logging_wrapper
@@ -495,10 +548,15 @@ def prefix():
   '''
   return Pfx._state.prefix
 
-def pfxprint(*a, **kw):
+def pfxprint(*a, print_func=None, **kw):
   ''' Call `print()` with the current prefix.
+
+      The optional keyword parameter `print_func`
+      provides an alternative function to the builtin `print()`.
   '''
-  print(prefix() + ':', *a, **kw)
+  if print_func is None:
+    print_func = print
+  print_func(prefix() + ':', *a, **kw)
 
 @contextmanager
 def PrePfx(tag, *args):
@@ -525,18 +583,19 @@ class PfxCallInfo(Pfx):
         caller[2], grandcaller[0], grandcaller[1], grandcaller[2]
     )
 
-def PfxThread(target=None, **kw):
-  ''' Factory function returning a Thread
+def PfxThread(target, **kw):
+  ''' Factory function returning a `Thread`
       which presents the current prefix as context.
   '''
+  from cs.threads import HasThreadState  # pylint: disable=import-outside-toplevel
+
   current_prefix = prefix()
 
-  def run(*a, **kw):
+  def PfxThread_run(*a, **kw):
     with Pfx(current_prefix):
-      if target is not None:
-        target(*a, **kw)
+      return target(*a, **kw)
 
-  return threading.Thread(target=run, **kw)
+  return HasThreadState.Thread(target=PfxThread_run, **kw)
 
 @decorator
 def pfx(func, message=None, message_args=()):
@@ -639,12 +698,15 @@ def pfx_method(method, use_str=False, with_args=False):
                   ....
   '''
 
-  fname = method.__name__
+  fname = getattr(method, '__name__', repr(method))
 
   def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
-    classref = self if use_str else type(self).__name__
+    classref = (
+        self
+        if use_str else self.__name__ if isclass(self) else type(self).__name__
+    )
     pfxfmt, pfxargs = func_a_kw_fmt(method, *a, **kw)
     with Pfx("%s." + pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)
@@ -658,7 +720,7 @@ def XP(msg, *args, **kwargs):
       which prefixes the message with the current Pfx prefix.
   '''
   if args:
-    return X("%s: " + msg, prefix(), *args, **kwargs)
+    return X("%s%s" + msg, prefix(), DEFAULT_SEPARATOR, *args, **kwargs)
   return X(prefix() + DEFAULT_SEPARATOR + msg, **kwargs)
 
 def XX(prepfx, msg, *args, **kwargs):

@@ -42,16 +42,14 @@ PyMODINIT_FUNC PyInit__scan(void)
 
 static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
     unsigned long   hash_value;
-    unsigned char   *buf;
-#ifdef PY_SSIZE_T_CLEAN
-    Py_ssize_t      buflen;
-#else
-    int             buflen;
-#endif
+    Py_buffer       pbuf;
 
-    if (!PyArg_ParseTuple(args, "ky#", &hash_value, &buf, &buflen)) {
+    if (!PyArg_ParseTuple(args, "ky*", &hash_value, &pbuf)) {
         return NULL;
     }
+
+    unsigned char   *buf = (unsigned char *)pbuf.buf;
+    Py_ssize_t      buflen = pbuf.len;
 
     unsigned long   *offsets = NULL;
     int             noffsets = 0;
@@ -73,6 +71,9 @@ static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
         }
         Py_END_ALLOW_THREADS
     }
+
+    /* we're done with the buffer now */
+    PyBuffer_Release(&pbuf);
 
     /* compose a Python list containing the offsets */
     PyObject        *offset_list = PyList_New(noffsets);
@@ -115,30 +116,36 @@ static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
     return ret_list;
 }
 
+/*
+ * Scan a buffer for offset points where the rolling hash function
+ * hits its magic value while honouring the min_block and max_block
+ * constraints on the distance between offsets.
+ */
 static PyObject *scan_scanbuf2(PyObject *self, PyObject *args) {
-    const unsigned char   *buf;
-#ifdef PY_SSIZE_T_CLEAN
-    Py_ssize_t      buflen;
-#else
-    int             buflen;
-#endif
+    Py_buffer       pbuf;
+
     unsigned long   hash_value;
     unsigned long   sofar;
     unsigned long   min_block;
     unsigned long   max_block;
 
     // Arguments:
-    // buf, buflen: a buffer of unsigned char to scan
+    // pbuf: a Py_buffer referencing the data to scan
     // hash_value: unsigned long initial hash value
+    //             from the scan of the preceeding block
     // sofar: the length of the initial partial block scanned prior
-    //        to this buffer
+    //        to this buffer, contributing the the size which is
+    //        constrainted by min_block and max_block
     // min_block: unsigned long minimum distance between offsets
     // max_block: unsigned long maximum distance between offsets
-    if (!PyArg_ParseTuple(args, "y#kkkk",
-            &buf, &buflen, &hash_value, &sofar, &min_block, &max_block)
+    if (!PyArg_ParseTuple(args, "y*kkkk",
+            &pbuf, &hash_value, &sofar, &min_block, &max_block)
     ) {
         return NULL;
     }
+
+    unsigned char   *buf = (unsigned char *)pbuf.buf;
+    Py_ssize_t      buflen = pbuf.len;
 
     unsigned long   *offsets = NULL;
     int             noffsets = 0;
@@ -166,6 +173,9 @@ static PyObject *scan_scanbuf2(PyObject *self, PyObject *args) {
         Py_END_ALLOW_THREADS
     }
 
+    /* we're done with the buffer now */
+    PyBuffer_Release(&pbuf);
+
     /* compose a Python list containing the offsets */
     PyObject        *offset_list = PyList_New(noffsets);
     if (offset_list == NULL) {
@@ -190,6 +200,9 @@ static PyObject *scan_scanbuf2(PyObject *self, PyObject *args) {
         free(offsets);
     }
 
+    // Return a 2 element list containing [hash_value, offsets]
+    // being the rolling hash value at the end of the scan for use in
+    // the next buffer and a list of the magic hash values offsets.
     PyObject    *ret_list = PyList_New(2);
     if (ret_list == NULL) {
         Py_DECREF(offset_list);

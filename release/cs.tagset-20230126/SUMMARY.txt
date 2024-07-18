@@ -1,0 +1,1 @@
+New TagSet.is_stale() method based on .expiry attribute, intended for TagSets which are caches of other primary data.

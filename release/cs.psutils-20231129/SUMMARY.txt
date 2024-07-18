@@ -1,0 +1,1 @@
+run(): default stdin=subprocess.DEVNULL.

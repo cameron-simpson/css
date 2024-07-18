@@ -34,6 +34,8 @@ usage="Usage: $cmd [options...] [--] {-|echo-args...}
     -           Read the alert text from standard input.
     echo-args   The alert text, passed to the echo(1) command."
 
+bel=''
+esc=''
 alert_to=${ALERT_TO:-$alert_to_default}
 colour=
 level=1
@@ -49,9 +51,7 @@ case "$OS" in
     tnotify=1
     ;;
 esac
-if flag -w GROWL_DISABLE
-then  growl=
-fi
+[ $growl ] && flag -w GROWL_DISABLE && growl=
 
 badopts=
 
@@ -172,15 +172,14 @@ then
   fi >>"$ALERTLOG" || xit=1
 fi
 
-[ $to_dlog ] && dlog log ALERT: "$*"
+[ $to_stderr ] && echo "ALERT: $title $subtitle $message" >&2
+[ $to_dlog ] && dlog log ALERT: "$*" </dev/null &
 
 if [ $to_desktop ]
 then
-  if [ $growl ]
-  then
-    # try growlnotify, otherwise hope /dev/tty is an iTerm
-    growlnotify -m "$*" || echo $'\e]9;$*\a' >/dev/tty || xit=1
-  fi
+  { [ $growl ] && growlnotify -m "$*"; } \
+  || printf '%s' "${esc}]9;$*${bel}" >/dev/tty \
+  || xit=1
 
   if [ $tnotify ]
   then
@@ -203,7 +202,5 @@ then
     "$@" </dev/null >/dev/null &
   fi
 fi
-
-[ $to_stderr ] && echo ALERT: "$title $subtitle $message" >&2
 
 exit $xit

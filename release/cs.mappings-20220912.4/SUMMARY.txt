@@ -1,0 +1,2 @@
+TypedKeyMixin: add .get() and .setdefault().
+Provide names for UUIDKeyedDict, StrKeyedDefaultDict, UUIDKeyedDefaultDict.

@@ -1,0 +1,2 @@
+Later: replace submittable checks with decorator accepting a force=True override.
+Later.defer_iterable: implement greedy vs nongreedy.

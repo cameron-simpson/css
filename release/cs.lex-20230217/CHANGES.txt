@@ -1,0 +1,2 @@
+lib/python/cs/lex.py: cs.lex: new get_prefix_n function to parse a numeric value preceeded by a prefix
+lib/python/cs/lex.py: cs.lex: drop strip_prefix_n, get_prefix_n is more general and I had not got around to using strip_prefix_n yet - when I did, I ended up writing get_prefix_n

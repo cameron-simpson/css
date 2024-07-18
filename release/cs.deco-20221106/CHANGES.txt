@@ -1,0 +1,6 @@
+lib/python/cs/deco.py: cs.deco: @default_params: bugfix for __doc__ in the decorated function
+lib/python/cs/deco.py: cs.deco: @default_params: improve the docstring
+lib/python/cs/deco.py: cs.deco: tweak TODO
+lib/python/cs/deco.py: cs.deco: new @promote decorator to autopromote parameter values according to their type annotation
+lib/python/cs/deco.py: cs.deco: remove obsolete test code
+lib/python/cs/deco.py: cs.deco: @promote: sanity check params if supplied

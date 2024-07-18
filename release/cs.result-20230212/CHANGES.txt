@@ -1,0 +1,5 @@
+lib/python/cs/result.py: cs.result: Result._complete: release self._get_lock before firing the event, as the event is what fires the notifiers
+lib/python/cs/result.py: cs.result: docstring update
+lib/python/cs/result.py: cs.result: Result.notify: when we make a direct notifier call, call the notifier outside the lock and remember to set self.collected=True
+lib/python/cs/result.py: cs.result: Result: new post_notify() method to queue a function of the Result.result, returning a Result for the completion of the post function
+lib/python/cs/result.py: merge default => vt

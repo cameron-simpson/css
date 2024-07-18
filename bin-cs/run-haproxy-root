@@ -46,4 +46,4 @@ done
 
 set -- ${1+"$@"} haproxy -f "$cfg"
 
-$trace sudo env "PATH=$PATH" "FLAGDIR=$FLAGDIR" /opt/css/bin/with-opt-css svcd -n "$svcdname" "$@"
+$trace sudo env "PATH=$PATH" "FLAGDIR=$FLAGDIR" /opt/css/bin/with-opt-css svcd run -n "$svcdname" "$@"

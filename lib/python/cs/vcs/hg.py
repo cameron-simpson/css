@@ -4,11 +4,12 @@
 '''
 
 from cs.deco import cachedmethod
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
+
 from . import VCS, ReleaseLogEntry
 
 class VCS_Hg(VCS):
-  ''' Mercurial implementation of cs.vcs.VCS.
+  ''' Mercurial implementation of `cs.vcs.VCS`.
   '''
 
   COMMAND_NAME = 'hg'
@@ -62,14 +63,15 @@ class VCS_Hg(VCS):
         involving `paths` (a list of `str`).
     '''
     for lineno, line in enumerate(self.logs(
-        paths, ['-r', tag + ':tip - '+tag, '--template', '{files}\t{desc|firstline}\n']),
-                                  1):
+        paths, ['-r', tag + ':tip - ' + tag, '--template',
+                '{files}\t{desc|firstline}\n']), 1):
       with Pfx("line %d", lineno):
         files, firstline = line.split('\t', 1)
         files = files.split()
         firstline = firstline.strip()
       yield files, firstline
 
+  @pfx_method
   def file_revisions(self, paths):
     ''' Return a mapping of `path->(rev,node)`
         containing the latest revision of each file in `paths`.
@@ -78,13 +80,17 @@ class VCS_Hg(VCS):
         and the `node` if the changeset identification hash.
         This pair supports choosing the latest hash from some files.
     '''
-    path_map={}
+    path_map = {}
     for path in paths:
-      for line in self.logs([path],['-l','1','--template','{rev} {node}\n']):
+      for line in self.logs([path],
+                            ['-l', '1', '--template', '{rev} {node}\n']):
         rev, node = line.split()
         break
-      path_map[path]=int(rev),node
+      else:
+        continue
+      path_map[path] = (None if rev is None else int(rev)), node
     return path_map
+
   def add_files(self, *paths):
     ''' Add the specified paths to the repository.
     '''
@@ -107,7 +113,10 @@ class VCS_Hg(VCS):
     paths = []
     with self._pipefrom(*status_argv) as f:
       for line in f:
-        s, path = line.rstrip().split(' ', 1)
+        line = line.rstrip()
+        if not line:
+          continue
+        s, path = line.split(' ', 1)
         if s != '?':
           paths.append(path)
     return paths

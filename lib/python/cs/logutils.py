@@ -61,15 +61,16 @@ from threading import Lock
 import time
 import traceback
 from types import SimpleNamespace as NS
+
 from cs.ansi_colour import colourise, env_no_color
+from cs.context import stackattrs
 from cs.deco import fmtdoc, logging_wrapper
 from cs.lex import is_dotted_identifier
 import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
-from cs.upd import Upd
 
-__version__ = '20210721-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -79,8 +80,13 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.ansi_colour>=20200729', 'cs.deco', 'cs.lex', 'cs.pfx',
-        'cs.py.func', 'cs.upd'
+        'cs.ansi_colour>=20200729',
+        'cs.context>=stackable_state',
+        'cs.deco',
+        'cs.lex',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.upd',  # done as a late import
     ],
 }
 
@@ -91,14 +97,20 @@ DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 # High level action tracking, above INFO and below WARNING.
 TRACK = logging.INFO + 5
 
+# Quiet messaging, below TRACK and above the rest.
+QUIET = TRACK - 1
+
 # Special status line tracking, above INFO and below TRACK and WARNING
-STATUS = TRACK - 1
+STATUS = QUIET - 1
 
 # Special verbose value, below INFO but above DEBUG.
 VERBOSE = logging.INFO - 1
 
 # check the hierarchy
-assert logging.DEBUG < VERBOSE < logging.INFO < STATUS < TRACK < logging.WARNING
+assert (
+    logging.DEBUG < VERBOSE < logging.INFO < STATUS < QUIET < TRACK <
+    logging.WARNING
+)
 
 loginfo = None
 D_mode = False
@@ -111,249 +123,212 @@ def ifdebug():
     loginfo = setup_logging()
   return loginfo.level <= logging.DEBUG
 
-# pylint: disable=too-many-branches,too-many-statements,too-many-locals
-# pylint: disable=too-many-arguments,redefined-builtin
-def setup_logging(
-    cmd_name=None,
-    main_log=None,
-    format=None,
-    level=None,
-    flags=None,
-    upd_mode=None,
-    ansi_mode=None,
-    trace_mode=None,
-    module_names=None,
-    function_names=None,
-    verbose=None,
-    supplant_root_logger=False,
-):
-  ''' Arrange basic logging setup for conventional UNIX command
-      line error messaging; return an object with informative attributes.
-      That object is also available as the global `cs.logutils.loginfo`.
-
-      Parameters:
-      * `cmd_name`: program name, default from `basename(sys.argv[0])`.
-        Side-effect: sets `cs.pfx.cmd` to this value.
-      * `main_log`: default logging system.
-        If `None`, the main log will go to `sys.stderr`;
-        if `main_log` is a string, is it used as a filename to
-        open in append mode;
-        otherwise main_log should be a stream suitable
-        for use with `logging.StreamHandler()`.
-        The resulting log handler is added to the `logging` root logger.
-      * `format`: the message format for `main_log`.
-        If `None`, use `DEFAULT_PFX_FORMAT_TTY`
-        when `main_log` is a tty or FIFO,
-        otherwise `DEFAULT_PFX_FORMAT`.
-      * `level`: `main_log` logging level.
-        If `None`, infer a level from the environment
-        using `infer_logging_level()`.
-      * `flags`: a string containing debugging flags separated by commas.
-        If `None`, infer the flags from the environment using
-        `infer_logging_level()`.
-        The following flags have meaning:
-        `D`: set cs.logutils.D_mode to True;
-        `TDUMP`: attach a signal handler to SIGHUP to do a thread stack dump;
-        `TRACE`: enable various noisy tracing facilities;
-        `UPD`, `NOUPD`: set the default for `upd_mode` to True or False respectively.
-      * `upd_mode`: a Boolean to activate cs.upd as the `main_log` method;
-        if `None`, set it to `True` if `flags` contains 'UPD',
-        otherwise to `False` if `flags` contains 'NOUPD',
-        otherwise set it from `main_log.isatty()`.
-        A true value causes the root logger to use `cs.upd` for logging.
-      * `ansi_mode`: if `None`,
-        set it from `main_log.isatty() and not cs.colourise.env_no_color()`,
-        which thus honours the `$NO_COLOR` environment variable
-        (see https://no-color.org/ for the convention).
-        A true value causes the root logger to colour certain logging levels
-        using ANSI terminal sequences (currently only if `cs.upd` is used).
-      * `trace_mode`: if `None`, set it according to the presence of
-        'TRACE' in flags. Otherwise if `trace_mode` is true, set the
-        global `loginfo.trace_level` to `loginfo.level`; otherwise it defaults
-        to `logging.DEBUG`.
-      * `verbose`: if `None`, then if stderr is a tty then the log
-        level is `INFO` otherwise `WARNING`. Otherwise, if `verbose` is
-        true then the log level is `INFO` otherwise `WARNING`.
+class LoggingState(NS):
+  ''' A logging setup arranged for conventional UNIX command line use.
   '''
-  global D_mode, loginfo  # pylint: disable=global-statement
 
-  # infer logging modes, these are the initial defaults
-  inferred = infer_logging_level(verbose=verbose)
-  if level is None:
-    level = inferred.level
-  if flags is None:
-    flags = inferred.flags
-  if module_names is None:
-    module_names = inferred.module_names
-  if function_names is None:
-    function_names = inferred.function_names
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  # pylint: disable=too-many-arguments,redefined-builtin
+  def __init__(
+      self,
+      cmd=None,
+      main_log=None,
+      format=None,
+      level=None,
+      flags=None,
+      upd_mode=None,
+      ansi_mode=None,
+      trace_mode=None,
+      verbose=None,
+      supplant_root_logger=False,
+  ):
+    ''' Prepare the `LoggingState` for conventional UNIX command
+        line error messaging.
 
-  if cmd_name is None:
-    cmd_name = os.path.basename(sys.argv[0])
-  cs.pfx.cmd = cmd_name
+        Amongst other things, the default logger now includes
+        the `cs.pfx` prefix in the message.
 
-  if main_log is None:
-    main_log = sys.stderr
-  elif isinstance(main_log, str):
-    main_log = open(main_log, "a")
+        This function runs in two modes:
+        - if logging has not been set up, it sets up a root logger
+        - if the root logger already has handlers,
+          monkey patch the first handler's formatter to prefix the `cs.pfx` state
 
-  # determine some attributes of main_log
-  try:
-    fd = main_log.fileno()
-  except (AttributeError, IOError):
-    is_fifo = False
-    ##is_reg = False                        # unused
-    is_tty = False
-  else:
-    st = os.fstat(fd)
-    is_fifo = stat.S_ISFIFO(st.st_mode)
-    ##is_reg = stat.S_ISREG(st.st_mode)     # unused
-    is_tty = stat.S_ISCHR(st.st_mode)
+        Parameters:
+        * `cmd`: program name, default from `basename(sys.argv[0])`.
+          Side-effect: sets `cs.pfx.cmd` to this value.
+        * `main_log`: default logging system.
+          If `None`, the main log will go to `sys.stderr`;
+          if `main_log` is a string, is it used as a filename to
+          open in append mode;
+          otherwise main_log should be a stream suitable
+          for use with `logging.StreamHandler()`.
+          The resulting log handler is added to the `logging` root logger.
+        * `format`: the message format for `main_log`.
+          If `None`, use `DEFAULT_PFX_FORMAT_TTY`
+          when `main_log` is a tty or FIFO,
+          otherwise `DEFAULT_PFX_FORMAT`.
+        * `level`: `main_log` logging level.
+          If `None`, infer a level from the environment
+          using `infer_logging_level()`.
+        * `flags`: a string containing debugging flags separated by commas.
+          If `None`, infer the flags from the environment using
+          `infer_logging_level()`.
+          The following flags have meaning:
+          `D`: set cs.logutils.D_mode to True;
+          `TDUMP`: attach a signal handler to SIGHUP to do a thread stack dump;
+          `TRACE`: enable various noisy tracing facilities;
+          `UPD`, `NOUPD`: set the default for `upd_mode` to True or False respectively.
+        * `upd_mode`: a Boolean to activate cs.upd as the `main_log` method;
+          if `None`, set it to `True` if `flags` contains 'UPD',
+          otherwise to `False` if `flags` contains 'NOUPD',
+          otherwise set it from `main_log.isatty()`.
+          A true value causes the root logger to use `cs.upd` for logging.
+        * `ansi_mode`: if `None`,
+          set it from `main_log.isatty() and not cs.colourise.env_no_color()`,
+          which thus honours the `$NO_COLOR` environment variable
+          (see https://no-color.org/ for the convention).
+          A true value causes the root logger to colour certain logging levels
+          using ANSI terminal sequences (currently only if `cs.upd` is used).
+        * `trace_mode`: if `None`, set it according to the presence of
+          'TRACE' in flags. Otherwise if `trace_mode` is true, set the
+          global `loginfo.trace_level` to `loginfo.level`; otherwise it defaults
+          to `logging.DEBUG`.
+        * `verbose`: if `None`, then if stderr is a tty then the log
+          level is `INFO` otherwise `WARNING`. Otherwise, if `verbose` is
+          true then the log level is `INFO` otherwise `WARNING`.
+    '''
+    global D_mode, loginfo  # pylint: disable=global-statement
 
-  if getattr(main_log, 'encoding', None) is None:
-    main_log = codecs.getwriter("utf-8")(main_log)
+    # infer logging modes, these are the initial defaults
+    inferred = infer_logging_level(verbose=verbose)
+    if level is None:
+      level = inferred.level
+    if flags is None:
+      flags = inferred.flags
 
-  if trace_mode is None:
-    trace_mode = 'TRACE' in flags
+    if cmd is None:
+      cmd = os.path.basename(sys.argv[0])
+    cs.pfx.cmd = cmd
 
-  if 'D' in flags:
-    D_mode = True
+    if main_log is None:
+      main_log = sys.stderr
+    elif isinstance(main_log, str):
+      # pylint: disable=consider-using-with
+      main_log = open(main_log, "a", encoding='utf-8')
 
-  if upd_mode is None:
-    if 'UPD' in flags:
-      upd_mode = True
-    elif 'NOUPD' in flags:
-      upd_mode = False
-    else:
-      upd_mode = is_tty
-
-  if ansi_mode is None:
-    ansi_mode = is_tty and not env_no_color()
-
-  if format is None:
-    if is_tty or is_fifo:
-      format = DEFAULT_PFX_FORMAT_TTY
-    else:
-      format = DEFAULT_PFX_FORMAT
-
-  if 'TDUMP' in flags:
-    # do a thread dump to the main_log on SIGHUP
-    # pylint: disable=import-outside-toplevel
-    import signal
-    import cs.debug as cs_debug
-
-    # pylint: disable=unused-argument
-    def handler(sig, frame):
-      cs_debug.thread_dump(None, main_log)
-
-    signal.signal(signal.SIGHUP, handler)
-
-  main_handler = logging.StreamHandler(main_log)
-  upd_ = Upd()
-  if upd_mode:
-    main_handler = UpdHandler(main_log, ansi_mode=ansi_mode, over_handler=main_handler)
-    upd_ = main_handler.upd
-
-  root_logger = logging.getLogger()
-  root_logger.setLevel(level)
-  if loginfo is None:
-    # only do this the first time
-    # TODO: fix this clumsy hack, some kind of stackable state?
-    main_handler.setFormatter(PfxFormatter(format))
-    if supplant_root_logger:
-        root_logger.handlers.pop(0)
-    root_logger.addHandler(main_handler)
-
-  if trace_mode:
-    # enable tracing in the thread that called setup_logging
-    Pfx._state.trace = info
-    trace_level = level
-  else:
-    trace_level = logging.DEBUG
-
-  if module_names or function_names:
-    if importlib is None:
-      warning(
-          "setup_logging: no importlib (python<2.7?),"
-          " ignoring module_names=%r/function_names=%r", module_names,
-          function_names
-      )
-    else:
-      for module_name in module_names:
-        try:
-          M = importlib.import_module(module_name)
-        except ImportError:
-          warning("setup_logging: cannot import %r", module_name)
-        else:
-          M.DEBUG = True
-      for module_name, func_name in function_names:
-        try:
-          M = importlib.import_module(module_name)
-        except ImportError:
-          warning("setup_logging: cannot import %r", module_name)
-          continue
-        F = M
-        for funcpart in func_name.split('.'):
-          M = F
-          try:
-            F = M.getattr(funcpart)
-          except AttributeError:
-            F = None
-            break
-        if F is None:
-          warning("no %s.%s() found", module_name, func_name)
-        else:
-          setattr(M, funcpart, _ftrace(F))
-
-  loginfo = NS(
-      logger=root_logger,
-      level=level,
-      verbose=verbose,
-      trace_level=trace_level,
-      flags=flags,
-      module_names=module_names,
-      function_names=function_names,
-      cmd=cmd_name,
-      upd=upd_,
-      upd_mode=upd_mode,
-      ansi_mode=ansi_mode,
-      format=format,
-  )
-
-  return loginfo
-
-def ftrace(func):
-  ''' Decorator to trace a function if `__module__.DEBUG` is true.
-  '''
-  M = func.__module__
-
-  def func_wrap(*a, **kw):
-    do_debug = M.__dict__.get('DEBUG', False)
-    wrapper = _ftrace(func) if do_debug else func
-    return wrapper(*a, **kw)
-
-  return func_wrap
-
-def _ftrace(func):
-  ''' Decorator to trace the call and return of a function.
-  '''
-  fname = '.'.join((func.__module__, funccite(func)))
-
-  def traced_func(*a, **kw):
-    citation = "%s(*%s, **%s)" % (
-        fname, pformat(a, depth=1), pformat(kw, depth=2)
-    )
-    XP("CALL %s", citation)
+    # determine some attributes of main_log
     try:
-      result = func(*a, **kw)
-    except Exception as e:
-      XP("EXCEPTION from %s: %s %s", citation, type(e), e)
-      raise
+      fd = main_log.fileno()
+    except (AttributeError, IOError):
+      is_fifo = False
+      ##is_reg = False                        # unused
+      is_tty = False
     else:
-      XP("RESULT from %s: %r", citation, result)
-      return result
+      st = os.fstat(fd)
+      is_fifo = stat.S_ISFIFO(st.st_mode)
+      ##is_reg = stat.S_ISREG(st.st_mode)     # unused
+      is_tty = stat.S_ISCHR(st.st_mode)
 
-  return traced_func
+    if getattr(main_log, 'encoding', None) is None:
+      main_log = codecs.getwriter("utf-8")(main_log)
+
+    if trace_mode is None:
+      trace_mode = 'TRACE' in flags
+
+    if 'D' in flags:
+      D_mode = True
+
+    if upd_mode is None:
+      if 'UPD' in flags:
+        upd_mode = True
+      elif 'NOUPD' in flags:
+        upd_mode = False
+      else:
+        upd_mode = is_tty
+
+    if ansi_mode is None:
+      ansi_mode = is_tty and not env_no_color()
+
+    if format is None:
+      if is_tty or is_fifo:
+        format = DEFAULT_PFX_FORMAT_TTY
+      else:
+        format = DEFAULT_PFX_FORMAT
+
+    upd_ = None
+    if upd_mode:
+      from cs.upd import Upd  # pylint: disable=import-outside-toplevel
+      upd_ = Upd()
+
+    if trace_mode:
+      # enable tracing in the thread that called setup_logging
+      Pfx._state.trace = info
+      trace_level = level
+    else:
+      trace_level = logging.DEBUG
+
+    NS.__init__(
+        self,
+        main_log=main_log,
+        level=level,
+        verbose=verbose,
+        trace_level=trace_level,
+        flags=flags,
+        cmd=cmd,
+        upd=upd_,
+        upd_mode=upd_mode,
+        ansi_mode=ansi_mode,
+        format=format,
+        supplant_root_logger=supplant_root_logger,
+    )
+
+  def apply(self):
+    ''' Apply this `LoggingState` to the current logging setup.
+    '''
+    global loginfo
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+      # The logging system is already set up.
+      # Just monkey patch the leading handler's formatter.
+      PfxFormatter.patch_formatter(root_logger.handlers[0].formatter)
+    else:
+      # Set up a handler etc.
+      main_handler = logging.StreamHandler(self.main_log)
+      if self.upd_mode:
+        main_handler = UpdHandler(
+            self.main_log, ansi_mode=self.ansi_mode, over_handler=main_handler
+        )
+        self.upd = main_handler.upd
+      root_logger.setLevel(self.level)
+      if loginfo is None:
+        # only do this the first time
+        # TODO: fix this clumsy hack, some kind of stackable state?
+        main_handler.setFormatter(PfxFormatter(self.format))
+        if self.supplant_root_logger:
+          root_logger.handlers.pop(0)
+        root_logger.addHandler(main_handler)
+
+    if 'TDUMP' in self.flags:
+      # do a thread dump to the main_log on SIGHUP
+      # pylint: disable=import-outside-toplevel
+      import signal
+      from cs.debug import thread_dump
+
+      # pylint: disable=unused-argument
+      def handler(sig, frame):
+        thread_dump(None, self.main_log)
+
+      signal.signal(signal.SIGHUP, handler)
+
+def setup_logging(cmd=None, **kw):
+  ''' Prepare a `LoggingState` and return it.
+      It is also available as the global `cs.logutils.loginfo`.
+  '''
+  global loginfo
+  logstate = LoggingState(cmd=cmd, **kw)
+  logstate.apply()
+  loginfo = logstate
+  return loginfo
 
 class PfxFormatter(Formatter):
   ''' A Formatter subclass that has access to the program's `cmd` and `Pfx` state.
@@ -395,6 +370,47 @@ class PfxFormatter(Formatter):
     record.message = s
     return s
 
+  @staticmethod
+  def patch_formatter(formatter):
+    ''' Monkey patch an existing `Formatter` instance
+        with a `format` method which prepends the current `Pfx` prefix.
+    '''
+    if isinstance(formatter, PfxFormatter):
+      return
+    try:
+      formatter.PfxFormatter__monkey_patched
+    except AttributeError:
+      old_format = formatter.format
+
+      def new_format(record):
+        ''' Call the former `formatter.format` method
+            and prepend the current `Pfx` prefix to the start.
+        '''
+        ##msg0 = record.msg
+        ##args0 = record.args
+        cur_pfx = Pfx._state.prefix
+        if not cur_pfx:
+          return old_format(record)
+        if not isinstance(record.args, tuple):
+          # TODO: dict support
+          return old_format(record)
+        if record.args:
+          new_msg = '%s' + str(record.msg)
+          new_args = (cur_pfx + cs.pfx.DEFAULT_SEPARATOR,) + tuple(record.args)
+        else:
+          new_msg = cur_pfx + cs.pfx.DEFAULT_SEPARATOR + str(record.msg)
+          new_args = record.args
+        try:
+          with stackattrs(record, msg=new_msg, args=new_args):
+            return old_format(record)
+        except Exception:  # pylint: disable=broad-except
+          # unsupported in some way, fall back to the original
+          # and lose the prefix
+          return old_format(record)
+
+      formatter.format = new_format
+      formatter.PfxFormatter__monkey_patched = True
+
 # pylint: disable=too-many-branches,too-many-statements,redefined-outer-name
 def infer_logging_level(env_debug=None, environ=None, verbose=None):
   ''' Infer a logging level from the `env_debug`, which by default
@@ -420,24 +436,21 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       Return an object with the following attributes:
       * `.level`: A logging level.
       * `.flags`: All the words from `$DEBUG` as separated by commas and uppercased.
-      * `.module_names`: Module names to be debugged.
-      * `.function_names`: Functions to be traced in the form *module_name*`.`*func_name*.
   '''
   if env_debug is None:
     if environ is None:
       environ = os.environ
-    env_debug = os.environ.get('DEBUG', '')
-  level = TRACK
+    env_debug = environ.get('DEBUG', '')
   if verbose is None:
-    if not sys.stderr.isatty():
+    if sys.stderr.isatty():
+      level = TRACK
+    else:
       level = logging.WARNING
   elif verbose:
     level = logging.VERBOSE
   else:
     level = logging.WARNING
-  flags = [F.upper() for F in env_debug.split(',') if len(F)]
-  module_names = []
-  function_names = []
+  flags = []
   for flag in env_debug.split(','):
     flag = flag.strip()
     if not flag:
@@ -451,15 +464,14 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       else:
         level = logging.INFO
     elif flag[0].islower() and is_dotted_identifier(flag):
-      # modulename
-      module_names.append(flag)
+      # modulename - now honoured by cs.debug, not this
+      pass
     elif ':' in flag:
-      # module:funcname
-      module_name, func_name = flag.split(':', 1)
-      if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
-        function_names.append((module_name, func_name))
+      # module:funcname - now honoured by cs.debug, not this
+      pass
     else:
       uc_flag = flag.upper()
+      flags.append(uc_flag)
       if uc_flag == 'DEBUG':
         level = logging.DEBUG
       elif uc_flag == 'STATUS':
@@ -476,8 +488,6 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   return NS(
       level=level,
       flags=flags,
-      module_names=module_names,
-      function_names=function_names
   )
 
 def D(msg, *args):
@@ -598,6 +608,12 @@ def track(msg, *args, **kwargs):
   log(TRACK, msg, *args, **kwargs)
 
 @logging_wrapper(stacklevel_increment=1)
+def quiet(msg, *args, **kwargs):
+  ''' Emit a log at `QUIET` level with the current `Pfx` prefix.
+  '''
+  log(QUIET, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
 def verbose(msg, *args, **kwargs):
   ''' Emit a log at `VERBOSE` level with the current `Pfx` prefix.
   '''
@@ -658,7 +674,7 @@ def upd(msg, *args, **kwargs):
 
 # pylint: disable=too-many-instance-attributes
 class LogTime(object):
-  ''' LogTime is a content manager that logs the elapsed time of the enclosed
+  ''' LogTime is a context manager that logs the elapsed time of the enclosed
       code. After the run, the field .elapsed contains the elapsed time in
       seconds.
   '''
@@ -715,7 +731,9 @@ class UpdHandler(StreamHandler):
       uses a `cs.upd.Upd` for transcription.
   '''
 
-  def __init__(self, strm=None, upd_level=None, ansi_mode=None, over_handler=None):
+  def __init__(
+      self, strm=None, upd_level=None, ansi_mode=None, over_handler=None
+  ):
     ''' Initialise the `UpdHandler`.
 
         Parameters:
@@ -726,6 +744,7 @@ class UpdHandler(StreamHandler):
           A true value causes the handler to colour certain logging levels
           using ANSI terminal sequences.
     '''
+    from cs.upd import Upd  # pylint: disable=import-outside-toplevel
     if strm is None:
       strm = sys.stderr
     if upd_level is None:

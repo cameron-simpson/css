@@ -1,0 +1,1 @@
+Result.__del__: issue a warning about no collection instead of raising an exception.

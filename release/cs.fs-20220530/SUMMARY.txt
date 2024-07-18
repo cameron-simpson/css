@@ -1,0 +1,1 @@
+FSPathBasedSingleton._resolve_fspath: new `envvar` and `default_attr` parameters.

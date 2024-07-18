@@ -1,0 +1,1 @@
+BaseCommand: new shell() method to present an interactive Python prompt for use by subclasses cmd_shell method if desired.

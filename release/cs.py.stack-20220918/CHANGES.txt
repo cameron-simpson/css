@@ -1,0 +1,2 @@
+lib/python/cs/py/stack.py: cs.py.stack: caller: return None if the frame offset is out of range
+lib/python/cs/py/stack.py: merge default ==> vt

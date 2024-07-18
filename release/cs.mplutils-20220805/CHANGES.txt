@@ -1,0 +1,8 @@
+lib/python/cs/mplutils.py: cs.mplutils: a few conveniences for working with matplotlib
+lib/python/cs/mplutils.py: cs.mplutils: print_figure: flush output file before running img2sixel
+lib/python/cs/mplutils.py: cs.mplutils: new axes([figure[,axes]])->Axes function
+lib/python/cs/mplutils.py: cs.mplutils: initial DISTINFO
+lib/python/cs/mplutils.py: cs.mplutils: new remove_decorations(figure) call to strip axes, elgends and padding from a figure
+lib/python/cs/mplutils.py: cs.mplutils: remove_decorations: accept a Figure or an Axes
+lib/python/cs/mplutils.py: cs.mplutils: DISTINFO update
+lib/python/cs/mplutils.py: cs.mplutils: update DISTINFO again

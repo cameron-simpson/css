@@ -6,5 +6,5 @@
 
 import sys
 sys.path[:] = [ path for path in sys.path if path ]
-from cs.pop3 import POP3Command
-sys.exit(POP3Command.run_argv(sys.argv))
+from cs.pop3 import main
+sys.exit(main(sys.argv))

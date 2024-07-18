@@ -1,0 +1,1 @@
+DEVNULL default open for "r+b" instead of "wb".

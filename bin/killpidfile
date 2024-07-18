@@ -1,42 +1,44 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Kill the pid kept in the supplied pid files.
-#	- Cameron Simpson <cs@cskk.id.au> 15jan2005
+# - Cameron Simpson <cs@cskk.id.au> 15jan2005
 #
+
+set -ue
 
 : ${VARRUN:=$HOME/var/run}
 
 trace=set-x
-sigopt=-TERM	# use USR1 if aiming at fetchmail daemon
+sigopt=-TERM    # use USR1 if aiming at fetchmail daemon
 dounlink=
 wopt=
 Wopt=
 
 cmd=$0
 usage="Usage: $cmd [-d pidfiledir] [-u] [-w] [-W seconds] [-signal] pidfiles...
-	-d	Default directory for pidfiles. Default from \$VARRUN or \$HOME/var/run.
-	-u	Unlink pidfiles if used.
-	-w	Wait for processes to exit.
-	-W	Wait seconds for processes to exit, then send SIGKILL.
-	-signal	Initial signal to send. Passed to kill(1)."
+        -d      Default directory for pidfiles. Default from \$VARRUN or \$HOME/var/run.
+        -u      Unlink pidfiles if used.
+        -w      Wait for processes to exit.
+        -W      Wait seconds for processes to exit, then send SIGKILL.
+        -signal Initial signal to send. Passed to kill(1)."
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -d)	VARRUN=$2; shift ;;
-    -u)	dounlink=1 ;;
-    -w)	wopt=$1 ;;
-    -W)	Wopt="-W $2"; shift ;;
+    -d) VARRUN=$2; shift ;;
+    -u) dounlink=1 ;;
+    -w) wopt=$1 ;;
+    -W) Wopt="-W $2"; shift ;;
     -[0-9]* | -[A-Z]* )
-	sigopt=$1
-	;;
-    --)	shift; break ;;
+        sigopt=$1
+        ;;
+    --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
-	badopts=1
-	;;
-    *)	break ;;
+        badopts=1
+        ;;
+    *)  break ;;
   esac
   shift
 done
@@ -56,9 +58,9 @@ then
       while read pid
       do  if kill -0 "$pid" 2>/dev/null
           then
-            echo "$pidfile	$pid" `ps -o args -p "$pid" 2>/dev/null | sed 1d`
+            echo "$pidfile      $pid" `ps -o args -p "$pid" 2>/dev/null | sed 1d`
           else
-            echo "$pidfile	$pid MISSING"
+            echo "$pidfile      $pid MISSING"
             ok=
           fi
       done

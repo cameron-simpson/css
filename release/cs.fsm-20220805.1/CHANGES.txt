@@ -1,0 +1,4 @@
+lib/python/cs/fsm.py: cs.fsm: FSM: subclass DOTNodeMixin and provide a hook for a colour palette for node fillcolors
+lib/python/cs/fsm.py: cs.fsm: docstring typo fixes
+lib/python/cs/fsm.py: cs.fsm,cs.taskqueue: consistent DOT_NODE_FILLCOLOR_PALETTE spelling, drop node_fill_palette from Task.tasks_as_dot
+lib/python/cs/fsm.py: merge taskqueue ==> default

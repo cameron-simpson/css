@@ -1,0 +1,2 @@
+Tag.parse_value: bugfix parse of float.
+TagSet.edit: accept optional comments parameter with addition header comment lines, be more tolerant of errors, avoid losing data on error.

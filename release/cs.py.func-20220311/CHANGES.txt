@@ -1,0 +1,4 @@
+lib/python/cs/py/func.py: cs.py.func: @trace: new pprint=False option to use pprint.pformat instead of repr for the return value
+lib/python/cs/py/func.py: cs.py.func: @trace: bugfix use of retval parameter
+lib/python/cs/py/func.py: cs.py.func: clean lint
+lib/python/cs/py/func.py: cs.py.func: be up front about importing cs.x

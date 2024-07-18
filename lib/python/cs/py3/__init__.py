@@ -36,7 +36,7 @@ try:
 except ImportError:
   StringTypes = (str,)
 
-__version__ = '20200517-post'
+__version__ = '20220523-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -62,6 +62,8 @@ if sys.hexversion >= 0x03000000:
   def ustr(s, e='utf-8', errors='strict'):
     ''' Upgrade string to unicode: no-op for python 3.
     '''
+    if not isinstance(s, str):
+      s = str(s)
     return s
 
   def iteritems(o):

@@ -1,0 +1,1 @@
+progressbar, BaseProgress.iterbar: use @uses_upd to provide a context Upd instance.

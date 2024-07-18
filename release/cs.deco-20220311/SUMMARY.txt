@@ -1,0 +1,1 @@
+@cachedmethod: change the meaning of poll_delay=None to mean "never goes stale" as I had thought it already did.

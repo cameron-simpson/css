@@ -1,0 +1,3 @@
+lib/python/cs/timeseries.py: cs.timeseries: put @typechecked closer to the method definitions
+lib/python/cs/timeseries.py: merge default ==> solar
+lib/python/cs/timeseries.py: cs.timeseries,cs.splink: DISTINFO: console_scripts spec update

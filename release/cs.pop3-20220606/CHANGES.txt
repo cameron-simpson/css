@@ -1,0 +1,3 @@
+lib/python/cs/pop3.py: cs.pop3: drop use of BaseCommand.run_argv, do the normal thing instead
+lib/python/cs/pop3.py: cs.pop3: clean lint
+lib/python/cs/pop3.py: cs.pop3: use cs.upd.print

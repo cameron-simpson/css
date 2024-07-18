@@ -1,0 +1,3 @@
+lib/python/cs/py/func.py: cs.py.func: new callif(doit[,modes],func,*a,**kw) to call or print a function
+lib/python/cs/py/func.py: merge ebooks ==> default: various fixes for cs.cmdutils, more progress on the cs.ebooks package
+lib/python/cs/py/func.py: cs.py.func: clean lint, fix small bug

@@ -1,0 +1,6 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: import declarative_base from sqlalchemy.orm, adjust DISTINFO
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: rename State to ThreadState, use cs.fileutils.lockfile context manager instead of makelockfile
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: rename arranged_session to orchestrated_session and improve docstring
+lib/python/cs/sqlalchemy_utils.py: cs.orchestrated_session: close newly made sessions after use - we were leaking db connections and opens of SQLite filens
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: add stray session close, update docstrings
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: commented out debug function used when chasing stray db connections

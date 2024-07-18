@@ -1,0 +1,14 @@
+lib/python/cs/timeseries.py: cs.timeseries: small docstring improvements
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.as_pd_dataframe: rename `keys` to `df_data`, and accept either a time series key or a `(key,series)` tuple
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.as_pd_dataframe: default `key_map`: annotate columns with their original CSV headers if present
+lib/python/cs/timeseries.py: cs.timeseries: TimeSeriesMapping.plot: rename `keys` to `plot_data` as for `as_pd_dataframe`, add `stacked` and `kind` parameters so that we can derive `kind` from `stacked`
+lib/python/cs/timeseries.py: cs.timeseries: as_datetime64s: use a fixed unit mapping instead of a new one every time
+lib/python/cs/timeseries.py: cs.timeseries: as_datetime64s: apply optional utcoffset timeshift, replace list(map()) with list comprehension
+lib/python/cs/timeseries.py: cs.timeseries: plot_events: explainatory comment for why we're not bulk computing datetime64s
+lib/python/cs/timeseries.py: cs.timeseries: plumb optional pad=False option through data, data2, as_pd_series; use slice(pad) instead of [] in data() (solves short data elsewhere)
+lib/python/cs/timeseries.py: cs.timeseries: use as_datetime64s(...,utcoffset) to compute indices
+lib/python/cs/timeseries.py: cs.timeseries: new PlotSeries namedtuple holding a label, a series and an extra dict as common carrier for data which will get plotted
+lib/python/cs/timeseries.py: cs.timeseries: @timerange: make distinct @_with_utcoffset decorator using @autoparam
+lib/python/cs/timeseries.py: cs.timeseries: drop import of autoparam, not meaningfully used (and now obsolete)
+lib/python/cs/timeseries.py: cs.timeseries: @_with_utcoffset: bugfix setting __doc__
+lib/python/cs/timeseries.py: cs.timeseries: @_with_utcoffset: bugfix setting __doc__ again

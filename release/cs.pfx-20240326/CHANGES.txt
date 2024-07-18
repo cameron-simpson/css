@@ -1,0 +1,4 @@
+lib/python/cs/pfx.py: merge default => cdrip
+lib/python/cs/pfx.py: merge default ==> cdrip
+lib/python/cs/pfx.py: cs.pfx: Pfx.prefixify_exception: sanity check the types of the prefixed attributes, may help debugging an issue elsewhere
+lib/python/cs/pfx.py: cs.pfx: Pfx.prefixify_exception: do not modify .message if it is not a string, also put more detail in the type mismatch message

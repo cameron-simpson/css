@@ -1,0 +1,2 @@
+CancellationError from cs.result to cs.fsm, and use it to catch silently FSM event callbacks which raise it.
+Some other minor churn.

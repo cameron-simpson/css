@@ -1,0 +1,3 @@
+UpdProxy: new .suffix property.
+Upd: new run_task context manager to display an UpdProxy while something runs, with optional ticker.
+Small bugfix.

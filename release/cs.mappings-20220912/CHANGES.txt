@@ -1,0 +1,1 @@
+lib/python/cs/mappings.py: cs.mappings: new TypedKeyMixin to check that the keys of a mapping are of a particular type; new TypedKeyDict(TypedKeyMixin,dict) subclass; new StrKeyedDict and UUIDKeyedDict factories

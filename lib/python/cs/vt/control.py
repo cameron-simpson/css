@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python33
 #
 # Control operations given a Dirent.
 # - Cameron Simpson <cs@cskk.id.au> 31may2018
@@ -10,11 +10,13 @@
 '''
 
 from getopt import GetoptError
+
 from cs.logutils import exception
 from cs.pfx import Pfx
+
 from . import PATHSEP
 from .dir import _Dirent
-from .transcribe import parse
+from .transcribe import Transcriber
 
 class Control:
   ''' Command line interface to perform operations on Dirents.
@@ -60,7 +62,7 @@ class Control:
     if argv:
       raise GetoptError("extra arguments after dirent_spec: %r" % (argv,))
     try:
-      E = parse(dirent_spec)
+      E = Transcriber.parse(dirent_spec)
     except ValueError as e:
       raise GetoptError("parse failure: %r: %s" % (dirent_spec, e)) from e
     if not isinstance(E, _Dirent):

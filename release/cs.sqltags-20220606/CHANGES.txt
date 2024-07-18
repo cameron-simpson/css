@@ -1,0 +1,7 @@
+lib/python/cs/sqltags.py: cs.sqltags: new SQLTagsORM.Entities.add_new_tags method, use it in SQLTags.default_factory for bulk insert
+lib/python/cs/sqltags.py: cs.sqltags: SQTCriterion: new .from_equality(tag_name,tag_value) factory to make an equality criterion
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: accept criteria as positional parameters instead of a single iterable, accept new keyword parameters as equality criteria
+lib/python/cs/sqltags.py: cs.sqltags: update calls to SQLTags.find to use new keyword parameter form
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__getitem__: accept a slice to index the .unixtime tag
+lib/python/cs/sqltags.py: cs.sqltags: explainatory comment
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: also turn on echo mode if "ECHO" in $SQLTAGS_MODES

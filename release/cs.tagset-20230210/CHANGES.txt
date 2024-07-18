@@ -1,0 +1,5 @@
+lib/python/cs/tagset.py: cs.tagset: TagSet: new .uuid:UUID property returning the UUID for the tag named 'uuid' or None
+lib/python/cs/tagset.py: cs.tagset: TagSet.edit: more information in warning
+lib/python/cs/tagset.py: cs.tagset: BaseTagSets: new __bool__ returning True
+lib/python/cs/tagset.py: cs.tagset: TagFile: new optional update_mapping secondary mapping to which to mirror file tags, for example to an SQLTags; this gives files a UUID as a side effect
+lib/python/cs/tagset.py: cs.tagset: remove debug

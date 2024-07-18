@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+#
+# ebooks - my ebook management script, with access to Apple Books, Calibre and Kindle.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.ebooks.__main__ import main
+sys.exit(main(sys.argv))

@@ -1,0 +1,3 @@
+lib/python/cs/fs.py: cs.fs: new module, initially with rpaths(), will acquire filesystem stuff from cs.fileutils
+lib/python/cs/fs.py: cs.fs: new @atomic_directory(infill_func,make_placeholder=False) decorator; remove debugging
+lib/python/cs/fs.py: cs.fs: add DISTINFO; pkg_tags: cs.fs stub line

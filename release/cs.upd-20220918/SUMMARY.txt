@@ -1,0 +1,9 @@
+DROPPING PYTHON 2 SUPPORT.
+New @uses_upd decorator for things accepting an optional upd=Upd().
+UpdProxy.__init__: use @uses_upd, make text the only optional positional parameter.
+New top level `run_task` context manager wrapping `Upd.run_task`.
+Make all the top level functions accept an optional upd=Upd() parameter.
+Upd.run_task: wrap the yield in a try/finally to manage the RunState.
+Upd.run_task: set default tick_delay=0.3, 0.15 was too fast.
+UpdProxy: new optional text_auto() callable parameter, used to compute proxy.text if proxy._text is empty.
+UpdProxy.width: account for the suffix.

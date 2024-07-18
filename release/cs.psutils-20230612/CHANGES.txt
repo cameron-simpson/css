@@ -1,0 +1,3 @@
+lib/python/cs/psutils.py: cs.psutils: tweak docstring
+lib/python/cs/psutils.py: merge default ==> beyonwiz
+lib/python/cs/psutils.py: cs.psutils: pipefrom: default stdin=DEVNULL; pipefrom,pipto: make most parameters keyword only

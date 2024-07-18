@@ -1,0 +1,5 @@
+lib/python/cs/csvutils.py: cs.csvutils: make csv_reader() a generator to cue the @strable decorator
+lib/python/cs/csvutils.py: cs.csvutils: docstring updates for clarity
+lib/python/cs/csvutils.py: cs.csvutils: plumb the new optional snake_case parameter
+lib/python/cs/csvutils.py: merge default ==> solar
+lib/python/cs/csvutils.py: merge timeseries ==> solar

@@ -1,0 +1,29 @@
+lib/python/cs/splink.py: cs.splink: fix usage message typos
+lib/python/cs/splink.py: cs.splink: lots of updates to the import process feedback; return the CSV import DataFrame
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: remove debugging skip of event files
+lib/python/cs/splink.py: merge timeseries ==> default
+lib/python/cs/splink.py: cs.splink: SPLinkData.plot: expose the default plot modes and event labels
+lib/python/cs/splink.py: cs.splink: fixup
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_import: refactor the event import a bit, improves the progress bar
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_fetch: fix argument parsing, pass -n through to rsync and still run it
+lib/python/cs/splink.py: cs.splink: SPLinkCommand: new cmd_pull, combining fetch and import
+lib/python/cs/splink.py: cs.splink: SPLinkCommand: cmd_fetch,cmd_import: accept optional option overrides as keyword parameters; cmd_pull: pass overrides in to cmd_fetch and cmd_import
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_fetch: return the rsync exit code, not the CompletedProcess object
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_fetch: -n is passed to rsync, do there is always a CompletedProcess
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: pass the local timezone to the plot call, update usage and options
+lib/python/cs/splink.py: cs.splink: SPLinkData.plot: rework the key matching and plot data gathering, pass the utcoffset to the subsidiary timeseries plot call
+lib/python/cs/splink.py: cs.splink: clean some lint
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir: class attributes for the time columns and their formats
+lib/python/cs/splink.py: cs.spplink: SPLinkDataDir.to_csv: shim TimeSeriesDataDir,to_csv to reproduce the SP-Link download CSV format
+lib/python/cs/splink.py: cs.splink: SPLinkCSVDir.export_csv_to_timeseries: plumb tzname to ts2001_unixtime()
+lib/python/cs/splink.py: cs.splink: SPLinkData.to_csv: to_csv for a particular dsataset
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_export: new "splink export" command to export data in SP-Link CSV format
+lib/python/cs/splink.py: cs.splink: tweak exception message
+lib/python/cs/splink.py: cs.splink: rename variable to avoid shadow
+lib/python/cs/splink.py: cs.splink: add missing import, fix spelling of COLUMN_SECONDS_2001 CSV column
+lib/python/cs/splink.py: cs.splink: fix references to DailySummaryData, improve usage messages around dataset names
+lib/python/cs/splink.py: cs.splink: .cmd_plot: accept start-time and optional stop-time
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: implement the --tz option, default system local timezone
+lib/python/cs/splink.py: cs.splink: TimeSeriesBaseCommand.parsetime now returns a UNIX timestamp
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: fix variable name
+lib/python/cs/splink.py: cs.splink: update DISTINFO

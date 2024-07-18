@@ -1,0 +1,9 @@
+Replace dropped UTF16NULField with BinaryUTF16NUL.
+Comment out unused CO64BoxBody.chunk_offsets, uses dropped (and not replaced) deferred_field.
+Drop FallbackBoxBody, we'll just use BoxBody when there's no box specific subclass.
+Replace pick_boxbody_class with BoxBody.for_box_type.
+Rename boxbody_type_from_klass to boxbody_type_from_class.
+Drop obsolete KNOWN_BOXBODY_CLASSES.
+MP4Command.cmd_info: print moov.udta.meta.ilst.cover in SIXEL format on a terminal.
+Rename parse_deref_path to get_deref_path like other lexical functions.
+ILSTBoxBody.__getattr__: fix lookup of long names.

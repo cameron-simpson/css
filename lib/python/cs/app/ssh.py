@@ -4,31 +4,31 @@
 #   - Cameron Simpson <cs@cskk.id.au> 01oct2016
 #
 
-from __future__ import print_function
-
-DISTINFO = {
-    'description': "OpenSSH configuration parsing.",
-    'keywords': ["python2", "python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.env', 'cs.lex', 'cs.logutils'],
-    'entry_points': {
-      'console_scripts': [
-          'ssh-opts = cs.app.ssh:main_ssh_opts',
-          ],
-    },
-}
-
 import sys
 from fnmatch import fnmatch
+
 from cs.env import envsub
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import XP
 from cs.pfx import Pfx
+
+DISTINFO = {
+    'description':
+    "OpenSSH configuration parsing.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.env', 'cs.lex', 'cs.logutils', 'cs.pfx'],
+    'entry_points': {
+        'console_scripts': [
+            'ssh-opts = cs.app.ssh:main_ssh_opts',
+        ],
+    },
+}
 
 DEFAULT_CONFIGS = ('$HOME/.ssh/config', '/etc/ssh/ssh_config')
 
@@ -93,7 +93,9 @@ def main_ssh_opts(argv):
   USAGE = r'''Usage: %s [-F config-file]... [-o opt=value]... host [options...]
   -F config-file    Specific configuration file to read. These accumulate.
                     If no configuration files are specified use:
-                        ''' + " ".join(DEFAULT_CONFIGS) + r'''
+                        ''' + " ".join(
+      DEFAULT_CONFIGS
+  ) + r'''
                     Configuration files are consulted in order and
                     the earlier matching setting of each option is
                     used.
@@ -144,7 +146,7 @@ def main_ssh_opts(argv):
   else:
     host = argv.pop(0)
   if not configs:
-    configs = [ envsub(cfg) for cfg in DEFAULT_CONFIGS ]
+    configs = [envsub(cfg) for cfg in DEFAULT_CONFIGS]
   if badopts:
     print(usage, file=sys.stderr)
     return 2

@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: default_param: append parameter descriptions to the docstring of the decorated function
+lib/python/cs/deco.py: merge tagger => default

@@ -12,58 +12,7 @@ import sys
 from functools import partial
 import time
 import unittest
-from .threads import bg, PriorityLock, PriorityLockSubLock, WorkerThreadPool
-
-class TestWorkerThreadPool(unittest.TestCase):
-  ''' Unit tests for `WorkerThreadPool`.
-  '''
-
-  def setUp(self):
-    ''' Start up the test thread pool.
-    '''
-    self.pool = WorkerThreadPool()
-
-  def tearDown(self):
-    ''' Shut down the test thread pool.
-    '''
-    self.pool.shutdown()
-
-  @staticmethod
-  def _testfunc(*a, **kw):
-    ##X("_testfunc: a=%r, kw=%r", a, kw)
-    return a, kw
-
-  def test00null(self):
-    ''' Null test: setUp and tearDown.
-    '''
-    pass
-
-  def test01run1(self):
-    ''' Dispatch a single function.
-    '''
-    f = partial(self._testfunc, 1, 2, 3, a=4, b=5)
-
-    def deliver(result):
-      ''' Dummy function to receive the pool result.
-      '''
-      ##X("result = %r", result)
-      pass
-
-    self.pool.dispatch(f, deliver=deliver)
-
-  def test01run16(self):
-    ''' Dispatch many parallel functions.
-    '''
-
-    def deliver(result):
-      ''' Dummy function to receive the pool result.
-      '''
-      ##X("result = %r", result)
-      pass
-
-    for n in range(16):
-      f = partial(self._testfunc, 1, 2, 3, a=4, b=5, n=n)
-      self.pool.dispatch(f, deliver=deliver)
+from .threads import bg, PriorityLock, PriorityLockSubLock
 
 class TestPriorityLock(unittest.TestCase):
   ''' Unit tests for `PriorityLock`.

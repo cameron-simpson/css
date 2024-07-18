@@ -1,0 +1,1 @@
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion: new promote(obj)->TagSetCriterion class method

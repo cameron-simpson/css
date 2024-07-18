@@ -1,0 +1,8 @@
+lib/python/cs/app/playon.py: cs.*: update implementations of BaseCommand.run_context to use super().run_context()
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.suburl_data: progress reporting, raise on bad response, upgrade JSON error warning
+lib/python/cs/app/playon.py: cs.app.pplayon: PlayOnAPI: use a common cookie jar across API calls
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: new "api" and "cds" API access subcommands
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand._refresh_sqltags_data: bugfix "expired cache" logic, now a normal method, add Upd task reporting
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: new "poll" subcommand reporting the API notifications response
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: define CDS_HOSTNAME_LOCAL and CDS_BASE_LOCAL, add notifications method, use the common cookie jar
+lib/python/cs/app/playon.py: cs.app.playon: general tidy up

@@ -1,0 +1,8 @@
+lib/python/cs/fstags.py: cs.fstags: FSTags: drop redundant call to MultiOpenMixin.__init__
+lib/python/cs/fstags.py: merge tagger ==> default: new "tagger" command and cs.app.tagger package with Tagger class for filing based on FSTags
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_tag: use parse_tag_addremove for the tags instead of the overengineered TagCriterion factories
+lib/python/cs/fstags.py: cs.fstags: fstags tagpaths: also use parse_tag_addremove to parse the tag specification; tweak "fstags tag" action
+lib/python/cs/fstags.py: cs.{fstags,sqltags,tagset}: rename edit_many to edit_tagsets
+lib/python/cs/fstags.py: cs.fstags: FSTags.edit_dirpath: include realpath(dirpath) at the top of the edit list
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_tagpaths: bugfix some variable references, drop obsolete code line
+lib/python/cs/fstags.py: cs.sqltags,cs.fstags: bump cs.tagset requirement to >=20211212

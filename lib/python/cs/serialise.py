@@ -4,7 +4,7 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' OBSOLETE: some serialising functions. Please use by cs.binary instead.
+''' OBSOLETE: some serialising functions. Please use cs.binary instead.
 
     Porting guide:
     * `get_bs` is now `BSUInt.parse_bytes`.

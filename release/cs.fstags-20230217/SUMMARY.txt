@@ -1,0 +1,1 @@
+FSTagsCommand.cmd_rename: use -o for the format string as for other commands, -n is for "no action".

@@ -7,30 +7,43 @@
 ''' Filesystem semantics for a Dir.
 '''
 
+from dataclasses import dataclass
 import errno
 from inspect import getmodule
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O_NOFOLLOW
+from os.path import (
+    basename,
+    isfile as isfilepath,
+    realpath,
+    splitext,
+)
 import shlex
+from threading import Thread
 from types import SimpleNamespace as NS
+from typing import Optional
 from uuid import UUID
-from cs.context import stackattrs
+
 from cs.excutils import logexc
+from cs.fs import shortpath
 from cs.later import Later
+from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import exception, error, warning, info, debug
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.range import Range
-from cs.threads import locked
+from cs.threads import locked, HasThreadState, State as ThreadState
 from cs.x import X
-from . import defaults, Lock, RLock
-from .block import isBlock
+
+from . import Lock, RLock, Store, uses_Store
+from .archive import Archive, FilePathArchive
 from .cache import BlockCache
+from .config import Config, uses_Config
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
 from .meta import Meta
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
-from .transcribe import Transcriber, mapping_transcriber, parse
+from .transcribe import Transcriber
 
 XATTR_VT_PREFIX = 'x-vt-'
 
@@ -117,21 +130,22 @@ class FileHandle:
     '''
     return self.fs.bg(func, *a, **kw)
 
-  def close(self):
+  @uses_Store
+  def close(self, *, S):
     ''' Close the file, mark its parent directory as changed.
     '''
-    S = defaults.S
     R = self.E.flush()
     self.E.parent.changed = True
-    S.open()
-    # NB: additional S.open/close around self.E.close
-    @logexc
-    def withR(R):
-      with stackattrs(defaults, S=S):
-        self.E.close()
-      S.close()
+    if R is not None:
+      S.open()
+      # NB: additional S.open/close around self.E.close
+      @logexc
+      def withR(R):
+        with S:
+          self.E.close()
+        S.close()
 
-    R.notify(withR)
+      R.notify(withR)
 
   def write(self, data, offset):
     ''' Write data to the file.
@@ -166,30 +180,17 @@ class FileHandle:
     ''' Commit file contents to Store.
         Chooses a scanner based on the Dirent.name.
     '''
-    X("FileHandle.flush: self.E.name=%r", self.E.name)
     mime_type = self.E.meta.mime_type
     if mime_type is None:
       scanner = None
     else:
-      X("look up scanner from mime_type %r", mime_type)
       scanner = scanner_from_mime_type(mime_type)
     if scanner is None:
-      X("look up scanner from filename %r", self.E.name)
       scanner = scanner_from_filename(self.E.name)
     self.E.flush(scanner, dispatch=self.bg)
     ## no touch, already done by any writes
-    X("FileHandle.Flush DONE")
 
-@mapping_transcriber(
-    prefix="Ino",
-    transcription_mapping=lambda self: {
-        'refcount': self.refcount,
-        'E': self.E,
-    },
-    required=('refcount', 'E'),
-    optional=(),
-)
-class Inode(Transcriber, NS):
+class Inode(Transcriber, NS, prefix='Ino'):
   ''' An Inode associates an inode number and a Dirent.
 
       Attributes:
@@ -212,16 +213,16 @@ class Inode(Transcriber, NS):
         )
     )
 
-  def transcribe_inner(self, T, fp):
-    return T.transcribe_mapping(
+  def transcribe_inner(self) -> str:
+    return self.transcribe_mapping_inner(
         {
             'refcount': self.refcount,
             'E': self.E,
-        }, fp, T=T
+        }
     )
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar, prefix):
+  def parse_inner(cls, s, offset, stopchar, prefix):
     if prefix != cls.transcribe_prefix:
       raise ValueError(
           "expected prefix=%r, got: %r" % (
@@ -229,7 +230,7 @@ class Inode(Transcriber, NS):
               prefix,
           )
       )
-    m, offset = T.parse_mapping(s, offset, stopchar=stopchar, T=T)
+    m, offset = cls.parse_mapping(s, offset, stopchar=stopchar)
     return cls(None, m['E'], m['refcount']), offset
 
 class Inodes:
@@ -260,16 +261,13 @@ class Inodes:
   def load_fs_inode_dirents(self, D):
     ''' Load entries from an `fs_inode_dirents` Dir into the Inode table.
     '''
-    X("LOAD FS INODE DIRENTS:")
-    dump_Dirent(D)
+    ##dump_Dirent(D)
     for name, E in D.entries.items():
-      X("  name=%r, E=%r", name, E)
       with Pfx(name):
         # get the refcount from the :uuid:refcount" name
         _, refcount_s = name.split(':')[:2]
         I = self.add(E)
         I.refcount = int(refcount_s)
-        X("  I=%s", I)
 
   def get_fs_inode_dirents(self):
     ''' Create an `fs_inode_dirents` Dir containing Inodes which
@@ -281,8 +279,7 @@ class Inodes:
         D["%s:%d" % (uuid, I.refcount)] = I.E
       else:
         warning("refcount=%s, SKIP %s", I.refcount, I.E)
-    X("GET FS INODE DIRENTS:")
-    dump_Dirent(D)
+    ##dump_Dirent(D)
     return D
 
   def _new_inum(self):
@@ -297,47 +294,47 @@ class Inodes:
     allocated.add(inum)
     return inum
 
+  @pfx_method
   def add(self, E, inum=None):
     ''' Add the Dirent `E` to the Inodes, return the new Inode.
         It is not an error to add the same Dirent more than once.
     '''
-    with Pfx("Inodes.add(E=%s)", E):
-      if E.isindirect:
-        raise ValueError("indirect Dirents may not become Inodes")
-      if inum is not None and inum < 1:
-        raise ValueError("inum must be >= 1, got: %d" % (inum,))
-      uu = E.uuid
-      I = self._by_dirent.get(E)
-      if I:
-        assert I.E is E
-        if inum is not None and I.inum != inum:
-          raise ValueError(
-              "inum=%d: Dirent already has an Inode with a different inum: %s"
-              % (inum, I)
-          )
-        if uu:
-          # opportunisticly update UUID mapping
-          # in case the Dirent has acquired a UUID
-          I2 = self._by_uuid.get(uu)
-          if I2:
-            assert I2.E is E
-          else:
-            self._by_uuid[uu] = I
-        return I
-      # unknown Dirent, create new Inode
-      if inum is None:
-        inum = self._new_inum()
-      else:
-        I = self._by_inum.get(inum)
-        if I:
-          raise ValueError("inum %d already allocated: %s" % (inum, I))
-        self._allocated.add(inum)
-      I = Inode(inum, E)
-      self._by_dirent[E] = I
-      self._by_inum[inum] = I
+    if E.isindirect:
+      raise ValueError("indirect Dirents may not become Inodes")
+    if inum is not None and inum < 1:
+      raise ValueError("inum must be >= 1, got: %d" % (inum,))
+    uu = E.uuid
+    I = self._by_dirent.get(E)
+    if I:
+      assert I.E is E
+      if inum is not None and I.inum != inum:
+        raise ValueError(
+            "inum=%d: Dirent already has an Inode with a different inum: %s" %
+            (inum, I)
+        )
       if uu:
-        self._by_uuid[uu] = I
+        # opportunisticly update UUID mapping
+        # in case the Dirent has acquired a UUID
+        I2 = self._by_uuid.get(uu)
+        if I2:
+          assert I2.E is E
+        else:
+          self._by_uuid[uu] = I
       return I
+    # unknown Dirent, create new Inode
+    if inum is None:
+      inum = self._new_inum()
+    else:
+      I = self._by_inum.get(inum)
+      if I:
+        raise ValueError("inum %d already allocated: %s" % (inum, I))
+      self._allocated.add(inum)
+    I = Inode(inum, E)
+    self._by_dirent[E] = I
+    self._by_inum[inum] = I
+    if uu:
+      self._by_uuid[uu] = I
+    return I
 
   def __getitem__(self, ndx):
     if isinstance(ndx, int):
@@ -359,7 +356,111 @@ class Inodes:
       return False
     return True
 
-class FileSystem:
+@dataclass
+class MountSpec:
+  fsname: str
+  S: Store
+  D: Dir
+  basename: str
+  readonly: bool = True
+  archive: Optional[Archive] = None
+
+  # pylint: disable=too-many-branches
+  @classmethod
+  @pfx_method
+  @uses_Config
+  def from_str(
+      cls, special: str, *, readonly=True, config: Config
+  ) -> "MountSpec":
+    ''' Parse the mount command's special device from `special`.
+        Return the `MountSpec`.
+
+        Supported formats:
+        * `D{...}`: a raw `Dir` transcription.
+        * `[`*clause*`]`: a config clause name.
+        * `[`*clause*`]`*archive*: a config clause name
+        and a reference to a named archive associated with that clause.
+        * *archive_file*`.vt`: a path to a `.vt` archive file.
+    '''
+    fsname = special
+    specialD = None
+    special_store = None
+    archive = None
+    if special.startswith('D{') and special.endswith('}'):
+      # D{dir}
+      specialD, offset = Dir.parse(special)
+      if offset != len(special):
+        raise ValueError("unparsed text: %r" % (special[offset:],))
+      if not isinstance(specialD, Dir):
+        raise ValueError(
+            "does not seem to be a Dir transcription, looks like a %s" %
+            (type(specialD),)
+        )
+      special_basename = specialD.name
+      if not readonly:
+        warning("setting readonly")
+        readonly = True
+    elif special.startswith('['):
+      if special.endswith(']'):
+        # expect "[clause]"
+        clause_name, offset = get_ini_clausename(special)
+        archive_name = ''
+        special_basename = clause_name
+      else:
+        # expect "[clause]archive"
+        # TODO: just pass to Archive(special,config=config)?
+        # what about special_basename then?
+        clause_name, archive_name, offset = get_ini_clause_entryname(special)
+        special_basename = archive_name
+      if offset < len(special):
+        raise ValueError("unparsed text: %r" % (special[offset:],))
+      fsname = str(config) + special
+      try:
+        special_store = config[clause_name]
+      except KeyError:
+        # pylint: disable=raise-missing-from
+        raise ValueError("unknown config clause [%s]" % (clause_name,))
+      if archive_name is None or not archive_name:
+        special_basename = clause_name
+      else:
+        special_basename = archive_name
+      archive = special_store.get_Archive(archive_name)
+    else:
+      # pathname to archive file
+      arpath = special
+      if not isfilepath(arpath):
+        raise ValueError("not a file")
+      fsname = shortpath(realpath(arpath))
+      spfx, sext = splitext(basename(arpath))
+      if spfx and sext == '.vt':
+        special_basename = spfx
+      else:
+        special_basename = special
+      archive = FilePathArchive(arpath)
+    return cls(
+        fsname=fsname,
+        readonly=readonly,
+        S=special_store,
+        D=specialD,
+        basename=special_basename,
+        archive=archive,
+    )
+
+  def mount(self, mnt: str, **mount_kw) -> Thread:
+    from .fuse import mount
+    _mount_kw = dict(
+        S=self.S,
+        archive=self.archive,
+        readonly=self.readonly,
+    )
+    _mount_kw.update(mount_kw)
+    return mount(
+        mnt,
+        self.D,
+        **_mount_kw,
+    )
+
+class FileSystem(HasThreadState):
   ''' The core filesystem functionality supporting FUSE operations
       and in principle other filesystem-like access.
 
@@ -372,11 +473,14 @@ class FileSystem:
       or the like.
   '''
 
+  perthread_state = ThreadState()
+
+  @uses_Store
   def __init__(
       self,
       E,
       *,
-      S=None,
+      S,
       archive=None,
       subpath=None,
       readonly=None,
@@ -399,10 +503,8 @@ class FileSystem:
     '''
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
-    if S is None:
-      S = defaults.S
     self._old_S_block_cache = S.block_cache
-    self.block_cache = S.block_cache or defaults.block_cache or BlockCache()
+    self.block_cache = S.block_cache or BlockCache.default() or BlockCache()
     S.block_cache = self.block_cache
     S.open()
     if readonly is None:
@@ -445,21 +547,12 @@ class FileSystem:
     try:
       with Pfx("fs_inode_dirents"):
         fs_inode_dirents = E.meta.get("fs_inode_dirents")
-        X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
         if fs_inode_dirents:
-          inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
-          if offset < len(fs_inode_dirents):
-            warning(
-                "unparsed text after Dirent: %r", fs_inode_dirents[offset:]
-            )
-          X("IMPORT INODES:")
+          inode_dir = _Dirent.from_str(fs_inode_dirents)
           dump_Dirent(inode_dir)
           inodes.load_fs_inode_dirents(inode_dir)
-        else:
-          X("NO INODE IMPORT")
-        X("FileSystem mntE:")
       with self.S:
-        with stackattrs(defaults, fs=self):
+        with self:
           dump_Dirent(mntE)
     except Exception as e:
       exception("exception during initial report: %s", e)
@@ -496,20 +589,14 @@ class FileSystem:
   @logexc
   def _sync(self):
     with Pfx("_sync"):
-      if defaults.S is None:
-        raise RuntimeError("RUNTIME: defaults.S is None!")
       archive = self.archive
       if not self.readonly and archive is not None:
         with self._lock:
           E = self.E
           updated = False
-          X("snapshot %r  ...", E)
           E.snapshot()
-          X("snapshot: afterwards E=%r", E)
           fs_inode_dirents = self._inodes.get_fs_inode_dirents()
-          X("_SYNC: FS_INODE_DIRENTS:")
           dump_Dirent(fs_inode_dirents)
-          X("set meta.fs_inode_dirents")
           if fs_inode_dirents.size > 0:
             E.meta['fs_inode_dirents'] = str(fs_inode_dirents)
           else:
@@ -717,7 +804,7 @@ class FileSystem:
           B, offset = parse(block_s)
           if offset < len(block_s):
             OS_EINVAL("unparsed text after trancription: %r", block_s[offset:])
-          if not isBlock(B):
+          if not isinstance(B, Block):
             OS_EINVAL("not a Block transcription")
           info("%s: update .block directly to %r", E, str(B))
           E.block = B

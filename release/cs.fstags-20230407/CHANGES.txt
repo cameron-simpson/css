@@ -1,0 +1,5 @@
+lib/python/cs/fstags.py: cs.fstags: FSTags: support open/close of self.update_mapping, update startup/shutdown to startup_shutdown
+lib/python/cs/fstags.py: cs.*: drop BaseCommand.apply_defaults in favour of the Options dataclass
+lib/python/cs/fstags.py: merge vt ==> solar: assorted updates from the vt branch, mostly the cs.cmdutils ones
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand: drop use of @uses_runstate, use presupplied options.runstate instead
+lib/python/cs/fstags.py: cs.fstags,tagset: move the ORM open/close from FSTags.startup_shutdown to TagFile.save, greatly shortens the ORM lock

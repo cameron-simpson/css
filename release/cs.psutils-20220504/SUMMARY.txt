@@ -1,0 +1,1 @@
+signal_handlers: reshape try/except to avoid confusing traceback.

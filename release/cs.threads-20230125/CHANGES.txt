@@ -1,0 +1,3 @@
+lib/python/cs/threads.py: cs.threads: new HasThreadState mixin for classes with a state=State() attribute to provide a cls.default() class method for the default instance and a context manager to push/pop self.state.current=self
+lib/python/cs/threads.py: cs.threads: HasThreadState: THREAD_STATE_ATTR = state class attribute to parameterise the thread state attribute name
+lib/python/cs/threads.py: cs.threads: HasThreadState.default: bugfix dereference of cls.THREAD_STATE_ATTR

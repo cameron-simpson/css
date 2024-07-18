@@ -1,0 +1,1 @@
+@decorator: use functools.update_wrapper to propagate the decorated function's attributes to the wrapper (still legacy code for Python prior to 3.2).

@@ -1,0 +1,4 @@
+lib/python/cs/lex.py: cs.lex: typed_str,typed_repr: make max_length the first optional positional parameter, make other parameters keyword only
+lib/python/cs/lex.py: merge default ==> cdrip
+lib/python/cs/lex.py: cs.lex: new camelcase() and snakecase() functions
+lib/python/cs/lex.py: merge head: work from the orge branch

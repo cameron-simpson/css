@@ -1,0 +1,2 @@
+@trace: new pprint=False option to use pprint.pformat instead of repr for the return value.
+@trace: bugfix use of retval parameter.

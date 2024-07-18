@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: @decorator: simplify logic, and try to use functools.update_wrapper to propagate the decorated function's attributes to the wrapper
+lib/python/cs/deco.py: cs.deco: @decorator: accomodate python pre-3.2 (no functools.update_wrapper), remove debug, tidy some lint

@@ -1,0 +1,2 @@
+Later: replace the default = _ThreadLocal with a default = ThreadState(current=None).
+Later: fold startup/shutdown/__enter__/__exit__ into the startup_shutdown context manager, fixes MultiOpenMixin misbehaviour.

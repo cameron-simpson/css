@@ -1,0 +1,5 @@
+lib/python/cs/lex.py: cs.lex: @has_format_attributes: new optional inherit parameter to inherit superclass (or other) format attributes, default False
+lib/python/cs/lex.py: merge default -> sqltags
+lib/python/cs/lex.py: cs/lex: new FNumericMixin, FFloat, FInt FormatableMixin subclasses like FStr - they add .localtime and .utctime formattable attributes
+lib/python/cs/lex.py: cs.lex: clean some lint
+lib/python/cs/lex.py: cs.lex: @has_format_attributes: bugfix definition of inherit parameter

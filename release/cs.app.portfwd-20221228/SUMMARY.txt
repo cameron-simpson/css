@@ -1,0 +1,1 @@
+get_ssh_options: be quiet.

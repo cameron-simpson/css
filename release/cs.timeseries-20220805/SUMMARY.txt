@@ -1,0 +1,4 @@
+Rename @plotrange to @timerange since it is not inherently associated with plotting, support both methods and functions.
+print_figure, save_figure and saved_figure now moved to cs.mplutils.
+plot_events: use the utcoffset parameter.
+TimeSeriesBaseCommand.cmd_plot: new --bare option for unadorned plots.

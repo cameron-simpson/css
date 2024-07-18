@@ -1,0 +1,4 @@
+lib/python/cs/psutils.py: cs.psutils: run: fold in the superior run() from cs.ebooks
+lib/python/cs/psutils.py: cs.psutils: pipefrom,pipeto: replace trace= with quiet= like run()
+lib/python/cs/psutils.py: cs.psutils: update imports and DISTINFO
+lib/python/cs/psutils.py: cs.psutils: print_argv(): move to above the __main__ boilerplate and add an `end` parameter (used by pipefrom)

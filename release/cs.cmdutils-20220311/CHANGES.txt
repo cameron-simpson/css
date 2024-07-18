@@ -1,0 +1,18 @@
+lib/python/cs/cmdutils.py: merge default => beyonwiz
+lib/python/cs/cmdutils.py: cs.cmdutils: small autoformat
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: subcommand_usage_text: extract usage when subcmd is a class, drop `fulldoc` parameter
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: make a _BaseCommandRun namedtuple for the prepared run state
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: bugfix the main_with_argv function definition when the method is a class
+lib/python/cs/cmdutils.py: cs.cmdutils: tidy up
+lib/python/cs/cmdutils.py: cs.cmdutils: DISTINFO: drop description, comes from the module docstring
+lib/python/cs/cmdutils.py: merge default ==> playon
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: big refactor of subcommand internals
+lib/python/cs/cmdutils.py: cs.cmdutils: bugfix _BaseSubCommand.from_class _MethodSubCommand construction
+lib/python/cs/cmdutils.py: cs.cmdutils: _BaseSubCommand: useful __str__
+lib/python/cs/cmdutils.py: cs.cmdutils: _MethodSubCommand.__call__: fix method invocation
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: adjust initialisation, fix internal self._run() invocation
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: default a default SUBCOMMAND_ARGV_DEFAULT=None because I can never remember its name
+lib/python/cs/cmdutils.py: cs.cmdutils: _MethodSubCommand.__call__: the method might already be bound (eg BaseCommand.cmd_help, a class method)
+lib/python/cs/cmdutils.py: merge ebooks ==> default: various fixes for cs.cmdutils, more progress on the cs.ebooks package
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.usage_text: plumb the class USAGE_KEYWORDS through to each subcommand usage format mapping
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: return immediately with 2 if self._printed_usage, which means that the invocation was bad which means that we should not run

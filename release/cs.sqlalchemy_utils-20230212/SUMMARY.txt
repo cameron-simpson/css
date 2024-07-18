@@ -1,0 +1,1 @@
+ORM.__init__: drop case_sensitive, no longer supported?

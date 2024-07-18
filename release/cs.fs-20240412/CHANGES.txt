@@ -1,0 +1,2 @@
+lib/python/cs/fs.py: cs.fs: HasFSPath: explain that the __init__ is optional in the docstring
+lib/python/cs/fs.py: merge default ==> vt

@@ -1,0 +1,5 @@
+@uses_upd: provide Upd() if there is no current default.
+@uses_upd: set the default Upd to the chosen Upd instance.
+Upd: subclass MultiOpenMixin, drop close() and closed() methods; always make a default Upd instance in open state.
+Upd: always define an initial slot and its UpdProxy, avoids a billion special cases elsewhere.
+UpdProxy: accept index=None as "make a bare UpdProxy for upd" used in the Upd._reset setup code, reserving the magic self inserting mode for when index is not None.

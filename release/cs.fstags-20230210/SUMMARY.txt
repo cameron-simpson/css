@@ -1,0 +1,1 @@
+New optional update_mapping for mirroring tags eg to an SQLTags; activated automatically by an $FSTAGS_UPDATE_MAPPING environment variable.

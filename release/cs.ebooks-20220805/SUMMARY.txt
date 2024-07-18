@@ -1,0 +1,3 @@
+CalibreCommand.books_from_spec: UPPERCASE matches a format.
+CalibreCommand: new cmd_linkto to link book files into an external directory with nice names.
+CalibreTree: fix .fspath and the associated .pathto and format paths.

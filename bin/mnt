@@ -8,19 +8,31 @@ set -ue
 
 : "${MNT_BASE:=$HOME/mnt}"
 
+daemon=
 rcfile=$HOME/.mntrc
 umount=
 mount_point=
 trace=
 [ -t 2 ] && trace=set-x
+use_tmux=1
+sshfs_opts=
+sshfs_idmap_mode=user
+sshfs_nomap_mode=ignore
 
 cmd=$(basename "$0")
 usage="Usage:
   $cmd [-f rcfile] ALL
+  $cmd [-f rcfile] /mount/point
   $cmd [-f rcfile] mount-path [/mount/point]
-  $cmd [-u] {mount-path|/mount/point}...
+  $cmd -u {mount-path|/mount/point}...
+    -d          Daemon mode: do not run in the foreground.
     -f rcfile   Specify config file. Default: $rcfile
+    -F sshcfg   Specify an ssh config file to use.
+    -o sshfs-opt Add an option for use with sshfs.
+    -q          Quiet. Turn off tracing, if any.
     -u          Unmount the mount-path.
+    -X          Run the mount directly, not in tmux.
+    -x          Trace the executed command.
     mount-path
         ALL
           Scan the file $rcfile
@@ -37,15 +49,20 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
+    -d) daemon=1 ;;
     -f) rcfile=$1; shift ;;
+    -F) sshfs_opts="$sshfs_opts -F $2"; shift ;;
+    -o) sshfs_opts="$sshfs_opts -o $2"; shift ;;
+    -q) trace= ;;
     -u) umount=1 ;;
+    -X) use_tmux= ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
   esac
   shift
 done
-[ $# -gt 0 ] && [ "x$1" = x-u ] && { umount=1; shift; }
 
 [ $# = 0 ] && {
   echo "$cmd: missing mount-path" >&2
@@ -147,14 +164,32 @@ do_mount(){
     set -ue
     case "$type" in
       ssh | sshfs )
-        $trace tm use-session -d "MNT_${host}_${pathbase}" \
-          set-x sshfs -f -o reconnect -o ssh_command='datethen 2 set-x ssh' \
-            -- "$host:$path" "$mount_point"
+        # construct the sshfs command
+        set -- sshfs
+        [ $use_tmux ] || [ $daemon ] || set -- "$@" -f
+        set -- "$@" \
+            -o reconnect \
+            -o ssh_command='datethen set-x ssh'
+        for idfile in gidfile uidfile
+        do  idfilepath=$HOME/rc/sshfs/$host-$idfile
+            [ -f "$idfilepath" ] && {
+              set -- "$@" -o "$idfile=$HOME/rc/sshfs/$host-$idfile"
+              sshfs_idmap_mode=file
+            }
+        done
+        set -- "$@" \
+            -o "idmap=$sshfs_idmap_mode" \
+            -o "nomap=$sshfs_nomap_mode" \
+            $sshfs_opts \
+            -- \
+            "$host:$path/" "$mount_point"
+        [ $use_tmux ] && set -- tm use-session -d "MNT_${host}_${pathbase}" $trace "$@"
         ;;
       *)echo "$cmd: $mount_point: unsupported type: $type" >&2
         exit 1
         ;;
     esac
+    exec $trace "$@"
   )
 }
 
@@ -244,7 +279,7 @@ case "$mnt_arg" in
     ;;
 esac
 
-[ -d "$mount_point" ] || set-x mkdir "$mount_point" || exit 1
+[ -d "$mount_point" ] || $trace mkdir "$mount_point" || exit 1
 do_mount "$mount_path" "$mount_point" || xit=1
 
 exit $xit

@@ -1,0 +1,1 @@
+lib/python/cs/x.py: cs.x: move the open-tty-for-append hacks into cs.gimmicks.open_append, fix unclosed file handle

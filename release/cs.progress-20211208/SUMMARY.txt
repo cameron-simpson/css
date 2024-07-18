@@ -1,0 +1,2 @@
+Progress.__init__: make the first optional positional parameter be "name", make other parameters keyword only.
+Progress.bar: make "label" the first optional positional parameter, make others keyword only.

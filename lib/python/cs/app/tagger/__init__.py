@@ -4,6 +4,8 @@
 '''
 
 from collections import defaultdict
+import filecmp
+from functools import cached_property, partial
 import os
 from os.path import (
     abspath,
@@ -15,46 +17,93 @@ from os.path import (
     isdir as isdirpath,
     join as joinpath,
     realpath,
+    relpath,
     samefile,
 )
 from threading import RLock
+from typing import List, Optional
 
+from icontract import require
 from typeguard import typechecked
 
-from cs.deco import fmtdoc
-from cs.fstags import FSTags
+from cs.deco import cachedmethod, default_params, fmtdoc, promote
+from cs.fs import FSPathBasedSingleton, shortpath
+from cs.fstags import FSTags, TaggedPath, uses_fstags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
 from cs.onttags import Ont, ONTTAGS_PATH_DEFAULT, ONTTAGS_PATH_ENVVAR
-from cs.pfx import Pfx, pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
-from cs.threads import locked
+from cs.threads import locked, ThreadState, HasThreadState
+from cs.upd import run_task, print
+
+from .rules import Rule, RuleResult, TagChange, RULE_MODES
+
+__version__ = None
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'entry_points': {
+        'console_scripts': {
+            'tagger': 'cs.app.tagger.__main__:main'
+        },
+        'gui_scripts': {
+            'tagger-gui': 'cs.app.tagger.gui_tk:main'
+        },
+    },
+    'install_requires': [
+        'cs.deco',
+        'cs.fs',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.onttags',
+        'cs.pfx',
+        'cs.queues',
+        'cs.seq',
+        'cs.tagset',
+        'cs.threads',
+    ],
+}
+
+pfx_link = partial(pfx_call, os.link)
+pfx_mkdir = partial(pfx_call, os.mkdir)
+pfx_remove = partial(pfx_call, os.remove)
+pfx_rename = partial(pfx_call, os.rename)
+pfx_stat = partial(pfx_call, os.stat)
 
 # the subtags containing Tagger releated values
 TAGGER_TAG_PREFIX_DEFAULT = 'tagger'
 
-class Tagger:
+class Tagger(FSPathBasedSingleton, HasThreadState):
   ''' The core logic of a tagger.
+
+      A `Tagger` is associated with a filesystem directory
+      and embodies rules for tagging and filing files found in that directory.
   '''
 
   TAG_PREFIX = TAGGER_TAG_PREFIX_DEFAULT
+  TAGGERRC = '.taggerrc'
 
-  def __init__(self, fstags=None, ont=None):
+  perthread_state = ThreadState(current=None)
+
+  @promote
+  def __init__(self, fspath: str, ont: Optional[Ont] = None):
     ''' Initialise the `Tagger`.
 
         Parameters:
-        * `fstags`: optional `FSTags` instance
+        * `ont`: optional `cs.onttags.Ont`;
+          an instance will be created if not supplied
     '''
-    if fstags is None:
-      fstags = FSTags()
-    if ont is None:
-      ont = os.environ.get(ONTTAGS_PATH_ENVVAR
-                           ) or expanduser(ONTTAGS_PATH_DEFAULT)
-    if isinstance(ont, str):
-      ont = Ont(ont)
-    self.fstags = fstags
+    if hasattr(self, 'fspath'):
+      return
+    super().__init__(fspath)
     self.ont = ont
     self._file_by_mappings = {}
     # mapping of (dirpath,tag_name)=>tag_value=>set(subdirpaths)
@@ -62,50 +111,142 @@ class Tagger:
     self._per_tag_auto_file_mappings = defaultdict(lambda: defaultdict(set))
     self._lock = RLock()
 
-  @classmethod
-  @typechecked
-  def conf_tags(cls, tags: TagSet):
-    ''' The `Tagger` related subtags from `tags`, a `TagSet`.
+  def tagger_for(self, dirpath):
+    ''' Factory to return a `Tagger` for a directory
+        using the same `FSTags` and ontology as `self`.
     '''
-    return tags.subtags(cls.TAG_PREFIX)
+    return type(self)(dirpath, ont=self.ont)
 
-  @classmethod
-  @typechecked
-  def conf_tag(cls, tags: TagSet, conf: str, default=None):
-    ''' Return the `Tagger` related subtag value for `conf`, or `default` (default `None).
+  @property
+  @uses_fstags
+  def tagged(self, fstags: FSTags):
+    ''' The `TaggedPath` associated with this directory.
     '''
-    return cls.conf_tags(tags).get(conf, default)
+    return fstags[self.fspath]
 
-  @classmethod
-  @typechecked
-  def has_conf_tag(cls, tags: TagSet, conf: str):
-    ''' Test for the presence of `conf` in he `Tagger` related subtags.
+  @cached_property
+  def rules(self):
+    ''' The `Rule`s for this `Tagger` directory.
     '''
-    return conf in cls.conf_tags(tags)
+    taggerrc = self.pathto(self.TAGGERRC)
+    with Pfx("%s.rules", self):
+      try:
+        with open(taggerrc) as f:
+          return tuple(Rule.from_file(f))
+      except FileNotFoundError:
+        return ()
+
+  @uses_fstags
+  @require(lambda filename: filename and '/' not in filename)
+  @typechecked
+  def process(
+      self,
+      filename,
+      *,
+      fstags: FSTags,
+      hashname: str,
+      doit=False,
+      verbose=False,
+      modes=RULE_MODES,
+  ) -> List[RuleResult]:
+    ''' Process the local file `filename` according to the `Tagger` rules.
+        Return the list of `RuleResult`s for matches `Rule`s.
+    '''
+    fspath = self.pathto(filename)
+    tagged = fstags[fspath]
+    # start with the format_tags of the file
+    tags = tagged.format_tagset()
+    matched_results = []
+    printed_filename = False
+    for rule in self.rules:
+      with Pfx(rule):
+        applied = rule.apply(
+            fspath,
+            tags,
+            hashname=hashname,
+            modes=modes,
+            doit=doit,
+            quiet=True,
+        )
+        if not applied.matched:
+          continue
+        matched_results.append(applied)
+        if verbose:
+          if not printed_filename:
+            print(fspath)
+            printed_filename = True
+        if applied.failed:
+          warning("  failed:")
+          for failure in applied.failed:
+            warning("   %s", failure)
+        for new_fspath in applied.filed_to:
+          if verbose:
+            print("  ->", shortpath(new_fspath))
+        for tag_change in applied.tag_changes:
+          match tag_change:
+            case TagChange(add_remove=True) as change:
+              if verbose:
+                print("  +", change.tag)
+            case TagChange(add_remove=False) as change:
+              if verbose:
+                print("  -", change.tag)
+            case _:
+              warning("ignoring unsupported action {r(action)}")
+        if rule.quick:
+          break
+    return matched_results
+
+  @property
+  @cachedmethod
+  def conf(self):
+    ''' The direct configuration `Tag`s.
+    '''
+    conf_tags = self.tagged.subtags(self.TAG_PREFIX)
+    conf_tags.setdefault('autoname', [])
+    conf_tags.setdefault('file_by', {})
+    conf_tags.setdefault('autotag', {}).setdefault('basename', [])
+    return conf_tags
+
+  @property
+  def conf_all(self):
+    ''' The configuration `Tag`s as inherited.
+    '''
+    return self.tagged.all_tags.subtags(self.TAG_PREFIX)
+
+  def autoname_formats(self) -> List[str]:
+    ''' The sequence of `autoname` formats.
+    '''
+    return self.conf_all.get('autoname', [])
 
   @pfx
-  def auto_name(self, srcpath, dstdirpath, tags):
-    ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
+  @uses_fstags
+  def autoname(self, srcpath, fstags: FSTags):
+    ''' Generate a filename computed from `srcpath`.
+
+        The format strings used to generate the pathname
+        come from the `autoname` configuration tag of this `Tagger`
+        `{self.TAG_PREFIX}.autoname`, usually `"tagger.autoname"`.
+
+        If no formats match, return `basename(srcpath)`.
     '''
-    tagged = self.fstags[dstdirpath]
-    formats = self.conf_tag(tagged.merged_tags(), 'auto_name', ())
+    formats = self.autoname_formats()
     if isinstance(formats, str):
       formats = [formats]
     if formats:
-      if not isinstance(tags, TagSet):
-        tags = TagSet()
-        for tag in tags:
-          tags.add(tag)
+      # the tags to use in the format string are the inherited Tags of
+      # dstdirpath overlaid by the inherited Tags of srcpath
+      fmttags = self.tagged.merged_tags()
+      fmttags.update(fstags[srcpath].merged_tags())
       for fmt in formats:
         with Pfx(repr(fmt)):
           try:
-            formatted = pfx_call(tags.format_as, fmt, strict=True)
+            formatted = pfx_call(fmttags.format_as, fmt, strict=True)
             if formatted.endswith('/'):
               formatted += basename(srcpath)
             return formatted
           except FormatAsError:
             ##warning("%s", e)
-            ##print("auto_name(%r): %r: %s", srcpath, fmt, e)
+            ##print("autoname(%r): %r: %s", srcpath, fmt, e)
             continue
     return basename(srcpath)
 
@@ -116,17 +257,23 @@ class Tagger:
     return list(self.ont.type_values(tag_name))
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
-  @pfx
+  @uses_fstags
   @fmtdoc
   def file_by_tags(
-      self, path: str, prune_inherited=False, no_link=False, do_remove=False
+      self,
+      origpath: str,
+      *,
+      prune_inherited=False,
+      no_link=False,
+      do_remove=False,
+      fstags: FSTags,
   ):
     ''' Examine a file's tags.
         Where those tags imply a location, link the file to that location.
         Return the list of links made.
 
         Parameters:
-        * `path`: the source path to file
+        * `origpath`: the source path to file
         * `prune_inherited`: optional, default `False`:
           prune the inherited tags from the direct tags on the target
         * `no_link`: optional, default `False`;
@@ -134,103 +281,136 @@ class Tagger:
         * `do_remove`: optional, default `False`;
           remove source files if successfully linked
 
-        Note: if `path` is already linked to an implied location
+        Note: if `origpath` is already linked to an implied location
         that location is also included in the returned list.
 
         The filing process is as follows:
-        - for each target directory, initially `dirname(path)`,
+        - for each target directory, initially `dirname(origpath)`,
           look for a filing map on tag `file_by_mapping`
-        - for each directory in that mapping which matches a tag from `path`,
+        - for each directory in that mapping which matches a tag from `origpath`,
           queue it as an additional target directory
-        - if there were no matching directories, file `path` at the current
+        - if there were no matching directories, file `origpath` at the current
           target directory under the filename
-          returned by `{TAGGER_TAG_PREFIX_DEFAULT}.auto_name`
+          returned by `{TAGGER_TAG_PREFIX_DEFAULT}.autoname`
     '''
     if do_remove and no_link:
       raise ValueError("do_remove and no_link may not both be true")
-    fstags = self.fstags
-    # start the queue with the resolved `path`
-    tagged = fstags[path]
-    srcpath = tagged.filepath
-    tags = tagged.all_tags
+    # start the queue with origpath
     # a queue of reference directories
-    q = ListQueue((dirname(srcpath),))
+    q = ListQueue((origpath,))
     linked_to = []
     seen = set()
-    for refdirpath in unrepeated(q, signature=abspath, seen=seen):
-      with Pfx(refdirpath):
-        # places to redirect this file
-        mapping = self.file_by_mapping(refdirpath)
-        interesting_tag_names = {tag.name for tag in mapping.keys()}
-        # locate specific filing locations in the refdirpath
-        refile_to = set()
-        for tag_name in sorted(interesting_tag_names):
-          with Pfx("tag_name %r", tag_name):
-            if tag_name not in tags:
-              continue
-            bare_tag = Tag(tag_name, tags[tag_name])
-            try:
-              target_dirs = mapping.get(bare_tag, ())
-            except TypeError as e:
-              warning("  %s not mapped (%s), skipping", bare_tag, e)
-              continue
-            if not target_dirs:
-              continue
-            # collect other filing locations
-            refile_to.update(target_dirs)
-        # queue further locations if they are new
-        if refile_to:
-          new_refile_to = set(map(abspath, refile_to)) - seen
-          if new_refile_to:
-            q.extend(new_refile_to)
+    for srcpath in unrepeated(q, signature=realpath, seen=seen):
+      with Pfx(shortpath(srcpath)):
+        tagged = fstags[srcpath]
+        tagger = self.tagger_for(dirname(srcpath))
+        # infer tags before filing
+        tagger.infer_tags(tagged.fspath, mode='infill')
+        tags = tagged.merged_tags()
+        conf = tagger.conf
+        # examine the file_by mapping for entries which match tags on origpath
+        refile_to_dirs = set()
+        for k, paths in conf.file_by.items():
+          try:
+            tag = Tag.from_str(k)
+          except ValueError as e:
+            warning("skipping bad Tag spec: %s", e)
             continue
-        # file locally (no new locations)
-        dstbase = self.auto_name(srcpath, refdirpath, tags)
-        with Pfx("%s => %s", refdirpath, dstbase):
-          dstpath = dstbase if isabspath(dstbase
-                                         ) else joinpath(refdirpath, dstbase)
-          if existspath(dstpath):
-            if not samefile(srcpath, dstpath):
-              warning("already exists, skipping")
+          if (tag.name if tag.value is None else tag) not in tags:
+            # this file_by entry does not match the tags
             continue
-          if no_link:
-            linked_to.append(dstpath)
-          else:
-            linkto_dirpath = dirname(dstpath)
-            if not isdirpath(linkto_dirpath):
-              pfx_call(os.mkdir, linkto_dirpath)
+          # this file_by entry matches a Tag on origpath
+          refile_paths = [
+              (ep if isabspath(ep) else joinpath(tagger.fspath, ep))
+              for ep in (expanduser(p) for p in paths)
+          ]
+          # follow the subdir tag map for further refiling
+          tag_value = tags[tag.name]
+          for refile_to_dir in refile_paths:
+            refile_tagger = self.tagger_for(refile_to_dir)
+            tagmap = refile_tagger.subdir_tag_map()
             try:
-              pfx_call(os.link, srcpath, dstpath)
-            except OSError as e:
-              warning("cannot link to %r: %s", dstpath, e)
+              subdirs = tagmap[tag.name][tag_value]
+            except KeyError:
+              # no mapping for this tag, file in refile_to_dir
+              refile_to_dirs.add(refile_to_dir)
             else:
-              linked_to.append(dstpath)
-              fstags[dstpath].update(tags)
+              if subdirs:
+                # link the file into each
+                refile_to_dirs.update(subdirs)
+              else:
+                # no subdirs, file in refile_to_dir
+                refile_to_dirs.add(refile_to_dir)
+        if refile_to_dirs:
+          # winnow directories already processed
+          refile_to_dirs = set(map(realpath, refile_to_dirs)) - seen
+          if refile_to_dirs:
+            # refile to other places
+            srcbase = basename(srcpath)
+            for subdir in refile_to_dirs:
+              qpath = joinpath(subdir, srcbase)
+              q.prepend((qpath,))
+              fstags[qpath].update(tagged)
               if prune_inherited:
-                fstags[dstpath].prune_inherited()
+                fstags[qpath].prune_inherited()
+            continue
+        # not refiling elsewhere, file here
+        # file locally (no new locations)
+        dstbase = tagger.autoname(srcpath)
+        dstpath = dstbase if isabspath(dstbase
+                                       ) else joinpath(tagger.fspath, dstbase)
+        dstdirpath = dirname(dstpath)
+        link_count_fudge = 0
+        with Pfx("=> %s", shortpath(dstpath)):
+          if existspath(dstpath):
+            if samefile(origpath, dstpath):
+              warning("same file, already \"linked\"")
+              linked_to.append(dstpath)
+            elif filecmp.cmp(origpath, dstpath, shallow=False):
+              warning("exists with same content")
+              linked_to.append(dstpath)
+              link_count_fudge += 1
+            else:
+              warning("already exists with different content, skipping")
+              continue
+          else:
+            if no_link:
+              linked_to.append(dstpath)
+            else:
+              if not isdirpath(dstdirpath):
+                pfx_mkdir(dstdirpath)
+              try:
+                pfx_link(origpath, dstpath)
+              except OSError as e:
+                warning("cannot link to %r: %s", dstpath, e)
+                continue
+          linked_to.append(dstpath)
+          fstags[dstpath].update(tagged)
+          if prune_inherited:
+            fstags[dstpath].prune_inherited()
     if linked_to and do_remove:
-      S = os.stat(srcpath)
-      if S.st_nlink < 2:
+      S = pfx_stat(origpath)
+      if S.st_nlink + link_count_fudge < 2:
         warning(
-            "not removing %r, unsufficient hard links (%s)", srcpath,
+            "not removing %r, insufficient hard links (%s)", origpath,
             S.st_nlink
         )
       else:
-        pfx_call(os.remove, srcpath)
+        pfx_remove(origpath)
     return linked_to
 
   @locked
   @pfx
+  @uses_fstags
   @fmtdoc
-  def per_tag_auto_file_map(self, dirpath: str, tag_names):
-    ''' Walk the file tree at `dirpath`
+  def per_tag_auto_file_map(self, tag_names, *, fstags: FSTags):
+    ''' Walk the file tree at `self.fspath`
         looking for directories whose direct tags contain tags
         whose name is in `tag_names`.
         Return a mapping of `Tag->[dirpaths...]`
         mapping specific tag values to the directory paths where they occur.
 
         Parameters:
-        * `dirpath`: the path to the directory to walk
         * `tag_names`: an iterable of `Tag` names of interest
 
         The intent here is to derive filing locations
@@ -239,17 +419,15 @@ class Tagger:
         We automatically skip subdirectories whose names commence with `'.'`.
         We also skip subdirectories tagged with `{TAGGER_TAG_PREFIX_DEFAULT}.skip`.
     '''
-    fstags = self.fstags
-    tagged = fstags[dirpath]
-    dirpath = tagged.filepath
+    fspath = self.fspath
     all_tag_names = set(tag_names)
     assert all(isinstance(tag_name, str) for tag_name in all_tag_names)
-    # collect all the per-tag_name mappings which exist for dirpath
-    # note tha mappings which do not exist
+    # collect all the per-tag_name mappings which exist for self.fspath
+    # note the mappings which do not exist
     mappings = {}
     missing_tag_names = set()
     for tag_name in all_tag_names:
-      per_tag_cache_key = dirpath, tag_name
+      per_tag_cache_key = fspath, tag_name
       if per_tag_cache_key in self._per_tag_auto_file_mappings:
         mappings[per_tag_cache_key] = self._per_tag_auto_file_mappings[
             per_tag_cache_key]
@@ -258,18 +436,24 @@ class Tagger:
     if missing_tag_names:
       # walk the tree to find the missing tags
       subdirpaths_by_tag = defaultdict(list)
-      for path, dirnames, _ in os.walk(realpath(dirpath)):
-        with Pfx("os.walk @ %r", path):
-          # order the descent
-          dirnames[:] = sorted(
-              dname for dname in dirnames
-              if dname and not dname.startswith('.')
-          )
-          tagged_subdir = fstags[path]
-          if self.has_conf_tag(tagged_subdir, 'skip'):
-            # tagger.skip => prune this directory tree from the mapping
-            dirnames[:] = []
-          else:
+      with run_task(
+          "%s.per_tag_auto_file_map(%s): os.walk" %
+          (self, ",".join(tag_names)),
+          report_print=True,
+      ) as proxy:
+        for path, dirnames, _ in os.walk(fspath):
+          proxy.text = relpath(path, fspath)
+          with Pfx("os.walk @ %r", path):
+            tagged_subdir = fstags[path]
+            if 'skip' in self.tagger_for(tagged_subdir.fspath).conf:
+              # tagger.skip => prune this directory tree from the mapping
+              dirnames[:] = []
+              continue
+            # order the descent
+            dirnames[:] = sorted(
+                dname for dname in dirnames
+                if dname and not dname.startswith('.')
+            )
             # look for the tags of interest
             for tag_name in missing_tag_names:
               try:
@@ -278,10 +462,10 @@ class Tagger:
                 pass
               else:
                 bare_tag = Tag(tag_name, tag_value)
-                subdirpaths_by_tag[bare_tag].append(tagged_subdir.filepath)
+                subdirpaths_by_tag[bare_tag].append(tagged_subdir.fspath)
       # make sure each cache exists and gather them up
       for tag_name in missing_tag_names:
-        per_tag_cache_key = dirpath, tag_name
+        per_tag_cache_key = fspath, tag_name
         assert per_tag_cache_key not in mappings
         assert per_tag_cache_key not in self._per_tag_auto_file_mappings
         mappings[per_tag_cache_key] = self._per_tag_auto_file_mappings[
@@ -289,7 +473,7 @@ class Tagger:
       # fill in the caches
       for bare_tag, subdirpaths in subdirpaths_by_tag.items():
         tag_name = bare_tag.name
-        per_tag_cache_key = dirpath, tag_name
+        per_tag_cache_key = fspath, tag_name
         # get the value=>[subdirpaths] mapping
         by_tag_name = self._per_tag_auto_file_mappings[per_tag_cache_key]
         by_tag_name[bare_tag.value].update(subdirpaths)
@@ -301,10 +485,35 @@ class Tagger:
         mapping[Tag(tag_name, tag_value)] = subpaths
     return mapping
 
+  @cachedmethod
+  def subdir_tag_map(self):
+    ''' Return a mapping of `tag_name`->`tag_value`->[dirpath,...]
+        covering the entire subdirectory tree.
+
+        Returns an empty mapping if `self.fspath` does not exist
+        or is not a directory.
+    '''
+    # scan the whole directory before recursing
+    tag_map = defaultdict(lambda: defaultdict(set))
+    if isdirpath(self.fspath):
+      for entry in [entry for entry in os.scandir(self.fspath)
+                    if entry.is_dir() and not entry.name.startswith('.')]:
+        subtagger = self.tagger_for(entry.path)
+        # make entries for each tag on the immediate subdir
+        for tag in subtagger.tagged.as_tags():
+          if isinstance(tag.value, (int, str)):
+            tag_map[tag.name][tag.value].add(entry.path)
+        # infill with all the entries from the subdir's own tag map
+        for tag_name, submap in subtagger.subdir_tag_map().items():
+          for tag_value, paths in submap.items():
+            tag_map[tag_name][tag_value].update(paths)
+    return tag_map
+
   @locked
   @pfx
+  @uses_fstags
   @fmtdoc
-  def file_by_mapping(self, srcdirpath):
+  def file_by_mapping(self, srcdirpath, *, fstags: FSTags):
     ''' Examine the `{TAGGER_TAG_PREFIX_DEFAULT}.file_by` tag for `srcdirpath`.
         Return a mapping of specific tag values to filing locations
         derived via `per_tag_auto_file_map`.
@@ -328,17 +537,15 @@ class Tagger:
 
         because the target subdirectory has been tagged with `abn="***********"`.
     '''
-    assert isdirpath(srcdirpath)
     assert not srcdirpath.startswith('~')
     assert '~' not in srcdirpath
-    fstags = self.fstags
     tagged = fstags[srcdirpath]
-    key = tagged.filepath
+    key = tagged.fspath
     try:
       mapping = self._file_by_mappings[key]
     except KeyError:
       mapping = defaultdict(set)
-      file_by = self.conf_tag(fstags[srcdirpath].all_tags, 'file_by', {})
+      file_by = self.conf_all.get('file_by', {})
       # group the tags by file_by target path
       grouped = defaultdict(set)
       for tag_name, file_to in file_by.items():
@@ -357,19 +564,21 @@ class Tagger:
       for file_to_path, tag_names in sorted(grouped.items()):
         with Pfx("%r:%r", file_to_path, tag_names):
           # accrue destination paths by tag values
-          for bare_key, dstpaths in self.per_tag_auto_file_map(
-              file_to_path, tag_names).items():
+          subtagger = self.tagger_for(file_to_path)
+          for bare_key, dstpaths in subtagger.per_tag_auto_file_map(tag_names
+                                                                    ).items():
             mapping[bare_key].update(dstpaths)
       self._file_by_mappings[key] = mapping
     return mapping
 
-  def suggested_tags(self, path):
+  @uses_fstags
+  def suggested_tags(self, path, *, fstags: FSTags):
     ''' Return a mapping of `tag_name=>set(tag_values)`
         representing suggested tags
         obtained from the autofiling configurations.
     '''
-    tagged = self.fstags[path]
-    srcdirpath = dirname(tagged.filepath)
+    tagged = fstags[path]
+    srcdirpath = dirname(tagged.fspath)
     suggestions = defaultdict(set)
     for bare_tag, _ in self.file_by_mapping(srcdirpath).items():
       if bare_tag not in tagged:
@@ -382,64 +591,31 @@ class Tagger:
           suggestions[bare_tag.name].add(bare_tag.value)
     return suggestions
 
-  def inference_rules(self, prefix, rule_spec):
-    ''' Generator yielding inference functions from `rule_spec`.
+  @staticmethod
+  def inference_rule(rule_spec):
+    ''' Return an inference rule from `rule_spec`.
 
-        Each yielded function accepts a path
-        and returns an iterable of `Tag`s or other values.
-        Because some functions are implemented as lambdas it is reasonable
-        to return an iterable conatining `None` values
-        to be discarded by the consumer of the rule.
+        Supported syntaxes:
+        - [tag_prefix`:`]`/`regexp a regular expression
     '''
-    with Pfx(r(rule_spec)):
-      if isinstance(rule_spec, str):
-        if rule_spec.startswith('/'):
-          rule = RegexpTagRule(rule_spec[1:])
-          yield lambda path, rule=rule: rule.infer_tags(basename(path)
-                                                        ).as_tags()
-        else:
-          tag_name, _ = get_dotted_identifier(rule_spec)
-          if tag_name and tag_name == rule_spec:
-            # return the value of tag_name or None, as a 1-tuple
-            yield lambda path: (self.fstags[path].get(tag_name),)
-          else:
-            warning("skipping unrecognised pattern")
-      elif isinstance(rule_spec, (list, tuple)):
-        for subspec in rule_spec:
-          yield from self.inference_rules(prefix, subspec)
+    if isinstance(rule_spec, str):
+      tag_prefix, offset = get_dotted_identifier(rule_spec)
+      if offset > 0 and rule_spec.startswith(':', offset):
+        offset += 1
       else:
-        warning("skipping unhandled type")
+        tag_prefix = None
+      if rule_spec.startswith('/', offset):
+        rule = RegexpTagRule(rule_spec[offset + 1:], tag_prefix=tag_prefix)
+      else:
+        raise ValueError("skipping unrecognised pattern")
+    else:
+      raise ValueError("skipping unhandled type")
+    return rule
 
   @pfx
+  @uses_fstags
   @fmtdoc
-  def inference_mapping(self, dirpath):
-    r'''Scan `path`'s `{TAGGER_TAG_PREFIX_DEFAULT}.filename_inference` tag,
-        a mapping of prefix=>rule specifications.
-        Return a mapping of prefix=>inference_function
-        where `inference_function(pathname)` returns a list of inferred `Tag`s.
-
-        The prefix is a tag prefix. Example:
-
-            {TAGGER_TAG_PREFIX_DEFAULT}.filename_inference={{
-                'cs.tv_episode':
-                    '/^(?P<series_title_lc>([^-]|-[^-])+)--s0*(?P<season_n>\d+)e0*(?P<episode_n>\d+)--(?P<episode_title_lc>([^-]|-[^-])+)--',
-            }}
-
-        which would try to match a filename against my habitual naming convention,
-        and if so return a `TagSet` with tags named `series_title_lc`,
-        `season_n`, `episode_n`, `episode_title_lc`.
-    '''
-    inference_spec = self.conf_tag(self.fstags[dirpath], 'inference', {})
-    mapping = defaultdict(list)
-    with Pfx("inference=%r", inference_spec):
-      for prefix, rule_spec in inference_spec.items():
-        with Pfx(prefix):
-          mapping[prefix].extend(self.inference_rules(prefix, rule_spec))
-    return mapping
-
-  @pfx
-  @fmtdoc
-  def infer(self, path, apply=False):
+  def infer_tags(self, path, *, mode='infer', fstags: FSTags):
     ''' Compare the `{TAGGER_TAG_PREFIX_DEFAULT}.filename_inference` rules to `path`,
         producing a mapping of prefix=>[Tag] for each rule which infers tags.
         Return the mapping.
@@ -448,35 +624,30 @@ class Tagger:
         also apply all the inferred tags to `path`
         with each `Tag` *name*=*value* applied as *prefix*.*name*=*value*.
     '''
-    tagged = self.fstags[path]
-    srcpath = tagged.filepath
-    srcdirpath = dirname(srcpath)
-    inference_mapping = self.inference_mapping(srcdirpath)
-    inferences = defaultdict(list)
-    for prefix, infer_funcs in inference_mapping.items():
-      with Pfx(prefix):
-        assert isinstance(prefix, str)
-        for infer_func in infer_funcs:
-          try:
-            values = list(infer_func(path))
-          except Exception as e:  # pylint: disable=broad-except
-            warning("skip rule %s: %s", infer_func, e)
-            continue
-          bare_values = []
-          for value in values:
-            if isinstance(value, Tag):
-              tag = value
-              tag_name = prefix + '.' + tag.name if prefix else tag.name
-              inferences[tag_name] = tag.value
-            else:
-              bare_values.append(value)
-          if bare_values:
-            if len(bare_values) == 1:
-              bare_values = bare_values[0]
-            inferences[prefix] = bare_values
-          break
-    if apply:
-      with Pfx("apply"):
-        for tag_name, values in inferences.items():
-          tagged[tag_name] = tag.value
-    return inferences
+    tagged = fstags[path]
+    srcpath = tagged.fspath
+    srcbase = basename(srcpath)
+    inferred_tags = TagSet()
+    basename_rule_specs = self.conf['autotag']['basename']
+    for rule_spec in basename_rule_specs:
+      try:
+        rule = self.inference_rule(rule_spec)
+      except ValueError as e:
+        warning("skipping invalid rule: %s", e)
+        continue
+      for tag in rule.infer_tags(srcbase):
+        inferred_tags.add(tag)
+    if mode == 'infer':
+      pass
+    elif mode == 'infill':
+      for tag in inferred_tags.as_tags():
+        if tag.name not in tagged:
+          tagged.add(tag)
+    elif mode == 'overwrite':
+      for tag in inferred_tags.as_tags():
+        tagged.add(tag)
+    else:
+      raise NotImplementedError("unhandled mode %r" % (mode,))
+    return inferred_tags
+
+uses_tagger = default_params(tagger=Tagger.default)

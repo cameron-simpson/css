@@ -1,0 +1,1 @@
+Seq: calling a Seq is like next(seq).

@@ -11,7 +11,6 @@ trace=
 
 flagfile=
 pymode=3
-pyformat=${CS_FORMAT_PY:-yapf}
 
 cmd=$0
 usage="Usage: $cmd [-2] [-3] [-n] [-q] [-t flagfile] [-x] filenames...
@@ -55,6 +54,10 @@ done
 
 xit=0
 
+srcfindup(){
+  exec findup -C "$srcdir" -P ${1+"$@"}
+}
+
 for srcfile
 do
   type=
@@ -69,19 +72,15 @@ do
       ;;
   esac
 
+  srcdir=$( dirname "$srcfile" )
+
   # Require nonempty flagfile in $srcfile directory tree.
   # Note: works from the directory of the file in order to accomodate
   # trees symlinked in.
   [ -z "$flagfile" ] || {
-    srcdir=$( dirname "$srcfile" )
     case "$flagfile" in
       ./* | /* ) ;;
-      *)  flagfile=$(
-            set -ue
-            cd "$srcdir"
-            unset PWD
-            findup "$flagfile"
-          ) || continue ;;
+      *)  flagfile=$( srcfindup "$flagfile" ) || continue ;;
     esac
     [ -s "$flagfile" ] || continue
   }
@@ -95,9 +94,6 @@ do
         ;;
       *.pl | *.pm )
         type=pl
-        ;;
-      *.py)
-        type=py
         ;;
     esac
   fi
@@ -115,6 +111,12 @@ do
     continue
   }
 
+  pyformat=${CS_FORMAT_PY:-''}
+  [ -n "$pyformat" ] || {
+    fsfmt='{cs.format.python}'
+    pyformat=$( fstags ls -d -o "$fsfmt" )
+    [ "x$pyformat" = "x$fsfmt" ] && pyformat=yapf
+  }
   if [ "x$type" = xpy ]
   then  type=${type}${pymode}
   fi
@@ -123,7 +125,8 @@ do
     js) $trace prettier --write "$srcfile" ;;
     json)$trace json-pprint < "$srcfile" | rewriteif -- "$srcfile" ;;
     php)$trace php-cs-fixer fix -q --rules=@PSR2 "$srcfile" ;;
-    py2)case $pyformat in
+    py2)
+        case $pyformat in
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python2 -m yapf --style "$style" -i "$srcfile" ;;
           black)  $trace black -q -t py27 "$srcfile" ;;
@@ -132,7 +135,8 @@ do
                   ;;
         esac
         ;;
-    py3)case $pyformat in
+    py3)
+        case $pyformat in
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python3 -m yapf --style "$style" -i "$srcfile" ;;
           black)  $trace black -q -t py38 -S "$srcfile" ;;

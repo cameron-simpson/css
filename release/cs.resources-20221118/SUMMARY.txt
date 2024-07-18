@@ -1,0 +1,2 @@
+New RunState.current thread local stackable class attribute.
+New @uses_runstate decorator for functions using a RunState, defaulting to RunState.current.runstate.

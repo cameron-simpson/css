@@ -1,0 +1,3 @@
+lib/python/cs/buffer.py: cs.buffer: drop @chunky, superceded by @promote for CornuCOpyBuffer parameters
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: remove mention of the long obsolete .buf attribute (the internal buffer .bufs is a list of bytes instances)
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: subclass Promotable

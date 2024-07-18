@@ -1,0 +1,2 @@
+SingletonMixin: change example to probe self__dict__ instead of hasattr, faster and less fragile.
+New Sentinel class for named sentinel objects, equal only to their own instance.

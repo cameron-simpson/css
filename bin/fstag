@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Wrapper for fstags to print a specific tag.
+# - Cameron Simpson <cs@cskk.id.au> 16jul2022
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [--direct] tagname
+  --direct  Do not search for the tag in ancestors."
+
+fstags_opts=
+
+badopts=
+
+[ "x${1:-''}" = x--direct ] && { fstags_opts="$fstags_opts --direct"; shift; }
+
+if [ $# = 0 ]
+then  echo "$cmd: missing tagname" >&2; badopts=1
+else  tagname=$1; shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec fstags ls -d $fstags_opts -o "{$tagname}" -- .

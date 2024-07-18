@@ -1,0 +1,5 @@
+lib/python/cs/gvutils.py: cs.gvutils: new module containing only gvprint(dot_text,...) at present
+lib/python/cs/gvutils.py: cs.gvutils: gvprint: process dot_kw, use "file" instead of "output" line print(), clean lint
+lib/python/cs/gvutils.py: cs.gvutils: new quote(s) function to quote a string for use in DOT syntax
+lib/python/cs/gvutils.py: cs.gvutils: update docstrings, autoformat
+lib/python/cs/gvutils.py: cs.gvutils: add DISTINFO

@@ -8,11 +8,11 @@
 #     macro index g "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><group-reply>:set editor=\$my_old_editor<enter>" "group reply"
 #     macro index L "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><list-reply>:set editor=\$my_old_editor<enter>" "list reply"
 #
-# and I have the environment variable $MUTTEDIT_EDITOR set to
-# "vim-flowed", which invokes vim with settings which aid with composing
+# and I have the environment variable $MUTTEDIT_EDITOR set to "vim-flowed",
+# which is a script which invokes vim with settings which aid with composing
 # format=flowed email (see RFC3676).
 # - Cameron Simpson <cs@cskk.id.au> 31mar2006
-# 
+#
 
 set -ue
 
@@ -47,7 +47,7 @@ Environment:
     If not empty, implies -w mode with its value.
 
 The default mode is window mode if \$MUTTEDIT_WINDOWPROG is set,
-otherwise pane mode (-T) if $TMUX is set, otherwise inline."
+otherwise pane mode (-T) if \$TMUX is set, otherwise inline."
 
 badopts=
 
@@ -120,6 +120,10 @@ tmpf=$composedir/muttedit.$$
 ( umask 077; cp -- "$filename" "$tmpf" ) || exit 1
 filename=$tmpf
 
+# mutt -H ignore $text_flowed, supply the header
+bsed '1i\
+Content-Type: text/plain; charset=utf-8; format=flowed' "$filename" || exit 1
+
 set -- \
   rmafter "$filename" \
     mutt -e "set editor=$editor" -e 'unset signature' -e 'set sidebar_visible=no' -H "$filename"
@@ -167,7 +171,7 @@ case "$mode" in
     ;;
   pane)
     qsession_name=$( shqstr "$session_name" )
-    tmux split-window -v -p 80 "unset TMUX; exec tmux attach-session -t $qsession_name"
+    tmux split-window -v -l 80% "unset TMUX; exec tmux attach-session -t $qsession_name"
     ;;
   window)
     if [ $use_tmux ]

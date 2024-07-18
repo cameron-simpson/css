@@ -1,0 +1,2 @@
+RunStateMixin: runstate parameter may be None, str, RunState.
+MultiOpenMixin.__enter_exit__: do not pass caller frame to self.close(), uninformative.

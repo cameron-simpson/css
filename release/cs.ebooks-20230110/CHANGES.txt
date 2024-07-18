@@ -1,0 +1,33 @@
+lib/python/cs/ebooks/__main__.py lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: new experimental module to use DeDRM/noDRM outside the Calibre plugin environment
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: getLibCrypto: dummy DrmException just like all the other DrmException classes littering the DeDRM/noDRM code :-(
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper: new .tags attribute being a subdomain of the default SQLTags instance; new .kindlekeys property and .update_kindlekeys() method keeping cached keys in the tags
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper.dedrm_imports: use redirect_stdout(sys.stderr) because the DeDRM/noDRM code litters its output with print()s
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMCommand.cmd_kindlekeys: use the new kindlekeys property
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: update imports, drop obsolete assignment
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: command line mode
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMCommand.USAGE_FORMAT: tiny usage message clarification
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMCommand.cmd_kindlekeys: new "import" mode
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMCommand.cmd_kindlekeys: fixes for import mode
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper: add .promote() class method
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper.__init__: honour `sqltags` parameter if provided
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: docstring punctuation, strip some debug, drop some redundant imports
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper.__init__: now default to using $DEDRM_PACKAGE_PATH if no path supplied, adjust setup in DeDRMCommand.run_context
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper.dedrm_imports: monkey patch builtins.print as cs.upd.print because the DRM stuff is very chatty
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: monkey patch kindlekey.kindlekeys as DeDRMWrapper.cached_kindlekeys, insert same into DeDRMWrapper.kindlekeys - this lets us supply the key dbs from our SQLTags db
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper.remove: fix function dedrm.temporary_file monkey patch, insert decryptor switchout calls copied from plugin; provide removed() context manager to provide a decrypted version of an ebbok as a temporary file
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: update imports
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.apply_opt: -K kindle_path: look for book_asset.db at the top level or one level down in "My Kindle Content", adapt supplied path accordingly
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleTree: new CONTENT_DIRNAME = 'My Kindle Content' naming the content subdirectory
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: define an instance of DeDRMWrapper if $DEDRM_PACKAGE_PATH is set and plumb it through to CalibreTree.add
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: update imports, add docstring
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: update cs.upd.Upd handling
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.add: new `dedrm` parameter, try removing DRM if it is provided
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.add: if there are no dbids seen in the command output, issue an informative warning including the output
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: new cmd_add with dedrm support
+lib/python/cs/ebooks/calibre.py: cs.ebooks.kindle: CalibreCommand.cmd_add: plumb dedrm; add missing missing assignment elsewhere
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: trim unused import
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: clean lint
+lib/python/cs/ebooks/__init__.py: cs.ebooks: require pycryptodomex in slight preference over pycryptodome - the drm plugin copes with either, trying pycryptodomex/Cryptodome first
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.add: print drm removal elapsed time
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: drop run_task, timing the whole process instead of just the drm removal
+lib/python/cs/ebooks/__init__.py: cs.ebooks: update DISTINFO

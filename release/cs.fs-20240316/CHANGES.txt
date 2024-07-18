@@ -1,0 +1,2 @@
+lib/python/cs/fs.py: cs.fs: new findup(dirpath) function
+lib/python/cs/fs.py: cs.fs: bugfixes for findup

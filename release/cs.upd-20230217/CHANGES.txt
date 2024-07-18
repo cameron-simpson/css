@@ -1,0 +1,14 @@
+lib/python/cs/upd.py: cs.upd: @uses_upd: provide Upd() if there is not current default
+lib/python/cs/upd.py: cs.upd: @uses_upd: set the default Upd to the chosen Upd instance
+lib/python/cs/upd.py: cs.upd: docstring tweaks, a type annotation
+lib/python/cs/upd.py: cs.upd: Upd: subclass MultiOpenMixin, drop close() and closed() methods; always make a default Upd instance in open state
+lib/python/cs/upd.py: cs.upd: UpdProxy: accept index=None as "make a bare UpdProxy for upd" used in the Upd._reset setup code, reserving the magic self inserting mode for when index is not None
+lib/python/cs/upd.py: cs.upd: Upd.__init__: make sure the backend is not None, set it a tad earlier
+lib/python/cs/upd.py: cs.upd: Upd.__init__: set self._lock before we call _reset()
+lib/python/cs/upd.py: cs.upd: Upd._reset: always define an initial slot and its UpdProxy, avoids a billion special cases elsewhere
+lib/python/cs/upd.py: cs.upd: Upd.__str__: report the backend even in disabled state
+lib/python/cs/upd.py: cs.upd: Upd: remove code for when there are no slots
+lib/python/cs/upd.py: cs.upd: Upd._move_to_slot_v: handle from_slot=None before testing assertions
+lib/python/cs/upd.py: cs.upd: add assertion, fix exception message, tweak UpdProxy.__str__, shorten demo for easier debugging
+lib/python/cs/upd.py: cs.upd: Upd.insert: remove another "empty slots" case
+lib/python/cs/upd.py: cs.upd: update DISTINFO

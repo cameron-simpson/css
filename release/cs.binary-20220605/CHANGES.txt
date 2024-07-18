@@ -1,0 +1,2 @@
+lib/python/cs/binary.py: cs.binary: fix docstring typo
+lib/python/cs/binary.py: cs.binary: BinaryMixin: replace scan_file with scan_fspath, as the former left uncertainty about the amount of the file consumed

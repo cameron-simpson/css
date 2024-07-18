@@ -1,0 +1,4 @@
+lib/python/cs/upd.py: cs.upd: Upd.cursor_visible,cursor_invisible: actually send the escape sequence; drop redundant call to cursor_visible on shutdown
+lib/python/cs/upd.py: merge timeseries ==> default
+lib/python/cs/upd.py: cs.upd: UpdProxy.delete: clear the .text state if no Upd index
+lib/python/cs/upd.py: cs.upd: UpdProxy._update: minor simplification

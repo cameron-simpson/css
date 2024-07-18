@@ -1,0 +1,2 @@
+lib/python/cs/context.py: cs.context: tweak docstring
+lib/python/cs/context.py: cs.context: ContextManagerMixin: new as_contextmanager(cls,self) class method to run the __enter_exit__ from a specific class, useful in subclasses

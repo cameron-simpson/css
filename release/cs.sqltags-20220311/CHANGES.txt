@@ -1,0 +1,6 @@
+lib/python/cs/sqltags.py: cs.sqltags: new PolyValued base class for this with polyvalues, ancestor of PolyValue and PolyValueColumnMixin
+lib/python/cs/sqltags.py: cs.sqltags: tweak type checks, adjust test
+lib/python/cs/sqltags.py: cs.sqltags: remove bogus Tag construction
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.default_db_session: raise AttributeError if no session; SQLTags.flush: warn if no session and verbose
+lib/python/cs/sqltags.py: cs.sqltags: docstring update
+lib/python/cs/sqltags.py: cs.sqltags: update DISTINFO

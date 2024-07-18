@@ -1,0 +1,1 @@
+Fix stray %s in format string, modernise MultiOpenMixin startup/shutdown, catch ConnectionRefusedError and report succintly.

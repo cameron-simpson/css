@@ -3,34 +3,47 @@
 
 r'''
 Assorted process and subprocess management functions.
+
+Not to be confused with the excellent
+(psutil)[https://pypi.org/project/psutil/] package.
 '''
 
-from __future__ import print_function
 from contextlib import contextmanager
 import errno
 import io
+from itertools import chain
 import logging
 import os
-from signal import SIGTERM, SIGKILL
-import subprocess
+import shlex
+from signal import SIGTERM, SIGKILL, signal
+from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subprocess_run
 import sys
 import time
+
+from cs.deco import fmtdoc
+from cs.gimmicks import trace, warning, DEVNULL
+from cs.pfx import pfx_call
+
+__version__ = '20240316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': [
+        'cs.deco',
+        'cs.gimmicks>=devnull',
+        'cs.pfx',
+    ],
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions
 # 262144 below is from MacOS El Capitan "sysctl kern.argmax", then
 # halved because even allowing for the size of the environment this
 # can be too big. Unsure why.
-MAX_ARGV = 262144 / 2
+MAX_ARGV = 262144 // 2
 
 def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
   ''' Stop the process specified by `pid`, optionally await its demise.
@@ -50,7 +63,7 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
         send the process `signal.SIGKILL` as a final measure before return.
   '''
   if isinstance(pid, str):
-    return stop(int(open(pid).read().strip()))
+    return stop(int(open(pid, encoding='ascii').read().strip()))
   os.kill(pid, signum)
   if wait is None:
     return True
@@ -76,6 +89,73 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
             raise
       return False
 
+@contextmanager
+def signal_handler(sig, handler, call_previous=False):
+  ''' Context manager to push a new signal handler,
+      yielding the old handler,
+      restoring the old handler on exit.
+      If `call_previous` is true (default `False`)
+      also call the old handler after the new handler on receipt of the signal.
+
+      Parameters:
+      * `sig`: the `int` signal number to catch
+      * `handler`: the handler function to call with `(sig,frame)`
+      * `call_previous`: optional flag (default `False`);
+        if true, also call the old handler (if any) after `handler`
+  '''
+  if call_previous:
+    # replace handler() with a wrapper to call both it and the old handler
+    handler0 = handler
+
+    def handler(sig, frame):  # pylint:disable=function-redefined
+      ''' Call the handler and then the previous handler if requested.
+      '''
+      handler0(sig, frame)
+      if callable(old_handler):
+        old_handler(sig, frame)
+
+  old_handler = signal(sig, handler)
+  try:
+    yield old_handler
+  finally:
+    # restiore the previous handler
+    signal(sig, old_handler)
+
+@contextmanager
+def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
+  ''' Context manager to stack multiple signal handlers,
+      yielding a mapping of `sig`=>`old_handler`.
+
+      Parameters:
+      * `sig_hnds`: a mapping of `sig`=>`new_handler`
+        or an iterable of `(sig,new_handler)` pairs
+      * `call_previous`: optional flag (default `False`), passed
+        to `signal_handler()`
+  '''
+  if _stacked is None:
+    _stacked = {}
+  try:
+    items = sig_hnds.items
+  except AttributeError:
+    # (sig,hnd),... from iterable
+    it = iter(sig_hnds)
+  else:
+    # (sig,hnd),... from mapping
+    it = iter(items())
+  try:
+    sig, handler = next(it)
+  except StopIteration:
+    pass
+  else:
+    with signal_handler(sig, handler,
+                        call_previous=call_previous) as old_handler:
+      _stacked[sig] = old_handler
+      with signal_handlers(it, call_previous=call_previous,
+                           _stacked=_stacked) as stacked:
+        yield stacked
+    return
+  yield _stacked
+
 def write_pidfile(path, pid=None):
   ''' Write a process id to a pid file.
 
@@ -85,14 +165,14 @@ def write_pidfile(path, pid=None):
   '''
   if pid is None:
     pid = os.getpid()
-  with open(path, "w") as pidfp:
+  with open(path, 'w', encoding='ascii') as pidfp:
     print(pid, file=pidfp)
 
 def remove_pidfile(path):
   ''' Truncate and remove a pidfile, permissions permitting.
   '''
   try:
-    with open(path, "w"):
+    with open(path, "wb"):  # pylint: disable=unspecified-encoding
       pass
     os.remove(path)
   except OSError as e:
@@ -117,85 +197,92 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
-def run(argv, logger=None, pids=None, **kw):
-  ''' Run a command. Optionally trace invocation.
-      Return result of subprocess.call.
+def run(
+    argv,
+    *,
+    doit=True,
+    logger=None,
+    quiet=True,
+    input=None,
+    stdin=None,
+    **subp_options,
+):
+  ''' Run a command via `subprocess.run`.
+      Return the `CompletedProcess` result or `None` if `doit` is false.
 
       Parameters:
-      * `argv`: the command argument list
-      * `pids`: if supplied and not None,
-        call .add and .remove with the subprocess pid around the execution
+      * `argv`: the command line to run
+      * `doit`: optional flag, default `True`;
+        if false do not run the command and return `None`
+      * `logger`: optional logger, default `None`;
+        if `True`, use `logging.getLogger()`;
+        if not `None` or `False` trace using `print_argv`
+      * `quiet`: default `True`; if false, print the command and its output
+      * `input`: default `None`: alternative to `stdin`;
+        passed to `subprocess.run`
+      * `stdin`: standard input for the subprocess, default `subprocess.DEVNULL`;
+        passed to `subprocess.run`
+      * `subp_options`: optional mapping of keyword arguments
+        to pass to `subprocess.run`
 
-      Other keyword arguments are passed to `subprocess.call`.
+      Note that `argv` is passed through `prep_argv` before use,
+      allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
   '''
+  argv = prep_argv(*argv)
   if logger is True:
     logger = logging.getLogger()
-  try:
-    if logger:
-      pargv = ['+'] + argv
-      logger.info("RUN COMMAND: %r", pargv)
-    P = subprocess.Popen(argv, **kw)
-    if pids is not None:
-      pids.add(P.pid)
-    returncode = P.wait()
-    if pids is not None:
-      pids.remove(P.pid)
-    if returncode != 0:
+  if not doit:
+    if not quiet:
       if logger:
-        logger.error("NONZERO EXIT STATUS: %s: %r", returncode, pargv)
-    return returncode
-  except BaseException as e:
+        trace("skip: %s", shlex.join(argv))
+      else:
+        print_argv(*argv, fold=True)
+    return None
+  if not quiet:
     if logger:
-      logger.exception("RUNNING COMMAND: %s", e)
-    raise
+      trace("+ %s", shlex.join(argv))
+    else:
+      print_argv(*argv, indent="+ ", file=sys.stderr)
+  if input is None:
+    if stdin is None:
+      stdin = subprocess_DEVNULL
+  elif stdin is not None:
+    raise ValueError("you may not specify both input and stdin")
+  cp = pfx_call(subprocess_run, argv, input=input, stdin=stdin, **subp_options)
+  if cp.stderr:
+    print(" stderr:")
+    print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
+  if cp.returncode != 0:
+    warning(
+        "run fails, exit code %s from %s",
+        cp.returncode,
+        shlex.join(cp.args),
+    )
+  return cp
 
-def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
-  ''' Pipe text from a command.
-      Optionally trace invocation.
-      Return the `Popen` object with `.stdout` decoded as text.
+def pipefrom(argv, *, quiet=False, text=True, stdin=DEVNULL, **popen_kw):
+  ''' Pipe text (usually) from a command using `subprocess.Popen`.
+      Return the `Popen` object with `.stdout` as a pipe.
 
       Parameters:
       * `argv`: the command argument list
-      * `binary`: if true (default false)
-        return the raw stdout instead of a text wrapper
-      * `trace`: if true (default `False`),
-        if `trace` is `True`, recite invocation to stderr
-        otherwise presume that `trace` is a stream
-        to which to recite the invocation.
-      * `keep_stdin`: if true (default `False`)
-        do not attach the command's standard input to the null device.
-        The default behaviour is to do so,
-        preventing commands from accidentally
-        consuming the main process' input stream.
+      * `quiet`: optional flag, default `False`;
+        if true, print the command to `stderr`
+      * `text`: optional flag, default `True`; passed to `Popen`.
+      * `stdin`: optional value for `Popen`'s `stdin`, default `DEVNULL`
+      Other keyword arguments are passed to `Popen`.
 
-      Other keyword arguments are passed to the `io.TextIOWrapper`
-      which wraps the command's output.
+      Note that `argv` is passed through `prep_argv` before use,
+      allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
   '''
-  if trace:
-    tracefp = sys.stderr if trace is True else trace
-    pargv = ['+'] + list(argv) + ['|']
-    print(*pargv, file=tracefp)
-  popen_kw = {}
-  if not keep_stdin:
-    sp_devnull = getattr(subprocess, 'DEVNULL', None)
-    if sp_devnull is None:
-      devnull = open(os.devnull, 'wb')
-    else:
-      devnull = sp_devnull
-    popen_kw['stdin'] = devnull
-  P = subprocess.Popen(argv, stdout=subprocess.PIPE, **popen_kw)
-  if binary:
-    if kw:
-      raise ValueError(
-          "binary mode: extra keyword arguments not supported: %r" % (kw,)
-      )
-  else:
-    P.stdout = io.TextIOWrapper(P.stdout, **kw)
-  if not keep_stdin and sp_devnull is None:
-    devnull.close()
-  return P
+  argv = prep_argv(*argv)
+  if not quiet:
+    print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
+  return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
 
-def pipeto(argv, trace=False, **kw):
+def pipeto(argv, *, quiet=False, **kw):
   ''' Pipe text to a command.
       Optionally trace invocation.
       Return the Popen object with .stdin encoded as text.
@@ -209,15 +296,19 @@ def pipeto(argv, trace=False, **kw):
 
       Other keyword arguments are passed to the `io.TextIOWrapper`
       which wraps the command's input.
+
+      Note that `argv` is passed through `prep_argv` before use,
+      allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
   '''
-  if trace:
-    tracefp = sys.stderr if trace is True else trace
-    pargv = ['+', '|'] + argv
-    print(*pargv, file=tracefp)
-  P = subprocess.Popen(argv, stdin=subprocess.PIPE)
+  argv = prep_argv(*argv)
+  if not quiet:
+    print_argv(*argv, indent="| ", file=sys.stderr)
+  P = Popen(argv, stdin=PIPE)  # pylint: disable=consider-using-with
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
 
+@fmtdoc
 def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   ''' Distribute the array `argv` over multiple arrays
       to fit within `MAX_ARGV`.
@@ -228,8 +319,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
       * `argv`: the sequence of arguments to distribute; this may not be empty
       * `post_argv`: optional, the sequence of trailing arguments
       * `max_argv`: optional, the maximum length of each distributed
-        argument list, default: MAX_ARGV
-      * `encode`: default False.
+        argument list, default from `MAX_ARGV`: `{MAX_ARGV}`
+      * `encode`: default `False`.
         If true, encode the argv sequences into bytes for accurate tallying.
         If `encode` is a Boolean,
         encode the elements with their .encode() method.
@@ -260,8 +351,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   else:
     pre_argv = list(pre_argv)
     post_argv = list(post_argv)
-  pre_nbytes = sum([len(arg) + 1 for arg in pre_argv])
-  post_nbytes = sum([len(arg) + 1 for arg in post_argv])
+  pre_nbytes = sum(len(arg) + 1 for arg in pre_argv)
+  post_nbytes = sum(len(arg) + 1 for arg in post_argv)
   argvs = []
   available = max_argv - pre_nbytes - post_nbytes
   per = []
@@ -281,6 +372,71 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   if per:
     argvs.append(pre_argv + per + post_argv)
   return argvs
+
+def prep_argv(*argv):
+  ''' A trite list comprehension to reduce an argument list `*argv`
+      to the entries which are not `None` or `False`
+      and to flatten other entries which are not strings.
+
+      This exists ease the construction of argument lists
+      with methods like this:
+
+          >>> command_exe = 'hashindex'
+          >>> hashname = 'sha1'
+          >>> quiet = False
+          >>> verbose = True
+          >>> prep_argv(
+          ...     command_exe,
+          ...     quiet and '-q',
+          ...     verbose and '-v',
+          ...     hashname and ('-h', hashname),
+          ... )
+          ['hashindex', '-v', '-h', 'sha1']
+
+      where `verbose` is a `bool` governing the `-v` option
+      and `hashname` is either `str` to be passed with `-h hashname`
+      or `None` to omit the option.
+  '''
+  return list(
+      chain(
+          *[
+              ((arg,) if isinstance(arg, str) else arg)
+              for arg in argv
+              if arg is not None and arg is not False
+          ]
+      )
+  )
+
+def print_argv(
+    *argv, indent="", subindent="  ", end="\n", file=None, fold=False
+):
+  ''' Print an indented possibly folded command line.
+  '''
+  if file is None:
+    file = sys.stdout
+  was_opt = False
+  for i, arg in enumerate(argv):
+    if i == 0:
+      file.write(indent)
+      was_opt = False
+    elif len(arg) >= 2 and arg.startswith('-'):
+      if fold:
+        # options get a new line
+        file.write(" \\\n" + indent + subindent)
+      else:
+        file.write(" ")
+      was_opt = True
+    else:
+      if was_opt:
+        file.write(" ")
+      elif fold:
+        # nonoptions get a new line
+        file.write(" \\\n" + indent + subindent)
+      else:
+        file.write(" ")
+      was_opt = False
+    file.write(shlex.quote(arg))
+  file.write(end)
 
 if __name__ == '__main__':
   for test_max_argv in 64, 20, 16, 8:

@@ -1,0 +1,2 @@
+Rename edit_many to edit_tagsets for clarity.
+Small bugfixes.

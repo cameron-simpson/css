@@ -1,0 +1,25 @@
+#!/bin/sh -u
+
+cmd=$0
+dispnum=5
+geom=1920x1200
+
+[ $# = 0 ] || { echo "Usage: $cmd" >&2; exit 2; }
+
+set :$dispnum -name "vnc:$dispnum@$HOST" -depth 24 -geometry "$geom"
+
+display=$1; shift
+args=
+
+fontpath=unix/:7100
+for fonttop in /usr/X11R6/lib/X11/fonts
+do  for fontdir in $fonttop/*
+    do
+	if [ -f "$fontdir/fonts.dir" ]
+	then
+	    fontpath=$fontpath,$fontdir
+	fi
+    done
+done
+
+set-x vncserver $display $args -alwaysshared "$@" $display ## -fp unix:7100 ## "$fontpath"

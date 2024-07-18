@@ -1,0 +1,15 @@
+lib/python/cs/tagset.py: merge default ==> tagsets
+lib/python/cs/tagset.py: cs.tagset: fix indenting of the module docstring
+lib/python/cs/tagset.py: cs.tagset: adjust module docstring formatting
+lib/python/cs/tagset.py: cs.tagset: some more docstring updates
+lib/python/cs/tagset.py: cs.tagset: TagSetPrefixView: new as_dict() method, simplify __str__, fix spelling of __delitem__
+lib/python/cs/tagset.py: cs.tagset: TagSetPrefixView.__str__: behave like TagSet.__str__
+lib/python/cs/tagset.py: cs.*: replace variations on filepath with .fspath and HasFSPath for consistency
+lib/python/cs/tagset.py: cs.tagset: update imports
+lib/python/cs/tagset.py: cs.tagsets: TagFile.save_tagsets: to not try to save if the file is missing and the tagsets are empty
+lib/python/cs/tagset.py: cs.tagset: new tagSet.from_tags(tags) factory to make a new TagSet from an iterable of tags
+lib/python/cs/tagset.py: cs.tagset: TagSetPrefixView: add .get and .setdefault mapping methods
+lib/python/cs/tagset.py: cs.tagset: RegexpTagRule: accept optional tag_prefix parameter
+lib/python/cs/tagset.py: cs.tagset: TagSet: new from_ini() and save_as_ini() methods to support cs.timeseries config files
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion.from_str: add sanity checks; TagFile.save_tagsets: drop noisy Pfx context
+lib/python/cs/tagset.py: cs.tagset: drop debug, update DISTINFO, clean some lint

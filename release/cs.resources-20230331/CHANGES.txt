@@ -1,0 +1,12 @@
+lib/python/cs/resources.py: cs.resources: RunStateMixin: use @uses_runstate - the default is not the current RunState rather than a new one [BREAKING]
+lib/python/cs/resources.py: merge default ==> vt
+lib/python/cs/resources.py: merge default => vt
+lib/python/cs/resources.py: merge default ==> vt
+lib/python/cs/resources.py: cs.resources: @uses_runstate: create a RunState if no default
+lib/python/cs/resources.py: cs.*: rename default HasThreadState.THREAD_STATE_ATTR to 'perthread_state', drop associated special cases
+lib/python/cs/resources.py: cs.threads: State renamed to ThreadState, update importing modules
+lib/python/cs/resources.py: cs.resources: MultiOpenMixin: move all the open/close counting logic to the _mom_state class, make several attributes public, drop separate finalise() method and associated Condition
+lib/python/cs/resources.py: cs.resources: _mom_state.open: only set self._teardown when opens==1
+lib/python/cs/resources.py: cs.resources: RunStateMixin.__init__: typecheck the runstate parameter
+lib/python/cs/resources.py: merge default ==> taskqueue
+lib/python/cs/resources.py: cs.resources: @uses_runstate: use the prevailing RunState or create one; cs.threads: update a docstring

@@ -1,0 +1,12 @@
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: new setter mode for .tags; CalibreCommand: new cmd_tags to update tags
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook.pull_format: mention the existing formats when adding new format
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_tags: -n: special case it - the general form gets confused with the "-tag" argument which may follow
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_pull: logic fix after successful pull
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_tag: fix set incantation
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: remove debugging delay
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook.pull_format: AZW formats: also check for AZW4
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.make_cbz: cbook name as context
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.books_from_spec: /regexp: search the tags as well
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: subclass FormatableMixin; CalibreCommand.cmd_ls: new "-o ls_format" option for the top line format
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: fix docstring typo, drop unused variable
+lib/python/cs/ebooks/__init__.py: cs.ebooks: update DISTINFO

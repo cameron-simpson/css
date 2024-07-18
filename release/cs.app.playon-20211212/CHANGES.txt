@@ -1,0 +1,148 @@
+lib/python/cs/app/playon.py: cs.app.playon: first cut at playon access
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: save download to file
+lib/python/cs/app/playon.py: cs.app.playon: rename @api_call to @_api_call
+lib/python/cs/app/playon.py: cs.app.playon: strip debug, add docstring
+lib/python/cs/app/playon.py: cs.app.playon: redo command line mode using BaseCommand with "dl" and "ls" subcommands
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.run_context: check for nonempty playon user and password
+lib/python/cs/app/playon.py: cs.app.playon: prevent the default auth-from-netrc mode in the requests module
+lib/python/cs/app/playon.py: cs.app.playon: get loginpassword from .netrc if omitted
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: add an sqltags db to keep download state
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.run_context: adjust to use the API as a context manager to support the sqltags db
+lib/python/cs/app/playon.py: cs.app.playon: clean some lint
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.downloads: update the sqltags data for the entries
+lib/python/cs/app/playon.py: cs.app.playon: rename PlayOnAPI.downloads to PlayOnAPI.recordings
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.__getitem__: return the SQLTaggedEntity for a download_id
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.recordings: update the sqltags update metaphor
+lib/python/cs/app/playon.py: cs.app.playon: format, docstring tweak
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: attribute for the sqlite db path
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_ls: add -l option to print the tags
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: if the supplied filename ends with '.', apply the download's file extension
+lib/python/cs/app/playon.py: cs.app.playon: docstring for the previous trailing-dot commit
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: set downloaded_path on associated SQLTaggedEntity and return the entity
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: only update downloaded_path if the download happened
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: update the playon.* fstags for the downloaded file
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: skip the download of the file already exists
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: accept "pending" to indicate undownloaded recordings, provide a filename more like my preferred naming
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.recordings: return a set of the associated SQLTaggedEntities
+lib/python/cs/app/playon.py: cs.app.playon: clean lint
+lib/python/cs/app/playon.py: cs.app.play: remove debug
+lib/python/cs/app/playon.py: cs.*: rename TaggedEntity to TagSet towards their merge
+lib/python/cs/app/playon.py: cs.app.playon: drop .tags, TaggedEntity folded into TagSet
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.__getitem__: SQLTags elements autocreate, .make method no longer available
+lib/python/cs/app/playon.py: cs.app.playon: compute URL using a format string
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: fix attribute reference
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: implement default "pending" argument
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: set the download_path tag after a successful download, supporting the "pending" pseudo recording id
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: _dl(): return the filename after a successfil down, None on failure
+lib/python/cs/app/playon.py: cs.app.playon: document the default filename format, allow environment override, update usage
+lib/python/cs/app/playon.py: cs.app.playon: tidy imports, improve docstring, autoformat
+lib/python/cs/app/playon.py: cs.app.playon: fix spelling of download_path tag
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: the download_path tag is set by the API download method
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.recordings: convert a few string fields before storing as tags
+lib/python/cs/app/playon.py: cs.app.playon: usage message punctuation fix
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: make the .sqltags attribute public
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: clean up the filename logic
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: collapse the FSTags update, actually makes it clearer
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: add some Pfx context to the download loop, tweak docstring
+lib/python/cs/app/playon.py: cs.app.playon: first cut at looking up the queue, incomplete because my queue is empty at present
+lib/python/cs/app/playon.py: cs.app.playon: new @_api_data decorator for API calls returning JSON data with success and data components, fit it to queue and recordings
+lib/python/cs/app/playon.py: cs.app.playon: drop @_api_call and @_api_data, add new PlayOnAPI suburl_request() and suburl_data() methods, adapt other methods to use them
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: new cmd_account reporting account information
+lib/python/cs/app/playon.py: cs.app.playon: new PlayOnSQLTagSet(SQLTagSet) class with recording convenience methods
+lib/python/cs/app/playon.py: cs.app.playon: new PlayOnSQLTags(SQLTags) class with TagSetClass=PlayOnSQLTagSet, recordings() method which is also __iter__ and recording_ids_from_str() for turning command line arguments into recording_id values
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.run_context: set up the PlayOnSQLTags distinctly and supply to the PlayOnAPI< include in the options
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: use sqltags.recording_ids_from_str() to obtain recording_ids, warn but allow redownload
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: describe the recordings specifications in theusage message
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: shorter usage
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_ls: accept recordings on the command line
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: update the recordings data from the API before processing the recordings
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_update: new command to update the recording and queue information from the API
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.__getitem__: pass the recording_id directly to PlayOnSQLTags.__getitem__
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.__init__: accept optional `sqltags` parameter, drop STATEDBPATH (now in PlayOnSQLTags)
+lib/python/cs/app/playon.py: cs.app.playon: autoformat
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet: new ls() method to list recordings
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: new -n (no download) option to just list chosen recordings
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_ls: use the new PlayOnTagSet.ls() method
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_queue: rename long_format to long_mode in consistency with other code
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: rename dlrq to dl_rsp for clarity
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: handle short writes
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: additional cleanup
+lib/python/cs/app/playon.py: cs.app.playon: clean lint, autoformat
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: new from_playon_date(str) method to compute the UNIX timestamp from a PlayOn date string
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: common code from cmd_ls as _list, reuse in cmd_queue
+lib/python/cs/app/playon.py: cs.app.playon: fix a couple of typos
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet: new is_available and is_queue test methods; PlayOnSQLTags: use the test methods when resolving recording specifications
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI._entities_from_entries: update commented out date parse functions
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet: new status property, use it in ls()
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: common code for queue() and recordings(), seem to be the same records in different states
+lib/python/cs/app/playon.py: cs.app.playon: clean lint
+lib/python/cs/app/playon.py: cs.app.playon: move LS_FORMAT from PlayOnSQLTagSet to PlayOnCommand, add QUEUE_FORMAT
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: _list: parse -l (long mode) and -o (output format) options, have cmd_ls and cmd_queue pass in they preferred output format defaults
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTags.recordings(): discard empty recordings, easily made by referencing spurious recounding_ids
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet: new is_stale() test; PlayOnAPI._entities_from_entries: set last_updated=now to support staleness testing
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet.is_expired: handle no playon.Expires tag, return False
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: new _refresh_sqltags_data method to reread the queue and recordings if any unexpired recordings are stale, call this from run_context()
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_update: report refresh calls; autoformat
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet.STALE_AGE: wind back from an hour to 10 minutes
+lib/python/cs/app/playon.py: cs.app.playon: make PlayOnAPI thread safe
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI._entities_from_entries: obtain an SQLTags SQL session for the work on the tags, supports multithreaded use
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand._refresh_sqltags_data,cmd_update: run the API calls in parallel
+lib/python/cs/app/playon.py: merge default ==> default: playon: parallelise some of the API calls
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: drop refresh of recordings, now automatic from run_context
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: run downloads in parallel
+lib/python/cs/app/playon.py: cs.app.playon: manage parallel downloads using a Semaphore(2)
+lib/python/cs/app/playon.py: merge default ==> default: playon: parallel downloads
+lib/python/cs/app/playon.py: cs.app.playon: update for new cs.cmdutils.BaseCommand API
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTags.recordings: use self.find(name~recording.) to collect everything in one query
+lib/python/cs/app/playon.py: cs.app.playon: preload the recordings to avoid tedious per recording queries later
+lib/python/cs/app/playon.py: cs.app.playon: refresh also if all records are expired
+lib/python/cs/app/playon.py: cs.app.playon:  ls,queue: strip trailing slash from regexp selection if present
+lib/python/cs/app/playon.py: cs.app.playon: dl: skip expired recordings
+lib/python/cs/app/playon.py: cs.app.playon: dl: skip unavailable recordings
+lib/python/cs/app/playon.py: cs.app.playon: q not a synonym for queue, rename update to refresh
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet: new .is_pending test method, dry up is_available, make .status lowercase and derived from the test methods
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.run_context: open the SQLTags
+lib/python/cs/app/playon.py: cs.app.playon: fix up the SQLTags open, we no longer know about db sessions
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI._entities_from_entries: again, we no longer know about db sessions
+lib/python/cs/app/playon.py: cs.app.plyon: PlayOnCommand._dl: filename: replace os.sep with a colon
+lib/python/cs/app/playon.py: cs.app.playon: keep the playon state tags db in its own file: ${PLAYON_TAGS_DBURL:-~/var/playon.sqlite}
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: _dl: rename "te" to "recording"
+lib/python/cs/app/playon.py: cs.app.playon: rename "te" to "recording", "tes" to "recordings" throughout
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: use new MutliOpenMixin.startup_shutdown context manager approach
+lib/python/cs/app/playon.py: cs.app.playon: new PlayOnSQLTagSet.nice_name() method, use in some error messages
+lib/python/cs/app/playon.py: cs.app.playon: new "expired" recording specifier"
+lib/python/cs/app/playon.py: cs.qpp.playon: PlayOnAPI: rename _entities_from_entries to _recordings_from_entries, getting similar code for services
+lib/python/cs/app/playon.py: cs.app.playon: initial support for another endpoint where the content lives
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: new services() and service(service_id) methods
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: new cmd_service to fetch service information
+lib/python/cs/app/playon.py: cs.app.playon: docstring tweaks
+lib/python/cs/app/playon.py: cs.app.playon: $PLAYON_USER defaults to $EMAIL
+lib/python/cs/app/playon.py: cs.app.playon: improve exception message for credential lookup failure
+lib/python/cs/app/playon.py: cs.app.playon: assertion to test weird behaviour with no $EMAIL and $PLAYON_USER
+lib/python/cs/app/playon.py: cs.app.play: update formatting for new regime
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet: mark a bunch of methods with @format_attribute
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet.ls: fold the status into LS_FORMAT
+lib/python/cs/app/playon.py: merge default => tagsets
+lib/python/cs/app/playon.py: cs.app.playon: tweak assertion
+lib/python/cs/app/playon.py: cs.app.playon: report completion of download progressbar
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.login_state: use a lock to avoid parallel login calls and races
+lib/python/cs/app/playon.py: cs.app.playon: playon dl: only report FAILED for bad downloads, the progressbar reports on good ones
+lib/python/cs/app/playon.py: cs.app.playon: playon dl: new -j jobs option to tune parallelism
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: bugfix output file write logic
+lib/python/cs/app/playon.py: cs.app/playon: PlayOnAPI.download: bugfix context message
+lib/python/cs/app/playon.py: cs.app/playon: PlayOnAPI.download: improve warning message
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: improve warning message
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: improve warning message, again
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet: new .resolution property mapping playon.Quality to a video resolution
+lib/python/cs/app/playon.py: cs.app.playon: add PLAYON_FILENAME_FORMAT, update LS_FORMAT and DEFAULT_FILENAME_FORMAT
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet.is_stale: expired entries are never stale because they wil never be updated
+lib/python/cs/app/playon.py: cs.app.playon: download now uses atomic_filename for the download file
+lib/python/cs/app/playon.py: cs.app.playon: initial DISTINFO, clean lint, add docstrings, autoformat
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTagSet.nice_name: handle Series="none"
+lib/python/cs/app/playon.py: cs.app.playon: rename PlayOnSQLTagSet to Recording; PlayOnSQLTags: drop TagSetClass = PlayOnSQLTagSet, add TAGSETCLASS_PREFIX_MAPPING{'recording': Recording}
+lib/python/cs/app/playon.py: cs.app.playon: tweak description
+lib/python/cs/app/playon.py: cs.app.playon: change need_refresh logic and refactor for easier debug
+lib/python/cs/app/playon.py: cs.app.playon: a recording with no playon.Expires is considered expired
+lib/python/cs/app/playon.py: cs.app.playon: shuffle default param handling
+lib/python/cs/app/playon.py: cs.app.playon: lint
+lib/python/cs/app/playon.py: cs.app.playon: update DISTINFO for initial release

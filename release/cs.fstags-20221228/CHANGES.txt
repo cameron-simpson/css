@@ -1,0 +1,3 @@
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.save: new options prune=True parameter to drop empty top level dict/lists
+lib/python/cs/fstags.py: merge fstags ==> default
+lib/python/cs/fstags.py: cs.*: update implementations of BaseCommand.run_context to use super().run_context()

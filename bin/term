@@ -5,7 +5,7 @@
 # Default location is tuned to my X11 setup (i.e. 103 pixels down from
 # the top of the screen).
 # The -big option is tuned to my X setup on a 1280x1024 screen.
-#	- Cameron Simpson <cs@cskk.id.au> December 1991
+#       - Cameron Simpson <cs@cskk.id.au> December 1991
 #
 
 set -ue
@@ -39,10 +39,10 @@ export RXVT_SOCKET TMPDIR
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
-		[-l lock] [-1 lock] [-j job]
-		[-f font] [-n name] [-keepio] [-xauthhack]
+                [-l lock] [-1 lock] [-j job]
+                [-f font] [-n name] [-keepio] [-xauthhack]
                 [-tab] [-window]
-		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
+                [{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
 
 windowmode=tab
 trace=${DEBUG:+set-x}
@@ -86,40 +86,40 @@ do
       ;;
   esac
   case $1 in
-    --)		shift; break ;;
-    -e)		shift; break ;;
-    -c)		shcmd=$2; shift; shift
-		set -- ${1+"$@"} -e "$SHELL" -c "$shcmd"
-		;;
-    -a)		async=1 ;;
-    +a)		async= ;;
-    -l)		lock=$2; shift ;;
-    -1)		lock1=$1 lock=$2; shift ;;
-    -j)		WINJOB=$2; shift; export WINJOB ;;
-    -ip)	dotrans=1 ;;
-    +ip)	dotrans= ;;
-    -sh)	shade=$2; shift ;;
-    -C|-iconic)	termopts="$termopts $1" ;;
-    -fg|-bg)	termopts="$termopts $1 $2"; shift ;;
-    -v)		set -x ;;
-    -w)		w=$2 ; shift ;;
-    -h)		h=$2 ; shift ;;
-    -x)		x=$2 ; shift ;;
-    -y)		y=$2 ; shift ;;
-    -n|-T)	title=$2 ; shift ;;
-    -f)		f=$2 ; shift ;;
-    -env)	exec $trace genv TERMOPTIONS TERMTINT TERMSHADE ;;
-    -keepio)	detach= ;;
-    -xauthhack)	xauthhack=1 ;;
+    --)         shift; break ;;
+    -e)         shift; break ;;
+    -c)         shcmd=$2; shift; shift
+                set -- ${1+"$@"} -e "$SHELL" -c "$shcmd"
+                ;;
+    -a)         async=1 ;;
+    +a)         async= ;;
+    -l)         lock=$2; shift ;;
+    -1)         lock1=$1 lock=$2; shift ;;
+    -j)         WINJOB=$2; shift; export WINJOB ;;
+    -ip)        dotrans=1 ;;
+    +ip)        dotrans= ;;
+    -sh)        shade=$2; shift ;;
+    -C|-iconic) termopts="$termopts $1" ;;
+    -fg|-bg)    termopts="$termopts $1 $2"; shift ;;
+    -v)         set -x ;;
+    -w)         w=$2 ; shift ;;
+    -h)         h=$2 ; shift ;;
+    -x)         x=$2 ; shift ;;
+    -y)         y=$2 ; shift ;;
+    -n|-T)      title=$2 ; shift ;;
+    -f)         f=$2 ; shift ;;
+    -env)       exec $trace genv TERMOPTIONS TERMTINT TERMSHADE ;;
+    -keepio)    detach= ;;
+    -xauthhack) xauthhack=1 ;;
     -tab)       windowmode=tab ;;
     -window)    windowmode=window ;;
     -g|-geometry)sized=1 geometry=$2; shift ;;
-    -xrm)	xrmopts="$xrmopts $1 "`shqstr "$2"`; shift ;;
-    --)		shift; break ;;
-    -?*)	echo "$cmd: unrecognised option: $1" >&2
-		badopts=1
-		;;
-    *)		break ;;
+    -xrm)       xrmopts="$xrmopts $1 "`shqstr "$2"`; shift ;;
+    --)         shift; break ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
   esac
   shift
 done
@@ -134,7 +134,26 @@ done
 set -- ttysane "$@"
 [ -n "$WINJOB" ] && set -- winjob "$WINJOB" "$@"
 
-case "$OS,$TERM,$DISPLAY" in
+case "$OS,${PREFTERM:-$TERM},$DISPLAY" in
+  darwin,iTerm.app,*)
+    set -- env runme=$( as-script "$@" ) python3 -c "if 1:
+                  import os
+                  import iterm2
+                  import AppKit
+
+                  AppKit.NSWorkspace.sharedWorkspace().launchApplication_('iTerm2')
+
+                  async def main(connection):
+                      app = await iterm2.async_get_app(connection)
+                      await app.async_activate()
+                      # This will run 'vi' from bash. If you use a different shell, you'll need
+                      # to change it here. Running it through the shell sets up your $PATH so you
+                      # don't need to specify a full path to the command.
+                      await iterm2.Window.async_create(connection, command=os.environ['runme'])
+
+                  iterm2.run_until_complete(main, True)
+    "
+    ;;
   darwin,*,/?* | darwin,*, )
     runme=$( as-script "$@" )
     case $windowmode in

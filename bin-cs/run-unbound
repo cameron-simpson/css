@@ -57,7 +57,7 @@ fi
 # if not once, wrap in svcd
 [ $once ] || \
 { set $trace \
-        svcd -q -x -n unbound -p "$svcdpidfile" -s get-default-gateway -U "$username" -- \
+        svcd run -q -x -n unbound -p "$svcdpidfile" -s get-default-gateway -U "$username" -- \
           "$0" -1 -u "$username" -- ${1+"$@"}
   if [ $dosudo ]
   then
@@ -88,7 +88,7 @@ do  [ -d "$d/." ] || $trace $as mkdir "$d"
 done
 
 $trace $as rewriteif -d "$cf" gen-unbound.conf -u "$username" -- ${1+"$@"}
-$trace $as unbound-checkconf "$cf"
+echo SKIP $trace $as unbound-checkconf "$cf"
 
 set -- $trace unbound -d -c "$cf"
 if [ $dosudo ]

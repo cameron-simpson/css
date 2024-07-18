@@ -1,0 +1,5 @@
+lib/python/cs/deco.py: cs.deco: tweak comment grammar
+lib/python/cs/deco.py: cs.deco: @cachedmethod: rename wrapper function for clarity in tracebacks
+lib/python/cs/deco.py: merge default -> sqltags
+lib/python/cs/deco.py: merge default ==> sqltags
+lib/python/cs/deco.py: cs.deco: @promote: add support for .as_TypeName() instance method on the source object or a .as_TypeName property/attribute

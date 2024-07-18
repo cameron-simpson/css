@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# Convenience wrapper for mitmproxy.
+# - Cameron Simpson <cs@cskk.id.au> 13feb2023
+#
+
+set -ue
+
+: "${MITMDIR:=$HOME/var/mitm}"
+: "${MITMPORT:=3131}"
+: "${MITMHOST:=127.0.0.1}"
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd subcommand [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing subcommand" >&2
+  badopts=1
+else
+  subcmd=$1
+  shift
+  case "$subcmd" in
+    dump | proxy | web )
+        mitmexe=mitm$subcmd
+        ;;
+    *)  echo "$cmd: $subcmd: unknown subcommand, I known: dump, proxy, web" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+cd "$MITMDIR"
+exec "$mitmexe" --listen-host "$MITMHOST" --listen-port "$MITMPORT" ${1+"$@"}

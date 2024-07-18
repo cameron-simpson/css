@@ -1,0 +1,5 @@
+lib/python/cs/psutils.py: cs.psutils: signal_handlers: bugfix iteration of sig_hnds
+lib/python/cs/psutils.py: cs.psutils: use cs.gimmicks instead of cs.logutils
+lib/python/cs/psutils.py: cs.psutils: drop use of cs.upd, fixes circular import; users of run() may need to call "with Upd().above()" themselves
+lib/python/cs/psutils.py: merge playon ==> default
+lib/python/cs/psutils.py: cs.psutils: clean lint

@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+#
+# spaces - command line wrapper for cs.app.osx.spaces
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.osx.spaces import main
+sys.exit(main(sys.argv))

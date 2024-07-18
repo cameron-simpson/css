@@ -9,8 +9,11 @@ set -ue
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-a] [-d] [-t top] [-T top] {relpath|.} [{-c shcmd | testcmd [args...]}]
   -a    Find all matches. Default is to stop after the first match.
+  -C wd Change directory to wd before the find.
   -d    Print the test directory instead of the test directory plus
         \"relpath\".
+  -P    Resolve relpath so as to do a findup of the physical path
+        instead of the logical path.
   -t top Go no higher than the directory top.
   -T top Go only lower than the directory top.
   Command:
@@ -27,6 +30,8 @@ usage="Usage: $cmd [-a] [-d] [-t top] [-T top] {relpath|.} [{-c shcmd | testcmd 
 
 all=
 dirmode=
+physical=
+cwd=
 top=
 top0=
 shmode=
@@ -37,7 +42,9 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -a) all=1 ;;
+    -C) cwd=$2; shift ;;
     -d) dirmode=1 ;;
+    -P) physical=1 ;;
     -t) top=$2; shift ;;
     -T) top0=$2; shift ;;
     --) shift; break ;;
@@ -59,6 +66,11 @@ else
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$cwd" ] && cd "$cwd"
+
+pwdopts=
+[ $physical ] && pwdopts=-P
 
 if [ $# -gt 0 ]
 then
@@ -83,7 +95,7 @@ fi
 xit=1
 
 odir=
-dir=$( pwd )
+dir=$( pwd $pwdopts )
 while [ -z "$odir" ] || [ "x$odir" != "x$dir" ]
 do
   [ -z "$top0" ] || [ "x$dir" != "x$top0" ] || break

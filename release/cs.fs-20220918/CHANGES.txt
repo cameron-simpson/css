@@ -1,0 +1,3 @@
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton.__init__: return True on the first call, False on subsequent calls; probe __dict__ for '_lock' instead of using hasattr (which plays poorly this early on with classes with their own __getattr__)
+lib/python/cs/fs.py: cs.fs: needdir: accept optional `log` parameter to log mkdir or makedirs
+lib/python/cs/fs.py: cs.fs: HasFSPath: add a default __str__

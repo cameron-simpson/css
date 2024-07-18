@@ -1,0 +1,1 @@
+Make POP3Command.cmd_dl an instance method (static methods broke with the latest cs.cmdutils release).

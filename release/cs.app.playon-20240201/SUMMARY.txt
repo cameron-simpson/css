@@ -1,0 +1,2 @@
+PlayOnCommand.cmd_dl: collapse dashes more reliably, restore the space squashing, make the downloads interruptable.
+PlayOnCommand._list: sort each listing argument by recording id.

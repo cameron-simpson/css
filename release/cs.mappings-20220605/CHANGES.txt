@@ -1,0 +1,3 @@
+lib/python/cs/mappings.py: cs.mappings: update docstrings and variable names for clarity
+lib/python/cs/mappings.py: cs.mappings: docstring improvements
+lib/python/cs/mappings.py: cs.mappings: named_row_tuple et al: plumb a new optional snake_case parameter to snake case mixed case attribute names; drop Python 2 support and the cs.py3 shims

@@ -1,0 +1,2 @@
+Make csv_reader() a generator to cue the @strable decorator.
+Plumb the new optional snake_case parameter.

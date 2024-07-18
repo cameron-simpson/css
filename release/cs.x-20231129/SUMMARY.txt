@@ -1,0 +1,1 @@
+New $CS_X_LOGGER environment variable to direct messages to a logger.

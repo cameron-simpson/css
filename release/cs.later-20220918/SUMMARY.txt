@@ -1,0 +1,3 @@
+Later.wait: new optional timeout, replaces hardwired 5s timeout; return the Event.finished return.
+Later: expose the finished Event as .finished_event.
+Later.finished_event logic fixes.

@@ -1,0 +1,2 @@
+BaseCommand.run_context: update RunState support.
+BaseCommand.run_context: always be having an self.options.upd.

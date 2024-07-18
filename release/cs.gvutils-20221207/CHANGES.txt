@@ -1,0 +1,3 @@
+lib/python/cs/gvutils.py: cs.gvutils: fix a trailing screwup from a rogue black autoformat
+lib/python/cs/gvutils.py: cs.gvutils: new gvsvg() convenience function to return SVG
+lib/python/cs/gvutils.py: cs.gvutils: fixup

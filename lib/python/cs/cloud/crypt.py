@@ -28,11 +28,15 @@ from subprocess import Popen, DEVNULL, PIPE
 import sys
 from tempfile import NamedTemporaryFile
 from uuid import uuid4
+
 from typeguard import typechecked
+
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom_fd
+from cs.fs import validate_rpath
 from cs.pfx import Pfx
-from . import validate_subpath, Cloud, CloudArea
+
+from . import Cloud, CloudArea
 
 # used when creating RSA keypairs
 DEFAULT_RSA_ALGORITHM = 'aes256'
@@ -422,9 +426,12 @@ def upload(
     overwrite: bool = False,
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
-      using the public key from the file named `public_path`,
-      return the upload result and the created cloud paths
-      (computed from `basepath`).
+      using the public key from the file named `public_path`.
+      Return `(uploaded,upload_result,data_subpath,key_subpath)`
+      being:
+      * whether an upload actually happened (may not when `overwrite` is false)
+      * the upload result
+      * the created cloud paths (computed from `basepath`)
 
       Parameters:
       * `stdin`: any value suitable for `openssl()`'s `stdin` parameter
@@ -446,7 +453,7 @@ def upload(
       if `public_key_name` was specified).
       The upload result is that for the `'.data.enc'` upload.
   '''
-  validate_subpath(basepath)
+  validate_rpath(basepath)
   data_subpath, key_subpath = upload_paths(
       basepath, public_key_name=public_key_name
   )
@@ -455,7 +462,7 @@ def upload(
     file_info = cloud.stat(bucket_name=bucket_name, path=data_subpath)
     if file_info and cloud.stat(bucket_name=bucket_name, path=key_subpath):
       # already exists, skip the upload
-      return file_info, data_subpath, key_subpath
+      return False, file_info, data_subpath, key_subpath
   # Encrypt directly into an upload file.
   # See if the cloud has a preferred location for upload files.
   cloud_tmpdir = cloud.tmpdir_for(bucket_name=bucket_name, path=data_subpath)
@@ -496,7 +503,7 @@ def upload(
       path=key_subpath,
       upload_progress=upload_progress,
   )
-  return upload_result, data_subpath, key_subpath
+  return True, upload_result, data_subpath, key_subpath
 
 def download_passtext(
     cloud,
@@ -559,7 +566,7 @@ def download(
       (or `basepath+'.key-`*public_key_name*`.enc'
       if `public_key_name` was specified).
   '''
-  validate_subpath(basepath)
+  validate_rpath(basepath)
   assert public_key_name is None or '/' not in public_key_name
   data_subpath, key_subpath = upload_paths(
       basepath, public_key_name=public_key_name

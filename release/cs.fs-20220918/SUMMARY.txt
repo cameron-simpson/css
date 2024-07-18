@@ -1,0 +1,4 @@
+FSPathBasedSingleton.__init__: return True on the first call, False on subsequent calls.
+FSPathBasedSingleton.__init__: probe __dict__ for '_lock' instead of using hasattr (which plays poorly this early on with classes with their own __getattr__).
+needdir: accept optional `log` parameter to log mkdir or makedirs.
+HasFSPath: add a default __str__.

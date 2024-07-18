@@ -1,0 +1,4 @@
+lib/python/cs/deco.py: cs.deco: @promote: fix docstring typo
+lib/python/cs/deco.py: cs.deco: new Promotable abstract class mixin, which requires the creation of a .promote(cls,obj)->cls class method
+lib/python/cs/deco.py: cs.deco: clean some lint
+lib/python/cs/deco.py: cs.deco: Promotable.promote: mark as a class method

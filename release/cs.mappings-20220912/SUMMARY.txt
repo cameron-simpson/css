@@ -1,0 +1,3 @@
+New TypedKeyMixin to check that the keys of a mapping are of a particular type.
+New TypedKeyDict(TypedKeyMixin,dict) subclass.
+New StrKeyedDict and UUIDKeyedDict factories.

@@ -1,0 +1,6 @@
+TimeSeriesMapping.as_pd_dataframe: rename `keys` to `df_data`, and accept either a time series key or a `(key,series)` tuple.
+TimeSeriesMapping.as_pd_dataframe: default `key_map`: annotate columns with their original CSV headers if present.
+TimeSeriesMapping.plot: rename `keys` to `plot_data` as for `as_pd_dataframe`, add `stacked` and `kind` parameters so that we can derive `kind` from `stacked`.
+as_datetime64s: apply optional utcoffset timeshift.
+Plumb optional pad=False option through data, data2, as_pd_series.
+New PlotSeries namedtuple holding a label, a series and an extra dict as common carrier for data which will get plotted.

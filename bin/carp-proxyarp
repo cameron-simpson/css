@@ -97,7 +97,7 @@ fi
 
 exec \
   $trace \
-    svcd -n "proxyarp-$carpif" \
+    svcd run -n "proxyarp-$carpif" \
          -t "set -ue
              carpifs='$carpifs'
              carpstate='$state'

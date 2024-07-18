@@ -1,0 +1,4 @@
+lib/python/cs/buffer.py: cs.buffer: docstring improvement
+lib/python/cs/buffer.py: cs.buffer: fix raise of StopIteration
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: new promote() method to promote int,str,bytes
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.promote: assume nonspecific iterables yield byteslike instances

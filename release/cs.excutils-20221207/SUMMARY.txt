@@ -1,0 +1,1 @@
+@unattributable: bugfix decorator construction to accomodate callable() @decorator precheck.

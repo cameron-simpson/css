@@ -1,0 +1,3 @@
+lib/python/cs/app/playon.py: cs.app.playon: DEFAULT_FILENAME_FORMAT: replace naive playon.Name with series_episode_name which is the name with leading series/episode info removed
+lib/python/cs/app/playon.py: cs.app.playon: remove stray debug
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: replace "----" with "--", handles playon.Name which is empty after stripping episode information

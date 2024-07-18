@@ -1,0 +1,13 @@
+lib/python/cs/id3.py: cs.id3: defer import of pyid3lib until initialisation
+lib/python/cs/id3.py: merge default ==> beyonwiz
+lib/python/cs/id3.py: cs.app.beyonwiz: merge from default
+lib/python/cs/id3.py: my email address has changed - update Python code
+lib/python/cs/id3.py: cs.id3: clean some lint
+lib/python/cs/id3.py: sweeping removal of cs.obj.O, universally supplanted by types.SimpleNamespace
+lib/python/cs/id3.py: cs.id3: import SimpleNamespace, autoformat
+lib/python/cs/id3.py: cs.id3: first cut at ID3V1 and ID3v2 binary classes, to be used in cs.mp3
+lib/python/cs/id3.py: cs.id3: ID3V1Frame,ID3V2Frame: new .tagset() method to return a TagSet
+lib/python/cs/id3.py: cs.id3: mark the old class wrapping pyid3lib as obsolete
+lib/python/cs/id3.py: cs.id3: ID3V2Frame.tagset: include version information
+lib/python/cs/id3.py: cs.id3: ID3V1Frame.parse: trim trailing NULs from the comment field
+lib/python/cs/id3.py: cs.cmdutils: BaseCommand.cmd_help: fix obsolete parameter list

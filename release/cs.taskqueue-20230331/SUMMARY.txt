@@ -1,0 +1,2 @@
+Task: subclass BaseTask instead of (FSM, RunStateMixin).
+BaseTask.__init__: use @uses_runstate to ensure we've got a RunState.

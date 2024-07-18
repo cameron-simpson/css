@@ -1,0 +1,5 @@
+lib/python/cs/queues.py: cs.queues: docstring updates
+lib/python/cs/queues.py: cs.queues: PushQueue: modernise the MutiOpenMixin startup_shutdown, do both open and close of self.outQ
+lib/python/cs/queues.py: merge default ==> pilfer
+lib/python/cs/queues.py: cs.queues: minor cleanups
+lib/python/cs/queues.py: merge default ==> pilfer for @cs.deco.promote

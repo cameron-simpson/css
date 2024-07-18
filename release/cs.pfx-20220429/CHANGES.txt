@@ -1,0 +1,3 @@
+lib/python/cs/pfx.py: cs.pfx: new Pfx.scope() context manager and Pfx.push(msg,*a) nonindenting Pfx push
+lib/python/cs/pfx.py: cs.pfx: Pfx.scope: workaround for @contextmanager not playing with class methods
+lib/python/cs/pfx.py: cs.pfx: pfxprint: new optional print_func keyword parameter

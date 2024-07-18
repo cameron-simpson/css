@@ -1,0 +1,2 @@
+lib/python/cs/context.py: cs.context: twostep: the returned "tear down" phase function needs to ignore StopIteration from the context manager - thanking PEP479 - this took many hours to debug because the RuntimeError does not include a reference to the source StopIteration, and therefore I had _no_ idea where that had come from
+lib/python/cs/context.py: cs.context: ContextManagerMixin.__exit__: tighten try/except, streamline logic

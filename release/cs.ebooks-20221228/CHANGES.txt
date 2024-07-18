@@ -1,0 +1,12 @@
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.popbooks: do not require argv to be empty at the end
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleBook: new amazon_url property returning an Amazon web page URL based on the ASIN
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: bugfix for format filesystem path, add try/except and warning
+lib/python/cs/ebooks/kindle.py: KindleCommand.cmd_import_tags: improve message
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.run: do the stdout print which we removed from cs.psutils.run
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: new default_kindle_library() function consulting the envvar and app defaults; adjust KindleTree to use this
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: new kindle_content_path_default() and kindle_content_path() functions; use these in default_kindle_library()
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: new app-path subcommand to report or set the Kindle application content path (does not work for setting, don't know why yet)
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_linkto: better progress reporting, do not warn about files which already exist
+lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/kindle.py: cs.ebooks: print src=>dst for a few commands
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: new -r (reverse) and -t (timestamp) sorting options
+lib/python/cs/ebooks/apple.py lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/kindle.py: cs.*: update implementations of BaseCommand.run_context to use super().run_context()

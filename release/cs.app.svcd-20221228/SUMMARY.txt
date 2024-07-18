@@ -1,0 +1,2 @@
+BREAKING: require "run" subcommand to run a service daemon.
+New "ls" subcommand to report services based on flags.

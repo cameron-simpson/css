@@ -55,7 +55,9 @@ class VBoxCommand(BaseCommand):
       pre_argv = [pre_argv]
     if isinstance(argv, str):
       argv = [argv]
-    return run([VBOXMANAGE] + pre_argv + argv + list(post_argv), logger=True)
+    return run(
+        [VBOXMANAGE] + pre_argv + argv + list(post_argv), logger=True
+    ).returncode
 
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [VBoxManage list options...]
@@ -64,7 +66,7 @@ class VBoxCommand(BaseCommand):
     return self.vbmg('list', argv)
 
   @staticmethod
-  def cmd_mkimg(argv):
+  def cmd_mkimg(self, argv):
     ''' Usage: {cmd} {{path.vdi|uuid}} [VBoxManage clonemedium options...]
           Create a .img file from a disc image file.
     '''
@@ -83,7 +85,7 @@ class VBoxCommand(BaseCommand):
       return 1
 
   @staticmethod
-  def cmd_mkvdi(argv):
+  def cmd_mkvdi(self, argv):
     ''' Usage: {cmd} img [VBoxManage convertfromraw options...]
           Create a .vdi file from a .img file.
     '''
@@ -91,7 +93,7 @@ class VBoxCommand(BaseCommand):
       raise GetoptError("missing source img")
     imgpath = argv.pop(0)
     imgpfx, imgext = splitext(imgpath)
-    if imgext('.raw', '.img'):
+    if imgext in ('.raw', '.img', '.vmdk'):
       vdipath = imgpfx + '.vdi'
     else:
       vdipath = imgpath + '.vdi'
@@ -117,7 +119,7 @@ class VBoxCommand(BaseCommand):
     return self.vbmg('list', argv, ['runningvms'])
 
   @staticmethod
-  def cmd_resize(argv):
+  def cmd_resize(self, argv):
     ''' Usage: {cmd} vdipath new_size_mb
           Resize a .vdi file to new_size_mb, a size in megabytes.
     '''

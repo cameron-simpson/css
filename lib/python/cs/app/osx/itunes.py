@@ -9,6 +9,7 @@
 
 from base64 import b64decode
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime
 try:
   from lxml import etree
@@ -16,7 +17,6 @@ except ImportError:
   import xml.etree.ElementTree as etree
 import os
 from os.path import basename, join as joinpath
-from pprint import pformat
 import sys
 from threading import RLock
 from cs.cmdutils import BaseCommand
@@ -44,11 +44,10 @@ class ITunesCommand(BaseCommand):
         Tag paths based on data from the iTunes library.
   '''
 
-  def apply_defaults(self, options):
-    ''' Set up the default values in `options`.
-    '''
-    options.fstags = FSTags()
-    options.library = ITunes()
+  @dataclass
+  class Options(BaseCommand.Options):
+    fstags: FSTags = field(default_factory=FSTags)
+    library: "ITunes" = field(default_factory=lambda: ITunes())
 
   @staticmethod
   def cmd_autotag(argv, options):

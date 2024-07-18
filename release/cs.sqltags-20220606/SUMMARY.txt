@@ -1,0 +1,5 @@
+New SQLTagsORM.Entities.add_new_tags method, use it in SQLTags.default_factory for bulk insert.
+SQTCriterion: new .from_equality(tag_name,tag_value) factory to make an equality criterion.
+SQLTags.find: accept criteria as positional parameters instead of a single iterable, accept new keyword parameters as equality criteria.
+SQLTags.__getitem__: accept a slice to index the .unixtime tag.
+SQLTagsORM: also turn on echo mode if "ECHO" in $SQLTAGS_MODES.

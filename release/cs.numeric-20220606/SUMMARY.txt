@@ -1,0 +1,1 @@
+New intif(f): int(f) if that equals f, otherwise f.

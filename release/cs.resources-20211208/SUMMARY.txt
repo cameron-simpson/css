@@ -1,0 +1,3 @@
+MultiOpenMixin.startup_shutdown: since this is the fallback for obsolete uses of MultiOpenMixin, warn if there is no .startup/.shutdown method.
+MultiOpenMixin.startup_shutdown: fix up shutdown logic, was not using a finally clause.
+MultiOpenMixin: use ContextManagerMixin __enter_exit__ generator method instead of __enter__ and __exit__.

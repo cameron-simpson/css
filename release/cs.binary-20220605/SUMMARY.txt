@@ -1,0 +1,1 @@
+BinaryMixin: replace scan_file with scan_fspath, as the former left uncertainty about the amount of the file consumed.
