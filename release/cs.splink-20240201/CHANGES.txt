@@ -1,0 +1,3 @@
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: new -U/--update option to run a "pull" before plotting
+lib/python/cs/splink.py: cs.splink: TagSets do not autofake missing attributes these days
+lib/python/cs/splink.py: cs.timeseries,cs.splink: DISTINFO: console_scripts spec update

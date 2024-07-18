@@ -1,0 +1,2 @@
+lib/python/cs/context.py: cs.context: new reconfigure_file(f,**kw), a context manager flavour of `TextIOBase.reconfigure`
+lib/python/cs/context.py: cs.context: clean some lint, fix docstring example

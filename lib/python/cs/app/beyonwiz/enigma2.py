@@ -10,21 +10,26 @@
 import errno
 from collections import namedtuple
 import datetime
-import os.path
-from cs.binary import structtuple
+import os
+from os.path import basename, isfile as isfilepath, splitext
+
+from icontract import require
+
+from cs.binary import BinaryMultiStruct
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py3 import datetime_fromisoformat
 from cs.tagset import TagSet
 from cs.threads import locked_property
+
 from . import _Recording
 
-# an "access poiint" record from the .ap file
-Enigma2APInfo = structtuple('Enigma2APInfo', '>QQ', 'pts offset')
+# an "access point" record from the .ap file
+Enigma2APInfo = BinaryMultiStruct('Enigma2APInfo', '>QQ', 'pts offset')
 
 # a "cut" record from the .cuts file
-Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
+Enigma2Cut = BinaryMultiStruct('Enigma2Cut', '>QL', 'pts type')
 
 class Enigma2(_Recording):
   ''' Access Enigma2 recordings, such as those used on the Beyonwiz T3, T4 etc devices.
@@ -32,15 +37,72 @@ class Enigma2(_Recording):
         https://github.com/oe-alliance/oe-alliance-enigma2/blob/master/doc/FILEFORMAT
   '''
 
-  DEFAULT_FILENAME_BASIS = '{meta.title:lc}--{file.channel:lc}--beyonwiz--{file.datetime}--{meta.description:lc}'
+  DEFAULT_FILENAME_BASIS = (
+      '{meta.title:lc}--{file.datetime:lc}--{file.channel:lc}'
+      '--beyonwiz--{meta.description:lc}'
+  )
 
-  def __init__(self, tspath):
+  FFMPEG_METADATA_MAPPINGS = {
+
+      # available metadata for MP4 files
+      'mp4': {
+          'album': None,
+          'album_artist': None,
+          'author': None,
+          'comment': None,
+          'composer': None,
+          'copyright': None,
+          'description': 'meta.description',
+          'episode_id': None,
+          'genre': None,
+          'grouping': None,
+          'lyrics': None,
+          'network': 'file.channel',
+          'show': 'meta.title',
+          'synopsis': 'meta.description',
+          'title': 'meta.title',
+          'track': None,
+          'year': lambda tags: tags['file.datetime'].year,
+      }
+  }
+
+  @require(lambda tspath: tspath.endswith('.ts'))
+  def __init__(self, tspath: str):
     _Recording.__init__(self, tspath)
     self.srcfmt = 'mpegts'
     self.tspath = tspath
-    self.metapath = tspath + '.meta'
+    tsbase = splitext(basename(tspath))[0]
     self.appath = tspath + '.ap'
     self.cutpath = tspath + '.cuts'
+    self.eitpath = tsbase + '.eit'
+    self.metapath = tspath + '.meta'
+    self.scpath = tspath + '.sc'
+
+  @property
+  def fspaths(self):
+    ''' All the filesystem paths associated with the recording.
+    '''
+    return (
+        self.tspath,
+        self.appath,
+        self.cutpath,
+        self.eitpath,
+        self.metapath,
+        self.scpath,
+    )
+
+  @pfx_method
+  def remove(self, *, doit=False):
+    ''' Remove all the files associated with this recording.
+    '''
+    for fspath in self.fspaths:
+      with Pfx(fspath):
+        print("remove", fspath)
+        if doit:
+          pfx_call(os.remove, fspath)
+        else:
+          if not isfilepath(fspath):
+            warning("not a file")
 
   def read_meta(self):
     ''' Read the .meta file and return the contents as a dict.
@@ -68,8 +130,11 @@ class Enigma2(_Recording):
     return data
 
   @locked_property
-  def metadata(self):
-    ''' The metadata associated with this recording.
+  def metadata(self) -> TagSet:
+    ''' The metadata associated with this recording as a `TagSet`.
+
+        meta.* comes from `self.read_meta()`.
+        file.* comes from `self.filename_metadata()`.
     '''
     tags = TagSet()
     tags.update(self.read_meta(), prefix='meta')
@@ -83,7 +148,7 @@ class Enigma2(_Recording):
     '''
     path = self.tspath
     fmeta = {'pathname': path}
-    base, _ = os.path.splitext(os.path.basename(path))
+    base, _ = splitext(basename(path))
     fields = base.split(' - ', 2)
     if len(fields) != 3:
       warning('cannot parse into "time - channel - program": %r', base)
@@ -106,10 +171,10 @@ class Enigma2(_Recording):
     return fmeta
 
   def _parse_path(self):
-    basis, ext = os.path.splitext(self.tspath)
+    basis, ext = splitext(self.tspath)
     if ext != '.ts':
       warning("does not end with .ts: %r", self.tspath)
-    basis = os.path.basename(basis)
+    basis = basename(basis)
     ymd, hm, _, channel, _, title = basis.split(' ', 5)
     dt = datetime.datetime.strptime(ymd + hm, '%Y%m%d%H%M')
     return title, dt, channel

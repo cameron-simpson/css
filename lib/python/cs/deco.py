@@ -1,11 +1,11 @@
 #!/usr/bin/python
 #
 # Decorators.
-#   - Cameron Simpson <cs@cskk.id.au> 02jul2017
+# - Cameron Simpson <cs@cskk.id.au> 02jul2017
 #
 
 r'''
-Assorted decorator functions.
+Assorted function decorators.
 '''
 
 from collections import defaultdict
@@ -18,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20230210-post'
+__version__ = '20240709-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -153,6 +153,7 @@ def decorator(deco):
     # `deco(func, *da, **kw)`.
     return lambda func: decorate(func, *da, **dkw)
 
+  metadeco.__name__ = getattr(deco, '__name__', repr(deco))
   metadeco.__doc__ = getattr(deco, '__doc__', '')
   metadeco.__module__ = getattr(deco, '__module__', None)
   return metadeco
@@ -487,7 +488,7 @@ def cachedmethod(
         except TypeError:
           changed = True
       if changed:
-        setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
+        setattr(self, rev_attr, (getattr(self, rev_attr, 0) or 0) + 1)
       return value
 
   ##  Doesn't work, has no access to self. :-(
@@ -752,7 +753,7 @@ def default_params(func, _strict=False, **param_defaults):
 
       Atypical one off direct use:
 
-          @default_params(dbconn=open_default_dbconn,debug=lambda: settings.DB_DEBUG_MODE)
+          @default_params(dbconn=open_default_dbconn,debug=lambda:settings.DB_DEBUG_MODE)
           def dbquery(query, *, dbconn):
               dbconn.query(query)
 
@@ -763,13 +764,13 @@ def default_params(func, _strict=False, **param_defaults):
 
           # calling code which needs a ds3client
           @uses_ds3
-          def do_something(.., *, ds3client,...):
+          def do_something(.., *, ds3client, ...):
               ... make queries using ds3client ...
 
       This replaces the standard boilerplate and avoids replicating
       knowledge of the default factory as exhibited in this legacy code:
 
-          def do_something(.., *, ds3client=None,...):
+          def do_something(.., *, ds3client=None, ...):
               if ds3client is None:
                   ds3client = get_ds3client()
               ... make queries using ds3client ...
@@ -801,11 +802,35 @@ def default_params(func, _strict=False, **param_defaults):
           ],
       ]
   )
+  sig0 = signature(func)
+  sig = sig0
+  modified_params = []
+  for param in sig0.parameters.values():
+    modified_param = None
+    try:
+      param_default = param_defaults[param.name]
+    except KeyError:
+      pass
+    else:
+      modified_param = param.replace(
+          annotation=typing.Optional[param.annotation],
+          default=None if param_default is param.empty else param_default,
+      )
+    if modified_param is None:
+      modified_param = param.replace()
+    modified_params.append(modified_param)
+  sig = sig.replace(parameters=modified_params)
+  defaulted_func.__signature__ = sig
   return defaulted_func
 
+# pylint: disable=too-many-statements
 @decorator
 def promote(func, params=None, types=None):
   ''' A decorator to promote argument values automatically in annotated functions.
+
+      If the annotation is `Optional[some_type]` or `Union[some_type,None]`
+      then the promotion will be to `some_type` but a value of `None`
+      will be passed through unchanged.
 
       The decorator accepts optional parameters:
       * `params`: if supplied, only parameters in this list will
@@ -818,13 +843,32 @@ def promote(func, params=None, types=None):
       value not of the type of the annotation, the `.promote` method
       will be called to promote the value to the expected type.
 
+      Note that the `Promotable` mixin provides a `.promote()`
+      method which promotes `obj` to the class if the class has a
+      factory class method `from_`*typename*`(obj)` where *typename*
+      is `obj.__class__.__name__`.
+      A common case for me is lexical objects which have a `from_str(str)`
+      factory to produce an instance from its textual form.
+
       Additionally, if the `.promote(value)` class method raises a `TypeError`
       and `value` has a `.as_`*typename* attribute
-      where *typename* is the name of the type annotation,
+      (where *typename* is the name of the type annotation),
       if that attribute is an instance method of `value`
       then promotion will be attempted by calling `value.as_`*typename*`()`
       otherwise the attribute will be used directly
       on the presumption that it is a property.
+
+      A typical `promote(cls, obj)` method looks like this:
+
+          @classmethod
+          def promote(cls, obj):
+              if isinstance(obj, cls):
+                  return obj
+              ... recognise various types ...
+              ... and return a suitable instance of cls ...
+              raise TypeError(
+                  "%s.promote: cannot promote %s:%r",
+                  cls.__name__, obj.__class__.__name__, obj)
 
       Example:
 
@@ -865,9 +909,10 @@ def promote(func, params=None, types=None):
       *Note*: one issue with this is due to the conflict in name
       between this decorator and the method it looks for in a class.
       The `promote` _method_ must appear after any methods in the
-      class which are decorated with `@promote`, otherwise the the
-      decorator method supplants the name `promote` making it
-      unavailable as the decorater.
+      class which are decorated with `@promote`, otherwise the
+      `promote` method supplants the name `promote` making it
+      unavailable as the decorator.
+      I usually just make `.promote` the last method.
 
       Failing example:
 
@@ -906,12 +951,16 @@ def promote(func, params=None, types=None):
     if annotation is Parameter.empty:
       continue
     # recognise optional parameters and use their primary type
+    optional = False
     if param.default is not Parameter.empty:
       anno_origin = typing.get_origin(annotation)
       anno_args = typing.get_args(annotation)
+      # recognise Optional[T], which becomes Union[T,None]
       if (anno_origin is typing.Union and len(anno_args) == 2
           and anno_args[-1] is type(None)):
+        optional = True
         annotation, _ = anno_args
+        optional = True
     if types is not None and annotation not in types:
       continue
     try:
@@ -920,7 +969,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (annotation, promote_method)
+    promotions[param_name] = (param, annotation, promote_method, optional)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -929,46 +978,98 @@ def promote(func, params=None, types=None):
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
     # we don't import cs.pfx (many dependencies!)
+    # pylint: disable=unnecessary-lambda-assignment
     get_context = lambda: (
         "@promote(%s.%s)(%s=%s:%r)" % (
             func.__module__, func.__name__, param_name, arg_value.__class__.
             __name__, arg_value
         )
     )
-    for param_name, (annotation, promote_method) in promotions.items():
+    for param_name, (param, annotation, promote_method,
+                     optional) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
-        continue
-      if isinstance(param_name, annotation):
+        # parameter not supplied
+        if param.default is Parameter.empty:
+          continue
+        # fill in the default values
+        arg_value = param.default
+      if isinstance(arg_value, annotation):
+        # already of the desired type
         continue
       try:
-        promoted_value = promote_method(arg_value)
-      except TypeError as te:
-        # see if the value has an as_TypeName() method
-        as_method_name = "as_" + annotation.__name__
         try:
-          as_annotation = getattr(arg_value, as_method_name)
-        except AttributeError:
-          # no .as_TypeName, reraise the original TypeError
-          raise te
-        else:
-          if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
-            # bound instance method of arg_value
-            try:
-              as_value = as_annotation()
-            except (TypeError, ValueError) as e:
-              raise TypeError(
-                  "%s: %s.%s(): %s" %
-                  (get_context(), param_name, as_method_name, e)
-              ) from e
+          promoted_value = promote_method(arg_value)
+        except TypeError as te:
+          # see if the value has an as_TypeName() method
+          as_method_name = "as_" + annotation.__name__
+          try:
+            as_annotation = getattr(arg_value, as_method_name)
+          except AttributeError:
+            # no .as_TypeName, reraise the original TypeError
+            raise te  # pylint: disable=raise-missing-from
           else:
-            # assuming a property or even a plain attribute
-            as_value = as_annotation
-          arg_value = as_value
+            if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
+              # bound instance method of arg_value
+              try:
+                as_value = as_annotation()
+              except (TypeError, ValueError) as e:
+                raise TypeError(
+                    "%s: %s.%s(): %s" %
+                    (get_context(), param_name, as_method_name, e)
+                ) from e
+            else:
+              # assuming a property or even a plain attribute
+              as_value = as_annotation
+            arg_value = as_value
+      except TypeError:
+        # promotion fails
+        if (optional and arg_value is param.default
+            and param.default is not Parameter.empty):
+          # allow omitted/unconverted optional value with default None
+          continue
+        raise
       else:
         arg_value = promoted_value
       arg_mapping[param_name] = arg_value
     return func(*bound_args.args, **bound_args.kwargs)
 
   return promoting_func
+
+# pylint: disable=too-few-public-methods
+class Promotable:
+  ''' A mixin class which supports the `@promote` decorator.
+  '''
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
+        This method supports the `@promote` decorator.
+
+        This base method will call the `from_`*typename*`(obj)` class factory
+        method if present, where *typename* is `obj.__class__.__name__`.
+
+        Subclasses may override this method to promote other types,
+        typically:
+
+            @classmethod
+            def promote(cls, obj):
+                if isinstance(obj, cls):
+                    return obj
+                ... various specific type promotions
+                ... not done via a from_typename factory method
+                # fall back to Promotable.promote
+                return super().promote(obj)
+    '''
+    if isinstance(obj, cls):
+      return obj
+    try:
+      from_type = getattr(cls, f'from_{obj.__class__.__name__}')
+    except AttributeError:
+      pass
+    else:
+      return from_type(obj)
+    raise TypeError(
+        f'{cls.__name__}.promote: cannot promote {obj.__class__.__name__}:{obj!r}'
+    )

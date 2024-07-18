@@ -1,17 +1,17 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 #
 # Apply the date of last changeset for files in the manifest to the
 # corresponding files in a target directory.
 # Closely based on suggested code from Dirkjan Ochtman.
-#       - Cameron Simpson <cs@cskk.id.au> 24oct2009
+# - Cameron Simpson <cs@cskk.id.au> 24oct2009
 #
 
-from __future__ import print_function
 import errno
 import os
 import sys
 import time
 from getopt import getopt, GetoptError
+
 from mercurial import ui, hg, error as hgerror
 
 cmd = sys.argv[0]
@@ -45,8 +45,10 @@ if badopts:
   print(usage, sys.stderr)
   sys.exit(2)
 
-repo = hg.repository(ui.ui(), '.')
-ctx = repo[rev] # or repo[None] for dirstate or whatever
+target_bs = target.encode('ascii')
+
+repo = hg.repository(ui.ui(), b'.')
+ctx = repo[rev.encode('ascii')] # or repo[None] for dirstate or whatever
 if not subpaths:
   subpaths = ctx
 for path in subpaths:
@@ -55,7 +57,7 @@ for path in subpaths:
   except hgerror.LookupError as e:
     print("%s: %s: can't look up revision: %s" % (cmd, path, e), file=sys.stderr)
   ctxtime, tzoffset = repo[rev].date()
-  tpath = os.path.join(target, path)
+  tpath = os.path.join(target_bs, path)
   try:
     S = os.stat(tpath)
   except OSError as e:

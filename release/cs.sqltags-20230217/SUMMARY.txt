@@ -1,0 +1,1 @@
+SQLTagsORM.search: previous changes seem to have dropped SQTCriterion support.

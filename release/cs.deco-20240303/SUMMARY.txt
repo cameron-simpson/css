@@ -1,0 +1,1 @@
+Promotable.promote: do not just handle str, handle anything with a from_*typename* factory method.

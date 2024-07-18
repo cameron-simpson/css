@@ -1,0 +1,1 @@
+Task: subclass HasThreadState, drop .current_task() class method.

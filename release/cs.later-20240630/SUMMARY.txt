@@ -1,0 +1,2 @@
+Later.submit: new optional daemon:bool parameter and associated plumbing, submit the final finished-Event.set as a daemon Thread.
+Later.startup_shutdown: make the finished_event.set thread daemon mode.

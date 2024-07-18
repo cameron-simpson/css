@@ -1,0 +1,2 @@
+SQLTagBasedTest.sql_parameters: fix general tag name.
+SQLTagSet: new jsonable class method to produce a JSON serialisable object - converts sets and Sequences to flat lists, etc.

@@ -1,0 +1,1 @@
+SQLTags: new .from_str so that we can inherit Promotable.promote.

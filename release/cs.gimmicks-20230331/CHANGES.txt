@@ -1,0 +1,2 @@
+lib/python/cs/gimmicks.py: cs.gimmicks: new open_append to handle idiotic Linux do-not-open-tty-for-append semantics
+lib/python/cs/gimmicks.py: cs.gimmicks: add missing imports

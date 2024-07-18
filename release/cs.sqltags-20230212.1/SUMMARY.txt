@@ -1,0 +1,1 @@
+Mark SQLTags as promotable.

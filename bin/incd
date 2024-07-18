@@ -57,7 +57,6 @@ then
     dir=$(       expr "x$target" : 'x[a-z][-a-z0-9_@]*[a-z0-9]:\(.*\)' )
     if [ $# = 0 ]
     then
-      sshopts=-t
       qcmd='${SHELL:-/bin/sh} --login'
     else
       qcmd=$( shqstr "$@" )
@@ -87,6 +86,7 @@ then
   then  $trace fstags tag . "$fstags_latest=\"$target\""
   fi
   qdir=$( shqstr "$dir" )
+  [ -t 0 ] && sshopts="$sshopts -t"
   exec $trace ssh $sshopts "$hostpart" "cd $qdir; exec $qcmd"
 else
   cd "$dir" || exit 1

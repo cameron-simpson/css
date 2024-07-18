@@ -1,0 +1,2 @@
+lib/python/cs/fsm.py: cs.fsm: FSM: new fsm_as_svg method and fsm_svg property
+lib/python/cs/fsm.py: cs.fsm: add missing import

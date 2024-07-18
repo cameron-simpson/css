@@ -1,0 +1,2 @@
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.search: previous changes seem to have dropped SQTCriterion support
+lib/python/cs/sqltags.py: cs.sqltags: tidy imports, clean a little lint

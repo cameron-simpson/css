@@ -1,0 +1,1 @@
+TagsOntology.metadata: actually call the .items() method!

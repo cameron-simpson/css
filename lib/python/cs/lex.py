@@ -31,8 +31,10 @@ from string import (
 import sys
 from textwrap import dedent
 from threading import Lock
+from typing import Tuple, Union
 
 from dateutil.tz import tzlocal
+from icontract import require
 from typeguard import typechecked
 
 from cs.dateutils import unixtime2datetime, UTC
@@ -42,7 +44,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20230210-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -57,7 +59,8 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.func',
         'cs.seq>=20200914',
-        'dateutil',
+        'python-dateutil',
+        'icontract',
         'typeguard',
     ],
 }
@@ -178,7 +181,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
 # convenience alias
 s = typed_str
 
-def typed_repr(o, use_cls=False, max_length=None):
+def typed_repr(o, max_length=None, *, use_cls=False):
   ''' Like `typed_str` but using `repr` instead of `str`.
       This is available as both `typed_repr` and `r`.
   '''
@@ -398,6 +401,13 @@ def skipwhite(s, offset=0):
   _, offset = get_white(s, offset=offset)
   return offset
 
+def indent(paragraph, line_indent="  "):
+  ''' Return the `paragraph` indented by `line_indent` (default `"  "`).
+  '''
+  return "\n".join(
+      line and line_indent + line for line in paragraph.split("\n")
+  )
+
 def stripped_dedent(s):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
@@ -433,60 +443,136 @@ def stripped_dedent(s):
   adjusted = dedent('\n'.join(lines))
   return line1 + '\n' + adjusted
 
-# pylint: disable=redefined-outer-name
-def strip_prefix_n(s, prefix, n=None):
-  ''' Strip a leading `prefix` and numeric value `n` from the start of a
-      string.  Return the remaining string, or the original string if the
-      prefix or numeric value do not match.
+@require(lambda offset: offset >= 0)
+def get_prefix_n(s, prefix, n=None, *, offset=0):
+  ''' Strip a leading `prefix` and numeric value `n` from the string `s`
+      starting at `offset` (default `0`).
+      Return the matched prefix, the numeric value and the new offset.
+      Returns `(None,None,offset)` on no match.
 
       Parameters:
-      * `s`: the string to strip
-      * `prefix`: the prefix string which must appear at the start of `s`
+      * `s`: the string to parse
+      * `prefix`: the prefix string which must appear at `offset`
+        or an object with a `match(str,offset)` method
+        such as an `re.Pattern` regexp instance
       * `n`: optional integer value;
         if omitted any value will be accepted, otherwise the numeric
         part must match `n`
 
+      If `prefix` is a `str`, the "matched prefix" return value is `prefix`.
+      Otherwise the "matched prefix" return value is the result of
+      the `prefix.match(s,offset)` call. The result must also support
+      a `.end()` method returning the offset in `s` beyond the match,
+      used to locate the following numeric portion.
+
       Examples:
 
-         >>> strip_prefix_n('s03e01--', 's', 3)
-         'e01--'
-         >>> strip_prefix_n('s03e01--', 's', 4)
-         's03e01--'
-         >>> strip_prefix_n('s03e01--', 's')
-         'e01--'
+         >>> import re
+         >>> get_prefix_n('s03e01--', 's')
+         ('s', 3, 3)
+         >>> get_prefix_n('s03e01--', 's', 3)
+         ('s', 3, 3)
+         >>> get_prefix_n('s03e01--', 's', 4)
+         (None, None, 0)
+         >>> get_prefix_n('s03e01--', re.compile('[es]',re.I))
+         (<re.Match object; span=(0, 1), match='s'>, 3, 3)
+         >>> get_prefix_n('s03e01--', re.compile('[es]',re.I), offset=3)
+         (<re.Match object; span=(3, 4), match='e'>, 1, 6)
   '''
-  s0 = s
-  if prefix:
-    s = cutprefix(s, prefix)
-    if s is s0:
-      # no match, return unchanged
-      return s0
-  else:
-    s = s0
-  if not s or not s[0].isdigit():
-    # no following digits, return unchanged
-    return s0
-  if n is None:
-    # strip all following digits
-    s = s.lstrip(digits)
-  else:
-    # evaluate the numeric part
-    s = s.lstrip('0')  # pylint: disable=no-member
-    if not s or not s[0].isdigit():
-      # all zeroes, leading value is 0
-      sn = 0
-      pos = 0
+  no_match = None, None, offset
+  if isinstance(prefix, str):
+    if s.startswith(prefix, offset):
+      matched = prefix
+      offset += len(prefix)
     else:
-      pos = 1
-      slen = len(s)
-      while pos < slen and s[pos].isdigit():
-        pos += 1
-      sn = int(s[:pos])
-    if sn != n:
-      # wrong numeric value
-      return s0
-    s = s[pos:]
-  return s
+      # no match, return unchanged
+      return no_match
+  else:
+    matched = pfx_call(prefix.match, s, offset)
+    if not matched:
+      return no_match
+    offset = matched.end()
+  if offset >= len(s) or not s[offset].isdigit():
+    return no_match
+  gn, offset = get_decimal_value(s, offset)
+  if n is not None and gn != n:
+    return no_match
+  return matched, gn, offset
+
+NUMERAL_NAMES = {
+    'en': {
+        # all the single word numbers
+        'zero': 0,
+        'nought': 0,
+        'one': 1,
+        'two': 2,
+        'three': 3,
+        'four': 4,
+        'five': 5,
+        'six': 6,
+        'seven': 7,
+        'eight': 8,
+        'nine': 9,
+        'ten': 10,
+        'eleven': 11,
+        'twelve': 12,
+        'thirteen': 13,
+        'fourteen': 14,
+        'fifteen': 15,
+        'sixteen': 16,
+        'seventeen': 17,
+        'eighteen': 18,
+        'nineteen': 19,
+        'twenty': 20,
+    },
+}
+
+def get_suffix_part(s, *, keywords=('part',), numeral_map=None):
+  ''' Strip a trailing "part N" suffix from the string `s`.
+      Return the matched suffix and the number part number.
+      Retrn `(None,None)` on no match.
+
+      Parameters:
+      * `s`: the string
+      * `keywords`: an iterable of `str` to match, or a single `str`;
+        default `'part'`
+      * `numeral_map`: an optional mapping of numeral names to numeric values;
+        default `NUMERAL_NAMES['en']`, the English numerals
+
+      Exanmple:
+
+          >>> get_suffix_part('s09e10 - A New World: Part One')
+          (': Part One', 1)
+  '''
+  if isinstance(keywords, str):
+    keywords = (keywords,)
+  if numeral_map is None:
+    numeral_map = NUMERAL_NAMES['en']
+  regexp_s = ''.join(
+      (
+          r'\W+(',
+          r'|'.join(keywords),
+          r')\s+(?P<numeral>\d+|',
+          r'|'.join(numeral_map.keys()),
+          r')\s*$',
+      )
+  )
+  regexp = re.compile(regexp_s, re.I)
+  m = regexp.search(s)
+  if not m:
+    return None, None
+  numeral = m.group('numeral')
+  try:
+    part_n = int(numeral)
+  except ValueError:
+    try:
+      part_n = numeral_map[numeral]
+    except KeyError:
+      try:
+        part_n = numeral_map[numeral.lower()]
+      except KeyError:
+        return None, None
+  return m.group(0), part_n
 
 # pylint: disable=redefined-outer-name
 def get_nonwhite(s, offset=0):
@@ -589,6 +675,13 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   return get_identifier(
       s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras
   )
+
+def is_uc_identifier(s, offset=0, **kw):
+  ''' Test if the string `s` is an uppercase identifier
+      from position `offset` (default `0`) onward.
+  '''
+  s2, offset2 = get_uc_identifier(s, offset=offset, **kw)
+  return s2 and offset2 == len(s)
 
 # pylint: disable=redefined-outer-name
 def get_dotted_identifier(s, offset=0, **kw):
@@ -960,11 +1053,9 @@ def match_tokens(s, offset, getters):
       and returns `(None,offset)`.
   '''
   try:
-    tokens, offset2 = get_tokens(s, offset, getters)
+    return get_tokens(s, offset, getters)
   except ValueError:
     return None, offset
-  else:
-    return tokens, offset2
 
 def isUC_(s):
   ''' Check that a string matches the regular expression `^[A-Z][A-Z_0-9]*$`.
@@ -1239,6 +1330,24 @@ def snakecase(camelcased):
     strs.append(c)
   return ''.join(strs)
 
+def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
+  ''' Split a path with an optional leading `[user@]rhost:` prefix
+      into the prefix and the remaining path.
+      `None` is returned for the prefix is there is none.
+      This is useful for things like `rsync` targets etc.
+  '''
+  ssh_target = None
+  # check for [user@]rhost
+  try:
+    prefix, suffix = remotepath.split(':', 1)
+  except ValueError:
+    pass
+  else:
+    if prefix and '/' not in prefix:
+      ssh_target = prefix
+      remotepath = suffix
+  return ssh_target, remotepath
+
 # pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
@@ -1437,7 +1546,7 @@ class FormatableFormatter(Formatter):
         mode = self.__dict__['format_mode']
       except KeyError:
         # pylint: disable=import-outside-toplevel
-        from cs.threads import State as ThreadState
+        from cs.threads import ThreadState
         mode = self.__dict__['format_mode'] = ThreadState(strict=False)
     return mode
 

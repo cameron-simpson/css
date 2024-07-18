@@ -1,0 +1,14 @@
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_ls: default to listing the current directory
+lib/python/cs/hashindex.py: cs.hashindex: new -o output_format to allow outputting only hashcodes or fspaths
+lib/python/cs/hashindex.py: cs.hashindex: fix reference to errno.EINVAL
+lib/python/cs/hashindex.py: cs.hashindex: brush off some lint
+lib/python/cs/hashindex.py: cs.hashindex: comment out 2 sanity checks which are incorrect for pathnames like "."
+lib/python/cs/hashindex.py: cs.hashindex: hashindex: plumb hashindex_exe and ssh_exe correctly
+lib/python/cs/hashindex.py: cs.hashindex: clean some lint
+lib/python/cs/hashindex.py: cs.hashindex: clean some lint
+lib/python/cs/hashindex.py: Backed out changeset a0a0af891512
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: new -r (relative) option for cmd_comm, plumb down into hashindex()
+lib/python/cs/hashindex.py: cs.hashindex: expand the module docstring with examples
+lib/python/cs/hashindex.py: cs.hashindex: run_remote_hashindex: plumb the quiet parameter correctly
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: explicitly pass doit=True to run_remote_hashindex because we pass a -n option as needed
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: do not print "remove", implied by the opname already

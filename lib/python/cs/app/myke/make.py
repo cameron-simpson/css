@@ -4,30 +4,40 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 import errno
-import getopt
+from itertools import zip_longest
 import logging
 import os
 import os.path
 from os.path import dirname, realpath
 from subprocess import Popen
 import sys
+from threading import RLock
 import time
 from types import SimpleNamespace as NS
+from typing import Any, Optional
+
+from typeguard import typechecked
 
 from cs.cmdutils import BaseCommandOptions
-from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later
 from cs.lex import get_identifier, get_white
 from cs.logutils import debug, info, error, exception, D
 import cs.pfx
-from cs.pfx import pfx, Pfx
+from cs.pfx import pfx, Pfx, pfx_method
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.result import Result
-from cs.threads import Lock, locked, locked_property
+from cs.threads import (
+    ThreadState,
+    HasThreadState,
+    Lock,
+    locked,
+    locked_property,
+)
 
 from . import DEFAULT_MAKE_COMMAND
 from .parse import (
@@ -44,69 +54,71 @@ PRI_PREREQ = 2
 
 MakeDebugFlags = Flags('debug', 'flags', 'make', 'parse')
 
-class Maker(BaseCommandOptions, MultiOpenMixin):
+@dataclass
+class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   ''' Main class representing a set of dependencies to make.
   '''
 
+  THREAD_STATE_ATTR = 'later_perthread_state'
+
+  later_perthread_state = ThreadState()
+
   DEFAULT_PARALLELISM = 1
 
-  def __init__(self, makecmd=None, parallel=None, name=None):
-    ''' Initialise a Maker.
-
-        Parameters:
-        * `makecmd`: used to define `$(MAKE)`, typically `sys.argv[0]`.
-        * `parallel`: the degree of parallelism of shell actions.
-    '''
-    if makecmd is None:
-      makecmd = DEFAULT_MAKE_COMMAND
-    if parallel is None:
-      parallel = self.DEFAULT_PARALLELISM
-    if parallel < 1:
-      raise ValueError(
-          "expected positive integer for parallel, got: %s" % (parallel,)
-      )
-    if name is None:
-      name = cs.pfx.cmd
+  def _make_debug_flags():
     debug = MakeDebugFlags()
     debug.debug = False  # logging.DEBUG noise
     debug.flags = False  # watch debug flag settings
     debug.make = False  # watch make decisions
     debug.parse = False  # watch Makefile parsing
-    super().__init__(
-        name=name,
-        makecmd=makecmd,
-        parallel=parallel,
-        debug=debug,
-        fail_fast=True,
-        no_action=False,
-        default_target=None,
-        _makefiles=[],
-        appendfiles=[],
-        macros={},
-        targets=TargetMap(self),  # autocreating mapping interface to Targets
-        rules={},
-        precious=set(),
-        active=set(),
-        _active_lock=Lock(),
-        _namespaces=[]
-    )
+    return debug
+
+  name: str = field(default_factory=lambda: cs.pfx.cmd)
+  makecmd: str = DEFAULT_MAKE_COMMAND
+  parallel: int = DEFAULT_PARALLELISM
+  debug: Any = field(default_factory=_make_debug_flags)
+  fail_fast: bool = True
+  no_action: bool = False
+  default_target: Optional["Target"] = None
+  _makefiles: list = field(default_factory=list)
+  appendfiles: list = field(default_factory=list)
+  macros: dict = field(default_factory=dict)
+  targets: "TargetMap" = field(default_factory=lambda: TargetMap())
+  rules: dict = field(default_factory=dict)
+  precious: set = field(default_factory=set)
+  active: set = field(default_factory=set)
+  # there's no Lock type I can name
+  activity_lock: Any = field(default_factory=Lock)
+  basic_namespaces: list = field(default_factory=list)
+  cmd_ns: dict = field(default_factory=dict)
 
   def __str__(self):
     return (
         '%s:%s(parallel=%s,fail_fast=%s,no_action=%s,default_target=%s)' % (
-            type(self).__name__, self.name, self.parallel, self.fail_fast,
+            self.__class__.__name__, self.name, self.parallel, self.fail_fast,
             self.no_action, self.default_target.name
         )
     )
+
+  def __enter_exit__(self):
+    ''' Run both the inherited context managers.
+    '''
+    for _ in zip_longest(
+        MultiOpenMixin.__enter_exit__(self),
+        HasThreadState.__enter_exit__(self),
+    ):
+      yield
 
   @contextmanager
   def startup_shutdown(self):
     ''' Set up the `Later` work queue.
     '''
     self._makeQ = Later(self.parallel, self.name)
-    with self._makeQ:
-      yield
-    self._makeQ.wait()
+    try:
+      with self._makeQ:
+        yield
+    finally:
+      self._makeQ.wait()
 
   def report(self, fp=None):
     ''' Report the make queue status.
@@ -129,14 +141,14 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
   def namespaces(self):
     ''' The namespaces for this Maker: the built namespaces plus the special macros.
     '''
-    return self._namespaces + [
+    return self.basic_namespaces + [
         dict(MAKE=self.makecmd.replace('$', '$$')), SPECIAL_MACROS
     ]
 
   def insert_namespace(self, ns):
     ''' Insert a macro namespace in front of the existing namespaces.
     '''
-    self._namespaces.insert(0, ns)
+    self.basic_namespaces.insert(0, ns)
 
   @prop
   def makefiles(self):
@@ -181,7 +193,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
     ''' Add this target to the set of "in progress" targets.
     '''
     self.debug_make("note target \"%s\" as active", target.name)
-    with self._active_lock:
+    with self.activity_lock:
       self.active.add(target)
 
   def target_inactive(self, target):
@@ -190,14 +202,14 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
     self.debug_make(
         "note target %r as inactive (%s)", target.name, target.fsm_state
     )
-    with self._active_lock:
+    with self.activity_lock:
       self.active.remove(target)
 
   def cancel_all(self):
     ''' Cancel all "in progress" targets.
     '''
     self.debug_make("cancel_all!")
-    with self._active_lock:
+    with self.activity_lock:
       Ts = list(self.active)
     for T in Ts:
       T.cancel()
@@ -453,10 +465,10 @@ class Maker(BaseCommandOptions, MultiOpenMixin):
             yield Target(
                 self,
                 target,
-                context,
+                context=context,
                 prereqs=prereqs_mexpr,
                 postprereqs=postprereqs_mexpr,
-                actions=action_list
+                actions=action_list,
             )
           continue
 
@@ -472,13 +484,18 @@ class TargetMap(NS):
       Raise KeyError for missing Targets which are not inferrable.
   '''
 
-  def __init__(self, maker):
-    ''' Initialise the TargetMap.
-        `maker` is the Maker using this TargetMap.
+  def __init__(self):
+    ''' Initialise the `TargetMap`.
     '''
-    self.maker = maker
+    self._maker = None
     self.targets = {}
     self._lock = RLock()
+
+  @property
+  def maker(self):
+    ''' The `Maker` to use to make `Target`s.
+    '''
+    return self._maker or Maker.default()
 
   def __getitem__(self, name):
     ''' Return the Target for `name`.
@@ -504,7 +521,14 @@ class TargetMap(NS):
   ):
     ''' Construct a new Target.
     '''
-    return Target(maker, name, context, prereqs, postprereqs, actions)
+    return Target(
+        maker,
+        name,
+        context=context,
+        prereqs=prereqs,
+        postprereqs=postprereqs,
+        actions=actions,
+    )
 
   def __setitem__(self, name, target):
     ''' Record new target in map.
@@ -528,23 +552,37 @@ class Target(Result):
   ''' A make target.
   '''
 
-  def __init__(self, maker, name, context, prereqs, postprereqs, actions):
+  @typechecked
+  def __init__(
+      self,
+      maker: Maker,
+      name: str,
+      *,
+      context,
+      prereqs,
+      postprereqs,
+      actions,
+  ):
     ''' Initialise a new target.
-          `maker`: the Maker with which this Target is associated.
-          `context`: the file context, for citations.
-          `name`: the name of the target.
-          `prereqs`: macro expression to produce prereqs.
-          `postprereqs`: macro expression to produce post-inference prereqs.
-          `actions`: a list of actions to build this Target
-          The same actions list is shared amongst all Targets defined
-          by a common clause in the Mykefile, and extends during the
-          Mykefile parse _after_ defining those Targets. So we do not
-          modify it the class; instead we extend .pending_actions
-          when .require() is called the first time, just as we do for a
-          :make directive.
-    '''
 
-    Result.__init__(self, name=name, lock=RLock())
+        Parameters:
+        * `maker`: the Maker with which this Target is associated.
+        * `context`: the file context, for citations.
+        * `name`: the name of the target.
+        * `prereqs`: macro expression to produce prereqs.
+        * `postprereqs`: macro expression to produce post-inference prereqs.
+        * `actions`: a list of actions to build this Target
+
+        The same actions list is shared amongst all `Target`s defined
+        by a common clause in the Mykefile, and extends during the
+        Mykefile parse _after_ defining those Targets. So we do not
+        modify it the class; instead we extend .pending_actions
+        when .require() is called the first time, just as we do for a
+        :make directive.
+  '''
+
+    self._lock = RLock()
+    Result.__init__(self, name=name, lock=self._lock)
     self.maker = maker
     self.context = context
     self.shell = SHELL
@@ -681,37 +719,37 @@ class Target(Result):
     self.maker.debug_make("%s: CANCEL", self)
     Result.cancel(self)
 
+  @pfx_method
   def require(self):
     ''' Require this Target to be made.
     '''
-    with Pfx("%r.require()", self.name):
-      with self._lock:
-        if self.is_pending:
-          # commence make of this Target
-          self.maker.target_active(self)
-          self.notify(self.maker.target_inactive)
-          self.dispatch()
-          self.was_missing = self.mtime is None
-          self.pending_actions = list(self.actions)
-          Ts = []
-          for Pname in self.prereqs:
-            T = self.maker[Pname]
-            Ts.append(T)
-            T.require()
+    with self._lock:
+      if self.is_pending:
+        # commence make of this Target
+        self.maker.target_active(self)
+        self.notify(self.maker.target_inactive)
+        self.dispatch()
+        self.was_missing = self.mtime is None
+        self.pending_actions = list(self.actions)
+        Ts = []
+        for Pname in self.prereqs:
+          T = self.maker[Pname]
+          Ts.append(T)
+          T.require()
 
-            # fire fail action immediately
-            def f(T):
-              if T.result:
-                pass
-              else:
-                self.fail("REQUIRE(%s): FAILED by prereq %s" % (self, T))
+          # fire fail action immediately
+          def f(T):
+            if T.result:
+              pass
+            else:
+              self.fail("REQUIRE(%s): FAILED by prereq %s" % (self, T))
 
-            T.notify(f)
-          # queue the first unit of work
-          if Ts:
-            self.maker.after(Ts, self._make_after_prereqs, Ts)
-          else:
-            self._make_after_prereqs(Ts)
+          T.notify(f)
+        # queue the first unit of work
+        if Ts:
+          self.maker.after(Ts, self._make_after_prereqs, Ts)
+        else:
+          self._make_after_prereqs(Ts)
 
   @logexc
   def _make_after_prereqs(self, Ts):
@@ -742,6 +780,7 @@ class Target(Result):
     ''' Apply the consequences of the completed prereq T.
     '''
     with Pfx("%s._apply_prereqs(T=%s)", self, T):
+      assert isinstance(self.maker, Maker)
       mdebug = self.maker.debug_make
       if not T.ready:
         raise RuntimeError("not ready")

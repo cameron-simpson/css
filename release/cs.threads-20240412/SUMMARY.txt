@@ -1,0 +1,4 @@
+New NRLock, an nonrecursive Lock and associated exception DeadlockError.
+bg: rename thread_class to thread_factory for clarity.
+HasThreadState: big refactor to separate the mapping of default instances from the previously automatic opening of a context for each.
+HasThreadState.bg: new optional pre_enter_objects to supply objects which should be opened before the Thread starts (before bg returns) and closed when the Thread exits.

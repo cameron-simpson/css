@@ -19,23 +19,23 @@ files with other files of the same size, and is hardlink aware - a
 partially hardlinked tree is processed efficiently and correctly.
 '''
 
-from __future__ import print_function
 from collections import defaultdict
+from functools import cached_property
 from getopt import GetoptError
-from hashlib import sha1 as hashfunc
 import os
 from os.path import dirname, isdir, join as joinpath, relpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
+
 from cs.cmdutils import BaseCommand
-from cs.fileutils import read_from, common_path_prefix, shortpath
+from cs.fileutils import common_path_prefix, shortpath
+from cs.hashindex import file_checksum
 from cs.logutils import status, warning, error
 from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop
-from cs.units import BINARY_BYTES_SCALE
-from cs.upd import UpdProxy, Upd, print, run_task  # pylint: disable=redefined-builtin
+from cs.resources import RunState, uses_runstate
+from cs.upd import UpdProxy, print, run_task  # pylint: disable=redefined-builtin
 
 __version__ = '20221228-post'
 
@@ -45,21 +45,22 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.cmdutils>=20210404',
         'cs.fileutils>=20200914',
+        'cs.hashindex',
         'cs.logutils',
         'cs.pfx',
         'cs.progress>=20200718.3',
-        'cs.py.func',
         'cs.units',
         'cs.upd>=20200914',
     ],
     'entry_points': {
-        'console_scripts': ['mklinks = cs.app.mklinks:main'],
+        'console_scripts': {
+            'mklinks': 'cs.app.mklinks:main'
+        },
     },
 }
 
@@ -84,9 +85,10 @@ class MKLinksCmd(BaseCommand):
     if opt == '-n':
       self.options.dry_run = True
     else:
-      raise RuntimeError("unhandled option")
+      raise NotImplementedError("unhandled option")
 
-  def main(self, argv):
+  @uses_runstate
+  def main(self, argv, *, runstate: RunState):
     ''' Usage: mklinks [-n] paths...
           Hard link files with identical contents.
           -n    No action. Report proposed actions.
@@ -94,20 +96,19 @@ class MKLinksCmd(BaseCommand):
     if not argv:
       raise GetoptError("missing paths")
     options = self.options
-    runstate = options.runstate
     linker = Linker()
-    with options.upd.insert(1) as step:
+    with run_task("scan") as step:
       # scan the supplied paths
       for path in argv:
+        runstate.raiseif()
         if runstate.cancelled:
           return 1
         step("scan " + path + ' ...')
         with Pfx(path):
-          linker.scan(path, runstate=runstate)
-      if runstate.cancelled:
-        return 1
-      step("merge ...")
-      linker.merge(dry_run=options.dry_run, runstate=runstate)
+          linker.scan(path)
+    with run_task("merge"):
+      linker.merge(dry_run=options.dry_run)
+    return 0
 
 class FileInfo(object):
   ''' Information about a particular inode.
@@ -137,50 +138,23 @@ class FileInfo(object):
     '''
     return S.st_dev, S.st_ino
 
-  @prop
+  @property
   def key(self):
     ''' The key for this file: `(dev,ino)`.
     '''
     return self.dev, self.ino
 
-  @prop
+  @property
   def path(self):
     ''' The primary path for this file, or `None` if we have no paths.
     '''
     return sorted(self.paths)[0] if self.paths else None
 
-  @prop
+  @cached_property
   def checksum(self):
     ''' Checksum the file contents, used as a proxy for comparing the actual content.
     '''
-    csum = self._checksum
-    if csum is None:
-      path = self.path
-      U = Upd()
-      pathspace = U.columns - 64
-      label = "scan " + (
-          path if len(path) < pathspace else '...' + path[-(pathspace - 3):]  # pylint: disable=unsubscriptable-object
-      )
-      with Pfx("checksum %r", path):
-        csum = hashfunc()
-        with open(path, 'rb') as fp:
-          length = os.fstat(fp.fileno()).st_size
-          read_len = 0
-          for data in progressbar(
-              read_from(fp, rsize=1024 * 1024),
-              label=label,
-              total=length,
-              units_scale=BINARY_BYTES_SCALE,
-              itemlenfunc=len,
-              update_frequency=128,
-              upd=U,
-          ):
-            csum.update(data)
-            read_len += len(data)
-          assert read_len == self.size
-      csum = csum.digest()
-      self._checksum = csum
-    return csum
+    return file_checksum(self.path)
 
   def same_dev(self, other):
     ''' Test whether two FileInfos are on the same filesystem.
@@ -192,7 +166,8 @@ class FileInfo(object):
     '''
     return self.key == other.key  # pylint: disable=comparison-with-callable
 
-  def assimilate(self, other, dry_run=False, runstate=None):
+  @uses_runstate
+  def assimilate(self, other, *, dry_run=False, runstate: RunState):
     ''' Link our primary path to all the paths from `other`. Return success.
     '''
     ok = True
@@ -212,7 +187,7 @@ class FileInfo(object):
           return ok
         assert self.same_dev(other)
         for opath in sorted(opaths):
-          if runstate and runstate.cancelled:
+          if runstate.cancelled:
             break
           with Pfx(opath):
             if opath in self.paths:
@@ -257,20 +232,20 @@ class Linker:
     self.min_size = min_size
 
   @pfx_method
-  def scan(self, path, runstate=None):
+  @uses_runstate
+  def scan(self, path, *, runstate: RunState):
     ''' Scan the file tree.
     '''
-    with run_task(f'scan {path}: ', runstate=runstate) as proxy:
+    with run_task(f'scan {path}: ') as proxy:
       if isdir(path):
         for dirpath, dirnames, filenames in os.walk(path):
-          if runstate and runstate.cancelled:
-            break
+          runstate.raiseif()
           proxy("sweep " + relpath(dirpath, path))
           for filename in progressbar(
               sorted(filenames),
               label=relpath(dirpath, path),
-              update_frequency=32,
           ):
+            runstate.raiseif()
             filepath = joinpath(dirpath, filename)
             self.addpath(filepath)
           dirnames[:] = sorted(dirnames)
@@ -300,29 +275,27 @@ class Linker:
         self.sizemap[S.st_size][key] = FI
 
   @pfx_method
-  def merge(self, dry_run=False, runstate=None):
+  @uses_runstate
+  def merge(self, *, dry_run=False, runstate: RunState):
     ''' Merge files with equivalent content.
     '''
     # process FileInfo groups by size, largest to smallest
-    with run_task(f'merge ... ') as proxy:
+    with run_task('merge ... ') as proxy:
       for _, FImap in sorted(self.sizemap.items(), reverse=True):
-        if runstate and runstate.cancelled:
-          break
+        runstate.raiseif()
         # order FileInfos by mtime (newest first) and then path
         FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
         size = FIs[0].size
         with proxy.extend_prefix(f'size {size} '):
           for i, FI in enumerate(progressbar(FIs, f'size {size}')):
-            if runstate and runstate.cancelled:
-              break
+            runstate.raiseif()
             # skip FileInfos with no paths
             # this happens when a FileInfo has been assimilated
             if not FI.paths:
               ##warning("SKIP, no paths")
               continue
             for FI2 in FIs[i + 1:]:
-              if runstate and runstate.cancelled:
-                break
+              runstate.raiseif()
               status(FI2.path)
               assert FI.size == FI2.size
               assert FI.mtime >= FI2.mtime
@@ -334,7 +307,7 @@ class Linker:
                 # different content, skip
                 continue
               # FI2 is the younger, keep it
-              FI.assimilate(FI2, dry_run=dry_run, runstate=runstate)
+              FI.assimilate(FI2, dry_run=dry_run)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

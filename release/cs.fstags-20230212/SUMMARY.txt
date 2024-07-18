@@ -1,0 +1,4 @@
+FSTags.keypath(fspath) and TaggedPath.keypath with the singleton filesystem path for a TaggedPath.
+TaggedPath.parent property.
+TaggedPath.findup(check) method.
+FSTagsCommand: cmd_find,cmd_ls: abort if runstate.cancelled thus honouring SIGINT/^C.

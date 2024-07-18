@@ -1,0 +1,1 @@
+FSM.__getattr__: known transition names no longerfall through to the superclass if not valid for the current state.

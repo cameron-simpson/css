@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 ''' Archive files.
 
@@ -18,14 +18,14 @@ import errno
 import os
 from os.path import isfile
 import time
-from icontract import require
+
 from cs.binary import BinaryMultiValue, BSSFloat
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl, get_ini_clause_entryname
-from cs.logutils import warning, exception, debug
+from cs.logutils import warning, exception
 from cs.pfx import Pfx, pfx, pfx_call
-from cs.py.func import prop
+
 from .dir import _Dirent, DirentRecord
 from .meta import NOUSERID, NOGROUPID
 
@@ -85,7 +85,7 @@ class BaseArchive(ABC):
   def __iter__(self):
     raise NotImplementedError("no .__iter__")
 
-  @prop
+  @property
   def last(self):
     ''' The last ArchiveEntry from the Archive, or ArchiveEntry(None,None).
     '''
@@ -114,7 +114,7 @@ class BaseArchive(ABC):
         fields = line.split(None, 3)
         _, unixtime, dent = fields[:3]
         when = float(unixtime)
-        E, offset = _Dirent.from_str(dent)
+        E, offset = _Dirent.parse(dent)
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
         ##info("when=%s, E=%s", when, E)

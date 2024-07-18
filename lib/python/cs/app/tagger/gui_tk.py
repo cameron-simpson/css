@@ -4,6 +4,8 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass
+from getopt import GetoptError
 import platform
 import sys
 import tkinter as tk
@@ -11,9 +13,11 @@ import tkinter as tk
 from icontract import require, ensure
 from typeguard import typechecked
 
+from cs.cmdutils import BaseCommandOptions
 from cs.context import stackattrs
 from cs.fs import shortpath, HasFSPath
 from cs.gui_tk import (
+    BaseTkCommand,
     _Widget,
     Button,
     Canvas,
@@ -27,7 +31,7 @@ from cs.gui_tk import (
 )
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
-from cs.resources import RunState
+from cs.resources import RunState, uses_runstate
 from cs.tagset import Tag, TagSet
 
 from . import Tagger, uses_tagger
@@ -37,11 +41,23 @@ is_darwin = platform.system() == "Darwin"
 def main(argv=None):
   ''' Tagger GUI command line mode.
   '''
-  if argv is None:
-    argv = sys.argv
-  cmd = argv.pop(0)
-  tagger = Tagger('.')
-  with Pfx(cmd):
+  return TaggerGUICommand(argv).run()
+
+class TaggerGUICommand(BaseTkCommand):
+
+  @dataclass
+  class Options(BaseCommandOptions, HasFSPath):
+    fspath: str = '.'
+
+  @contextmanager
+  def run_context(self):
+    options = self.options
+    with Tagger(options.fspath) as tagger:
+      with stackattrs(options, tagger=tagger):
+        yield
+
+  def main(self, argv):
+    tagger = self.options.tagger
     root = tk.Tk()
     gui = TaggerWidget(root, tagger=tagger, fspaths=argv)
     gui.mainloop()
@@ -206,12 +222,11 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
                         fspath=self.fspaths[0] if self.fspaths else None):
           yield app
 
-  def run(self, runstate=None):
+  @uses_runstate
+  def run(self, runstate: RunState):
     ''' Run the GUI.
     '''
     print("run...")
-    if runstate is None:
-      runstate = RunState(str(self))
     with runstate:
       print("before mainloop")
       self.app.mainloop()

@@ -1,0 +1,2 @@
+Tag.from_str2: make the ontology optional.
+TagSetPrefixView: provide __len__() and update().

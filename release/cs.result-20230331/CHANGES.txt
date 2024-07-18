@@ -1,0 +1,3 @@
+lib/python/cs/result.py: cs.splink,cs.result: fix spelling of "cancelled"
+lib/python/cs/result.py: cs.result: Result.join: access self._result instead of the property
+lib/python/cs/result.py: cs.result: Result.__del__: tweak exception message

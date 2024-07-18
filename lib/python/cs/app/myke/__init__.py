@@ -3,7 +3,7 @@
 ''' My make programme, a parallel make tool with superior expression syntax.
 '''
 
-__version__ = '20220805-post'
+__version__ = '20240316.1-post'
 
 DISTINFO = {
     'description':
@@ -29,9 +29,9 @@ DISTINFO = {
         'cs.threads',
     ],
     'entry_points': {
-        'console_scripts': [
-            'myke = cs.app.myke__main__:main',
-        ],
+        'console_scripts': {
+            'myke': 'cs.app.myke.__main__:main',
+        },
     },
 }
 

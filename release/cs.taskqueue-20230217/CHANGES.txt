@@ -1,0 +1,1 @@
+lib/python/cs/taskqueue.py: cs.taskqueue: Task: subclass HasThreadState, drop .current_task() class method

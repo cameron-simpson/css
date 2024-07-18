@@ -27,8 +27,8 @@ from icontract import require, ensure
 from PIL import Image, ImageTk, UnidentifiedImageError
 from typeguard import typechecked
 
+from cs.cache import convof
 from cs.cmdutils import BaseCommand
-from cs.convcache import convof
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags
 from cs.hashutils import SHA256
@@ -100,9 +100,9 @@ class BaseTkCommand(BaseCommand):
     xit = super().run(**kw)
     if xit is None:
       # the command did GUI setup - run the app now
-      runstate = self.options.runstate()
-      if not runstate.cancelled():
-        with runstate():
+      runstate = self.options.runstate
+      if not runstate.cancelled:
+        with runstate:
           self.options.tk_app.mainloop()
     return xit
 
@@ -228,7 +228,7 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
 
   @classmethod
   def of(cls, w):
-    ''' The geometry of this widget in root coordinates.
+    ''' The geometry of the widget `w` in root coordinates.
     '''
     x, y = w.winfo_rootx(), w.winfo_rooty()
     dx, dy = w.winfo_width(), w.winfo_height()
@@ -268,14 +268,14 @@ class _Widget(ABC):
         v = getattr(self, attr)
         if v is not None:
           kw.setdefault(K.lower(), v)
-    X("CALLER = %s", caller())
-    X("type(self)=%r", type(self))
-    X("type(parent)=%s", type(parent))
-    X("parent=%s", r(parent))
-    X(
-        "%s: _Widget.__init__: super().__init__(parent=%s,*a=%r,**kw=%r)...",
-        type(self), r(parent), a, kw
-    )
+    ##X("CALLER = %s", caller())
+    ##X("type(self)=%r", type(self))
+    ##X("type(parent)=%s", type(parent))
+    ##X("parent=%s", r(parent))
+    ##X(
+    ##    "%s: _Widget.__init__: super().__init__(parent=%s,*a=%r,**kw=%r)...",
+    ##    type(self), r(parent), a, kw
+    ##)
     super().__init__(parent, *a, **kw)
     if fixed_size is None:
       fixed_size = (None, None)

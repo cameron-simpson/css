@@ -1,0 +1,1 @@
+Bugfix LateFunction.__init__: the thread must run self.run_func(self.func) in order to collect the result/exception.

@@ -1,0 +1,7 @@
+BaseCommand: use @uses_runstate when preparing the command, store as self.options.runstate.
+Make BaseCommandOptions a data class.
+Drop any pretence at python 2 support, we're long past that.
+BaseCommand: new cmdloop method to run a cmd.Cmd instance to run subcommand interactively.
+BaseCommand: rename shell to repl, add cmd_shell to call cmdloop().
+Drop BaseCommand.apply_defaults in favour of the Options dataclass.
+BaseCommand: do setup_logging before initiating the Options instance.

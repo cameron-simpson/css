@@ -1,0 +1,2 @@
+lib/python/cs/threads.py: cs.threads: HasThreadState: maintain a set of the HasThreadState classes in use, new Thread class factory method to create a new Thread with the current threads states at time of call instantiated in the new Thread
+lib/python/cs/threads.py: cs.threads: bg: new no_context=False parameter to suppress use of HasThreadState.Thread to create the new Thread

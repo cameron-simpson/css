@@ -1,0 +1,111 @@
+#!/bin/sh
+#
+# Run a command inside an sshfs mount.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+: "${TMPDIR:=/tmp}"
+rtmp=/tmp
+
+cmd=$( basename "$0" )
+usage="Usage: $0 [options...] {sshhost:path|@rhost} [command [args...]]
+  -F sshcfg Specify ssh config file, passed to mnt (for sshfs).
+  -o opt    Passed to mnt (for sshfs).
+  -q        Turn off tracing.
+  --rtmp tmppath
+            Bit of a hack to use something other than $rtmp at the
+            remote end.
+  The default command is the user's shell (from \$SHELL).
+  Modes:
+    sshhost:path
+            Use a remote directory locally.
+            Mount path from sshhost and run the command in it.
+    @rhost  Use the current directory remotely.
+            Ssh to rhost and run \"inmnt thishost:pwd command\"."
+
+trace=
+[ -t 2 ] && trace=set-x
+sshopts=
+[ -t 1 ] && sshopts="$sshopts -t"
+
+badopts=
+
+mntopts=
+inmntopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -F) mntopts="$mntopts -F $2"; shift ;;
+    -o) mntopts="$mntopts -o $2"; shift ;;
+    -q) trace= mntopts="$mntopts -q" inmntopts="$inmntopts -q" ;;
+    --rtmp) rtmp=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing sshhost:path or @rhost" >&2
+  badopts=1
+else
+  sshfspath=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$sshfspath" in
+  @*) # connect to remote host and sshfs to here
+      rhost=$( expr "$sshfspath" : '@\(.*\)' )
+      host=${HOST:-$( hostname | sed 's/\..*//' )}
+      ssh_exe=ssh
+      rssh_exe=ssh
+      rssh_host=reverse-$host
+      local_ssh_endpoint=127.0.0.1:22
+      localdir=$( pwd )
+      reverse_sock=$rtmp/revssh-$host-$$
+      reverse_cfg=$rtmp/revssh-$host-$$.cfg
+      $trace $ssh_exe $sshopts \
+        -o ControlPath=none \
+        -o ExitOnForwardFailure=yes \
+        -o ForwardAgent=yes \
+        -R "$reverse_sock:$local_ssh_endpoint" \
+        "$rhost" \
+        "
+          ##set -x
+          umask 077
+          echo Host $rssh_host >'$reverse_cfg'
+          echo   CheckHostIP no >>'$reverse_cfg'
+          echo   StrictHostkeyChecking no >>'$reverse_cfg'
+          echo   ForwardAgent yes >>'$reverse_cfg'
+          echo   ProxyCommand nc -U $reverse_sock >>'$reverse_cfg'
+          ##ssh-add -l
+          INMNT_SRCHOST='$host'
+          INMNT_SRCPATH='$localdir'
+          export INMNT_SRCHOST INMNT_SRCPATH
+          $trace inmnt -F '$reverse_cfg' $inmntopts '$rssh_host:$localdir' $*
+          xit=\$?
+          rm -f '$reverse_cfg' '$reverse_sock'
+          exit \$xit
+        "
+      exit $?
+      ;;
+  *)  # run the sshfs mount
+      [ $# = 0 ] && set -- "$SHELL"
+      mntdir=$TMPDIR/sshfs-mnt
+      [ -d "$mntdir" ] || $trace mkdir -- "$mntdir"
+      mntpath=$mntdir/mnt-$$-$( echo "$sshfspath" | tr /: __ )
+      $trace mnt -d -X $mntopts -- "$sshfspath" "$mntpath"
+      xit=0
+      ( cd "$mntpath" && $trace "$@" ) || xit=$?
+      $trace umount "$mntpath" || xit=1
+      exit $xit
+      ;;
+esac

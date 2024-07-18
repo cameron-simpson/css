@@ -1,0 +1,1 @@
+lib/python/cs/gimmicks.py: cs.gimmicks: add gimmicks for cs.lex.r and cs.lex.s, clean some lint

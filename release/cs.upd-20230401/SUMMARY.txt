@@ -1,0 +1,5 @@
+Upd.run_task: use a local RunState to control the ticker, drop `runstate` parameter.
+Renamed default HasThreadState.THREAD_STATE_ATTR to 'perthread_state'.
+Keep a module level name for the default Upd instance.
+Upd.shutdown: cope with shutdown early enough that there's no self._lock.
+Honour new $CS_UPD_BACKEND envvar to support eg defaulting Upd to /dev/null.

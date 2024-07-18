@@ -1,0 +1,5 @@
+DebuggingRLock fixes.
+Move @trace from cs.py.func to cs.debug.
+Drop Lock and RLock alias factories - importers should just use the debugging lock classes directly.
+Rename threading.Thread to threading_Thread.
+Simplify the debugging lock classes.

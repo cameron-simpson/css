@@ -1,3 +1,4 @@
+update_mapping: make into a specification, promotable from a dict, and add a set of tag names to mirror
 fstags locate: look up [uuid:]uuid_s, hashname:hashcode via sqltags and return filesystem path
 autotag: findup to locate tagging rules?
 bring the jsonable hook from cs.app.beyonwiz in house for subclassing

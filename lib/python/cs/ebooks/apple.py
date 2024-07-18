@@ -4,11 +4,13 @@
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from getopt import GetoptError
 from glob import glob
 from os.path import join as joinpath
 from pprint import pprint
 import sys
+from typing import Optional
 
 from sqlalchemy import (
     Column,
@@ -210,11 +212,9 @@ class AppleBooksCommand(BaseCommand):
   ''' Command line access to Apple Books.
   '''
 
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    options = self.options
-    options.apple_path = None
+  @dataclass
+  class Options(BaseCommand.Options):
+    apple_path: Optional[str] = None
 
   @contextmanager
   def run_context(self):

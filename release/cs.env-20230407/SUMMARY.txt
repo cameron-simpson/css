@@ -1,0 +1,1 @@
+getenv: new parse callable parameter to parse the value.

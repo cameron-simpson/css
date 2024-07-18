@@ -1,0 +1,2 @@
+Drop cs.context.StackableState in favour of cs.threads.State.
+MP4Command.cmd_autotag: use @uses_fstags for the fstags parameter.

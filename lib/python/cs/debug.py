@@ -6,30 +6,63 @@
 
 r'''
 Assorted debugging facilities.
+
+If the environment variable `$CS_DEBUG_BUILTINS` is set to a comma
+separated list of names then the `builtins` module will be monkey
+patched with those names, enabling trite debug use of those names
+anywhere in the code provided this module has been imported somewhere.
+
+The allowed names are the list `cs.debug.__all__` and include:
+* `X`: `cs.x.X`
+* `breakpoint`: `cs.upd.breakpoint`
+* `pformat`: `pprint.pformat`
+* `pprint`: `pprint.pprint`
+* `print`: `cs.upd.print`
+* `r`: `cs.lex.r`
+* `redirect_stdout`: `contextlib.redirect_stdout`
+* `s`: `cs.lex.s`
+* `stack_dump`: dump current `Thread`'s call stack
+* `thread_dump` dump the active `Thread`s with their call stacks
+* `trace`: the `@trace` decorator
+`$CS_DEBUG_BUILTINS` can also be set to `"1"` to install all of
+`__all__` in the builtins.
 '''
 
 from __future__ import print_function
 from cmd import Cmd
+from contextlib import redirect_stdout
 import inspect
 import logging
 import os
+from pprint import pformat, pprint  # pylint: disable=unused-import
 from subprocess import Popen, PIPE
 import sys
-import threading
+from threading import (
+    enumerate as enumerate_threads,
+    Lock as threading_Lock,
+    RLock as threading_RLock,
+    Thread as threading_Thread,
+)
 import time
 import traceback
 from types import SimpleNamespace as NS
 
+from cs.deco import ALL, decorator
+from cs.fs import shortpath
+from cs.lex import s, r, is_identifier, is_dotted_identifier  # pylint: disable=unused-import
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
+from cs.py.func import funccite, funcname, func_a_kw_fmt
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
+from cs.threads import ThreadState
+from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20221118-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -39,44 +72,43 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
+        'cs.fs',
+        'cs.lex',
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py.func',
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
+        'cs.upd',
         'cs.x',
     ],
 }
+
+__all__ = [
+    'X', 'breakpoint', 'pformat', 'pprint', 'print', 'r', 'redirect_stdout',
+    's'
+]
+
+# environment variable specifying names to become built in
+CS_DEBUG_BUILTINS_ENVVAR = 'CS_DEBUG_BUILTINS'
+
+# white list of allowed builtin names
+CS_DEBUG_BUILTINS_NAMES = ('X', 'pformat', 'pprint', 's', 'r', 'trace')
 
 # @DEBUG dispatches a thread to monitor function elapsed time.
 # This is how often it polls for function completion.
 DEBUG_POLL_RATE = 0.25
 
-def Lock():
-  ''' Factory function: if `cs.logutils.loginfo.level<=logging.DEBUG`
-      then return a `DebuggingLock`, otherwise a `threading.Lock`.
-  '''
-  if not ifdebug():
-    return threading.Lock()
-  filename, lineno = inspect.stack()[1][1:3]
-  return DebuggingLock({'filename': filename, 'lineno': lineno})
-
-def RLock():
-  ''' Factory function: if `cs.logutils.loginfo.level<=logging.DEBUG`
-      then return a `DebuggingRLock`, otherwise a `threading.RLock`.
-  '''
-  if not ifdebug():
-    return threading.RLock()
-  filename, lineno = inspect.stack()[1][1:3]
-  return DebuggingRLock({'filename': filename, 'lineno': lineno})
-
+@ALL
 class TimingOutLock(object):
   ''' A `Lock` replacement which times out, used for locating deadlock points.
   '''
 
   def __init__(self, deadlock_timeout=20.0, recursive=False):
-    self._lock = threading.RLock() if recursive else threading.Lock()
+    self._lock = threading_RLock() if recursive else threading_Lock()
     self._deadlock_timeout = deadlock_timeout
 
   def acquire(self, blocking=True, timeout=-1, name=None):
@@ -125,10 +157,11 @@ class TraceSuite(object):
 
 def Thread(*a, **kw):
   if not ifdebug():
-    return threading.Thread(*a, **kw)
+    return threading_Thread(*a, **kw)
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingThread({'filename': filename, 'lineno': lineno}, *a, **kw)
 
+@ALL
 def thread_dump(Ts=None, fp=None):
   ''' Write thread identifiers and stack traces to the file `fp`.
 
@@ -137,7 +170,7 @@ def thread_dump(Ts=None, fp=None):
       * `fp`: the file to which to write; if unspecified use `sys.stderr`.
   '''
   if Ts is None:
-    Ts = threading.enumerate()
+    Ts = enumerate_threads()
   if fp is None:
     fp = sys.stderr
   with Pfx("thread_dump"):
@@ -148,10 +181,11 @@ def thread_dump(Ts=None, fp=None):
       except KeyError:
         warning("no frame for Thread.ident=%s", T.ident)
         continue
-      print("Thread", T.ident, T.name, file=fp)
+      print("Thread", T.ident, T.name, T, file=fp)
       traceback.print_stack(frame, None, fp)
       print(file=fp)
 
+@ALL
 def stack_dump(stack=None, limit=None, logger=None, log_level=None):
   ''' Dump a stack trace to a logger.
 
@@ -190,7 +224,7 @@ def DEBUG(f, force=False):
     filename, lineno = inspect.stack()[1][1:3]
     n = seq()
     R = Result()
-    T = threading.Thread(
+    T = threading_Thread(
         target=_debug_watcher, args=(filename, lineno, n, f.__name__, R)
     )
     T.daemon = True
@@ -268,13 +302,13 @@ class DebuggingLock(DebugWrapper):
       `threading.Lock` otherwise.
   '''
 
-  def __init__(self, dkw, slow=2):
+  def __init__(self, *, slow=2, **dkw):
     DebugWrapper.__init__(self, **dkw)
     self.debug("__init__(slow=%r)", slow)
     if slow <= 0:
       raise ValueError("slow must be positive, received: %r" % (slow,))
     self.slow = slow
-    self.lock = threading.Lock()
+    self.lock = threading_Lock()
     self.held = None
 
   def __enter__(self):
@@ -363,50 +397,67 @@ class DebuggingRLock(DebugWrapper):
       `threading.RLock` otherwise.
   '''
 
-  def __init__(self, dkw):
-    D("dkw = %r", dkw)
-    DebugWrapper.__init__(self, **dkw)
+  def __init__(self, owner=None, **dkw):
+    if owner is None:
+      owner = caller()
+    DebugWrapper.__init__(
+        self, filename=owner.filename, lineno=owner.lineno, **dkw
+    )
     self.debug('__init__')
-    self.lock = threading.RLock()
-    self.stack = None
+    self.lock = threading_RLock()
+    self.stack = []
 
   def __str__(self):
-    return "%s%r" % (
-        type(self).__name__, [
-            "%s:%s:%s" % (f.filename, f.lineno, f.code_context[0].strip())
-            for f in self.stack
-        ] if self.stack else "NO_STACK"
+    return "%s[%s:%s]%s" % (
+        type(self).__name__,
+        shortpath(self.filename),
+        self.lineno,
+        "->".join(
+            ["%s:%s" % filename_lineno for filename_lineno in self.stack]
+        ),
     )
 
-  def __enter__(self):
-    filename, lineno = inspect.stack()[1][1:3]
-    self.debug('from %s:%d: __enter__ ...', filename, lineno)
-    self.lock.__enter__()
-    self.stack = inspect.stack()
-    self.debug('from %s:%d: __enter__ ENTERED', filename, lineno)
-    return self
+  def __enter__(self, locker=None):
+    if locker is None:
+      locker = caller()
+    filename_lineno = locker.filename, locker.lineno
+    self.debug('from %s:%d: __enter__ ...', locker.filename, locker.lineno)
+    entry = self.lock.__enter__()
+    self.stack.append(filename_lineno)
+    return entry
 
-  def __exit__(self, *a):
-    filename, lineno = inspect.stack()[1][1:3]
-    self.debug('%s:%d: __exit__(*%s) ...', filename, lineno, a)
-    return self.lock.__exit__(*a)
+  def __exit__(self, *a, exiter=None):
+    if exiter is None:
+      exiter = caller()
+    self.debug('%s:%d: __exit__(*%s) ...', exiter.filename, exiter.lineno, a)
+    exited = self.lock.__exit__(*a)
+    self.stack.pop()
+    return exited
 
-  def acquire(self, blocking=True, timeout=-1):
-    filename, lineno = inspect.stack()[0][1:3]
-    self.debug('%s:%d: acquire(blocking=%s)', filename, lineno, blocking)
+  def acquire(self, blocking=True, timeout=-1, acquirer=None):
+    if acquirer is None:
+      acquirer = caller()
+    self.debug(
+        '%s:%d: acquire(blocking=%s)', acquirer.filename, acquirer.lineno,
+        blocking
+    )
     if timeout < 0:
       ret = self.lock.acquire(blocking)
     else:
       ret = self.lock.acquire(blocking, timeout)
     if ret:
-      self.stack = inspect.stack()
+      self.stack.append((acquirer.filename, acquirer.lineno))
     return ret
 
-  def release(self):
-    filename, lineno = inspect.stack()[0][1:3]
-    self.debug('%s:%d: release()', filename, lineno)
+  def release(self, releaser=None):
+    if releaser is None:
+      releaser = caller()
+    self.debug('%s:%d: release()', releaser.filename, releaser.lineno)
     self.lock.release()
-    self.stack = None
+    self.stack.pop()
+
+Lock = DebuggingLock
+RLock = DebuggingRLock
 
 _debug_threads = set()
 
@@ -416,18 +467,18 @@ def dump_debug_threads():
     D("dump_debug_threads: thread %r: %r", T.name, T.debug_label)
   D("dump_debug_threads done")
 
-class DebuggingThread(threading.Thread, DebugWrapper):
+class DebuggingThread(threading_Thread, DebugWrapper):
 
   def __init__(self, dkw, *a, **kw):
     DebugWrapper.__init__(self, **dkw)
     self.debug("NEW THREAD(*%r, **%r)", a, kw)
     _debug_threads.add(self)
-    threading.Thread.__init__(self, *a, **kw)
+    threading_Thread.__init__(self, *a, **kw)
 
   @DEBUG
   def join(self, timeout=None):
     self.debug("join(timeout=%r)...", timeout)
-    retval = threading.Thread.join(self, timeout=timeout)
+    retval = threading_Thread.join(self, timeout=timeout)
     self.debug("join(timeout=%r) completed", timeout)
     _debug_threads.discard(self)
     return retval
@@ -439,9 +490,13 @@ def trace_caller(func):
   def subfunc(*a, **kw):
     frame = caller()
     D(
-        "CALL %s()<%s:%d> FROM %s()<%s:%d>", func.__name__,
-        func.__code__.co_filename, func.__code__.co_firstlineno,
-        frame.funcname, frame.filename, frame.lineno
+        "CALL %s()<%s:%d> FROM %s()<%s:%d>",
+        func.__name__,
+        func.__code__.co_filename,
+        func.__code__.co_firstlineno,
+        frame.name,
+        frame.filename,
+        frame.lineno,
     )
     return func(*a, **kw)
 
@@ -554,6 +609,203 @@ def debug_object_shell(o, prompt=None):
   C.prompt = prompt
   C.cmdloop(intro)
 
+_trace_state = ThreadState(indent='')
+
+@ALL
+@decorator
+# pylint: disable=too-many-arguments
+def trace(
+    func,
+    call=True,
+    retval=False,
+    exception=True,
+    use_pformat=False,
+    with_caller=False,
+    with_pfx=False,
+):
+  ''' Decorator to report the call and return of a function.
+
+      Decorator parameters:
+      * `call`: trace the call, default `True`
+      * `retval`: trace the return, default `False`
+      * `exception`: trace raised exceptions, default `True`
+      * `use_pformat`: present the return value using
+        `pformat` instead of `repr`, default `False`
+      * `with_caller`: include the caller if this function, default `False`
+      * `with_pfx`: include the current `Pfx` prefix, default `False`
+  '''
+
+  citation = funcname(func)  ## funccite(func)
+
+  def traced_function_wrapper(*a, **kw):
+    ''' Wrapper for `func` to trace call and return.
+    '''
+    global _trace_state  # pylint: disable=global-statement
+    if with_pfx:
+      # late import so that we can use this in modules we import
+      # pylint: disable=import-outside-toplevel
+      try:
+        from cs.pfx import XP as xlog
+      except ImportError:
+        xlog = X
+    else:
+      xlog = X
+    log_cite = citation
+    if with_caller:
+      log_cite = log_cite + "from[%s]" % (caller(),)
+    if call:
+      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
+      xlog("%sCALL " + fmt, _trace_state.indent, *av)
+    old_indent = _trace_state.indent
+    _trace_state.indent += '  '
+    start_time = time.time()
+    try:
+      result = func(*a, **kw)
+    except Exception as e:
+      end_time = time.time()
+      if exception:
+        xlog_kw = {}
+        if xlog is X:
+          xlog_kw['colour'] = 'red'
+        xlog(
+            "%sCALL %s %gs RAISE %r",
+            _trace_state.indent,
+            log_cite,
+            end_time - start_time,
+            e,
+            **xlog_kw,
+        )
+      _trace_state.indent = old_indent
+      raise
+    else:
+      end_time = time.time()
+      if retval:
+        xlog(
+            "%sCALL %s %gs RETURN %s",
+            _trace_state.indent,
+            log_cite,
+            end_time - start_time,
+            (pformat if use_pformat else repr)(result),
+        )
+      if inspect.isgeneratorfunction(func):
+        iterator = result
+
+        def traced_generator():
+          while True:
+            next_time = time.time()
+            if call:
+              xlog(
+                  "%sNEXT %s %gs ...",
+                  _trace_state.indent,
+                  log_cite,
+                  next_time - start_time,
+              )
+            try:
+              item = next(iterator)
+            except StopIteration:
+              yield_time = time.time()
+              xlog(
+                  "%sDONE %s %gs ...",
+                  _trace_state.indent,
+                  log_cite,
+                  yield_time - next_time,
+              )
+              break
+            except Exception as e:
+              end_time = time.time()
+              if exception:
+                xlog_kw = {}
+                if xlog is X:
+                  xlog_kw['colour'] = 'red'
+                xlog(
+                    "%sCALL %s %gs RAISE %r",
+                    _trace_state.indent,
+                    log_cite,
+                    end_time - start_time,
+                    e,
+                    **xlog_kw,
+                )
+              _trace_state.indent = old_indent
+              raise
+            else:
+              yield_time = time.time()
+              xlog(
+                  "%sYIELD %gs %s <= %s",
+                  _trace_state.indent,
+                  yield_time - next_time,
+                  s(item),
+                  log_cite,
+              )
+              yield item
+
+        result = traced_generator()
+      else:
+        ##xlog("%sRETURN %s <= %s", _trace_state.indent, type(result), log_cite)
+        if retval:
+          xlog(
+              "%sRETURN %gs %s <= %s",
+              _trace_state.indent,
+              end_time - start_time,
+              s(result),
+              log_cite,
+          )
+      _trace_state.indent = old_indent
+      return result
+
+  traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
+  traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
+  return traced_function_wrapper
+
+def trace_DEBUG(debug_spec=None):
+  ''' Apply the `@trace` decorator to functions specified by `debug_spec`,
+      default from the environment variable `$DEBUG`.
+  '''
+  with Pfx("trace_DEBUG"):
+    try:
+      import importlib
+    except ImportError as e:
+      warning("trace_DEBUG: cannot import importlib, no applying: %s", e)
+      return
+    if debug_spec is None:
+      debug_spec = os.environ.get('DEBUG', '')
+    if isinstance(debug_spec, str):
+      debug_spec = debug_spec.split(',')
+    with Pfx("%r", debug_spec):
+      module_names = []
+      function_names = []
+      for spec in debug_spec:
+        with Pfx(spec):
+          if is_dotted_identifier(spec):
+            module_names.append(spec)
+          elif ':' in spec:
+            # module:funcname
+            module_name, func_name = spec.split(':', 1)
+            if (is_dotted_identifier(module_name)
+                and is_dotted_identifier(func_name)):
+              function_names.append((module_name, func_name))
+    for module_name in module_names:
+      with Pfx("module %s", module_name):
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError as e:
+          warning("cannot import: %s", e)
+          continue
+        M.DEBUG = True
+    for module_name, func_name in function_names:
+      with Pfx("function %s:%s", module_name, func_name):
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError as e:
+          warning("cannot import: %s", e)
+          continue
+        try:
+          F = getattr(M, func_name)
+        except AttributeError as e:
+          warning("function %s not found: %s", e)
+          continue
+        if callable(F):
+          setattr(M, func_name, trace(F))
+
 def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.
   '''
@@ -567,3 +819,38 @@ def selftest(module_name, defaultTest=None, argv=None):
   signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
   import unittest
   return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
+
+builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
+if builtin_names_s:
+  try:
+    import builtins  # pylint: disable=unused-import
+  except ImportError:
+    warning(
+        "$%s=%r but connot import builtins for monkey patching",
+        CS_DEBUG_BUILTINS_ENVVAR, builtin_names_s
+    )
+  else:
+    vs = vars()
+    for builtin_name in (__all__ if builtin_names_s == "1" else
+                         builtin_names_s.split(',')):
+      if not builtin_name:
+        continue
+      if builtin_name in ('breakpoint',):
+        # breakpoint doesn't work right if wrapped, gets the wrong frame
+        continue
+      if builtin_name not in __all__:
+        warning(
+            "$%s: ignoring %r, not in cs.debug.__all__:%r",
+            CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
+        )
+        continue
+      if not is_identifier(builtin_name):
+        warning(
+            "$%s: ignoring %r, not an identifier", CS_DEBUG_BUILTINS_ENVVAR,
+            builtin_name
+        )
+        continue
+      setattr(builtins, builtin_name, vs[builtin_name])
+
+# honour the $DEBUG trace flags
+trace_DEBUG()

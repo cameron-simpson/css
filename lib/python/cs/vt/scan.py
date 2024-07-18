@@ -91,6 +91,7 @@ except ImportError as import_e:
     except SystemExit as exit_e:
       chdir(owd)
       error("SETUP FAILS: %s:%s", type(exit_e), exit_e)
+      scanbuf2 = py_scanbuf2
     else:
       chdir(owd)
       try:

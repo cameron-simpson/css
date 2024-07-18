@@ -1,0 +1,1 @@
+FSM.fsm_transitions_as_dot: bugfix: the style needs "style=filled" as well as the fillcolor.

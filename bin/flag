@@ -18,8 +18,6 @@ verbose=        # print flag state changes
 verbose_all=    # print flag state regardless
 [ -t 2 ] && verbose=1
 ##[ -t 2 ] && trace=set-x
-debug=${DEBUG:+1}
-[ -n "$debug" ] || { [ -s "$flagdir/FLAG_DEBUG" ] && debug=1; }
 
 cmd=$( basename "$0" )
 usage="Usage:
@@ -75,10 +73,6 @@ vecho(){
 
 vvecho(){
   [ $verbose_all ] && echo "$*" || :
-}
-
-debug(){
-  [ $debug ] && echo "$0: $*" >&2 || :
 }
 
 normflag(){
@@ -217,7 +211,6 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 flagfile=$flagdir/$flagname
-debug "flagfile=$flagfile"
 
 if [ $setstate ]
 then
@@ -234,7 +227,6 @@ then
   if [ $newstate ]
   then
     # new state true
-    debug "$flagfile -> 1"
     if testflag "$flagname"
     then  vvecho "$flagname -> 1" >&2
     else  vecho "$flagname -> 1" >&2
@@ -243,7 +235,6 @@ then
     echo 1 >"$flagfile" || exit 1
   else
     # new state false
-    debug "$flagfile -> ''"
     if testflag "$flagname"
     then  vecho "$flagname -> 0"
     else  vvecho "$flagname -> 0"

@@ -35,22 +35,25 @@ import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
+
 from cs.buffer import CornuCopyBuffer
+from cs.context import stackattrs
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
-from cs.gimmicks import TimeoutError
+from cs.gimmicks import TimeoutError  # pylint: disable=redefined-builtin
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
+from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20221118-post'
+__version__ = '20240709-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -61,6 +64,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.buffer',
+        'cs.context',
         'cs.deco',
         'cs.filestate',
         'cs.fs>=shortpath',
@@ -71,6 +75,7 @@ DISTINFO = {
         'cs.progress',
         'cs.py3',
         'cs.range',
+        'cs.resources',
         'cs.result',
         'cs.threads',
         'cs.units',
@@ -262,6 +267,7 @@ def rewrite(
     overwrite_anyway=False
 ):
   ''' Rewrite the file `filepath` with data from the file object `srcf`.
+      Return `True` if the content was changed, `False` if unchanged.
 
       Parameters:
       * `filepath`: the name of the file to rewrite.
@@ -293,7 +299,7 @@ def rewrite(
         # need to compare data
         if compare(T.name, filepath):
           # data the same, do nothing
-          return
+          return False
         if do_diff:
           # call the supplied differ
           do_diff(filepath, T.name)
@@ -309,6 +315,7 @@ def rewrite(
         if backup_ext:
           shutil.copy2(filepath, filepath + backup_ext)
         shutil.copyfile(T.name, filepath)
+  return True
 
 @contextmanager
 def rewrite_cmgr(filepath, mode='w', **kw):
@@ -328,7 +335,7 @@ def rewrite_cmgr(filepath, mode='w', **kw):
     yield T
     T.flush()
     with open(T.name, 'rb') as f:
-      rewrite(filepath, mode='wb', srcf=f, **kw)
+      return rewrite(filepath, mode='wb', srcf=f, **kw)
 
 def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
@@ -614,8 +621,17 @@ def make_files_property(
   return made_files_property
 
 # pylint: disable=too-many-branches
+@uses_runstate
+@pfx
 def makelockfile(
-    path, ext=None, poll_interval=None, timeout=None, runstate=None
+    path,
+    *,
+    ext=None,
+    poll_interval=None,
+    timeout=None,
+    runstate: RunState,
+    keepopen=False,
+    max_interval=37,
 ):
   ''' Create a lockfile and return its path.
 
@@ -636,6 +652,9 @@ def makelockfile(
       * `runstate`: optional `RunState` duck instance supporting cancellation.
         Note that if a cancelled `RunState` is provided
         no attempt will be made to make the lockfile.
+      * `keepopen`: optional flag, default `False`:
+        if true, do not close the lockfile and return `(lockpath,lockfd)`
+        being the lock file path and the open file descriptor
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
@@ -647,7 +666,7 @@ def makelockfile(
   lockpath = path + ext
   with Pfx("makelockfile: %r", lockpath):
     while True:
-      if runstate is not None and runstate.cancelled:
+      if runstate.cancelled:
         warning(
             "%s cancelled; pid %d waited %ds", runstate, os.getpid(),
             0 if start is None else time.time() - start
@@ -673,7 +692,7 @@ def makelockfile(
           if now - complaint_last >= complaint_interval:
             warning("pid %d waited %ds", os.getpid(), now - start)
             complaint_last = now
-            complaint_interval *= 2
+            complaint_interval = min(complaint_interval * 2, max_interval)
         # post: start is set
         if timeout is None:
           sleep_for = poll_interval
@@ -687,34 +706,28 @@ def makelockfile(
         continue
       else:
         break
+    if keepopen:
+      return lockpath, lockfd
     os.close(lockfd)
     return lockpath
 
 @contextmanager
-def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
+def lockfile(path, **lock_kw):
   ''' A context manager which takes and holds a lock file.
-
-      Parameters:
-      * `path`: the base associated with the lock file.
-      * `ext`: the extension to the base used to construct the lock file name.
-        Default: `'.lock'`
-      * `timeout`: maximum time to wait before failing.
-        Default: `None` (wait forever).
-      * `poll_interval`: polling frequency when timeout is not `0`.
-      * `runstate`: optional `RunState` duck instance supporting cancellation.
+      An open file descriptor is kept for the lock file as well
+      to aid locating the process holding the lock file using eg `lsof`.
+      This is just a context manager shim for `makelockfile`
+      and all arguments are plumbed through.
   '''
-  lockpath = makelockfile(
-      path,
-      ext=ext,
-      poll_interval=poll_interval,
-      timeout=timeout,
-      runstate=runstate
-  )
+  lockpath, lockfd = makelockfile(path, keepopen=True, **lock_kw)
   try:
     yield lockpath
   finally:
-    with Pfx("remove %r", lockpath):
-      os.remove(lockpath)
+    try:
+      pfx_call(os.remove, lockpath)
+    except FileNotFoundError as e:
+      warning("lock file already removed: %s", e)
+    pfx_call(os.close, lockfd)
 
 def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.
@@ -744,19 +757,19 @@ def crop_name(name, ext=None, name_max=255):
     return name
   return base[:max_base_len] + ext
 
-def max_suffix(dirpath, pfx):
+def max_suffix(dirpath, prefix):
   ''' Compute the highest existing numeric suffix
-      for names starting with the prefix `pfx`.
+      for names starting with `prefix`.
 
       This is generally used as a starting point for picking
       a new numeric suffix.
   '''
-  pfx = ustr(pfx)
+  prefix = ustr(prefix)
   maxn = None
-  pfxlen = len(pfx)
+  pfxlen = len(prefix)
   for e in os.listdir(dirpath):
     e = ustr(e)
-    if len(e) <= pfxlen or not e.startswith(pfx):
+    if len(e) <= pfxlen or not e.startswith(prefix):
       continue
     tail = e[pfxlen:]
     if tail.isdigit():
@@ -791,12 +804,12 @@ def mkdirn(path, sep=''):
             " with a trailing %r seems nonsensical" % (path, sep, os.sep)
         )
       dirpath = path[:-len(os.sep)]
-      pfx = ''
+      prefix = ''
     else:
       dirpath = dirname(path)
       if not dirpath:
         dirpath = '.'
-      pfx = basename(path) + sep
+      prefix = basename(path) + sep
 
     if not isdir(dirpath):
       error("parent not a directory: %r", dirpath)
@@ -805,7 +818,7 @@ def mkdirn(path, sep=''):
     # do a quick scan of the directory to find
     # if any names of the desired form already exist
     # in order to start after them
-    maxn = max_suffix(dirpath, pfx)
+    maxn = max_suffix(dirpath, prefix)
     if maxn is None:
       newn = 0
     else:
@@ -997,10 +1010,10 @@ class Pathname(str):
     '''
     return self.shorten()
 
-  def shorten(self, environ=None, prefixes=None):
+  def shorten(self, prefixes=None):
     ''' Shorten a Pathname using ~ and ~user.
     '''
-    return shortpath(self, environ=environ, prefixes=prefixes)
+    return shortpath(self, prefixes=prefixes)
 
 def iter_fd(fd, **kw):
   ''' Iterate over data from the file descriptor `fd`.
@@ -1198,9 +1211,7 @@ class ReadMixin(object):
       else:
         offset = bfr.offset
     if size == -1:
-      size = len(self) - offset
-      if size < 0:
-        size = 0
+      size = max(len(self) - offset, 0)
     if size == 0:
       return b''
     if longread:
@@ -1492,8 +1503,10 @@ class Tee(object):
 
 @contextmanager
 def tee(fp, fp2):
-  ''' Context manager duplicating .write and .flush from fp to fp2.
+  ''' Context manager duplicating `.write` and `.flush` from `fp` to `fp2`.
   '''
+  old_write = fp.write
+  old_flush = fp.flush
 
   def _write(*a, **kw):
     fp2.write(*a, **kw)
@@ -1503,15 +1516,8 @@ def tee(fp, fp2):
     fp2.flush(*a, **kw)
     return old_flush(*a, **kw)
 
-  old_write = getattr(fp, 'write')
-  old_flush = getattr(fp, 'flush')
-  fp.write = _write
-  fp.flush = _flush
-  try:
+  with stackattrs(fp, write=_write, flush=_flush):
     yield
-  finally:
-    fp.write = old_write
-    fp.flush = old_flush
 
 class NullFile(object):
   ''' Writable file that discards its input.
@@ -1643,7 +1649,8 @@ def atomic_filename(
     dir=None,
     prefix=None,
     suffix=None,
-    **kw
+    rename_func=rename,
+    **tempfile_kw
 ):
   ''' A context manager to create `filename` atomicly on completion.
       This returns a `NamedTemporaryFile` to use to create the file contents.
@@ -1664,6 +1671,10 @@ def atomic_filename(
       * `suffix`: passed to `NamedTemporaryFile`, specifies a suffix
         for the temporary file; the default is the extension obtained
         from `splitext(basename(filename))`
+      * `rename_func`: a callable accepting `(tempname,filename)`
+        used to rename the temporary file to the final name; the
+        default is `os.rename` and this parametr exists to accept
+        something such as `FSTags.move`
       Other keyword arguments are passed to the `NamedTemporaryFile` constructor.
 
       Example:
@@ -1684,13 +1695,17 @@ def atomic_filename(
     dir = dirname(filename)
   fprefix, fsuffix = splitext(basename(filename))
   if prefix is None:
-    prefix = '.' + fprefix
+    prefix = '.' + fprefix + '-'
   if suffix is None:
     suffix = fsuffix
-  if existspath(filename) and not exists_ok:
-    raise ValueError("already exists: %r" % (filename,))
-  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, delete=False,
-                          **kw) as T:
+  if not exists_ok and existspath(filename):
+    raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), filename)
+  with NamedTemporaryFile(
+      dir=dir,
+      prefix=prefix,
+      suffix=suffix,
+      **tempfile_kw,
+  ) as T:
     if placeholder:
       # create a placeholder file
       with open(filename, 'ab' if exists_ok else 'xb'):
@@ -1712,7 +1727,10 @@ def atomic_filename(
       except FileNotFoundError:
         atime = mtime
       pfx_call(os.utime, T.name, (atime, mtime))
-    pfx_call(rename, T.name, filename)
+    pfx_call(rename_func, T.name, filename)
+    # recreate the temp file so that it can be cleaned up
+    with pfx_call(open, T.name, 'xb'):
+      pass
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.

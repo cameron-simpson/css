@@ -1,0 +1,7 @@
+lib/python/cs/range.py: cs.range: Span: __new__ method which sanity checks start and end
+lib/python/cs/range.py: cs.range: Range.__contains__: doctest, idiom tweak
+lib/python/cs/range.py: cs.range: Range.issubset: efficient comparison with another Range
+lib/python/cs/range.py: cs.range: Range.issuperset: handle anothe Range efficiently by passing to other.issubset; slightly streamline the rest of the method
+lib/python/cs/range.py: cs.range: Span.__lt__: just check the start values
+lib/python/cs/range.py: cs.range: cosmetic tweaks
+lib/python/cs/range.py: cs.range: tidy some lint

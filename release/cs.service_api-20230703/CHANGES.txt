@@ -1,0 +1,4 @@
+lib/python/cs/service_api.py: cs.service_api: retry logic for requests
+lib/python/cs/service_api.py: merge playon ==> default: cs.service_api: retry logic for requests
+lib/python/cs/service_api.py: cs.service_api: ServiceAPI.API_RETRY_DELAY spelling fix
+lib/python/cs/service_api.py: merge playon ==> default

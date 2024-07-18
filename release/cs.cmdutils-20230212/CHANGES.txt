@@ -1,0 +1,7 @@
+lib/python/cs/cmdutils.py: merge default ==> tagger
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: update RunState support
+lib/python/cs/cmdutils.py: merge default ==> fstags
+lib/python/cs/cmdutils.py: merge fstags ==> tagger
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCOmmand: always be having an self.options.upd
+lib/python/cs/cmdutils.py: cs.cmdutils: add missing import
+lib/python/cs/cmdutils.py: cs.cmdutils: flick a piece of lint, update DISTINFO

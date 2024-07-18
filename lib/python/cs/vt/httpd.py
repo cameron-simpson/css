@@ -8,9 +8,11 @@ import sys
 from flask import (
     Flask, render_template, request, session as flask_session, jsonify, abort
 )
+
 from cs.logutils import warning
 from cs.resources import RunStateMixin
-from . import defaults
+
+from . import uses_Store
 from .block import IndirectBlock
 from .hash import HashCode, MissingHashcodeError
 
@@ -23,14 +25,15 @@ def main(argv=None):
     host, port = argv
   else:
     host, port = '127.0.0.1', 5000
-  app = StoreApp(name, defaults.S)
+  app = StoreApp(name)
   app.run(host=host, port=port)
 
 class _StoreApp(Flask, RunStateMixin):
   ''' A Flask application with a `.store` attribute.
   '''
 
-  def __init__(self, name, S):
+  @uses_Store
+  def __init__(self, name, *, S):
     Flask.__init__(self, name)
     RunStateMixin.__init__(self)
     self.store = S

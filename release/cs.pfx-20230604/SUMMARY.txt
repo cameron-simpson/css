@@ -1,0 +1,1 @@
+@pfx_method: handle methods with no __name__ (generally a misuse of the decorator).

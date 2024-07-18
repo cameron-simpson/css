@@ -1,0 +1,2 @@
+BinaryMixin: new load(file) and save(file) methods.
+BinaryMixin.scan: promote the bfr argument.

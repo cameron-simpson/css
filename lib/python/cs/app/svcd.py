@@ -89,7 +89,9 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': ['svcd = cs.app.svcd:main'],
+        'console_scripts': {
+            'svcd': 'cs.app.svcd:main'
+        },
     },
 }
 
@@ -101,6 +103,10 @@ def main(argv=None):
 class SvcDCommand(BaseCommand):
   ''' Implementation of `SvcD` command line mode.
   '''
+
+  USAGE_KEYWORDS = {
+      'VARRUN': VARRUN,
+  }
 
   def disable(self, argv):
     ''' {cmd} disable names...
@@ -252,7 +258,7 @@ class SvcDCommand(BaseCommand):
         elif opt == '-x':
           trace = True
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if not argv:
       warning("missing command")
     if name is None:
@@ -426,7 +432,7 @@ class SvcD(FlaggedMixin, object):
     if pidfile is None and name is not None:
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     if flags is None:
-      flags = Flags(environ=environ, debug=trace)
+      flags = Flags(environ=environ)  ##, debug=trace)
     if group_name is None:
       group_name = "SVCD " + name
     if test_flags is None:

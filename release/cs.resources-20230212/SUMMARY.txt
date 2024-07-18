@@ -1,0 +1,1 @@
+RunState: if already running, do not adjust state or catch signals; if not in the main thread do not adjust signals.

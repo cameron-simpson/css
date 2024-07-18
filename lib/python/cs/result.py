@@ -53,28 +53,26 @@ You can also collect multiple `Result`s in completion order using the `report()`
         print(x)    # print result
 '''
 
+from queue import Queue
 import sys
-from threading import Lock, RLock
-
-from icontract import require
+from threading import Lock, RLock, Thread
+from typing import Callable, Optional
 
 from cs.deco import OBSOLETE
-from cs.fsm import FSM
+from cs.fsm import FSM, CancellationError
 from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
 from cs.pfx import pfx_method
 from cs.py.func import funcname, func_a_kw_fmt
-from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20221207-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -84,32 +82,10 @@ DISTINFO = {
         'cs.mappings',
         'cs.pfx',
         'cs.py.func',
-        'cs.py3',
         'cs.seq',
         'cs.threads',
-        'icontract',
     ],
 }
-
-class CancellationError(Exception):
-  ''' Raised when accessing `result` or `exc_info` after cancellation.
-  '''
-
-  def __init__(self, message=None, **kw):
-    ''' Initialise the `CancellationError`.
-
-        The optional `message` parameter (default `"cancelled"`)
-        is set as the `message` attribute.
-        Other keyword parameters set their matching attributes.
-    '''
-    if message is None:
-      message = "cancelled"
-    elif not isinstance(message, StringTypes):
-      message = "cancelled: %s" % (message,)
-    Exception.__init__(self, message)
-    self.message = message
-    for k, v in kw.items():
-      setattr(self, k, v)
 
 # pylint: disable=too-many-instance-attributes
 class Result(FSM):
@@ -125,9 +101,6 @@ class Result(FSM):
   _seq = Seq()
 
   FSM_TRANSITIONS = {
-      'PREPARE': {
-          'prepared': 'PENDING',
-      },
       'PENDING': {
           'dispatch': 'RUNNING',
           'cancel': 'CANCELLED',
@@ -137,13 +110,23 @@ class Result(FSM):
           'cancel': 'CANCELLED',
           'complete': 'DONE',
       },
-      'CANCELLED': {},
-      'DONE': {},
+      'CANCELLED': {
+          'cancel': 'CANCELLED',
+      },
+      'DONE': {
+          'cancel': 'DONE',
+      },
   }
 
   # pylint: disable=too-many-arguments
   def __init__(
-      self, name=None, lock=None, result=None, state=None, extra=None
+      self,
+      name=None,
+      *,
+      lock=None,
+      result=None,
+      state=None,
+      extra=None,
   ):
     ''' Base initialiser for `Result` objects and subclasses.
 
@@ -161,31 +144,38 @@ class Result(FSM):
       lock = RLock()
     if name is None:
       name = "%s-%d" % (type(self).__name__, next(self._seq))
-    if state is None:
-      state = self.PENDING
     self.name = name
     self.extra = AttrableMapping()
     if extra:
       self.extra.update(extra)
     FSM.__init__(self, state, lock=lock)
     self.collected = False
+    # the result collection lock
     self._get_lock = Lock()
     self._get_lock.acquire()  # pylint: disable=consider-using-with
-    self._lock = lock
+    self.__lock = lock
+    # internal fields
+    self._result = None
+    self._exc_info = None
+    self._cancel_msg = None
     if result is not None:
       self.result = result
 
   def __str__(self):
-    return "%s[%r:%s]" % (type(self).__name__, self.name, self.fsm_state)
+    return "%s[%r:%s]" % (
+        type(self).__name__,
+        self.__dict__.get('name', 'NO_NAME'),
+        self.__dict__.get('fsm_state', 'NO_FSM_STATE'),
+    )
 
   __repr__ = __str__
 
   def __del__(self):
-    if not self.collected:
+    if not getattr(self, 'collected', False):
       if self.is_done:
         exc_info = self.exc_info
         if exc_info:
-          raise RuntimeError("UNREPORTED EXCEPTION: %r" % (exc_info,))
+          warning("UNREPORTED EXCEPTION at __del__: %r", exc_info)
 
   def __hash__(self):
     return id(self)
@@ -201,9 +191,26 @@ class Result(FSM):
     '''
     return self.fsm_state
 
+  def _complete(self, result, exc_info):
+    ''' Set the result or exception.
+        Alert people to completion.
+    '''
+    if result is not None and exc_info is not None:
+      raise ValueError(
+          "one of (result, exc_info) must be None, got (%r, %r)" %
+          (result, exc_info)
+      )
+    with self.__lock:
+      if self.ready:
+        raise RuntimeError(f'%s already completed')
+      self._result = result  # pylint: disable=attribute-defined-outside-init
+      self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
+      self.fsm_event('complete')
+      self._get_lock.release()
+
   @property
   def ready(self):
-    ''' True if `Result` state is `DONE` or `CANCLLED`..
+    ''' True if the `Result` state is `DONE` or `CANCELLED`..
     '''
     return self.fsm_state in (self.DONE, self.CANCELLED)
 
@@ -228,34 +235,28 @@ class Result(FSM):
     '''
     return not self.ready
 
-  def cancel(self):
-    ''' Cancel this function.
-        If `self.fsm_state` is `PENDING`` or `'CANCELLED'`, return `True`.
-        Otherwise return `False` (too late to cancel).
+  def cancel(self, msg: Optional[str] = None):
+    ''' Cancel this `Result`.
     '''
-    with self._lock:
-      state = self.fsm_state
-      if state == self.CANCELLED:
-        # already cancelled - this is ok, no call to ._complete
-        return True
-      if state == self.DONE:
-        # completed - "fail" the cancel, no call to ._complete
-        return False
-      self.fsm_event('cancel')
-    return True
+    self._cancel_msg = msg
+    self.fsm_event('cancel')
 
   @property
   def result(self):
     ''' The result.
         This property is not available before completion.
+        Accessing this on a cancelled `Result` raises `CancellationError`.
     '''
     state = self.fsm_state
-    if state not in (self.CANCELLED, self.DONE):
-      raise AttributeError("%s not ready: no .result attribute" % (self,))
-    self.collected = True
-    if state == self.CANCELLED:
-      raise CancellationError
-    return self._result
+    if state == 'DONE':
+      self.collected = True
+      return self._result
+    if state == 'CANCELLED':
+      self.collected = True
+      raise CancellationError(
+          self._cancel_msg or ".result: cancelled", fsm=self
+      )
+    raise AttributeError(f'.result: {self} not ready')
 
   @result.setter
   def result(self, new_result):
@@ -272,15 +273,16 @@ class Result(FSM):
   def exc_info(self):
     ''' The exception information from a completed `Result`.
         This is not available before completion.
+        Accessing this on a cancelled `Result` raises `CancellationError`.
     '''
     state = self.fsm_state
-    if state not in (self.CANCELLED, self.DONE):
-      raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
-    self.collected = True
-    if state == self.CANCELLED:
+    if state == 'DONE':
       self.collected = True
-      raise CancellationError
-    return self._exc_info
+      return self._exc_info
+    if state == 'CANCELLED':
+      self.collected = True
+      raise CancellationError(".exc_info: cancelled", fsm=self)
+    raise AttributeError(f'.exc_info: {self} not ready')
 
   @exc_info.setter
   def exc_info(self, exc_info):
@@ -289,6 +291,17 @@ class Result(FSM):
   def raise_(self, exc=None):
     ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
         If `exc` is omitted or `None`, uses `sys.exc_info()`.
+
+        Examples:
+
+            # complete the result using the current exception state
+            R.raise_()
+
+            # complete the result with an exception type
+            R.raise_(RuntimeError)
+
+            # complete the result with an exception
+            R.raise_(ValueError("bad value!"))
     '''
     if exc is None:
       self.exc_info = sys.exc_info()
@@ -316,12 +329,25 @@ class Result(FSM):
     ''' Submit a function to compute the result in a separate `Thread`,
         returning the `Thread`.
 
+        Keyword arguments for `cs.threads.bg` may be supplied by
+        prefixing their names with an underscore, for example:
+
+            T = R.bg(mainloop, _pre_enter_objects=(S, fs))
+
         This dispatches a `Thread` to run `self.run_func(func,*a,**kw)`
         and as such the `Result` must be in "pending" state,
         and transitions to "running".
     '''
+    bg_kw = {}
+    for k in list(kw.keys()):
+      if k.startswith('_'):
+        bg_kw[k[1:]] = kw.pop(k)
     return bg_thread(
-        self.run_func, name=self.name, args=[func] + list(a), kwargs=kw
+        self.run_func,
+        name=self.name,
+        args=[func] + list(a),
+        kwargs=kw,
+        **bg_kw,
     )
 
   def run_func_in_thread(self, func, *a, **kw):
@@ -335,42 +361,6 @@ class Result(FSM):
     T = self.bg(func, *a, **kw)
     T.join()
     return self()
-
-  @require(
-      lambda self: self.fsm_state in
-      (self.PENDING, self.RUNNING, self.CANCELLED)
-  )
-  def _complete(self, result, exc_info):
-    ''' Set the result.
-        Alert people to completion.
-        Expect to be called _inside_ `self._lock`.
-    '''
-    if result is not None and exc_info is not None:
-      raise ValueError(
-          "one of (result, exc_info) must be None, got (%r, %r)" %
-          (result, exc_info)
-      )
-    with self._lock:
-      state = self.fsm_state
-      if state in (self.PENDING, self.RUNNING, self.CANCELLED):
-        self._result = result  # pylint: disable=attribute-defined-outside-init
-        self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
-        self._get_lock.release()
-        if state != self.CANCELLED:
-          self.fsm_event('complete')
-      elif state == self.DONE:
-        warning(
-            "<%s>: state is %s, ignoring result=%r, exc_info=%r",
-            self,
-            self.fsm_state,
-            result,
-            exc_info,
-        )
-      else:
-        raise RuntimeError(
-            "<%s>: state:%s is not one of (PENDING, RUNNING, CANCELLED, DONE)"
-            % (self, self.fsm_state)
-        )
 
   @pfx_method
   def join(self):
@@ -386,7 +376,7 @@ class Result(FSM):
     '''
     self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._get_lock.release()
-    return self.result, self.exc_info
+    return self._result, self._exc_info
 
   def get(self, default=None):
     ''' Wait for readiness; return the result if `self.exc_info` is `None`,
@@ -403,17 +393,32 @@ class Result(FSM):
         You can optionally supply a callable and arguments,
         in which case `callable(*args,**kwargs)` will be called
         via `Result.call` and the results applied to this `Result`.
+
+        Basic example:
+
+            R = Result()
+            ... hand R to something which will fulfil it later ...
+            x = R() # wait for fulfilment - value lands in x
+
+        Direct call:
+
+            R = Result()
+            ... pass R to something which wants the result ...
+            # call func(1,2,z=3), save result in R
+            # ready for collection by whatever received R
+            R(func,1,2,z=3)
     '''
     if a:
       self.run_func(*a, **kw)
     if self.is_cancelled:
-      raise CancellationError(self)
+      raise CancellationError(self, fsm=self)
     result, exc_info = self.join()
     if exc_info:
-      raise3(*exc_info)
+      _, exc_value, exc_traceback = exc_info
+      raise exc_value.with_traceback(exc_traceback)
     return result
 
-  def notify(self, notifier):
+  def notify(self, notifier: Callable[["Result"], None]):
     ''' After the `Result` completes, call `notifier(self)`.
 
         If the `Result` has already completed this will happen immediately.
@@ -423,15 +428,15 @@ class Result(FSM):
     # TODO: adjust all users of .notify() to use fsm_callback and
     # accept a transition object?
     # pylint: disable=unused-argument
-    def callback(fsm, fsm_transition):
+    def result_callback_wrapper(fsm, fsm_transition):
       ''' `FSM.fsm_callback` shim for plain `notify(Result)` notifier functions.
       '''
       self.collected = True
       return notifier(fsm)
 
-    with self._lock:
-      self.fsm_callback('CANCELLED', callback)
-      self.fsm_callback('DONE', callback)
+    with self.__lock:
+      self.fsm_callback('CANCELLED', result_callback_wrapper)
+      self.fsm_callback('DONE', result_callback_wrapper)
       state = self.fsm_state
     # already cancelled or done? call the notifier immediately
     if state in (self.CANCELLED, self.DONE):
@@ -445,6 +450,14 @@ class Result(FSM):
         `retval` is the result of `self`, and use that to complete
         the secondary `Result`.
 
+        *Important note*: because the completion lock object is
+        released after the internal `FSM.fsm_event` call, the
+        callback used to implement `.post_notify` is fired before
+        the lock object is released. As such, it would deadlock as
+        it waits for completion of `self` by using that lock.
+        Therefore the callback dispatches a separate `Thread` to
+        wait for `self` and then run `post_func`.
+
         Example:
 
             # submit packet to data stream
@@ -456,13 +469,22 @@ class Result(FSM):
 
         If the `Result` has already completed this will happen immediately.
     '''
-    post_R = Result(f'POST_RESULT[{self.name}]')
+    post_R = Result(f'post_notify({self.name}):{post_func}')
 
-    def notifier(preR):
+    def post_notify_notifier(preR):
+      '''Run `post_func(self())`.'''
       retval = preR()
       post_R.run_func(post_func, retval)
 
-    self.notify(notifier)
+    # We dispatch the post_func in a separate Thread because it
+    # will deadlock on the completion of self.
+    self.notify(
+        lambda preR: Thread(
+            name=f'{self}.post_notify({post_func})',
+            target=post_notify_notifier,
+            args=(preR,)
+        ).start()
+    )
     return post_R
 
 def in_thread(func):
@@ -517,7 +539,7 @@ def report(LFs):
   Q = Queue()
   n = 0
   notify = Q.put
-  for LF in LFs:
+  for LF in list(LFs):
     n += 1
     LF.notify(notify)
   for _ in range(n):

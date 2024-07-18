@@ -18,7 +18,8 @@ import sys
 __version__ = '20210316-post'
 
 DISTINFO = {
-    'description': "Convenience functions for constructing shell commands.",
+    'description':
+    "Convenience functions for constructing shell commands.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -27,9 +28,7 @@ DISTINFO = {
     ],
     'install_requires': [],
     'entry_points': {
-        'console_scripts': [
-            'shqstr = cs.sh:main_shqstr'
-        ],
+        'console_scripts': ['shqstr = cs.sh:main_shqstr'],
     },
 }
 
@@ -39,7 +38,9 @@ SAFECHARS = string.digits + string.ascii_letters + '-+_.,/:'
 def quote(args):
   ''' Quote the supplied strings, return a list of the quoted strings.
 
-      As of Python 3.8 the function `shlex.join()` is available for this.
+      As of Python 3.8 the function `shlex.join()` probably does
+      what you would have done with the result of this function
+      i.e. join the resulting strings together.
   '''
   return [quotestr(s) for s in args]
 
@@ -77,6 +78,7 @@ def quotestr(s):
   if q_count == 0:
     # unsafe but no single quotes
     return "'" + s + "'"
+
   def flush():
     ''' Output the pending characters, which are either all safe or all unsafe.
     '''
@@ -91,15 +93,16 @@ def quotestr(s):
       if not safe:
         if len(part) > 1:
           qparts.append("'")
+
   qparts = []
   start = 0
-  safe = True       # not in quotes
+  safe = True  # not in quotes
   for offset, c in enumerate(s):
     if c == "'" or (safe and c == '\\'):
       flush()
       qparts.append('\\')
       qparts.append(c)
-      start = offset + 1    # do not include this character in the flushable set
+      start = offset + 1  # do not include this character in the flushable set
       new_safe = False
     else:
       new_safe = c in SAFECHARS

@@ -1,0 +1,18 @@
+lib/python/cs/splink.py: cs.*: replace a lot of runstate plumbing with @uses_runstate
+lib/python/cs/splink.py: cs.splink,cs.result: fix spelling of "cancelled"
+lib/python/cs/splink.py: cs.splink: fix import
+lib/python/cs/splink.py: cs.splink: SPLinkData.plot: modern Upd usage
+lib/python/cs/splink.py: merge default => solar
+lib/python/cs/splink.py: cs.splink: tweak @uses_upd usage
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: rename det_data to detail_series_cropped for clarity
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: separate the figure setup and plotting from the data specifications, allowing flexible graphing
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: notice if any data specs fail to match, recite known data specs when this happens
+lib/python/cs/splink.py: cs.*: drop BaseCommand.apply_defaults in favour of the Options dataclass
+lib/python/cs/splink.py: merge vt ==> solar: assorted updates from the vt branch, mostly the cs.cmdutils ones
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.Options: fix references to SPLinkCommand.DEFAULT_FETCH_SOURCE_ENVVAR and SPLinkCommand.DEFAULT_SPDPATH_ENVVAR, manked during the move of the options to dataclasses
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.Options: default to the default FSTags instance
+lib/python/cs/splink.py: cs.splink: SPLinkCommand: new print_known_datasets method, use in help
+lib/python/cs/splink.py: cs.splink: SPLinkCommand.cmd_plot: if the start/stop times are out of order, swap them
+lib/python/cs/splink.py: cs.splink: ts2001_unixtime: correct docstring
+lib/python/cs/splink.py: merge default ==> ebooks
+lib/python/cs/splink.py: cs.splink: update DISTINFO

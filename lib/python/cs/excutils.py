@@ -11,10 +11,11 @@ Convenience facilities for managing exceptions.
 import sys
 import traceback
 from cs.deco import decorator
-from cs.gimmicks import exception, error, warning
+from cs.gimmicks import exception, warning
 from cs.py.func import funcname
+from cs.py3 import raise_from
 
-__version__ = '20221228-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'description':
@@ -29,6 +30,7 @@ DISTINFO = {
         'cs.deco',
         'cs.gimmicks',
         'cs.py.func',
+        'cs.py3',
     ],
 }
 
@@ -83,7 +85,6 @@ def noexc(func):
   '''
 
   def noexc_wrapper(*args, **kwargs):
-    from cs.gimmicks import exception  # pylint: disable=import-outside-toplevel
     from cs.x import X  # pylint: disable=import-outside-toplevel
     # pylint: disable=broad-except
     try:
@@ -121,7 +122,6 @@ def noexc_gen(func):
       it = iter(func(*args, **kwargs))
     except Exception as e0:
       try:
-        from cs.gimmicks import exception  # pylint: disable=import-outside-toplevel
         exception(
             "exception calling %s(*%s, **(%s)): %s", func.__name__, args,
             kwargs, e0
@@ -142,7 +142,6 @@ def noexc_gen(func):
         raise
       except Exception as e:
         try:
-          from cs.gimmicks import exception  # pylint: disable=import-outside-toplevel
           exception(
               "exception calling next(%s(*%s, **(%s))): %s", func.__name__,
               args, kwargs, e
@@ -244,39 +243,35 @@ class NoExceptions(object):
       if self.handler is not None:
         return self.handler(exc_type, exc_value, tb)
       # report handled exception
-      from cs.gimmicks import warning  # pylint: disable=import-outside-toplevel
       warning("IGNORE  " + str(exc_type) + ": " + str(exc_value))
       for line in traceback.format_tb(tb):
         warning("IGNORE> " + line[:-1])
     return True
 
-def LogExceptions(conceal=False):
+def LogExceptions(log=None, conceal=False):
   ''' Wrapper for `NoExceptions` which reports exceptions and optionally
       suppresses them.
   '''
 
-  def handler(exc_type, exc_value, _):
-    from cs.gimmicks import exception  # pylint: disable=import-outside-toplevel
-    exception("EXCEPTION: <%s> %s", exc_type, exc_value)
+  def handler(exc_type, exc_value, exc_tb):
+    logmsg = exception if log is None else log
+    logmsg("EXCEPTION: <%s> %s", exc_type, exc_value)
     return conceal
 
   return NoExceptions(handler)
 
-def logexc(func):
+@decorator
+def logexc(func, **deco_kw):
   ''' Decorator to log exceptions and reraise.
   '''
 
   def logexc_wrapper(*a, **kw):
-    with LogExceptions():
+    with LogExceptions(**deco_kw):
       return func(*a, **kw)
 
-  try:
-    name = func.__name__
-  except AttributeError:
-    name = str(func)
-  logexc_wrapper.__name__ = 'logexc(%s)' % (name,)
   return logexc_wrapper
 
+@decorator
 def logexc_gen(genfunc):
   ''' Decorator to log exceptions and reraise for generators.
   '''
@@ -291,7 +286,6 @@ def logexc_gen(genfunc):
           return
         yield item
 
-  logexc_gen_wrapper.__name__ = 'logexc_gen(%s)' % (genfunc.__name__,)
   return logexc_gen_wrapper
 
 @decorator

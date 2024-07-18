@@ -1,17 +1,33 @@
 #!/usr/bin/env python3
 
-''' Access the MacOS degfaults via the `defaults` command.
+''' Access the MacOS defaults via the `defaults` command.
 '''
 
 from subprocess import PIPE
 
+from cs.app.osx.plist import ingest_plist
 from cs.deco import cachedmethod
 from cs.lex import r
 from cs.psutils import run
 
-from .plist import ingest_plist
-
 from typeguard import typechecked
+
+__version__ = '20240316-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.app.osx.plist',
+        'cs.deco',
+        'cs.lex',
+        'cs.psutils',
+        'typeguard',
+    ],
+}
 
 def defaults(argv, *, host=None, doit=True, **subp):
   ''' Run the `defaults` command with the arguments `argv`.

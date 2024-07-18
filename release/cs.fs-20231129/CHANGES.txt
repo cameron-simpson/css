@@ -1,0 +1,6 @@
+lib/python/cs/fs.py: cs.fs: new HasFSPath.listdir method
+lib/python/cs/fs.py: cs.fs: HasFSPath.pathto: accept multiple relative subpaths
+lib/python/cs/fs.py: cs.fs: clean a little lint
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton: accept cls.FSPATH_FACTORY as a factory function for the default fspath, makes it possible to defer the path lookup
+lib/python/cs/fs.py: merge ebooks ==> default: cs.ebooks: initial Kobo Desktop support
+lib/python/cs/fs.py: cs.fs: replace is_clean_subpath with validate_rpath/is_valid_rpath pair
