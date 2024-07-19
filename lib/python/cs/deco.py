@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Decorators.
-#   - Cameron Simpson <cs@cskk.id.au> 02jul2017
+# - Cameron Simpson <cs@cskk.id.au> 02jul2017
 #
 
 r'''
@@ -18,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20240412-post'
+__version__ = '20240709-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -753,7 +753,7 @@ def default_params(func, _strict=False, **param_defaults):
 
       Atypical one off direct use:
 
-          @default_params(dbconn=open_default_dbconn,debug=lambda: settings.DB_DEBUG_MODE)
+          @default_params(dbconn=open_default_dbconn,debug=lambda:settings.DB_DEBUG_MODE)
           def dbquery(query, *, dbconn):
               dbconn.query(query)
 
@@ -764,13 +764,13 @@ def default_params(func, _strict=False, **param_defaults):
 
           # calling code which needs a ds3client
           @uses_ds3
-          def do_something(.., *, ds3client,...):
+          def do_something(.., *, ds3client, ...):
               ... make queries using ds3client ...
 
       This replaces the standard boilerplate and avoids replicating
       knowledge of the default factory as exhibited in this legacy code:
 
-          def do_something(.., *, ds3client=None,...):
+          def do_something(.., *, ds3client=None, ...):
               if ds3client is None:
                   ds3client = get_ds3client()
               ... make queries using ds3client ...
@@ -803,19 +803,24 @@ def default_params(func, _strict=False, **param_defaults):
       ]
   )
   sig0 = signature(func)
-  new_params = []
+  sig = sig0
+  modified_params = []
   for param in sig0.parameters.values():
+    modified_param = None
     try:
       param_default = param_defaults[param.name]
     except KeyError:
-      new_params.append(param)
+      pass
     else:
-      new_param = param.replace(
+      modified_param = param.replace(
           annotation=typing.Optional[param.annotation],
           default=None if param_default is param.empty else param_default,
       )
-      new_params.append(new_param)
-  defaulted_func.__signature__ = sig0.replace(parameters=new_params)
+    if modified_param is None:
+      modified_param = param.replace()
+    modified_params.append(modified_param)
+  sig = sig.replace(parameters=modified_params)
+  defaulted_func.__signature__ = sig
   return defaulted_func
 
 # pylint: disable=too-many-statements
@@ -950,6 +955,7 @@ def promote(func, params=None, types=None):
     if param.default is not Parameter.empty:
       anno_origin = typing.get_origin(annotation)
       anno_args = typing.get_args(annotation)
+      # recognise Optional[T], which becomes Union[T,None]
       if (anno_origin is typing.Union and len(anno_args) == 2
           and anno_args[-1] is type(None)):
         optional = True
@@ -963,7 +969,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (annotation, promote_method, optional)
+    promotions[param_name] = (param, annotation, promote_method, optional)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -979,43 +985,51 @@ def promote(func, params=None, types=None):
             __name__, arg_value
         )
     )
-    for param_name, (annotation, promote_method,
+    for param_name, (param, annotation, promote_method,
                      optional) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
         # parameter not supplied
-        continue
-      if optional and arg_value is None:
-        # skip omitted optional value
-        continue
+        if param.default is Parameter.empty:
+          continue
+        # fill in the default values
+        arg_value = param.default
       if isinstance(arg_value, annotation):
         # already of the desired type
         continue
       try:
-        promoted_value = promote_method(arg_value)
-      except TypeError as te:
-        # see if the value has an as_TypeName() method
-        as_method_name = "as_" + annotation.__name__
         try:
-          as_annotation = getattr(arg_value, as_method_name)
-        except AttributeError:
-          # no .as_TypeName, reraise the original TypeError
-          raise te  # pylint: disable=raise-missing-from
-        else:
-          if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
-            # bound instance method of arg_value
-            try:
-              as_value = as_annotation()
-            except (TypeError, ValueError) as e:
-              raise TypeError(
-                  "%s: %s.%s(): %s" %
-                  (get_context(), param_name, as_method_name, e)
-              ) from e
+          promoted_value = promote_method(arg_value)
+        except TypeError as te:
+          # see if the value has an as_TypeName() method
+          as_method_name = "as_" + annotation.__name__
+          try:
+            as_annotation = getattr(arg_value, as_method_name)
+          except AttributeError:
+            # no .as_TypeName, reraise the original TypeError
+            raise te  # pylint: disable=raise-missing-from
           else:
-            # assuming a property or even a plain attribute
-            as_value = as_annotation
-          arg_value = as_value
+            if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
+              # bound instance method of arg_value
+              try:
+                as_value = as_annotation()
+              except (TypeError, ValueError) as e:
+                raise TypeError(
+                    "%s: %s.%s(): %s" %
+                    (get_context(), param_name, as_method_name, e)
+                ) from e
+            else:
+              # assuming a property or even a plain attribute
+              as_value = as_annotation
+            arg_value = as_value
+      except TypeError:
+        # promotion fails
+        if (optional and arg_value is param.default
+            and param.default is not Parameter.empty):
+          # allow omitted/unconverted optional value with default None
+          continue
+        raise
       else:
         arg_value = promoted_value
       arg_mapping[param_name] = arg_value

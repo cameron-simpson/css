@@ -1,0 +1,5 @@
+lib/python/cs/resources.py: cs.resources: @uses_runstate: if we make a new RunState, get the default name from the wrapped function
+lib/python/cs/resources.py: cs.resources: @uses_runstate: docstring
+lib/python/cs/resources.py: cs.resources: RunState.cancel: just call fsm_event('cancel'), put the effects in there; drop the .cancelled setter
+lib/python/cs/resources.py: cs.resources: RunState.run_time: handle surprising stop_time=None
+lib/python/cs/resources.py: cs.resources: update DISTINFO

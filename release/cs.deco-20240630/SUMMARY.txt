@@ -1,0 +1,2 @@
+@default_params: apply modified signature parameters one at a time, as applying them in a single list seems to trigger some ordering checks.
+@promote: pass the original Parameter through to the wrapper so that we can use .default if needed, have the wrapper test for None last, so that we can promote None to something with a .from_NoneType method, make the check for the default value more specific.

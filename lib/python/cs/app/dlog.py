@@ -291,13 +291,12 @@ class DLog:
 
   @classmethod
   @uses_runstate
-  @promote
   @typechecked
   def daemon(
       cls,
       pipepath: str,
       logpath: Optional[str] = None,
-      sqltags: Optional[SQLTags] = None,
+      sqltags: Optional[SQLTags | str] = None,
       *,
       runstate: RunState,
   ):
@@ -314,6 +313,7 @@ class DLog:
       try:
         pfd = pfx_call(os.open, pipepath, os.O_RDWR)
         q = Queue(1024)
+        # worker to read from the pipe and pass to the queue
         Thread(
             target=cls._daemon_worker,
             args=(pfd, q),
@@ -325,6 +325,7 @@ class DLog:
             lines = get_batch(q)
           if not lines:
             break
+          sqltags = SQLTags.promote(sqltags)
           # open the db once around the whole batch
           with sqltags:
             for lineno, line in lines:
@@ -412,7 +413,7 @@ class DLogCommand(BaseCommand):
             raise GetoptError("unparsed date: %s" % (e,))
           options.when = datetime2unixtime(dt)
         else:
-          raise RuntimeError("unimplemented option")
+          raise NotImplementedError("unimplemented option")
     if dt is None:
       dt = datetime.fromtimestamp(options.when)
     if badopts:

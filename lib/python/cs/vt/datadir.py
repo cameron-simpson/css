@@ -75,7 +75,6 @@ from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
-from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
 from cs.threads import locked, bg as bg_thread, joinif
@@ -879,14 +878,14 @@ class DataDir(FilesDir):
               info("skip nonfile")
               continue
           if new_size > DFstate.scanned_to:
-            warning(
-                "%s: new_size:%d > DFstate.scanned_to:%d", DFstate, new_size,
-                DFstate.scanned_to
-            )
+            ##warning(
+            ##    "%s: new_size:%d > DFstate.scanned_to:%d", DFstate, new_size,
+            ##    DFstate.scanned_to
+            ##)
             offset = DFstate.scanned_to
             hashclass = self.hashclass
             scanner = DFstate.scanfrom(offset=offset)
-            if run_modes.show_progress:
+            if run_modes.show_progress and new_size - offset >= 1024 * 1024:
               scanner = progressbar(
                   scanner,
                   "%s: scan %s" %
@@ -897,6 +896,7 @@ class DataDir(FilesDir):
                       lambda pre_dr_post: pre_dr_post[2] - pre_dr_post[0]
                   ),
                   units_scale=BINARY_BYTES_SCALE,
+                  report_print=True,
               )
             for pre_offset, DR, post_offset in scanner:
               hashcode = hashclass.from_data(DR.data)

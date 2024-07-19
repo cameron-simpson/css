@@ -79,7 +79,7 @@ def mount(
         to the mountpoint
       * `readonly`: forbid data modification operations
       * `append_only`: files may not be truncated or overwritten
-      * `fsname`: optional filesystem name for use by llfuse
+      * `fsname`: optional filesystem name for use by `llfuse`
   '''
   if readonly is None:
     readonly = S.readonly

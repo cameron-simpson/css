@@ -123,7 +123,7 @@ DEFAULT_PLOT_EVENT_LABELS = (
 pfx_listdir = partial(pfx_call, os.listdir)
 
 def main(argv=None):
-  ''' SP-Link command line mode.
+  ''' SP-Link command line mode using the `SPLinkCommand` class.
   '''
   return SPLinkCommand(argv).run()
 
@@ -722,7 +722,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     elif opt == '-n':
       options.doit = False
     else:
-      raise RuntimeError("unhandled pre-option")
+      raise NotImplementedError("unhandled pre-option")
 
   def print_known_datasets(self, file=None):
     ''' Print the known datasets and their fields to `file`.
@@ -833,15 +833,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
   @uses_upd
-  @uses_runstate
   def cmd_import(
-      self,
-      argv,
-      runstate: RunState,
-      upd: Upd,
-      datasets=None,
-      doit=None,
-      force=None
+      self, argv, *, upd: Upd, datasets=None, doit=None, force=None
   ):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
@@ -874,6 +867,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     datasets = options.datasets
     doit = options.doit
     force = options.force
+    runstate = options.runstate
     if not datasets:
       warning("empty dataset list")
     for dataset in datasets:

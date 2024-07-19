@@ -667,7 +667,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         )
         constraint = constraint_fn and constraint_fn(alias, timestamp)
       else:
-        raise RuntimeError("unhandled non-tag field %r" % (tag_name,))
+        raise NotImplementedError("unhandled non-tag field %r" % (tag_name,))
       sqlp = SQLParameters(
           criterion=self,
           alias=alias,
@@ -1994,6 +1994,14 @@ class SQLTags(BaseTagSets, Promotable):
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
+  TAGSETS_CLASS = SQLTags
+
+  TAGSET_CRITERION_CLASS = SQTCriterion
+
+  TAG_BASED_TEST_CLASS = SQLTagBasedTest
+
+  GETOPT_SPEC = 'f:'
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database shell.
@@ -2080,7 +2088,9 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
             )
         )
     else:
-      raise RuntimeError("unimplemented export format %r" % (export_format,))
+      raise NotImplementedError(
+          "unimplemented export format %r" % (export_format,)
+      )
 
   # pylint: disable=too-many-locals
   def cmd_find(self, argv):
@@ -2148,7 +2158,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         if option in ('-u', '--update'):
           update_mode = True
         else:
-          raise RuntimeError("unsupported option")
+          raise NotImplementedError("unsupported option")
     if not argv:
       warning("missing srcpaths")
       badopts = True
@@ -2210,7 +2220,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         elif opt == '-D':
           strptime_format = val
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if dt is not None and strptime_format is not None:
       warning("-d and -D are mutually exclusive")
       badopts = True
@@ -2372,14 +2382,6 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
   ''' Common features for commands oriented around an `SQLTags` database.
   '''
 
-  TAGSETS_CLASS = SQLTags
-
-  TAGSET_CRITERION_CLASS = SQTCriterion
-
-  TAG_BASED_TEST_CLASS = SQLTagBasedTest
-
-  GETOPT_SPEC = 'f:'
-
   # TODO:
   # export_csv [criteria...] >csv_data
   #   Export selected items to CSV data.
@@ -2395,13 +2397,12 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
   USAGE_KEYWORDS = {
       'DBURL_DEFAULT': DBURL_DEFAULT,
       'DBURL_ENVVAR': DBURL_ENVVAR,
+      'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
   }
 
   @dataclass
   class Options(BaseCommand.Options):
-    db_url: str = field(
-        default_factory=lambda: BaseSQLTagsCommand.TAGSETS_CLASS.infer_db_url()
-    )
+    db_url: str = None
     sqltags: Optional[SQLTags] = None
 
   def apply_opt(self, opt, val):
@@ -2420,6 +2421,8 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
     with super().run_context():
       options = self.options
       db_url = options.db_url
+      if db_url is None:
+        db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
       sqltags = self.TAGSETS_CLASS(db_url)
       with sqltags:
         with stackattrs(options, sqltags=sqltags, verbose=True):

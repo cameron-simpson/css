@@ -22,17 +22,17 @@ from os.path import (
     relpath,
     splitext,
 )
+from pathlib import Path
+from pwd import getpwuid
 from tempfile import TemporaryDirectory
 from threading import Lock
 from typing import Any, Callable, Optional, Union
 
-from icontract import require
-
-from cs.deco import decorator
+from cs.deco import decorator, fmtdoc
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20240422-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -44,7 +44,6 @@ DISTINFO = {
         'cs.deco',
         'cs.obj',
         'cs.pfx',
-        'icontract',
     ],
 }
 
@@ -141,7 +140,7 @@ def scandirtree(
       * `dirpath`: the directory to scan, default `'.'`
       * `include_dirs`: if true yield directories; default `False`
       * `name_selector`: optional callable to select particular names;
-        the default is to select names no starting with a dot (`'.'`)
+        the default is to select names not starting with a dot (`'.'`)
       * `only_suffixes`: if supplied, skip entries whose extension
         is not in `only_suffixes`
       * `skip_suffixes`: if supplied, skip entries whose extension
@@ -161,23 +160,27 @@ def scandirtree(
     except NotADirectoryError:
       yield False, path
       continue
-    if include_dirs:
+    if not recurse and include_dirs:
       yield True, path
     if sort_names:
       dirents = sorted(dirents, key=lambda entry: entry.name)
     for entry in dirents:
-      if recurse and entry.is_dir(follow_symlinks=follow_symlinks):
-        pending.append(entry.path)
       name = entry.name
       if not name_selector(name):
         continue
       if only_suffixes or skip_suffixes:
-        base, ext = splitext(name)
+        _, ext = splitext(name)
         if only_suffixes and ext[1:] not in only_suffixes:
           continue
         if skip_suffixes and ext[1:] in skip_suffixes:
           continue
-      if include_dirs or not entry.is_dir(follow_symlinks=follow_symlinks):
+      is_dir = entry.is_dir(follow_symlinks=follow_symlinks)
+      if is_dir:
+        if recurse:
+          pending.append(entry.path)
+        if include_dirs:
+          yield True, entry.path
+      else:
         yield False, entry.path
 
 def scandirpaths(dirpath='.', **scan_kw):
@@ -329,40 +332,145 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
 
     '''
     if '_lock' in self.__dict__:
-      return False
+      return
     fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
     if lock is None:
       lock = Lock()
     self._lock = lock
-    return True
 
-DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
+SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 
-def shortpath(path, prefixes=None):
-  ''' Return `path` with the first matching leading prefix replaced.
+@fmtdoc
+def shortpath(
+    fspath, prefixes=None, *, collapseuser=False, foldsymlinks=False
+):
+  ''' Return `fspath` with the first matching leading prefix replaced.
 
       Parameters:
-      * `environ`: environment mapping if not os.environ
-      * `prefixes`: optional iterable of `(prefix,subst)` to consider for replacement;
-        each `prefix` is subject to environment variable
-        substitution before consideration
-        The default considers "$HOME/" for replacement by "~/".
+      * `prefixes`: optional list of `(prefix,subst)` pairs
+      * `collapseuser`: optional flag to enable detection of user
+        home directory paths; default `False`
+      * `foldsymlinks`: optional flag to enable detection of
+        convenience symlinks which point deeper into the path;
+        default `False`
+
+      The `prefixes` is an optional iterable of `(prefix,subst)`
+      to consider for replacement.  Each `prefix` is subject to
+      environment variable substitution before consideration.
+      The default `prefixes` is from `SHORTPATH_PREFIXES_DEFAULT`:
+      `{SHORTPATH_PREFIXES_DEFAULT!r}`.
   '''
   if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
+    prefixes = SHORTPATH_PREFIXES_DEFAULT
+  if collapseuser or foldsymlinks:
+    # our resolved path
+    leaf = Path(fspath).resolve()
+    assert leaf.is_absolute()
+    # Paths from leaf-parent to root
+    parents = list(leaf.parents)
+    paths = [leaf] + parents
+
+    def statkey(S):
+      ''' A 2-tuple of `(S.st_dev,Sst_info)`.
+      '''
+      return S.st_dev, S.st_ino
+
+    def pathkey(P):
+      ''' A 2-tuple of `(st_dev,st_info)` from `P.stat()`
+          or `None` if the `stat` fails.
+      '''
+      try:
+        S = P.stat()
+      except OSError:
+        return None
+      return statkey(S)
+
+    base_s = None
+    if collapseuser:
+      # scan for the lowest homedir in the path
+      pws = {}
+      for i, path in enumerate(paths):
+        try:
+          st = path.stat()
+        except OSError:
+          continue
+        try:
+          pw = pws[st.st_uid]
+        except KeyError:
+          pw = pws[st.st_uid] = getpwuid(st.st_uid)
+        if path.samefile(pw.pw_dir):
+          base_s = '~' if pw.pw_uid == os.geteuid() else f'~{pw.pw_name}'
+          paths = paths[:i + 1]
+          break
+    # a list of (Path,display) from base to leaf
+    paths_as = [[path, None] for path in reversed(paths)]
+    # note the display for the base Path
+    paths_as[0][1] = base_s
+    if not foldsymlinks:
+      keep_as = paths_as
+    else:
+      # look for symlinks which point deeper into the path
+      # map path keys to (i,path)
+      pathindex_by_key = {
+          sk: i
+          for sk, i in
+          ((pathkey(path_as[0]), i) for i, path_as in enumerate(paths_as))
+          if sk is not None
+      }
+      # scan from the base towards the leaf, excluding the leaf
+      i = 0
+      keep_as = []
+      while i < len(paths_as) - 1:
+        path_as = paths_as[i]
+        keep_as.append(path_as)
+        path = path_as[0]
+        skip_to_i = None
+        try:
+          for entry in os.scandir(path):
+            if not entry.name.isalpha():
+              continue
+            try:
+              if not entry.is_symlink():
+                continue
+              sympath = os.readlink(entry.path)
+            except OSError:
+              continue
+            # only consider clean subpaths
+            if not is_valid_rpath(sympath):
+              continue
+            # see the the symlink resolves to a path entry
+            try:
+              pathndx = pathindex_by_key[statkey(entry.stat())]
+            except KeyError:
+              continue
+            if skip_to_i is None or pathndx > skip_to_i:
+              # we will advance to skip_to_i
+              skip_to_i = pathndx
+              # note the symlink name for this component
+              paths_as[skip_to_i][1] = entry.name
+          i = i + 1 if skip_to_i is None else skip_to_i
+        except OSError:
+          i += 1
+    parts = list(
+        (path_as[1] or (path_as[0].path if i == 0 else path_as[0].name))
+        for i, path_as in enumerate(keep_as)
+    )
+    parts.append(paths_as[-1][1] or leaf.name)
+    fspath = os.sep.join(parts)
+  # replace leading prefix
   for prefix, subst in prefixes:
     prefix = expandvars(prefix)
-    if path.startswith(prefix):
-      return subst + path[len(prefix):]
-  return path
+    if fspath.startswith(prefix):
+      return subst + fspath[len(prefix):]
+  return fspath
 
 def longpath(path, prefixes=None):
   ''' Return `path` with prefixes and environment variables substituted.
       The converse of `shortpath()`.
   '''
   if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
+    prefixes = SHORTPATH_PREFIXES_DEFAULT
   for prefix, subst in prefixes:
     if path.startswith(subst):
       path = prefix + path[len(subst):]
