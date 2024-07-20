@@ -24,7 +24,7 @@ from cs.deco import decorator, contextdecorator
 from cs.fileutils import lockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import ThreadState
