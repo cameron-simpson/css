@@ -881,14 +881,18 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
                                                '').split(',')):
       self.engine_keywords.update(echo=True)
-    self.define_schema()
+    self.__first_use = True
 
-  def define_schema(self):
-    ''' Instantiate the schema and define the root metanode.
-    '''
-    with self.sqla_state.auto_session() as session:
-      self.Base.metadata.create_all(bind=self.engine)
-      self.prepare_metanode(session=session)
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      # make sure the schema is up to date
+      # in particular, create the metanode 0 if missing
+      if self.__first_use:
+        with self.sqla_state.auto_session() as session:
+          self.prepare_metanode(session=session)
+        self.__first_use = False
+      yield
 
   def prepare_metanode(self, *, session):
     ''' Ensure row id 0, the metanode, exists.
