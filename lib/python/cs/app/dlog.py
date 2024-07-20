@@ -108,7 +108,7 @@ def main(argv=None):
 
 DEFAULT_DBPATH = DBURL_DEFAULT
 DEFAULT_LOGPATH = '~/var/log/dlog-quick'
-DEFAULT_PIPEPATH = '~/var/log/dlog.pipe'
+DEFAULT_PIPEPATH = '~/var/dlog.pipe'
 
 CATS_RE = re.compile(r'([A-Z][A-Z0-9]*(,+[A-Z][A-Z0-9]*)*):\s*')
 
