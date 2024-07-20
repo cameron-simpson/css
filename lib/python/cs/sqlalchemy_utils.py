@@ -19,6 +19,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
 from typeguard import typechecked
 
+from cs.context import contextif
 from cs.deco import decorator, contextdecorator
 from cs.fileutils import lockfile
 from cs.lex import cutprefix
@@ -56,6 +57,7 @@ DISTINFO = {
         'icontract',
         'sqlalchemy>=2.0',
         'typeguard',
+        'cs.context',
         'cs.deco',
         'cs.fileutils',
         'cs.lex',
@@ -282,7 +284,7 @@ class ORM(MultiOpenMixin, ABC):
         # no fs path
         db_fspath = None
     else:
-      # starts with sqlite:///, we have the db_fspath
+      # starts with sqlite:///, we have the db_fspath from the cutprefix
       pass
     self.db_url = db_url
     self.db_fspath = db_fspath
@@ -320,7 +322,9 @@ class ORM(MultiOpenMixin, ABC):
       self.engine_keywords.update(
           poolclass=NullPool, connect_args={'check_same_thread': False}
       )
+    # declare the schema - does not access the db itself
     self.declare_schema()
+    self.__first_use = True
 
   @abstractmethod
   def declare_schema(self):
@@ -356,10 +360,17 @@ class ORM(MultiOpenMixin, ABC):
         The lock file is only operated if `self.db_fspath`,
         currently set only for filesystem SQLite database URLs.
     '''
-    if self.db_fspath:
-      with lockfile(self.db_fspath, poll_interval=0.2):
-        yield
-    else:
+    with contextif(
+        bool(self.db_fspath),
+        lockfile,
+        self.db_fspath,
+        poll_interval=0.2,
+    ):
+      # make sure that the db tables are up to date
+      if self.__first_use:
+        with self.sqla_state.auto_session() as session:
+          self.Base.metadata.create_all(bind=self.engine)
+        self.__first_use = False
       yield
 
   @property
