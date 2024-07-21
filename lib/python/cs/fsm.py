@@ -399,6 +399,42 @@ class FSM(DOTNodeMixin):
     dot.append('}')
     return sep.join(dot)
 
+  @classmethod
+  def fsm_print_state_diagram(
+      cls,
+      file=None,
+      *,
+      fmt=None,
+      graph_name=None,
+      history=None,
+      history_style=None,
+      state=None,
+      transitions=None,
+      **gvprint_kw,
+  ):
+    ''' Print the state diagram via `cs.gvutils.gvprint`.
+
+        The DOT syntax graph description is computed with
+        `FSM.fsm_state_diagram_as_dot` and the `graph_name`,
+        `history`, `history_style`, `state` and `transitions`
+        parameters are passed through to this.
+
+        If `fmt` is specified as `dot` then the DOT and any remaining
+        keyword arguments are passed to `print()`.
+
+        Otherwise any remaining keyword paramaeters are passed to `gvprint`.
+    '''
+    dot_s = cls.fsm_state_diagram_as_dot(
+        transitions,
+        state=state,
+        graph_name=graph_name,
+        history=history,
+        history_style=history_style,
+    )
+    if fmt == 'dot':
+      return print(dot_s, **gvprint_kw)
+    return gvprint(dot_s, file=file, **gvprint_kw)
+
   @property
   def fsm_dot(self) -> str:
     ''' A DOT syntax description of the state diagram in the current state.
