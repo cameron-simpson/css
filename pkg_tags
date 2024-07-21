@@ -60,7 +60,7 @@ cs.ffmpegutils ok_revision="9dbd656200e52f7a9bbd101154dd5c54ce5d507c" pypi.relea
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20240709" ok_revision="714723fb2798e1804c008f26c88dc9b2a31d2f73" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
 cs.fs ok_revision="30e13ce7b5c4bcf822645f5777fdc3c58391eb8d" pypi.release="20240630" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"],"20240422":["scandirpaths","scandirtree"]}
-cs.fsm ok_revision="5ae8004fa098d550560f7f00cfec61728b3fe805" pypi.release="20240712" features={"20231018":["fsm_transitions_as_dot__history_style"],"20240630":["CancellationError"]}
+cs.fsm ok_revision="4e0e313b2b440e0a5ee4c0a7f39d06910c4167b1" pypi.release="20240712" features={"20231018":["fsm_transitions_as_dot__history_style"],"20240630":["CancellationError"]}
 cs.fsrelease
 cs.fstag
 cs.fstags pypi.release="20240709" ok_revision=b7b194343492a4b00703e8daaca1b9cdbc13fc3c features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"],"20240422":["fix_fstags__repr"],"20240709":["CachedValue"]}
