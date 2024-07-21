@@ -433,7 +433,7 @@ class FSM(DOTNodeMixin):
     )
     if fmt == 'dot':
       return print(dot_s, **gvprint_kw)
-    return gvprint(dot_s, file=file, **gvprint_kw)
+    return gvprint(dot_s, file=file, fmt=fmt, **gvprint_kw)
 
   @property
   def fsm_dot(self) -> str:
