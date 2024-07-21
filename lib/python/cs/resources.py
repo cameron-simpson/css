@@ -26,7 +26,7 @@ from cs.obj import Proxy
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import signal_handlers
 from cs.py.func import funccite
-from cs.py.stack import caller, frames as stack_frames, stack_dump, StackSummary
+from cs.py.stack import caller, frames as stack_frames, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
 
@@ -55,7 +55,7 @@ DISTINFO = {
 }
 
 class ClosedError(Exception):
-  ''' Exception for operations invalid when something is closed.
+  ''' Exception for operations which are invalid when something is closed.
   '''
 
 @decorator
@@ -364,7 +364,7 @@ class MultiOpenMixin(ContextManagerMixin):
   @property
   def closed(self):
     ''' Whether this object has been closed.
-        Note: False if never opened.
+        Note: `False` if never opened.
     '''
     state = self.MultiOpenMixin_state
     if state.opens > 0:
@@ -433,26 +433,38 @@ class _SubOpen(Proxy):
     self._proxied.close()
     self.closed = True
 
+@OBSOLETE
 class MultiOpen(MultiOpenMixin):
-  ''' Context manager class that manages a single open/close object
-      using a MultiOpenMixin.
+  ''' A context manager class that manages a single-open/close object
+      using a `MultiOpenMixin`.
+
+      Use:
+
+          mo = MultiOpen(obj)
+          ......
+          with mo:
+               .... use obj ...
+
+      This required `obj` to have a `.open()` method which can
+      be called with no arguments (which is pretty uncommon)
+      and a `.close()` method.
   '''
 
   def __init__(self, openable, finalise_later=False):
     ''' Initialise: save the `openable` and call the MultiOpenMixin initialiser.
     '''
-    MultiOpenMixin.__init__(self, finalise_later=finalise_later)
+    super().__init__(self, finalise_later=finalise_later)
     self.openable = openable
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Open the associated openable object.
     '''
     self.openable.open()
-
-  def shutdown(self):
-    ''' Close the associated openable object.
-    '''
-    self.openable.close()
+    try:
+      yield
+    finally:
+      self.openable.close()
 
 @contextmanager
 def openif(obj):
@@ -759,7 +771,7 @@ class RunState(FSM, HasThreadState):
 
   def raiseif(self, msg=None, *a):
     ''' Raise `CancellationError` if cancelled.
-        This is the concise way to terminate an operation which honour
+        This is the concise way to terminate an operation which honours
         `.cancelled` if you're prepared to handle the exception.
 
         Example:
@@ -771,9 +783,8 @@ class RunState(FSM, HasThreadState):
     if self.cancelled:
       if msg is None:
         msg = "%s.cancelled" % (self,)
-      else:
-        if a:
-          msg = msg % a
+      elif a:
+        msg = msg % a
       raise CancellationError(msg)
 
   @property
@@ -795,7 +806,7 @@ class RunState(FSM, HasThreadState):
 
   @property
   def run_time(self):
-    ''' Property returning most recent run time (`stop_time-start_time`).
+    ''' A property returning most recent run time (`stop_time-start_time`).
         If still running, use now as the stop time.
         If not started, return `0.0`.
     '''
