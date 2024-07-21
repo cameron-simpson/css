@@ -79,9 +79,7 @@ def gvprint(
   if file is None:
     file = sys.stdout
   if isinstance(file, str):
-    if existspath(file):
-      raise ValueError("file %r: already exists" % (file,))
-    with open(file, 'wb') as f:
+    with open(file, 'xb') as f:
       return gvprint(dot_s, file=f, fmt=fmt, layout=layout, **dot_kw)
   if file is GVDATAURL:
     if dataurl_encoding is None:
