@@ -17,7 +17,7 @@ from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 from cs.seq import first
 
-__version__ = '20240721.1'
+__version__ = '20240721.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
