@@ -510,12 +510,13 @@ class PathView(LabelFrame):
     return suggestions
 
   @property
-  def tagged(self):
+  @uses_fstags
+  def tagged(self, *, fstags: FSTags):
     ''' The `TaggedFile` for the currently displayed path.
     '''
     if self._fspath is None:
       return None
-    return self.tagger.fstags[self._fspath]
+    return fstags[self._fspath]
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
