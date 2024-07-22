@@ -1,0 +1,17 @@
+lib/python/cs/result.py: cs.fsm,result: move CancellationError from cs.result to cs.fsm, and use it to catch silently FSM event callbacks which raise it
+lib/python/cs/result.py: cs.result: drop Python 2 cs.py3 compatibility package
+lib/python/cs/result.py: cs.result: report: avoid iterating over the live set
+lib/python/cs/result.py: cs.result: Result: drop the PREPARE state, allow 'cancel' no-op event in CANCELLED and DONE states
+lib/python/cs/result.py: cs.result: Result.__init__: pass state straight through, make params after name keyword only
+lib/python/cs/result.py: cs.result: Result: rename self._lock to self.__lock to avoid conflicts in subclasses
+lib/python/cs/result.py: cs.result: Result._complete: move up the top, rely on fsm_event for the state logic checks
+lib/python/cs/result.py: cs.result: Result.cancel(): just fires the 'cancel' event now
+lib/python/cs/result.py: cs.result: Result.result,exc_info getters: raise CancellationError if the Result is cancelled
+lib/python/cs/result.py: cs.result: Result: improve a CancellationError construction now that it subclasses FSMError
+lib/python/cs/result.py: cs.result: update imports, DISTINFO
+lib/python/cs/result.py: cs.result: Result.post_notify: instead of having FSM.fsm_event run all callbacks in a worker Thread, have out callback dispatch a Thread for our special situation
+lib/python/cs/result.py: cs.result: Result._complete: fire the 'complete' event after the ._result and ._exc_info attributes are set but still before the self._get_lock.release()
+lib/python/cs/result.py: cs.result: rename an inner function for clarity
+lib/python/cs/result.py: cs.result: add missing import
+lib/python/cs/result.py: cs.result: Result.raise_: add some examples to the docstring
+lib/python/cs/result.py: cs.result: Result: preserve message passed to .cancel(), _complete raises RuntimeError if already complete

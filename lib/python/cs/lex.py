@@ -44,7 +44,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20240519-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -400,6 +400,13 @@ def skipwhite(s, offset=0):
   '''
   _, offset = get_white(s, offset=offset)
   return offset
+
+def indent(paragraph, line_indent="  "):
+  ''' Return the `paragraph` indented by `line_indent` (default `"  "`).
+  '''
+  return "\n".join(
+      line and line_indent + line for line in paragraph.split("\n")
+  )
 
 def stripped_dedent(s):
   ''' Slightly smarter dedent which ignores a string's opening indent.

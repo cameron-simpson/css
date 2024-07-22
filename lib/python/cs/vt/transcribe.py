@@ -79,7 +79,7 @@ class Transcriber(Promotable):  ##, ABC):
 
       Transcribers implement the following methods:
       * `transcribe_inner(T, fp)`: to transcribe to the file `fp`.
-      * `parse_inner(T, s, offset, stopchar)`:
+      * `parse_inner(T,s,offset,*,stopchar='}',prefix=None)`:
         to parse this class up to `stopchar`.
 
       Optional attribute:
@@ -274,7 +274,9 @@ class Transcriber(Promotable):  ##, ABC):
           if prefix_cls is None:
             raise ValueError("prefix not registered")
           with Pfx("prefix_cls=%s", prefix_cls.__name__):
-            obj, offset = prefix_cls.parse_inner(s, offset, '}', prefix)
+            obj, offset = prefix_cls.parse_inner(
+                s, offset, stopchar='}', prefix=prefix
+            )
             assert isinstance(
                 obj, prefix_cls
             ), f'{prefix_cls}.parse_inner did not return the expected object type, got {type(obj)}'

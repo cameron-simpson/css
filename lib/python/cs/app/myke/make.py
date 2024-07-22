@@ -465,10 +465,10 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
             yield Target(
                 self,
                 target,
-                context,
+                context=context,
                 prereqs=prereqs_mexpr,
                 postprereqs=postprereqs_mexpr,
-                actions=action_list
+                actions=action_list,
             )
           continue
 
@@ -521,7 +521,14 @@ class TargetMap(NS):
   ):
     ''' Construct a new Target.
     '''
-    return Target(maker, name, context, prereqs, postprereqs, actions)
+    return Target(
+        maker,
+        name,
+        context=context,
+        prereqs=prereqs,
+        postprereqs=postprereqs,
+        actions=actions,
+    )
 
   def __setitem__(self, name, target):
     ''' Record new target in map.
@@ -550,27 +557,32 @@ class Target(Result):
       self,
       maker: Maker,
       name: str,
+      *,
       context,
       prereqs,
       postprereqs,
       actions,
   ):
     ''' Initialise a new target.
-          `maker`: the Maker with which this Target is associated.
-          `context`: the file context, for citations.
-          `name`: the name of the target.
-          `prereqs`: macro expression to produce prereqs.
-          `postprereqs`: macro expression to produce post-inference prereqs.
-          `actions`: a list of actions to build this Target
-          The same actions list is shared amongst all Targets defined
-          by a common clause in the Mykefile, and extends during the
-          Mykefile parse _after_ defining those Targets. So we do not
-          modify it the class; instead we extend .pending_actions
-          when .require() is called the first time, just as we do for a
-          :make directive.
-    '''
 
-    Result.__init__(self, name=name, lock=RLock())
+        Parameters:
+        * `maker`: the Maker with which this Target is associated.
+        * `context`: the file context, for citations.
+        * `name`: the name of the target.
+        * `prereqs`: macro expression to produce prereqs.
+        * `postprereqs`: macro expression to produce post-inference prereqs.
+        * `actions`: a list of actions to build this Target
+
+        The same actions list is shared amongst all `Target`s defined
+        by a common clause in the Mykefile, and extends during the
+        Mykefile parse _after_ defining those Targets. So we do not
+        modify it the class; instead we extend .pending_actions
+        when .require() is called the first time, just as we do for a
+        :make directive.
+  '''
+
+    self._lock = RLock()
+    Result.__init__(self, name=name, lock=self._lock)
     self.maker = maker
     self.context = context
     self.shell = SHELL

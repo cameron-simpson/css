@@ -158,8 +158,8 @@ case "$op" in
       printf 'top %s\ntype %s\nbranch %s\n' "$vcs_top" "$vcs_type" "$vcs_branch"
       case "$vcs_type" in
         hg)
-          bookmark=$(hg bookmark | sed -n '/^ \* /!d; s///; s/ .*//; p')
-          printf 'bookmark %s\n' "$bookmark"
+          ## bookmark=$(hg bookmark | sed -n '/^ \* /!d; s///; s/ .*//; p')
+          ## printf 'bookmark %s\n' "$bookmark"
           ;;
       esac
     fi

@@ -56,7 +56,7 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20240316-post'
+__version__ = '20240522-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -77,14 +77,17 @@ DISTINFO = {
         'cs.context',
         'cs.deco',
         'cs.fileutils>=atomic_filename',
+        'cs.fstags',
         'cs.lex',
         'cs.logutils',
+        'cs.mediainfo',
         'cs.pfx>=pfx_call',
         'cs.progress',
         'cs.resources',
         'cs.result',
         'cs.service_api',
         'cs.sqltags',
+        'cs.tagset',
         'cs.threads',
         'cs.units',
         'cs.upd',
@@ -297,7 +300,7 @@ class PlayOnCommand(BaseCommand):
         elif opt == '-n':
           no_download = True
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if not argv:
       argv = ['pending']
     api = options.api
@@ -401,7 +404,7 @@ class PlayOnCommand(BaseCommand):
       elif opt == '-o':
         listing_format = val
       else:
-        raise RuntimeError("unhandled option: %r" % (opt,))
+        raise NotImplementedError("unhandled option: %r" % (opt,))
     if not argv:
       argv = list(default_argv)
     xit = 0

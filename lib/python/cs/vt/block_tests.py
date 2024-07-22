@@ -8,6 +8,7 @@
 '''
 
 from contextlib import contextmanager
+from logging import warning
 import sys
 ##sys.setrecursionlimit(10000)
 from random import choice
@@ -105,7 +106,7 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
           if subspan == 0:
             block_type = BlockType.BT_LITERAL
         else:
-          raise ValueError("unknow block type")
+          raise ValueError("unknown block type")
         self.assertEqual(
             B.type, block_type, "new Block is wrong type: %r, should be %r" % (
                 B.type,
@@ -223,11 +224,12 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
             elif Btype == BlockType.BT_RLE:
               self.assertEqual(B2.get_spanned_data(), B2.octet * B2.span)
             elif Btype == BlockType.BT_LITERAL:
-              raise unittest.SkipTest("no specific test for LiteralBlock")
+              # no specific test for LiteralBlock
+              continue
             elif Btype == BlockType.BT_SUBBLOCK:
               self._verify_block(B2.superblock)
             else:
-              raise unittest.SkipTest(
+              warning(
                   "no type specific tests for Block type %r" % (block_type,)
               )
 

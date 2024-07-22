@@ -1,0 +1,16 @@
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand._list: it is not an error if there are no recordings
+lib/python/cs/app/playon.py: cs.*: changes to accomodate dropping BaseCommandOptions.runstate
+lib/python/cs/app/playon.py: cs.*: we also dropped BaseCommandOptions.upd in favour of @uses_upd; related lint cleanups
+lib/python/cs/app/playon.py: cs.app.plex,cs.app.playon,cs.mediainfo: move scrub_title() into cs.mediainfo, update uses
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_feature: update option parse
+lib/python/cs/app/playon.py: cs.app.playon: new SeriesEpisodeInfo class expressing TV series episode information with .from_Recording factory to make one from a Playon recording; new Recording.sei cached property to get the SeriesEpisodeInfo for a Recording
+lib/python/cs/app/playon.py: cs.app.playon: SeriesEpisodeInfo.from_Recording: handle the occasional series at the front of the episode name
+lib/python/cs/app/playon.py: cs.app.playon: Recording.nice_name: use self.sei to produce the citation string, use in the default ls format
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand,PlayOnAPI: honour the options.runstate
+lib/python/cs/app/playon.py: cs.app.playon: Recording.series_prefix,series_episode_name: use self.sei, add ptNN support
+lib/python/cs/app/playon.py: cs.app.playon: new SeriesEpisodeInfo.as_dict() method, use it to apply the series info as direct top level tags to the downloaded file
+lib/python/cs/app/playon.py: cs.app.playon: rename SeriesEpisodeInfo to PlayonSeriesEpisodeInfo and subclass cs.mediainfo.SeriesEpisodeInfo, have from_Recording start with SeriesEpisodeInfo.from_str(playon.Name) and then override
+lib/python/cs/app/playon.py: cs.app.playon: new rename command
+lib/python/cs/app/playon.py: cs.app.playon: remove debugging
+lib/python/cs/app/playon.py: cs.app.playon: remove more debug, tweak rename tracing
+lib/python/cs/app/playon.py: cs.app.playon: update DISTINFO

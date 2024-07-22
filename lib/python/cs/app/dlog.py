@@ -108,7 +108,7 @@ def main(argv=None):
 
 DEFAULT_DBPATH = DBURL_DEFAULT
 DEFAULT_LOGPATH = '~/var/log/dlog-quick'
-DEFAULT_PIPEPATH = '~/var/log/dlog.pipe'
+DEFAULT_PIPEPATH = '~/var/dlog.pipe'
 
 CATS_RE = re.compile(r'([A-Z][A-Z0-9]*(,+[A-Z][A-Z0-9]*)*):\s*')
 
@@ -207,7 +207,6 @@ class DLog:
       builtin_print(self, file=logf, flush=True)
 
   @pfx_method
-  @promote
   @require(
       lambda logpath, sqltags: logpath is not None or sqltags is not None,
       "one of logpath or sqltags must be supplied"
@@ -217,15 +216,15 @@ class DLog:
       logpath: Optional[str] = None,
       *,
       pipepath: Optional[str] = None,
-      sqltags: Optional[SQLTags] = None,
+      sqltags: Optional[SQLTags | str] = None,
   ):
     ''' Log to `pipepath`, falling back to `logpath` and/or `sqltags`.
 
         Parameters:
-        * `pipepath`: optional filesystem path of a named pipe
-           to which to write the log line
         * `logpath`: optional filesystem path of a regular file to
           which to append the log line
+        * `pipepath`: optional filesystem path of a named pipe
+           to which to write the log line
         * `sqltags`: optional `SQLTags` instance or filesystem path
           of an SQLite file to use with `SQLTags`; also log the `DLog`
           entry here
@@ -261,6 +260,8 @@ class DLog:
                 "failed to log to pipeath:%r: %s, falling back to direct log",
                 pipepath, e
             )
+        else:
+          warning(f'not a named pipe, ignoring {pipepath!r}')
     if logpath is None and sqltags is None:
       raise ValueError(
           f'{self.__class__.__name__}.log: logpath and sqltags cannot both be None'
@@ -272,6 +273,7 @@ class DLog:
       sql_logtags = TagSet(self.tags)
       sql_logtags.categories = sorted(self.categories)
       sql_logtags.headline = self.headline
+      sqltags = SQLTags.promote(sqltags)
       with sqltags:
         sqltags.default_factory(None, unixtime=self.when, tags=sql_logtags)
 
@@ -291,13 +293,12 @@ class DLog:
 
   @classmethod
   @uses_runstate
-  @promote
   @typechecked
   def daemon(
       cls,
       pipepath: str,
       logpath: Optional[str] = None,
-      sqltags: Optional[SQLTags] = None,
+      sqltags: Optional[SQLTags | str] = None,
       *,
       runstate: RunState,
   ):
@@ -314,6 +315,7 @@ class DLog:
       try:
         pfd = pfx_call(os.open, pipepath, os.O_RDWR)
         q = Queue(1024)
+        # worker to read from the pipe and pass to the queue
         Thread(
             target=cls._daemon_worker,
             args=(pfd, q),
@@ -325,6 +327,7 @@ class DLog:
             lines = get_batch(q)
           if not lines:
             break
+          sqltags = SQLTags.promote(sqltags)
           # open the db once around the whole batch
           with sqltags:
             for lineno, line in lines:
@@ -412,7 +415,7 @@ class DLogCommand(BaseCommand):
             raise GetoptError("unparsed date: %s" % (e,))
           options.when = datetime2unixtime(dt)
         else:
-          raise RuntimeError("unimplemented option")
+          raise NotImplementedError("unimplemented option")
     if dt is None:
       dt = datetime.fromtimestamp(options.when)
     if badopts:

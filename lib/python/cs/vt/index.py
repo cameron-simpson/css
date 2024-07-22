@@ -430,6 +430,14 @@ class NDBMIndex(BinaryIndex):
           with self._ndbm_lock:
             self._ndbm.close()
 
+  def __len__(self):
+    ''' Count the number of keys by iterating through them all.
+    '''
+    length = 0
+    for _ in self._ndbm.keys():
+      length += 1
+    return length
+
   def flush(self):
     ''' Flush the index: sync the ndbm.
     '''

@@ -1,3 +1,16 @@
+service_api: rate limiter? context manager to access it directly, implied if .API_RATE_LIMIT
+Upd: try the hide-the cursor stuff again, maybe in the update+clean method
+Upd: keep a set of dirty slots, update+clean method
+cs.cmdutils: getopt from a called subcommand should only produce the usage for the subcommand
+Result: embed state diagram in the PyPI README.md
+RunState: include state diagram in README.md
+setvar: not expanding leading $MANPATH etc
+bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
+cs.jsonutils: merge the various JSON utility functions?
+merge the variable jsonable functions?
+cs.binary: _BinaryMultiValue_Base.for_json: use jsonable?
+contextif: bypass the callable check if cmgr has .__enter__
+atomic_filename: use the O_EXCL tick for reliable rename-to-target stuff?
 RunState.notify_cancel: use the FSM notification system
 cs.fsm: why is the default state a per-thread perthread_state.initial_state d
 cs.cmdutils: solidify the thread wide runstate setup in run_context after merging the playon branch
@@ -7,11 +20,6 @@ motion-shrink-timelapse: use -disposition to extract the 7am video from as JPG a
     motion-shrink-timelapse: -metadata fields
     zz
 TODO: accept -f to specify the file?
-test2
-test2
-vt2: test1
-vt2: test1
-test1
 dk update: figure out the git rev associated with the imagewhich would be pulled, list log from fstag dk.lastrev to that rev
 cs.cmdutils/distinfo: cmd_blah descriptions should format the usage parts
 cs.cmdutils: recite module version in command usage message?

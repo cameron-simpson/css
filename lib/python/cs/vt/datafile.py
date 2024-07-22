@@ -218,7 +218,7 @@ class DataFile(SingletonMixin, HasFSPath, MultiOpenMixin):
   def scanfrom(self, *, offset=0, **scan_kw):
     ''' Scan the file from `offset` (default `0`)
         and yield `DataRecord` instances.
-        This honours the `BinaryMixin.scan` parameters
+        This honours the `AbstractBinary.scan` parameters
         such as `with_offsets`.
     '''
     with pfx_call(open, self.fspath, 'rb') as rf:
