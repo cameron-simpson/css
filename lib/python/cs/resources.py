@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import partial
 import sys
-from threading import Lock, current_thread, main_thread
+from threading import Lock, RLock, current_thread, main_thread
 import time
 from typing import Any, Callable, Mapping, Optional, Tuple, Union
 
@@ -91,7 +91,9 @@ class _MultiOpenMixinOpenCloseState:
   final_close_from: StackSummary = None
   join_lock: Lock = None
   _teardown: Callable = None
-  _lock: NRLock = field(default_factory=NRLock)
+  _lock: RLock = field(
+      default_factory=RLock
+  )  ## was NRLock, still investigating conflicts
 
   def open(self, caller_frame=None) -> int:
     ''' The open process:
@@ -107,10 +109,10 @@ class _MultiOpenMixinOpenCloseState:
         frame_key = caller_frame.filename, caller_frame.lineno
         self.opens_from[frame_key] += 1
       if opens == 1:
+        self.opened = True
         self.join_lock = Lock()
         self.join_lock.acquire()
         self._teardown = setup_cmgr(self.mom.startup_shutdown())
-        self.opened = True
     return opens
 
   def close(
