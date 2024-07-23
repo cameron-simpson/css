@@ -1842,11 +1842,6 @@ class SQLTags(BaseTagSets, Promotable):
       db_url = expanduser(default_path)
     return db_url
 
-  def init(self):
-    ''' Initialise the database.
-    '''
-    self.orm.define_schema()
-
   def db_entity(self, index):
     ''' Return the `Entities` instance for `index` or `None`.
     '''
