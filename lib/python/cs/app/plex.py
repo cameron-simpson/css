@@ -4,6 +4,7 @@
 ''' Stuff for Plex media libraries.
 '''
 
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from getopt import GetoptError
@@ -15,22 +16,21 @@ from os.path import (
     exists as existspath,
     expanduser,
     isdir as isdirpath,
-    isfile as isfilepath,
     join as joinpath,
-    normpath,
     splitext,
 )
 import sys
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Tuple
 
+from icontract import ensure
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.fs import needdir, shortpath
-from cs.fstags import FSTags, rfilepaths, uses_fstags
-from cs.hashindex import merge, DEFAULT_HASHNAME
-from cs.lex import get_prefix_n
+from cs.fs import is_valid_rpath, needdir, scandirtree, shortpath
+from cs.fstags import FSTags, uses_fstags
+from cs.hashindex import merge, HASHNAME_DEFAULT
 from cs.logutils import warning
+from cs.mediainfo import scrub_title
 from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.upd import run_task, print
@@ -66,7 +66,6 @@ def main(argv=None):
 class UnsupportedPlexModeError(ValueError):
   ''' Plex path does not match the active modes.
   '''
-  pass
 
 class PlexCommand(BaseCommand):
   ''' `plex` main command line class.
@@ -125,6 +124,7 @@ class PlexCommand(BaseCommand):
           -v          Verbose.
     '''
     options = self.options
+    options.modes = "tv"
     options.symlink_mode = False
     options.popopts(
         argv,
@@ -135,6 +135,8 @@ class PlexCommand(BaseCommand):
         v='verbose',
     )
     doit = options.doit
+    if not doit:
+      options.verbose = True
     modes = options.modes.split(',')
     plextree = options.plextree
     symlink_mode = options.symlink_mode
@@ -146,12 +148,15 @@ class PlexCommand(BaseCommand):
       raise GetoptError(f'plextree does not exist: {plextree!r}')
     with run_task('linktree') as proxy:
       seen = set()
+      plexmatch_cache = {}
       for srcroot in srcroots:
         runstate.raiseif()
         osrcdir = None
-        for srcpath in srcroot if isfilepath(srcroot) else sorted(
-            (joinpath(srcroot, normpath(subpath))
-             for subpath in rfilepaths(srcroot))):
+        for _, srcpath in scandirtree(
+            srcroot,
+            sort_names=True,
+            only_suffixes=('mp4', 'mkv'),
+        ):
           runstate.raiseif()
           with Pfx(srcpath):
             srcdir = dirname(srcpath)
@@ -177,6 +182,7 @@ class PlexCommand(BaseCommand):
                   doit=doit,
                   quiet=False,
                   seen=seen,
+                  plexmatch_cache=plexmatch_cache,
               )
             except UnsupportedPlexModeError as e:
               verbose and warning("skipping, unsupported plex mode: %s", e)
@@ -187,40 +193,30 @@ class PlexCommand(BaseCommand):
             except OSError as e:
               warning("failed: %s", e)
 
-def scrub_title(title: str, *, season=None, episode=None):
-  ''' Strip redundant text from the start of an episode title.
-  '''
-  title = title.strip()
-  if season:
-    spfx, n, offset = get_prefix_n(title, 's', n=season)
-    if spfx:
-      assert title.startswith(f's{season:02d}')
-      title = title[offset:]
-  if episode:
-    epfx, n, offset = get_prefix_n(title, 'e', n=episode)
-    if epfx:
-      assert title.startswith(f'e{episode:02d}')
-      title = title[offset:]
-  title = title.lstrip(' -')
-  if episode:
-    epfx, n, offset = get_prefix_n(title.lower(), 'episode ', n=episode)
-    if epfx:
-      title = title[offset:]
-    title = title.lstrip(' -')
-  return title
-
 @uses_fstags
+@ensure(
+    lambda result:
+    all(is_valid_rpath(subpath) for subpath in result[1].keys())
+)
 @typechecked
 def plex_subpath(
-    fspath: str, *, modes: Optional[Sequence[str]] = None, fstags: FSTags
-):
+    fspath: str,
+    *,
+    modes: Optional[Sequence[str]] = None,
+    fstags: FSTags
+) -> Tuple[str, dict]:
   ''' Compute a Plex filesystem subpath based on the tags of `fspath`.
+      Return a 2-tuple of `(subpath,plexmatches)` containing the
+      Plex filesystem subpath and a `dict` with any entries for
+      `.plexmatch` files along the path of the form
+      `subdirpath`->`hint`->`value`.
 
       See: https://support.plex.tv/articles/naming-and-organizing-your-tv-show-files/
+      and: https://support.plex.tv/articles/plexmatch/
   '''
+  plexmatches = defaultdict(dict)
   if modes is None:
     modes = "movie", "tv"
-  assert tuple(modes) == ("tv",), "expected just [tv], got %r" % (modes,)
   filename = basename(fspath)
   # infer from filename?
   base, ext = splitext(filename)
@@ -235,40 +231,54 @@ def plex_subpath(
   extra = isinstance(tv.extra, (int, str)) and int(tv.extra)
   extra_title = tv.extra_title
   part = tv.part and int(tv.part)
+
+  def scrub(part):
+    ''' Clean up a path component.
+    '''
+    return part.replace('/', '::').strip()
+
   # compose the filesystem path
-  dstpath = []
   if tv.series_title and season and episode:
     # TV Series
-    if "tv" not in modes:
-      raise UnsupportedPlexModeError("tv not in modes %r" % (modes,))
-    dstpath.append('TV Shows')
-    series_part = tv.series_title
+    mode = 'tv'
+    if mode not in modes:
+      raise UnsupportedPlexModeError(f'{mode!r} not in modes {modes!r}')
+    toppath = 'TV Shows'
+    series_title = tv.series_title
+    series_part = series_title
     if tv.series_year:
       series_part = f'{series_part} ({tv.series_year})'
-    dstpath.append(series_part)
-    dstpath.append(f'Season {season:02d}')
+    series_path = joinpath(toppath, scrub(series_part))
+    plexmatches[series_path]['show'] = series_title
+    if tv.series_year:
+      plexmatches[series_path]['year'] = tv.series_year
+    season_part = f'Season {season:02d}'
+    season_path = joinpath(series_path, scrub(season_part))
+    plexmatches[season_path]['season'] = season
     dstfilename = series_part
     if episode:
       dstfilename += f' - s{season:02d}e{episode:02d}'
     else:
       dstfilename += f' - s{season:02d}x{extra:02d}'
+    subdirpath = season_path
   else:
     # Movie
-    if "movie" not in modes:
-      raise UnsupportedPlexModeError("movie not in modes %r" % (modes,))
-    dstpath.append('Movies')
+    mode = 'movie'
+    if mode not in modes:
+      raise UnsupportedPlexModeError(f'{mode!r} not in modes {modes!r}')
+    toppath = 'Movies'
     dstfilename = title
     if episode:
       dstfilename += f' - {episode:d}'
+    subdirpath = toppath
   if episode_title and episode_title != title:
     dstfilename += f' - {episode_title}'
   elif extra_title and extra_title != title:
     dstfilename += f' - {extra_title}'
   if part:
     dstfilename += f' - pt{part:d}'
-  dstpath.append(dstfilename + ext)
-  subpath = joinpath(*(part.replace('/', '::') for part in dstpath))
-  return subpath
+  subpath = joinpath(subdirpath, scrub(dstfilename) + ext)
+  return subpath, plexmatches
 
 # pylint: disable=redefined-builtin
 def plex_linkpath(
@@ -278,9 +288,10 @@ def plex_linkpath(
     modes: Optional[Sequence[str]] = None,
     doit=True,
     quiet=False,
-    hashname=DEFAULT_HASHNAME,
+    hashname=HASHNAME_DEFAULT,
     symlink_mode=True,
     seen=None,
+    plexmatch_cache=None,
 ):
   ''' Symlink `srcpath` into `plex_topdirpath`.
 
@@ -292,10 +303,14 @@ def plex_linkpath(
       * `doit`: default `True`: if false do not make the link
       * `quiet`: default `False`; if false print the planned link
       * `hashname`: the file content hash algorithm name
+      * `seen`: optional set of `srcpath` values already processed
+      * `plexmatch_cache`: optional cache of `.plexmatch` contents
   '''
   if seen is None:
-    seet = set()
-  subpath = plex_subpath(srcpath, modes=modes)
+    seen = set()
+  if plexmatch_cache is None:
+    plexmatch_cache = {}
+  subpath, plexmatches = plex_subpath(srcpath, modes=modes)
   if subpath in seen:
     quiet or warning(
         "skipping %r -> %r, we already set it up", srcpath, subpath
@@ -312,10 +327,63 @@ def plex_linkpath(
           hashname=hashname,
           symlink_mode=symlink_mode,
           quiet=False,
-          doit=doit
+          doit=doit,
       )
     except FileExistsError:
       warning("already exists")
+    else:
+      # make .plexmatch files
+      for subdirpath, matches in sorted(plexmatches.items()):
+        assert subpath.startswith(subdirpath + '/')
+        if not matches:
+          warning("no plex matches for %r?", subdirpath)
+          continue
+        # get the current plex match contents
+        plexmatchpath = joinpath(plex_topdirpath, subdirpath, '.plexmatch')
+        try:
+          match_hints = plexmatch_cache[plexmatchpath]
+        except KeyError:
+          match_hints = plexmatch_cache[plexmatchpath] = read_matchfile(
+              plexmatchpath
+          )
+        if not quiet:
+          for hint, value in sorted(matches.items()):
+            if match_hints.get(hint) == value:
+              del matches[hint]
+            else:
+              print(shortpath(plexmatchpath), '+', f'{hint}:', value)
+        if doit:
+          if matches:
+            with pfx_call(open, plexmatchpath, "a") as pmf:
+              for hint, value in sorted(matches.items()):
+                print(f'{hint}:', value, file=pmf)
+            # update the cache
+            match_hints.update(matches)
+
+def read_matchfile(fspath) -> dict:
+  match_hints = {}
+  try:
+    with pfx_call(open, fspath, "r") as f:
+      for lineno, line in enumerate(f, 1):
+        with Pfx("%s:%d", fspath, lineno):
+          line = line.strip()
+          if not line or line.startswith('#'):
+            continue
+          try:
+            hint, value = line.split(':', 1)
+          except ValueError:
+            warning("bad syntax, no colon")
+          else:
+            value = value.strip()
+            if hint in ('season', 'year'):
+              try:
+                value = int(value)
+              except ValueError:
+                warning("%s: expected an int, got: %r", hint, value)
+            match_hints[hint] = value
+  except FileNotFoundError:
+    pass
+  return match_hints
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

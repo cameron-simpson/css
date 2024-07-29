@@ -1,0 +1,2 @@
+New SpacesCommand with a "wp" command to report or set wallpaper configs.
+Assorted other updates.

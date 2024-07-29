@@ -1,0 +1,1 @@
+BaseCommand.run_context: attach the runstate to the options.

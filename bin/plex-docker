@@ -122,6 +122,7 @@ set -- \
   docker run --rm \
   --name "$docker_name" \
   --net=host \
+  --pull "$run_pull_mode" \
   -e "PUID=$uid" \
   -e "PGID=$gid" \
   -e "TZ=$tz" \

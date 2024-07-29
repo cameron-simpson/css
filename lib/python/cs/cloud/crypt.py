@@ -28,11 +28,15 @@ from subprocess import Popen, DEVNULL, PIPE
 import sys
 from tempfile import NamedTemporaryFile
 from uuid import uuid4
+
 from typeguard import typechecked
+
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom_fd
+from cs.fs import validate_rpath
 from cs.pfx import Pfx
-from . import validate_subpath, Cloud, CloudArea
+
+from . import Cloud, CloudArea
 
 # used when creating RSA keypairs
 DEFAULT_RSA_ALGORITHM = 'aes256'
@@ -449,7 +453,7 @@ def upload(
       if `public_key_name` was specified).
       The upload result is that for the `'.data.enc'` upload.
   '''
-  validate_subpath(basepath)
+  validate_rpath(basepath)
   data_subpath, key_subpath = upload_paths(
       basepath, public_key_name=public_key_name
   )
@@ -562,7 +566,7 @@ def download(
       (or `basepath+'.key-`*public_key_name*`.enc'
       if `public_key_name` was specified).
   '''
-  validate_subpath(basepath)
+  validate_rpath(basepath)
   assert public_key_name is None or '/' not in public_key_name
   data_subpath, key_subpath = upload_paths(
       basepath, public_key_name=public_key_name

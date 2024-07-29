@@ -1,0 +1,14 @@
+lib/python/cs/binary.py: cs.binary: docstring update
+lib/python/cs/binary.py: merge recent pdf => ebooks
+lib/python/cs/binary.py: merge default ==> ebooks
+lib/python/cs/binary.py: cs.binary: flatten: do not yield empty str-as-ascii-bytes - we want to ensure that flatten never yields an empty bytes instance
+lib/python/cs/binary.py: cs.binary: new AbstractBinary.write(f) method to write the binary form of this object to a file
+lib/python/cs/binary.py: cs.binary: some type annotations and docstring tweaks
+lib/python/cs/binary.py: cs.binary: rename some **parameters for clarity
+lib/python/cs/binary.py: cs.binary: BinarySingleValue: new value_from_bytes(bytes) class method to return the value from a bytes instance
+lib/python/cs/binary.py: cs.binary: move AbstractBinary.write up into BinaryMixin
+lib/python/cs/binary.py: cs.binary: drop BinaryMixin, now folded directly into AbstractBinary
+lib/python/cs/binary.py: cs.binary: BinarySingleValue.__repr__: make robust against pre-init use with no .value
+lib/python/cs/binary.py: cs.binary: _BinaryMultiValue_Base.parse: prepare all the field values before calling cls() so that a subclass receives its expected parameters
+lib/python/cs/binary.py: _BinaryMultiValue_Base.for_json: add docstring
+lib/python/cs/binary.py: cs.binary: AbstractBinary.scan: pass extra keyword arguments to AbstractBinary.parse, supporting plumbing eg a logging parameter through

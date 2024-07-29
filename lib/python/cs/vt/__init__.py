@@ -50,12 +50,13 @@ from typing import Iterable, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
+from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc
+from cs.deco import default_params, fmtdoc, promote
 from cs.later import Later
 from cs.lex import r
 from cs.logutils import warning
-from cs.progress import Progress, OverProgress, progressbar
+from cs.progress import Progress
 from cs.queues import IterableQueue, QueueIterator
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin, uses_runstate
@@ -64,9 +65,10 @@ from cs.threads import bg as bg_thread, ThreadState, HasThreadState
 from cs.upd import Upd, uses_upd
 
 from .hash import (
-    DEFAULT_HASHCLASS,
-    HASHCLASS_BY_NAME,
+    HASHNAME_DEFAULT,
+    HASHNAME_ENVVAR,
     HashCode,
+    HashCodeType,
     HashCodeUtilsMixin,
     MissingHashcodeError,
 )
@@ -112,6 +114,7 @@ DISTINFO = {
         'cs.units',
         'cs.upd',
         'cs.x',
+        'blake3',
         'icontract',
         'lmdb',
     ],
@@ -134,7 +137,7 @@ DEFAULT_CONFIG_PATH = '~/.vtrc'
 VT_STORE_ENVVAR = 'VT_STORE'
 VT_STORE_DEFAULT = '[default]'
 VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
-DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
+VT_CACHE_STORE_DEFAULT = '[cache]'
 
 DEFAULT_CONFIG_MAP = {
     'GLOBAL': {
@@ -155,8 +158,9 @@ DEFAULT_CONFIG_MAP = {
     },
 }
 
-# intercept Lock and RLock
 if False:
+  # intercept Lock and RLock
+  from cs.threads import NRLock
   from .debug import DebuggingLock
 
   def RLock():
@@ -171,7 +175,7 @@ if False:
 
   # monkey patch MultiOpenMixin
   import cs.resources
-  cs.resources.MultiOpenMixin._mom_state_lock = Lock()
+  cs.resources.MultiOpenMixin._mom_state_lock = NRLock()
 else:
   from threading import (
       Lock as threading_Lock,
@@ -233,10 +237,16 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   perthread_state = ThreadState()
 
   @uses_runstate
-  @pfx_method
   @fmtdoc
+  @promote
   def __init__(
-      self, name, *, capacity=None, hashclass=None, runstate: RunState
+      self,
+      name,
+      *,
+      capacity=None,
+      conv_cache=None,
+      hashclass: HashCodeType = None,
+      runstate: RunState,
   ):
     ''' Initialise the Store.
 
@@ -245,10 +255,17 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
           if `None`, a sequential name based on the Store class name
           is generated
         * `capacity`: a capacity for the internal `Later` queue, default 4
-        * `hashclass`: the hash class to use for this Store,
-          default: `DEFAULT_HASHCLASS` (`{DEFAULT_HASHCLASS.__name__}`)
+        * `convcache`: optional `cs.cache.ConvCache` for persistent
+          storage of certain cached values
+        * `hashclass`: the hash class to use for this Store, or the name of a
+          hash class; default from `Store.get_default_hashclass()`
         * `runstate`: a `cs.resources.RunState` for external control;
           if not supplied one is allocated
+
+        `conv_cache`: most `Store`s do not have one of these, but
+        a `DataDirStore` does, a `ProxyStore` returns the first
+        conv cache from its read Stores and a `FileCacheStore`
+        presents the conv cache of its backend.
     '''
     if not isinstance(name, str):
       raise TypeError(
@@ -256,17 +273,13 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       )
     if name is None:
       name = "%s%d" % (type(self).__name__, next(self._seq()))
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
-    elif isinstance(hashclass, str):
-      hashclass = HASHCLASS_BY_NAME[hashclass]
-    assert issubclass(hashclass, HashCode)
     if capacity is None:
       capacity = 4
     RunStateMixin.__init__(self, runstate=runstate)
     self._str_attrs = {}
     self.name = name
     self._capacity = capacity
+    self.conv_cache = conv_cache
     self.later = None
     self.hashclass = hashclass
     self._config = None
@@ -281,12 +294,11 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def init(self):
     ''' Method provided to support "vt init".
         For stores requiring some physical setup,
-        for example to create an empty DataDir,
+        for example to create an empty `DataDir`,
         that code goes here.
     '''
 
   def __str__(self):
-    ##return "STORE(%s:%s)" % (type(self), self.name)
     params = []
     for attr, val in sorted(getattr(self, '_str_attrs', {}).items()):
       if isinstance(val, type):
@@ -301,6 +313,67 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     )
 
   __repr__ = __str__
+
+  @staticmethod
+  @fmtdoc
+  def get_default_spec():
+    ''' The default `Store` specification from `${VT_STORE_ENVVAR}`,
+        default `{VT_STORE_DEFAULT!r}`.
+    '''
+    return os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
+
+  @staticmethod
+  @fmtdoc
+  def get_default_cache_spec():
+    ''' The default cache `Store` specification from `${VT_CACHE_STORE_ENVVAR}`,
+        default `{VT_CACHE_STORE_DEFAULT!r}`.
+    '''
+    return os.environ.get(VT_CACHE_STORE_ENVVAR, VT_CACHE_STORE_DEFAULT)
+
+  @staticmethod
+  @fmtdoc
+  def get_default_hashclass():
+    ''' The default hashclass from `${HASHNAME_ENVVAR}`, default `{HASHNAME_DEFAULT!r}`.
+    '''
+    hashname = os.environ.get(HASHNAME_ENVVAR, HASHNAME_DEFAULT)
+    return HashCode.by_hashname[hashname]
+
+  @classmethod
+  def default(cls, config_spec=None, store_spec=None, cache_spec=None):
+    ''' Get the prevailing `Store` instance.
+        This calls `HasThreadState.default()` first,
+        but falls back to constrcting the default `Store` instance
+        from `Store.get_default_spec` and `Store.get_default_cache_spec`.
+        As such, the returns `Store` is not necessarily "open"
+        and users should open it for use. Example:
+
+            S = Store.default()
+            with S:
+                ... do stuff ...
+    '''
+    from .store import ProxyStore
+    S = super().default()
+    if S is None:
+      # no prevailing Store
+      # construct the default Store
+      from .config import Config
+      config = Config(config_spec)
+      if store_spec is None:
+        store_spec = cls.get_default_spec()
+      if cache_spec is None:
+        cache_spec = cls.get_default_cache_spec()
+      S = cls.promote(store_spec, config)
+      if cache_spec is not None and cache_spec not in ("", "NONE"):
+        cacheS = cls.promote(cache_spec, config)
+        S = ProxyStore(
+            "%s:%s" % (cacheS.name, S.name),
+            read=(cacheS,),
+            read2=(S,),
+            copy2=(cacheS,),
+            save=(cacheS, S),
+            archives=((S, '*'),),
+        )
+    return S
 
   __bool__ = lambda self: True
 
@@ -342,10 +415,10 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         Raise `MissingHashcodeError` (a subclass of `KeyError`)
         if the hashcode is not present.
     '''
-    block = self.get(h)
-    if block is None:
+    data = self.get(h)
+    if data is None:
       raise MissingHashcodeError(h)
-    return block
+    return data
 
   def __setitem__(self, h, data):
     ''' Save `data` against hash key `h`.
@@ -391,6 +464,19 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
             finally:
               self.runstate.cancel()
       L.wait()
+
+  @contextmanager
+  def connected(self):
+    ''' The `connectioned()` context manager method establishes an
+        active connect to the `Store`'s backend resource, if any.
+        This base class implementation does nothing but `Stroe`s
+        like `TCPClientStore` activate the TCP connection to their server
+        for the duration of this method.
+
+        Functions performing multiple `Store` operations should run
+        them inside this context manager.
+    '''
+    yield
 
   #############################
   ## Function dispatch methods.
@@ -609,7 +695,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       self.close()
       dstS.close()
 
-  def is_complete_indirect(self, ih):
+  def is_complete_indirect(self, ih) -> bool:
     ''' Check whether `ih`, the hashcode of an indirect Block,
         has its data and all its implied data present in this Store.
     '''
@@ -622,9 +708,14 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       # missing hash, incomplete
       return False
     from .block import IndirectBlock  # pylint:disable=import-outside-toplevel
-    IB = IndirectBlock.from_subblocks_data(subblocks_data)
+    IB = IndirectBlock.from_subblocks_data(subblocks_data, force=True)
     for subblock in IB.subblocks:
-      h = subblock.hashcode
+      try:
+        h = subblock.hashcode
+      except AttributeError:
+        # no hashcode, so data are present in the Block directly
+        # thus complete
+        continue
       if h not in self:
         # missing hash, incomplete
         return False
@@ -669,6 +760,30 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
                     entry.flags |= entry.INDIRECT_COMPLETE
     '''
     yield None
+
+  def block_for(self, src, *, name=None) -> "Block":
+    from .blockify import block_for
+    with self:
+      # use the cache if given a filesystem path and we have a .conv_cache
+      if isinstance(src, str):
+        conv_cache = self.conv_cache
+        if conv_cache is not None:
+          from .uri import VTURI
+
+          def cache_file_uri(fspath, cachepath):
+            ''' Generate the URI for `fspath` and store in `cachepath`.
+            '''
+            uri = block_for(src, name=name).uri
+            with open(cachepath, 'w') as cachef:
+              print(uri, file=cachef)
+
+          uri_cachepath = conv_cache.convof(
+              src, f'filepath.vturi.{self.hashclass.hashname}', cache_file_uri
+          )
+          with open(uri_cachepath) as cachef:
+            uri = VTURI.from_uri(cachef.readline().strip())
+          return uri.block
+      return block_for(src, name=name)
 
   @classmethod
   @fmtdoc
@@ -734,7 +849,4 @@ class StoreAsyncBase(Store):
   def flush(self):
     return self.flush_bg()()
 
-def uses_Store(func):
-  ''' Decorator to provide the default Store as the parameter `S`.
-  '''
-  return default_params(func, S=Store.default)
+uses_Store = default_params(S=Store.default)

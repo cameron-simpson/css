@@ -24,8 +24,7 @@ from cs.context import (
     ContextManagerMixin,
     stackattrs,
     stackset,
-    twostep,
-    withall,
+    closeall,
 )
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
@@ -35,7 +34,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20240412-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'description':
@@ -52,6 +51,7 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
+        'cs.py.stack',
         'cs.seq',
     ],
 }
@@ -126,7 +126,7 @@ class HasThreadState(ContextManagerMixin):
   THREAD_STATE_ATTR = 'perthread_state'
 
   @classmethod
-  def default(cls, factory=None, raise_on_None=False):
+  def default(cls, *, factory=None, raise_on_None=False):
     ''' The default instance of this class from `cls.perthread_state.current`.
 
         Parameters:
@@ -290,8 +290,8 @@ class HasThreadState(ContextManagerMixin):
 
     return builtin_Thread(name=name, target=target_wrapper, **Thread_kw)
 
-  def bg(self, func, *, enter_objects=None, pre_enter_objects=None, **bg_kw):
-    ''' Get a `Thread` using `type(elf).Thread` and start it.
+  def bg(self, func, *, enter_objects=None, **bg_kw):
+    ''' Get a `Thread` using `type(self).Thread` and start it.
         Return the `Thread`.
 
         The `HasThreadState.Thread` factory duplicates the current `Thread`'s
@@ -365,7 +365,7 @@ def bg(
     thread_factory = HasThreadState.Thread
   ##thread_prefix = prefix() + ': ' + name
   thread_prefix = name
-  preopen_close_it = None
+  preopen_close = None
 
   def thread_body():
     ''' Establish a basic `Pfx` context for the target `func`.
@@ -374,9 +374,9 @@ def bg(
       with Pfx("Thread:%d:%s", current_thread().ident, thread_prefix):
         return func(*args, **kwargs)
     finally:
-      if preopen_close_it is not None:
+      if preopen_close is not None:
         # do the closes
-        next(preopen_close_it)
+        preopen_close()
 
   T = thread_factory(
       name=thread_prefix,
@@ -388,10 +388,7 @@ def bg(
   if daemon is not None:
     T.daemon = daemon
   if pre_enter_objects:
-    # prepare a context manager to open all the pre_enter_objects
-    preopen_close_it = twostep(withall(pre_enter_objects))
-    # do the opens
-    next(preopen_close_it)
+    preopen_close = closeall(pre_enter_objects)
   if not no_start:
     T.start()
   return T
@@ -542,8 +539,8 @@ def locked_property(
 
   @transmute(exc_from=AttributeError)
   def locked_property_getprop(self):
-    ''' Attempt lockless fetch of property first.
-        Use lock if property is unset.
+    ''' Attempt lockless fetch of the property first.
+        Use lock if the property is unset.
     '''
     p = getattr(self, prop_name, unset_object)
     if p is unset_object:
@@ -583,21 +580,21 @@ class LockableMixin(object):
 
   @property
   def lock(self):
-    ''' Return the lock.
+    ''' The internal lock object.
     '''
     return self._lock
 
 def via(cmanager, func, *a, **kw):
   ''' Return a callable that calls the supplied `func` inside a
-      with statement using the context manager `cmanager`.
+      `with` statement using the context manager `cmanager`.
       This intended use case is aimed at deferred function calls.
   '''
 
-  def f():
+  def via_func_wrapper():
     with cmanager:
       return func(*a, **kw)
 
-  return f
+  return via_func_wrapper
 
 class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
                                      'name priority lock priority_lock')):
@@ -785,20 +782,22 @@ class NRLock:
   ''' A nonrecursive lock.
       Attempting to take this lock when it is already held by the current `Thread`
       will raise `DeadlockError`.
-      Otherwise this behaves likc `threading.Lock`.
+      Otherwise this behaves like `threading.Lock`.
   '''
 
-  __slots__ = ('_lock', '_lock_thread', '_locked_by')
+  __slots__ = ('_lock', '_lock_thread', '_locked_by', '_name')
 
-  def __init__(self):
+  def __init__(self, name=None):
     self._lock = Lock()
     self._lock_thread = None
     self._locked_by = None
+    self._name = name
 
   def __repr__(self):
     return (
-        f'{self.__class__.__name__}:{self._lock}:{self._lock_thread}:{self._locked_by}'
-        if self.locked() else f'{self.__class__.__name__}:{self._lock}'
+        f'{self.__class__.__name__}:{self._name!r}:{self._lock}:{self._lock_thread}:{self._locked_by}'
+        if self.locked() else
+        f'{self.__class__.__name__}:{self._name!r}:{self._lock}'
     )
 
   def locked(self):
@@ -812,7 +811,9 @@ class NRLock:
     '''
     lock = self._lock
     if lock.locked() and current_thread() is self._lock_thread:
-      raise DeadlockError('lock already held by current Thread')
+      raise DeadlockError(
+          f'lock already held by current Thread:{self._locked_by}'
+      )
     acquired = lock.acquire(*a, **kw)
     if acquired:
       if caller_frame is None:
@@ -822,6 +823,8 @@ class NRLock:
     return acquired
 
   def release(self):
+    ''' Release the lock as for `threading.Lock`.
+    '''
     self._lock.release()
     self._lock_thread = None
     self._locked_by = None
