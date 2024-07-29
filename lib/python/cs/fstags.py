@@ -106,7 +106,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import default_params, fmtdoc, Promotable
-from cs.fileutils import crop_name, findup, shortpath
+from cs.fileutils import atomic_copy2, crop_name, findup, shortpath
 from cs.fs import HasFSPath, FSPathBasedSingleton, scandirpaths, scandirtree
 from cs.lex import (
     cutsuffix,
@@ -206,7 +206,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   '''
 
   GETOPT_SPEC = 'o:P'
-
 
   USAGE_KEYWORDS = {
       'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
@@ -1506,7 +1505,7 @@ class FSTags(MultiOpenMixin):
   def copy(self, srcpath, dstpath, **kw):
     ''' Copy `srcpath` to `dstpath`.
     '''
-    return self.attach_path(shutil.copy2, srcpath, dstpath, **kw)
+    return self.attach_path(atomic_copy2, srcpath, dstpath, **kw)
 
   @pfx_method
   def link(self, srcpath, dstpath, **kw):
