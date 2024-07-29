@@ -1732,6 +1732,20 @@ def atomic_filename(
     with pfx_call(open, T.name, 'xb'):
       pass
 
+def atomic_copy2(srcpath, dstpath, *, follow_symlinks=True, **af_kw):
+  ''' Call `shutil.copy2` to copy `srcpath` to `dstpath` via a
+      temporary file using `atomic_filename`.
+      This differs from `shutil.copy2` in 2 ways:
+      - it is an error if `dstpath` already exists unless you supply
+        `exists_ok=True`
+      - the new copy appears atomicly when the copy is complete
+        instead of be visible partially complete during the copy
+      The `follow_symlinks=True` parameter is passed to `shutil.copy2`.
+      Other keyword parameters are passed to `atomic_filename`.
+  '''
+  with atomic_filename(dstpath, **af_kw) as af:
+    return shutil.copy2(srcpath, af.name, follow_symlinks=follow_symlinks)
+
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.
   '''
