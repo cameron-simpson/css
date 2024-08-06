@@ -96,7 +96,8 @@ def caller(frame_index=-3):
 
       The default `from_index` value is `-3`.
   '''
-  frs = frames()
+  # get the current frames, excluding the frame which ran frames()
+  frs = frames()[:-1]
   try:
     return frs[frame_index]
   except IndexError:
