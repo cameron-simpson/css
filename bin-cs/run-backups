@@ -11,6 +11,8 @@
 
 set -ue
 
+: "${HOST:=$( hostname -s )}"
+
 quiet=1
 rsvopts=
 trace=
