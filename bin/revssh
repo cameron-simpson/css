@@ -45,7 +45,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -E) renvvar=$(   expr "x$2" : 'x\([A-Za-z_][A-Za-z_0-9]*\)=.*' )
-        renvvalue=$( expr "x$2" : 'x[A-Za-z_][A-Za-z_0-9]*=\(.*\)' )
+        renvvalue=$( expr "x$2" : 'x[A-Za-z_][A-Za-z_0-9]*=\(.*\)' || : )
         shift
         rsetenv="$rsetenv
           $renvvar=$( shqstr "$renvvalue" )
@@ -123,6 +123,7 @@ $trace $ssh_exe $sshopts \
       echo "  StrictHostkeyChecking no"
       echo "  ForwardAgent yes"
       echo "  ProxyCommand nc -U $REVSSH_SSHSOCK"
+      echo "  Compression no"
     ) >"$REVSSH_SSHCFG"
     ( '"$rsetx
         $rqcmd"'
