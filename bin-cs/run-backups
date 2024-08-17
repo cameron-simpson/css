@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #
 # Run my backups from the current machine to other places.
 # Consults ~/rc-local/run-backups files as follows:
