@@ -26,7 +26,11 @@ rcdir=$HOME/.run-backups
 backups=$rcdir/backups
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-n] [srcs...]
+usage="Usage: $cmd [-n] [-q] [-v] [-x] [@target,...] [srcs...]
+  Backup data from this host to various remotes, with assorted backup modes.
+  The backup location at the remote is BACKUP/\$HOST/mode/...
+
+  Options:
   -n    No action. Passed -n to rsync for the rsync backups,
         and suppresses the histbackup runs.
   -q    Quiet (default).
@@ -39,7 +43,8 @@ usage="Usage: $cmd [-n] [srcs...]
 
 The configuration file: $backups
 contains lines of the form:
-    src mode dsthost [options...]
+    src mode dsthost,... [options...]
+The dsthost \".\" indicates backing up to the local machine.
 
 Modes:
   hg    Use \"hg push -f\" to push commits to
