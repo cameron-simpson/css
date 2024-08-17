@@ -23,15 +23,17 @@ ssh_exe=ssh
 rssh_exe=ssh
 rssh_host=reverse-$HOST
 local_ssh_endpoint=127.0.0.1:22
+rsetenv=
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-x] remote [remote-command [args...]]
+usage="Usage: $cmd [options...] remote [remote-command [args...]]
   Ssh to remote with a reverse ssh available back to the origin (here).
   The basic reverse ssh command is:
     ssh -F \"\$REVSSH_SSHCFG\" \"\$REVSSH_SRCHOST\"
   Without a remote-command this recites the remote envionment.
   Options:
-    -x  trace execution of the remote command.
+    -E envvar=value Set envvar=value in the remote environment.
+    -x              Trace execution of the remote command.
   Note that _unlike_ ssh, the remote-command is passed to the far
   end as a correctly quoted command instead of being collapsed into
   a command string for the remote shell. The mechanism involved
@@ -42,6 +44,13 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
+    -E) renvvar=$(   expr "x$2" : 'x\([A-Za-z_][A-Za-z_0-9]*\)=.*' )
+        renvvalue=$( expr "x$2" : 'x[A-Za-z_][A-Za-z_0-9]*=\(.*\)' )
+        shift
+        rsetenv="$rsetenv
+          $renvvar=$( shqstr "$renvvalue" )
+          export $renvvar"
+        ;;
     -x) rsetx='set -x'
         ##trace=set-x
         ;;
@@ -88,7 +97,7 @@ reverse_cfg=$rtmp/revssh-$HOST-$$.cfg
 reverse_sock=$rtmp/revssh-$HOST-$$
 
 # shell commands to set up the remote environment
-rsetenv="
+rsetenv="$rsetenv
 REVSSH_SRCHOST=$( shqstr "$reverse_host" )
 REVSSH_SRCUSER=$USER
 REVSSH_SSHCFG=$(  shqstr "$reverse_cfg"  )
