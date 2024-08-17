@@ -119,7 +119,7 @@ do
   then  suffix=/ srccd=$src
   else  suffix=  srccd=$( dirname "$src" )
   fi
-  for dsthost in ${dsthost/,/ }
+  for dsthost in $( echo "$dsthost" | tr , ' ' )
   do
     case "$dsthost" in
       *:*)    dst=$(     expr "x$dsthost" : 'x[^:]*:\(.*\)' )
