@@ -150,15 +150,33 @@ do
               ;;
     esac
     (
-      case "$mode" in
-        hg)         set -- incd "$src" hg push -f $etc "ssh://$dsthost/$dst" ;;
-        image)      set -- rsync -a $rsvopts --delete-after $etc "$src$suffix" "$dsthost:$dst$suffix" ;;
-        mv)         set -- rsync -a $rsvopts --remove-source-files $etc "$src$suffix" "$dsthost:$dst$suffix" ;;
-        push)       set -- rsync -a $rsvopts $etc "$src$suffix" "$dsthost:$dst$suffix" ;;
-        histbackup) set -- rhistbackup "$src:$dsthost:$dst" ;;
-        *)          echo "$0: $backups:$lineno: unsupported mode: $mode" >&2
-                    exit 1
-                    ;;
+      case "$dsthost" in
+        .)
+          # local
+          case "$mode" in
+            hg)         set -- incd "$src" hg push -f $etc "$HOME/$dst" ;;
+            image)      set -- rsync -a $rsvopts --delete-after $etc "$src$suffix" "$HOME/$dst$suffix" ;;
+            mv)         set -- rsync -a $rsvopts --remove-source-files $etc "$src$suffix" "$HOME/$dst$suffix" ;;
+            push)       set -- rsync -a $rsvopts $etc "$src$suffix" "$HOME/$dst$suffix" ;;
+            histbackup) set -- incd "$HOME/$dst" histbackup "$src" . ;;
+            *)          echo "$0: $backups:$lineno: unsupported mode: $mode" >&2
+                        exit 1
+                        ;;
+          esac
+          ;;
+        *)
+          # remote
+          case "$mode" in
+            hg)         set -- incd "$src" hg push -f $etc "ssh://$dsthost/$dst" ;;
+            image)      set -- rsync -a $rsvopts --delete-after $etc "$src$suffix" "$dsthost:$dst$suffix" ;;
+            mv)         set -- rsync -a $rsvopts --remove-source-files $etc "$src$suffix" "$dsthost:$dst$suffix" ;;
+            push)       set -- rsync -a $rsvopts $etc "$src$suffix" "$dsthost:$dst$suffix" ;;
+            histbackup) set -- rhistbackup "$src:$dsthost:$dst" ;;
+            *)          echo "$0: $backups:$lineno: unsupported mode: $mode" >&2
+                        exit 1
+                        ;;
+          esac
+          ;;
       esac
       if [ $doit ]
       then  pfx "$src:$dsthost:$dst" $trace incd "$srccd" "$@"
