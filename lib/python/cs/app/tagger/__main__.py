@@ -85,7 +85,7 @@ class TaggerCommand(BaseCommand):
     elif opt == '-v':
       options.verbose = True
     else:
-      raise RuntimeError(f'unhandled option: {opt!r}')
+      raise NotImplementedError(f'unsupported option: {opt!r}')
 
   @contextmanager
   @uses_fstags
@@ -242,7 +242,7 @@ class TaggerCommand(BaseCommand):
         elif opt == '-n':
           infill_mode = 'infer'
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if not argv:
       raise GetoptError("missing paths")
     for path in argv:

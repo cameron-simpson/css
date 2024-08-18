@@ -11,12 +11,14 @@ from inspect import (
 )
 from itertools import chain
 
+from cs.fsm import FSM
+from cs.gvutils import gvdataurl, GVDATAURL
 from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.py.modules import module_attributes
 
-__version__ = '20240422-post'
+__version__ = '20240709-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -25,7 +27,6 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.cmdutils',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -58,9 +59,7 @@ def module_doc(
         dunders, then other public names
   '''
   if isinstance(module, str):
-    module_name = module
-    with Pfx("import_module(%r)", module_name):
-      module = importlib.import_module(module_name)
+    module = pfx_call(importlib.import_module, module)
   full_docs = [obj_docstring(module)]
   ALL = getattr(module, '__all__', None)
   for Mname, obj in sorted(module_attributes(module), key=sort_key):
@@ -82,9 +81,8 @@ def module_doc(
         continue
       if isfunction(obj):
         sig = signature(obj)
-        full_docs.append(f'\n\n## Function `{Mname}{sig}`\n\n{obj_doc}')
+        full_docs.append(f'\n\n## `{Mname}{sig}`\n\n{obj_doc}')
       elif isclass(obj):
-        from cs.cmdutils import BaseCommand
         classname_etc = Mname
         mro_names = []
         mro_set = set(obj.__mro__)
@@ -102,10 +100,18 @@ def module_doc(
         if mro_names:
           classname_etc += '(' + ', '.join(mro_names) + ')'
           ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
+        if issubclass(obj, FSM) and hasattr(obj, 'FSM_TRANSITIONS'):
+          obj_doc += (
+              f'\n\nState diagram:\n![{Mname} State Diagram](' + gvdataurl(
+                  obj.fsm_state_diagram_as_dot(
+                      graph_name=f'{Mname} State Diagram',
+                      sep='',
+                  ),
+                  fmt='svg',
+                  dataurl_encoding='base64',
+              ) + f' "{Mname} State Diagram")\n'
+          )
         full_docs.append(f'\n\n## Class `{classname_etc}`\n\n{obj_doc}')
-        if issubclass(obj, BaseCommand):
-          full_docs.append("\n\nUsage summary:\n\n    ")
-          full_docs.append("\n    ".join(obj.usage_text().split("\n")))
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order
@@ -147,12 +153,10 @@ def module_doc(
           if ismethod(attr) or isfunction(attr):
             method_sig = signature(attr)
             full_docs.append(
-                f'\n\n*Method `{Mname}.{attr_name}{method_sig}`*:\n{attr_doc}'
+                f'\n\n*`{Mname}.{attr_name}{method_sig}`*:\n{attr_doc}'
             )
           elif isdatadescriptor(attr):
-            full_docs.append(
-                f'\n\n*Property `{Mname}.{attr_name}`*:\n{attr_doc}'
-            )
+            full_docs.append(f'\n\n*`{Mname}.{attr_name}`*:\n{attr_doc}')
           elif not callable(attr):
             pass
           elif isinstance(attr, property):

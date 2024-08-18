@@ -46,9 +46,9 @@ from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
 from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
-from cs.upd import Upd, uses_upd
+from cs.upd import Upd, uses_upd, print
 
-__version__ = '20240519-post'
+__version__ = '20240709-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -118,11 +118,43 @@ def docmd(dofunc):
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
 
+def extract_usage_from_doc(doc: str | None,
+                           usage_marker="Usage:") -> Tuple[str, str]:
+  ''' Extract a `"Usage:"`paragraph from a docstring
+          and return the unindented usage and the docstring with that paragraph elided.
+
+          If the usage paragraph is not present, return `(None,doc)`.
+      '''
+  if not doc:
+    # no doc, return unchanged
+    return None, doc
+  try:
+    pre_usage, usage_onward = doc.split(usage_marker, 1)
+  except ValueError:
+    # no usage: paragraph
+    return None, doc
+  try:
+    usage_format, post_usage = usage_onward.split("\n\n", 1)
+  except ValueError:
+    usage_format, post_usage = usage_onward.rstrip(), ''
+  usage_format = stripped_dedent(usage_format)
+  # indent the second and following lines
+  try:
+    top_line, post_lines = usage_format.split("\n", 1)
+  except ValueError:
+    # single line usage only
+    pass
+  else:
+    usage_format = f'{top_line}\n{indent(post_lines)}'
+  return usage_format, pre_usage + post_usage
+
 @dataclass
 class SubCommand:
   ''' An implementation for a subcommand.
   '''
 
+  # the BaseCommand instance with which we're associated
+  command: "BaseCommand"
   # a method or a subclass of BaseCommand
   method: Callable
   # the notional name of the command/subcommand
@@ -145,17 +177,16 @@ class SubCommand:
     return self.cmd
 
   @typechecked
-  def __call__(self, base_command: "BaseCommandSubType", argv: List[str]):
+  def __call__(self, argv: List[str]):
     ''' Run the subcommand.
 
         Parameters:
-        * `base_command`: the instance of `BaseCommand`
         * `argv`: the command line arguments after the subcommand name
     '''
     method = self.method
     if isclass(method):
       # plumb the options through to the subcommand
-      updates = base_command.options.as_dict()
+      updates = self.command.options.as_dict()
       updates.update(cmd=self.get_cmd())
       return pfx_call(method, argv, **updates).run()
     return method(argv)
@@ -178,10 +209,11 @@ class SubCommand:
 
   def get_usage_format(self) -> str:
     ''' Return the usage format string for this subcommand.
+        *Note*: no leading "Usage:" prefix.
 
         This first tries `self.method.USAGE_FORMAT`, falling back
         to deriving it from `obj_docstring(self.method)`.
-        Usually a subcommand with is another `BaseCommand` instance
+        Usually a subcommand which is another `BaseCommand` instance
         will have a `.USAGE_FORMAT` attribute and a subcommand which
         is a method will derive the usage from its docstring.
 
@@ -190,32 +222,20 @@ class SubCommand:
         to its first parapgraph.
     '''
     method = self.method
+    method_name = method.__name__
+    subcmd = self.command.method_cmdname(method_name)
     try:
       usage_format = method.USAGE_FORMAT
     except AttributeError:
+      # derive from the docstring or from self.default_usage()
       doc = obj_docstring(self.method)
-      if doc:
-        try:
-          _, post_usage = doc.split('Usage:', 1)
-        except ValueError:
-          # default usage line and first paragraph
-          usage_format = self.default_usage()
-          paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
-          if paragraph1:
-            usage_format = f'{usage_format}\n{indent(paragraph1)}'
-        else:
-          # extract the Usage: paragraph
-          usage_format, *_ = post_usage.strip().split('\n\n', 1)
-          try:
-            top_line, post_lines = usage_format.split("\n", 1)
-          except ValueError:
-            # single line usage only
-            pass
-          else:
-            usage_format = f'{top_line}\n{indent(post_lines)}'
-      else:
-        # default usage text
+      usage_format, doc = extract_usage_from_doc(doc)
+      if not usage_format:
+        # No "Usage:" paragraph - use default usage line and first paragraph.
         usage_format = self.default_usage()
+        paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
+        if paragraph1:
+          usage_format += "\n" + indent(paragraph1)
     # The existing USAGE_FORMAT based usages have the word "Usage:"
     # at the front but this is supplied at print time now.
     return cutprefix(usage_format, 'Usage:').lstrip()
@@ -255,7 +275,7 @@ class SubCommand:
     ''' Return the filled out usage text for this subcommand.
     '''
     if show_subcmds is None:
-      show_subcmds = not short
+      show_subcmds = True
     if isinstance(show_subcmds, bool):
       if show_subcmds:
         show_subcmds = self.get_subcmds()
@@ -293,7 +313,15 @@ class SubCommand:
           if show_subcmds is None or subcmd in show_subcmds
       ]
       if subusages:
-        subusage_listing = "\n".join(["Subcommands:", *map(indent, subusages)])
+        subcmds_header = (
+            'Subcommands'
+            if show_subcmds is None or len(show_subcmds) > 1 else 'Subcommand'
+        )
+        if short:
+          subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
+        subusage_listing = "\n".join(
+            [f'{subcmds_header}:', *map(indent, subusages)]
+        )
         usage = f'{usage}\n{indent(subusage_listing)}'
     return usage
 
@@ -538,9 +566,8 @@ class BaseCommand:
           cmd_subthing = SubThingCommand
 
       Returning to methods, if there is a paragraph in the method docstring
-      commencing with `Usage:`
-      then that paragraph is incorporated automatically
-      into the main usage message.
+      commencing with `Usage:` then that paragraph is incorporated
+      into the main usage message automatically.
       Example:
 
           def cmd_ls(self, argv):
@@ -560,6 +587,10 @@ class BaseCommand:
         `opts` is an `(option,value)` sequence
         as returned by `getopot.getopt`.
         The default implementation iterates over these and calls `apply_opt`.
+      * `run_context()`:
+        a context manager to provide setup or teardown actions
+        to occur before and after the command implementation respectively,
+        such as to open and close a database.
       * `cmd_`*subcmd*`(argv)`:
         if the command line options are followed by an argument
         whose value is *subcmd*,
@@ -567,15 +598,8 @@ class BaseCommand:
         will be called where `subcmd_argv` contains the command line arguments
         following *subcmd*.
       * `main(argv)`:
-        if there are no command line arguments after the options
-        or the first argument does not have a corresponding
-        `cmd_`*subcmd* method
-        then method `main(argv)`
+        if there are no `cmd_`*subcmd*` methods then method `main(argv)`
         will be called where `argv` contains the command line arguments.
-      * `run_context()`:
-        a context manager to provide setup or teardown actions
-        to occur before and after the command implementation respectively,
-        such as to open and close a database.
 
       Editorial: why not arparse?
       Primarily because when incorrectly invoked
@@ -586,8 +610,27 @@ class BaseCommand:
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
-  SUBCOMMAND_ARGV_DEFAULT = None
+  SUBCOMMAND_ARGV_DEFAULT = 'shell'
   Options = BaseCommandOptions
+
+  def __init_subclass__(cls, **super_kw):
+    super().__init_subclass__(**super_kw)
+    instance = cls([cls.__name__])
+    usage_format, doc_without_usage = extract_usage_from_doc(
+        obj_docstring(cls)
+    )
+    # This little shuffle is so that instance.usage_text()
+    # does not process format strings twice.
+    cls.__doc__ = doc_without_usage
+    if usage_format and not hasattr(cls, 'USAGE_FORMAT'):
+      cls.USAGE_FORMAT = usage_format
+    usage_text = instance.usage_text()
+    docv = [
+        doc_without_usage,
+        "\n\nUsage summary:\n\n",
+        indent("Usage: " + usage_text, "    "),
+    ]
+    cls.__doc__ = ''.join(docv)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
@@ -679,7 +722,7 @@ class BaseCommand:
     loginfo = setup_logging(cmd=self.cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.loginfo = loginfo
-    self._run = lambda subcmd, command, argv: 2
+    self._run = lambda argv: 2
     # we catch GetoptError from this suite...
     subcmd = None  # default: no subcmd specific usage available
     try:
@@ -705,11 +748,11 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
-        self._run = SubCommand(main)
+        self._run = SubCommand(self, main)
       else:
         # expect a subcommand on the command line
         if not argv:
-          default_argv = getattr(self, 'SUBCOMMAND_ARGV_DEFAULT', None)
+          default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
             raise GetoptError(
                 "missing subcommand, expected one of: %s" %
@@ -743,6 +786,12 @@ class BaseCommand:
         return
       raise
 
+  @classmethod
+  def method_cmdname(cls, method_name: str):
+    ''' The `cmd` value from a method name.
+    '''
+    return cutprefix(method_name, cls.SUBCOMMAND_METHOD_PREFIX)
+
   @cache
   def subcommands(self):
     ''' Return a mapping of subcommand names to subcommand specifications
@@ -755,10 +804,17 @@ class BaseCommand:
     mapping = {}
     for method_name in dir(cls):
       if method_name.startswith(prefix):
+        subcmd = self.method_cmdname(method_name)
         method = getattr(self, method_name)
-        subcmd = cutprefix(method_name, prefix)
+        subusage_mapping = dict(usage_mapping)
+        method_keywords = getattr(method, 'USAGE_KEYWORDS', {})
+        subusage_mapping.update(method_keywords)
+        subusage_mapping.update(cmd=subcmd)
         mapping[subcmd] = SubCommand(
-            method, cmd=subcmd, usage_mapping=usage_mapping
+            self,
+            method,
+            cmd=subcmd,
+            usage_mapping=subusage_mapping,
         )
     return mapping
 
@@ -792,12 +848,65 @@ class BaseCommand:
         * `cmd`: optional command name, default derived from the class name
         * `format_mapping`: an optional format mapping for filling
           in format strings in the usage text
-        * `subcmd`: constrain the usage to a particular subcommand named `subcmd`;
-          this is used to produce a shorter usage for subcommand usage failures
+        * `short`: default `False`; if true then just provide the opening sentence
+        * `show_subcmds`: constrain the usage to particular subcommands
+          named in `show_subcmds`; this is used to produce a shorter
+          usage for subcommand usage failures
     '''
-    return SubCommand(method=type(self)).usage_text(
+    return SubCommand(
+        self, method=type(self)
+    ).usage_text(
         short=short, show_subcmds=show_subcmds
     )
+
+  def subcommand_usage_text(
+      self, subcmd, usage_format_mapping=None, short=False
+  ):
+    ''' Return the usage text for a subcommand.
+
+        Parameters:
+        * `subcmd`: the subcommand name
+        * `short`: just include the first line of the usage message,
+          intented for when there are many subcommands
+    '''
+    method = self.subcommands()[subcmd].method
+    subusage = None
+    # support (method, get_suboptions)
+    try:
+      classy = issubclass(method, BaseCommand)
+    except TypeError:
+      classy = False
+    if classy:
+      # first paragraph of the class usage text
+      doc = method([]).usage_text(cmd=subcmd)
+      subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
+    else:
+      # extract the usage from the object docstring
+      doc = obj_docstring(method)
+      if doc:
+        if 'Usage:' in doc:
+          # extract the Usage: paragraph
+          pre_usage, post_usage = doc.split('Usage:', 1)
+          pre_usage = pre_usage.strip()
+          post_usage_format, *_ = post_usage.split('\n\n', 1)
+          subusage_format = stripped_dedent(post_usage_format)
+        else:
+          # extract the first paragraph
+          subusage_format, *_ = doc.split('\n\n', 1)
+      else:
+        # default usage text - include the docstring below a header
+        subusage_format = "\n  ".join(
+            ['{cmd} ...'] + [doc.split('\n\n', 1)[0]]
+        )
+    if subusage_format:
+      if short:
+        subusage_format, *_ = subusage_format.split('\n', 1)
+      mapping = dict(sys.modules[method.__module__].__dict__)
+      if usage_format_mapping:
+        mapping.update(usage_format_mapping)
+      mapping.update(cmd=subcmd)
+      subusage = subusage_format.format_map(mapping)
+    return subusage.replace('\n', '\n  ')
 
   @pfx_method
   # pylint: disable=no-self-use
@@ -809,7 +918,7 @@ class BaseCommand:
         and would imply that a `GETOPT_SPEC` was supplied
         without an `apply_opt` or `apply_opts` method to implement the options.
     '''
-    raise RuntimeError("unhandled option %r" % (opt,))
+    raise NotImplementedError("unhandled option %r" % (opt,))
 
   def apply_opts(self, opts):
     ''' Apply command line options.
@@ -1187,7 +1296,7 @@ class BaseCommand:
     try:
       with self.run_context(**kw_options):
         try:
-          return self._run(self, self._argv)
+          return self._run(self._argv)
         except CancellationError:
           error("cancelled")
           return 1
@@ -1201,12 +1310,14 @@ class BaseCommand:
         return 2
       raise
 
-  @classmethod
-  def cmdloop(cls, intro=None):
+  def cmdloop(self, intro=None):
     ''' Use `cmd.Cmd` to run a command loop which calls the `cmd_`* methods.
     '''
+    if not sys.stdin.isatty():
+      raise GetoptError("input is not a tty")
     # TODO: get intro from usage/help
-    cmdobj = BaseCommandCmd(cls)
+    cmdobj = BaseCommandCmd(self)
+    cmdobj.prompt = f'{self.cmd}> '
     cmdobj.cmdloop(intro)
 
   # pylint: disable=unused-argument
@@ -1275,7 +1386,10 @@ class BaseCommand:
     try:
       run_options = self.options.copy(runstate=runstate, **options_kw)
       with run_options:  # make the default ThreadState
-        with stackattrs(self, options=run_options):
+        with stackattrs(
+            self,
+            options=run_options,
+        ):
           with upd:
             with runstate:
               with runstate.catch_signal(
@@ -1321,11 +1435,15 @@ class BaseCommand:
         self.usage_text(short=short, show_subcmds=show_subcmds or None)
     )
 
-  def cmd_shell(self, argv):
+  @uses_upd
+  def cmd_shell(self, argv, *, upd: Upd):
     ''' Usage: {cmd}
           Run a command prompt via cmd.Cmd using this command's subcommands.
     '''
-    self.cmdloop()
+    if argv:
+      raise GetoptError("extra arguments")
+    with upd.without():
+      self.cmdloop()
 
   def repl(self, *argv, banner=None, local=None):
     ''' Run an interactive Python prompt with some predefined local names.
@@ -1390,41 +1508,39 @@ class BaseCommandCmd(Cmd):
       i.e. `cmd.Cmd.cmdloop`.
   '''
 
-  def __init__(self, command_class: BaseCommandSubType):
-    super().__init__()
-    self.command_class = command_class
-
   @typechecked
-  def _doarg(self, subcmd: str, arg: str):
-    cls = self.command_class
-    argv = shlex.split(arg)
-    command = cls([cls.__name__, subcmd] + argv)
-    with stackattrs(command, _subcmd=subcmd):
-      command.run()
+  def __init__(self, command: BaseCommandSubType):
+    super().__init__()
+    self.__command = command
 
   def get_names(self):
-    cls = self.command_class
+    cmdcls = type(self.__command)
     names = []
-    for method_name in dir(cls):
-      if method_name.startswith(cls.SUBCOMMAND_METHOD_PREFIX):
-        subcmd = cutprefix(method_name, cls.SUBCOMMAND_METHOD_PREFIX)
+    for method_name in dir(cmdcls):
+      if method_name.startswith(cmdcls.SUBCOMMAND_METHOD_PREFIX):
+        subcmd = cutprefix(method_name, cmdcls.SUBCOMMAND_METHOD_PREFIX)
         names.append('do_' + subcmd)
         ##names.append('help_' + subcmd)
     return names
 
   def __getattr__(self, attr):
-    cls = self.command_class
+    command = self.__command
+    cmdcls = type(command)
     subcmd = cutprefix(attr, 'do_')
     if subcmd is not attr:
-      method_name = cls.SUBCOMMAND_METHOD_PREFIX + subcmd
+      method_name = command.SUBCOMMAND_METHOD_PREFIX + subcmd
       try:
-        method = getattr(cls, method_name)
+        method = getattr(command, method_name)
       except AttributeError:
         pass
       else:
-        do_subcmd = lambda arg: self._doarg(subcmd, arg)
+
+        def do_subcmd(arg: str):
+          argv = shlex.split(arg)
+          method(argv)
+
         do_subcmd.__name__ = attr
-        do_subcmd.__doc__ = method.__doc__.format(cmd=subcmd)
+        do_subcmd.__doc__ = command.subcommand_usage_text(subcmd)
         return do_subcmd
       if subcmd in ('EOF', 'exit', 'quit'):
         return lambda _: True

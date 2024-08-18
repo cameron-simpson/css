@@ -64,7 +64,7 @@ class MykeCommand(BaseCommand):
     elif opt == '-n':
       M.no_action = True
     else:
-      raise RuntimeError("unhandled option")
+      raise NotImplementedError("unhandled option")
 
   def apply_preargv(self, argv):
     # gather any macro assignments and apply

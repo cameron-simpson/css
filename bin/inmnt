@@ -7,12 +7,16 @@
 set -ue
 
 : "${TMPDIR:=/tmp}"
+rtmp=/tmp
 
 cmd=$( basename "$0" )
 usage="Usage: $0 [options...] {sshhost:path|@rhost} [command [args...]]
   -F sshcfg Specify ssh config file, passed to mnt (for sshfs).
   -o opt    Passed to mnt (for sshfs).
   -q        Turn off tracing.
+  --rtmp tmppath
+            Bit of a hack to use something other than $rtmp at the
+            remote end.
   The default command is the user's shell (from \$SHELL).
   Modes:
     sshhost:path
@@ -37,6 +41,7 @@ do
     -F) mntopts="$mntopts -F $2"; shift ;;
     -o) mntopts="$mntopts -o $2"; shift ;;
     -q) trace= mntopts="$mntopts -q" inmntopts="$inmntopts -q" ;;
+    --rtmp) rtmp=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -58,39 +63,17 @@ fi
 
 case "$sshfspath" in
   @*) # connect to remote host and sshfs to here
+      [ $# -gt 0 ] || set -- sh -c 'exec $SHELL'
       rhost=$( expr "$sshfspath" : '@\(.*\)' )
-      host=$( hostname | sed 's/\..*//' )
-      ssh_exe=ssh
-      rssh_exe=ssh
-      rssh_host=reverse-$host
-      local_ssh_endpoint=127.0.0.1:22
       localdir=$( pwd )
-      reverse_sock=/tmp/revssh-$host-$$
-      reverse_cfg=/tmp/revssh-$host-$$.cfg
-      $trace $ssh_exe $sshopts \
-        -o ControlPath=none \
-        -o ExitOnForwardFailure=yes \
-        -o ForwardAgent=yes \
-        -R "$reverse_sock:$local_ssh_endpoint" \
+      qlocaldir=$( shqstr "$localdir" )
+      qargv=$( shqstr "$@" )
+      exec revssh \
+        -x \
+        -E "INMNT_OPTS=$inmntopts" \
+        -E "localdir=$localdir" \
         "$rhost" \
-        "
-          ##set -x
-          umask 077
-          echo Host $rssh_host >'$reverse_cfg'
-          echo   CheckHostIP no >>'$reverse_cfg'
-          echo   StrictHostkeyChecking no >>'$reverse_cfg'
-          echo   ForwardAgent yes >>'$reverse_cfg'
-          echo   ProxyCommand nc -U $reverse_sock >>'$reverse_cfg'
-          ##ssh-add -l
-          INMNT_SRCHOST='$host'
-          INMNT_SRCPATH='$localdir'
-          export INMNT_SRCHOST INMNT_SRCPATH
-          $trace inmnt -F '$reverse_cfg' $inmntopts '$rssh_host:$localdir' $*
-          xit=\$?
-          rm -f '$reverse_cfg' '$reverse_sock'
-          exit \$xit
-        "
-      exit $?
+        sh -uec 'inmnt -F "$REVSSH_SSHCFG" $INMNT_OPTS "$REVSSH_SRCHOST:$localdir" '"$qargv"
       ;;
   *)  # run the sshfs mount
       [ $# = 0 ] && set -- "$SHELL"

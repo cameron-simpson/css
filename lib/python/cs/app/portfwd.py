@@ -196,7 +196,7 @@ def main(argv=None, environ=None):
         elif opt == '-v':
           verbose = True
         else:
-          raise RuntimeError('unhandled option')
+          raise NotImplementedError('unsupported option')
     if not argv and not auto_mode:
       raise GetoptError(
           "missing targets; targets or -A (auto) option required"

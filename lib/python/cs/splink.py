@@ -12,7 +12,7 @@
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
 from getopt import GetoptError
@@ -44,7 +44,7 @@ from cs.context import stackattrs
 from cs.csvutils import csv_import
 from cs.deco import cachedmethod
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
-from cs.fstags import FSTags, DEFAULT_FSTAGS
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import s
 from cs.logutils import warning, error
 from cs.mplutils import axes, remove_decorations, print_figure, save_figure, FigureSize
@@ -699,17 +699,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
 
   @dataclass
   class Options(TimeSeriesBaseCommand.Options):
-    fetch_source: Optional[str] = field(
-        default_factory=lambda: os.environ.
-        get(SPLinkCommand.DEFAULT_FETCH_SOURCE_ENVVAR)
-    )
-    fstags: FSTags = field(default_factory=lambda: DEFAULT_FSTAGS)
-    spdpath: str = field(
-        default_factory=lambda: os.environ.get(
-            SPLinkCommand.DEFAULT_SPDPATH_ENVVAR,
-            SPLinkCommand.DEFAULT_SPDPATH,
-        )
-    )
+    fetch_source: Optional[str] = None
+    spdpath: Optional[str] = None
 
   def apply_opt(self, opt, val):
     ''' Handle an individual global command line option.
@@ -722,7 +713,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     elif opt == '-n':
       options.doit = False
     else:
-      raise RuntimeError("unhandled pre-option")
+      raise NotImplementedError("unhandled pre-option")
 
   def print_known_datasets(self, file=None):
     ''' Print the known datasets and their fields to `file`.
@@ -757,18 +748,33 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     )
 
   @contextmanager
-  def run_context(self):
+  @uses_fstags
+  def run_context(self, *, fstags: FSTags):
     ''' Define `self.options` attributes:
         * `tz`: the default local timezone
         * `spd`: the `SPLinkData` instance for `options.spdpath`
     '''
     with super().run_context():
       options = self.options
-      fstags = options.fstags
-      options.tz = tzlocal()
+      fetch_source = (
+          options.fetch_source
+          or os.environ.get(self.DEFAULT_FETCH_SOURCE_ENVVAR)
+      )
+      spdpath = (
+          options.spdpath or os.environ.get(
+              self.DEFAULT_SPDPATH_ENVVAR,
+              self.DEFAULT_SPDPATH,
+          )
+      )
+      spd = SPLinkData(spdpath)
       with fstags:
-        spd = SPLinkData(options.spdpath)
-        with stackattrs(options, spd=spd):
+        with stackattrs(
+            options,
+            fetch_source=fetch_source,
+            spd=spd,
+            spdpath=spdpath,
+            tz=tzlocal(),
+        ):
           with spd:
             yield
 
@@ -832,9 +838,17 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     return run(rsargv).returncode
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
+  @uses_fstags
   @uses_upd
   def cmd_import(
-      self, argv, *, upd: Upd, datasets=None, doit=None, force=None
+      self,
+      argv,
+      *,
+      upd: Upd,
+      datasets=None,
+      doit=None,
+      force=None,
+      fstags: FSTags,
   ):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
@@ -863,7 +877,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         dry_run='dry_run',
     )
     spd = options.spd
-    fstags = options.fstags
     datasets = options.datasets
     doit = options.doit
     force = options.force

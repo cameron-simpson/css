@@ -32,7 +32,7 @@ from cs.deco import decorator, fmtdoc
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20240522-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -160,23 +160,27 @@ def scandirtree(
     except NotADirectoryError:
       yield False, path
       continue
-    if include_dirs:
+    if not recurse and include_dirs:
       yield True, path
     if sort_names:
       dirents = sorted(dirents, key=lambda entry: entry.name)
     for entry in dirents:
-      if recurse and entry.is_dir(follow_symlinks=follow_symlinks):
-        pending.append(entry.path)
       name = entry.name
       if not name_selector(name):
         continue
       if only_suffixes or skip_suffixes:
-        base, ext = splitext(name)
+        _, ext = splitext(name)
         if only_suffixes and ext[1:] not in only_suffixes:
           continue
         if skip_suffixes and ext[1:] in skip_suffixes:
           continue
-      if include_dirs or not entry.is_dir(follow_symlinks=follow_symlinks):
+      is_dir = entry.is_dir(follow_symlinks=follow_symlinks)
+      if is_dir:
+        if recurse:
+          pending.append(entry.path)
+        if include_dirs:
+          yield True, entry.path
+      else:
         yield False, entry.path
 
 def scandirpaths(dirpath='.', **scan_kw):
@@ -449,11 +453,10 @@ def shortpath(
         except OSError:
           i += 1
     parts = list(
-        (path_as[0].path if i == 0 else path_as[0].name
-         ) if path_as[1] is None else path_as[1]
+        (path_as[1] or (path_as[0].path if i == 0 else path_as[0].name))
         for i, path_as in enumerate(keep_as)
     )
-    parts.append(leaf.name)
+    parts.append(paths_as[-1][1] or leaf.name)
     fspath = os.sep.join(parts)
   # replace leading prefix
   for prefix, subst in prefixes:

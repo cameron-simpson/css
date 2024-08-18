@@ -79,7 +79,7 @@ from os.path import (
     samefile,
 )
 import shlex
-from stat import S_ISLNK, S_ISREG
+from stat import S_ISREG
 from subprocess import CalledProcessError
 import sys
 from typing import Iterable, List, Mapping, Optional, Tuple, Union
@@ -98,9 +98,9 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
-from cs.upd import print, run_task, without  # pylint: disable=redefined-builtin
+from cs.upd import above as above_upd, print, run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20240412-post'
+__version__ = '20240709-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -126,12 +126,13 @@ DISTINFO = {
         'cs.psutils',
         'cs.resources',
         'cs.upd',
+        'blake3',
         'icontract',
         'typeguard',
     ],
 }
 
-HASHNAME_DEFAULT = 'sha256'
+HASHNAME_DEFAULT = 'blake3'
 HASHINDEX_EXE_DEFAULT = 'hashindex'
 SSH_EXE_DEFAULT = 'ssh'
 SSH_EXE_ENVVAR = 'HASHINDEX_SSH'
@@ -516,83 +517,45 @@ def file_checksum(
   ''' Return the hashcode for the contents of the file at `fspath`.
       Warn and return `None` on `OSError`.
   '''
-  hashcode, S = get_fstags_hashcode(fspath, hashname)
-  if not S_ISREG(S.st_mode):
+  st = os.lstat(fspath)
+  if not S_ISREG(st.st_mode):
     # ignore nonregular files
     return None
-  if hashcode is None:
-    hashclass = BaseHashCode.hashclass(hashname)
-    with contextif(
-        S.st_size > 1024 * 1024,
-        run_task,
-        f'checksum {shortpath(fspath)}',
-    ):
-      try:
-        hashcode = hashclass.from_fspath(fspath)
-      except OSError as e:
-        warning("%s.from_fspath(%r): %s", hashclass.__name__, fspath, e)
-        return None
-    set_fstags_hashcode(fspath, hashcode, S, fstags=fstags)
+  with fstags:
+    cached_hash = fstags[fspath].cached_value(
+        f'checksum.{hashname}', 'hashcode'
+    )
+    hashcode = None
+    hashcode_s, state = cached_hash.get()
+    if hashcode_s is not None:
+      if isinstance(hashcode_s, str):
+        try:
+          hashcode = BaseHashCode.from_prefixed_hashbytes_hex(hashcode_s)
+        except (TypeError, ValueError) as e:
+          # unrecognised hashcode
+          warning("cannot decode hashcode %s: %s", r(hashcode_s), e)
+        else:
+          # wrong hash type
+          if hashcode.hashname != hashname:
+            warning("ignoring unexpected hashname %r", hashcode.hashname)
+            hashcode = None
+      else:
+        warning("ignoring not string cached value: %s", r(hashcode_s))
+    if hashcode is None:
+      # out of date or no cached entry
+      hashclass = BaseHashCode.hashclass(hashname)
+      with contextif(
+          st.st_size > 1024 * 1024,
+          run_task,
+          f'checksum {hashname}:{shortpath(fspath)}',
+      ):
+        try:
+          hashcode = hashclass.from_fspath(fspath)
+        except OSError as e:
+          warning("%s.from_fspath(%r): %s", hashclass.__name__, fspath, e)
+        else:
+          cached_hash.set(str(hashcode), state=state)
   return hashcode
-
-@uses_fstags
-@typechecked
-def get_fstags_hashcode(
-    fspath: str,
-    hashname: str,
-    fstags: FSTags,
-) -> Tuple[Optional[BaseHashCode], Optional[os.stat_result]]:
-  ''' Obtain the hashcode cached in the fstags if still valid.
-      Return a 2-tuple of `(hashcode,stat_result)`
-      where `hashcode` is a `BaseHashCode` subclass instance is valid
-      or `None` if missing or no longer valid
-      and `stat_result` is the current `os.stat` result for `fspath`.
-  '''
-  try:
-    S = os.lstat(fspath)
-  except OSError as e:
-    warning("stat %r: %s", fspath, e)
-    return None, None
-  if S_ISLNK(S.st_mode):
-    # ignore symlinks
-    return None, S
-  if not S_ISREG(S.st_mode):
-    raise ValueError("not a regular file")
-  tags = fstags[fspath]
-  csum = tags.subtags(f'checksum.{hashname}')
-  csum_hash = csum.get('hashcode', '')
-  if not csum_hash:
-    return None, S
-  try:
-    st_size = int(csum.get('st_size', 0))
-    st_mtime = int(csum.get('st_mtime', 0))
-  except (TypeError, ValueError):
-    return None, S
-  if S.st_size != st_size or int(S.st_mtime) != st_mtime:
-    # file has changed, do not return the cached hashcode
-    return None, S
-  hashcode = BaseHashCode.from_prefixed_hashbytes_hex(csum_hash)
-  if hashcode.hashname != hashname:
-    warning("ignoring unexpected hashname %r", hashcode.hashname)
-    return None, S
-  return hashcode, S
-
-##@trace
-@uses_fstags
-@typechecked
-def set_fstags_hashcode(
-    fspath: str,
-    hashcode,
-    S: os.stat_result,
-    fstags: FSTags,
-):
-  ''' Record `hashcode` against `fspath`.
-  '''
-  tags = fstags[fspath]
-  csum = tags.subtags(f'checksum.{hashcode.hashname}')
-  csum.hashcode = str(hashcode)
-  csum.st_size = S.st_size
-  csum.st_mtime = S.st_mtime
 
 def hashindex(
     fspath: Union[str, TextIOBase, Tuple[Union[None, str], str]],
@@ -794,7 +757,7 @@ def run_remote_hashindex(
       *argv,
   ))
   remote_argv = [ssh_exe, rhost, hashindex_cmd]
-  with without():
+  with above_upd():
     return run(
         remote_argv, check=check, doit=doit, quiet=quiet, **subp_options
     )

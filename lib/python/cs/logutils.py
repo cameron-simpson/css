@@ -61,6 +61,7 @@ from threading import Lock
 import time
 import traceback
 from types import SimpleNamespace as NS
+
 from cs.ansi_colour import colourise, env_no_color
 from cs.context import stackattrs
 from cs.deco import fmtdoc, logging_wrapper
@@ -69,7 +70,7 @@ import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 
-__version__ = '20230212-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -85,7 +86,7 @@ DISTINFO = {
         'cs.lex',
         'cs.pfx',
         'cs.py.func',
-        'cs.upd',
+        'cs.upd',  # done as a late import
     ],
 }
 
@@ -302,7 +303,7 @@ class LoggingState(NS):
       if loginfo is None:
         # only do this the first time
         # TODO: fix this clumsy hack, some kind of stackable state?
-        main_handler.setFormatter(PfxFormatter(format))
+        main_handler.setFormatter(PfxFormatter(self.format))
         if self.supplant_root_logger:
           root_logger.handlers.pop(0)
         root_logger.addHandler(main_handler)
@@ -319,13 +320,14 @@ class LoggingState(NS):
 
       signal.signal(signal.SIGHUP, handler)
 
-def setup_logging(**kw):
+def setup_logging(cmd=None, **kw):
   ''' Prepare a `LoggingState` and return it.
       It is also available as the global `cs.logutils.loginfo`.
   '''
   global loginfo
-  loginfo = LoggingState(**kw)
-  loginfo.apply()
+  logstate = LoggingState(cmd=cmd, **kw)
+  logstate.apply()
+  loginfo = logstate
   return loginfo
 
 class PfxFormatter(Formatter):

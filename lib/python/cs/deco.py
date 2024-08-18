@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Decorators.
-#   - Cameron Simpson <cs@cskk.id.au> 02jul2017
+# - Cameron Simpson <cs@cskk.id.au> 02jul2017
 #
 
 r'''
@@ -18,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20240412-post'
+__version__ = '20240709-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -499,7 +499,7 @@ def cachedmethod(
 
 @decorator
 def OBSOLETE(func, suggestion=None):
-  ''' Decorator for obsolete functions.
+  ''' A decorator for obsolete functions or classes.
 
       Use:
 
@@ -517,7 +517,7 @@ def OBSOLETE(func, suggestion=None):
 
   callers = set()
 
-  def wrapped(*args, **kwargs):
+  def OBSOLETE_func_wrapper(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
     frame = traceback.extract_stack(None, 2)[0]
@@ -538,12 +538,12 @@ def OBSOLETE(func, suggestion=None):
 
   funcname = getattr(func, '__name__', str(func))
   funcdoc = getattr(func, '__doc__', None) or ''
-  doc = "OBSOLETE FUNCTION " + funcname
+  doc = "OBSOLETE " + funcname
+  func.__doc__ = doc + '\n\n' + funcdoc
   if suggestion:
     doc += ' suggestion: ' + suggestion
-  wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  wrapped.__doc__ = doc + '\n\n' + funcdoc
-  return wrapped
+  OBSOLETE_func_wrapper.__name__ = '@OBSOLETE(%s)' % (funcname,)
+  return OBSOLETE_func_wrapper
 
 @OBSOLETE(suggestion='cachedmethod')
 def cached(*a, **kw):
@@ -804,9 +804,9 @@ def default_params(func, _strict=False, **param_defaults):
   )
   sig0 = signature(func)
   sig = sig0
-  new_params = []
   modified_params = []
   for param in sig0.parameters.values():
+    modified_param = None
     try:
       param_default = param_defaults[param.name]
     except KeyError:
@@ -816,7 +816,10 @@ def default_params(func, _strict=False, **param_defaults):
           annotation=typing.Optional[param.annotation],
           default=None if param_default is param.empty else param_default,
       )
-      sig = sig.replace(parameters=[modified_param])
+    if modified_param is None:
+      modified_param = param.replace()
+    modified_params.append(modified_param)
+  sig = sig.replace(parameters=modified_params)
   defaulted_func.__signature__ = sig
   return defaulted_func
 
@@ -952,6 +955,7 @@ def promote(func, params=None, types=None):
     if param.default is not Parameter.empty:
       anno_origin = typing.get_origin(annotation)
       anno_args = typing.get_args(annotation)
+      # recognise Optional[T], which becomes Union[T,None]
       if (anno_origin is typing.Union and len(anno_args) == 2
           and anno_args[-1] is type(None)):
         optional = True
@@ -965,7 +969,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (annotation, promote_method, optional)
+    promotions[param_name] = (param, annotation, promote_method, optional)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -981,43 +985,51 @@ def promote(func, params=None, types=None):
             __name__, arg_value
         )
     )
-    for param_name, (annotation, promote_method,
+    for param_name, (param, annotation, promote_method,
                      optional) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
         # parameter not supplied
-        continue
-      if optional and arg_value is None:
-        # skip omitted optional value
-        continue
+        if param.default is Parameter.empty:
+          continue
+        # fill in the default values
+        arg_value = param.default
       if isinstance(arg_value, annotation):
         # already of the desired type
         continue
       try:
-        promoted_value = promote_method(arg_value)
-      except TypeError as te:
-        # see if the value has an as_TypeName() method
-        as_method_name = "as_" + annotation.__name__
         try:
-          as_annotation = getattr(arg_value, as_method_name)
-        except AttributeError:
-          # no .as_TypeName, reraise the original TypeError
-          raise te  # pylint: disable=raise-missing-from
-        else:
-          if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
-            # bound instance method of arg_value
-            try:
-              as_value = as_annotation()
-            except (TypeError, ValueError) as e:
-              raise TypeError(
-                  "%s: %s.%s(): %s" %
-                  (get_context(), param_name, as_method_name, e)
-              ) from e
+          promoted_value = promote_method(arg_value)
+        except TypeError as te:
+          # see if the value has an as_TypeName() method
+          as_method_name = "as_" + annotation.__name__
+          try:
+            as_annotation = getattr(arg_value, as_method_name)
+          except AttributeError:
+            # no .as_TypeName, reraise the original TypeError
+            raise te  # pylint: disable=raise-missing-from
           else:
-            # assuming a property or even a plain attribute
-            as_value = as_annotation
-          arg_value = as_value
+            if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
+              # bound instance method of arg_value
+              try:
+                as_value = as_annotation()
+              except (TypeError, ValueError) as e:
+                raise TypeError(
+                    "%s: %s.%s(): %s" %
+                    (get_context(), param_name, as_method_name, e)
+                ) from e
+            else:
+              # assuming a property or even a plain attribute
+              as_value = as_annotation
+            arg_value = as_value
+      except TypeError:
+        # promotion fails
+        if (optional and arg_value is param.default
+            and param.default is not Parameter.empty):
+          # allow omitted/unconverted optional value with default None
+          continue
+        raise
       else:
         arg_value = promoted_value
       arg_mapping[param_name] = arg_value

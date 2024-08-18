@@ -1,0 +1,6 @@
+Move CancellationError from cs.result to cs.fsm.
+report: avoid iterating over the live set.
+Result: drop the PREPARE state, allow 'cancel' no-op event in CANCELLED and DONE states.
+Result.result,exc_info getters: raise CancellationError if the Result is cancelled.
+Result._complete: fire the 'complete' event after the ._result and ._exc_info attributes are set but still before the self._get_lock.release().
+Result: preserve message passed to .cancel(), _complete raises RuntimeError if already complete.

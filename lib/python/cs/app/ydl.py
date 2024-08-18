@@ -138,7 +138,7 @@ class YDLCommand(BaseCommand):
               if options.parallel < 1:
                 raise GetoptError("must be >= 1")
         else:
-          raise RuntimeError("unhandled option: %s=%s" % (opt, val))
+          raise NotImplementedError("unhandled option: %s=%s" % (opt, val))
 
   def main(self, argv):
     ''' Command line main programme.

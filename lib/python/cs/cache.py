@@ -6,17 +6,36 @@
 from collections import deque
 from collections.abc import MutableMapping
 from contextlib import contextmanager
+from functools import partial
 from itertools import chain
+import os
+from os.path import (
+    dirname,
+    exists as existspath,
+    expanduser,
+    isabs as isabspath,
+    join as joinpath,
+    realpath,
+    split as splitpath,
+)
+from stat import S_ISREG
 from threading import Lock, RLock, Thread
 import time
 from typing import Any, Callable, Mapping, Optional
 
 from cs.context import stackattrs, withif
+from cs.deco import fmtdoc
+from cs.fileutils import atomic_filename
+from cs.fs import needdir, HasFSPath, validate_rpath
+from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.lex import r, s
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result
-from cs.seq import unrepeated
+from cs.seq import splitoff, unrepeated
+
+from icontract import require
 
 __version__ = '20240422.1-post'
 
@@ -431,34 +450,6 @@ class CachingMapping(MultiOpenMixin, MutableMapping):
     self._workQ.put((self.FLUSH, R))
     return R()
 
-''' A cache for storing conversions of source files such as thumbnails
-    or transcoded media, etc.
-'''
-
-from functools import partial
-import os
-from os.path import (
-    dirname,
-    exists as existspath,
-    expanduser,
-    isabs as isabspath,
-    join as joinpath,
-    normpath,
-    realpath,
-    split as splitpath,
-)
-from stat import S_ISREG
-from typing import Optional
-
-from icontract import require
-
-from cs.deco import fmtdoc
-from cs.fileutils import atomic_filename
-from cs.fs import needdir, HasFSPath
-from cs.hashindex import file_checksum, HASHNAME_DEFAULT
-from cs.pfx import Pfx, pfx_call, pfx_method
-from cs.seq import splitoff
-
 @fmtdoc
 class ConvCache(HasFSPath):
   ''' A cache for conversions of file contents such as thumbnails
@@ -512,7 +503,7 @@ class ConvCache(HasFSPath):
       self._content_keys[srcpath] = content_key, signature
     return content_key
 
-  def content_subpath(self, srcpath):
+  def content_subpath(self, srcpath) -> str:
     ''' Return the content key based subpath component.
 
         This default assumes the content key is a hash code and
@@ -524,8 +515,17 @@ class ConvCache(HasFSPath):
     return joinpath(hashname, *splitoff(hashhex, 2, 2))
 
   @require(lambda conv_subpath: not isabspath(conv_subpath))
-  def convof(self, srcpath, conv_subpath, conv_func, ext=None):
-    ''' Return the filesystem path of the cached conversion of `srcpath` via `conv_func`.
+  def convof(
+      self,
+      srcpath,
+      conv_subpath,
+      conv_func,
+      *,
+      ext=None,
+      force=False,
+  ) -> str:
+    ''' Return the filesystem path of the cached conversion of
+        `srcpath` via `conv_func`.
 
         Parameters:
         * `srcpath`: the source filesystem path
@@ -537,27 +537,37 @@ class ConvCache(HasFSPath):
           to the filesystem path `dstpath`
         * `ext`: an optional filename extension, default from the
           first component of `conv_subpath`
+        * `force`: option flag to require conversion even if the
+          cache has an entry
     '''
-    conv_subpath = normpath(conv_subpath)
+    # ensure that conv_subpath is a clean normalised subpath
+    validate_rpath(conv_subpath)
     conv_subparts = splitpath(conv_subpath)
-    assert conv_subparts and '.' not in conv_subparts and '..' not in conv_subparts
     if ext is None:
+      # assume the first component is a file extension
+      # works for things like png/64/64
       ext = conv_subparts[0]
     suffix = '.' + ext
     dstpath = self.pathto(conv_subpath, self.content_subpath(srcpath) + suffix)
     dstdirpath = dirname(dstpath)
     needdir(dstdirpath, use_makedirs=True)
-    if not existspath(dstpath):
+    if force or not existspath(dstpath):
       with Pfx('<%s %s >%s', srcpath, conv_func, dstpath):
-        with atomic_filename(dstpath,
-                             prefix=f'{self.__class__.__name__}.convof-',
-                             suffix=suffix) as T:
+        with atomic_filename(
+            dstpath,
+            prefix=
+            f'.{self.__class__.__name__}.convof--{conv_subpath.replace(os.sep,"--")}--',
+            suffix=suffix,
+            exists_ok=force,
+        ) as T:
           pfx_call(conv_func, srcpath, T.name)
     return dstpath
 
 _default_conv_cache = ConvCache()
 
-def convof(srcpath, conv_subpath, conv_func, ext=None):
+def convof(srcpath, conv_subpath, conv_func, *, ext=None, force=False):
   ''' `ConvCache.convof` using the default cache.
   '''
-  return _default_conv_cache.convof(srcpath, conv_subpath, conv_func, ext=ext)
+  return _default_conv_cache.convof(
+      srcpath, conv_subpath, conv_func, ext=ext, force=force
+  )

@@ -10,7 +10,8 @@ trace=
 
 : "${DK_APP_USER:=appuser}"
 : "${DK_COMPOSE_CMD:=docker compose}" ## or docker-compose on older machines
-: "${DK_COMPOSE_YML:=docker-compose.yml}"
+: "${DK_COMPOSE_YML:=${COMPOSE_FILE:-docker-compose.yml}}"
+export "COMPOSE_FILE=$DK_COMPOSE_YML"
 : "${DK_CP_PREFIX:=.}"
 : "${DK_ENVVARS:=}"
 : "${DK_EXEC_PREFIX:=}"
@@ -32,7 +33,7 @@ cmd=$0
 usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
   -f docker-compose.yml
     Specify $DK_COMPOSE_CMD YAML file.
-    Default from \$DK_COMPOSE_YML: $DK_COMPOSE_YML
+    Default from \$DK_COMPOSE_YML or \$COMPOSE_FILE: $DK_COMPOSE_YML
   -i Passed to \"docker exec\", for commands which use that.
   -n name
     Specify primary service name.
@@ -118,7 +119,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -f) DK_COMPOSE_YML=$2; shift ;;
+    -f) DK_COMPOSE_YML=$2 COMPOSE_FILE=$2; shift ;;
     -h|--help)
         echo "$usage"
         exit 0
@@ -203,8 +204,15 @@ resolve_container_path(){
   )
 }
 
-[ -e "$DK_COMPOSE_YML" ] && DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
-ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
+case "$DK_COMPOSE_YML" in
+  *:*)  ymlbasedir=$(pwd) ;;
+  *)    [ -e "$DK_COMPOSE_YML" ] && DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
+        ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
+        ;;
+esac
+# maintain parity
+export DOCKER_COMPOSE=$DK_COMPOSE_YML
+
 : ${DK_BASE_PREFIX:=${COMPOSE_PROJECT_NAME:-$( basename "$ymlbasedir" )}}
 base=$DK_BASE_PREFIX
 primary_container=$( resolve_shortname "$DK_PRIMARY_SERVICE" )

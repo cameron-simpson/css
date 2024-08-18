@@ -7,10 +7,11 @@
 r'''
 Assorted debugging facilities.
 
-If the environment variable $CS_DEBUG_BUILTINS is set to a comma
+If the environment variable `$CS_DEBUG_BUILTINS` is set to a comma
 separated list of names then the `builtins` module will be monkey
 patched with those names, enabling trite debug use of those names
 anywhere in the code provided this module has been imported somewhere.
+
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
 * `breakpoint`: `cs.upd.breakpoint`
@@ -53,14 +54,15 @@ import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
-from cs.py.func import funccite, func_a_kw_fmt
+from cs.py.func import funccite, funcname, func_a_kw_fmt
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
+from cs.threads import ThreadState
 from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20240519-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -179,7 +181,7 @@ def thread_dump(Ts=None, fp=None):
       except KeyError:
         warning("no frame for Thread.ident=%s", T.ident)
         continue
-      print("Thread", T.ident, T.name, file=fp)
+      print("Thread", T.ident, T.name, T, file=fp)
       traceback.print_stack(frame, None, fp)
       print(file=fp)
 
@@ -607,7 +609,7 @@ def debug_object_shell(o, prompt=None):
   C.prompt = prompt
   C.cmdloop(intro)
 
-_trace_indent = ""
+_trace_state = ThreadState(indent='')
 
 @ALL
 @decorator
@@ -622,14 +624,23 @@ def trace(
     with_pfx=False,
 ):
   ''' Decorator to report the call and return of a function.
+
+      Decorator parameters:
+      * `call`: trace the call, default `True`
+      * `retval`: trace the return, default `False`
+      * `exception`: trace raised exceptions, default `True`
+      * `use_pformat`: present the return value using
+        `pformat` instead of `repr`, default `False`
+      * `with_caller`: include the caller if this function, default `False`
+      * `with_pfx`: include the current `Pfx` prefix, default `False`
   '''
 
-  citation = funccite(func)
+  citation = funcname(func)  ## funccite(func)
 
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
     '''
-    global _trace_indent  # pylint: disable=global-statement
+    global _trace_state  # pylint: disable=global-statement
     if with_pfx:
       # late import so that we can use this in modules we import
       # pylint: disable=import-outside-toplevel
@@ -644,44 +655,101 @@ def trace(
       log_cite = log_cite + "from[%s]" % (caller(),)
     if call:
       fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("%sCALL " + fmt, _trace_indent, *av)
-    old_indent = _trace_indent
-    _trace_indent += '  '
+      xlog("%sCALL " + fmt, _trace_state.indent, *av)
+    old_indent = _trace_state.indent
+    _trace_state.indent += '  '
     start_time = time.time()
     try:
       result = func(*a, **kw)
     except Exception as e:
       end_time = time.time()
       if exception:
+        xlog_kw = {}
+        if xlog is X:
+          xlog_kw['colour'] = 'red'
         xlog(
             "%sCALL %s %gs RAISE %r",
-            _trace_indent,
+            _trace_state.indent,
             log_cite,
             end_time - start_time,
             e,
+            **xlog_kw,
         )
-      _trace_indent = old_indent
+      _trace_state.indent = old_indent
       raise
     else:
       end_time = time.time()
       if retval:
         xlog(
             "%sCALL %s %gs RETURN %s",
-            _trace_indent,
+            _trace_state.indent,
             log_cite,
             end_time - start_time,
             (pformat if use_pformat else repr)(result),
         )
+      if inspect.isgeneratorfunction(func):
+        iterator = result
+
+        def traced_generator():
+          while True:
+            next_time = time.time()
+            if call:
+              xlog(
+                  "%sNEXT %s %gs ...",
+                  _trace_state.indent,
+                  log_cite,
+                  next_time - start_time,
+              )
+            try:
+              item = next(iterator)
+            except StopIteration:
+              yield_time = time.time()
+              xlog(
+                  "%sDONE %s %gs ...",
+                  _trace_state.indent,
+                  log_cite,
+                  yield_time - next_time,
+              )
+              break
+            except Exception as e:
+              end_time = time.time()
+              if exception:
+                xlog_kw = {}
+                if xlog is X:
+                  xlog_kw['colour'] = 'red'
+                xlog(
+                    "%sCALL %s %gs RAISE %r",
+                    _trace_state.indent,
+                    log_cite,
+                    end_time - start_time,
+                    e,
+                    **xlog_kw,
+                )
+              _trace_state.indent = old_indent
+              raise
+            else:
+              yield_time = time.time()
+              xlog(
+                  "%sYIELD %gs %s <= %s",
+                  _trace_state.indent,
+                  yield_time - next_time,
+                  s(item),
+                  log_cite,
+              )
+              yield item
+
+        result = traced_generator()
       else:
-        ##xlog("%sRETURN %s <= %s", _trace_indent, type(result), log_cite)
-        xlog(
-            "%sRETURN %gs %s <= %s",
-            _trace_indent,
-            end_time - start_time,
-            s(result),
-            log_cite,
-        )
-      _trace_indent = old_indent
+        ##xlog("%sRETURN %s <= %s", _trace_state.indent, type(result), log_cite)
+        if retval:
+          xlog(
+              "%sRETURN %gs %s <= %s",
+              _trace_state.indent,
+              end_time - start_time,
+              s(result),
+              log_cite,
+          )
+      _trace_state.indent = old_indent
       return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
@@ -708,7 +776,7 @@ def trace_DEBUG(debug_spec=None):
       for spec in debug_spec:
         with Pfx(spec):
           if is_dotted_identifier(spec):
-            module_names.sppend(spec)
+            module_names.append(spec)
           elif ':' in spec:
             # module:funcname
             module_name, func_name = spec.split(':', 1)
