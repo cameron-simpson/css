@@ -872,7 +872,7 @@ def uses_runstate(func, name=None):
   ''' A wrapper for `@default_params` which makes a new thread wide
       `RunState` parameter `runstate` if missing.
       The optional decorator parameter `name` may be used to specify
-      a name for the new `RunState` if one is made. The default
+      a name for the new `RunState` if one is made. The default name
       comes from the wrapped function's name.
 
       Example:
