@@ -817,8 +817,7 @@ class CalibreMetadataDB(ORM):
   def shell(self):
     ''' Interactive db shell.
     '''
-    print("sqlite3", self.db_path)
-    run(['sqlite3', self.db_path], check=True)
+    run(['sqlite3', self.db_path], check=True, quiet=False, stdin=sys.stdin)
     return 0
 
   # lifted from SQLTags
