@@ -134,7 +134,7 @@ class DeDRMCommand(BaseCommand):
     return xit
 
   def cmd_kindlekeys(self, argv):
-    ''' Usage: {cmd} [import|json|print]
+    ''' Usage: {cmd} [base|import|json|print]
           Dump, print or import the Kindle DRM keys.
           Modes:
             base [-json] [filepaths...]
