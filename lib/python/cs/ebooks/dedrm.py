@@ -532,6 +532,15 @@ def getLibCrypto():
     pass
 
   # interface to needed routines in openssl's libcrypto
+  #
+  # Note that this started crashing with:
+  #   WARNING: /Users/cameron/tmp/venv--css-ebooks--apple.x86_64.darwin/bin/python3 is loading libcrypto in an unsafe way
+  #   [1]    85172 abort      env-dev python3 -m cs.ebooks kindle
+  # resolved by:
+  #   CSS[~/hg/css-ebooks(hg:ebooks)]fleet2*> cd /usr/local/lib
+  #   [/usr/local/lib]fleet2*> ln -s ~/var/homebrew/lib/libcrypto.* .
+  #   + exec ln -s /Users/cameron/var/homebrew/lib/libcrypto.3.dylib /Users/cameron/var/homebrew/lib/libcrypto.a /Users/cameron/var/homebrew/lib/libcrypto.dylib .
+  #
   def _load_crypto_libcrypto():
     from ctypes import (
         CDLL, byref, POINTER, c_void_p, c_char_p, c_int, c_long, Structure,
