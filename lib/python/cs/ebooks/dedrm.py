@@ -137,13 +137,18 @@ class DeDRMCommand(BaseCommand):
     ''' Usage: {cmd} [import|json|print]
           Dump, print or import the Kindle DRM keys.
           Modes:
+            base [-json] [filepaths...]
+                      List the kindle keys derived from the current system.
             import    Read a JSON list of key dicts and update the cached keys.
             json      Write the cached list of keys as JSON.
             print     Readable listing of the keys.
           The default mode is 'json'.
-          Example:
-            Import the keys from one host into the local collection:
-              ssh otherhost python3 -m cs.ebooks.dedrm kindlekeys \
+          Examples:
+            Import the base keys from this system into the local collection:
+              python3 -m cs.ebooks.dedrm kindlekeys base \
+              | python3 -m cs.ebooks dedrm kindlekeys import
+            Import the keys from another host into the local collection:
+              ssh otherhost python3 -m cs.ebooks.dedrm kindlekeys json \
               | python3 -m cs.ebooks dedrm kindlekeys import
     '''
     dedrm = self.options.dedrm
@@ -151,11 +156,26 @@ class DeDRMCommand(BaseCommand):
       argv = ['json']
     op = argv.pop(0)
     with Pfx(op):
-      if op == 'import':
+      if op == 'base':
+        json_mode = not sys.stdout.isatty()
+        if argv and argv[0] == '-json':
+          json_mode = True
+          argv.pop(0)
+        # fetch the base system kindle keys
+        with redirect_stdout(sys.stderr):
+          new_kks = dedrm.base_kindlekeys(argv)
+        if json_mode:
+          print(json.dumps(new_kks, indent=2))
+        else:
+          for i, kk in enumerate(new_kks):
+            print(f'{i}:')
+            for k, v in sorted(kk.items()):
+              print(" ", k, v)
+      elif op == 'import':
         if argv:
           raise GetoptError("extra arguments: %r" % (argv,))
         if sys.stdin.isatty():
-          print("Reading JSON keys from stadnard input.")
+          print("Reading JSON keys from standard input.")
         new_kks = json.loads(sys.stdin.read())
         assert all(isinstance(kk, dict) for kk in new_kks)
         dedrm.update_kindlekeys_from_keys(new_kks)
@@ -164,7 +184,7 @@ class DeDRMCommand(BaseCommand):
           raise GetoptError("extra arguments: %r" % (argv,))
         with redirect_stdout(sys.stderr):
           kks = dedrm.kindlekeys
-        print(json.dumps(kks))
+        print(json.dumps(kks, indent=2))
       elif op == 'print':
         if argv:
           raise GetoptError("extra arguments: %r" % (argv,))
