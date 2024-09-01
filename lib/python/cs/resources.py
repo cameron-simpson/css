@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import partial
 import sys
-from threading import Lock, current_thread, main_thread
+from threading import Lock, RLock, current_thread, main_thread
 import time
 from typing import Any, Callable, Mapping, Optional, Tuple, Union
 
@@ -30,7 +30,7 @@ from cs.py.stack import caller, frames as stack_frames, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20240721-post'
+__version__ = '20240723-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -91,7 +91,9 @@ class _MultiOpenMixinOpenCloseState:
   final_close_from: StackSummary = None
   join_lock: Lock = None
   _teardown: Callable = None
-  _lock: NRLock = field(default_factory=NRLock)
+  _lock: RLock = field(
+      default_factory=RLock
+  )  ## was NRLock, still investigating conflicts
 
   def open(self, caller_frame=None) -> int:
     ''' The open process:
@@ -107,10 +109,10 @@ class _MultiOpenMixinOpenCloseState:
         frame_key = caller_frame.filename, caller_frame.lineno
         self.opens_from[frame_key] += 1
       if opens == 1:
+        self.opened = True
         self.join_lock = Lock()
         self.join_lock.acquire()
         self._teardown = setup_cmgr(self.mom.startup_shutdown())
-        self.opened = True
     return opens
 
   def close(
@@ -870,7 +872,7 @@ def uses_runstate(func, name=None):
   ''' A wrapper for `@default_params` which makes a new thread wide
       `RunState` parameter `runstate` if missing.
       The optional decorator parameter `name` may be used to specify
-      a name for the new `RunState` if one is made. The default
+      a name for the new `RunState` if one is made. The default name
       comes from the wrapped function's name.
 
       Example:
