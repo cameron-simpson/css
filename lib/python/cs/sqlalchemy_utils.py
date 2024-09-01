@@ -322,9 +322,9 @@ class ORM(MultiOpenMixin, ABC):
       self.engine_keywords.update(
           poolclass=NullPool, connect_args={'check_same_thread': False}
       )
+    self.__first_use = True
     # declare the schema - does not access the db itself
     self.declare_schema()
-    self.__first_use = True
 
   @abstractmethod
   def declare_schema(self):

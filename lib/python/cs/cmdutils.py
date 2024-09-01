@@ -366,6 +366,7 @@ class BaseCommandOptions(HasThreadState):
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
+  runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
   verbose: bool = False
 
@@ -1382,6 +1383,8 @@ class BaseCommand:
                 finally:
                   ... any unconditional cleanup ...
     '''
+    # prefer the runstate from the options if specified
+    runstate = self.options.runstate or runstate
     # redundant try/finally to remind subclassers of correct structure
     try:
       run_options = self.options.copy(runstate=runstate, **options_kw)

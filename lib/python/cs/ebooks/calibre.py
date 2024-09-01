@@ -817,8 +817,7 @@ class CalibreMetadataDB(ORM):
   def shell(self):
     ''' Interactive db shell.
     '''
-    print("sqlite3", self.db_path)
-    run(['sqlite3', self.db_path], check=True)
+    run(['sqlite3', self.db_path], check=True, quiet=False, stdin=sys.stdin)
     return 0
 
   # lifted from SQLTags
@@ -1139,10 +1138,7 @@ class CalibreCommand(BaseCommand):
     calibre_path: str = field(
         default_factory=lambda: os.environ.get(CalibreTree.FSPATH_ENVVAR)
     )
-    calibre_path_other: Optional[str] = field(
-        default_factory=lambda: os.environ.
-        get(CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR),
-    )
+    calibre_path_other: Optional[str] = None
     dedrm_package_path: Optional[str] = field(
         default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR),
     )
@@ -1155,11 +1151,7 @@ class CalibreCommand(BaseCommand):
       )
 
     kindle_path: Optional[str] = field(default_factory=_default_kindle_path)
-    linkto_dirpath: str = field(
-        default_factory=lambda: os.environ.get(
-            CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR
-        ) or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
-    )
+    linkto_dirpath: Optional[str] = None
     # used by "calibre add [--cbz]"
     make_cbz: bool = False
 
@@ -1210,8 +1202,16 @@ class CalibreCommand(BaseCommand):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     with super().run_context():
-      calibre = self.options.calibre
-      with calibre:
+      options = self.options
+      if options.calibre_path_other is None:
+        options.calibre_path_other = os.environ.get(
+            CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR
+        )
+      if options.linkto_dirpath is None:
+        options.linkto_dirpath = os.environ.get(
+            CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR
+        ) or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
+      with options.calibre:
         yield
 
   @staticmethod
