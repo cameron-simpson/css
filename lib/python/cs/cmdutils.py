@@ -349,7 +349,7 @@ class BaseCommandOptions(HasThreadState):
       * `.verbose=False`
       and a `.doit` property which is the inverse of `.dry_run`.
 
-      It is recommended that if ``BaseCommand` subclasses use a
+      It is recommended that if `BaseCommand` subclasses use a
       different type for their `Options` that it should be a
       subclass of `BaseCommandOptions`.
       Since `BaseCommandOptions` is a data class, this typically looks like:
@@ -362,10 +362,13 @@ class BaseCommandOptions(HasThreadState):
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
   COMMON_OPT_SPECS = _COMMON_OPT_SPECS
 
+  # the cmd prefix while a command runs
   cmd: Optional[str] = None
+  # dry run, no action
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
+  runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
   verbose: bool = False
 
@@ -1382,6 +1385,8 @@ class BaseCommand:
                 finally:
                   ... any unconditional cleanup ...
     '''
+    # prefer the runstate from the options if specified
+    runstate = self.options.runstate or runstate
     # redundant try/finally to remind subclassers of correct structure
     try:
       run_options = self.options.copy(runstate=runstate, **options_kw)

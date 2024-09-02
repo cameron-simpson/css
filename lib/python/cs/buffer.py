@@ -47,12 +47,23 @@ class CornuCopyBuffer(Promotable):
   ''' An automatically refilling buffer intended to support parsing
       of data streams.
 
-      Its purpose is to aid binary parsers
+      Its primary purpose is to aid binary parsers
       which do not themselves need to handle sources specially;
       `CornuCopyBuffer`s are trivially made from `bytes`,
       iterables of `bytes` and file-like objects.
       See `cs.binary` for convenient parsing classes
-      which work against `CornuCopyBuffer`s.
+      which work with `CornuCopyBuffer`s.
+
+      A `CornuCopyBuffer` is iterable, yielding data in whatever
+      sizes come from its `input_data` source, preceeded by any
+      content in the internal buffer.
+
+      A `CornuCopyBuffer` also supports the file methods `.read`,
+      `.tell` and `.seek` supporting drop in use of the buffer in
+      many file contexts. Backward seeks are not supported. `.seek`
+      will take advantage of the `input_data`'s `.seek` method if it
+      has one, otherwise it will use consume the `input_data`
+      as required.
 
       Attributes:
       * `buf`: the first of any buffered leading chunks
@@ -65,7 +76,9 @@ class CornuCopyBuffer(Promotable):
       *Note*: the initialiser may supply a cleanup function;
       although this will be called via the buffer's `.__del__` method
       a prudent user of a buffer should call the `.close()` method
-      when finished with the buffer to ensure prompt cleanup.
+      when finished with the buffer to ensure prompt cleanup;
+      the `contextlib.closing` context manager provides an easy way
+      to do this in common cases.
 
       The primary methods supporting parsing of data streams are
       `.extend()` and `take()`.
@@ -81,17 +94,6 @@ class CornuCopyBuffer(Promotable):
 
       Indexing a `CornuCopyBuffer` accesses the buffered data only,
       returning an individual byte's value (an `int`).
-
-      A `CornuCopyBuffer` is also iterable, yielding data in whatever
-      sizes come from its `input_data` source, preceeded by any
-      content in the internal buffer.
-
-      A `CornuCopyBuffer` also supports the file methods `.read`,
-      `.tell` and `.seek` supporting drop in use of the buffer in
-      many file contexts. Backward seeks are not supported. `.seek`
-      will take advantage of the `input_data`'s .seek method if it
-      has one, otherwise it will use consume the `input_data`
-      as required.
   '''
 
   # pylint: disable=too-many-arguments

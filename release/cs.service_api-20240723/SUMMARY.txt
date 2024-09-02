@@ -1,0 +1,1 @@
+ServiceAPI: acquire the fstags automatically at init.

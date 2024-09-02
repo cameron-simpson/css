@@ -499,7 +499,7 @@ def cachedmethod(
 
 @decorator
 def OBSOLETE(func, suggestion=None):
-  ''' Decorator for obsolete functions.
+  ''' A decorator for obsolete functions or classes.
 
       Use:
 
@@ -517,7 +517,7 @@ def OBSOLETE(func, suggestion=None):
 
   callers = set()
 
-  def wrapped(*args, **kwargs):
+  def OBSOLETE_func_wrapper(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
     frame = traceback.extract_stack(None, 2)[0]
@@ -538,12 +538,12 @@ def OBSOLETE(func, suggestion=None):
 
   funcname = getattr(func, '__name__', str(func))
   funcdoc = getattr(func, '__doc__', None) or ''
-  doc = "OBSOLETE FUNCTION " + funcname
+  doc = "OBSOLETE " + funcname
+  func.__doc__ = doc + '\n\n' + funcdoc
   if suggestion:
     doc += ' suggestion: ' + suggestion
-  wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  wrapped.__doc__ = doc + '\n\n' + funcdoc
-  return wrapped
+  OBSOLETE_func_wrapper.__name__ = '@OBSOLETE(%s)' % (funcname,)
+  return OBSOLETE_func_wrapper
 
 @OBSOLETE(suggestion='cachedmethod')
 def cached(*a, **kw):

@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20240316-post'
+__version__ = '20240723-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1841,11 +1841,6 @@ class SQLTags(BaseTagSets, Promotable):
     if not db_url:
       db_url = expanduser(default_path)
     return db_url
-
-  def init(self):
-    ''' Initialise the database.
-    '''
-    self.orm.define_schema()
 
   def db_entity(self, index):
     ''' Return the `Entities` instance for `index` or `None`.

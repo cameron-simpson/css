@@ -1,0 +1,1 @@
+lib/python/cs/app/playon.py: replace many raises of RuntimeError with NotImplementedError, suggestion by @dimaqq on disucss.python.org
