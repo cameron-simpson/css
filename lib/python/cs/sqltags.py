@@ -66,6 +66,7 @@ from cs.lex import FormatAsError, has_format_attributes, get_decimal_value, r
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
+from cs.resources import RunState, uses_runstate
 from cs.sqlalchemy_utils import (
     ORM,
     BasicTableMixin,
@@ -1862,7 +1863,10 @@ class SQLTags(BaseTagSets, Promotable):
     '''
     return self[0]
 
-  def find(self, *criteria, _without_tags=False, **crit_kw):
+  @uses_runstate
+  def find(
+      self, *criteria, runstate: RunState, _without_tags=False, **crit_kw
+  ):
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTagSet` instances.
 
@@ -1898,6 +1902,7 @@ class SQLTags(BaseTagSets, Promotable):
       # merge entities and tag information
       entity_map = {}
       for row in query:
+        runstate.raiseif()
         entity_id = row.id
         te = entity_map.get(entity_id)
         if te:
@@ -1933,6 +1938,7 @@ class SQLTags(BaseTagSets, Promotable):
     else:
       # verify all the entities for criteria which do not express well as SQL
       for te in entity_map.values():
+        runstate.raiseif()
         if all(criterion.match_tagged_entity(te)
                for criterion in post_criteria):
           yield te
@@ -2053,6 +2059,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           * tags: a column per Tag
     '''
     options = self.options
+    runstate = options.runstate
     sqltags = options.sqltags
     export_format = 'csv'
     badopts = False
@@ -2077,10 +2084,12 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     if export_format == 'csv':
       csvw = csv.writer(sys.stdout)
       for tags in tagsets:
+        runstate.raiseif()
         with Pfx(tags):
           csvw.writerow(tags.csvrow)
     elif export_format == 'fstags':
       for tags in tagsets:
+        runstate.raiseif()
         print(
             TagFile.tags_line(
                 tags.name, [Tag('unixtime', tags.unixtime)] + list(tags)
