@@ -2080,7 +2080,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    tagsets = sqltags.find(tag_criteria)
+    tagsets = sqltags.find(*tag_criteria)
     if export_format == 'csv':
       csvw = csv.writer(sys.stdout)
       for tags in tagsets:
