@@ -6,14 +6,19 @@
 import abc
 import importlib
 from inspect import (
-    getcomments, getmodule, isclass, isdatadescriptor, isfunction, ismethod,
-    signature
+    getcomments,
+    getmodule,
+    isclass,
+    isdatadescriptor,
+    isfunction,
+    ismethod,
+    signature,
 )
 from itertools import chain
 
 from cs.fsm import FSM
-from cs.gvutils import gvdataurl, GVDATAURL
-from cs.lex import cutprefix, stripped_dedent
+from cs.gvutils import gvdataurl, GVDATAURL, gvsvg
+from cs.lex import cutprefix, stripped_dedent, indent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.py.modules import module_attributes
@@ -88,6 +93,7 @@ def module_doc(
         )
       elif isclass(obj):
         classname_etc = Mname
+        # compute the list of immediate superclass names
         mro_names = []
         mro_set = set(obj.__mro__)
         for superclass in obj.__mro__:
