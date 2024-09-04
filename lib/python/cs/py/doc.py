@@ -75,13 +75,17 @@ def module_doc(
       obj_doc = obj_docstring(obj) if obj_module else ''
       if not callable(obj):
         if obj_doc:
-          full_docs.append(f'\n\n## `{Mname} = {obj!r}`\n\n{obj_doc}')
+          full_docs.append(
+              f'\n\n## <a name="{Mname}"></a>`{Mname} = {obj!r}`\n\n{obj_doc}'
+          )
         continue
       if not obj_doc:
         continue
       if isfunction(obj):
         sig = signature(obj)
-        full_docs.append(f'\n\n## `{Mname}{sig}`\n\n{obj_doc}')
+        full_docs.append(
+            f'\n\n## <a name="{Mname}"></a>`{Mname}{sig}`\n\n{obj_doc}'
+        )
       elif isclass(obj):
         classname_etc = Mname
         mro_names = []
@@ -111,7 +115,9 @@ def module_doc(
                   dataurl_encoding='base64',
               ) + f' "{Mname} State Diagram")\n'
           )
-        full_docs.append(f'\n\n## Class `{classname_etc}`\n\n{obj_doc}')
+        full_docs.append(
+            f'\n\n## <a name="{Mname}"></a>Class `{classname_etc}`\n\n{obj_doc}'
+        )
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order
