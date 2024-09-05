@@ -1,3 +1,4 @@
+cs.cmdutils OptSpec to be promotable, leverage in popopts
 fetch the dedrm package if not present, store where?
 fetch the dedrm package if not present, store where?
 service_api: rate limiter? context manager to access it directly, implied if .API_RATE_LIMIT
