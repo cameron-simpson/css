@@ -1,3 +1,4 @@
+script to run strace or truss or sudo dtruss -p PID etc depending on the OS
 cs.cmdutils OptSpec to be promotable, leverage in popopts
 fetch the dedrm package if not present, store where?
 fetch the dedrm package if not present, store where?
