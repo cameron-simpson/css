@@ -118,6 +118,97 @@ def docmd(dofunc):
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
 
+@dataclass
+class OptionSpec(Promotable):
+  ''' A class to support parsing an option value.
+  '''
+
+  UNVALIDATED_MESSAGE_DEFAULT = "invalid value"
+
+  help_text: str
+  parse: Optional[Callable[[str], Any]] = None
+  validate: Optional[Callable[[Any], bool]] = None
+  unvalidated_message: str = UNVALIDATED_MESSAGE_DEFAULT
+
+  def parse_value(self, value):
+    ''' Parse `value` according to the spec.
+        Raises `GetoptError` for invalid values.
+    '''
+    with Pfx("%s %r", self.help_text, value):
+      try:
+        value = pfx_call(self.parse, value)
+        if self.validate is not None:
+          if not pfx_call(self.validate, value):
+            raise ValueError(self.unvalidated_message)
+      except ValueError as e:
+        raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
+    return value
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Construct an `OptionSpec` from a list of positional parameters
+        as for `poparg()` or `popopts()`.
+
+        Examples:
+
+          >>> OptionSpec.promote( () ) #doctest: +ELLIPSIS
+          OptionSpec(help_text='string value', parse=<function ...>, validate=None, unvalidated_message='invalid value')
+    '''
+    if isinstance(obj, cls):
+      return obj
+    # reform obj as a list to convert into a specification
+    if isinstance(obj, str):
+      # just the help text
+      specs = (obj,)
+    elif callable(obj):
+      # just the value parser/factory
+      specs = (obj,)
+    else:
+      # some iterable
+      specs = tuple(obj)
+    parse = None
+    help_text = None
+    validate = None
+    unvalidated_message = None
+    for spec in specs:
+      with Pfx("%r", spec):
+        if isinstance(spec, str):
+          # help text or invlaid message
+          if help_text is None:
+            help_text = spec
+            continue
+          if unvalidated_message is None:
+            unvalidated_message = spec
+            continue
+        elif callable(spec):
+          # parser/factory or validator
+          if parse is None:
+            parse = spec
+            continue
+          if validate is None:
+            validate = spec
+            continue
+        raise TypeError(
+            "unexpected argument, expected help_text or parse,"
+            " then optional validate and optional invalid message,"
+            " received %s" % (r(spec),)
+        )
+    if help_text is None:
+      help_text = (
+          "string value" if parse is None else "value for %s" % (parse,)
+      )
+    if parse is None:
+      # pass option value through unchanged
+      parse = lambda val: val  # pylint: disable=unnecessary-lambda-assignment
+    if unvalidated_message is None:
+      unvalidated_message = cls.UNVALIDATED_MESSAGE_DEFAULT
+    return cls(
+        help_text=help_text,
+        parse=parse,
+        validate=validate,
+        unvalidated_message=unvalidated_message,
+    )
+
 def extract_usage_from_doc(doc: str | None,
                            usage_marker="Usage:") -> Tuple[str, str]:
   ''' Extract a `"Usage:"`paragraph from a docstring
@@ -371,6 +462,7 @@ class BaseCommandOptions(HasThreadState):
   runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
   verbose: bool = False
+  opt_spec_class = OptionSpec
 
   perthread_state = ThreadState()
 
@@ -614,6 +706,7 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = 'shell'
+
   Options = BaseCommandOptions
 
   def __init_subclass__(cls, **super_kw):
@@ -952,82 +1045,10 @@ class BaseCommand:
     self.options.popopts(argv)
     return argv
 
-  class _OptSpec(
-      namedtuple('_OptSpec',
-                 'help_text, parse, validate, unvalidated_message'),
-      Promotable,
-  ):
-    ''' A class to support parsing an option value.
-    '''
-
-    @classmethod
-    def promote(cls, obj):
-      ''' Construct an `_OptSpec` from a list of positional parameters
-          as for `poparg()`.
-      '''
-      if isinstance(obj, cls):
-        return obj
-      if isinstance(obj, str):
-        # the help text
-        specs = (obj,)
-      elif callable(obj):
-        # the factory
-        specs = (obj,)
-      else:
-        # some iterable
-        specs = obj
-      parse = None
-      help_text = None
-      validate = None
-      unvalidated_message = None
-      for spec in specs:
-        with Pfx("%r", spec):
-          if help_text is None and isinstance(spec, str):
-            help_text = spec
-          elif unvalidated_message is None and isinstance(spec, str):
-            unvalidated_message = spec
-          elif parse is None and callable(spec):
-            parse = spec
-          elif validate is None and callable(spec):
-            validate = spec
-          else:
-            raise TypeError(
-                "unexpected argument, expected help_text or parse,"
-                " then optional validate and optional invalid message,"
-                " received %s" % (r(spec),)
-            )
-      if help_text is None:
-        help_text = (
-            "string value" if parse is None else "value for %s" % (parse,)
-        )
-      if parse is None:
-        # pass option value through unchanged
-        parse = lambda val: val  # pylint: disable=unnecessary-lambda-assignment
-      if unvalidated_message is None:
-        unvalidated_message = "invalid value"
-      return cls(
-          help_text=help_text,
-          parse=parse,
-          validate=validate,
-          unvalidated_message=unvalidated_message,
-      )
-
-    def parse_value(self, value):
-      ''' Parse `value` according to the spec.
-          Raises a `GetoptError` for invalid values.
-      '''
-      try:
-        with Pfx("%s %r", self.help_text, value):
-          value = pfx_call(self.parse, value)
-          if self.validate is not None:
-            if not pfx_call(self.validate, value):
-              raise ValueError(self.unvalidated_message)
-      except ValueError as e:
-        raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
-      return value
-
   @classmethod
-  def poparg(cls, argv: List[str], *a, unpop_on_error=False):
+  def poparg(
+      cls, argv: List[str], *a, unpop_on_error=False, opt_spec_class=None
+  ):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
         Raises `getopt.GetoptError` on a missing or invalid argument.
@@ -1098,7 +1119,9 @@ class BaseCommand:
             >>> argv  # zz was pushed back
             ['zz']
     '''
-    opt_spec = cls._OptSpec.promote(a)
+    if opt_spec_class is None:
+      opt_spec_class = OptionSpec
+    opt_spec = opt_spec_class.promote(a)
     with Pfx(opt_spec.help_text):
       if not argv:
         raise GetoptError("missing argument")
@@ -1233,7 +1256,7 @@ class BaseCommand:
           # list or tuple: copyt to a list
           specs = list(opt_spec)
         else:
-          # promote scaler to single element list
+          # promote scalar to single element list
           specs = [opt_spec]
         if specs:
           # see if the leading spec is an option citation
@@ -1247,7 +1270,7 @@ class BaseCommand:
         if not specs or not isinstance(specs[0], str):
           specs.insert(0, default_help_text)
         if needs_arg:
-          opt_spec = cls._OptSpec.promote(specs)
+          opt_spec = cls.OptionSpec.promote(specs)
           opt_spec_map[opt] = opt_spec
         opt_name_map[opt] = opt_name
     opts, post_argv = getopt(argv, shortopts, longopts)
